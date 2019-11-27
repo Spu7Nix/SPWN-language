@@ -1,0 +1,11 @@
+[package]
+name = "spwn-lang"
+version = "0.1.0"
+authors = ["Spu7Nix <spu7nix@outlook.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pest = "2.0"
+pest_derive = "2.0"

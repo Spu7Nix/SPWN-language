@@ -1,0 +1,35 @@
+//comment
+
+/*
+multiline comment
+*/
+
+//defining a variable
+let a = 10g //1g means group 10
+let b = 10c //color 10
+let c = 10b //block id 10
+let d = 10i //item id 10
+
+//defining a function 
+let do_something = { /* something */ }
+
+//calling a function
+do_something!
+//native functions like move triggers will be added soon
+
+//event
+on event -> {}
+
+//use examples (will have arguments in the future)
+
+on start -> {}
+on collision -> {}
+on count -> {}
+
+/*
+TODO:
+-abstraction
+-native functions
+-native events
+-actually compiling lol
+*/

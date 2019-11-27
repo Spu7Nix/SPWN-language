@@ -1,0 +1,36 @@
+
+
+COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!"\n" ~ ANY)* ~ "\n")}
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+
+stmt  = _{
+    def | event | call
+}
+
+def = {"let" ~ symbol ~ "=" ~ (value)}
+event = {"on" ~ symbol ~ "->" ~ cmp_stmt}
+call = {value ~ ("." ~ symbol)* ~ "!"}
+
+cmp_stmt = {
+    "{" ~ stmt* ~ "}"
+}
+
+value = {id | number | cmp_stmt | symbol}
+
+number = @{
+    "-"?
+    ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
+    ~ ("." ~ ASCII_DIGIT*)?
+    ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
+}
+
+id = {
+    number ~ className
+}
+
+className = {"g" | "b" | "c" | "i"}
+
+symbol = ${ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")*}
+
+spwn = { SOI ~ (stmt)+ ~ EOI }
+
