@@ -1,10 +1,11 @@
+//! Abstract Syntax Tree (AST) type definitions
+
 #[derive(Debug)]
 pub enum Statement {
     Definition(Definition),
     Event(Event),
     Call(Call),
-    EOI
-    
+    EOI,
 }
 
 #[derive(Debug)]
@@ -12,8 +13,7 @@ pub enum Value {
     ID(ID),
     Number(f64),
     CmpStmt(CompoundStatement),
-    Symbol(String)
-    
+    Symbol(String),
 }
 
 #[derive(Debug)]
@@ -32,18 +32,18 @@ pub struct Event {
 #[derive(Debug)]
 pub struct Call {
     pub value: Value,
-    pub symbols: Vec<String>
+    pub symbols: Vec<String>,
 }
 
 #[derive(Debug)]
 pub struct CompoundStatement {
-    pub statements: Vec<Statement>
+    pub statements: Vec<Statement>,
 }
 
 #[derive(Debug)]
 pub struct ID {
     pub number: u16,
-    pub class_name: String
+    pub class_name: String,
 }
 
 #[derive(Debug)]
