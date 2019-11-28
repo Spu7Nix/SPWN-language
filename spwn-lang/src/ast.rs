@@ -9,18 +9,18 @@ pub enum Statement {
 }
 
 #[derive(Debug)]
-pub enum Value {
+pub enum ValueLiteral {
     ID(ID),
     Number(f64),
     CmpStmt(CompoundStatement),
-    Symbol(String),
+    Symbol(String)
 }
+
 
 #[derive(Debug)]
 pub struct Definition {
-    //#[pest_ast(outer(with(span_into_str), with(str::parse), with(Definition::unwrap)))]
     pub symbol: String,
-    pub value: Value,
+    pub value: Variable,
 }
 
 #[derive(Debug)]
@@ -31,8 +31,13 @@ pub struct Event {
 
 #[derive(Debug)]
 pub struct Call {
-    pub value: Value,
-    pub symbols: Vec<String>,
+    pub function: Variable
+}
+
+#[derive(Debug)]
+pub struct Variable {
+    pub value: ValueLiteral,
+    pub symbols: Vec<String>
 }
 
 #[derive(Debug)]

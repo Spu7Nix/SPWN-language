@@ -7,15 +7,21 @@ stmt  = _{
     def | event | call
 }
 
-def = {"let" ~ symbol ~ "=" ~ (value)}
+def = {"let" ~ symbol ~ "=" ~ (variable)}
 event = {"on" ~ symbol ~ "->" ~ cmp_stmt}
-call = {value ~ ("." ~ symbol)* ~ "!"}
+call = {variable ~ "!"}
 
 cmp_stmt = {
     "{" ~ stmt* ~ "}"
 }
 
-value = {id | number | cmp_stmt | symbol}
+value_literal = {id | number | cmp_stmt | symbol}
+
+variable = {(value_literal) ~ ("." ~ symbol)*}
+
+arguments = {
+    "(" ~ (variable ~ ",")* ~ variable? ~ ")"
+}
 
 number = @{
     "-"?
