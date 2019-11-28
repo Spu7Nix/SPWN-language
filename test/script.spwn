@@ -26,9 +26,25 @@ on start -> {}
 on collision -> {}
 on count -> {}
 
+//abstraction example
+
+let player = {
+    let group = 4g
+    let color = 4c
+
+    let moveUp = {
+        //...
+    }
+
+}
+
+player.moveUp!
+
+let a = player.group
+let b = player.color
+
 /*
 TODO:
--abstraction
 -native functions
 -native events
 -actually compiling lol
