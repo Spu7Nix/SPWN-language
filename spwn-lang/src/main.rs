@@ -16,7 +16,7 @@ fn main() {
         .expect("unsuccessful parse").next().unwrap(); // get and unwrap the `spwn` rule; never fails
 
         
-    //println!("{:?}\n\n", parse_tree.clone().into_inner());
+    println!("{:?}\n\n", parse_tree.clone().into_inner());
 
     let statements = parse_statements(&mut parse_tree.into_inner());
 
@@ -38,13 +38,24 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
                     value:  parse_variable(inner.next().unwrap())
                 })
             },
-            Rule::event => ast::Statement::Event(ast::Event {
-                symbol:   statement.clone().into_inner().next().unwrap().as_span().as_str().to_string(),
-                cmp_stmt: ast::CompoundStatement {
-                    statements: parse_statements(&mut statement.into_inner().nth(1).unwrap().into_inner())
-                }
-            }),
+            Rule::event => {
+                let mut info = statement.into_inner();
+                ast::Statement::Event(ast::Event {
+                    symbol:   info.next().unwrap().as_span().as_str().to_string(),
+                    args:   info.next().unwrap().into_inner().map(|arg| parse_variable(arg)).collect(),
+                    cmp_stmt: ast::CompoundStatement {
+                        statements: parse_statements(&mut info.next().unwrap().into_inner())
+                    }
+                })
+            },
             Rule::call => ast::Statement::Call(ast::Call {function: parse_variable(statement.into_inner().next().unwrap())}),
+            Rule::native => {
+                let mut info = statement.into_inner();
+                ast::Statement::Native(ast::Native {
+                    function:   parse_variable(info.next().unwrap()),
+                    args:   info.next().unwrap().into_inner().map(|arg| parse_variable(arg)).collect()
+                })
+            },
             Rule::EOI => ast::Statement::EOI,
             _ => {
                 println!("{:?} is not added to parse_statements yet", statement.as_rule());
@@ -63,11 +74,28 @@ fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
     
     fn parse_value(pair: Pair<Rule>) -> ast::ValueLiteral {
         match pair.as_rule() {
-            Rule::id => ast::ValueLiteral::ID(ast::ID {
-                number: pair.clone().into_inner().next().unwrap().as_span().as_str().parse().unwrap(),
-                class_name: pair.into_inner().nth(1).unwrap().as_span().as_str().to_string()
-            }),
-            Rule::number => ast::ValueLiteral::Number(pair.as_span().as_str().parse().unwrap()),
+            Rule::id => {
+                let number: u16;
+                let mut scope = pair.into_inner();
+                let mut unspecified = false;
+                let first_value = scope.next().unwrap();
+                let class_name: String;
+
+                if first_value.as_rule() == Rule::number {
+                    number = first_value.as_span().as_str().parse().unwrap();
+                    class_name = scope.next().unwrap().as_span().as_str().to_string();
+                } else {
+                    unspecified = true;
+                    number = 0;
+                    class_name = first_value.as_span().as_str().to_string();
+                }
+
+                ast::ValueLiteral::ID(ast::ID {number, unspecified, class_name })
+            },
+            Rule::number => ast::ValueLiteral::Number(pair.as_span().as_str().parse().expect("invalid number")),
+
+            Rule::bool => ast::ValueLiteral::Bool(pair.as_span().as_str() == "true"),
+
             Rule::cmp_stmt => ast::ValueLiteral::CmpStmt(ast::CompoundStatement {
                 statements: parse_statements(&mut pair.into_inner())
             }),

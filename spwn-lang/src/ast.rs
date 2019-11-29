@@ -5,7 +5,8 @@ pub enum Statement {
     Definition(Definition),
     Event(Event),
     Call(Call),
-    EOI,
+    Native(Native),
+    EOI
 }
 
 #[derive(Debug)]
@@ -13,7 +14,8 @@ pub enum ValueLiteral {
     ID(ID),
     Number(f64),
     CmpStmt(CompoundStatement),
-    Symbol(String)
+    Symbol(String),
+    Bool(bool)
 }
 
 
@@ -26,12 +28,19 @@ pub struct Definition {
 #[derive(Debug)]
 pub struct Event {
     pub symbol: String,
+    pub args: Vec<Variable>,
     pub cmp_stmt: CompoundStatement,
 }
 
 #[derive(Debug)]
 pub struct Call {
     pub function: Variable
+}
+
+#[derive(Debug)]
+pub struct Native {
+    pub function: Variable,
+    pub args: Vec<Variable>
 }
 
 #[derive(Debug)]
@@ -48,6 +57,7 @@ pub struct CompoundStatement {
 #[derive(Debug)]
 pub struct ID {
     pub number: u16,
+    pub unspecified: bool,
     pub class_name: String,
 }
 

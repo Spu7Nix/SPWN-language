@@ -4,18 +4,19 @@ COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!"\n" ~ ANY)* ~ "\n")}
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 
 stmt  = _{
-    def | event | call
+    def | event | call | native
 }
 
 def = {"let" ~ symbol ~ "=" ~ (variable)}
-event = {"on" ~ symbol ~ "->" ~ cmp_stmt}
+event = {"on" ~ symbol ~ arguments ~ "->" ~ cmp_stmt}
 call = {variable ~ "!"}
+native = {variable ~ arguments}
 
 cmp_stmt = {
     "{" ~ stmt* ~ "}"
 }
 
-value_literal = {id | number | cmp_stmt | symbol}
+value_literal = {id | number | cmp_stmt | bool | symbol}
 
 variable = {(value_literal) ~ ("." ~ symbol)*}
 
@@ -30,8 +31,10 @@ number = @{
     ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
 
+bool = {"true" | "false"}
+
 id = {
-    number ~ className
+    (number | "?") ~ className
 }
 
 className = {"g" | "b" | "c" | "i"}
