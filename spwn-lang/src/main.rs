@@ -1,8 +1,13 @@
 mod ast;
+mod compiler;
+mod native;
+mod levelstring;
 
 use std::{env, fs};
 use pest::{Parser, iterators::Pair};
 use pest_derive::Parser;
+
+//use std::collections::HashMap;
 
 #[derive(Parser)]
 #[grammar = "spwn.pest"]
@@ -15,14 +20,24 @@ fn main() {
     let parse_tree = SPWNParser::parse(Rule::spwn, &unparsed)
         .expect("unsuccessful parse").next().unwrap(); // get and unwrap the `spwn` rule; never fails
 
-        
-    println!("{:?}\n\n", parse_tree.clone().into_inner());
+    //println!("{:?}\n\n", parse_tree.clone().into_inner());
 
     let statements = parse_statements(&mut parse_tree.into_inner());
 
-    for s in statements.iter() {
-        println!("{:?}\n\n", s);
+    for statement in statements.iter() {
+        println!("{:?}\n\n", statement);
     }
+
+    let compiled = compiler::Compile(statements);
+
+    let mut level_string = String::new();
+
+    for trigger in compiled {
+        level_string += &levelstring::serialize_trigger(trigger);
+    }
+
+    println!("{:?}", level_string);
+
 }
 
 fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::Statement>{

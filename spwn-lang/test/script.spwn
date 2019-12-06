@@ -1,0 +1,7 @@
+let player = {
+    let block = 10b
+}
+
+on Collide(player.block, 100b) -> {}
+
+

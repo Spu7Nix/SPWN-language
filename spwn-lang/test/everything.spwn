@@ -25,7 +25,7 @@ let player = {
     let jump = {
         monsterGroup.move(0, 30, 0.5, EASE_OUT)
         delay(0.5)
-        monsterGroup.move(0, --30, 0.5, EASE_IN)
+        monsterGroup.move(0, -30, 0.5, EASE_IN)
     }
 }
 
@@ -42,4 +42,3 @@ on collision(player.collision, floor) -> {
     player.jump.stop()
 }
 
-//and more soon
