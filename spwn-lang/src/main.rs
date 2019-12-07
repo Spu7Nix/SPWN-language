@@ -28,7 +28,7 @@ fn main() {
         println!("{:?}\n\n", statement);
     }
 
-    let compiled = compiler::Compile(statements);
+    let compiled = compiler::compile_spwn(statements);
 
     let mut level_string = String::new();
 
@@ -58,9 +58,7 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
                 ast::Statement::Event(ast::Event {
                     symbol:   info.next().unwrap().as_span().as_str().to_string(),
                     args:   info.next().unwrap().into_inner().map(|arg| parse_variable(arg)).collect(),
-                    cmp_stmt: ast::CompoundStatement {
-                        statements: parse_statements(&mut info.next().unwrap().into_inner())
-                    }
+                    func: parse_variable(info.next().unwrap())
                 })
             },
             Rule::call => ast::Statement::Call(ast::Call {function: parse_variable(statement.into_inner().next().unwrap())}),

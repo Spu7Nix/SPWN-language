@@ -8,7 +8,7 @@ stmt  = _{
 }
 
 def = {"let" ~ symbol ~ "=" ~ (variable)}
-event = {"on" ~ symbol ~ arguments ~ "->" ~ cmp_stmt}
+event = {"on" ~ symbol ~ arguments ~ "->" ~ variable}
 call = {variable ~ "!"}
 native = {variable ~ arguments}
 

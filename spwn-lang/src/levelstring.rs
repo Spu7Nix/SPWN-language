@@ -1,29 +1,27 @@
 // useful things for dealing with gd level data
 use crate::native::*;
-
 use crate::compiler::*;
 
-use std::collections::HashMap;
 
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct GDTrigger {
-    pub objID: u16,
+    pub obj_id: u16,
     pub groups: Vec<Group>,
     pub target: Group,
-    pub spawnTriggered: bool,
+    pub spawn_triggered: bool,
     pub x: u32,
     pub y: u16,
     pub params: Vec<(u16, String)>
 }
 
 impl GDTrigger {
-    fn context_parameters(&mut self, context: Context) {
-        self.x = context.x;
+    pub fn context_parameters(&mut self, context: Context) -> GDTrigger{
         for g in context.added_groups.iter(){
             self.groups.push(*g);
         }
-        self.spawnTriggered = context.spawn_triggered;
-        
+        self.spawn_triggered = context.spawn_triggered;
+        (*self).clone()
     }
 }
 
@@ -39,9 +37,9 @@ pub fn serialize_trigger(trigger: GDTrigger) -> String {
 
     let mut obj_string = format!("1,{},2,{},3,{},51,{}",
 
-    trigger.objID, trigger.x, trigger.y, trigger.target.id);
+    trigger.obj_id, trigger.x, trigger.y, trigger.target.id);
 
-    if trigger.spawnTriggered {
+    if trigger.spawn_triggered {
         obj_string += ",62,1,87,1";
     }
 

@@ -12,7 +12,7 @@ pub struct Group {
 }
 
 impl Group {
-    pub fn native(&self, name:  &String, arguments: Vec<Value>, context: Context, globals: &mut Globals) -> Context {
+    pub fn native(&self, name:  &String, arguments: Vec<Value>, context: Context, globals: &mut Globals, start_group: Group) -> Context {
         match name.as_str() {
 
             
@@ -28,15 +28,16 @@ impl Group {
                 }
                 
                 let trigger = GDTrigger {
-                    objID: 901,
+                    obj_id: 901,
                     target: *self,
+                    groups: vec![start_group],
                     params: vec![(28, (args[0] * 3.0).to_string()),
                                  (29, (args[1] * 3.0).to_string()), 
                                  (10, args[2].to_string()), 
                                  (30, args[3].to_string()), 
                                  (85, args[4].to_string())],
                     ..context_trigger(context.clone())
-                };
+                }.context_parameters(context.clone());
 
                 (*globals).obj_list.push(trigger);
                 context
@@ -83,10 +84,10 @@ impl Item {
 
 pub fn context_trigger (context: Context) -> GDTrigger {
     GDTrigger {
-        objID: 0,
+        obj_id: 0,
         groups: context.added_groups,
         target: Group {id: 0},
-        spawnTriggered: context.spawn_triggered,
+        spawn_triggered: context.spawn_triggered,
         params: Vec::new(),
         x: context.x,
         y: context.y
@@ -127,43 +128,33 @@ pub fn member(value: Value, member: String) -> Value {
     }
 }
 
-pub fn event(name: &String, args: Vec<Value>, context: Context, globals: &mut Globals) -> (Context, Group){
+pub fn event(name: &String, args: Vec<Value>, context: Context, globals: &mut Globals, start_group: Group, activate_group: Group){
     match name.as_ref() {
         "Collide" => {
-            let block_A_ID = match args[0] {
-                Value::Block(Block) => Block,
+            let block_a_id = match args[0] {
+                Value::Block(b) => b,
                 _ => panic!("Expected block, got {:?}", args[0])
             };
 
-            let block_B_ID = match args[1] {
-                Value::Block(Block) => Block,
+            let block_b_id = match args[1] {
+                Value::Block(b) => b,
                 _ => panic!("Expected block")
             };
 
-            let mut ag = context.added_groups;
+            
 
-            let group = Group {id: nextFree(&mut globals.closed_groups)};
+            let group = activate_group;
             let trigger = GDTrigger {
-                objID: 1815,
-                groups: ag.clone(),
+                obj_id: 1815,
+                groups: vec![start_group],
                 target: group,
-                spawnTriggered: context.spawn_triggered,
-                params: vec![(80, block_A_ID.id.to_string()), (95, block_B_ID.id.to_string()), (56, "1".to_string())],
-                x: context.x,
-                y: 0
-            };
+                params: vec![(80, block_a_id.id.to_string()), (95, block_b_id.id.to_string()), (56, "1".to_string())],
+                ..context_trigger(context.clone())
+            }.context_parameters(context.clone());
 
-            ag.push(group);
+            
             
             (*globals).obj_list.push(trigger);
-
-            (Context {
-                spawn_triggered: true,
-                added_groups: ag,
-                ..context
-            }, group)
-
-
         },
         _ => {
             panic!("This event does not exist!")
@@ -171,11 +162,11 @@ pub fn event(name: &String, args: Vec<Value>, context: Context, globals: &mut Gl
     }
 }
 
-pub fn nativeFunc (mut function: ast::Native, context: Context, globals: &mut Globals) -> Context {
+pub fn native_func (function: ast::Native, context: Context, globals: &mut Globals, start_group: Group) -> Context {
     let mut var = function.function;
     let args = function.args.iter().map(|x| x.to_value(&context, globals)).collect();
 
-    let funcName = var.symbols[var.symbols.len() - 1].clone();
+    let func_name = var.symbols[var.symbols.len() - 1].clone();
     let mut value = Value::Null;
     
     if var.symbols.len() > 0 {
@@ -184,7 +175,7 @@ pub fn nativeFunc (mut function: ast::Native, context: Context, globals: &mut Gl
     }
 
     match value {
-        Value::Group(group) => group.native(&funcName, args, context, globals),
+        Value::Group(group) => group.native(&func_name, args, context, globals, start_group),
         /*Value::Color(color) => {
 
         },

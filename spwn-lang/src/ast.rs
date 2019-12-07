@@ -31,7 +31,7 @@ pub struct Definition {
 pub struct Event {
     pub symbol: String,
     pub args: Vec<Variable>,
-    pub cmp_stmt: CompoundStatement,
+    pub func: Variable,
 }
 
 #[derive(Clone)]
