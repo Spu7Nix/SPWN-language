@@ -1,7 +1,11 @@
+
 let player = {
-    let block = 10b
+    let group = ?g
+    let block = ?b
 }
 
-on Collide(player.block, 100b) -> {}
+on Collide(player.block, 100b) -> {
+    player.group.move(100, 50, 1.2, 1, 4)
+}
 
 

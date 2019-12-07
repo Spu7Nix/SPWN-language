@@ -1,5 +1,6 @@
 //! Abstract Syntax Tree (AST) type definitions
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub enum Statement {
     Definition(Definition),
@@ -8,7 +9,7 @@ pub enum Statement {
     Native(Native),
     EOI
 }
-
+#[derive(Clone)]
 #[derive(Debug)]
 pub enum ValueLiteral {
     ID(ID),
@@ -18,13 +19,14 @@ pub enum ValueLiteral {
     Bool(bool)
 }
 
-
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct Definition {
     pub symbol: String,
     pub value: Variable,
 }
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct Event {
     pub symbol: String,
@@ -32,28 +34,32 @@ pub struct Event {
     pub cmp_stmt: CompoundStatement,
 }
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct Call {
     pub function: Variable
 }
-
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct Native {
     pub function: Variable,
     pub args: Vec<Variable>
 }
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct Variable {
     pub value: ValueLiteral,
     pub symbols: Vec<String>
 }
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct CompoundStatement {
     pub statements: Vec<Statement>,
 }
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub struct ID {
     pub number: u16,

@@ -37,9 +37,13 @@ pub fn serialize_trigger(trigger: GDTrigger) -> String {
         string
     }
 
-    let mut obj_string = format!("1,{},2,{},3,{},51,{},62,{}",
+    let mut obj_string = format!("1,{},2,{},3,{},51,{}",
 
-    trigger.objID, trigger.x, trigger.y, trigger.target.id, trigger.spawnTriggered as u8);
+    trigger.objID, trigger.x, trigger.y, trigger.target.id);
+
+    if trigger.spawnTriggered {
+        obj_string += ",62,1,87,1";
+    }
 
     if !trigger.groups.is_empty() {
         obj_string += &(String::from(",57,") + &group_string(trigger.groups));

@@ -8,11 +8,12 @@ use std::collections::HashMap;
 #[derive(Clone)]
 pub struct Context {
     pub x: u32,
+    pub y: u16,
     pub added_groups: Vec<Group>,
     pub spawn_triggered: bool,
     pub variables: HashMap<String, Value>
 }
-
+#[derive(Debug)]
 #[derive(Clone)]
 pub struct Scope {
     pub group: Group,
@@ -20,6 +21,7 @@ pub struct Scope {
 }
 
 #[derive(Clone)]
+#[derive(Debug)]
 pub enum Value {
     Group (Group),
     Color (Color),
@@ -27,7 +29,8 @@ pub enum Value {
     Item  (Item),
     Number(f64),
     Bool  (bool),
-    Scope (Scope)
+    Scope (Scope),
+    Null
 }
 
 
@@ -50,6 +53,7 @@ pub fn Compile (statements: Vec<ast::Statement>) -> Vec<GDTrigger> {
     //context at the start of the program
     let start_context = Context {
         x : 0,
+        y : 0,
         added_groups : Vec::new(),
         spawn_triggered : false,
         variables : HashMap::new()
@@ -88,7 +92,7 @@ pub fn compile_scope (statements: &Vec<ast::Statement>, mut context: Context, st
             ast::Statement::Event(e) => {
                 let pair = event(&e.symbol, e.args.iter().map(|x| x.to_value(&context, globals)).collect(), context.clone(), globals);
 
-                let scope = compile_scope(&e.cmp_stmt.statements, pair.0, pair.1, globals);
+                compile_scope(&e.cmp_stmt.statements, pair.0, pair.1, globals);
             },
 
             ast::Statement::Call(call) => {
@@ -96,8 +100,8 @@ pub fn compile_scope (statements: &Vec<ast::Statement>, mut context: Context, st
                 
             },
 
-            ast::Statement::Native(func) => {
-
+            ast::Statement::Native(call) => {
+                nativeFunc(call.clone(), context.clone(), globals);
             },
 
             ast::Statement::EOI => {
@@ -118,10 +122,34 @@ impl ast::Variable {
         let baseValue = match &self.value {
             ast::ValueLiteral::ID(ID) => {
                 match ID.class_name.as_ref() {
-                    "g" => Value::Group(Group {id: ID.number}),
-                    "c" => Value::Color(Color {id: ID.number}),
-                    "b" => Value::Block(Block {id: ID.number}),
-                    "i" => Value::Item (Item  {id: ID.number}),
+                    "g" => {
+                        if ID.unspecified{
+                            Value::Group( Group {id: nextFree(&mut globals.closed_groups) })
+                        } else {
+                            Value::Group(Group {id: ID.number})
+                        }
+                    },
+                    "c" => {
+                        if ID.unspecified{
+                            Value::Color( Color {id: nextFree(&mut globals.closed_colors) })
+                        } else {
+                            Value::Color(Color {id: ID.number})
+                        }
+                    },
+                    "b" => {
+                        if ID.unspecified{
+                            Value::Block( Block {id: nextFree(&mut globals.closed_blocks) })
+                        } else {
+                            Value::Block(Block {id: ID.number})
+                        }
+                    },
+                    "i" => {
+                        if ID.unspecified{
+                            Value::Item( Item {id: nextFree(&mut globals.closed_items) })
+                        } else {
+                            Value::Item (Item  {id: ID.number})
+                        }
+                    },
                     _ => unreachable!()
                 }
             },
