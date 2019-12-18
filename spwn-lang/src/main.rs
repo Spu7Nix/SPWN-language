@@ -1,11 +1,12 @@
 mod ast;
 mod compiler;
-mod native;
 mod levelstring;
+mod native;
 
-use std::{env, fs};
-use pest::{Parser, iterators::Pair};
+use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
+use std::path::PathBuf;
+use std::{env, fs};
 
 //use std::collections::HashMap;
 
@@ -13,65 +14,113 @@ use pest_derive::Parser;
 #[grammar = "spwn.pest"]
 pub struct SPWNParser;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let unparsed = fs::read_to_string(&args[1]).expect("Something went wrong reading the file");
+pub fn parse_spwn(path: &PathBuf) -> Vec<ast::Statement> {
+    let unparsed = fs::read_to_string(path).expect("Something went wrong reading the file");
 
     let parse_tree = SPWNParser::parse(Rule::spwn, &unparsed)
-        .expect("unsuccessful parse").next().unwrap(); // get and unwrap the `spwn` rule; never fails
+        .expect("unsuccessful parse")
+        .next()
+        .unwrap(); // get and unwrap the `spwn` rule; never fails
 
-    //println!("{:?}\n\n", parse_tree.clone().into_inner());
+    parse_statements(&mut parse_tree.into_inner())
+}
 
-    let statements = parse_statements(&mut parse_tree.into_inner());
-
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let script_path = PathBuf::from(&args[1]);
+    let statements = parse_spwn(&script_path);
     for statement in statements.iter() {
         println!("{:?}\n\n", statement);
     }
 
-    let compiled = compiler::compile_spwn(statements);
-
+    let compiled = compiler::compile_spwn(statements, script_path);
     let mut level_string = String::new();
 
-    for trigger in compiled {
+    for trigger in compiled.obj_list {
         level_string += &levelstring::serialize_trigger(trigger);
     }
+    println!("Using {} groups", compiled.closed_groups.len());
 
     println!("{:?}", level_string);
-
 }
 
-fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::Statement>{
+fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::Statement> {
     let mut stmts: Vec<ast::Statement> = vec![];
 
     for statement in statements {
-        
         stmts.push(match statement.as_rule() {
             Rule::def => {
                 let mut inner = statement.into_inner();
                 ast::Statement::Definition(ast::Definition {
                     symbol: inner.next().unwrap().as_span().as_str().to_string(),
-                    value:  parse_variable(inner.next().unwrap())
+                    value: parse_expr(inner.next().unwrap()),
                 })
-            },
+            }
             Rule::event => {
                 let mut info = statement.into_inner();
                 ast::Statement::Event(ast::Event {
-                    symbol:   info.next().unwrap().as_span().as_str().to_string(),
-                    args:   info.next().unwrap().into_inner().map(|arg| parse_variable(arg)).collect(),
-                    func: parse_variable(info.next().unwrap())
+                    symbol: info.next().unwrap().as_span().as_str().to_string(),
+                    args: info
+                        .next()
+                        .unwrap()
+                        .into_inner()
+                        .map(|arg| parse_expr(arg))
+                        .collect(),
+                    func: parse_variable(info.next().unwrap()),
                 })
-            },
-            Rule::call => ast::Statement::Call(ast::Call {function: parse_variable(statement.into_inner().next().unwrap())}),
+            }
+            Rule::call => ast::Statement::Call(ast::Call {
+                function: parse_variable(statement.into_inner().next().unwrap()),
+            }),
             Rule::native => {
                 let mut info = statement.into_inner();
                 ast::Statement::Native(ast::Native {
-                    function:   parse_variable(info.next().unwrap()),
-                    args:   info.next().unwrap().into_inner().map(|arg| parse_variable(arg)).collect()
+                    function: parse_variable(info.next().unwrap()),
+                    args: info
+                        .next()
+                        .unwrap()
+                        .into_inner()
+                        .map(|arg| parse_expr(arg))
+                        .collect(),
                 })
-            },
+            }
+            Rule::macro_def => {
+                let mut inner = statement.into_inner();
+                ast::Statement::Macro(ast::Macro {
+                    name: inner.next().unwrap().as_span().as_str().to_string(),
+                    args: inner
+                        .next()
+                        .unwrap()
+                        .into_inner()
+                        .map(|arg| arg.as_span().as_str().to_string())
+                        .collect(),
+                    body: ast::CompoundStatement {
+                        statements: parse_statements(&mut inner.next().unwrap().into_inner()),
+                    },
+                })
+            }
+
+            /*Rule::module => {
+                let mut inner = statement.into_inner();
+                ast::Statement::Macro(ast::Macro {
+                    name: inner.next().unwrap().as_span().as_str().to_string(),
+                    args: inner
+                        .next()
+                        .unwrap()
+                        .into_inner()
+                        .map(|arg| arg.as_span().as_str().to_string())
+                        .collect(),
+                    body: ast::CompoundStatement {
+                        statements: parse_statements(&mut inner.next().unwrap().into_inner()),
+                    },
+                })
+            }*/
             Rule::EOI => ast::Statement::EOI,
             _ => {
-                println!("{:?} is not added to parse_statements yet", statement.as_rule());
+                println!(
+                    "{:?} is not added to parse_statements yet",
+                    statement.as_rule()
+                );
                 ast::Statement::EOI
             }
         })
@@ -80,11 +129,11 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
 }
 
 fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
-    
     let mut call_list = pair.into_inner();
-    let value = parse_value(call_list.next().unwrap().into_inner().next().unwrap());
-    let symbols: Vec<String> = call_list.map(|x| x.as_span().as_str().to_string()).collect();
-    
+    let value = parse_value(call_list.next().unwrap());
+    let symbols: Vec<String> = call_list
+        .map(|x| x.as_span().as_str().to_string())
+        .collect();
     fn parse_value(pair: Pair<Rule>) -> ast::ValueLiteral {
         match pair.as_rule() {
             Rule::id => {
@@ -103,17 +152,36 @@ fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
                     class_name = first_value.as_span().as_str().to_string();
                 }
 
-                ast::ValueLiteral::ID(ast::ID {number, unspecified, class_name })
-            },
-            Rule::number => ast::ValueLiteral::Number(pair.as_span().as_str().parse().expect("invalid number")),
+                ast::ValueLiteral::ID(ast::ID {
+                    number,
+                    unspecified,
+                    class_name,
+                })
+            }
+            Rule::number => {
+                ast::ValueLiteral::Number(pair.as_span().as_str().parse().expect("invalid number"))
+            }
 
             Rule::bool => ast::ValueLiteral::Bool(pair.as_span().as_str() == "true"),
 
             Rule::cmp_stmt => ast::ValueLiteral::CmpStmt(ast::CompoundStatement {
-                statements: parse_statements(&mut pair.into_inner())
+                statements: parse_statements(&mut pair.into_inner()),
             }),
             Rule::value_literal => parse_value(pair.into_inner().next().unwrap()),
+            Rule::variable => parse_value(pair.into_inner().next().unwrap()),
+            Rule::expr => ast::ValueLiteral::Expression(parse_expr(pair)),
             Rule::symbol => ast::ValueLiteral::Symbol(pair.as_span().as_str().to_string()),
+            Rule::string => {
+                ast::ValueLiteral::Str(ast::str_content(pair.as_span().as_str().to_string()))
+            }
+            Rule::import => ast::ValueLiteral::Import(PathBuf::from(ast::str_content(
+                pair.into_inner()
+                    .next()
+                    .unwrap()
+                    .as_span()
+                    .as_str()
+                    .to_string(),
+            ))),
             _ => {
                 println!("{:?} is not added to parse_values yet", pair.as_rule());
                 ast::ValueLiteral::Number(0.0)
@@ -121,9 +189,19 @@ fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
         }
     }
 
-    ast::Variable{ value, symbols }
+    ast::Variable { value, symbols }
 }
 
+fn parse_expr(pair: Pair<Rule>) -> ast::Expression {
+    let mut values: Vec<ast::Variable> = Vec::new();
+    let mut operators: Vec<String> = Vec::new();
 
+    for item in pair.into_inner() {
+        match item.as_rule() {
+            Rule::operator => operators.push(item.as_span().as_str().to_string()),
+            _ => values.push(parse_variable(item)),
+        }
+    }
 
-
+    ast::Expression { operators, values }
+}

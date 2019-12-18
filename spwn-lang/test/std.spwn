@@ -1,0 +1,4 @@
+
+let exports(group) = {
+    group.move(10, 10, 0.5)
+}

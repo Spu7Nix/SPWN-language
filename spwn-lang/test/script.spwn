@@ -1,28 +1,4 @@
-1g.move(10, 10)
-2g.move(10, 10)
-3g.move(10, 10)
 
-let func1 = {
-    ?g.move(10, 10)
-    ?g.move(10, 10)
-    ?g.move(10, 10)
-}
+let moveThing = import "std.spwn"
 
-func1!
-
-let player = {
-    let group = ?g
-    let block = ?b
-    let jump = {
-        group.move(0, 30, 0.3)
-        group.move(0, -30, 0.3)
-    }
-}
-
-player.jump!
-
-on Collide(player.block, 10b) -> {
-    ?g.move(10, 10)
-    ?g.move(10, 10)
-    ?g.move(10, 10)
-}
+moveThing(100g)

@@ -1,35 +1,43 @@
 
-
 COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!"\n" ~ ANY)* ~ "\n")}
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 
 stmt  = _{
-    def | event | call | native
+    def | event | call | native | macro_def
 }
 
-def = {"let" ~ symbol ~ "=" ~ (variable)}
+def = {"let" ~ symbol ~ "=" ~ (expr)}
 event = {"on" ~ symbol ~ arguments ~ "->" ~ variable}
 call = {variable ~ "!"}
 native = {variable ~ arguments}
+macro_def = {"let" ~ symbol ~ arg_def ~ "=" ~ cmp_stmt}
+
 
 cmp_stmt = {
     "{" ~ stmt* ~ "}"
 }
 
-value_literal = {id | number | cmp_stmt | bool | symbol}
+import = {"import" ~ variable}
 
 variable = {(value_literal) ~ ("." ~ symbol)*}
+value_literal = _{import | id | number | cmp_stmt | bool | symbol | string | "(" ~ expr ~")"}
 
 arguments = {
-    "(" ~ (variable ~ ",")* ~ variable? ~ ")"
+    "(" ~ (expr ~ ",")* ~ expr? ~ ")"
 }
 
-number = @{
-    "-"?
-    ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
-    ~ ("." ~ ASCII_DIGIT*)?
-    ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
+arg_def = {
+    "(" ~ (symbol ~ ",")* ~ symbol? ~ ")"
 }
+
+number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT*)? }
+
+expr = {((variable ~ operator)+ ~ variable) | variable}
+
+operator = {("||" | "&&" | "==" | "!=") | 
+			(">" | "<" | ">=" | "<=") | 
+            ("/" | "*") | 
+            ("+" | "-")} 
 
 bool = {"true" | "false"}
 
@@ -40,6 +48,8 @@ id = {
 className = {"g" | "b" | "c" | "i"}
 
 symbol = ${ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")*}
+
+string = {("\"" ~ (!"\"" ~ ANY)* ~ "\"") | ("'" ~ (!"'" ~ ANY)* ~ "'")}
 
 spwn = { SOI ~ (stmt)+ ~ EOI }
 
