@@ -1,4 +1,6 @@
 
-let moveThing = import "std.spwn"
+let * = import "std.spwn"
+let expr = 1 + 3 * 4
 
-moveThing(100g)
+let expr = 287
+

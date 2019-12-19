@@ -6,7 +6,7 @@ stmt  = _{
     def | event | call | native | macro_def
 }
 
-def = {"let" ~ symbol ~ "=" ~ (expr)}
+def = {"let" ~ (symbol | "*") ~ "=" ~ (expr)}
 event = {"on" ~ symbol ~ arguments ~ "->" ~ variable}
 call = {variable ~ "!"}
 native = {variable ~ arguments}

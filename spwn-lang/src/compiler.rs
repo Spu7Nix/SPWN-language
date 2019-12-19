@@ -189,7 +189,16 @@ pub fn compile_scope(
 
                     _ => def.value.eval(&context.move_down(), globals),
                 };
-                context.variables.insert(String::from(&def.symbol), val);
+                if def.symbol == "*" {
+                    match val {
+                        Value::Scope(s) => {
+                            context.variables.extend(s.members);
+                        }
+                        _ => panic!("Only compound statements can have their values extracted"),
+                    }
+                } else {
+                    context.variables.insert(String::from(&def.symbol), val);
+                }
                 //TODO: Account for dicts
             }
 

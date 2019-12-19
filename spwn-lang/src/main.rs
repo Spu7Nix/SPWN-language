@@ -29,9 +29,9 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let script_path = PathBuf::from(&args[1]);
     let statements = parse_spwn(&script_path);
-    for statement in statements.iter() {
-        println!("{:?}\n\n", statement);
-    }
+    // for statement in statements.iter() {
+    //     println!("{:?}\n\n", statement);
+    // }
 
     let compiled = compiler::compile_spwn(statements, script_path);
     let mut level_string = String::new();
@@ -51,10 +51,21 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
         stmts.push(match statement.as_rule() {
             Rule::def => {
                 let mut inner = statement.into_inner();
-                ast::Statement::Definition(ast::Definition {
-                    symbol: inner.next().unwrap().as_span().as_str().to_string(),
-                    value: parse_expr(inner.next().unwrap()),
-                })
+                let first = inner.next().unwrap();
+                match first.as_rule() {
+                    Rule::expr => ast::Statement::Definition(ast::Definition {
+                        symbol: "*".to_string(),
+                        value: parse_expr(first),
+                    }),
+                    Rule::symbol => {
+                        let value = parse_expr(inner.next().unwrap());
+                        ast::Statement::Definition(ast::Definition {
+                            symbol: first.as_span().as_str().to_string(),
+                            value,
+                        })
+                    }
+                    _ => unreachable!(),
+                }
             }
             Rule::event => {
                 let mut info = statement.into_inner();
@@ -204,4 +215,19 @@ fn parse_expr(pair: Pair<Rule>) -> ast::Expression {
     }
 
     ast::Expression { operators, values }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn decrypt() {
+        let file_content =
+            fs::read_to_string("C:/Users/spu7n/AppData/Local/GeometryDash/CCLocalLevels.dat")
+                .expect("Something went wrong reading the file");
+        println!(
+            "{}",
+            levelstring::get_level_string(file_content.to_string())
+        );
+    }
 }
