@@ -1,6 +1,13 @@
 
-let * = import "std.spwn"
-let expr = 1 + 3 * 4
+let move_thing = {
+    let group = 1g
+    let move = {
+        group.move(100, 0, 5)
+    }
+}
 
-let expr = 287
+on Touch() -> move_thing.move
 
+on TouchEnd() -> {
+    move_thing.move.stop()
+}

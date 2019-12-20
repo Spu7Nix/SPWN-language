@@ -3,7 +3,7 @@ use crate::ast;
 use crate::levelstring::*;
 use crate::native::*;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Context {
@@ -64,7 +64,6 @@ pub struct Globals {
 
 pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
     let mut default_variables: HashMap<String, Value> = HashMap::new();
-
     //add easing types
     for (i, easing) in vec![
         "NONE",
@@ -120,6 +119,38 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
 
         highest_x: 0,
     };
+
+    let file_content =
+        fs::read_to_string("C:/Users/spu7n/AppData/Local/GeometryDash/CCLocalLevels.dat")
+            .expect("Something went wrong reading the file");
+    let level_string = get_level_string(file_content);
+
+    let objects = level_string.split(";");
+
+    for obj in objects {
+        let props: Vec<&str> = obj.split(",").collect();
+        for i in (0..props.len() - 1).step_by(2) {
+            let key = props[i];
+            let value = props[i + 1];
+
+            match key {
+                "57" => {
+                    //GROUPS
+                    let groups = value.split(".");
+                    for g in groups {
+                        let group = Group {
+                            id: g.parse().unwrap(),
+                        };
+                        if !globals.closed_groups.contains(&group.id) {
+                            globals.closed_groups.push(group.id);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    println!("{:?}", globals.closed_groups);
 
     compile_scope(&statements, start_context, Group { id: 0 }, &mut globals);
 
