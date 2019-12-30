@@ -1,5 +1,6 @@
 
 let exports = {
+<<<<<<< HEAD
     let props = {
         :TYPE: 1
         :X: 2
@@ -19,4 +20,9 @@ let exports = {
         }
         wait(duration)
     }
+=======
+    
+
+    
+>>>>>>> 3d2fc3ab4701fd95ce68bf9c78495ff9b9086450
 }
