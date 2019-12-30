@@ -5,6 +5,7 @@ mod native;
 
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
+
 use std::path::PathBuf;
 use std::{env, fs};
 
@@ -91,7 +92,23 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
                         .next()
                         .unwrap()
                         .into_inner()
-                        .map(|arg| parse_expr(arg))
+                        .map(|arg| {
+                            let mut argument = arg.into_inner();
+                            let first = argument.next().unwrap();
+                            match first.as_rule() {
+                                Rule::symbol => ast::Argument {
+                                    symbol: Some(first.as_span().as_str().to_string()),
+                                    value: parse_expr(argument.next().unwrap()),
+                                },
+
+                                Rule::expr => ast::Argument {
+                                    symbol: None,
+                                    value: parse_expr(first),
+                                },
+
+                                _ => unreachable!(),
+                            }
+                        })
                         .collect(),
                 })
             }
@@ -103,29 +120,23 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
                         .next()
                         .unwrap()
                         .into_inner()
-                        .map(|arg| arg.as_span().as_str().to_string())
+                        .map(|arg| {
+                            let mut full = arg.into_inner();
+                            let name = full.next().unwrap().as_span().as_str().to_string();
+                            let default = match full.next() {
+                                Some(value) => Some(parse_expr(value)),
+                                None => None,
+                            };
+
+                            (name, default)
+                        })
                         .collect(),
                     body: ast::CompoundStatement {
                         statements: parse_statements(&mut inner.next().unwrap().into_inner()),
                     },
                 })
             }
-
-            /*Rule::module => {
-                let mut inner = statement.into_inner();
-                ast::Statement::Macro(ast::Macro {
-                    name: inner.next().unwrap().as_span().as_str().to_string(),
-                    args: inner
-                        .next()
-                        .unwrap()
-                        .into_inner()
-                        .map(|arg| arg.as_span().as_str().to_string())
-                        .collect(),
-                    body: ast::CompoundStatement {
-                        statements: parse_statements(&mut inner.next().unwrap().into_inner()),
-                    },
-                })
-            }*/
+            Rule::retrn => ast::Statement::Return,
             Rule::EOI => ast::Statement::EOI,
             _ => {
                 println!(
@@ -139,12 +150,22 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
     stmts
 }
 
+fn parse_path(pair: Pair<Rule>) -> ast::Path {
+    match pair.as_rule() {
+        Rule::symbol => ast::Path::Member(pair.as_span().as_str().to_string()),
+
+        Rule::index => ast::Path::Index(parse_expr(pair.into_inner().next().unwrap())),
+
+        Rule::arguments => ast::Path::Call(pair.into_inner().map(|x| parse_expr(x)).collect()),
+
+        _ => unreachable!(),
+    }
+}
+
 fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
     let mut call_list = pair.into_inner();
     let value = parse_value(call_list.next().unwrap());
-    let symbols: Vec<String> = call_list
-        .map(|x| x.as_span().as_str().to_string())
-        .collect();
+    let path: Vec<ast::Path> = call_list.map(|x| parse_path(x)).collect();
     fn parse_value(pair: Pair<Rule>) -> ast::ValueLiteral {
         match pair.as_rule() {
             Rule::id => {
@@ -175,15 +196,23 @@ fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
 
             Rule::bool => ast::ValueLiteral::Bool(pair.as_span().as_str() == "true"),
 
+            Rule::dictionary => ast::ValueLiteral::Dictionary(ast::Dictionary {
+                members: parse_statements(&mut pair.into_inner()),
+            }),
+
             Rule::cmp_stmt => ast::ValueLiteral::CmpStmt(ast::CompoundStatement {
                 statements: parse_statements(&mut pair.into_inner()),
             }),
+
             Rule::value_literal => parse_value(pair.into_inner().next().unwrap()),
             Rule::variable => parse_value(pair.into_inner().next().unwrap()),
             Rule::expr => ast::ValueLiteral::Expression(parse_expr(pair)),
             Rule::symbol => ast::ValueLiteral::Symbol(pair.as_span().as_str().to_string()),
             Rule::string => {
                 ast::ValueLiteral::Str(ast::str_content(pair.as_span().as_str().to_string()))
+            }
+            Rule::array => {
+                ast::ValueLiteral::Array(pair.into_inner().map(|x| parse_expr(x)).collect())
             }
             Rule::import => ast::ValueLiteral::Import(PathBuf::from(ast::str_content(
                 pair.into_inner()
@@ -200,7 +229,7 @@ fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
         }
     }
 
-    ast::Variable { value, symbols }
+    ast::Variable { value, path }
 }
 
 fn parse_expr(pair: Pair<Rule>) -> ast::Expression {
@@ -222,9 +251,11 @@ mod tests {
     use super::*;
     #[test]
     fn decrypt() {
-        let file_content =
-            fs::read_to_string("C:/Users/spu7n/AppData/Local/GeometryDash/CCLocalLevels.dat")
-                .expect("Something went wrong reading the file");
+        //not working on mac :(
+        let file_content = fs::read_to_string(
+            "/Users/August/Library/Application Support/GeometryDash/CCLocalLevels.dat",
+        )
+        .expect("Something went wrong reading the file");
         println!(
             "{}",
             levelstring::get_level_string(file_content.to_string())

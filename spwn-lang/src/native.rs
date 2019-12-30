@@ -29,7 +29,7 @@ impl Group {
                         _ => panic!("Expected number"),
                     };
                 }
-                let trigger = GDTrigger {
+                let trigger = GDObj {
                     obj_id: 901,
                     target: *self,
                     groups: vec![start_group],
@@ -49,7 +49,7 @@ impl Group {
             }
 
             "stop" => {
-                let trigger = GDTrigger {
+                let trigger = GDObj {
                     obj_id: 1616,
                     target: *self,
                     groups: vec![start_group],
@@ -71,7 +71,7 @@ impl Group {
                     };
                 }
 
-                let trigger = GDTrigger {
+                let trigger = GDObj {
                     obj_id: 1007,
                     target: *self,
                     groups: vec![start_group],
@@ -85,7 +85,7 @@ impl Group {
             }
 
             "enable" => {
-                let trigger = GDTrigger {
+                let trigger = GDObj {
                     obj_id: 1649,
                     target: *self,
                     groups: vec![start_group],
@@ -99,7 +99,7 @@ impl Group {
             }
 
             "disable" => {
-                let trigger = GDTrigger {
+                let trigger = GDObj {
                     obj_id: 1649,
                     target: *self,
                     groups: vec![start_group],
@@ -151,7 +151,7 @@ impl Group {
                     };
                 }
 
-                let trigger = GDTrigger {
+                let trigger = GDObj {
                     obj_id: 1346,
                     target: *self,
                     groups: vec![start_group],
@@ -210,7 +210,7 @@ impl Color {
                         _ => panic!("Expected boolean"),
                     };
                 }
-                let trigger = GDTrigger {
+                let trigger = GDObj {
                     obj_id: 899,
                     target: Group { id: 0 },
                     groups: vec![start_group],
@@ -266,7 +266,7 @@ impl Item {
                     Value::Number(n) => n,
                     _ => panic!("Expected number"),
                 };
-                let trigger = GDTrigger {
+                let trigger = GDObj {
                     obj_id: 1817,
                     target: Group { id: 0 },
                     groups: vec![start_group],
@@ -298,7 +298,7 @@ impl Item {
                     Value::Scope(s) => s.group,
                     _ => panic!("Expected function"),
                 };
-                let trigger = GDTrigger {
+                let trigger = GDObj {
                     obj_id: 1811,
                     target: func,
                     groups: vec![start_group],
@@ -320,8 +320,8 @@ impl Item {
     }
 }
 
-pub fn context_trigger(context: Context) -> GDTrigger {
-    GDTrigger {
+pub fn context_trigger(context: Context) -> GDObj {
+    GDObj {
         obj_id: 0,
         groups: context.added_groups,
         target: Group { id: 0 },
@@ -334,21 +334,14 @@ pub fn context_trigger(context: Context) -> GDTrigger {
 
 pub fn member(value: Value, member: String) -> Value {
     match value {
-        /*Value::Group(group) => {
-            Value::Number(20.0)
-        },
-        Value::Color(color) => {
-            Value::Number(20.0)
-        },
-        Value::Block(block) => {
-            Value::Number(20.0)
-        },
-        Value::Item(item) => {
-            Value::Number(20.0)
-        },*/
         Value::Scope(scope) => match scope.members.get(&member) {
             Some(value) => (value).clone(),
-            None => panic!("Variable does not have member"),
+            None => panic!("Scope does not have member"),
+        },
+
+        Value::Dict(dict) => match dict.get(&member) {
+            Some(value) => (value).clone(),
+            None => panic!("Dictionary does not have member"),
         },
 
         _ => panic!("Object does not have member!"),
@@ -376,7 +369,7 @@ pub fn event(
             };
 
             let group = activate_group;
-            let trigger = GDTrigger {
+            let trigger = GDObj {
                 obj_id: 1815,
                 groups: vec![start_group],
                 target: group,
@@ -393,7 +386,7 @@ pub fn event(
         }
         "Touch" => {
             let group = activate_group;
-            let trigger = GDTrigger {
+            let trigger = GDObj {
                 obj_id: 1595,
                 groups: vec![start_group],
                 target: group,
@@ -407,7 +400,7 @@ pub fn event(
 
         "TouchEnd" => {
             let group = activate_group;
-            let trigger = GDTrigger {
+            let trigger = GDObj {
                 obj_id: 1595,
                 groups: vec![start_group],
                 target: group,
@@ -430,7 +423,7 @@ pub fn event(
             };
 
             let group = activate_group;
-            let trigger = GDTrigger {
+            let trigger = GDObj {
                 obj_id: 1611,
                 groups: vec![start_group],
                 target: group,
@@ -461,23 +454,26 @@ pub fn native_func(
     let args = function
         .args
         .iter()
-        .map(|x| x.eval(&context, globals))
+        .map(|x| x.value.eval(&context, globals))
         .collect();
 
     let func_name: String;
 
-    if var.symbols.is_empty() {
+    if var.path.is_empty() {
         func_name = match &var.value {
             ast::ValueLiteral::Symbol(s) => s.clone(),
             _ => panic!("Cannot take value as native function name"),
         }
     } else {
-        func_name = var.symbols[var.symbols.len() - 1].clone();
+        func_name = match var.path[var.path.len() - 1].clone() {
+            ast::Path::Member(m) => m,
+            _ => panic!("will deprecate"),
+        }
     }
 
     let mut value = Value::Null;
-    if var.symbols.len() > 0 {
-        var.symbols.pop();
+    if var.path.len() > 0 {
+        var.path.pop();
         value = var.to_value(&context, globals);
     }
 
@@ -504,7 +500,7 @@ pub fn native_func(
                         Value::Scope(s) => s.group,
                         _ => panic!("Expected function"),
                     };
-                    let trigger = GDTrigger {
+                    let trigger = GDObj {
                         obj_id: 1268,
                         target: func,
                         groups: vec![start_group],

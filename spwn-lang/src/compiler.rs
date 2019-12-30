@@ -2,6 +2,7 @@
 use crate::ast;
 use crate::levelstring::*;
 use crate::native::*;
+use std::boxed::Box;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -12,6 +13,7 @@ pub struct Context {
     pub added_groups: Vec<Group>,
     pub spawn_triggered: bool,
     pub variables: HashMap<String, Value>,
+    pub ret: Option<Box<Return>>,
 }
 
 impl Context {
@@ -23,6 +25,12 @@ impl Context {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Return {
+    pub context: Context,
+    pub statements: Vec<ast::Statement>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scope {
     pub group: Group,
@@ -31,7 +39,7 @@ pub struct Scope {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
-    pub args: Vec<String>,
+    pub args: Vec<(String, Option<Value>)>,
     pub def_context: Context,
     pub body: Vec<ast::Statement>,
 }
@@ -45,8 +53,10 @@ pub enum Value {
     Number(f64),
     Bool(bool),
     Scope(Scope),
+    Dict(HashMap<String, Value>),
     Macro(Macro),
     Str(String),
+    Array(Vec<Value>),
     Null,
 }
 
@@ -57,7 +67,7 @@ pub struct Globals {
     pub closed_blocks: Vec<u16>,
     pub closed_items: Vec<u16>,
     pub path: PathBuf,
-    pub obj_list: Vec<GDTrigger>,
+    pub obj_list: Vec<GDObj>,
 
     pub highest_x: u32,
 }
@@ -107,6 +117,7 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
         added_groups: Vec::new(),
         spawn_triggered: false,
         variables: default_variables,
+        ret: None,
     };
 
     //variables that get changed throughout the compiling
@@ -139,6 +150,8 @@ pub fn compile_scope(
     context.added_groups.sort_by(|a, b| a.id.cmp(&b.id));
     context.added_groups.dedup();
 
+    let mut exports: HashMap<String, Value> = HashMap::new();
+
     //check if it only has difinitions
     if !statements.iter().any(|x| match x {
         ast::Statement::Definition(_def) => false,
@@ -152,9 +165,9 @@ pub fn compile_scope(
         }
         start_group = Group { id: 0 };
     }
-    let statements_iter = statements.iter();
+    let mut statements_iter = statements.iter();
 
-    for statement in statements_iter {
+    while let Some(statement) = statements_iter.next() {
         //find out what kind of statement this is
 
         match statement {
@@ -192,14 +205,22 @@ pub fn compile_scope(
                 if def.symbol == "*" {
                     match val {
                         Value::Scope(s) => {
-                            context.variables.extend(s.members);
+                            context.variables.extend(s.members.clone());
+                            exports.extend(s.members);
+                        }
+
+                        Value::Dict(d) => {
+                            context.variables.extend(d.clone());
+                            exports.extend(d);
                         }
                         _ => panic!("Only compound statements can have their values extracted"),
                     }
                 } else {
-                    context.variables.insert(String::from(&def.symbol), val);
+                    context
+                        .variables
+                        .insert(String::from(&def.symbol), val.clone());
+                    exports.insert(String::from(&def.symbol), val);
                 }
-                //TODO: Account for dicts
             }
 
             ast::Statement::Event(e) => {
@@ -224,7 +245,7 @@ pub fn compile_scope(
                 let func = call.function.to_value(&(context.move_down()), globals);
 
                 (*globals).obj_list.push(
-                    GDTrigger {
+                    GDObj {
                         obj_id: 1268,
                         groups: vec![start_group],
                         target: match func {
@@ -247,12 +268,53 @@ pub fn compile_scope(
                         Value::Macro(m) => {
                             let mut new_context = context.clone();
                             new_context.variables = m.def_context.variables;
-                            for (i, arg) in m.args.iter().enumerate() {
-                                new_context
-                                    .variables
-                                    .insert(arg.clone(), call.args[i].eval(&context, globals));
+                            new_context.ret = Some(Box::new(Return {
+                                statements: statements_iter.clone().map(|x| x.clone()).collect(),
+                                context: context.clone(),
+                            }));
+
+                            let mut new_variables: HashMap<String, Value> = HashMap::new();
+
+                            for (i, arg) in call.args.iter().enumerate() {
+                                match &arg.symbol {
+                                    Some(name) => {
+                                        if m.args.iter().any(|e| e.0 == *name) {
+                                            new_variables.insert(
+                                                name.clone(),
+                                                arg.value.eval(&context, globals),
+                                            );
+                                        } else {
+                                            panic!("This function has no argument with this name!")
+                                        }
+                                    }
+                                    None => {
+                                        new_variables.insert(
+                                            m.args[i].0.clone(),
+                                            arg.value.eval(&context, globals),
+                                        );
+                                    }
+                                }
                             }
-                            compile_scope(&m.body, new_context, start_group, globals);
+
+                            for arg in m.args.iter() {
+                                if !new_variables.contains_key(&arg.0) {
+                                    match &arg.1 {
+                                        Some(default) => {
+                                            new_variables.insert(arg.0.clone(), default.clone());
+                                        }
+
+                                        None => panic!(
+                                            "Non-optional argument '{}' not satisfied!",
+                                            arg.0
+                                        ),
+                                    }
+                                }
+                            }
+
+                            new_context.variables.extend(new_variables);
+                            let mut ret_body = m.body.clone();
+                            let scope = compile_scope(&ret_body, new_context, start_group, globals);
+                            return scope;
                         }
                         _ => panic!("Not a function!"),
                     }
@@ -265,11 +327,35 @@ pub fn compile_scope(
                 context.variables.insert(
                     String::from(&m.name),
                     Value::Macro(Macro {
-                        args: m.args.clone(),
+                        args: m
+                            .args
+                            .iter()
+                            .map(|arg| {
+                                (
+                                    arg.0.clone(),
+                                    match &arg.1 {
+                                        Some(expr) => Some(expr.eval(&context, globals)),
+                                        None => None,
+                                    },
+                                )
+                            })
+                            .collect(),
                         def_context: context.clone(),
                         body: m.body.statements.clone(),
                     }),
                 );
+            }
+            ast::Statement::Return => {
+                let return_info = match context.ret.clone() {
+                    Some(ret) => ret,
+                    None => panic!("Cannot return outside function defnition"),
+                };
+                let new_context = Context {
+                    spawn_triggered: true,
+                    added_groups: context.added_groups.clone(),
+                    ..return_info.context
+                };
+                compile_scope(&return_info.statements, new_context, start_group, globals);
             }
 
             ast::Statement::EOI => {}
@@ -278,7 +364,7 @@ pub fn compile_scope(
 
     Scope {
         group: start_group,
-        members: context.clone().variables,
+        members: exports,
     }
 }
 impl ast::Expression {
@@ -367,6 +453,7 @@ fn import_module(path: &PathBuf, globals: &mut Globals) -> Value {
             added_groups: Vec::new(),
             spawn_triggered: false,
             variables: HashMap::new(),
+            ret: None,
         },
         Group { id: 0 },
         globals,
@@ -422,6 +509,7 @@ impl ast::Variable {
                 _ => unreachable!(),
             },
             ast::ValueLiteral::Number(num) => Value::Number(*num),
+            ast::ValueLiteral::Dictionary(dict) => Value::Dict(dict.read(&context, globals)),
             ast::ValueLiteral::CmpStmt(cmp_stmt) => {
                 Value::Scope(cmp_stmt.to_scope(context, globals))
             }
@@ -435,13 +523,31 @@ impl ast::Variable {
                 )),
             },
             ast::ValueLiteral::Str(s) => Value::Str(s.clone()),
+            ast::ValueLiteral::Array(a) => {
+                Value::Array(a.iter().map(|x| x.eval(&context, globals)).collect())
+            }
             ast::ValueLiteral::Import(i) => import_module(i, globals),
         };
 
         let mut final_value = base_value;
 
-        for mem in self.symbols.iter() {
-            final_value = member(final_value, mem.clone());
+        for p in self.path.iter() {
+            match p {
+                ast::Path::Member(m) => final_value = member(final_value, m.clone()),
+
+                ast::Path::Index(i) => {
+                    final_value = match final_value {
+                        Value::Array(a) => a[match i.eval(context, globals) {
+                            Value::Number(n) => n,
+                            _ => panic!("Expected number"),
+                        } as usize]
+                            .clone(),
+                        _ => panic!("Can't index non-iteratable variable"),
+                    }
+                }
+
+                ast::Path::Call(c) => unimplemented!(),
+            }
         }
 
         final_value
@@ -464,6 +570,12 @@ impl ast::CompoundStatement {
     }
 }
 
+impl ast::Dictionary {
+    fn read(&self, context: &Context, globals: &mut Globals) -> HashMap<String, Value> {
+        compile_scope(&self.members, context.clone(), Group { id: 0 }, globals).members
+    }
+}
+
 const ID_MAX: u16 = 999;
 
 pub fn next_free(ids: &mut Vec<u16>) -> u16 {
@@ -473,5 +585,5 @@ pub fn next_free(ids: &mut Vec<u16>) -> u16 {
             return i;
         }
     }
-    panic!("All ids of this t are used up!");
+    panic!("All ids of this type are used up!");
 }

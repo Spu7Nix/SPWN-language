@@ -2,8 +2,8 @@
 use crate::compiler::*;
 use crate::native::*;
 
-#[derive(Debug, Clone)]
-pub struct GDTrigger {
+#[derive(Clone, PartialEq, Debug)]
+pub struct GDObj {
     pub obj_id: u16,
     pub groups: Vec<Group>,
     pub target: Group,
@@ -13,8 +13,8 @@ pub struct GDTrigger {
     pub params: Vec<(u16, String)>,
 }
 
-impl GDTrigger {
-    pub fn context_parameters(&mut self, context: Context) -> GDTrigger {
+impl GDObj {
+    pub fn context_parameters(&mut self, context: Context) -> GDObj {
         for g in context.added_groups.iter() {
             self.groups.push(*g);
         }
@@ -23,7 +23,7 @@ impl GDTrigger {
     }
 }
 
-pub fn serialize_trigger(trigger: GDTrigger) -> String {
+pub fn serialize_trigger(trigger: GDObj) -> String {
     fn group_string(list: Vec<Group>) -> String {
         let mut string = String::new();
         for group in list.iter() {

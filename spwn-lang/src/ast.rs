@@ -1,4 +1,5 @@
 //! Abstract Syntax Tree (AST) type definitions
+
 use std::path::PathBuf;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -8,6 +9,7 @@ pub enum Statement {
     Call(Call),
     Native(Native),
     Macro(Macro),
+    Return,
     EOI,
 }
 #[derive(Clone, PartialEq, Debug)]
@@ -15,16 +17,30 @@ pub enum ValueLiteral {
     ID(ID),
     Number(f64),
     CmpStmt(CompoundStatement),
+    Dictionary(Dictionary),
     Symbol(String),
     Bool(bool),
     Expression(Expression),
     Str(String),
     Import(PathBuf),
+    Array(Vec<Expression>),
+}
+#[derive(Clone, PartialEq, Debug)]
+pub enum Path {
+    Member(String),
+    Index(Expression),
+    Call(Vec<Expression>),
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Definition {
     pub symbol: String,
+    pub value: Expression,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Argument {
+    pub symbol: Option<String>,
     pub value: Expression,
 }
 
@@ -43,20 +59,20 @@ pub struct Call {
 #[derive(Clone, PartialEq, Debug)]
 pub struct Native {
     pub function: Variable,
-    pub args: Vec<Expression>,
+    pub args: Vec<Argument>,
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
     pub name: String,
-    pub args: Vec<String>,
+    pub args: Vec<(String, Option<Expression>)>,
     pub body: CompoundStatement,
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Variable {
     pub value: ValueLiteral,
-    pub symbols: Vec<String>,
+    pub path: Vec<Path>,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -68,6 +84,11 @@ pub struct Expression {
 #[derive(Clone, PartialEq, Debug)]
 pub struct CompoundStatement {
     pub statements: Vec<Statement>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Dictionary {
+    pub members: Vec<Statement>,
 }
 
 #[derive(Clone, PartialEq, Debug)]

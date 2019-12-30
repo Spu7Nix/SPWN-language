@@ -1,35 +1,23 @@
 
-let copy (source, dest1, dest2, callback) = { //ads first value to the two second values
+let copy (source, dest1, dest2) = { //ads first value to the two second values
     let add = {
-        source.is(LARGER_THAN, 40, {
-            source.add(-40)
-            dest1.add(40)
-            dest2.add(40)
-            wait(0.02, add)
-        })
-
-        source.is(LARGER_THAN, 20, {
-            source.add(-20)
-            dest1.add(20)
-            dest2.add(20)
-            wait(0.02, add)
-        })
-
-        source.is(LARGER_THAN, 10, {
-            source.add(-10)
-            dest1.add(10)
-            dest2.add(10)
-            wait(0.02, add)
-        })
+        let mini_add(num) = {
+            source.is(LARGER_THAN, num, {
+                source.add(0 - num)
+                dest1.add(num)
+                dest2.add(num)
+                wait(0.02, add)
+            })
+        }
         
-        source.is(LARGER_THAN, 0, {
-            source.add(-1)
-            dest1.add(1)
-            dest2.add(1)
-            wait(0.02, add)
-        })
 
-        source.is(SMALLER_THAN, 1, callback)     
+        mini_add(40)
+        mini_add(20)
+        mini_add(10)
+        mini_add(1)
+
+
+        source.is(SMALLER_THAN, 1, {return})     
     }
 
     add!
@@ -49,17 +37,11 @@ wait(1, {
     let mult = {
         val2.is(LARGER_THAN, 0, {
             val2.add(-1)
-
-            copy (val1, result, tmp, {
-                copy (tmp, val1, trash, {
-                    wait(0.02, mult)
-                })
-            })
-            
+            copy (val1, result, tmp)
+            copy (tmp, val1, trash)
+            wait(0.02, mult)
         })
     }
 
     mult!
-        
-     
 })

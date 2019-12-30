@@ -1,38 +1,55 @@
 
 COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!"\n" ~ ANY)* ~ "\n")}
-WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+WHITESPACE = _{ " " | "\t"}
+
 
 stmt  = _{
-    def | event | call | native | macro_def
+    def | event | call | native | macro_def | retrn
 }
 
-def = {"let" ~ (symbol | "*") ~ "=" ~ (expr)}
+def = {(symbol | "*") ~ "=" ~ (expr)}
 event = {"on" ~ symbol ~ arguments ~ "->" ~ variable}
 call = {variable ~ "!"}
 native = {variable ~ arguments}
-macro_def = {"let" ~ symbol ~ arg_def ~ "=" ~ cmp_stmt}
+macro_def = {symbol ~ arguments_def ~ "=" ~ cmp_stmt}
+retrn = {"return"}
 
 
 cmp_stmt = {
-    "{" ~ stmt* ~ "}"
+    "{" ~ ss* ~ (stmt ~ ss+)* ~ stmt? ~ "}"
 }
+
+dictionary = {
+    "{" ~ ss* ~ ((def | macro_def) ~ ss+)* ~ (def | macro_def)? ~ "}"
+}
+
+array = {
+    "[" ~ ss* ~ (expr ~ "," ~ ss*)* ~ expr? ~ ss* ~ "]"
+}
+
+
 
 import = {"import" ~ variable}
 
-variable = {(value_literal) ~ ("." ~ symbol)*}
-value_literal = _{import | id | number | cmp_stmt | bool | symbol | string | "(" ~ expr ~")"}
-
-arguments = {
-    "(" ~ (expr ~ ",")* ~ expr? ~ ")"
+variable = {value_literal ~ (("." ~ symbol) | index/* | arguments*/)*}
+value_literal = _{
+    import | id | number | dictionary | 
+    cmp_stmt | bool | symbol | string | 
+    array | "(" ~ expr ~")"
 }
 
-arg_def = {
-    "(" ~ (symbol ~ ",")* ~ symbol? ~ ")"
+arg = {symbol ~ "=" ~ expr | expr}
+arguments = { "(" ~ (arg ~ ",")* ~ arg? ~ ")" }
+index = {"[" ~ expr ~ "]"}
+
+arg_def = {symbol ~ ":" ~ expr | symbol}
+arguments_def = {
+    "(" ~ (arg_def ~ ",")* ~ arg_def? ~ ")"
 }
 
 number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT*)? }
 
-expr = {((variable ~ operator)+ ~ variable) | variable}
+expr = {(variable ~ operator)* ~ variable}
 
 operator = {("||" | "&&" | "==" | "!=") | 
 			(">" | "<" | ">=" | "<=") | 
@@ -51,5 +68,7 @@ symbol = ${ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")*}
 
 string = {("\"" ~ (!"\"" ~ ANY)* ~ "\"") | ("'" ~ (!"'" ~ ANY)* ~ "'")}
 
-spwn = { SOI ~ (stmt)+ ~ EOI }
+ss = _{(("\r" | "\n") | ";") ~ ("\r" | "\n")*}
+
+spwn = { SOI ~ (stmt ~ ss)+ ~ stmt? ~ EOI }
 
