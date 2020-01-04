@@ -1,28 +1,3 @@
-a(b: 100) = {
-    10g.move(b, 0, 0.5)
-    wait(0.5, {return})
-}
+dict = { a = 10 #private() }
 
-a(10)
-a(20)
-a(30)
-
-
-
-
-<<<<<<< HEAD
-
-=======
-let move_thing = {
-    let group = 1g
-    let move = {
-        group.move(100, 0, 5)
-    }
-}
-
-on Touch() -> move_thing.move
->>>>>>> 3d2fc3ab4701fd95ce68bf9c78495ff9b9086450
-
-on TouchEnd() -> {
-    move_thing.move.stop()
-}
+print(dict.a)

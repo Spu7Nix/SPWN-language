@@ -4,15 +4,20 @@ WHITESPACE = _{ " " | "\t"}
 
 
 stmt  = _{
-    def | event | call | native | macro_def | retrn
+    def | event | add_obj | call | native | macro_def | retrn
 }
 
-def = {(symbol | "*") ~ "=" ~ (expr)}
+def = {(symbol | "*") ~ "=" ~ (expr) ~ native_prop*}
 event = {"on" ~ symbol ~ arguments ~ "->" ~ variable}
 call = {variable ~ "!"}
 native = {variable ~ arguments}
-macro_def = {symbol ~ arguments_def ~ "=" ~ cmp_stmt}
+macro_def = {symbol ~ arguments_def ~ "=" ~ cmp_stmt ~ native_prop*}
 retrn = {"return"}
+add_obj = {"add" ~ expr}
+
+native_prop = {"#" ~ (private /*| id_define*/) ~ arguments}
+    private =   {"private"}
+    //id_define = "id_define"
 
 
 cmp_stmt = {
@@ -27,16 +32,22 @@ array = {
     "[" ~ ss* ~ (expr ~ "," ~ ss*)* ~ expr? ~ ss* ~ "]"
 }
 
+obj = {
+    "obj" ~ "{" ~ ss* ~ (obj_prop ~ "," ~ ss*)* ~ obj_prop? ~ ss* ~ "}"
+}
 
+obj_prop = {expr ~ ":" ~ expr}
 
 import = {"import" ~ variable}
 
-variable = {value_literal ~ (("." ~ symbol) | index/* | arguments*/)*}
+
 value_literal = _{
-    import | id | number | dictionary | 
+    import | id | number | obj | dictionary | 
     cmp_stmt | bool | symbol | string | 
     array | "(" ~ expr ~")"
 }
+
+variable = {value_literal ~ (("." ~ symbol) | index/* | arguments*/)*}
 
 arg = {symbol ~ "=" ~ expr | expr}
 arguments = { "(" ~ (arg ~ ",")* ~ arg? ~ ")" }
@@ -70,5 +81,5 @@ string = {("\"" ~ (!"\"" ~ ANY)* ~ "\"") | ("'" ~ (!"'" ~ ANY)* ~ "'")}
 
 ss = _{(("\r" | "\n") | ";") ~ ("\r" | "\n")*}
 
-spwn = { SOI ~ (stmt ~ ss)+ ~ stmt? ~ EOI }
+spwn = { SOI ~ ss* ~ (stmt ~ ss+)* ~ stmt? ~ EOI }
 

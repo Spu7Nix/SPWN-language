@@ -24,6 +24,7 @@ impl GDObj {
 }
 
 pub fn serialize_trigger(trigger: GDObj) -> String {
+    //println!("{:?}", trigger);
     fn group_string(list: Vec<Group>) -> String {
         let mut string = String::new();
         for group in list.iter() {
@@ -32,22 +33,39 @@ pub fn serialize_trigger(trigger: GDObj) -> String {
         string.pop();
         string
     }
-
+    /*
     let mut obj_string = format!(
         "1,{},2,{},3,{},51,{}",
         trigger.obj_id, trigger.x, trigger.y, trigger.target.id
     );
+    */
 
-    if trigger.spawn_triggered {
-        obj_string += ",62,1,87,1";
+    let mut obj_string = String::new();
+
+    for i in 0..3 {
+        let keys = [1, 2, 3, 51];
+        let values = [
+            trigger.obj_id as u32,
+            trigger.x,
+            trigger.y as u32,
+            trigger.target.id as u32,
+        ];
+
+        if !trigger.params.iter().any(|x| x.0 == keys[i]) {
+            obj_string += &format!("{},{},", keys[i].to_string(), values[i].to_string());
+        }
+    }
+
+    if trigger.spawn_triggered && !trigger.params.iter().any(|x| x.0 == 62) {
+        obj_string += "62,1,87,1,";
     }
 
     if !trigger.groups.is_empty() {
-        obj_string += &(String::from(",57,") + &group_string(trigger.groups));
+        obj_string += &(String::from("57,") + &group_string(trigger.groups) + ",");
     }
 
     for param in trigger.params {
-        obj_string += &(String::from(",") + &param.0.to_string() + "," + &param.1);
+        obj_string += &(param.0.to_string() + "," + &param.1 + ",");
     }
 
     obj_string + ";"

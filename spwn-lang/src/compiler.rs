@@ -57,6 +57,7 @@ pub enum Value {
     Macro(Macro),
     Str(String),
     Array(Vec<Value>),
+    Obj(Vec<(u16, String)>),
     Null,
 }
 
@@ -131,7 +132,7 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
         highest_x: 0,
     };
 
-    let file_content =
+    /*let file_content =
         fs::read_to_string("C:/Users/spu7n/AppData/Local/GeometryDash/CCLocalLevels.dat")
             .expect("Something went wrong reading the file");
     let level_string = get_level_string(file_content);
@@ -161,7 +162,7 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
             }
         }
     }
-    println!("{:?}", globals.closed_groups);
+    println!("{:?}", globals.closed_groups);*/
 
     compile_scope(&statements, start_context, Group { id: 0 }, &mut globals);
 
@@ -292,6 +293,25 @@ pub fn compile_scope(
                 context.y -= 30;
             }
 
+            ast::Statement::Add(v) => {
+                let val = v.eval(&context, globals);
+                match val {
+                    Value::Obj(obj) => {
+                        (*globals).obj_list.push(
+                            GDObj {
+                                params: obj,
+                                groups: vec![start_group],
+                                ..context_trigger(context.clone())
+                            }
+                            .context_parameters(context.clone()),
+                        );
+                        context.y -= 30;
+                    }
+
+                    _ => panic!("Expected Object"),
+                }
+            }
+
             ast::Statement::Native(call) => {
                 let native = native_func(call.clone(), context.clone(), globals, start_group);
                 if !native {
@@ -343,7 +363,7 @@ pub fn compile_scope(
                             }
 
                             new_context.variables.extend(new_variables);
-                            let mut ret_body = m.body.clone();
+                            let ret_body = m.body.clone();
                             let scope = compile_scope(&ret_body, new_context, start_group, globals);
                             return scope;
                         }
@@ -558,6 +578,24 @@ impl ast::Variable {
                 Value::Array(a.iter().map(|x| x.eval(&context, globals)).collect())
             }
             ast::ValueLiteral::Import(i) => import_module(i, globals),
+            ast::ValueLiteral::Obj(o) => Value::Obj(
+                o.iter()
+                    .map(|prop| {
+                        (
+                            match prop.0.eval(&context, globals) {
+                                Value::Number(n) => n as u16,
+                                _ => panic!("Expected number as object property"),
+                            },
+                            match prop.1.eval(&context, globals) {
+                                Value::Number(n) => n.to_string(),
+                                Value::Str(s) => s,
+                                //Value::Array(a) => {} TODO: Add this
+                                _ => panic!("Not a valid object value"),
+                            },
+                        )
+                    })
+                    .collect(),
+            ),
         };
 
         let mut final_value = base_value;
@@ -577,7 +615,8 @@ impl ast::Variable {
                     }
                 }
 
-                ast::Path::Call(c) => unimplemented!(),
+                //ast::Path::Call(c) => unimplemented!(),
+                _=> unimplemented!()
             }
         }
 

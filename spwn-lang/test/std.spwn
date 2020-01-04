@@ -1,28 +1,22 @@
 
 let exports = {
-<<<<<<< HEAD
     let props = {
-        :TYPE: 1
-        :X: 2
-        :Y: 3
+        TYPE = 1
+        X = 2
+        Y = 3
 
     }
-    let wait(time): {
+    wait(time) = {
         obj{
             props.TYPE: 1227,
             10: time,
             51: {return}
         }
     }
-    let Group.move(x: 0, y: 0, duration: 0): {
+    Group.move(x: 0, y: 0, duration: 0) = {
         obj{
            props.TYPE: 901,
         }
         wait(duration)
     }
-=======
-    
-
-    
->>>>>>> 3d2fc3ab4701fd95ce68bf9c78495ff9b9086450
 }

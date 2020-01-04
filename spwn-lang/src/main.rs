@@ -48,6 +48,37 @@ fn main() {
 fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::Statement> {
     let mut stmts: Vec<ast::Statement> = vec![];
 
+    let parse_args = |arg: Pair<Rule>| {
+        let mut argument = arg.into_inner();
+        let first = argument.next().unwrap();
+        match first.as_rule() {
+            Rule::symbol => ast::Argument {
+                symbol: Some(first.as_span().as_str().to_string()),
+                value: parse_expr(argument.next().unwrap()),
+            },
+
+            Rule::expr => ast::Argument {
+                symbol: None,
+                value: parse_expr(first),
+            },
+
+            _ => unreachable!(),
+        }
+    };
+
+    let parse_native_prop = |prop: Pair<Rule>| {
+        let mut prop_inner = prop.into_inner();
+        (
+            prop_inner.next().unwrap().as_span().as_str().to_string(),
+            prop_inner
+                .next()
+                .unwrap()
+                .into_inner()
+                .map(parse_args)
+                .collect(),
+        )
+    };
+
     for statement in statements {
         stmts.push(match statement.as_rule() {
             Rule::def => {
@@ -57,12 +88,14 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
                     Rule::expr => ast::Statement::Definition(ast::Definition {
                         symbol: "*".to_string(),
                         value: parse_expr(first),
+                        props: inner.map(parse_native_prop).collect(),
                     }),
                     Rule::symbol => {
                         let value = parse_expr(inner.next().unwrap());
                         ast::Statement::Definition(ast::Definition {
                             symbol: first.as_span().as_str().to_string(),
                             value,
+                            props: inner.map(parse_native_prop).collect(),
                         })
                     }
                     _ => unreachable!(),
@@ -88,28 +121,7 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
                 let mut info = statement.into_inner();
                 ast::Statement::Native(ast::Native {
                     function: parse_variable(info.next().unwrap()),
-                    args: info
-                        .next()
-                        .unwrap()
-                        .into_inner()
-                        .map(|arg| {
-                            let mut argument = arg.into_inner();
-                            let first = argument.next().unwrap();
-                            match first.as_rule() {
-                                Rule::symbol => ast::Argument {
-                                    symbol: Some(first.as_span().as_str().to_string()),
-                                    value: parse_expr(argument.next().unwrap()),
-                                },
-
-                                Rule::expr => ast::Argument {
-                                    symbol: None,
-                                    value: parse_expr(first),
-                                },
-
-                                _ => unreachable!(),
-                            }
-                        })
-                        .collect(),
+                    args: info.next().unwrap().into_inner().map(parse_args).collect(),
                 })
             }
             Rule::macro_def => {
@@ -134,7 +146,11 @@ fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<ast::S
                     body: ast::CompoundStatement {
                         statements: parse_statements(&mut inner.next().unwrap().into_inner()),
                     },
+                    props: inner.map(parse_native_prop).collect(),
                 })
+            }
+            Rule::add_obj => {
+                ast::Statement::Add(parse_expr(statement.into_inner().next().unwrap()))
             }
             Rule::retrn => ast::Statement::Return,
             Rule::EOI => ast::Statement::EOI,
@@ -203,6 +219,18 @@ fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
             Rule::cmp_stmt => ast::ValueLiteral::CmpStmt(ast::CompoundStatement {
                 statements: parse_statements(&mut pair.into_inner()),
             }),
+
+            Rule::obj => ast::ValueLiteral::Obj(
+                pair.into_inner()
+                    .map(|prop| {
+                        let mut inner = prop.into_inner();
+                        (
+                            parse_expr(inner.next().unwrap()),
+                            parse_expr(inner.next().unwrap()),
+                        )
+                    })
+                    .collect(),
+            ),
 
             Rule::value_literal => parse_value(pair.into_inner().next().unwrap()),
             Rule::variable => parse_value(pair.into_inner().next().unwrap()),
