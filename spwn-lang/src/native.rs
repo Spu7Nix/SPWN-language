@@ -1,5 +1,6 @@
 //! Defining all native classes and functions
 use crate::compiler::*;
+use crate::compiler_types::*;
 use crate::levelstring::*;
 
 use crate::ast;
@@ -348,7 +349,7 @@ pub fn member(value: Value, member: String) -> Value {
     }
 }
 
-pub fn event(
+/*pub fn event(
     name: &String,
     args: Vec<Value>,
     context: Context,
@@ -526,4 +527,4 @@ pub fn native_func(
             ));
         }
     }
-}
+}*/

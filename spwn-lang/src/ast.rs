@@ -5,12 +5,10 @@ use std::path::PathBuf;
 #[derive(Clone, PartialEq, Debug)]
 pub enum Statement {
     Definition(Definition),
-    Event(Event),
     Call(Call),
-    Native(Native),
-    Macro(Macro),
+    Expr(Expression),
     Add(Expression),
-    Return,
+    Return(Expression),
     EOI,
 }
 #[derive(Clone, PartialEq, Debug)]
@@ -26,6 +24,9 @@ pub enum ValueLiteral {
     Import(PathBuf),
     Array(Vec<Expression>),
     Obj(Vec<(Expression, Expression)>),
+    Macro(Macro),
+    PLACEHOLDER,
+    Null,
 }
 #[derive(Clone, PartialEq, Debug)]
 pub enum Path {
@@ -67,10 +68,8 @@ pub struct Native {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
-    pub name: String,
     pub args: Vec<(String, Option<Expression>)>,
     pub body: CompoundStatement,
-    pub props: Vec<(String, Vec<Argument>)>,
 }
 
 #[derive(Clone, PartialEq, Debug)]

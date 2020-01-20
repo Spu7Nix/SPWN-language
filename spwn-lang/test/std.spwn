@@ -19,4 +19,28 @@ let exports = {
         }
         wait(duration)
     }
+
+
+    mut = (src) {
+        id = ?i
+        if src.type == "number" {
+            id.add(scr)
+        } else if scr.type == "boolean" {
+            if scr {
+                id.add(1)
+            }
+        } else {
+            error "mut requires a scalar value (number / boolean)!"
+        }
+        return {
+            type = "mutable"
+            item = id
+        }
+    }
+
+    impl "mutable" {
+        add = (self, other) {
+            return const(self) * other
+        }
+    }
 }

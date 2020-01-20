@@ -1,5 +1,5 @@
 // useful things for dealing with gd level data
-use crate::compiler::*;
+use crate::compiler_types::*;
 use crate::native::*;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -42,21 +42,23 @@ pub fn serialize_trigger(trigger: GDObj) -> String {
 
     let mut obj_string = String::new();
 
-    for i in 0..3 {
-        let keys = [1, 2, 3, 51];
-        let values = [
-            trigger.obj_id as u32,
-            trigger.x,
-            trigger.y as u32,
-            trigger.target.id as u32,
-        ];
+    let spawned = trigger.spawn_triggered && !trigger.params.iter().any(|x| x.0 == 62);
 
+    let keys = [1, 2, 3, 51];
+    let values = [
+        trigger.obj_id as u32,
+        if spawned { trigger.x } else { 0 },
+        if spawned { trigger.y as u32 } else { 0 },
+        trigger.target.id as u32,
+    ];
+
+    for i in 0..4 {
         if !trigger.params.iter().any(|x| x.0 == keys[i]) {
             obj_string += &format!("{},{},", keys[i].to_string(), values[i].to_string());
         }
     }
 
-    if trigger.spawn_triggered && !trigger.params.iter().any(|x| x.0 == 62) {
+    if spawned {
         obj_string += "62,1,87,1,";
     }
 

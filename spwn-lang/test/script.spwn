@@ -1,3 +1,6 @@
-dict = { a = 10 #private() }
+fn = (a, b) {
+    return a + b
+}
 
-print(dict.a)
+fn(100, 100)
+
