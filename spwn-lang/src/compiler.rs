@@ -105,7 +105,7 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
         start_context,
         Group { id: 0 },
         &mut globals,
-        Value::Null,
+        &Value::Null,
     );
 
     globals
@@ -116,7 +116,7 @@ pub fn compile_scope(
     mut context: Context,
     mut start_group: Group,
     globals: &mut Globals,
-    placeholder_value: Value,
+    placeholder_value: &Value,
 ) -> Scope {
     context.x = globals.highest_x;
 
@@ -147,7 +147,15 @@ pub fn compile_scope(
 
         match statement {
             ast::Statement::Expr(expr) => {
-                let value = expr.eval(&context, globals);
+                match expr.eval(&context, globals, placeholder_value) {
+                    Literal(_l) => {},
+                    Evaluatable(e) => {
+                        let mut new_statements = vec![ast::Statement::Expr(e.2.to_expression())];
+                        new_statements.extend(statements_iter.cloned());
+                        return evaluate_and_execute((e.0, e.1), &context, globals, new_statements, start_group)
+                    }
+
+                };
             }
 
             ast::Statement::Definition(def) => {
@@ -176,13 +184,20 @@ pub fn compile_scope(
                             new_context,
                             start_group,
                             globals,
-                            Value::Null,
+                            &Value::Null,
                         ))
                     }
 
-                    _ => match def.value.eval(&context.move_down(), globals) {
+                    _ => match def.value.eval(&context.move_down(), globals, placeholder_value) {
                         Literal(l) => l,
-                        Evaluatable(e) => unimplemented!(),
+                        Evaluatable(e) => {
+                            let mut new_statements = vec![ast::Statement::Definition(ast::Definition {
+                                value: e.2.to_expression(),
+                                ..def.clone()
+                            })];
+                            new_statements.extend(statements_iter.cloned());
+                            return evaluate_and_execute((e.0, e.1), &context, globals, new_statements, start_group)
+                        }
                     },
                 };
                 if def.symbol == "*" {
@@ -224,9 +239,16 @@ pub fn compile_scope(
                 context.y -= 30;
             }*/
             ast::Statement::Call(call) => {
-                let func = match call.function.to_value(&(context.move_down()), globals) {
+                let func = match call.function.to_value(&(context.move_down()), globals, placeholder_value) {
                     Literal(l) => l,
-                    Evaluatable(e) => unimplemented!(),
+                    Evaluatable(e) => {
+                        let mut new_statements = vec![ast::Statement::Call(ast::Call {
+                            function: e.2,
+                            
+                        })];
+                        new_statements.extend(statements_iter.cloned());
+                        return evaluate_and_execute((e.0, e.1), &context, globals, new_statements, start_group)
+                    },
                 };
 
                 (*globals).obj_list.push(
@@ -247,9 +269,13 @@ pub fn compile_scope(
             }
 
             ast::Statement::Add(v) => {
-                let val = match v.eval(&context, globals){
+                let val = match v.eval(&context, globals, placeholder_value){
                     Literal(l) => l,
-                    Evaluatable(e) => unimplemented!(),
+                    Evaluatable(e) => {
+                        let mut new_statements = vec![ast::Statement::Add(e.2.to_expression())];
+                        new_statements.extend(statements_iter.cloned());
+                        return evaluate_and_execute((e.0, e.1), &context, globals, new_statements, start_group)
+                    },
                 };
                 match val {
                     Value::Obj(obj) => {
@@ -268,67 +294,7 @@ pub fn compile_scope(
                 }
             }
 
-            /*ast::Statement::Native(call) => {
-                let native = native_func(call.clone(), context.clone(), globals, start_group);
-                if !native {
-                    match call.function.to_value(&context, globals) {
-                        Value::Macro(m) => {
-                            let mut new_context = context.clone();
-                            new_context.variables = m.def_context.variables;
-                            new_context.ret = Some(Box::new(Return {
-                                statements: statements_iter.clone().map(|x| x.clone()).collect(),
-                                context: context.clone(),
-                            }));
-
-                            let mut new_variables: HashMap<String, Value> = HashMap::new();
-
-                            for (i, arg) in call.args.iter().enumerate() {
-                                match &arg.symbol {
-                                    Some(name) => {
-                                        if m.args.iter().any(|e| e.0 == *name) {
-                                            new_variables.insert(
-                                                name.clone(),
-                                                arg.value.eval(&context, globals),
-                                            );
-                                        } else {
-                                            panic!("This function has no argument with this name!")
-                                        }
-                                    }
-                                    None => {
-                                        new_variables.insert(
-                                            m.args[i].0.clone(),
-                                            arg.value.eval(&context, globals),
-                                        );
-                                    }
-                                }
-                            }
-
-                            for arg in m.args.iter() {
-                                if !new_variables.contains_key(&arg.0) {
-                                    match &arg.1 {
-                                        Some(default) => {
-                                            new_variables.insert(arg.0.clone(), default.clone());
-                                        }
-
-                                        None => panic!(
-                                            "Non-optional argument '{}' not satisfied!",
-                                            arg.0
-                                        ),
-                                    }
-                                }
-                            }
-
-                            new_context.variables.extend(new_variables);
-                            let ret_body = m.body.clone();
-                            let scope = compile_scope(&ret_body, new_context, start_group, globals);
-                            return scope;
-                        }
-                        _ => panic!("Not a function!"),
-                    }
-                }
-
-                context.y -= 30;
-            }*/
+            
             ast::Statement::Return(val) => {
                 let return_info = match context.ret.clone() {
                     Some(ret) => ret,
@@ -340,9 +306,13 @@ pub fn compile_scope(
                     ..return_info.context
                 };
                 
-                let return_placeholder = match val.eval(&context, globals) {
+                let return_placeholder = match val.eval(&context, globals, placeholder_value) {
                     Literal(l) => l,
-                    Evaluatable(e) => unimplemented!(),
+                    Evaluatable(e) => {
+                        let mut new_statements = vec![ast::Statement::Return(e.2.to_expression())];
+                        new_statements.extend(statements_iter.cloned());
+                        return evaluate_and_execute((e.0, e.1), &context, globals, new_statements, start_group)
+                    },
                 };
 
                 compile_scope(
@@ -350,7 +320,7 @@ pub fn compile_scope(
                     new_context,
                     start_group,
                     globals,
-                    return_placeholder
+                    &return_placeholder
                 );
             }
 
@@ -384,7 +354,7 @@ pub fn import_module(path: &PathBuf, globals: &mut Globals) -> Value {
         },
         Group { id: 0 },
         globals,
-        Value::Null,
+        &Value::Null,
     );
     match scope.members.get("exports") {
         Some(value) => (value).clone(),

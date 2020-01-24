@@ -42,5 +42,19 @@ let exports = {
         add = (self, other) {
             return const(self) * other
         }
+
+        const = (range) {
+            range * (val) {
+                this.id.is(EQUAL_TO, val, {
+                    return val
+                }) 
+            }
+        }
+
+        as = (type) {
+            if type == "bool" {
+                return this.const([0, 1]) == 1
+            }
+        }
     }
 }

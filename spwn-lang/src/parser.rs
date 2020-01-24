@@ -33,12 +33,10 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<as
                 symbol: Some(first.as_span().as_str().to_string()),
                 value: parse_expr(argument.next().unwrap()),
             },
-
             Rule::expr => ast::Argument {
                 symbol: None,
                 value: parse_expr(first),
             },
-
             _ => unreachable!(),
         }
     };
@@ -132,12 +130,27 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<as
 }
 
 pub fn parse_path(pair: Pair<Rule>) -> ast::Path {
+    let parse_args = |arg: Pair<Rule>| {
+        let mut argument = arg.into_inner();
+        let first = argument.next().unwrap();
+        match first.as_rule() {
+            Rule::symbol => ast::Argument {
+                symbol: Some(first.as_span().as_str().to_string()),
+                value: parse_expr(argument.next().unwrap()),
+            },
+            Rule::expr => ast::Argument {
+                symbol: None,
+                value: parse_expr(first),
+            },
+            _ => unreachable!(),
+        }
+    };
     match pair.as_rule() {
         Rule::symbol => ast::Path::Member(pair.as_span().as_str().to_string()),
 
         Rule::index => ast::Path::Index(parse_expr(pair.into_inner().next().unwrap())),
 
-        Rule::arguments => ast::Path::Call(pair.into_inner().map(|x| parse_expr(x)).collect()),
+        Rule::arguments => ast::Path::Call(pair.into_inner().map(|x| parse_args(x)).collect()),
 
         _ => unreachable!(),
     }

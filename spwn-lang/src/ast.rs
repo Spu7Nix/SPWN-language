@@ -2,6 +2,8 @@
 
 use std::path::PathBuf;
 
+use crate::compiler_types::Value;
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Statement {
     Definition(Definition),
@@ -26,13 +28,24 @@ pub enum ValueLiteral {
     Obj(Vec<(Expression, Expression)>),
     Macro(Macro),
     PLACEHOLDER,
+    Resolved(Value),
     Null,
 }
+
+impl ValueLiteral {
+    pub fn to_variable(&self) -> Variable {
+        Variable {
+            value: self.clone(),
+            path: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Path {
     Member(String),
     Index(Expression),
-    Call(Vec<Expression>),
+    Call(Vec<Argument>),
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -76,6 +89,15 @@ pub struct Macro {
 pub struct Variable {
     pub value: ValueLiteral,
     pub path: Vec<Path>,
+}
+
+impl Variable {
+    pub fn to_expression(&self) -> Expression {
+        Expression {
+            values: vec![self.clone()],
+            operators: Vec::new(),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
