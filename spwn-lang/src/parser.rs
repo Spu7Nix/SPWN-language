@@ -103,6 +103,14 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<as
                 ast::Statement::Add(parse_expr(statement.into_inner().next().unwrap()))
             }
 
+            Rule::implement => {
+                let mut inner = statement.into_inner();
+                ast::Statement::Impl(ast::Implementation {
+                    symbol: parse_variable(inner.next().unwrap()),
+                    members: parse_statements(&mut inner.next().unwrap().into_inner()),
+                })
+            }
+
             Rule::expr => ast::Statement::Expr(parse_expr(statement)),
             Rule::retrn => ast::Statement::Return(match statement.into_inner().next() {
                 Some(expr) => parse_expr(expr),

@@ -1,11 +1,8 @@
-fn = (a, b) {
-    return a + b
-}
+* = import "std.spwn"
 
+10g.move(0, 100, 1)
+10g.move(0, -100, 1)
 
-add obj {
-    19: 'test',
-    20: '69',
-    1: fn(fn(1111, 2222) + 1, 6666),
-    122: '69',
-}
+10g.toggle_off()
+wait(2)
+10g.toggle_on()

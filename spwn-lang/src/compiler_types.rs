@@ -81,8 +81,11 @@ pub struct Globals {
     pub obj_list: Vec<GDObj>,
 
     pub highest_x: u32,
+
+    pub implementations: HashMap<String, HashMap<String, Value>>,
 }
 
+#[derive(Debug)]
 pub enum ValSuccess {
     Literal(Value),
     Evaluatable(
@@ -249,10 +252,10 @@ pub fn evaluate_and_execute(
 
     new_context.variables.extend(new_variables);
     let ret_body = m.body.clone();
+    new_context.y -= 30;
     let scope = compile_scope(&ret_body, new_context, start_group, globals, &Value::Null);
-    return scope;
 
-    context.y -= 30;
+    return scope;
 }
 
 impl ast::Variable {
@@ -390,6 +393,13 @@ impl ast::Variable {
                         match prop.1.eval(&context, globals, placeholder_value) {
                             Literal(Value::Number(n)) => n.to_string(),
                             Literal(Value::Str(s)) => s,
+                            Literal(Value::Scope(s)) => s.group.id.to_string(),
+
+                            Literal(Value::Group(g)) => g.id.to_string(),
+                            Literal(Value::Color(c)) => c.id.to_string(),
+                            Literal(Value::Block(b)) => b.id.to_string(),
+                            Literal(Value::Item(i)) => i.id.to_string(),
+
                             Evaluatable(e) => {
                                 //literally just copy paste of the above because im lazy
                                 return Evaluatable((e.0, e.1, {
@@ -416,7 +426,7 @@ impl ast::Variable {
                                 }));
                             }
                             //Value::Array(a) => {} TODO: Add this
-                            _ => panic!("Not a valid object value"),
+                            x => panic!("{:?} is not a valid object value", x),
                         },
                     ))
                 }
@@ -453,9 +463,11 @@ impl ast::Variable {
             ast::ValueLiteral::PLACEHOLDER => placeholder_value.clone(),
         };
         let mut path_iter = self.path.iter();
+        let mut parent = Value::Null;
         for p in &mut path_iter {
+            let stored = final_value.clone();
             match p {
-                ast::Path::Member(m) => final_value = member(final_value, m.clone()),
+                ast::Path::Member(m) => final_value = final_value.member(m.clone(), globals),
 
                 ast::Path::Index(i) => {
                     final_value = match &final_value {
@@ -492,10 +504,13 @@ impl ast::Variable {
                         _ => panic!("Not a macro!"),
                     };
                     return Evaluatable((
-                        m,
+                        m.clone(),
                         {
                             let mut vals: Vec<(Option<String>, Value)> = Vec::new();
                             let mut c_iter = c.iter();
+                            if !m.args.is_empty() && m.args[0].0 == "self" {
+                                vals.push((None, parent))
+                            }
                             for arg in &mut c_iter {
                                 let arg_value =
                                     match arg.value.eval(&context, globals, placeholder_value) {
@@ -545,6 +560,7 @@ impl ast::Variable {
                     ));
                 }
             }
+            parent = stored;
         }
 
         Literal(final_value)

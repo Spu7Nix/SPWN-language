@@ -333,19 +333,59 @@ pub fn context_trigger(context: Context) -> GDObj {
     }
 }
 
-pub fn member(value: Value, member: String) -> Value {
-    match value {
-        Value::Scope(scope) => match scope.members.get(&member) {
-            Some(value) => (value).clone(),
-            None => panic!("Scope does not have member"),
-        },
+const TYPE_MEMBER_NAME: &str = "TYPE";
+impl Value {
+    pub fn member(&self, member: String, globals: &Globals) -> Value {
+        let get_imp = |t: String, m: String| match globals.implementations.get(&(t)) {
+            Some(imp) => match imp.get(&m) {
+                Some(mem) => mem.clone(),
+                None => panic!("{} does not have member", t),
+            },
+            None => panic!("{} does not have member", t),
+        };
+        let my_type = match self {
+            Value::Scope(scope) => match scope.members.get(TYPE_MEMBER_NAME) {
+                Some(value) => match (value).clone() {
+                    Value::Str(s) => s,
+                    _ => unreachable!(),
+                },
+                None => "function".to_string(),
+            },
+            Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
+                Some(value) => match (value).clone() {
+                    Value::Str(s) => s,
+                    _ => unreachable!(),
+                },
+                None => "dictionary".to_string(),
+            },
 
-        Value::Dict(dict) => match dict.get(&member) {
-            Some(value) => (value).clone(),
-            None => panic!("Dictionary does not have member"),
-        },
-
-        _ => panic!("Object does not have member!"),
+            Value::Group(_) => "group".to_string(),
+            Value::Color(_) => "color".to_string(),
+            Value::Block(_) => "block".to_string(),
+            Value::Item(_) => "item".to_string(),
+            Value::Number(_) => "number".to_string(),
+            Value::Bool(_) => "boolean".to_string(),
+            Value::Macro(_) => "macro".to_string(),
+            Value::Str(_) => "string".to_string(),
+            Value::Array(_) => "array".to_string(),
+            Value::Obj(_) => "object".to_string(),
+            Value::Null => "null".to_string(),
+        };
+        if member == TYPE_MEMBER_NAME {
+            return Value::Str(my_type);
+        } else {
+            match self {
+                Value::Scope(scope) => match scope.members.get(&member) {
+                    Some(value) => (value).clone(),
+                    None => get_imp(my_type, member),
+                },
+                Value::Dict(dict) => match dict.get(&member) {
+                    Some(value) => (value).clone(),
+                    None => get_imp(my_type, member),
+                },
+                _ => get_imp(my_type, member),
+            }
+        }
     }
 }
 

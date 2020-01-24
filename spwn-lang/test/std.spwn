@@ -1,27 +1,88 @@
 
-let exports = {
-    let props = {
-        TYPE = 1
-        X = 2
-        Y = 3
+exports = {
 
-    }
-    wait(time) = {
-        obj{
-            props.TYPE: 1227,
-            10: time,
-            51: {return}
+    * = import "obj_props.spwn"
+    
+    wait = (time){
+        add obj{
+            OBJ_ID: 1268,
+            DURATION: time,
+            TARGET: {return}
         }
     }
-    Group.move(x: 0, y: 0, duration: 0) = {
-        obj{
-           props.TYPE: 901,
+
+    
+    impl "group" {
+        move = (self, x, y, duration: 0, easing: 0, easing_rate: 0) {
+            add obj{
+               OBJ_ID: 901,
+               TARGET: self,
+               MOVE_X: x * 3,
+               MOVE_Y: y * 3,
+               DURATION: duration,
+               EASING: easing,
+               EASING_RATE: easing_rate,
+            }
+            wait(duration)
+            return
         }
-        wait(duration)
+
+        stop = (self){
+            add obj{
+                OBJ_ID: 1616,
+                TARGET: self,
+            }
+            return
+        }
+
+        alpha = (self, opacity: 1, duration: 0){
+            add obj {
+                OBJ_ID: 1007,
+                TARGET: self,
+                OPACITY: opacity,
+                DURATION: duration,
+            }
+            wait(duration)
+            return
+        }
+
+        toggle_on = (self){
+            add obj{
+                OBJ_ID: 1049,
+                TARGET: self,
+                ACTIVATE_GROUP: 1,
+            }
+            return
+        }
+
+        toggle_off = (self){
+            add obj{
+                OBJ_ID: 1049,
+                TARGET: self,
+                ACTIVATE_GROUP: 0,
+            }
+            return
+        }
+
+        rotate = (self, center, degrees, duration: 0, easing: 0, easing_rate: 0, lock_object_rotation: 0){
+            add obj{
+                OBJ_ID: 1346,
+                TARGET: self,
+                CENTER: center,
+                ROTATE_DEGREES: degrees,
+                DURATION: duration,
+                EASING: easing,
+                EASING_RATE: easing_rate,
+                LOCK_OBJECT_ROTATION: lock_object_rotation
+            }
+            wait(duration)
+            return
+        }
     }
+    
 
 
-    mut = (src) {
+    /*mut = (src) {
         id = ?i
         if src.type == "number" {
             id.add(scr)
@@ -56,5 +117,5 @@ let exports = {
                 return this.const([0, 1]) == 1
             }
         }
-    }
+    }*/
 }

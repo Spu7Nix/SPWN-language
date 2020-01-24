@@ -4,16 +4,14 @@ WHITESPACE = _{ " " | "\t"}
 
 
 stmt  = _{
-    def | add_obj | call | retrn | expr
+    def | add_obj | call | retrn | implement | expr
 }
 
 def = {(symbol | "*") ~ "=" ~ (expr) ~ native_prop*}
-
 call = {variable ~ "!"}
-
-
 retrn = {"return" ~ expr?}
 add_obj = {"add" ~ expr}
+implement = {"impl" ~ variable ~ dictionary}
 
 native_prop = {"#" ~ (private /*| id_define*/) ~ arguments}
     private =   {"private"}
@@ -25,7 +23,7 @@ cmp_stmt = {
 }
 
 dictionary = {
-    "{" ~ ss* ~ ((def | macro_def) ~ ss+)* ~ (def | macro_def)? ~ "}"
+    "{" ~ ss* ~ ((def) ~ ss+)* ~ (def)? ~ "}"
 }
 
 array = {

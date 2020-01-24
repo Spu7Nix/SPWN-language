@@ -11,6 +11,7 @@ pub enum Statement {
     Expr(Expression),
     Add(Expression),
     Return(Expression),
+    Impl(Implementation),
     EOI,
 }
 #[derive(Clone, PartialEq, Debug)]
@@ -113,6 +114,12 @@ pub struct CompoundStatement {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Dictionary {
+    pub members: Vec<Statement>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Implementation {
+    pub symbol: Variable,
     pub members: Vec<Statement>,
 }
 
