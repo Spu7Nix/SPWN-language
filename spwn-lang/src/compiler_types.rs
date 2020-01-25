@@ -337,8 +337,8 @@ impl ast::Variable {
             ast::ValueLiteral::Str(s) => Value::Str(s.clone()),
             ast::ValueLiteral::Array(a) => {
                 let mut arr: Vec<Value> = Vec::new();
-                let mut a_iter = a.iter().enumerate();
-                for (i, val) in &mut a_iter {
+                let mut a_iter = a.iter();
+                for val in &mut a_iter {
                     arr.push(match val.eval(&context, globals, placeholder_value) {
                         Literal(l) => l,
                         Evaluatable(e) => {
@@ -348,7 +348,7 @@ impl ast::Variable {
                                     .map(|x| x.to_variable().to_expression())
                                     .collect();
                                 new_arr.push(e.2.to_expression());
-                                new_arr.extend(a_iter.map(|x| x.1.clone()));
+                                new_arr.extend(a_iter.cloned());
                                 ast::Variable {
                                     value: ast::ValueLiteral::Array(new_arr),
                                     path: Vec::new(),

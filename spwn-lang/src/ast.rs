@@ -12,6 +12,7 @@ pub enum Statement {
     Add(Expression),
     Return(Expression),
     Impl(Implementation),
+    If(If),
     EOI,
 }
 #[derive(Clone, PartialEq, Debug)]
@@ -121,6 +122,13 @@ pub struct Dictionary {
 pub struct Implementation {
     pub symbol: Variable,
     pub members: Vec<Statement>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct If {
+    pub condition: Expression,
+    pub if_body: Vec<Statement>,
+    pub else_body: Option<Vec<Statement>>,
 }
 
 #[derive(Clone, PartialEq, Debug)]

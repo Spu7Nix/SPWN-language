@@ -76,29 +76,21 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<as
                     _ => unreachable!(),
                 }
             }
-            /*Rule::event => {
-                let mut info = statement.into_inner();
-                ast::Statement::Event(ast::Event {
-                    symbol: info.next().unwrap().as_span().as_str().to_string(),
-                    args: info
-                        .next()
-                        .unwrap()
-                        .into_inner()
-                        .map(|arg| parse_expr(arg))
-                        .collect(),
-                    func: parse_variable(info.next().unwrap()),
-                })
-            }*/
             Rule::call => ast::Statement::Call(ast::Call {
                 function: parse_variable(statement.into_inner().next().unwrap()),
             }),
-            /*Rule::native => {
-                let mut info = statement.into_inner();
-                ast::Statement::Native(ast::Native {
-                    function: parse_variable(info.next().unwrap()),
-                    args: info.next().unwrap().into_inner().map(parse_args).collect(),
+
+            Rule::if_stmt => {
+                let mut inner = statement.into_inner();
+                ast::Statement::If(ast::If {
+                    condition: parse_expr(inner.next().unwrap()),
+                    if_body: parse_statements(&mut inner.next().unwrap().into_inner()),
+                    else_body: match inner.next() {
+                        Some(body) => Some(parse_statements(&mut body.into_inner())),
+                        None => None,
+                    },
                 })
-            }*/
+            }
             Rule::add_obj => {
                 ast::Statement::Add(parse_expr(statement.into_inner().next().unwrap()))
             }

@@ -4,7 +4,7 @@ WHITESPACE = _{ " " | "\t"}
 
 
 stmt  = _{
-    def | add_obj | call | retrn | implement | expr
+    def | add_obj | call | retrn | implement | if_stmt | expr
 }
 
 def = {(symbol | "*") ~ "=" ~ (expr) ~ native_prop*}
@@ -12,6 +12,9 @@ call = {variable ~ "!"}
 retrn = {"return" ~ expr?}
 add_obj = {"add" ~ expr}
 implement = {"impl" ~ variable ~ dictionary}
+
+if_stmt = {"if" ~ expr ~ ss* ~ cmp_stmt ~ ss* ~ ("else" ~ ss* ~ (cmp_stmt | if_else))?}
+if_else = {if_stmt}
 
 native_prop = {"#" ~ (private /*| id_define*/) ~ arguments}
     private =   {"private"}

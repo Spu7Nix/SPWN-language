@@ -1,8 +1,22 @@
 * = import "std.spwn"
 
-10g.move(0, 100, 1)
-10g.move(0, -100, 1)
 
-10g.toggle_off()
-wait(2)
-10g.toggle_on()
+
+is_big = (item) {
+    item.if_is(LARGER_THAN, 10, {
+        return true
+    })
+
+    item.if_is(SMALLER_THAN , 10, {
+        return false
+    }) 
+}
+
+num = ?i
+num.add(11)
+wait(1)
+if is_big(num) {
+    10g.move(0, 100, 0.5)
+} else {
+    10g.move(0, -100, 0.5)
+}

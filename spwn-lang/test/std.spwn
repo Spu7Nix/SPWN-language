@@ -6,8 +6,10 @@ exports = {
     wait = (time){
         add obj{
             OBJ_ID: 1268,
-            DURATION: time,
-            TARGET: {return}
+            SPAWN_DURATION: time,
+            TARGET: {
+                return
+            }
         }
     }
 
@@ -79,7 +81,46 @@ exports = {
             return
         }
     }
+
+    impl "color" {
+        set = (self, r, g, b, duration: 0, opacity: 1, blending: 0){ //change blending to bool
+            add obj{
+                OBJ_ID: 899,
+                DURATION: duration,
+                TRIGGER_RED: r,
+                TRIGGER_GREEN: g,
+                TRIGGER_BLUE: b,
+                OPACITY: opacity,
+                BLENDING: blending,
+            }
+            wait(duration)
+            return
+        }
+    }
     
+    impl "item" {
+        
+        add = (self, amount) {
+            add obj{
+                OBJ_ID: 1817,
+                COUNT: amount,
+                ITEM: self,
+            }
+            return
+        }
+
+        if_is = (self, comparison, other, function) {
+            add obj{
+                OBJ_ID: 1811,
+                TARGET: function,
+                COUNT: other,
+                ACTIVATE_GROUP: 1, 
+                COMPARISON: comparison, 
+                ITEM: self,
+            }
+            return
+        }
+    }
 
 
     /*mut = (src) {

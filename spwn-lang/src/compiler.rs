@@ -237,6 +237,55 @@ pub fn compile_scope(
                 }
             }
 
+            ast::Statement::If(if_stmt) => {
+                let condition = match if_stmt.condition.eval(&context, globals, placeholder_value) {
+                    Literal(l) => l,
+                    Evaluatable(e) => {
+                        let mut new_statements = vec![ast::Statement::If(ast::If {
+                            condition: e.2.to_expression(),
+                            ..if_stmt.clone()
+                        })];
+                        new_statements.extend(statements_iter.cloned());
+                        return evaluate_and_execute(
+                            (e.0, e.1),
+                            &context,
+                            globals,
+                            new_statements,
+                            start_group,
+                        );
+                    }
+                };
+
+                match condition {
+                    Value::Bool(b) => {
+                        //internal if statement
+                        if b {
+                            compile_scope(
+                                &if_stmt.if_body,
+                                context.move_down(),
+                                start_group,
+                                globals,
+                                &Value::Null,
+                            );
+                        } else {
+                            match &if_stmt.else_body {
+                                Some(body) => {
+                                    compile_scope(
+                                        body,
+                                        context.move_down(),
+                                        start_group,
+                                        globals,
+                                        &Value::Null,
+                                    );
+                                }
+                                None => {}
+                            };
+                        }
+                    }
+                    _ => panic!("Expected boolean condition in if statement"),
+                }
+            }
+
             ast::Statement::Impl(imp) => {
                 let evaled =
                     match imp
@@ -361,7 +410,7 @@ pub fn compile_scope(
                     None => panic!("Cannot return outside function defnition"),
                 };
                 let new_context = Context {
-                    spawn_triggered: true,
+                    spawn_triggered: context.spawn_triggered,
                     added_groups: context.added_groups.clone(),
                     ..return_info.context
                 };

@@ -48,7 +48,7 @@ pub fn serialize_trigger(trigger: GDObj) -> String {
     let values = [
         trigger.obj_id as u32,
         if spawned { trigger.x } else { 0 },
-        if spawned { trigger.y as u32 } else { 0 },
+        trigger.y as u32,
         trigger.target.id as u32,
     ];
 
