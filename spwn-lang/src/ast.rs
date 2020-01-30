@@ -13,6 +13,8 @@ pub enum Statement {
     Return(Expression),
     Impl(Implementation),
     If(If),
+    Async(Variable),
+    For(For),
     EOI,
 }
 #[derive(Clone, PartialEq, Debug)]
@@ -39,6 +41,7 @@ impl ValueLiteral {
         Variable {
             value: self.clone(),
             path: Vec::new(),
+            operator: None,
         }
     }
 }
@@ -88,13 +91,26 @@ pub struct Macro {
 }
 
 #[derive(Clone, PartialEq, Debug)]
+pub struct For {
+    pub symbol: String,
+    pub array: Expression,
+    pub body: Vec<Statement>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub struct Variable {
+    pub operator: Option<String>,
     pub value: ValueLiteral,
     pub path: Vec<Path>,
 }
 
 impl Variable {
     pub fn to_expression(&self) -> Expression {
+        if let ValueLiteral::Expression(e) = &self.value {
+            if self.path.is_empty() {
+                return e.to_owned();
+            }
+        }
         Expression {
             values: vec![self.clone()],
             operators: Vec::new(),
@@ -145,13 +161,11 @@ pub struct File {
 }
 
 pub fn str_content(inp: String) -> String {
-    let out = inp
-        .clone()
+    inp.clone()
         .replace("\"", "")
         .replace("'", "")
         .replace("\r", "")
-        .replace("\n", "");
-    out
+        .replace("\n", "")
 }
 
 #[derive(Debug)]

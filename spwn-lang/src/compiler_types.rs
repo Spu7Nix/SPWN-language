@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use crate::compiler::{compile_scope, import_module, next_free};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Context {
     pub x: u32,
     pub y: u16,
@@ -16,12 +16,35 @@ pub struct Context {
     pub variables: HashMap<String, Value>,
     pub ret: Option<Box<Return>>,
 }
+use std::fmt;
+impl fmt::Debug for Context {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CONTEXT")
+    }
+}
 
 impl Context {
     pub fn move_down(&self) -> Context {
         Context {
             y: self.y - 30,
             ..self.clone()
+        }
+    }
+
+    pub fn move_right(&self) -> Context {
+        Context {
+            x: self.x + 30,
+            ..self.clone()
+        }
+    }
+    pub fn new() -> Context {
+        Context {
+            x: 0,
+            y: 300,
+            added_groups: Vec::new(),
+            spawn_triggered: false,
+            variables: HashMap::new(),
+            ret: None,
         }
     }
 }
@@ -67,6 +90,7 @@ impl Value {
         ast::Variable {
             value: ast::ValueLiteral::Resolved(self.clone()),
             path: Vec::new(),
+            operator: None,
         }
     }
 }
@@ -102,7 +126,7 @@ use ValSuccess::{Evaluatable, Literal};
 impl ast::Expression {
     pub fn eval(
         &self,
-        context: &Context,
+        context: &mut Context,
         globals: &mut Globals,
         placeholder_value: &Value,
     ) -> ValSuccess {
@@ -122,6 +146,7 @@ impl ast::Expression {
                     ast::Variable {
                         value: ast::ValueLiteral::Expression(return_expr),
                         path: Vec::new(),
+                        operator: None,
                     },
                 ));
             }
@@ -143,6 +168,7 @@ impl ast::Expression {
                         ast::Variable {
                             value: ast::ValueLiteral::Expression(return_expr),
                             path: Vec::new(),
+                            operator: None,
                         },
                     ));
                 }
@@ -196,6 +222,20 @@ impl ast::Expression {
 
                 "!=" => {
                     acum = Value::Bool(val != acum);
+                }
+
+                "->" => {
+                    acum = Value::Array(
+                        (match acum {
+                            Value::Number(n) => n as i32,
+                            _ => panic!("Both sides must be numbers"),
+                        }..match val {
+                            Value::Number(n) => n as i32,
+                            _ => panic!("Both sides must be numbers"),
+                        })
+                            .map(|x| Value::Number(x as f64))
+                            .collect(),
+                    )
                 }
 
                 _ => unreachable!(),
@@ -252,8 +292,14 @@ pub fn evaluate_and_execute(
 
     new_context.variables.extend(new_variables);
     let ret_body = m.body.clone();
-    new_context.y -= 30;
-    let scope = compile_scope(&ret_body, new_context, start_group, globals, &Value::Null);
+    //new_context.y -= 30;
+    let scope = compile_scope(
+        &ret_body,
+        &mut new_context,
+        start_group,
+        globals,
+        &Value::Null,
+    );
 
     return scope;
 }
@@ -261,7 +307,7 @@ pub fn evaluate_and_execute(
 impl ast::Variable {
     pub fn to_value(
         &self,
-        context: &Context,
+        context: &mut Context,
         globals: &mut Globals,
         placeholder_value: &Value,
     ) -> ValSuccess {
@@ -308,13 +354,13 @@ impl ast::Variable {
                 _ => unreachable!(),
             },
             ast::ValueLiteral::Number(num) => Value::Number(*num),
-            ast::ValueLiteral::Dictionary(dict) => Value::Dict(dict.read(&context, globals)),
+            ast::ValueLiteral::Dictionary(dict) => Value::Dict(dict.read(context, globals)),
             ast::ValueLiteral::CmpStmt(cmp_stmt) => {
                 Value::Scope(cmp_stmt.to_scope(context, globals))
             }
 
             ast::ValueLiteral::Expression(expr) => {
-                match expr.eval(&context, globals, placeholder_value) {
+                match expr.eval(context, globals, placeholder_value) {
                     Literal(l) => l,
                     Evaluatable(e) => {
                         return Evaluatable((e.0, e.1, {
@@ -339,7 +385,7 @@ impl ast::Variable {
                 let mut arr: Vec<Value> = Vec::new();
                 let mut a_iter = a.iter();
                 for val in &mut a_iter {
-                    arr.push(match val.eval(&context, globals, placeholder_value) {
+                    arr.push(match val.eval(context, globals, placeholder_value) {
                         Literal(l) => l,
                         Evaluatable(e) => {
                             return Evaluatable((e.0, e.1, {
@@ -352,6 +398,7 @@ impl ast::Variable {
                                 ast::Variable {
                                     value: ast::ValueLiteral::Array(new_arr),
                                     path: Vec::new(),
+                                    operator: None,
                                 }
                             }))
                         }
@@ -365,7 +412,7 @@ impl ast::Variable {
                 let mut o_iter = o.iter();
                 for prop in &mut o_iter {
                     obj.push((
-                        match prop.0.eval(&context, globals, placeholder_value) {
+                        match prop.0.eval(context, globals, placeholder_value) {
                             Literal(Value::Number(n)) => n as u16,
                             Evaluatable(e) => {
                                 return Evaluatable((e.0, e.1, {
@@ -390,7 +437,7 @@ impl ast::Variable {
                             }
                             _ => panic!("Expected number as object property"),
                         },
-                        match prop.1.eval(&context, globals, placeholder_value) {
+                        match prop.1.eval(context, globals, placeholder_value) {
                             Literal(Value::Number(n)) => n.to_string(),
                             Literal(Value::Str(s)) => s,
                             Literal(Value::Scope(s)) => s.group.id.to_string(),
@@ -399,6 +446,14 @@ impl ast::Variable {
                             Literal(Value::Color(c)) => c.id.to_string(),
                             Literal(Value::Block(b)) => b.id.to_string(),
                             Literal(Value::Item(i)) => i.id.to_string(),
+
+                            Literal(Value::Bool(b)) => {
+                                if b {
+                                    "1".to_string()
+                                } else {
+                                    "0".to_string()
+                                }
+                            }
 
                             Evaluatable(e) => {
                                 //literally just copy paste of the above because im lazy
@@ -441,7 +496,7 @@ impl ast::Variable {
                             arg.0.clone(),
                             match &arg.1 {
                                 Some(expr) => {
-                                    Some(match expr.eval(&context, globals, placeholder_value) {
+                                    Some(match expr.eval(context, globals, placeholder_value) {
                                         Literal(l) => l,
                                         Evaluatable(e) => return Evaluatable(e),
                                     })
@@ -489,6 +544,7 @@ impl ast::Variable {
                                     ast::Variable {
                                         value: ast::ValueLiteral::Resolved(final_value),
                                         path,
+                                        operator: None,
                                     },
                                 ));
                             }
@@ -513,7 +569,7 @@ impl ast::Variable {
                             }
                             for arg in &mut c_iter {
                                 let arg_value =
-                                    match arg.value.eval(&context, globals, placeholder_value) {
+                                    match arg.value.eval(context, globals, placeholder_value) {
                                         Literal(l) => (arg.symbol.clone(), l),
                                         Evaluatable(e) => {
                                             let mut path: Vec<ast::Path> = vec![ast::Path::Call(
@@ -544,6 +600,7 @@ impl ast::Variable {
                                                 ast::Variable {
                                                     value: ast::ValueLiteral::Resolved(final_value),
                                                     path,
+                                                    operator: None,
                                                 },
                                             ));
                                         }
@@ -556,11 +613,34 @@ impl ast::Variable {
                         ast::Variable {
                             value: ast::ValueLiteral::PLACEHOLDER,
                             path: path_iter.map(|x| x.clone()).collect(),
+                            operator: None,
                         },
                     ));
                 }
             }
             parent = stored;
+        }
+
+        if let Some(o) = &self.operator {
+            match o.as_ref() {
+                "-" => {
+                    if let Value::Number(n) = &final_value {
+                        final_value = Value::Number(-n);
+                    } else {
+                        panic!("Cannot make non number type negative!")
+                    }
+                }
+
+                "!" => {
+                    if let Value::Bool(b) = &final_value {
+                        final_value = Value::Bool(!b);
+                    } else {
+                        panic!("Cannot make non boolean type oposite!")
+                    }
+                }
+
+                _ => unreachable!(),
+            }
         }
 
         Literal(final_value)
@@ -581,7 +661,7 @@ impl ast::CompoundStatement {
 
         compile_scope(
             &self.statements,
-            new_context,
+            &mut new_context,
             start_group,
             globals,
             &Value::Null,
@@ -590,10 +670,10 @@ impl ast::CompoundStatement {
 }
 
 impl ast::Dictionary {
-    fn read(&self, context: &Context, globals: &mut Globals) -> HashMap<String, Value> {
+    fn read(&self, context: &mut Context, globals: &mut Globals) -> HashMap<String, Value> {
         compile_scope(
             &self.members,
-            context.clone(),
+            context,
             Group { id: 0 },
             globals,
             &Value::Null,

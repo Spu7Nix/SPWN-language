@@ -4,7 +4,7 @@ WHITESPACE = _{ " " | "\t"}
 
 
 stmt  = _{
-    def | add_obj | call | retrn | implement | if_stmt | expr
+    def | add_obj | if_stmt | for_loop | call | async_call | retrn | implement | expr
 }
 
 def = {(symbol | "*") ~ "=" ~ (expr) ~ native_prop*}
@@ -12,6 +12,8 @@ call = {variable ~ "!"}
 retrn = {"return" ~ expr?}
 add_obj = {"add" ~ expr}
 implement = {"impl" ~ variable ~ dictionary}
+async_call = {"->" ~ variable}
+for_loop = {"for" ~ symbol ~ "in" ~ expr ~ cmp_stmt}
 
 if_stmt = {"if" ~ expr ~ ss* ~ cmp_stmt ~ ss* ~ ("else" ~ ss* ~ (cmp_stmt | if_else))?}
 if_else = {if_stmt}
@@ -50,7 +52,7 @@ value_literal = _{
     array | "(" ~ expr ~")"
 }
 
-variable = {value_literal ~ (("." ~ symbol) | index | arguments)*}
+variable = {unary_operator? ~ value_literal ~ (("." ~ symbol) | index | arguments)*}
 
 arg = {symbol ~ "=" ~ expr | expr}
 arguments = { "(" ~ (arg ~ ",")* ~ arg? ~ ")" }
@@ -61,14 +63,16 @@ arguments_def = {
     "(" ~ (arg_def ~ ",")* ~ arg_def? ~ ")"
 }
 
-number = @{"-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT*)? }
+number = @{("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT*)? }
 
 expr = {(variable ~ operator)* ~ variable}
 
-operator = {("||" | "&&" | "==" | "!=") | 
+operator = {("||" | "&&" | "==" | "!=" | "->") | 
 			(">" | "<" | ">=" | "<=") | 
             ("/" | "*") | 
-            ("+" | "-")} 
+            ("+" | "-")}
+
+unary_operator = {"-" | "!"}
 
 bool = {"true" | "false"}
 

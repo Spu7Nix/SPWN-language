@@ -95,6 +95,19 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<as
                 ast::Statement::Add(parse_expr(statement.into_inner().next().unwrap()))
             }
 
+            Rule::async_call => {
+                ast::Statement::Async(parse_variable(statement.into_inner().next().unwrap()))
+            }
+
+            Rule::for_loop => {
+                let mut inner = statement.into_inner();
+                ast::Statement::For(ast::For {
+                    symbol: inner.next().unwrap().as_span().as_str().to_string(),
+                    array: parse_expr(inner.next().unwrap()),
+                    body: parse_statements(&mut inner.next().unwrap().into_inner()),
+                })
+            }
+
             Rule::implement => {
                 let mut inner = statement.into_inner();
                 ast::Statement::Impl(ast::Implementation {
@@ -110,6 +123,7 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<as
                 None => ast::Expression {
                     // null expression
                     values: vec![ast::Variable {
+                        operator: None,
                         value: ast::ValueLiteral::Null,
                         path: Vec::new(),
                     }],
@@ -158,7 +172,20 @@ pub fn parse_path(pair: Pair<Rule>) -> ast::Path {
 
 pub fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
     let mut call_list = pair.into_inner();
-    let value = parse_value(call_list.next().unwrap());
+    let first = call_list.next().unwrap();
+
+    let value: ast::ValueLiteral;
+
+    let operator = match first.as_rule() {
+        Rule::unary_operator => {
+            value = parse_value(call_list.next().unwrap());
+            Some(first.as_span().as_str().to_string())
+        }
+        _ => {
+            value = parse_value(first);
+            None
+        }
+    };
     let path: Vec<ast::Path> = call_list.map(|x| parse_path(x)).collect();
     fn parse_value(pair: Pair<Rule>) -> ast::ValueLiteral {
         match pair.as_rule() {
@@ -260,7 +287,11 @@ pub fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
         }
     }
 
-    ast::Variable { value, path }
+    ast::Variable {
+        value,
+        path,
+        operator,
+    }
 }
 
 fn parse_expr(pair: Pair<Rule>) -> ast::Expression {

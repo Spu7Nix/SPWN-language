@@ -1,7 +1,10 @@
 
 exports = {
 
-    * = import "obj_props.spwn"
+    * = import "constants.spwn"
+    * = obj_props
+    * = easing_types
+    * = comparisons
     
     wait = (time){
         add obj{
