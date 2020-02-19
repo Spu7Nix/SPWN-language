@@ -57,30 +57,24 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
     }
     println!("{:?}", globals.closed_groups);*/
 
-    compile_scope(
-        &statements,
-        &mut Context::new(),
-        Group { id: 0 },
-        &mut globals,
-        &Value::Null,
-    );
+    compile_scope(&statements, vec![Context::new()], &mut globals);
 
     globals
 }
 
 pub fn compile_scope(
     statements: &Vec<ast::Statement>,
-    context: &mut Context,
-    mut start_group: Group,
+    mut contexts: Vec<Context>,
     globals: &mut Globals,
-    placeholder_value: &Value,
-) -> Scope {
+) -> (Scope, Vec<Context>) {
+    /*
     context.x = globals.highest_x;
     if start_group.id != 0 {
         context.spawn_triggered = true;
     }
 
     (*globals).highest_x += 30;
+    context.y -= 30;
 
     context.added_groups.sort_by(|a, b| a.id.cmp(&b.id));
     context.added_groups.dedup();
@@ -100,6 +94,7 @@ pub fn compile_scope(
         }
         start_group = Group { id: 0 };
     }
+    */
     let mut statements_iter = statements.iter();
 
     while let Some(statement) = statements_iter.next() {
@@ -107,20 +102,12 @@ pub fn compile_scope(
 
         match statement {
             ast::Statement::Expr(expr) => {
-                match expr.eval(context, globals, placeholder_value) {
-                    Literal(_l) => {}
-                    Evaluatable(e) => {
-                        let mut new_statements = vec![ast::Statement::Expr(e.2.to_expression())];
-                        new_statements.extend(statements_iter.cloned());
-                        return evaluate_and_execute(
-                            (e.0, e.1),
-                            &context,
-                            globals,
-                            new_statements,
-                            start_group,
-                        );
-                    }
-                };
+                for context in contexts {
+                    match expr.eval(&mut context, globals, &Value::Null) {
+                        Literal(_l) => {}
+                        Evaluatable(e) => {}
+                    };
+                }
             }
 
             ast::Statement::Definition(def) => {
@@ -491,6 +478,8 @@ pub fn compile_scope(
             ast::Statement::EOI => {}
         }
     }
+
+    (*globals).highest_x = context.x;
 
     Scope {
         group: start_group,

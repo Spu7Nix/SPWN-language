@@ -11,10 +11,10 @@ use crate::compiler::{compile_scope, import_module, next_free};
 pub struct Context {
     pub x: u32,
     pub y: u16,
-    pub added_groups: Vec<Group>,
+    pub start_group: Group,
     pub spawn_triggered: bool,
     pub variables: HashMap<String, Value>,
-    pub ret: Option<Box<Return>>,
+    pub return_val: Box<Value>,
 }
 use std::fmt;
 impl fmt::Debug for Context {
@@ -24,36 +24,23 @@ impl fmt::Debug for Context {
 }
 
 impl Context {
-    pub fn move_down(&self) -> Context {
-        Context {
-            y: self.y - 30,
-            ..self.clone()
-        }
-    }
-
-    pub fn move_right(&self) -> Context {
-        Context {
-            x: self.x + 30,
-            ..self.clone()
-        }
-    }
     pub fn new() -> Context {
         Context {
             x: 0,
-            y: 300,
-            added_groups: Vec::new(),
+            y: 1500,
+            start_group: Group { id: 0 },
             spawn_triggered: false,
             variables: HashMap::new(),
-            ret: None,
+            return_val: Box::new(Value::Null),
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+/*#[derive(Clone, Debug, PartialEq)]
 pub struct Return {
     pub context: Context,
     pub statements: Vec<ast::Statement>,
-}
+}*/
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scope {
@@ -109,156 +96,125 @@ pub struct Globals {
     pub implementations: HashMap<String, HashMap<String, Value>>,
 }
 
-#[derive(Debug)]
+/*#[derive(Debug)]
 pub enum ValSuccess {
     Literal(Value),
-    Evaluatable(
-        (
-            Macro,                        //macro called
-            Vec<(Option<String>, Value)>, //macro arguments
-            ast::Variable,                //variable with PLACEHOLDER somewhere in it
-        ),
-    ),
+    Evaluatable((Value, Vec<Context>)),
 }
 
-use ValSuccess::{Evaluatable, Literal};
+use ValSuccess::{Evaluatable, Literal};*/
 
+fn add_contexts(evaled: Vec<(Value, Context)>, new_contexts: &mut Vec<Context>) -> Vec<Value> {
+    let v = evaled.iter().map(|x| x.0).collect();
+    let c = evaled.iter().map(|x| x.1);
+    (*new_contexts).extend(c);
+    v
+}
+
+fn into_tuple_vec<T1, T2>(vec1: Vec<T1>, vec2: Vec<T2>) -> Vec<(T1, T2)> {
+    if vec1.len() != vec2.len() {
+        panic!("not equal length of vectors");
+    }
+    let out: Vec<(T1, T2)> = Vec::new();
+
+    for i in 0..vec1.len() {
+        out.push((vec1[i], vec2[i]));
+    }
+    out
+}
 impl ast::Expression {
-    pub fn eval(
-        &self,
-        context: &mut Context,
-        globals: &mut Globals,
-        placeholder_value: &Value,
-    ) -> ValSuccess {
+    pub fn eval(&self, contexts: Vec<Context>, globals: &mut Globals) -> Vec<(Value, Context)> {
+        let mut new_contexts: Vec<Context> = contexts;
         let mut vals = self.values.iter();
-        let mut acum = match vals
-            .next()
-            .unwrap()
-            .to_value(context, globals, placeholder_value)
-        {
-            Literal(l) => l,
-            Evaluatable(e) => {
-                let mut return_expr = self.clone();
-                return_expr.values[0] = e.2;
-                return Evaluatable((
-                    e.0,
-                    e.1,
-                    ast::Variable {
-                        value: ast::ValueLiteral::Expression(return_expr),
-                        path: Vec::new(),
-                        operator: None,
-                    },
-                ));
-            }
-        };
+        let mut acum = add_contexts(
+            vals.next().unwrap().to_value(contexts, globals),
+            &mut new_contexts,
+        );
 
         if self.operators.is_empty() {
-            return Literal(acum);
+            return into_tuple_vec(acum, new_contexts);
         }
 
         for (i, var) in vals.enumerate() {
-            let val = match var.to_value(context, globals, placeholder_value) {
-                Literal(l) => l,
-                Evaluatable(e) => {
-                    let mut return_expr = self.clone();
-                    return_expr.values[i] = e.2;
-                    return Evaluatable((
-                        e.0,
-                        e.1,
-                        ast::Variable {
-                            value: ast::ValueLiteral::Expression(return_expr),
-                            path: Vec::new(),
-                            operator: None,
-                        },
-                    ));
-                }
-            };
-
-            match self.operators[i].as_ref() {
-                "||" | "&&" => {
-                    //boolean operations
-                    if let Value::Bool(b) = val {
-                        if let Value::Bool(a) = acum {
-                            match self.operators[i].as_ref() {
-                                "||" => acum = Value::Bool(a || b),
-                                "&&" => acum = Value::Bool(a && b),
-                                _ => unreachable!(),
+            acum = acum.iter().map(|tup| {
+                let acum_val = tup;
+                
+                match self.operators[i].as_ref() {
+                    "||" | "&&" => {
+                        //boolean operations
+                        if let Value::Bool(b) = val {
+                            if let Value::Bool(a) = acum_val {
+                                match self.operators[i].as_ref() {
+                                    "||" => acum_val = Value::Bool(a || b),
+                                    "&&" => acum_val = Value::Bool(a && b),
+                                    _ => unreachable!(),
+                                }
+                            } else {
+                                panic!("Right side must be boolean")
                             }
                         } else {
-                            panic!("Right side must be boolean")
+                            panic!("Both sides must be boolean")
                         }
-                    } else {
-                        panic!("Both sides must be boolean")
                     }
-                }
-
-                ">" | "<" | ">=" | "<=" | "/" | "*" | "+" | "-" => {
-                    //number operations
-                    if let Value::Number(num) = val {
-                        if let Value::Number(a) = acum {
-                            match self.operators[i].as_ref() {
-                                ">" => acum = Value::Bool(a > num),
-                                "<" => acum = Value::Bool(a < num),
-                                ">=" => acum = Value::Bool(a >= num),
-                                "<=" => acum = Value::Bool(a <= num),
-                                "/" => acum = Value::Number(a / num),
-                                "*" => acum = Value::Number(a * num),
-                                "+" => acum = Value::Number(a + num),
-                                "-" => acum = Value::Number(a - num),
-                                _ => unreachable!(),
+                    ">" | "<" | ">=" | "<=" | "/" | "*" | "+" | "-" => {
+                        //number operations
+                        if let Value::Number(num) = val {
+                            if let Value::Number(a) = acum_val {
+                                match self.operators[i].as_ref() {
+                                    ">" => acum_val = Value::Bool(a > num),
+                                    "<" => acum_val = Value::Bool(a < num),
+                                    ">=" => acum_val = Value::Bool(a >= num),
+                                    "<=" => acum_val = Value::Bool(a <= num),
+                                    "/" => acum_val = Value::Number(a / num),
+                                    "*" => acum_val = Value::Number(a * num),
+                                    "+" => acum_val = Value::Number(a + num),
+                                    "-" => acum_val = Value::Number(a - num),
+                                    _ => unreachable!(),
+                                }
+                            } else {
+                                panic!("Right side must be number")
                             }
                         } else {
-                            panic!("Right side must be number")
+                            panic!("Both sides must be numbers")
                         }
-                    } else {
-                        panic!("Both sides must be numbers")
                     }
+                    //any
+                    "==" => {
+                        acum_val = Value::Bool(val == acum_val);
+                    }
+                    "!=" => {
+                        acum_val = Value::Bool(val != acum_val);
+                    }
+                    "->" => {
+                        acum_val = Value::Array(
+                            (match acum_val {
+                                Value::Number(n) => n as i32,
+                                _ => panic!("Both sides must be numbers"),
+                            }..match val {
+                                Value::Number(n) => n as i32,
+                                _ => panic!("Both sides must be numbers"),
+                            })
+                                .map(|x| Value::Number(x as f64))
+                                .collect(),
+                        )
+                    }
+                    _ => unreachable!(),
                 }
-
-                //any
-                "==" => {
-                    acum = Value::Bool(val == acum);
-                }
-
-                "!=" => {
-                    acum = Value::Bool(val != acum);
-                }
-
-                "->" => {
-                    acum = Value::Array(
-                        (match acum {
-                            Value::Number(n) => n as i32,
-                            _ => panic!("Both sides must be numbers"),
-                        }..match val {
-                            Value::Number(n) => n as i32,
-                            _ => panic!("Both sides must be numbers"),
-                        })
-                            .map(|x| Value::Number(x as f64))
-                            .collect(),
-                    )
-                }
-
-                _ => unreachable!(),
-            }
+                ()
+            }).collect();
         }
 
-        Literal(acum)
+        (acum, new_contexts)
     }
 }
 
-pub fn evaluate_and_execute(
+pub fn execute_macro(
     (m, args): (Macro, Vec<(Option<String>, Value)>),
     context: &Context,
     globals: &mut Globals,
-    statements: Vec<ast::Statement>, // with PLACEHOLDER in it
-    start_group: Group,
-) -> Scope {
+) -> Vec<Context> {
     let mut new_context = context.clone();
     new_context.variables = m.def_context.variables;
-    new_context.ret = Some(Box::new(Return {
-        statements: statements.clone(),
-        context: context.clone(),
-    }));
 
     let mut new_variables: HashMap<String, Value> = HashMap::new();
 
@@ -291,27 +247,15 @@ pub fn evaluate_and_execute(
     }
 
     new_context.variables.extend(new_variables);
-    let ret_body = m.body.clone();
-    //new_context.y -= 30;
-    let scope = compile_scope(
-        &ret_body,
-        &mut new_context,
-        start_group,
-        globals,
-        &Value::Null,
-    );
 
-    return scope;
+    //new_context.y -= 30;
+    compile_scope(&m.body, vec![new_context], globals).1
 }
 
 impl ast::Variable {
-    pub fn to_value(
-        &self,
-        context: &mut Context,
-        globals: &mut Globals,
-        placeholder_value: &Value,
-    ) -> ValSuccess {
+    pub fn to_value(&self, contexts: Vec<Context>, globals: &mut Globals) -> Vec<(Value, Context)> {
         // TODO: Check if this variable has native functions called on it, and if not set this to false
+        let mut new_contexts: Vec<Context> = Vec::new();
 
         let mut final_value = match &self.value {
             ast::ValueLiteral::ID(id) => match id.class_name.as_ref() {
@@ -354,22 +298,13 @@ impl ast::Variable {
                 _ => unreachable!(),
             },
             ast::ValueLiteral::Number(num) => Value::Number(*num),
-            ast::ValueLiteral::Dictionary(dict) => Value::Dict(dict.read(context, globals)),
+            ast::ValueLiteral::Dictionary(dict) => Value::Dict(dict.read(*context, globals)),
             ast::ValueLiteral::CmpStmt(cmp_stmt) => {
                 Value::Scope(cmp_stmt.to_scope(context, globals))
             }
 
             ast::ValueLiteral::Expression(expr) => {
-                match expr.eval(context, globals, placeholder_value) {
-                    Literal(l) => l,
-                    Evaluatable(e) => {
-                        return Evaluatable((e.0, e.1, {
-                            let mut placeholder = e.2;
-                            placeholder.path = self.path.clone(); //expr.eval never returns a variable with a path, so I can just replace this
-                            placeholder
-                        }));
-                    }
-                }
+                add_contexts(expr.eval(context, globals), &mut new_contexts)
             }
 
             ast::ValueLiteral::Bool(b) => Value::Bool(*b),
@@ -385,24 +320,7 @@ impl ast::Variable {
                 let mut arr: Vec<Value> = Vec::new();
                 let mut a_iter = a.iter();
                 for val in &mut a_iter {
-                    arr.push(match val.eval(context, globals, placeholder_value) {
-                        Literal(l) => l,
-                        Evaluatable(e) => {
-                            return Evaluatable((e.0, e.1, {
-                                let mut new_arr: Vec<ast::Expression> = arr
-                                    .iter()
-                                    .map(|x| x.to_variable().to_expression())
-                                    .collect();
-                                new_arr.push(e.2.to_expression());
-                                new_arr.extend(a_iter.cloned());
-                                ast::Variable {
-                                    value: ast::ValueLiteral::Array(new_arr),
-                                    path: Vec::new(),
-                                    operator: None,
-                                }
-                            }))
-                        }
-                    });
+                    arr.push(add_contexts(val.eval(context, globals), &mut new_contexts));
                 }
                 Value::Array(arr)
             }
@@ -411,43 +329,25 @@ impl ast::Variable {
                 let mut obj: Vec<(u16, String)> = Vec::new();
                 let mut o_iter = o.iter();
                 for prop in &mut o_iter {
+                    let v = add_contexts(prop.0.eval(context, globals), &mut new_contexts);
+                    let v2 = add_contexts(prop.1.eval(context, globals), &mut new_contexts);
+
                     obj.push((
-                        match prop.0.eval(context, globals, placeholder_value) {
-                            Literal(Value::Number(n)) => n as u16,
-                            Evaluatable(e) => {
-                                return Evaluatable((e.0, e.1, {
-                                    let mut new_obj: Vec<(ast::Expression, ast::Expression)> = obj
-                                        .clone()
-                                        .iter()
-                                        .map(|x| {
-                                            (
-                                                Value::Number(x.0 as f64)
-                                                    .to_variable()
-                                                    .to_expression(),
-                                                Value::Str(x.1.clone())
-                                                    .to_variable()
-                                                    .to_expression(),
-                                            )
-                                        })
-                                        .collect();
-                                    new_obj.push((e.2.to_expression(), prop.1.clone()));
-                                    new_obj.extend(o_iter.cloned());
-                                    ast::ValueLiteral::Obj(new_obj).to_variable()
-                                }))
-                            }
+                        match v {
+                            Value::Number(n) => n as u16,
                             _ => panic!("Expected number as object property"),
                         },
-                        match prop.1.eval(context, globals, placeholder_value) {
-                            Literal(Value::Number(n)) => n.to_string(),
-                            Literal(Value::Str(s)) => s,
-                            Literal(Value::Scope(s)) => s.group.id.to_string(),
+                        match v2 {
+                            Value::Number(n) => n.to_string(),
+                            Value::Str(s) => s,
+                            Value::Scope(s) => s.group.id.to_string(),
 
-                            Literal(Value::Group(g)) => g.id.to_string(),
-                            Literal(Value::Color(c)) => c.id.to_string(),
-                            Literal(Value::Block(b)) => b.id.to_string(),
-                            Literal(Value::Item(i)) => i.id.to_string(),
+                            Value::Group(g) => g.id.to_string(),
+                            Value::Color(c) => c.id.to_string(),
+                            Value::Block(b) => b.id.to_string(),
+                            Value::Item(i) => i.id.to_string(),
 
-                            Literal(Value::Bool(b)) => {
+                            Value::Bool(b) => {
                                 if b {
                                     "1".to_string()
                                 } else {
@@ -455,31 +355,6 @@ impl ast::Variable {
                                 }
                             }
 
-                            Evaluatable(e) => {
-                                //literally just copy paste of the above because im lazy
-                                return Evaluatable((e.0, e.1, {
-                                    let mut new_obj: Vec<(ast::Expression, ast::Expression)> = obj
-                                        .clone()
-                                        .iter()
-                                        .map(|x| {
-                                            (
-                                                Value::Number(x.0 as f64)
-                                                    .to_variable()
-                                                    .to_expression(),
-                                                Value::Str(x.1.clone())
-                                                    .to_variable()
-                                                    .to_expression(),
-                                            )
-                                        })
-                                        .collect();
-                                    //since the previous value has already been determined, this can be improved by storing the previous
-                                    //in a var and replacing it with the prop.0
-                                    //          This 🠟
-                                    new_obj.push((prop.0.clone(), e.2.to_expression()));
-                                    new_obj.extend(o_iter.cloned());
-                                    ast::ValueLiteral::Obj(new_obj).to_variable()
-                                }));
-                            }
                             //Value::Array(a) => {} TODO: Add this
                             x => panic!("{:?} is not a valid object value", x),
                         },
@@ -496,10 +371,9 @@ impl ast::Variable {
                             arg.0.clone(),
                             match &arg.1 {
                                 Some(expr) => {
-                                    Some(match expr.eval(context, globals, placeholder_value) {
-                                        Literal(l) => l,
-                                        Evaluatable(e) => return Evaluatable(e),
-                                    })
+                                    let (v, c) = expr.eval(context, globals);
+                                    new_contexts.extend(c.iter().cloned());
+                                    Some(v)
                                 }
                                 None => None,
                             },
@@ -515,7 +389,6 @@ impl ast::Variable {
             ast::ValueLiteral::Resolved(r) => r.clone(),
 
             ast::ValueLiteral::Null => Value::Null,
-            ast::ValueLiteral::PLACEHOLDER => placeholder_value.clone(),
         };
         let mut path_iter = self.path.iter();
         let mut parent = Value::Null;
@@ -525,29 +398,11 @@ impl ast::Variable {
                 ast::Path::Member(m) => final_value = final_value.member(m.clone(), globals),
 
                 ast::Path::Index(i) => {
+                    let v = add_contexts(i.eval(context, globals), &mut new_contexts);
                     final_value = match &final_value {
-                        Value::Array(a) => a[match i.eval(context, globals, placeholder_value) {
-                            Literal(l) => match l {
-                                Value::Number(n) => n,
-                                _ => panic!("Expected number"),
-                            },
-
-                            Evaluatable(e) => {
-                                let mut path: Vec<ast::Path> =
-                                    vec![ast::Path::Index(e.2.to_expression())];
-
-                                path.extend(path_iter.cloned());
-
-                                return Evaluatable((
-                                    e.0,
-                                    e.1,
-                                    ast::Variable {
-                                        value: ast::ValueLiteral::Resolved(final_value),
-                                        path,
-                                        operator: None,
-                                    },
-                                ));
-                            }
+                        Value::Array(a) => a[match v {
+                            Value::Number(n) => n,
+                            _ => panic!("Expected number"),
                         } as usize]
                             .clone(),
                         _ => panic!("Can't index non-iteratable variable"),
@@ -559,63 +414,22 @@ impl ast::Variable {
                         Value::Macro(m) => m,
                         _ => panic!("Not a macro!"),
                     };
-                    return Evaluatable((
-                        m.clone(),
-                        {
-                            let mut vals: Vec<(Option<String>, Value)> = Vec::new();
-                            let mut c_iter = c.iter();
-                            if !m.args.is_empty() && m.args[0].0 == "self" {
-                                vals.push((None, parent))
-                            }
-                            for arg in &mut c_iter {
-                                let arg_value =
-                                    match arg.value.eval(context, globals, placeholder_value) {
-                                        Literal(l) => (arg.symbol.clone(), l),
-                                        Evaluatable(e) => {
-                                            let mut path: Vec<ast::Path> = vec![ast::Path::Call(
-                                                [
-                                                    vals.iter()
-                                                        .map(|x| ast::Argument {
-                                                            symbol: x.0.clone(),
-                                                            value: x
-                                                                .1
-                                                                .to_variable()
-                                                                .to_expression(),
-                                                        })
-                                                        .collect(),
-                                                    vec![ast::Argument {
-                                                        value: e.2.to_expression(),
-                                                        ..arg.clone()
-                                                    }],
-                                                    c_iter.cloned().collect(),
-                                                ]
-                                                .concat(),
-                                            )];
-
-                                            path.extend(path_iter.cloned());
-
-                                            return Evaluatable((
-                                                e.0,
-                                                e.1,
-                                                ast::Variable {
-                                                    value: ast::ValueLiteral::Resolved(final_value),
-                                                    path,
-                                                    operator: None,
-                                                },
-                                            ));
-                                        }
-                                    };
-
-                                vals.push(arg_value);
-                            }
-                            vals
-                        },
-                        ast::Variable {
-                            value: ast::ValueLiteral::PLACEHOLDER,
-                            path: path_iter.map(|x| x.clone()).collect(),
-                            operator: None,
-                        },
-                    ));
+                    let mut vals: Vec<(Option<String>, Value)> = Vec::new();
+                    let mut c_iter = c.iter();
+                    if !m.args.is_empty() && m.args[0].0 == "self" {
+                        vals.push((None, parent))
+                    }
+                    for arg in &mut c_iter {
+                        let arg_value = (
+                            arg.symbol,
+                            add_contexts(arg.value.eval(context, globals), &mut new_contexts),
+                        );
+                        vals.push(arg_value);
+                    }
+                    final_value = add_contexts(
+                        execute_macro((m, vals), context, globals),
+                        &mut new_contexts,
+                    );
                 }
             }
             parent = stored;
@@ -643,7 +457,7 @@ impl ast::Variable {
             }
         }
 
-        Literal(final_value)
+        (final_value, new_contexts)
     }
 }
 
@@ -659,25 +473,14 @@ impl ast::CompoundStatement {
             id: next_free(&mut globals.closed_groups),
         };
 
-        compile_scope(
-            &self.statements,
-            &mut new_context,
-            start_group,
-            globals,
-            &Value::Null,
-        )
+        compile_scope(&self.statements, vec![new_context], globals).0
     }
 }
 
 impl ast::Dictionary {
-    fn read(&self, context: &mut Context, globals: &mut Globals) -> HashMap<String, Value> {
-        compile_scope(
-            &self.members,
-            context,
-            Group { id: 0 },
-            globals,
-            &Value::Null,
-        )
-        .members
+    fn read(&self, context: Context, globals: &mut Globals) -> HashMap<String, Value> {
+        compile_scope(&self.members, vec![context], globals)
+            .0
+            .members
     }
 }

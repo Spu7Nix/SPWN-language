@@ -12,6 +12,7 @@ if the macro has one return, dont use compile_and_exec, rather just change the c
 compile_scope should have a parameter that says if its the defining scope of a macro, and if it reaches the end, do a return
 */
 
-for i in 1->10 {
-    -> 10g.move(i, 10)
-}
+m = mut(2)
+
+
+10g.move(m.const(0->3), 0, 0.5)
