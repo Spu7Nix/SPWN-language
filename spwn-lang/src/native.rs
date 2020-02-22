@@ -41,6 +41,7 @@ pub fn context_trigger(context: Context) -> GDObj {
 const TYPE_MEMBER_NAME: &str = "TYPE";
 impl Value {
     pub fn member(&self, member: String, context: &Context) -> Value {
+        //println!("{:?}", context.implementations);
         let get_impl = |t: String, m: String| match context.implementations.get(&(t)) {
             Some(imp) => match imp.get(&m) {
                 Some(mem) => mem.clone(),

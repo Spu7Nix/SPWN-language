@@ -3,7 +3,7 @@ use crate::ast;
 use crate::levelstring::*;
 use crate::native::*;
 
-use std::collections::HashMap;
+//use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::compiler_types::*;
@@ -98,23 +98,34 @@ pub fn compile_scope(
 
     let mut returns: Returns = Vec::new();
 
+    use std::time::Instant;
+
     while let Some(statement) = statements_iter.next() {
         //find out what kind of statement this is
+        let start_time = Instant::now();
 
+        println!("compiling a statement in {} contexts", contexts.len());
+        let mut statement_type: &str = "";
         match statement {
             ast::Statement::Expr(expr) => {
+                statement_type = "expr";
                 let mut new_contexts: Vec<Context> = Vec::new();
                 for context in contexts {
                     //we dont care about the return value in this case
-                    new_contexts.extend(expr.eval(context, globals).iter().map(|x| x.1.clone()));
+                    let (evaled, inner_returns) = expr.eval(context, globals);
+                    returns.extend(inner_returns);
+                    new_contexts.extend(evaled.iter().map(|x| x.1.clone()));
                 }
                 contexts = new_contexts;
             }
 
             ast::Statement::Definition(def) => {
+                statement_type = "def";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
-                    all_values.extend(def.value.eval(context, globals));
+                    let (evaled, inner_returns) = def.value.eval(context, globals);
+                    returns.extend(inner_returns);
+                    all_values.extend(evaled);
                 }
                 contexts = Vec::new();
                 for (val, mut context) in all_values {
@@ -135,9 +146,12 @@ pub fn compile_scope(
             }
 
             ast::Statement::If(if_stmt) => {
+                statement_type = "if";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
-                    all_values.extend(if_stmt.condition.eval(context, globals));
+                    let (evaled, inner_returns) = if_stmt.condition.eval(context, globals);
+                    returns.extend(inner_returns);
+                    all_values.extend(evaled);
                 }
                 contexts = Vec::new();
 
@@ -146,12 +160,15 @@ pub fn compile_scope(
                         Value::Bool(b) => {
                             //internal if statement
                             if b {
-                                compile_scope(&if_stmt.if_body, vec![context], globals);
+                                let compiled =
+                                    compile_scope(&if_stmt.if_body, vec![context], globals);
+                                returns.extend(compiled.1);
                             // TODO: add the returns from these scopes
                             } else {
                                 match &if_stmt.else_body {
                                     Some(body) => {
-                                        compile_scope(body, vec![context], globals);
+                                        let compiled = compile_scope(body, vec![context], globals);
+                                        returns.extend(compiled.1);
                                     }
                                     None => {}
                                 };
@@ -167,32 +184,52 @@ pub fn compile_scope(
             }
 
             ast::Statement::Impl(imp) => {
-                for context in &mut contexts {
-                    let evaled = imp.symbol.to_value(context.clone(), globals);
-
+                statement_type = "impl";
+                let mut new_contexts: Vec<Context> = Vec::new();
+                for context in contexts.clone() {
+                    let (evaled, inner_returns) = imp.symbol.to_value(context.clone(), globals);
+                    returns.extend(inner_returns);
                     for (typ, c) in evaled {
                         if let Value::Str(s) = typ {
+                            let (evaled, inner_returns) =
+                                eval_dict(imp.members.clone(), c, globals);
+                            returns.extend(inner_returns);
+                            for (val, c2) in evaled {
+                                let mut new_context = c2.clone();
+                                if let Value::Dict(d) = val {
+                                    match new_context.implementations.get_mut(&s) {
+                                        Some(implementation) => {
+                                            for (key, val) in d.into_iter() {
+                                                (*implementation).insert(key, val);
+                                            }
+                                        }
+                                        None => {
+                                            new_context.implementations.insert(s.clone(), d);
+                                        }
+                                    }
+                                } else {
+                                    unreachable!();
+                                }
+                                new_contexts.push(new_context);
+                            }
+                        /**/
                         } else {
                             panic!("Must implement on a type (a string)");
                         }
                     }
                 }
+                //println!("{:?}", new_contexts[0].implementations);
+                contexts = new_contexts;
 
-                /*match globals.implementations.get_mut(&typ) {
-                    Some(implementation) => {
-                        for (key, val) in Func.members.into_iter() {
-                            (*implementation).insert(key, val);
-                        }
-                    }
-                    None => {
-                        (*globals).implementations.insert(typ, Func.members);
-                    }
-                }*/
+                /**/
             }
             ast::Statement::Call(call) => {
+                statement_type = "call";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
-                    all_values.extend(call.function.to_value(context, globals));
+                    let (evaled, inner_returns) = call.function.to_value(context, globals);
+                    returns.extend(inner_returns);
+                    all_values.extend(evaled);
                 }
                 contexts = Vec::new();
                 for (func, context) in all_values {
@@ -215,9 +252,12 @@ pub fn compile_scope(
             }
 
             ast::Statement::Add(v) => {
+                statement_type = "add";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
-                    all_values.extend(v.eval(context, globals));
+                    let (evaled, inner_returns) = v.eval(context, globals);
+                    returns.extend(inner_returns);
+                    all_values.extend(evaled);
                 }
                 contexts = Vec::new();
                 for (val, context) in all_values {
@@ -238,7 +278,7 @@ pub fn compile_scope(
                     }
                 }
             }
-            ast::Statement::For(f) => unimplemented!(),
+            ast::Statement::For(_) => unimplemented!(),
             /*ast::Statement::For(f) => {
                 let evaled = match f.array.eval(context, globals, placeholder_value) {
                     Literal(l) => l,
@@ -315,9 +355,12 @@ pub fn compile_scope(
                 //TODO: make some deeply nested shit that deals with this or smth idk i need sleep gn
             }*/
             ast::Statement::Return(val) => {
+                statement_type = "return";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts.clone() {
-                    all_values.extend(val.eval(context, globals));
+                    let (evaled, inner_returns) = val.eval(context, globals);
+                    returns.extend(inner_returns);
+                    all_values.extend(evaled);
                 }
 
                 returns.extend(all_values);
@@ -325,13 +368,18 @@ pub fn compile_scope(
 
             ast::Statement::EOI => {}
         }
+        println!(
+            "Compiled '{}' in {} milliseconds!",
+            statement_type,
+            start_time.elapsed().as_millis()
+        );
     }
 
     //(*globals).highest_x = context.x;
     (contexts, returns)
 }
 
-pub fn import_module(path: &PathBuf, globals: &mut Globals) -> Value {
+pub fn import_module(path: &PathBuf, globals: &mut Globals) -> (Value, Implementations) {
     let module_path = globals
         .path
         .clone()
@@ -346,10 +394,13 @@ pub fn import_module(path: &PathBuf, globals: &mut Globals) -> Value {
             Please remove any context splitting statements outside of function or macro definitions."
         )
     }
-    match contexts[0].variables.get("exports") {
-        Some(val) => val.clone(),
-        None => Value::Null,
-    }
+    (
+        match contexts[0].variables.get("exports") {
+            Some(val) => val.clone(),
+            None => Value::Null,
+        },
+        contexts[0].implementations.clone(),
+    )
 }
 
 const ID_MAX: u16 = 999;

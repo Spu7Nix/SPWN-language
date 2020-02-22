@@ -8,8 +8,9 @@ use std::path::PathBuf;
 use crate::compiler::{compile_scope, import_module, next_free};
 
 pub type Returns = Vec<(Value, Context)>;
+pub type Implementations = HashMap<String, HashMap<String, Value>>;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Context {
     pub x: u32,
     pub y: u16,
@@ -17,14 +18,14 @@ pub struct Context {
     pub spawn_triggered: bool,
     pub variables: HashMap<String, Value>,
     pub return_val: Box<Value>,
-    pub implementations: HashMap<String, HashMap<String, Value>>,
+    pub implementations: Implementations,
 }
-use std::fmt;
+/*use std::fmt;
 impl fmt::Debug for Context {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "CONTEXT")
     }
-}
+}*/
 
 impl Context {
     pub fn new() -> Context {
@@ -84,12 +85,12 @@ pub enum ValSuccess {
 
 use ValSuccess::{Evaluatable, Literal};*/
 
-fn add_contexts(evaled: Returns, new_contexts: &mut Vec<Context>) -> Vec<Value> {
+/*fn add_contexts(evaled: Returns, new_contexts: &mut Vec<Context>) -> Vec<Value> {
     let v = evaled.iter().map(|x| x.0.clone()).collect();
     let c = evaled.iter().map(|x| x.1.clone());
     (*new_contexts).extend(c);
     v
-}
+}*/
 
 /*fn into_tuple_vec<T1, T2>(vec1: Vec<T1>, vec2: Vec<T2>) -> Vec<(T1, T2)> {
     if vec1.len() != vec2.len() {
@@ -103,13 +104,16 @@ fn add_contexts(evaled: Returns, new_contexts: &mut Vec<Context>) -> Vec<Value> 
     out
 }*/
 impl ast::Expression {
-    pub fn eval(&self, context: Context, globals: &mut Globals) -> Returns {
+    pub fn eval(&self, context: Context, globals: &mut Globals) -> (Returns, Returns) {
+        //second returns is in case there are any values in the expression that includes a return statement
         let mut vals = self.values.iter();
-        let mut acum = vals.next().unwrap().to_value(context, globals);
+        let first_value = vals.next().unwrap().to_value(context, globals);
+        let mut acum = first_value.0;
+        let mut inner_returns = first_value.1;
 
         if self.operators.is_empty() {
             //if only variable
-            return acum;
+            return (acum, inner_returns);
         }
 
         for (i, var) in vals.enumerate() {
@@ -117,9 +121,10 @@ impl ast::Expression {
             //every value in acum will be operated with the value of var in the corresponding context
             for (acum_val, c) in acum {
                 //what the value in acum becomes
-                let mut new_val: Returns = Vec::new();
-                for (val, c2) in var.to_value(c, globals) {
-                    new_val.push((
+                let evaled = var.to_value(c, globals);
+                inner_returns.extend(evaled.1);
+                for (val, c2) in evaled.0 {
+                    new_acum.push((
                         //doing the operation
                         match self.operators[i].as_ref() {
                             "||" | "&&" => {
@@ -182,7 +187,7 @@ impl ast::Expression {
             }
             acum = new_acum;
         }
-        acum
+        (acum, inner_returns)
     }
 }
 
@@ -190,8 +195,9 @@ pub fn execute_macro(
     (m, args): (Macro, Vec<ast::Argument>),
     context: Context,
     globals: &mut Globals,
-) -> Returns {
-    let evaled_args = all_combinations(
+) -> (Returns, Returns) {
+    // second returns is for any compound statements in the args
+    let (evaled_args, inner_returns) = all_combinations(
         args.iter().map(|x| x.value.clone()).collect(),
         context,
         globals,
@@ -234,29 +240,32 @@ pub fn execute_macro(
 
         new_contexts.push(new_context);
     }
-    compile_scope(&m.body, new_contexts, globals).1
+    (
+        compile_scope(&m.body, new_contexts, globals).1,
+        inner_returns,
+    )
 }
 
 fn all_combinations(
     a: Vec<ast::Expression>,
     context: Context,
     globals: &mut Globals,
-) -> Vec<(Vec<Value>, Context)> {
+) -> (Vec<(Vec<Value>, Context)>, Returns) {
     let mut out: Vec<(Vec<Value>, Context)> = Vec::new();
+    let mut inner_returns = Returns::new();
     if a.is_empty() {
         //if there are so value, there is only one combination
         out.push((Vec::new(), context));
     } else {
         let mut a_iter = a.iter();
         //starts with all the combinations of the first expr
+        let (start_values, start_returns) = a_iter.next().unwrap().eval(context, globals);
         out.extend(
-            a_iter
-                .next()
-                .unwrap()
-                .eval(context, globals)
+            start_values
                 .iter()
                 .map(|x| (vec![x.0.clone()], x.1.clone())),
         );
+        inner_returns.extend(start_returns);
         //for the rest of the expressions
         for expr in a_iter {
             //all the new combinations end up in this
@@ -264,7 +273,9 @@ fn all_combinations(
             //run through all the lists in out
             for (inner_arr, c) in out.iter() {
                 //for each one, run through all the returns in that context
-                for (v, c2) in expr.eval(c.clone(), globals).iter() {
+                let (values, returns) = expr.eval(c.clone(), globals);
+                inner_returns.extend(returns);
+                for (v, c2) in values.iter() {
                     //push a new list with each return pushed to it
                     new_out.push((
                         {
@@ -280,13 +291,53 @@ fn all_combinations(
             out = new_out;
         }
     }
-    out
+    (out, inner_returns)
+}
+pub fn eval_dict(
+    dict: Vec<ast::DictDef>,
+    context: Context,
+    globals: &mut Globals,
+) -> (Returns, Returns) {
+    let mut inner_returns = Returns::new();
+    let (evaled, returns) = all_combinations(
+        dict.iter()
+            .map(|def| match def {
+                ast::DictDef::Def(d) => d.1.clone(),
+                ast::DictDef::Extract(e) => e.clone(),
+            })
+            .collect(),
+        context,
+        globals,
+    );
+    inner_returns.extend(returns);
+    let mut out = Returns::new();
+    for expressions in evaled {
+        let mut expr_index: usize = 0;
+        let mut dict_out: HashMap<String, Value> = HashMap::new();
+        for def in dict.clone() {
+            match def {
+                ast::DictDef::Def(d) => {
+                    dict_out.insert(d.0.clone(), expressions.0[expr_index].clone());
+                }
+                ast::DictDef::Extract(_) => {
+                    dict_out.extend(match &expressions.0[expr_index] {
+                        Value::Dict(d) => d.clone(),
+                        _ => panic!("Cannot extract from this value"),
+                    });
+                }
+            };
+            expr_index += 1;
+        }
+        out.push((Value::Dict(dict_out), expressions.1));
+    }
+    (out, inner_returns)
 }
 
 impl ast::Variable {
-    pub fn to_value(&self, context: Context, globals: &mut Globals) -> Returns {
+    pub fn to_value(&self, context: Context, globals: &mut Globals) -> (Returns, Returns) {
         // TODO: Check if this variable has native functions called on it, and if not set this to false
         let mut out: Returns = Vec::new();
+        let mut inner_returns = Returns::new();
 
         match &self.value {
             ast::ValueLiteral::ID(id) => out.push((
@@ -333,43 +384,20 @@ impl ast::Variable {
             )),
             ast::ValueLiteral::Number(num) => out.push((Value::Number(*num), context)),
             ast::ValueLiteral::Dictionary(dict) => {
-                let evaled = all_combinations(
-                    dict.iter()
-                        .map(|def| match def {
-                            ast::DictDef::Def(d) => d.1.clone(),
-                            ast::DictDef::Extract(e) => e.clone(),
-                        })
-                        .collect(),
-                    context,
-                    globals,
-                );
-
-                for expressions in evaled {
-                    let mut expr_index: usize = 0;
-                    let mut dict_out: HashMap<String, Value> = HashMap::new();
-                    for def in dict {
-                        match def {
-                            ast::DictDef::Def(d) => {
-                                dict_out.insert(d.0.clone(), expressions.0[expr_index].clone());
-                            }
-                            ast::DictDef::Extract(_) => {
-                                dict_out.extend(match &expressions.0[expr_index] {
-                                    Value::Dict(d) => d.clone(),
-                                    _ => panic!("Cannot extract from this value"),
-                                });
-                            }
-                        };
-                        expr_index += 1;
-                    }
-                    out.push((Value::Dict(dict_out), expressions.1));
-                }
+                let (new_out, new_inner_returns) = eval_dict(dict.clone(), context, globals);
+                out = new_out;
+                inner_returns = new_inner_returns;
             }
             ast::ValueLiteral::CmpStmt(cmp_stmt) => {
-                out.push((Value::Func(cmp_stmt.to_scope(&context, globals)), context))
+                let (evaled, returns) = cmp_stmt.to_scope(&context, globals);
+                inner_returns.extend(returns);
+                out.push((Value::Func(evaled), context));
             }
 
             ast::ValueLiteral::Expression(expr) => {
-                out.extend(expr.eval(context, globals).iter().cloned());
+                let (evaled, returns) = expr.eval(context, globals);
+                inner_returns.extend(returns);
+                out.extend(evaled.iter().cloned());
             }
 
             ast::ValueLiteral::Bool(b) => out.push((Value::Bool(*b), context)),
@@ -382,19 +410,27 @@ impl ast::Variable {
             },
             ast::ValueLiteral::Str(s) => out.push((Value::Str(s.clone()), context)),
             ast::ValueLiteral::Array(a) => {
-                out = all_combinations(a.clone(), context, globals)
+                let (evaled, returns) = all_combinations(a.clone(), context, globals);
+                inner_returns.extend(returns);
+                out = evaled
                     .iter()
                     .map(|x| (Value::Array(x.0.clone()), x.1.clone()))
                     .collect();
             }
-            ast::ValueLiteral::Import(i) => out.push((import_module(i, globals), context)),
+            ast::ValueLiteral::Import(i) => {
+                let mut new_context = context.clone();
+                let (val, imp) = import_module(i, globals);
+                new_context.implementations.extend(imp);
+                out.push((val, new_context));
+            }
             ast::ValueLiteral::Obj(o) => {
                 let mut all_expr: Vec<ast::Expression> = Vec::new();
                 for prop in o {
                     all_expr.push(prop.0.clone());
                     all_expr.push(prop.1.clone());
                 }
-                let evaled = all_combinations(all_expr, context, globals);
+                let (evaled, returns) = all_combinations(all_expr, context, globals);
+                inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, String)> = Vec::new();
                     for i in 0..(o.len() - 1) {
@@ -440,8 +476,9 @@ impl ast::Variable {
                         all_expr.push(e.clone());
                     }
                 }
-                let argument_possibilities = all_combinations(all_expr, context, globals);
-
+                let (argument_possibilities, returns) =
+                    all_combinations(all_expr, context, globals);
+                inner_returns.extend(returns);
                 for defaults in argument_possibilities {
                     let mut args: Vec<(String, Option<Value>)> = Vec::new();
                     let mut expr_index = 0;
@@ -490,7 +527,9 @@ impl ast::Variable {
                     for (prev_v, prev_c) in out.clone() {
                         match prev_v {
                             Value::Array(arr) => {
-                                for index in i.eval(prev_c, globals) {
+                                let (evaled, returns) = i.eval(prev_c, globals);
+                                inner_returns.extend(returns);
+                                for index in evaled {
                                     match index.0 {
                                         Value::Number(n) => {
                                             new_out.push((arr[n as usize].clone(), index.1));
@@ -508,7 +547,10 @@ impl ast::Variable {
                     for (v, cont) in out.clone() {
                         match v {
                             Value::Macro(m) => {
-                                out = execute_macro((m, args.clone()), cont, globals);
+                                let (evaled, returns) =
+                                    execute_macro((m, args.clone()), cont, globals);
+                                inner_returns.extend(returns);
+                                out = evaled;
                             }
                             _ => panic!("not a macro"),
                         }
@@ -543,12 +585,12 @@ impl ast::Variable {
             }
         }
 
-        out
+        (out, inner_returns)
     }
 }
 
 impl ast::CompoundStatement {
-    fn to_scope(&self, context: &Context, globals: &mut Globals) -> Group {
+    fn to_scope(&self, context: &Context, globals: &mut Globals) -> (Group, Returns) {
         //create the function context
         let mut new_context = context.clone();
 
@@ -559,8 +601,9 @@ impl ast::CompoundStatement {
             id: next_free(&mut globals.closed_groups),
         };
 
-        compile_scope(&self.statements, vec![new_context], globals);
-
-        start_group
+        (
+            start_group,
+            compile_scope(&self.statements, vec![new_context], globals).1,
+        )
     }
 }

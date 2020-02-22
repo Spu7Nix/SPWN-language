@@ -3,6 +3,16 @@ constants = import "constants.spwn"
 
 * = constants.obj_props
 
+wait = (time){
+    add obj{
+        OBJ_ID: 1268,
+        SPAWN_DURATION: time,
+        TARGET: {
+            return
+        }
+    }
+}
+
 impl "group" {
     move: (self, x, y, duration: 0, easing: 0, easing_rate: 0) {
         add obj{
@@ -133,19 +143,11 @@ impl "mutable" {
 }
 
 exports = {
-    ..constants.obj_props,
+    //..constants.obj_props,
     ..constants.easing_types,
     ..constants.comparisons,
     
-    wait: (time){
-        add obj{
-            OBJ_ID: 1268,
-            SPAWN_DURATION: time,
-            TARGET: {
-                return
-            }
-        }
-    },
+    wait: wait,
 
 
     mut: (num){
@@ -154,13 +156,12 @@ exports = {
         id.add(num)
         
         return {
-            TYPE = "mutable"
-            item = id
+            TYPE: "mutable",
+            item: id
 
             
         }
     }
-
     
 }
 

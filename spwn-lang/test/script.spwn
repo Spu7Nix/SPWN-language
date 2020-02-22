@@ -1,3 +1,4 @@
 * = import "std.spwn"
 
-wait(10)
+10g.move(100, 0, 0.5)
+
