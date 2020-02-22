@@ -1,18 +1,3 @@
 * = import "std.spwn"
 
-//must be optimized before its used for anything other than async stuff (because stack overflow)
-/*
-IDEAS:
-
-more referances (in structs etc)
-
-count the amount of returns when parsing (returns in loops should count for 2)
-if the macro has one return, dont use compile_and_exec, rather just change the context to that return's context
-
-compile_scope should have a parameter that says if its the defining scope of a macro, and if it reaches the end, do a return
-*/
-
-m = mut(2)
-
-
-10g.move(m.const(0->3), 0, 0.5)
+wait(10)

@@ -29,7 +29,7 @@ pub struct Item {
 pub fn context_trigger(context: Context) -> GDObj {
     GDObj {
         obj_id: 0,
-        groups: context.added_groups,
+        groups: vec![context.start_group],
         target: Group { id: 0 },
         spawn_triggered: context.spawn_triggered,
         params: Vec::new(),
@@ -40,8 +40,8 @@ pub fn context_trigger(context: Context) -> GDObj {
 
 const TYPE_MEMBER_NAME: &str = "TYPE";
 impl Value {
-    pub fn member(&self, member: String, globals: &Globals) -> Value {
-        let get_imp = |t: String, m: String| match globals.implementations.get(&(t)) {
+    pub fn member(&self, member: String, context: &Context) -> Value {
+        let get_impl = |t: String, m: String| match context.implementations.get(&(t)) {
             Some(imp) => match imp.get(&m) {
                 Some(mem) => mem.clone(),
                 None => panic!("{} does not have member", t),
@@ -49,13 +49,6 @@ impl Value {
             None => panic!("{} does not have member", t),
         };
         let my_type = match self {
-            Value::Scope(scope) => match scope.members.get(TYPE_MEMBER_NAME) {
-                Some(value) => match (value).clone() {
-                    Value::Str(s) => s,
-                    _ => unreachable!(),
-                },
-                None => "function".to_string(),
-            },
             Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
                 Some(value) => match (value).clone() {
                     Value::Str(s) => s,
@@ -64,6 +57,7 @@ impl Value {
                 None => "dictionary".to_string(),
             },
 
+            Value::Func(_) => "function".to_string(),
             Value::Group(_) => "group".to_string(),
             Value::Color(_) => "color".to_string(),
             Value::Block(_) => "block".to_string(),
@@ -80,15 +74,11 @@ impl Value {
             return Value::Str(my_type);
         } else {
             match self {
-                Value::Scope(scope) => match scope.members.get(&member) {
-                    Some(value) => (value).clone(),
-                    None => get_imp(my_type, member),
-                },
                 Value::Dict(dict) => match dict.get(&member) {
                     Some(value) => (value).clone(),
-                    None => get_imp(my_type, member),
+                    None => get_impl(my_type, member),
                 },
-                _ => get_imp(my_type, member),
+                _ => get_impl(my_type, member),
             }
         }
     }
@@ -225,7 +215,7 @@ pub fn native_func(
 
     match value {
         Value::Group(group) => group.native(&func_name, args, context, globals, start_group),
-        Value::Scope(scope) => scope
+        Value::Func(Func) => Func
             .group
             .native(&func_name, args, context, globals, start_group),
         Value::Color(color) => color.native(&func_name, args, context, globals, start_group),
@@ -243,7 +233,7 @@ pub fn native_func(
                         _ => panic!("Expected number"),
                     };
                     let func = match &args[1] {
-                        Value::Scope(s) => s.group,
+                        Value::Func(s) => s.group,
                         _ => panic!("Expected function"),
                     };
                     let trigger = GDObj {

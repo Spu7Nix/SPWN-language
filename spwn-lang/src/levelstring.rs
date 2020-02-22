@@ -15,9 +15,7 @@ pub struct GDObj {
 
 impl GDObj {
     pub fn context_parameters(&mut self, context: Context) -> GDObj {
-        for g in context.added_groups.iter() {
-            self.groups.push(*g);
-        }
+        self.groups = vec![context.start_group];
         self.spawn_triggered = context.spawn_triggered;
         (*self).clone()
     }

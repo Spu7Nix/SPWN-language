@@ -112,7 +112,7 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<as
                 let mut inner = statement.into_inner();
                 ast::Statement::Impl(ast::Implementation {
                     symbol: parse_variable(inner.next().unwrap()),
-                    members: parse_statements(&mut inner.next().unwrap().into_inner()),
+                    members: parse_dict(inner.next().unwrap()),
                 })
             }
 
@@ -191,14 +191,14 @@ pub fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
         match pair.as_rule() {
             Rule::id => {
                 let number: u16;
-                let mut scope = pair.into_inner();
+                let mut Func = pair.into_inner();
                 let mut unspecified = false;
-                let first_value = scope.next().unwrap();
+                let first_value = Func.next().unwrap();
                 let class_name: String;
 
                 if first_value.as_rule() == Rule::number {
                     number = first_value.as_span().as_str().parse().unwrap();
-                    class_name = scope.next().unwrap().as_span().as_str().to_string();
+                    class_name = Func.next().unwrap().as_span().as_str().to_string();
                 } else {
                     unspecified = true;
                     number = 0;
@@ -242,9 +242,7 @@ pub fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
 
             Rule::bool => ast::ValueLiteral::Bool(pair.as_span().as_str() == "true"),
 
-            Rule::dictionary => ast::ValueLiteral::Dictionary(ast::Dictionary {
-                members: parse_statements(&mut pair.into_inner()),
-            }),
+            Rule::dictionary => ast::ValueLiteral::Dictionary(parse_dict(pair)),
 
             Rule::cmp_stmt => ast::ValueLiteral::CmpStmt(ast::CompoundStatement {
                 statements: parse_statements(&mut pair.into_inner()),
@@ -292,6 +290,28 @@ pub fn parse_variable(pair: Pair<Rule>) -> ast::Variable {
         path,
         operator,
     }
+}
+
+fn parse_dict(pair: Pair<Rule>) -> Vec<ast::DictDef> {
+    let mut out: Vec<ast::DictDef> = Vec::new();
+    for def in pair.into_inner() {
+        match def.as_rule() {
+            Rule::dict_def => {
+                let mut inner = def.into_inner();
+                out.push(ast::DictDef::Def((
+                    inner.next().unwrap().as_span().as_str().to_string(), //symbol
+                    parse_expr(inner.next().unwrap()),                    //expression
+                )));
+            }
+
+            Rule::dict_extract => out.push(ast::DictDef::Extract(parse_expr(
+                def.into_inner().next().unwrap(),
+            ))),
+
+            _ => unreachable!(),
+        };
+    }
+    out
 }
 
 fn parse_expr(pair: Pair<Rule>) -> ast::Expression {

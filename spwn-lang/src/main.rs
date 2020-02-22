@@ -16,7 +16,7 @@ fn main() {
     let start_time = Instant::now();
 
     let args: Vec<String> = env::args().collect();
-    let script_path = PathBuf::from("d:/spwn/spwn-lang/test/script.spwn"); //&args[1]
+    let script_path = PathBuf::from(&args[1]); //&args[1]
     let statements = parse_spwn(&script_path);
     // for statement in statements.iter() {
     //     println!("{:?}\n\n", statement);

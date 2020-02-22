@@ -5,6 +5,12 @@ use std::path::PathBuf;
 use crate::compiler_types::Value;
 
 #[derive(Clone, PartialEq, Debug)]
+pub enum DictDef {
+    Def((String, Expression)),
+    Extract(Expression),
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub enum Statement {
     Definition(Definition),
     Call(Call),
@@ -22,7 +28,7 @@ pub enum ValueLiteral {
     ID(ID),
     Number(f64),
     CmpStmt(CompoundStatement),
-    Dictionary(Dictionary),
+    Dictionary(Vec<DictDef>),
     Symbol(String),
     Bool(bool),
     Expression(Expression),
@@ -31,8 +37,6 @@ pub enum ValueLiteral {
     Array(Vec<Expression>),
     Obj(Vec<(Expression, Expression)>),
     Macro(Macro),
-    PLACEHOLDER,
-    Resolved(Value),
     Null,
 }
 
@@ -130,14 +134,9 @@ pub struct CompoundStatement {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Dictionary {
-    pub members: Vec<Statement>,
-}
-
-#[derive(Clone, PartialEq, Debug)]
 pub struct Implementation {
     pub symbol: Variable,
-    pub members: Vec<Statement>,
+    pub members: Vec<DictDef>,
 }
 
 #[derive(Clone, PartialEq, Debug)]

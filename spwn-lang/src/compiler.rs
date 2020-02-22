@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::compiler_types::*;
-use ValSuccess::{Evaluatable, Literal};
+//use ValSuccess::{Evaluatable, Literal};
 
 pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
     //context at the start of the program
@@ -22,7 +22,6 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
         obj_list: Vec::new(),
 
         highest_x: 0,
-        implementations: HashMap::new(),
     };
 
     /*let file_content =
@@ -66,7 +65,7 @@ pub fn compile_scope(
     statements: &Vec<ast::Statement>,
     mut contexts: Vec<Context>,
     globals: &mut Globals,
-) -> (Scope, Vec<Context>) {
+) -> (Vec<Context>, Returns) {
     /*
     context.x = globals.highest_x;
     if start_group.id != 0 {
@@ -97,275 +96,150 @@ pub fn compile_scope(
     */
     let mut statements_iter = statements.iter();
 
+    let mut returns: Returns = Vec::new();
+
     while let Some(statement) = statements_iter.next() {
         //find out what kind of statement this is
 
         match statement {
             ast::Statement::Expr(expr) => {
+                let mut new_contexts: Vec<Context> = Vec::new();
                 for context in contexts {
-                    match expr.eval(&mut context, globals, &Value::Null) {
-                        Literal(_l) => {}
-                        Evaluatable(e) => {}
-                    };
+                    //we dont care about the return value in this case
+                    new_contexts.extend(expr.eval(context, globals).iter().map(|x| x.1.clone()));
                 }
+                contexts = new_contexts;
             }
 
             ast::Statement::Definition(def) => {
-                //insert the variable into the variable list
-                let val = match &def.value.values[0].value {
-                    ast::ValueLiteral::CmpStmt(cmp_stmt) => {
-                        //create the function context
-                        let mut new_context = context.clone();
-
-                        new_context.spawn_triggered = true;
-
-                        //pick a start group
-                        let start_group = Group {
-                            id: next_free(&mut globals.closed_groups),
-                        };
-                        new_context.variables.insert(
-                            String::from(&def.symbol),
-                            Value::Scope(Scope {
-                                group: start_group,
-                                members: HashMap::new(),
-                            }),
-                        );
-
-                        Value::Scope(compile_scope(
-                            &cmp_stmt.statements,
-                            &mut new_context,
-                            start_group,
-                            globals,
-                            &Value::Null,
-                        ))
+                let mut all_values: Returns = Vec::new();
+                for context in contexts {
+                    all_values.extend(def.value.eval(context, globals));
+                }
+                contexts = Vec::new();
+                for (val, mut context) in all_values {
+                    if def.symbol == "*" {
+                        match val {
+                            Value::Dict(d) => {
+                                context.variables.extend(d.clone());
+                            }
+                            _ => panic!("Only dict can have their values extracted"),
+                        }
+                    } else {
+                        context
+                            .variables
+                            .insert(String::from(&def.symbol), val.clone());
                     }
-
-                    _ => match def.value.eval(context, globals, placeholder_value) {
-                        Literal(l) => l,
-                        Evaluatable(e) => {
-                            let mut new_statements =
-                                vec![ast::Statement::Definition(ast::Definition {
-                                    value: e.2.to_expression(),
-                                    ..def.clone()
-                                })];
-                            new_statements.extend(statements_iter.cloned());
-                            return evaluate_and_execute(
-                                (e.0, e.1),
-                                &context,
-                                globals,
-                                new_statements,
-                                start_group,
-                            );
-                        }
-                    },
-                };
-                if def.symbol == "*" {
-                    match val {
-                        Value::Scope(s) => {
-                            context.variables.extend(s.members.clone());
-                            exports.extend(s.members);
-                        }
-
-                        Value::Dict(d) => {
-                            context.variables.extend(d.clone());
-                            exports.extend(d);
-                        }
-                        _ => panic!("Only compound statements can have their values extracted"),
-                    }
-                } else {
-                    context
-                        .variables
-                        .insert(String::from(&def.symbol), val.clone());
-                    exports.insert(String::from(&def.symbol), val);
+                    contexts.push(context);
                 }
             }
 
             ast::Statement::If(if_stmt) => {
-                let condition = match if_stmt.condition.eval(context, globals, placeholder_value) {
-                    Literal(l) => l,
-                    Evaluatable(e) => {
-                        let mut new_statements = vec![ast::Statement::If(ast::If {
-                            condition: e.2.to_expression(),
-                            ..if_stmt.clone()
-                        })];
-                        new_statements.extend(statements_iter.cloned());
-                        return evaluate_and_execute(
-                            (e.0, e.1),
-                            &context,
-                            globals,
-                            new_statements,
-                            start_group,
-                        );
-                    }
-                };
+                let mut all_values: Returns = Vec::new();
+                for context in contexts {
+                    all_values.extend(if_stmt.condition.eval(context, globals));
+                }
+                contexts = Vec::new();
 
-                match condition {
-                    Value::Bool(b) => {
-                        //internal if statement
-                        if b {
-                            compile_scope(
-                                &if_stmt.if_body,
-                                context,
-                                start_group,
-                                globals,
-                                &Value::Null,
-                            );
-                        } else {
-                            match &if_stmt.else_body {
-                                Some(body) => {
-                                    compile_scope(
-                                        body,
-                                        context,
-                                        start_group,
-                                        globals,
-                                        &Value::Null,
-                                    );
-                                }
-                                None => {}
-                            };
+                for (val, context) in all_values {
+                    match val {
+                        Value::Bool(b) => {
+                            //internal if statement
+                            if b {
+                                compile_scope(&if_stmt.if_body, vec![context], globals);
+                            // TODO: add the returns from these scopes
+                            } else {
+                                match &if_stmt.else_body {
+                                    Some(body) => {
+                                        compile_scope(body, vec![context], globals);
+                                    }
+                                    None => {}
+                                };
+                            }
                         }
+                        _ => panic!("Expected boolean condition in if statement"),
                     }
-                    _ => panic!("Expected boolean condition in if statement"),
                 }
             }
 
             ast::Statement::Async(a) => {
-                match a.to_value(context, globals, placeholder_value) {
-                    Literal(_l) => panic!("Expected macro call"),
-
-                    Evaluatable(e) => {
-                        if e.2.path.len() > 1 {
-                            let mut new_statements = vec![ast::Statement::Async(e.2)];
-                            new_statements.extend(statements_iter.cloned());
-                            return evaluate_and_execute(
-                                (e.0, e.1),
-                                &context,
-                                globals,
-                                new_statements,
-                                start_group,
-                            );
-                        } else {
-                            //call and continue
-                            evaluate_and_execute(
-                                (e.0, e.1),
-                                &context,
-                                globals,
-                                Vec::new(),
-                                start_group,
-                            );
-                        }
-                    }
-                };
+                //just get value of a in every context ig
             }
 
             ast::Statement::Impl(imp) => {
-                let evaled = match imp.symbol.to_value(context, globals, placeholder_value) {
-                    Literal(l) => l,
-                    Evaluatable(e) => {
-                        let mut new_statements = vec![ast::Statement::Impl(ast::Implementation {
-                            symbol: e.2,
-                            ..imp.clone()
-                        })];
-                        new_statements.extend(statements_iter.cloned());
-                        return evaluate_and_execute(
-                            (e.0, e.1),
-                            &context,
-                            globals,
-                            new_statements,
-                            start_group,
-                        );
+                for context in &mut contexts {
+                    let evaled = imp.symbol.to_value(context.clone(), globals);
+
+                    for (typ, c) in evaled {
+                        if let Value::Str(s) = typ {
+                        } else {
+                            panic!("Must implement on a type (a string)");
+                        }
                     }
-                };
+                }
 
-                let typ = match evaled {
-                    Value::Str(s) => s,
-                    _ => panic!("Expected type (string)"),
-                };
-
-                let scope = compile_scope(
-                    &imp.members,
-                    context,
-                    Group { id: 0 },
-                    globals,
-                    &Value::Null,
-                );
-
-                match globals.implementations.get_mut(&typ) {
+                /*match globals.implementations.get_mut(&typ) {
                     Some(implementation) => {
-                        for (key, val) in scope.members.into_iter() {
+                        for (key, val) in Func.members.into_iter() {
                             (*implementation).insert(key, val);
                         }
                     }
                     None => {
-                        (*globals).implementations.insert(typ, scope.members);
+                        (*globals).implementations.insert(typ, Func.members);
                     }
-                }
+                }*/
             }
             ast::Statement::Call(call) => {
-                let func = match call.function.to_value(context, globals, placeholder_value) {
-                    Literal(l) => l,
-                    Evaluatable(e) => {
-                        let mut new_statements =
-                            vec![ast::Statement::Call(ast::Call { function: e.2 })];
-                        new_statements.extend(statements_iter.cloned());
-                        return evaluate_and_execute(
-                            (e.0, e.1),
-                            &context,
-                            globals,
-                            new_statements,
-                            start_group,
-                        );
-                    }
-                };
+                let mut all_values: Returns = Vec::new();
+                for context in contexts {
+                    all_values.extend(call.function.to_value(context, globals));
+                }
+                contexts = Vec::new();
+                for (func, context) in all_values {
+                    contexts.push(context.clone());
+                    (*globals).obj_list.push(
+                        GDObj {
+                            obj_id: 1268,
+                            groups: vec![context.start_group],
+                            target: match func {
+                                Value::Func(g) => g,
+                                Value::Group(g) => g,
+                                _ => panic!("Not callable"),
+                            },
 
-                (*globals).obj_list.push(
-                    GDObj {
-                        obj_id: 1268,
-                        groups: vec![start_group],
-                        target: match func {
-                            Value::Scope(s) => s.group,
-                            Value::Group(g) => g,
-                            _ => panic!("Not callable"),
-                        },
-
-                        ..context_trigger(context.clone())
-                    }
-                    .context_parameters(context.clone()),
-                );
+                            ..context_trigger(context.clone())
+                        }
+                        .context_parameters(context.clone()),
+                    );
+                }
             }
 
             ast::Statement::Add(v) => {
-                let val = match v.eval(context, globals, placeholder_value) {
-                    Literal(l) => l,
-                    Evaluatable(e) => {
-                        let mut new_statements = vec![ast::Statement::Add(e.2.to_expression())];
-                        new_statements.extend(statements_iter.cloned());
-                        return evaluate_and_execute(
-                            (e.0, e.1),
-                            &context,
-                            globals,
-                            new_statements,
-                            start_group,
-                        );
-                    }
-                };
-                match val {
-                    Value::Obj(obj) => {
-                        (*globals).obj_list.push(
-                            GDObj {
-                                params: obj,
-                                groups: vec![start_group],
-                                ..context_trigger(context.clone())
-                            }
-                            .context_parameters(context.clone()),
-                        );
-                    }
+                let mut all_values: Returns = Vec::new();
+                for context in contexts {
+                    all_values.extend(v.eval(context, globals));
+                }
+                contexts = Vec::new();
+                for (val, context) in all_values {
+                    contexts.push(context.clone());
+                    match val {
+                        Value::Obj(obj) => {
+                            (*globals).obj_list.push(
+                                GDObj {
+                                    params: obj,
+                                    groups: vec![context.start_group],
+                                    ..context_trigger(context.clone())
+                                }
+                                .context_parameters(context.clone()),
+                            );
+                        }
 
-                    _ => panic!("Expected Object"),
+                        _ => panic!("Expected Object"),
+                    }
                 }
             }
-
-            ast::Statement::For(f) => {
+            ast::Statement::For(f) => unimplemented!(),
+            /*ast::Statement::For(f) => {
                 let evaled = match f.array.eval(context, globals, placeholder_value) {
                     Literal(l) => l,
                     Evaluatable(e) => {
@@ -439,52 +313,22 @@ pub fn compile_scope(
 
                 //internal for loop
                 //TODO: make some deeply nested shit that deals with this or smth idk i need sleep gn
-            }
-
+            }*/
             ast::Statement::Return(val) => {
-                let return_info = match context.ret.clone() {
-                    Some(ret) => ret,
-                    None => panic!("Cannot return outside function defnition"),
-                };
-                let mut new_context = Context {
-                    spawn_triggered: context.spawn_triggered,
-                    added_groups: context.added_groups.clone(),
-                    ..return_info.context
-                };
-                let return_placeholder = match val.eval(context, globals, placeholder_value) {
-                    Literal(l) => l,
-                    Evaluatable(e) => {
-                        let mut new_statements = vec![ast::Statement::Return(e.2.to_expression())];
-                        new_statements.extend(statements_iter.cloned());
-                        return evaluate_and_execute(
-                            (e.0, e.1),
-                            &context,
-                            globals,
-                            new_statements,
-                            start_group,
-                        );
-                    }
-                };
+                let mut all_values: Returns = Vec::new();
+                for context in contexts.clone() {
+                    all_values.extend(val.eval(context, globals));
+                }
 
-                let scope = compile_scope(
-                    &return_info.statements,
-                    &mut new_context,
-                    start_group,
-                    globals,
-                    &return_placeholder,
-                );
+                returns.extend(all_values);
             }
 
             ast::Statement::EOI => {}
         }
     }
 
-    (*globals).highest_x = context.x;
-
-    Scope {
-        group: start_group,
-        members: exports,
-    }
+    //(*globals).highest_x = context.x;
+    (contexts, returns)
 }
 
 pub fn import_module(path: &PathBuf, globals: &mut Globals) -> Value {
@@ -495,16 +339,16 @@ pub fn import_module(path: &PathBuf, globals: &mut Globals) -> Value {
         .expect("Your file must be in a folder to import modules!")
         .join(&path);
     let parsed = crate::parse_spwn(&module_path);
-    let scope = compile_scope(
-        &parsed,
-        &mut Context::new(),
-        Group { id: 0 },
-        globals,
-        &Value::Null,
-    );
-    match scope.members.get("exports") {
-        Some(value) => (value).clone(),
-        None => panic!("No \"exports\" variable in module"),
+    let (contexts, _) = compile_scope(&parsed, vec![Context::new()], globals);
+    if contexts.len() > 1 {
+        panic!(
+            "Imported files does not (currently) support context splitting in the main scope.
+            Please remove any context splitting statements outside of function or macro definitions."
+        )
+    }
+    match contexts[0].variables.get("exports") {
+        Some(val) => val.clone(),
+        None => Value::Null,
     }
 }
 

@@ -1,12 +1,143 @@
 
-exports = {
+constants = import "constants.spwn"
 
-    * = import "constants.spwn"
-    * = obj_props
-    * = easing_types
-    * = comparisons
+* = constants.obj_props
+
+impl "group" {
+    move: (self, x, y, duration: 0, easing: 0, easing_rate: 0) {
+        add obj{
+            OBJ_ID: 901,
+            TARGET: self,
+            MOVE_X: x * 3,
+            MOVE_Y: y * 3,
+            DURATION: duration,
+            EASING: easing,
+            EASING_RATE: easing_rate,
+        }
+        wait(duration)
+        return
+    },
+
+    stop: (self){
+        add obj{
+            OBJ_ID: 1616,
+            TARGET: self,
+        }
+        return
+    },
+
+    alpha: (self, opacity: 1, duration: 0){
+        add obj {
+            OBJ_ID: 1007,
+            TARGET: self,
+            OPACITY: opacity,
+            DURATION: duration,
+        }
+        wait(duration)
+        return
+    },
+
+    toggle_on: (self){
+        add obj{
+            OBJ_ID: 1049,
+            TARGET: self,
+            ACTIVATE_GROUP: 1,
+        }
+        return
+    },
+
+    toggle_off: (self){
+        add obj{
+            OBJ_ID: 1049,
+            TARGET: self,
+            ACTIVATE_GROUP: 0,
+        }
+        return
+    },
+
+    rotate: (self, center, degrees, duration: 0, easing: 0, easing_rate: 0, lock_object_rotation: 0){
+        add obj{
+            OBJ_ID: 1346,
+            TARGET: self,
+            CENTER: center,
+            ROTATE_DEGREES: degrees,
+            DURATION: duration,
+            EASING: easing,
+            EASING_RATE: easing_rate,
+            LOCK_OBJECT_ROTATION: lock_object_rotation
+        }
+        wait(duration)
+        return
+    }
+}
+
+impl "color" {
+    set: (self, r, g, b, duration: 0, opacity: 1, blending: 0){ //change blending to bool
+        add obj{
+            OBJ_ID: 899,
+            DURATION: duration,
+            TRIGGER_RED: r,
+            TRIGGER_GREEN: g,
+            TRIGGER_BLUE: b,
+            OPACITY: opacity,
+            BLENDING: blending,
+        }
+        wait(duration)
+        return
+    }
+}
+
+impl "item" {
     
-    wait = (time){
+    add: (self, amount) {
+        add obj{
+            OBJ_ID: 1817,
+            COUNT: amount,
+            ITEM: self,
+        }
+        return
+    },
+
+    if_is: (self, comparison, other, function) {
+        add obj{
+            OBJ_ID: 1811,
+            TARGET: function,
+            COUNT: other,
+            ACTIVATE_GROUP: 1, 
+            COMPARISON: comparison, 
+            ITEM: self,
+        }
+        return
+    }
+}
+
+impl "mutable" {
+    plus: (self, other) {
+        return const(self) + other
+    },
+
+    const: (self, range) {
+        for val in range {
+            -> self.item.if_is(EQUAL_TO, val, {
+                return val
+            }) 
+        }
+    },
+    
+
+    as: (self, type) {
+        if type == "bool" {
+            return self.const([0, 1]) == 1
+        }
+    }
+}
+
+exports = {
+    ..constants.obj_props,
+    ..constants.easing_types,
+    ..constants.comparisons,
+    
+    wait: (time){
         add obj{
             OBJ_ID: 1268,
             SPAWN_DURATION: time,
@@ -14,119 +145,10 @@ exports = {
                 return
             }
         }
-    }
-
-    
-    impl "group" {
-        move = (self, x, y, duration: 0, easing: 0, easing_rate: 0) {
-            add obj{
-               OBJ_ID: 901,
-               TARGET: self,
-               MOVE_X: x * 3,
-               MOVE_Y: y * 3,
-               DURATION: duration,
-               EASING: easing,
-               EASING_RATE: easing_rate,
-            }
-            wait(duration)
-            return
-        }
-
-        stop = (self){
-            add obj{
-                OBJ_ID: 1616,
-                TARGET: self,
-            }
-            return
-        }
-
-        alpha = (self, opacity: 1, duration: 0){
-            add obj {
-                OBJ_ID: 1007,
-                TARGET: self,
-                OPACITY: opacity,
-                DURATION: duration,
-            }
-            wait(duration)
-            return
-        }
-
-        toggle_on = (self){
-            add obj{
-                OBJ_ID: 1049,
-                TARGET: self,
-                ACTIVATE_GROUP: 1,
-            }
-            return
-        }
-
-        toggle_off = (self){
-            add obj{
-                OBJ_ID: 1049,
-                TARGET: self,
-                ACTIVATE_GROUP: 0,
-            }
-            return
-        }
-
-        rotate = (self, center, degrees, duration: 0, easing: 0, easing_rate: 0, lock_object_rotation: 0){
-            add obj{
-                OBJ_ID: 1346,
-                TARGET: self,
-                CENTER: center,
-                ROTATE_DEGREES: degrees,
-                DURATION: duration,
-                EASING: easing,
-                EASING_RATE: easing_rate,
-                LOCK_OBJECT_ROTATION: lock_object_rotation
-            }
-            wait(duration)
-            return
-        }
-    }
-
-    impl "color" {
-        set = (self, r, g, b, duration: 0, opacity: 1, blending: 0){ //change blending to bool
-            add obj{
-                OBJ_ID: 899,
-                DURATION: duration,
-                TRIGGER_RED: r,
-                TRIGGER_GREEN: g,
-                TRIGGER_BLUE: b,
-                OPACITY: opacity,
-                BLENDING: blending,
-            }
-            wait(duration)
-            return
-        }
-    }
-    
-    impl "item" {
-        
-        add = (self, amount) {
-            add obj{
-                OBJ_ID: 1817,
-                COUNT: amount,
-                ITEM: self,
-            }
-            return
-        }
-
-        if_is = (self, comparison, other, function) {
-            add obj{
-                OBJ_ID: 1811,
-                TARGET: function,
-                COUNT: other,
-                ACTIVATE_GROUP: 1, 
-                COMPARISON: comparison, 
-                ITEM: self,
-            }
-            return
-        }
-    }
+    },
 
 
-    mut = (num){
+    mut: (num){
         id = ?i
         
         id.add(num)
@@ -139,24 +161,7 @@ exports = {
         }
     }
 
-    impl "mutable" {
-        plus = (self, other) {
-            return const(self) + other
-        }
-
-        const = (self, range) {
-            for val in range {
-                -> self.item.if_is(EQUAL_TO, val, {
-                    return val
-                }) 
-            }
-        }
-        
-
-        as = (self, type) {
-            if type == "bool" {
-                return self.const([0, 1]) == 1
-            }
-        }
-    }
+    
 }
+
+

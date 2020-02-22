@@ -27,8 +27,10 @@ cmp_stmt = {
     "{" ~ ss* ~ (stmt ~ ss+)* ~ stmt? ~ "}"
 }
 
+dict_def = {symbol ~ ":" ~ expr}
+dict_extract = {".." ~ expr}
 dictionary = {
-    "{" ~ ss* ~ ((def) ~ ss+)* ~ (def)? ~ "}"
+    "{" ~ ss* ~ ((dict_def | dict_extract) ~ "," ~ ss*)* ~ (dict_def | dict_extract) ~ ","? ~ ss* ~ "}"
 }
 
 array = {
