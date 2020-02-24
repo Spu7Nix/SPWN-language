@@ -12,6 +12,9 @@ use std::path::PathBuf;
 
 use std::time::Instant;
 
+#[macro_use]
+extern crate lazy_static;
+
 fn main() {
     let start_time = Instant::now();
 

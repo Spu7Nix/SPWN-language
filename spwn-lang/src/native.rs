@@ -72,14 +72,14 @@ impl Value {
             Value::Null => "null".to_string(),
         };
         if member == TYPE_MEMBER_NAME {
-            return Value::Str(my_type);
+            return Value::Str(my_type.to_string());
         } else {
             match self {
                 Value::Dict(dict) => match dict.get(&member) {
-                    Some(value) => (value).clone(),
-                    None => get_impl(my_type, member),
+                    Some(value) => (*value).clone(),
+                    None => get_impl(my_type.to_string(), member).clone(),
                 },
-                _ => get_impl(my_type, member),
+                _ => get_impl(my_type.to_string(), member).clone(),
             }
         }
     }
