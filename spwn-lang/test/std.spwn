@@ -158,8 +158,6 @@ exports = {
         return {
             TYPE: "mutable",
             item: id
-
-            
         }
     }
     

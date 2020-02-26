@@ -212,6 +212,7 @@ pub fn execute_macro(
     (m, args): (Macro, Vec<ast::Argument>),
     context: Context,
     globals: &mut Globals,
+    parent: Value,
     info: CompilerInfo,
 ) -> (Returns, Returns) {
     // second returns is for any compound statements in the args
@@ -243,7 +244,12 @@ pub fn execute_macro(
             }
         }
         //insert defaults and check non-optional arguments
-        for arg in m.args.iter() {
+        let mut m_args_iter = m.args.iter();
+        if m.args[0].0 == "self" {
+            new_variables.insert("self".to_string(), parent.clone());
+            m_args_iter.next();
+        }
+        for arg in m_args_iter {
             if !new_variables.contains_key(&arg.0) {
                 match &arg.1 {
                     Some(default) => {
@@ -364,11 +370,11 @@ impl ast::Variable {
         info: CompilerInfo,
     ) -> (Returns, Returns) {
         // TODO: Check if this variable has native functions called on it, and if not set this to false
-        let mut out: Returns = Vec::new();
+        let mut start_val: Vec<(Value, Context)> = Vec::new();
         let mut inner_returns = Returns::new();
 
         match &self.value {
-            ast::ValueLiteral::ID(id) => out.push((
+            ast::ValueLiteral::ID(id) => start_val.push((
                 match id.class_name.as_ref() {
                     "g" => {
                         if id.unspecified {
@@ -410,39 +416,39 @@ impl ast::Variable {
                 },
                 context,
             )),
-            ast::ValueLiteral::Number(num) => out.push((Value::Number(*num), context)),
+            ast::ValueLiteral::Number(num) => start_val.push((Value::Number(*num), context)),
             ast::ValueLiteral::Dictionary(dict) => {
                 let (new_out, new_inner_returns) =
                     eval_dict(dict.clone(), context, globals, info.next("dictionary"));
-                out = new_out;
+                start_val = new_out;
                 inner_returns = new_inner_returns;
             }
             ast::ValueLiteral::CmpStmt(cmp_stmt) => {
                 let (evaled, returns) = cmp_stmt.to_scope(&context, globals, info.clone());
                 inner_returns.extend(returns);
-                out.push((Value::Func(evaled), context));
+                start_val.push((Value::Func(evaled), context));
             }
 
             ast::ValueLiteral::Expression(expr) => {
                 let (evaled, returns) = expr.eval(context, globals, info.clone());
                 inner_returns.extend(returns);
-                out.extend(evaled.iter().cloned());
+                start_val.extend(evaled.iter().cloned());
             }
 
-            ast::ValueLiteral::Bool(b) => out.push((Value::Bool(*b), context)),
+            ast::ValueLiteral::Bool(b) => start_val.push((Value::Bool(*b), context)),
             ast::ValueLiteral::Symbol(string) => match context.variables.get(string) {
-                Some(value) => out.push(((*value).clone(), context)),
+                Some(value) => start_val.push(((*value).clone(), context)),
                 None => panic!(format!(
                     "The variable {} does not exist in this Func.",
                     string
                 )),
             },
-            ast::ValueLiteral::Str(s) => out.push((Value::Str(s.clone()), context)),
+            ast::ValueLiteral::Str(s) => start_val.push((Value::Str(s.clone()), context)),
             ast::ValueLiteral::Array(a) => {
                 let (evaled, returns) =
                     all_combinations(a.clone(), context, globals, info.next("array"));
                 inner_returns.extend(returns);
-                out = evaled
+                start_val = evaled
                     .iter()
                     .map(|x| (Value::Array(x.0.clone()), x.1.clone()))
                     .collect();
@@ -451,7 +457,7 @@ impl ast::Variable {
                 let mut new_context = context.clone();
                 let (val, imp) = import_module(i, globals, info.clone());
                 new_context.implementations.extend(imp);
-                out.push((val, new_context));
+                start_val.push((val, new_context));
             }
             ast::ValueLiteral::Obj(o) => {
                 let mut all_expr: Vec<ast::Expression> = Vec::new();
@@ -496,7 +502,7 @@ impl ast::Variable {
                             },
                         ))
                     }
-                    out.push((Value::Obj(obj), context));
+                    start_val.push((Value::Obj(obj), context));
                 }
             }
 
@@ -526,7 +532,7 @@ impl ast::Variable {
                         ));
                     }
 
-                    out.push((
+                    start_val.push((
                         Value::Macro(Macro {
                             args,
                             body: m.body.statements.clone(),
@@ -537,33 +543,39 @@ impl ast::Variable {
                 }
             }
             //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
-            ast::ValueLiteral::Null => out.push((Value::Null, context)),
+            ast::ValueLiteral::Null => start_val.push((Value::Null, context)),
         };
-        let mut path_iter = self.path.iter();
-        let mut parent = out.clone();
-        for p in &mut path_iter {
-            let stored = out.clone();
 
+        let mut path_iter = self.path.iter();
+        let mut with_parent: Vec<(Value, Context, Value)> = start_val
+            .iter()
+            .map(|x| (x.0.clone(), x.1.clone(), Value::Null))
+            .collect();
+        for p in &mut path_iter {
             match &p {
                 ast::Path::Member(m) => {
-                    out = out
+                    with_parent = with_parent
                         .iter()
-                        .map(|x| (x.0.member(m.clone(), &x.1), x.1.clone()))
+                        .map(|x| (x.0.member(m.clone(), &x.1), x.1.clone(), x.0.clone()))
                         .collect();
                 }
 
                 ast::Path::Index(i) => {
-                    let mut new_out: Returns = Vec::new();
+                    let mut new_out: Vec<(Value, Context, Value)> = Vec::new();
 
-                    for (prev_v, prev_c) in out.clone() {
-                        match prev_v {
+                    for (prev_v, prev_c, _) in with_parent.clone() {
+                        match prev_v.clone() {
                             Value::Array(arr) => {
                                 let (evaled, returns) = i.eval(prev_c, globals, info.next("index"));
                                 inner_returns.extend(returns);
                                 for index in evaled {
                                     match index.0 {
                                         Value::Number(n) => {
-                                            new_out.push((arr[n as usize].clone(), index.1));
+                                            new_out.push((
+                                                arr[n as usize].clone(),
+                                                index.1,
+                                                prev_v.clone(),
+                                            ));
                                         }
                                         _ => panic!("Index must be a number"),
                                     }
@@ -575,22 +587,33 @@ impl ast::Variable {
                 }
 
                 ast::Path::Call(args) => {
-                    for (v, cont) in out.clone() {
+                    for (v, cont, parent) in with_parent.clone().iter() {
                         match v {
                             Value::Macro(m) => {
-                                let (evaled, returns) =
-                                    execute_macro((m, args.clone()), cont, globals, info.clone());
+                                let (evaled, returns) = execute_macro(
+                                    (m.clone(), args.clone()),
+                                    cont.clone(),
+                                    globals,
+                                    parent.clone(),
+                                    info.clone(),
+                                );
                                 inner_returns.extend(returns);
-                                out = evaled;
+                                with_parent = evaled
+                                    .iter()
+                                    .map(|x| (x.0.clone(), x.1.clone(), v.clone()))
+                                    .collect();
                             }
                             _ => panic!("not a macro"),
                         }
                     }
                 }
             };
-
-            parent = stored;
         }
+
+        let mut out: Returns = with_parent
+            .iter()
+            .map(|x| (x.0.clone(), x.1.clone()))
+            .collect();
 
         if let Some(o) = &self.operator {
             for final_value in &mut out {
