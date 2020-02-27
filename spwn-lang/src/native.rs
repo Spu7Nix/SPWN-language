@@ -40,18 +40,18 @@ pub fn context_trigger(context: Context) -> GDObj {
 
 const TYPE_MEMBER_NAME: &str = "TYPE";
 impl Value {
-    pub fn member(&self, member: String, context: &Context) -> Value {
+    pub fn member(&self, member: String, context: &Context, globals: &mut Globals) -> Value {
         //println!("{:?}", context.implementations);
         let get_impl = |t: String, m: String| match context.implementations.get(&(t)) {
             Some(imp) => match imp.get(&m) {
-                Some(mem) => mem.clone(),
+                Some(mem) => (*globals).stored_values[*mem as usize].clone(),
                 None => panic!("{} does not have member", t),
             },
             None => panic!("{} does not have member", t),
         };
         let my_type = match self {
             Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
-                Some(value) => match (value).clone() {
+                Some(value) => match (*globals).stored_values[*value as usize].clone() {
                     Value::Str(s) => s,
                     _ => unreachable!(),
                 },
@@ -76,7 +76,7 @@ impl Value {
         } else {
             match self {
                 Value::Dict(dict) => match dict.get(&member) {
-                    Some(value) => (*value).clone(),
+                    Some(value) => (*globals).stored_values[*value as usize].clone(),
                     None => get_impl(my_type.to_string(), member).clone(),
                 },
                 Value::Func(f) => {

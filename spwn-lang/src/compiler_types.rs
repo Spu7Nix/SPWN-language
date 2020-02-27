@@ -8,7 +8,12 @@ use std::path::PathBuf;
 use crate::compiler::{compile_scope, import_module, next_free};
 
 pub type Returns = Vec<(Value, Context)>;
-pub type Implementations = HashMap<String, HashMap<String, Value>>;
+pub type Implementations = HashMap<String, HashMap<String, u32>>;
+pub type StoredValue = u32; //index to stored value in globals.stored_values
+pub fn store_value(val: Value, globals: &mut Globals) -> StoredValue {
+    (*globals).stored_values.push(val);
+    (globals.stored_values.len() as u32) - 1
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Context {
@@ -16,7 +21,7 @@ pub struct Context {
     pub y: u16,
     pub start_group: Group,
     pub spawn_triggered: bool,
-    pub variables: HashMap<String, Value>,
+    pub variables: HashMap<String, StoredValue>,
     pub implementations: Implementations,
 }
 #[derive(Debug, Clone)]
@@ -66,7 +71,7 @@ pub enum Value {
     Number(f64),
     Bool(bool),
     Func(Group),
-    Dict(HashMap<String, Value>),
+    Dict(HashMap<String, StoredValue>),
     Macro(Macro),
     Str(String),
     Array(Vec<Value>),
@@ -84,6 +89,7 @@ pub struct Globals {
     pub obj_list: Vec<GDObj>,
 
     pub highest_x: u32,
+    pub stored_values: Vec<Value>,
 }
 
 /*#[derive(Debug)]
@@ -226,14 +232,15 @@ pub fn execute_macro(
 
     for (arg_values, mut new_context) in evaled_args {
         new_context.variables = m.def_context.variables.clone();
-        let mut new_variables: HashMap<String, Value> = HashMap::new();
+        let mut new_variables: HashMap<String, StoredValue> = HashMap::new();
 
         //parse each argument given into a local macro variable
         for (i, arg) in args.iter().enumerate() {
             match &arg.symbol {
                 Some(name) => {
                     if m.args.iter().any(|e| e.0 == *name) {
-                        new_variables.insert(name.clone(), arg_values[i].clone());
+                        new_variables
+                            .insert(name.clone(), store_value(arg_values[i].clone(), globals));
                     } else {
                         panic!("This macro has no argument with this name!")
                     }
@@ -243,7 +250,7 @@ pub fn execute_macro(
                         m.args[if m.args[0].0 == "self" { i + 1 } else { i }]
                             .0
                             .clone(),
-                        arg_values[i].clone(),
+                        store_value(arg_values[i].clone(), globals),
                     );
                 }
             }
@@ -251,14 +258,14 @@ pub fn execute_macro(
         //insert defaults and check non-optional arguments
         let mut m_args_iter = m.args.iter();
         if m.args[0].0 == "self" {
-            new_variables.insert("self".to_string(), parent.clone());
+            new_variables.insert("self".to_string(), store_value(parent.clone(), globals));
             m_args_iter.next();
         }
         for arg in m_args_iter {
             if !new_variables.contains_key(&arg.0) {
                 match &arg.1 {
                     Some(default) => {
-                        new_variables.insert(arg.0.clone(), default.clone());
+                        new_variables.insert(arg.0.clone(), store_value(default.clone(), globals));
                     }
 
                     None => panic!("Non-optional argument '{}' not satisfied!", arg.0),
@@ -359,11 +366,14 @@ pub fn eval_dict(
     let mut out = Returns::new();
     for expressions in evaled {
         let mut expr_index: usize = 0;
-        let mut dict_out: HashMap<String, Value> = HashMap::new();
+        let mut dict_out: HashMap<String, StoredValue> = HashMap::new();
         for def in dict.clone() {
             match def {
                 ast::DictDef::Def(d) => {
-                    dict_out.insert(d.0.clone(), expressions.0[expr_index].clone());
+                    dict_out.insert(
+                        d.0.clone(),
+                        store_value(expressions.0[expr_index].clone(), globals),
+                    );
                 }
                 ast::DictDef::Extract(_) => {
                     dict_out.extend(match &expressions.0[expr_index] {
@@ -454,9 +464,11 @@ impl ast::Variable {
 
             ast::ValueLiteral::Bool(b) => start_val.push((Value::Bool(*b), context)),
             ast::ValueLiteral::Symbol(string) => match context.variables.get(string) {
-                Some(value) => start_val.push(((*value).clone(), context)),
+                Some(value) => {
+                    start_val.push((((*globals).stored_values[*value as usize]).clone(), context))
+                }
                 None => panic!(format!(
-                    "The variable {} does not exist in this Func.",
+                    "The variable \"{}\" does not exist in this Func.",
                     string
                 )),
             },
@@ -573,7 +585,13 @@ impl ast::Variable {
                 ast::Path::Member(m) => {
                     with_parent = with_parent
                         .iter()
-                        .map(|x| (x.0.member(m.clone(), &x.1), x.1.clone(), x.0.clone()))
+                        .map(|x| {
+                            (
+                                x.0.member(m.clone(), &x.1, globals),
+                                x.1.clone(),
+                                x.0.clone(),
+                            )
+                        })
                         .collect();
                 }
 

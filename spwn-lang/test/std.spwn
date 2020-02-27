@@ -2,6 +2,7 @@
 constants = import "constants.spwn"
 
 * = constants.obj_props
+* = constants.comparisons
 
 wait = (time){
     add obj{

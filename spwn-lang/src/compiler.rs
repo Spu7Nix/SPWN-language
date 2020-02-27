@@ -20,8 +20,8 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
         closed_items: Vec::new(),
         path: path,
         obj_list: Vec::new(),
-
         highest_x: 0,
+        stored_values: Vec::new(),
     };
 
     /*let file_content =
@@ -71,34 +71,11 @@ pub fn compile_scope(
     globals: &mut Globals,
     info: CompilerInfo,
 ) -> (Vec<Context>, Returns) {
-    /*
-    context.x = globals.highest_x;
-    if start_group.id != 0 {
-        context.spawn_triggered = true;
+    for context in &mut contexts {
+        context.x = globals.highest_x;
     }
-
     (*globals).highest_x += 30;
-    context.y -= 30;
 
-    context.added_groups.sort_by(|a, b| a.id.cmp(&b.id));
-    context.added_groups.dedup();
-
-    let mut exports: HashMap<String, Value> = HashMap::new();
-
-    //check if it only has difinitions
-    if !statements.iter().any(|x| match x {
-        ast::Statement::Definition(_def) => false,
-        _ => true,
-    }) {
-        for (i, g) in context.added_groups.iter().enumerate() {
-            if g.id == start_group.id {
-                context.added_groups.remove(i);
-                break;
-            }
-        }
-        start_group = Group { id: 0 };
-    }
-    */
     let mut statements_iter = statements.iter();
 
     let mut returns: Returns = Vec::new();
@@ -125,6 +102,7 @@ pub fn compile_scope(
             contexts.len()
         );
         let mut statement_type: &str = "";
+
         match statement {
             ast::Statement::Expr(expr) => {
                 statement_type = "expr";
@@ -156,7 +134,9 @@ pub fn compile_scope(
                             _ => panic!("Only dict can have their values extracted"),
                         }
                     } else {
-                        context.variables.insert(String::from(&def.symbol), val);
+                        context
+                            .variables
+                            .insert(String::from(&def.symbol), store_value(val, globals));
                     }
                     contexts.push(context);
                 }
@@ -325,82 +305,48 @@ pub fn compile_scope(
                     }
                 }
             }
-            ast::Statement::For(_) => unimplemented!(),
-            /*ast::Statement::For(f) => {
-                let evaled = match f.array.eval(context, globals, placeholder_value) {
-                    Literal(l) => l,
-                    Evaluatable(e) => {
-                        let mut new_statements = vec![ast::Statement::For(ast::For {
-                            array: e.2.to_expression(),
-                            ..f.clone()
-                        })];
-                        new_statements.extend(statements_iter.cloned());
-                        return evaluate_and_execute(
-                            (e.0, e.1),
-                            &context,
-                            globals,
-                            new_statements,
-                            start_group,
-                        );
-                    }
-                };
+            ast::Statement::For(f) => {
+                statement_type = "for loop";
 
-                let array = match evaled {
-                    Value::Array(a) => a,
-                    _ => panic!("Non iteratable type"),
-                };
-
-                if !array.is_empty() {
-                    //currently makes a macro and then calls that macro.
-                    //Probably super innefiencent, but this is a job for future sput
-                    let mut new_vars = context.variables.clone();
-                    new_vars.insert(f.symbol.clone(), array[0].clone());
-
-                    let mut body_with_ret = f.body.to_owned();
-                    body_with_ret.push(ast::Statement::Return(
-                        Value::Null.to_variable().to_expression(),
-                    ));
-                    let mut new_statements = vec![ast::Statement::Expr(
-                        ast::Variable {
-                            operator: None,
-                            value: ast::ValueLiteral::Resolved(Value::Macro(Macro {
-                                body: body_with_ret,
-                                args: Vec::new(),
-                                def_context: Context {
-                                    variables: new_vars,
-                                    ..context.clone()
-                                },
-                            })),
-                            path: vec![ast::Path::Call(Vec::new())],
-                        }
-                        .to_expression(),
-                    )];
-
-                    if array.len() > 1 {
-                        new_statements.push(ast::Statement::For(ast::For {
-                            array: ast::ValueLiteral::Resolved(Value::Array(
-                                array[1..(array.len() - 1)].to_vec(),
-                            ))
-                            .to_variable()
-                            .to_expression(),
-                            ..f.to_owned()
-                        }));
-                    }
-                    new_statements.extend(statements_iter.cloned());
-
-                    //println!("{:?}", new_statements);
-                    return compile_scope(
-                        &new_statements,
-                        context,
-                        start_group,
-                        globals,
-                        &Value::Null,
-                    );
+                let mut all_arrays: Returns = Vec::new();
+                for context in contexts {
+                    let (evaled, inner_returns) = f.array.eval(context, globals, info.clone());
+                    returns.extend(inner_returns);
+                    all_arrays.extend(evaled);
                 }
+                contexts = Vec::new();
+                for (val, context) in all_arrays {
+                    match val {
+                        Value::Array(arr) => {
+                            let mut new_contexts = vec![context];
 
-                //internal for loop
-                //TODO: make some deeply nested shit that deals with this or smth idk i need sleep gn
-            }*/
+                            for element in arr {
+                                for mut c in new_contexts.clone() {
+                                    c.variables.insert(
+                                        f.symbol.clone(),
+                                        store_value(element.clone(), globals),
+                                    ); //this will store a lot of values, maybe fix this sometime idk
+
+                                    let (end_contexts, inner_returns) = compile_scope(
+                                        &f.body,
+                                        vec![c],
+                                        globals,
+                                        info.next("for loop"),
+                                    );
+                                    returns.extend(inner_returns);
+                                    new_contexts = end_contexts;
+                                }
+                            }
+                            contexts.extend(new_contexts);
+                        }
+
+                        _ => panic!(
+                            "Expected array, got {:?}",
+                            val.member("TYPE".to_string(), &context, globals)
+                        ),
+                    }
+                }
+            }
             ast::Statement::Return(val) => {
                 statement_type = "return";
                 let mut all_values: Returns = Vec::new();
@@ -449,7 +395,7 @@ pub fn import_module(
     }
     (
         match contexts[0].variables.get("exports") {
-            Some(val) => (*val).clone(),
+            Some(val) => (*globals).stored_values[*val as usize].clone(),
             None => Value::Null,
         },
         contexts[0].implementations.clone(),

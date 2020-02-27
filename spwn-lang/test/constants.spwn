@@ -66,7 +66,8 @@ exports = {
         PULSE_MODE : 48,
         COPIED_COLOR_HVS : 49,
         COPIED_COLOR_ID : 50,
-        TARGET : 51,
+        
+        T : 51,
         TARGET_TYPE : 52,
         YELLOW_TELEPORTATION_PORTAL_DISTANCE : 54,
         ACTIVATE_GROUP : 56,
