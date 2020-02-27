@@ -218,7 +218,7 @@ pub fn execute_macro(
     // second returns is for any compound statements in the args
     let (evaled_args, inner_returns) = all_combinations(
         args.iter().map(|x| x.value.clone()).collect(),
-        context,
+        context.clone(),
         globals,
         info.clone(),
     );
@@ -235,11 +235,16 @@ pub fn execute_macro(
                     if m.args.iter().any(|e| e.0 == *name) {
                         new_variables.insert(name.clone(), arg_values[i].clone());
                     } else {
-                        panic!("This function has no argument with this name!")
+                        panic!("This macro has no argument with this name!")
                     }
                 }
                 None => {
-                    new_variables.insert(m.args[i].0.clone(), arg_values[i].clone());
+                    new_variables.insert(
+                        m.args[if m.args[0].0 == "self" { i + 1 } else { i }]
+                            .0
+                            .clone(),
+                        arg_values[i].clone(),
+                    );
                 }
             }
         }
@@ -266,7 +271,19 @@ pub fn execute_macro(
         new_contexts.push(new_context);
     }
     (
-        compile_scope(&m.body, new_contexts, globals, info.next("macro body")).1,
+        compile_scope(&m.body, new_contexts, globals, info.next("macro body"))
+            .1
+            .iter()
+            .map(|x| {
+                (
+                    x.0.clone(),
+                    Context {
+                        variables: context.variables.clone(),
+                        ..x.1.clone()
+                    },
+                )
+            })
+            .collect(),
         inner_returns,
     )
 }
@@ -470,7 +487,7 @@ impl ast::Variable {
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, String)> = Vec::new();
-                    for i in 0..(o.len() - 1) {
+                    for i in 0..(o.len()) {
                         let v = expressions[i * 2].clone();
                         let v2 = expressions[i * 2 + 1].clone();
 
@@ -659,6 +676,8 @@ impl ast::CompoundStatement {
         let start_group = Group {
             id: next_free(&mut globals.closed_groups),
         };
+
+        new_context.start_group = start_group;
 
         (
             start_group,

@@ -57,7 +57,7 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
     println!("{:?}", globals.closed_groups);*/
     let start_info = CompilerInfo {
         depth: 0,
-        path: vec!["main scope".to_string()],
+        path: vec![".".to_string()],
     };
 
     compile_scope(&statements, vec![Context::new()], &mut globals, start_info);
@@ -105,13 +105,13 @@ pub fn compile_scope(
 
     use std::time::Instant;
 
-    let indent = {
+    /*let indent = {
         let mut new_string = String::new();
         for _ in 0..info.depth {
             new_string += "|-->";
         }
         new_string
-    };
+    };*/
 
     let path = info.path.join("/");
 
@@ -120,10 +120,9 @@ pub fn compile_scope(
         let start_time = Instant::now();
 
         println!(
-            "{}Compiling a statement in {} contexts ({})",
-            indent,
-            contexts.len(),
-            path
+            "{} -> Compiling a statement in {} contexts",
+            path,
+            contexts.len()
         );
         let mut statement_type: &str = "";
         match statement {
@@ -211,6 +210,15 @@ pub fn compile_scope(
 
             ast::Statement::Async(a) => {
                 //just get value of a in every context ig
+                statement_type = "async";
+                // NO CONTEXT CHANGE, NO RETURNS, NO NOTHIN
+                //let mut all_values: Returns = Vec::new();
+                for context in contexts.clone() {
+                    let (_, inner_returns) = a.to_value(context, globals, info.clone());
+                    returns.extend(inner_returns);
+                    //all_values.extend(evaled);
+                }
+                //contexts = Vec::new();
             }
 
             ast::Statement::Impl(imp) => {
@@ -409,11 +417,10 @@ pub fn compile_scope(
             ast::Statement::EOI => {}
         }
         println!(
-            "{}Compiled '{}' in {} milliseconds! ({})",
-            indent,
+            "{} -> Compiled '{}' in {} milliseconds!",
+            path,
             statement_type,
             start_time.elapsed().as_millis(),
-            path
         );
     }
 

@@ -79,6 +79,13 @@ impl Value {
                     Some(value) => (*value).clone(),
                     None => get_impl(my_type.to_string(), member).clone(),
                 },
+                Value::Func(f) => {
+                    if &member == "start_group" {
+                        Value::Group(*f)
+                    } else {
+                        get_impl(my_type.to_string(), member).clone()
+                    }
+                }
                 _ => get_impl(my_type.to_string(), member).clone(),
             }
         }
