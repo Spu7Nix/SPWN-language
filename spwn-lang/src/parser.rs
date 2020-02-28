@@ -54,90 +54,108 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>) -> Vec<as
         )
     };
 
-    for statement in statements {
-        stmts.push(match statement.as_rule() {
-            Rule::def => {
-                let mut inner = statement.into_inner();
-                let first = inner.next().unwrap();
-                match first.as_rule() {
-                    Rule::expr => ast::Statement::Definition(ast::Definition {
-                        symbol: "*".to_string(),
-                        value: parse_expr(first),
-                        props: inner.map(parse_native_prop).collect(),
-                    }),
-                    Rule::symbol => {
-                        let value = parse_expr(inner.next().unwrap());
-                        ast::Statement::Definition(ast::Definition {
-                            symbol: first.as_span().as_str().to_string(),
-                            value,
+    for unpacked in statements {
+        let mut inner = unpacked.clone().into_inner();
+        let mut async_arrow = false;
+        let first_elem = match inner.next() {
+            Some(val) => val,
+            None => break, //EOF
+        };
+        let statement = match first_elem.as_rule() {
+            Rule::async_arrow => {
+                async_arrow = true;
+                inner.next().unwrap()
+            }
+            _ => first_elem,
+        };
+        stmts.push(ast::Statement {
+            body: match statement.as_rule() {
+                Rule::def => {
+                    let mut inner = statement.into_inner();
+                    let first = inner.next().unwrap();
+                    match first.as_rule() {
+                        Rule::expr => ast::StatementBody::Definition(ast::Definition {
+                            symbol: "*".to_string(),
+                            value: parse_expr(first),
                             props: inner.map(parse_native_prop).collect(),
-                        })
+                        }),
+                        Rule::symbol => {
+                            let value = parse_expr(inner.next().unwrap());
+                            ast::StatementBody::Definition(ast::Definition {
+                                symbol: first.as_span().as_str().to_string(),
+                                value,
+                                props: inner.map(parse_native_prop).collect(),
+                            })
+                        }
+                        _ => unreachable!(),
                     }
-                    _ => unreachable!(),
                 }
-            }
-            Rule::call => ast::Statement::Call(ast::Call {
-                function: parse_variable(statement.into_inner().next().unwrap()),
-            }),
+                Rule::call => ast::StatementBody::Call(ast::Call {
+                    function: parse_variable(statement.into_inner().next().unwrap()),
+                }),
 
-            Rule::if_stmt => {
-                let mut inner = statement.into_inner();
-                ast::Statement::If(ast::If {
-                    condition: parse_expr(inner.next().unwrap()),
-                    if_body: parse_statements(&mut inner.next().unwrap().into_inner()),
-                    else_body: match inner.next() {
-                        Some(body) => Some(parse_statements(&mut body.into_inner())),
-                        None => None,
+                Rule::if_stmt => {
+                    let mut inner = statement.into_inner();
+                    ast::StatementBody::If(ast::If {
+                        condition: parse_expr(inner.next().unwrap()),
+                        if_body: parse_statements(&mut inner.next().unwrap().into_inner()),
+                        else_body: match inner.next() {
+                            Some(body) => Some(parse_statements(&mut body.into_inner())),
+                            None => None,
+                        },
+                    })
+                }
+                Rule::add_obj => {
+                    ast::StatementBody::Add(parse_expr(statement.into_inner().next().unwrap()))
+                }
+
+                Rule::for_loop => {
+                    let mut inner = statement.into_inner();
+                    ast::StatementBody::For(ast::For {
+                        symbol: inner.next().unwrap().as_span().as_str().to_string(),
+                        array: parse_expr(inner.next().unwrap()),
+                        body: parse_statements(&mut inner.next().unwrap().into_inner()),
+                    })
+                }
+
+                Rule::implement => {
+                    let mut inner = statement.into_inner();
+                    ast::StatementBody::Impl(ast::Implementation {
+                        symbol: parse_variable(inner.next().unwrap()),
+                        members: parse_dict(inner.next().unwrap()),
+                    })
+                }
+
+                Rule::error => ast::StatementBody::Error(ast::Error {
+                    message: parse_expr(statement.into_inner().next().unwrap()),
+                }),
+
+                Rule::expr => ast::StatementBody::Expr(parse_expr(statement)),
+                Rule::retrn => ast::StatementBody::Return(match statement.into_inner().next() {
+                    Some(expr) => parse_expr(expr),
+
+                    None => ast::Expression {
+                        // null expression
+                        values: vec![ast::Variable {
+                            operator: None,
+                            value: ast::ValueLiteral::Null,
+                            path: Vec::new(),
+                        }],
+                        operators: Vec::new(),
                     },
-                })
-            }
-            Rule::add_obj => {
-                ast::Statement::Add(parse_expr(statement.into_inner().next().unwrap()))
-            }
+                }),
+                Rule::EOI => ast::StatementBody::EOI,
+                _ => {
+                    println!(
+                        "{:?} is not added to parse_statements yet",
+                        statement.as_rule()
+                    );
+                    ast::StatementBody::EOI
+                }
+            },
 
-            Rule::async_call => {
-                ast::Statement::Async(parse_variable(statement.into_inner().next().unwrap()))
-            }
-
-            Rule::for_loop => {
-                let mut inner = statement.into_inner();
-                ast::Statement::For(ast::For {
-                    symbol: inner.next().unwrap().as_span().as_str().to_string(),
-                    array: parse_expr(inner.next().unwrap()),
-                    body: parse_statements(&mut inner.next().unwrap().into_inner()),
-                })
-            }
-
-            Rule::implement => {
-                let mut inner = statement.into_inner();
-                ast::Statement::Impl(ast::Implementation {
-                    symbol: parse_variable(inner.next().unwrap()),
-                    members: parse_dict(inner.next().unwrap()),
-                })
-            }
-
-            Rule::expr => ast::Statement::Expr(parse_expr(statement)),
-            Rule::retrn => ast::Statement::Return(match statement.into_inner().next() {
-                Some(expr) => parse_expr(expr),
-
-                None => ast::Expression {
-                    // null expression
-                    values: vec![ast::Variable {
-                        operator: None,
-                        value: ast::ValueLiteral::Null,
-                        path: Vec::new(),
-                    }],
-                    operators: Vec::new(),
-                },
-            }),
-            Rule::EOI => ast::Statement::EOI,
-            _ => {
-                println!(
-                    "{:?} is not added to parse_statements yet",
-                    statement.as_rule()
-                );
-                ast::Statement::EOI
-            }
+            arrow: async_arrow,
+            line: unpacked.as_span().start_pos().line_col(),
         })
     }
     stmts

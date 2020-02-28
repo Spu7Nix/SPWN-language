@@ -26,7 +26,6 @@ impl "group" {
             EASING_RATE: easing_rate,
         }
         wait(duration)
-        return
     },
 
     stop: (self){
@@ -34,7 +33,6 @@ impl "group" {
             OBJ_ID: 1616,
             TARGET: self,
         }
-        return
     },
 
     alpha: (self, opacity: 1, duration: 0){
@@ -45,7 +43,6 @@ impl "group" {
             DURATION: duration,
         }
         wait(duration)
-        return
     },
 
     toggle_on: (self){
@@ -54,7 +51,6 @@ impl "group" {
             TARGET: self,
             ACTIVATE_GROUP: 1,
         }
-        return
     },
 
     toggle_off: (self){
@@ -63,7 +59,6 @@ impl "group" {
             TARGET: self,
             ACTIVATE_GROUP: 0,
         }
-        return
     },
 
     rotate: (self, center, degrees, duration: 0, easing: 0, easing_rate: 0, lock_object_rotation: 0){
@@ -78,7 +73,6 @@ impl "group" {
             LOCK_OBJECT_ROTATION: lock_object_rotation
         }
         wait(duration)
-        return
     }
 }
 
@@ -94,7 +88,6 @@ impl "color" {
             BLENDING: blending,
         }
         wait(duration)
-        return
     }
 }
 
@@ -106,7 +99,6 @@ impl "item" {
             COUNT: amount,
             ITEM: self,
         }
-        return
     },
 
     if_is: (self, comparison, other, function) {
@@ -118,16 +110,23 @@ impl "item" {
             COMPARISON: comparison, 
             ITEM: self,
         }
-        return
-    }
+    },
+
+    on_count: (self, number: 0, function) {
+        add obj{
+            OBJ_ID: 1611,
+            TARGET: function,
+            COUNT: other,
+            ACTIVATE_GROUP: 1, 
+            ITEM: self,
+        }
+    },
 }
 
 impl "mutable" {
-    plus: (self, other) {
-        return const(self) + other
-    },
+    
 
-    const: (self, range) {
+    to_const: (self, range) {
         for val in range {
             -> self.item.if_is(EQUAL_TO, val, {
                 return val
@@ -139,14 +138,38 @@ impl "mutable" {
     as: (self, type) {
         if type == "bool" {
             return self.const([0, 1]) == 1
+        } else {
+            error "Cannot convert to this type (mut can convert to a number using the mut.to_const macro)"
         }
     }
 }
+
+
+
+general_functions = {
+    
+        
+    on_touch: (function) {
+
+        add obj{
+            OBJ_ID: 1595,
+            HOLD_MODE: true,
+            TOGGLE_MODE: 1,
+            TARGET: function
+        }
+    },
+
+    
+    
+}
+
+
 
 exports = {
     //..constants.obj_props,
     ..constants.easing_types,
     ..constants.comparisons,
+    ..general_functions,
     
     wait: wait,
 
@@ -160,7 +183,11 @@ exports = {
             TYPE: "mutable",
             item: id
         }
-    }
+    },
+
+    
+
+    
     
 }
 

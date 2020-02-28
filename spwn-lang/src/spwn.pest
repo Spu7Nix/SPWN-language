@@ -2,9 +2,10 @@
 COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!"\n" ~ ANY)* ~ "\n")}
 WHITESPACE = _{ " " | "\t"}
 
+async_arrow  = {"->"}
 
-stmt  = _{
-    def | add_obj | if_stmt | for_loop | call | async_call | retrn | implement | expr
+stmt  = {
+    async_arrow? ~ (def | add_obj | if_stmt | for_loop | call | error | retrn | implement | expr)
 }
 
 def = {(symbol | "*") ~ "=" ~ (expr) ~ native_prop*}
@@ -12,8 +13,9 @@ call = {variable ~ "!"}
 retrn = {"return" ~ expr?}
 add_obj = {"add" ~ expr}
 implement = {"impl" ~ variable ~ dictionary}
-async_call = {"->" ~ variable}
+//async_call = {"->" ~ variable}
 for_loop = {"for" ~ symbol ~ "in" ~ expr ~ cmp_stmt}
+error = {"error" ~ expr}
 
 if_stmt = {"if" ~ expr ~ ss* ~ cmp_stmt ~ ss* ~ ("else" ~ ss* ~ (cmp_stmt | if_else))?}
 if_else = {if_stmt}
@@ -30,7 +32,7 @@ cmp_stmt = {
 dict_def = {symbol ~ ":" ~ expr}
 dict_extract = {".." ~ expr}
 dictionary = {
-    "{" ~ ss* ~ ((dict_def | dict_extract) ~ "," ~ ss*)* ~ (dict_def | dict_extract) ~ ","? ~ ss* ~ "}"
+    "{" ~ ss* ~ ((dict_def | dict_extract) ~ "," ~ ss*)* ~ (dict_def | dict_extract)? ~ ss* ~ "}"
 }
 
 array = {

@@ -11,7 +11,14 @@ pub enum DictDef {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum Statement {
+pub struct Statement {
+    pub body: StatementBody,
+    pub arrow: bool, //context changing
+    pub line: (usize, usize),
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum StatementBody {
     Definition(Definition),
     Call(Call),
     Expr(Expression),
@@ -19,8 +26,8 @@ pub enum Statement {
     Return(Expression),
     Impl(Implementation),
     If(If),
-    Async(Variable),
     For(For),
+    Error(Error),
     EOI,
 }
 #[derive(Clone, PartialEq, Debug)]
@@ -38,16 +45,6 @@ pub enum ValueLiteral {
     Obj(Vec<(Expression, Expression)>),
     Macro(Macro),
     Null,
-}
-
-impl ValueLiteral {
-    pub fn to_variable(&self) -> Variable {
-        Variable {
-            value: self.clone(),
-            path: Vec::new(),
-            operator: None,
-        }
-    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -99,6 +96,11 @@ pub struct For {
     pub symbol: String,
     pub array: Expression,
     pub body: Vec<Statement>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Error {
+    pub message: Expression,
 }
 
 #[derive(Clone, PartialEq, Debug)]

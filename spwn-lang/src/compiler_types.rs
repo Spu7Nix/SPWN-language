@@ -28,6 +28,7 @@ pub struct Context {
 pub struct CompilerInfo {
     pub depth: u8,
     pub path: Vec<String>,
+    pub line: (usize, usize),
 }
 
 impl CompilerInfo {
@@ -37,6 +38,7 @@ impl CompilerInfo {
         CompilerInfo {
             depth: self.depth + 1,
             path: new_path,
+            line: self.line,
         }
     }
 }
@@ -90,6 +92,22 @@ pub struct Globals {
 
     pub highest_x: u32,
     pub stored_values: Vec<Value>,
+}
+
+pub fn compile_error(msg: &str, info: CompilerInfo) -> String {
+    format!(
+        "
+{}
+-~-~-~-~-~-~-~-~-~-~-~
+line: {}, position: {}
+Error: \"{}\"
+
+",
+        info.path.join("->"),
+        info.line.0,
+        info.line.1,
+        msg
+    )
 }
 
 /*#[derive(Debug)]
@@ -160,14 +178,15 @@ impl ast::Expression {
                                             _ => unreachable!(),
                                         }
                                     } else {
-                                        panic!("Right side must be boolean")
+                                        panic!(compile_error("Right side must be boolean", info));
                                     }
                                 } else {
-                                    panic!("Both sides must be boolean")
+                                    panic!(compile_error("Both sides must be boolean", info))
                                 }
                             }
                             ">" | "<" | ">=" | "<=" | "/" | "*" | "+" | "-" => {
                                 //number operations
+                                //add support for strings?
                                 if let Value::Number(num) = val {
                                     if let Value::Number(a) = acum_val {
                                         match self.operators[i].as_ref() {
@@ -182,10 +201,10 @@ impl ast::Expression {
                                             _ => unreachable!(),
                                         }
                                     } else {
-                                        panic!("Right side must be number")
+                                        panic!(compile_error("Right side must be number", info))
                                     }
                                 } else {
-                                    panic!("Both sides must be numbers")
+                                    panic!(compile_error("Both sides must be numbers", info))
                                 }
                             }
                             //any
@@ -194,10 +213,10 @@ impl ast::Expression {
                             "->" => Value::Array(
                                 (match acum_val {
                                     Value::Number(n) => n as i32,
-                                    _ => panic!("Both sides must be numbers"),
+                                    _ => panic!(compile_error("Both sides must be numbers", info)),
                                 }..match val {
                                     Value::Number(n) => n as i32,
-                                    _ => panic!("Both sides must be numbers"),
+                                    _ => panic!(compile_error("Both sides must be numbers", info)),
                                 })
                                     .map(|x| Value::Number(x as f64))
                                     .collect(),
@@ -242,7 +261,10 @@ pub fn execute_macro(
                         new_variables
                             .insert(name.clone(), store_value(arg_values[i].clone(), globals));
                     } else {
-                        panic!("This macro has no argument with this name!")
+                        panic!(compile_error(
+                            "This macro has no argument with this name!",
+                            info
+                        ))
                     }
                 }
                 None => {
@@ -268,7 +290,10 @@ pub fn execute_macro(
                         new_variables.insert(arg.0.clone(), store_value(default.clone(), globals));
                     }
 
-                    None => panic!("Non-optional argument '{}' not satisfied!", arg.0),
+                    None => panic!(compile_error(
+                        &format!("Non-optional argument '{}' not satisfied!", arg.0),
+                        info
+                    )),
                 }
             }
         }
@@ -277,9 +302,18 @@ pub fn execute_macro(
 
         new_contexts.push(new_context);
     }
+    let compiled = compile_scope(&m.body, new_contexts, globals, info.next("macro body"));
+    let returns = if compiled.1.is_empty() {
+        compiled
+            .0
+            .iter()
+            .map(|x| (Value::Null, x.clone()))
+            .collect()
+    } else {
+        compiled.1
+    };
     (
-        compile_scope(&m.body, new_contexts, globals, info.next("macro body"))
-            .1
+        returns
             .iter()
             .map(|x| {
                 (
@@ -360,7 +394,7 @@ pub fn eval_dict(
             .collect(),
         context,
         globals,
-        info,
+        info.clone(),
     );
     inner_returns.extend(returns);
     let mut out = Returns::new();
@@ -378,7 +412,7 @@ pub fn eval_dict(
                 ast::DictDef::Extract(_) => {
                     dict_out.extend(match &expressions.0[expr_index] {
                         Value::Dict(d) => d.clone(),
-                        _ => panic!("Cannot extract from this value"),
+                        _ => panic!(compile_error("Cannot extract from this value", info)),
                     });
                 }
             };
@@ -467,9 +501,9 @@ impl ast::Variable {
                 Some(value) => {
                     start_val.push((((*globals).stored_values[*value as usize]).clone(), context))
                 }
-                None => panic!(format!(
-                    "The variable \"{}\" does not exist in this Func.",
-                    string
+                None => panic!(compile_error(
+                    &format!("The variable \"{}\" does not exist in this Func.", string),
+                    info
                 )),
             },
             ast::ValueLiteral::Str(s) => start_val.push((Value::Str(s.clone()), context)),
@@ -506,7 +540,10 @@ impl ast::Variable {
                         obj.push((
                             match v {
                                 Value::Number(n) => n as u16,
-                                _ => panic!("Expected number as object property"),
+                                _ => panic!(compile_error(
+                                    "Expected number as object property",
+                                    info
+                                )),
                             },
                             match v2 {
                                 Value::Number(n) => n.to_string(),
@@ -527,7 +564,10 @@ impl ast::Variable {
                                 }
 
                                 //Value::Array(a) => {} TODO: Add this
-                                x => panic!("{:?} is not a valid object value", x),
+                                x => panic!(compile_error(
+                                    &format!("{:?} is not a valid object value", x),
+                                    info
+                                )),
                             },
                         ))
                     }
@@ -587,7 +627,7 @@ impl ast::Variable {
                         .iter()
                         .map(|x| {
                             (
-                                x.0.member(m.clone(), &x.1, globals),
+                                x.0.member(m.clone(), &x.1, globals, info.clone()),
                                 x.1.clone(),
                                 x.0.clone(),
                             )
@@ -612,11 +652,11 @@ impl ast::Variable {
                                                 prev_v.clone(),
                                             ));
                                         }
-                                        _ => panic!("Index must be a number"),
+                                        _ => panic!(compile_error("Index must be a number", info)),
                                     }
                                 }
                             }
-                            _ => panic!("Cannot index this"),
+                            _ => panic!(compile_error("Cannot index this", info)),
                         }
                     }
                 }
@@ -638,7 +678,7 @@ impl ast::Variable {
                                     .map(|x| (x.0.clone(), x.1.clone(), v.clone()))
                                     .collect();
                             }
-                            _ => panic!("not a macro"),
+                            _ => panic!(compile_error("not a macro", info)),
                         }
                     }
                 }
@@ -657,7 +697,7 @@ impl ast::Variable {
                         if let Value::Number(n) = final_value.0 {
                             *final_value = (Value::Number(-n), final_value.1.clone());
                         } else {
-                            panic!("Cannot make non number type negative!")
+                            panic!(compile_error("Cannot make non number type negative!", info))
                         }
                     }
 
@@ -665,7 +705,7 @@ impl ast::Variable {
                         if let Value::Bool(b) = final_value.0 {
                             *final_value = (Value::Bool(!b), final_value.1.clone());
                         } else {
-                            panic!("Cannot nagate non-boolean value")
+                            panic!(compile_error("Cannot nagate non-boolean value", info))
                         }
                     }
 

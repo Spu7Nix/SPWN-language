@@ -57,7 +57,8 @@ pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
     println!("{:?}", globals.closed_groups);*/
     let start_info = CompilerInfo {
         depth: 0,
-        path: vec![".".to_string()],
+        path: vec!["main scope".to_string()],
+        line: statements[0].line,
     };
 
     compile_scope(&statements, vec![Context::new()], &mut globals, start_info);
@@ -69,7 +70,7 @@ pub fn compile_scope(
     statements: &Vec<ast::Statement>,
     mut contexts: Vec<Context>,
     globals: &mut Globals,
-    info: CompilerInfo,
+    mut info: CompilerInfo,
 ) -> (Vec<Context>, Returns) {
     for context in &mut contexts {
         context.x = globals.highest_x;
@@ -102,9 +103,18 @@ pub fn compile_scope(
             contexts.len()
         );
         let mut statement_type: &str = "";
+        use ast::StatementBody::*;
 
-        match statement {
-            ast::Statement::Expr(expr) => {
+        let stored_context = if statement.arrow {
+            Some(contexts.clone())
+        } else {
+            None
+        };
+
+        info.line = statement.line;
+
+        match &statement.body {
+            Expr(expr) => {
                 statement_type = "expr";
                 let mut new_contexts: Vec<Context> = Vec::new();
                 for context in contexts {
@@ -116,7 +126,7 @@ pub fn compile_scope(
                 contexts = new_contexts;
             }
 
-            ast::Statement::Definition(def) => {
+            Definition(def) => {
                 statement_type = "def";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
@@ -131,7 +141,10 @@ pub fn compile_scope(
                             Value::Dict(d) => {
                                 context.variables.extend(d.clone());
                             }
-                            _ => panic!("Only dict can have their values extracted"),
+                            _ => panic!(compile_error(
+                                "Only dict can have their values extracted",
+                                info
+                            )),
                         }
                     } else {
                         context
@@ -142,7 +155,7 @@ pub fn compile_scope(
                 }
             }
 
-            ast::Statement::If(if_stmt) => {
+            If(if_stmt) => {
                 statement_type = "if";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
@@ -183,25 +196,15 @@ pub fn compile_scope(
                                 };
                             }
                         }
-                        _ => panic!("Expected boolean condition in if statement"),
+                        _ => panic!(compile_error(
+                            "Expected boolean condition in if statement",
+                            info
+                        )),
                     }
                 }
             }
 
-            ast::Statement::Async(a) => {
-                //just get value of a in every context ig
-                statement_type = "async";
-                // NO CONTEXT CHANGE, NO RETURNS, NO NOTHIN
-                //let mut all_values: Returns = Vec::new();
-                for context in contexts.clone() {
-                    let (_, inner_returns) = a.to_value(context, globals, info.clone());
-                    returns.extend(inner_returns);
-                    //all_values.extend(evaled);
-                }
-                //contexts = Vec::new();
-            }
-
-            ast::Statement::Impl(imp) => {
+            Impl(imp) => {
                 statement_type = "impl";
                 let mut new_contexts: Vec<Context> = Vec::new();
                 for context in contexts.clone() {
@@ -240,7 +243,7 @@ pub fn compile_scope(
                             }
                         /**/
                         } else {
-                            panic!("Must implement on a type (a string)");
+                            panic!(compile_error("Must implement on a type (a string)", info));
                         }
                     }
                 }
@@ -249,7 +252,7 @@ pub fn compile_scope(
 
                 /**/
             }
-            ast::Statement::Call(call) => {
+            Call(call) => {
                 statement_type = "call";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
@@ -268,7 +271,7 @@ pub fn compile_scope(
                             target: match func {
                                 Value::Func(g) => g,
                                 Value::Group(g) => g,
-                                _ => panic!("Not callable"),
+                                _ => panic!(compile_error("Not callable", info)),
                             },
 
                             ..context_trigger(context.clone())
@@ -278,7 +281,7 @@ pub fn compile_scope(
                 }
             }
 
-            ast::Statement::Add(v) => {
+            Add(v) => {
                 statement_type = "add";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
@@ -301,11 +304,11 @@ pub fn compile_scope(
                             );
                         }
 
-                        _ => panic!("Expected Object"),
+                        _ => panic!(compile_error("Expected Object", info)),
                     }
                 }
             }
-            ast::Statement::For(f) => {
+            For(f) => {
                 statement_type = "for loop";
 
                 let mut all_arrays: Returns = Vec::new();
@@ -340,14 +343,17 @@ pub fn compile_scope(
                             contexts.extend(new_contexts);
                         }
 
-                        _ => panic!(
-                            "Expected array, got {:?}",
-                            val.member("TYPE".to_string(), &context, globals)
-                        ),
+                        _ => panic!(compile_error(
+                            &format!(
+                                "Expected array, got {:?}",
+                                val.member("TYPE".to_string(), &context, globals, info.clone())
+                            ),
+                            info
+                        )),
                     }
                 }
             }
-            ast::Statement::Return(val) => {
+            Return(val) => {
                 statement_type = "return";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts.clone() {
@@ -360,8 +366,32 @@ pub fn compile_scope(
                 returns.extend(all_values);
             }
 
-            ast::Statement::EOI => {}
+            Error(e) => {
+                for context in contexts.clone() {
+                    let (evaled, _) = e.message.eval(context, globals, info.next("return value"));
+                    for (msg, _) in evaled {
+                        println!(
+                            "ERROR: {:?}",
+                            match msg {
+                                Value::Str(s) => s,
+                                _ => "no message".to_string(),
+                            }
+                        );
+                    }
+                }
+                panic!(compile_error(
+                    "Error statement, see message(s) above.",
+                    info
+                ))
+            }
+
+            EOI => {}
         }
+        if let Some(c) = stored_context {
+            //resetting the context if async
+            contexts = c;
+        }
+
         println!(
             "{} -> Compiled '{}' in {} milliseconds!",
             path,

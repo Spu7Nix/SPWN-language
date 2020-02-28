@@ -1,8 +1,7 @@
 * = import "std.spwn"
 
-a = mut(10)
 
-100g.move(a.const(0->10) * 10, 0, 0.5)
+
 
 
 
