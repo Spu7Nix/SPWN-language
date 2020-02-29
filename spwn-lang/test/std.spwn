@@ -14,6 +14,14 @@ wait = (time){
     }
 }
 
+call_with_delay = (time, function) {
+    add obj{
+        OBJ_ID: 1268,
+        SPAWN_DURATION: time,
+        TARGET: function
+    }
+}
+
 impl "group" {
     move: (self, x, y, duration: 0, easing: 0, easing_rate: 0) {
         add obj{
@@ -123,7 +131,73 @@ impl "item" {
     },
 }
 
+mut = (source){
+    if source.TYPE == "number" {
+        id = ?i
+    
+        id.add(source)
+        
+        return {
+            TYPE: "mutable",
+            item: id
+        }
+    } else {
+        if source.TYPE == "item" {
+            return {
+                TYPE: "mutable",
+                item: source
+            }
+        }
+    }
+    
+}
+
 impl "mutable" {
+
+    add_to: (self, items) {
+        add = {
+            
+            self.item.if_is(LARGER_THAN, 0, {
+                mini_add = (num){
+                    self.item.if_is(LARGER_THAN, num - 1, {
+                        self.item.add(-num)
+                        for item in items {
+                            item.add(num)
+                        }
+                        call_with_delay(0.05, add)
+                    })
+                }
+                mini_add(1)
+                mini_add(10)
+                mini_add(100)
+            })
+            self.item.if_is(EQUAL_TO, 0, {
+                wait(0.05)
+                return
+            })
+        }
+        add!
+    },
+
+    copy_to: (self, item) {
+        temp_storage = ?i
+        self.add_to([item, temp_storage])
+        mut(temp_storage).add_to([self.item])
+    },
+
+    clone: (self) {
+        new_mut = ?i
+        self.copy_to(new_mut)
+        new_mut
+    }
+
+    _plus_: (self, other) {
+        if other.TYPE == "number" {
+            new_mut = mut(?i)
+            self.copy_to(new_mut.item)
+            new_mut.item.add(other)
+        }
+    } ,
     
 
     to_const: (self, range) {
@@ -137,7 +211,7 @@ impl "mutable" {
 
     as: (self, type) {
         if type == "bool" {
-            return self.const([0, 1]) == 1
+            return self.to_const([0, 1]) == 1
         } else {
             error "Cannot convert to this type (mut can convert to a number using the mut.to_const macro)"
         }
@@ -174,16 +248,8 @@ exports = {
     wait: wait,
 
 
-    mut: (num){
-        id = ?i
-        
-        id.add(num)
-        
-        return {
-            TYPE: "mutable",
-            item: id
-        }
-    },
+    mut: mut,
+    call_with_delay: call_with_delay,
 
     
 

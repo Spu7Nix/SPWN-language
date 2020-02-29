@@ -81,8 +81,6 @@ pub fn compile_scope(
 
     let mut returns: Returns = Vec::new();
 
-    use std::time::Instant;
-
     /*let indent = {
         let mut new_string = String::new();
         for _ in 0..info.depth {
@@ -91,17 +89,15 @@ pub fn compile_scope(
         new_string
     };*/
 
-    let path = info.path.join("/");
-
     while let Some(statement) = statements_iter.next() {
         //find out what kind of statement this is
-        let start_time = Instant::now();
+        //let start_time = Instant::now();
 
-        println!(
+        /*println!(
             "{} -> Compiling a statement in {} contexts",
             path,
             contexts.len()
-        );
+        );*/
         let mut statement_type: &str = "";
         use ast::StatementBody::*;
 
@@ -115,7 +111,6 @@ pub fn compile_scope(
 
         match &statement.body {
             Expr(expr) => {
-                statement_type = "expr";
                 let mut new_contexts: Vec<Context> = Vec::new();
                 for context in contexts {
                     //we dont care about the return value in this case
@@ -127,12 +122,44 @@ pub fn compile_scope(
             }
 
             Definition(def) => {
-                statement_type = "def";
                 let mut all_values: Returns = Vec::new();
+
                 for context in contexts {
-                    let (evaled, inner_returns) = def.value.eval(context, globals, info.clone());
-                    returns.extend(inner_returns);
-                    all_values.extend(evaled);
+                    if let ast::ValueLiteral::CmpStmt(f) = &def.value.values[0].value {
+                        if def.value.values.len() == 1 {
+                            //create the function context
+                            let mut new_context = context.clone();
+                            new_context.spawn_triggered = true;
+                            //pick a start group
+                            let start_group = Group {
+                                id: next_free(&mut globals.closed_groups),
+                            };
+                            new_context.variables.insert(
+                                def.symbol.clone(),
+                                store_value(Value::Func(start_group), globals),
+                            );
+                            all_values.push((Value::Func(start_group), context));
+                            new_context.start_group = start_group;
+                            let (_, inner_returns) = compile_scope(
+                                &f.statements,
+                                vec![new_context],
+                                globals,
+                                info.next("function body"),
+                            );
+                            returns.extend(inner_returns);
+                        } else {
+                            let (evaled, inner_returns) =
+                                def.value.eval(context, globals, info.clone());
+                            returns.extend(inner_returns);
+                            all_values.extend(evaled);
+                        }
+                    } else {
+                        let (evaled, inner_returns) =
+                            def.value.eval(context, globals, info.clone());
+                        returns.extend(inner_returns);
+                        all_values.extend(evaled);
+                    }
+                    //copied because im lazy
                 }
                 contexts = Vec::new();
                 for (val, mut context) in all_values {
@@ -392,12 +419,12 @@ pub fn compile_scope(
             contexts = c;
         }
 
-        println!(
+        /*println!(
             "{} -> Compiled '{}' in {} milliseconds!",
             path,
             statement_type,
             start_time.elapsed().as_millis(),
-        );
+        );*/
     }
 
     //(*globals).highest_x = context.x;

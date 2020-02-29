@@ -148,7 +148,7 @@ impl ast::Expression {
         let first_value = vals
             .next()
             .unwrap()
-            .to_value(context, globals, info.clone());
+            .to_value(context.clone(), globals, info.clone());
         let mut acum = first_value.0;
         let mut inner_returns = first_value.1;
 
@@ -165,54 +165,461 @@ impl ast::Expression {
                 let evaled = var.to_value(c, globals, info.clone());
                 inner_returns.extend(evaled.1);
                 for (val, c2) in evaled.0 {
-                    new_acum.push((
-                        //doing the operation
-                        match self.operators[i].as_ref() {
-                            "||" | "&&" => {
-                                //boolean operations
-                                if let Value::Bool(b) = val {
-                                    if let Value::Bool(a) = acum_val {
-                                        match self.operators[i].as_ref() {
-                                            "||" => Value::Bool(a || b),
-                                            "&&" => Value::Bool(a && b),
-                                            _ => unreachable!(),
-                                        }
+                    let vals: Returns = match self.operators[i].as_ref() {
+                        "||" => {
+                            if let Some(Value::Macro(m)) =
+                                acum_val.member("_or_".to_string(), &context, globals, info.clone())
+                            {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("logical or"),
+                                );
+                                values
+                            } else {
+                                if let Value::Bool(b) = &acum_val {
+                                    if let Value::Bool(b2) = &val {
+                                        vec![(Value::Bool(*b || *b2), c2)]
                                     } else {
-                                        panic!(compile_error("Right side must be boolean", info));
+                                        panic!(compile_error("This type has no _or_ macro", info))
                                     }
                                 } else {
-                                    panic!(compile_error("Both sides must be boolean", info))
+                                    panic!(compile_error(
+                                        "This type has no _or_ macro",
+                                        info.clone()
+                                    ))
                                 }
                             }
-                            ">" | "<" | ">=" | "<=" | "/" | "*" | "+" | "-" => {
-                                //number operations
-                                //add support for strings?
-                                if let Value::Number(num) = val {
-                                    if let Value::Number(a) = acum_val {
-                                        match self.operators[i].as_ref() {
-                                            ">" => Value::Bool(a > num),
-                                            "<" => Value::Bool(a < num),
-                                            ">=" => Value::Bool(a >= num),
-                                            "<=" => Value::Bool(a <= num),
-                                            "/" => Value::Number(a / num),
-                                            "*" => Value::Number(a * num),
-                                            "+" => Value::Number(a + num),
-                                            "-" => Value::Number(a - num),
-                                            _ => unreachable!(),
-                                        }
+                        }
+                        "&&" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_and_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("logical and"),
+                                );
+                                values
+                            } else {
+                                if let Value::Bool(b) = &acum_val {
+                                    if let Value::Bool(b2) = &val {
+                                        vec![(Value::Bool(*b && *b2), c2)]
                                     } else {
-                                        panic!(compile_error("Right side must be number", info))
+                                        panic!(compile_error("This type has no _and_ macro", info))
                                     }
                                 } else {
-                                    panic!(compile_error("Both sides must be numbers", info))
+                                    panic!(compile_error(
+                                        "This type has no _and_ macro",
+                                        info.clone()
+                                    ))
                                 }
                             }
-                            //any
-                            "==" => Value::Bool(val == acum_val),
-                            "!=" => Value::Bool(val != acum_val),
-                            "->" => Value::Array(
-                                (match acum_val {
-                                    Value::Number(n) => n as i32,
+                        }
+                        ">" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_more_than_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("comparison"),
+                                );
+                                values
+                            } else {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = val {
+                                        vec![(Value::Bool(n > &n2), c2)]
+                                    } else {
+                                        panic!(compile_error(
+                                            "This type has no _more_than_ macro",
+                                            info
+                                        ))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _more_than_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            }
+                        }
+                        "<" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_less_than_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("comparison"),
+                                );
+                                values
+                            } else {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = &val {
+                                        vec![(Value::Bool(n < n2), c2)]
+                                    } else {
+                                        panic!(compile_error(
+                                            "This type has no _less_than_ macro",
+                                            info
+                                        ))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _less_than_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            }
+                        }
+                        ">=" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_more_or_equal_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("comparison"),
+                                );
+                                values
+                            } else {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = &val {
+                                        vec![(Value::Bool(n >= n2), c2)]
+                                    } else {
+                                        panic!(compile_error(
+                                            "This type has no _more_or_equal_ macro",
+                                            info
+                                        ))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _more_or_equal_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            }
+                        }
+                        "<=" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_less_or_equal_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("comparison"),
+                                );
+                                values
+                            } else {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = &val {
+                                        vec![(Value::Bool(n <= n2), c2)]
+                                    } else {
+                                        panic!(compile_error(
+                                            "This type has no _less_or_equal_ macro",
+                                            info
+                                        ))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _less_or_equal_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            }
+                        }
+                        "/" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_divided_by_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("divide"),
+                                );
+                                values
+                            } else {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = &val {
+                                        vec![(Value::Number(n / n2), c2)]
+                                    } else {
+                                        panic!(compile_error(
+                                            "This type has no _divided_by_ macro",
+                                            info
+                                        ))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _divided_by_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            }
+                        }
+                        "*" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_times_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("multiply"),
+                                );
+                                values
+                            } else {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = &val {
+                                        vec![(Value::Number(n * n2), c2)]
+                                    } else {
+                                        panic!(compile_error(
+                                            "This type has no _times_ macro",
+                                            info
+                                        ))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _times_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            }
+                        }
+                        "+" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_plus_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("plus"),
+                                );
+                                values
+                            } else {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = &val {
+                                        vec![(Value::Number(n + n2), c2)]
+                                    } else {
+                                        panic!(compile_error("This type has no _plus_ macro", info))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _plus_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            }
+                        }
+                        "-" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_minus_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("subtract"),
+                                );
+                                values
+                            } else {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = &val {
+                                        vec![(Value::Number(n - n2), c2)]
+                                    } else {
+                                        panic!(compile_error(
+                                            "This type has no _minus_ macro",
+                                            info
+                                        ))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _minus_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            }
+                        }
+                        "==" => vec![(Value::Bool(val == acum_val), c2)],
+                        "!=" => vec![(Value::Bool(val != acum_val), c2)],
+                        "->" => vec![(
+                            Value::Array(
+                                (match &acum_val {
+                                    Value::Number(n) => *n as i32,
                                     _ => panic!(compile_error("Both sides must be numbers", info)),
                                 }..match val {
                                     Value::Number(n) => n as i32,
@@ -221,10 +628,11 @@ impl ast::Expression {
                                     .map(|x| Value::Number(x as f64))
                                     .collect(),
                             ),
-                            _ => unreachable!(),
-                        },
-                        c2,
-                    ));
+                            c2,
+                        )],
+                        _ => unreachable!(),
+                    };
+                    new_acum.extend(vals);
                 }
             }
             acum = new_acum;
@@ -435,6 +843,7 @@ impl ast::Variable {
         let mut inner_returns = Returns::new();
 
         match &self.value {
+            ast::ValueLiteral::Resolved(r) => start_val.push((r.clone(), context)),
             ast::ValueLiteral::ID(id) => start_val.push((
                 match id.class_name.as_ref() {
                     "g" => {
@@ -627,7 +1036,24 @@ impl ast::Variable {
                         .iter()
                         .map(|x| {
                             (
-                                x.0.member(m.clone(), &x.1, globals, info.clone()),
+                                x.0.member(m.clone(), &x.1, globals, info.clone()).expect(
+                                    &compile_error(
+                                        &format!(
+                                            "'{}' does not have member '{}'!",
+                                            match x.0.member(
+                                                "TYPE".to_string(),
+                                                &x.1,
+                                                globals,
+                                                info.clone()
+                                            ) {
+                                                Some(Value::Str(s)) => s,
+                                                _ => unreachable!(),
+                                            },
+                                            m
+                                        ),
+                                        info.clone(),
+                                    ),
+                                ),
                                 x.1.clone(),
                                 x.0.clone(),
                             )

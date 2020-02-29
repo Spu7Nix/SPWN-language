@@ -46,14 +46,14 @@ impl Value {
         context: &Context,
         globals: &mut Globals,
         info: CompilerInfo,
-    ) -> Value {
+    ) -> Option<Value> {
         //println!("{:?}", context.implementations);
         let get_impl = |t: String, m: String| match context.implementations.get(&(t)) {
             Some(imp) => match imp.get(&m) {
-                Some(mem) => (*globals).stored_values[*mem as usize].clone(),
-                None => panic!(compile_error(&format!("{} does not have member", t), info)),
+                Some(mem) => Some((*globals).stored_values[*mem as usize].clone()),
+                None => None,
             },
-            None => panic!(compile_error(&format!("{} does not have member", t), info)),
+            None => None,
         };
         let my_type = match self {
             Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
@@ -78,16 +78,16 @@ impl Value {
             Value::Null => "null".to_string(),
         };
         if member == TYPE_MEMBER_NAME {
-            return Value::Str(my_type.to_string());
+            return Some(Value::Str(my_type.to_string()));
         } else {
             match self {
                 Value::Dict(dict) => match dict.get(&member) {
-                    Some(value) => (*globals).stored_values[*value as usize].clone(),
+                    Some(value) => Some((*globals).stored_values[*value as usize].clone()),
                     None => get_impl(my_type.to_string(), member).clone(),
                 },
                 Value::Func(f) => {
                     if &member == "start_group" {
-                        Value::Group(*f)
+                        Some(Value::Group(*f))
                     } else {
                         get_impl(my_type.to_string(), member).clone()
                     }

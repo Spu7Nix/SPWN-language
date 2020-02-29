@@ -1,5 +1,23 @@
 * = import "std.spwn"
 
+taps = mut(0)
+
+time_over = mut(0)
+
+on_touch({
+	if !time_over.as("bool") {
+		taps.item.add(1)
+	}
+})
+
+call_with_delay(5, {
+	time_over.item.add(1)
+	evaled = taps.to_const(0->10)
+	100g.move(evaled * 10, 0, evaled / 5)
+})
+
+
+
 
 
 

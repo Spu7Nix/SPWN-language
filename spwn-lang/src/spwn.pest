@@ -14,7 +14,7 @@ retrn = {"return" ~ expr?}
 add_obj = {"add" ~ expr}
 implement = {"impl" ~ variable ~ dictionary}
 //async_call = {"->" ~ variable}
-for_loop = {"for" ~ symbol ~ "in" ~ expr ~ cmp_stmt}
+for_loop = {"for" ~ symbol ~ "in" ~ expr ~ ss* ~ cmp_stmt}
 error = {"error" ~ expr}
 
 if_stmt = {"if" ~ expr ~ ss* ~ cmp_stmt ~ ss* ~ ("else" ~ ss* ~ (cmp_stmt | if_else))?}
@@ -86,7 +86,7 @@ id = {
 
 className = {"g" | "b" | "c" | "i"}
 
-symbol = ${ASCII_ALPHA ~ (ASCII_ALPHA | ASCII_DIGIT | "_")*}
+symbol = ${(ASCII_ALPHA | "_") ~ (ASCII_ALPHA | ASCII_DIGIT | "_")*}
 
 string = {("\"" ~ (!"\"" ~ ANY)* ~ "\"") | ("'" ~ (!"'" ~ ANY)* ~ "'")}
 
