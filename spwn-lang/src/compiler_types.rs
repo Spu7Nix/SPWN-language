@@ -47,7 +47,7 @@ impl Context {
     pub fn new() -> Context {
         Context {
             x: 0,
-            y: 1500,
+            y: 0,
             start_group: Group { id: 0 },
             spawn_triggered: false,
             variables: HashMap::new(),
@@ -90,7 +90,7 @@ pub struct Globals {
     pub path: PathBuf,
     pub obj_list: Vec<GDObj>,
 
-    pub highest_x: u32,
+    pub lowest_y: HashMap<u32, u16>,
     pub stored_values: Vec<Value>,
 }
 

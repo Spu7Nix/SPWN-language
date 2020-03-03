@@ -10,34 +10,30 @@ use parser::*;
 use std::env;
 use std::path::PathBuf;
 
-use std::time::Instant;
-
 #[macro_use]
 extern crate lazy_static;
 
 fn main() {
-    let start_time = Instant::now();
-
     let args: Vec<String> = env::args().collect();
     let script_path = PathBuf::from(&args[1]); //&args[1]
-    let statements = parse_spwn(&script_path);
+    let (statements, notes) = parse_spwn(&script_path);
     // for statement in statements.iter() {
     //     println!("{:?}\n\n", statement);
     // }
-
-    let compiled = compiler::compile_spwn(statements, script_path);
+    let gd_path = PathBuf::from(std::env::var("localappdata").expect("No local app data"))
+        .join("GeometryDash/CCLocalLevels.dat");
+    let (mut compiled, old_ls) =
+        compiler::compile_spwn(statements, script_path, gd_path.clone(), notes);
     let mut level_string = String::new();
 
     for trigger in compiled.obj_list {
         level_string += &levelstring::serialize_trigger(trigger);
     }
 
-    println!(
-        "Compiled in {} milliseconds!",
-        start_time.elapsed().as_millis()
-    );
+    compiled.closed_groups.sort();
+    compiled.closed_groups.dedup();
 
     println!("Using {} groups", compiled.closed_groups.len());
-
-    println!("{:?}", level_string);
+    levelstring::encrypt_level_string(level_string, old_ls, gd_path);
+    println!("Written to save. You can now open Geometry Dash again!");
 }

@@ -2,6 +2,7 @@
 
 use crate::compiler_types::*;
 use crate::levelstring::*;
+use std::collections::HashMap;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Group {
@@ -26,7 +27,7 @@ pub struct Item {
     pub id: u16,
 }
 
-pub fn context_trigger(context: Context) -> GDObj {
+pub fn context_trigger(context: Context, globals: &mut Globals) -> GDObj {
     GDObj {
         obj_id: 0,
         groups: vec![context.start_group],
@@ -34,7 +35,22 @@ pub fn context_trigger(context: Context) -> GDObj {
         spawn_triggered: context.spawn_triggered,
         params: Vec::new(),
         x: context.x,
-        y: context.y,
+        y: 50
+            - match globals.lowest_y.get_mut(&context.x) {
+                Some(max) => {
+                    if context.y > *max {
+                        (*max) = context.y;
+                        context.y
+                    } else {
+                        (*max) += 1;
+                        *max
+                    }
+                }
+                None => {
+                    (*globals).lowest_y.insert(context.x, context.y);
+                    context.y
+                }
+            },
     }
 }
 

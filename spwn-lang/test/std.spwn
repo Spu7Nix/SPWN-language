@@ -23,7 +23,7 @@ call_with_delay = (time, function) {
 }
 
 impl "group" {
-    move: (self, x, y, duration: 0, easing: 0, easing_rate: 0) {
+    move: (self, x, y, duration: 0, easing: NONE, easing_rate: 2) {
         add obj{
             OBJ_ID: 901,
             TARGET: self,
@@ -57,7 +57,7 @@ impl "group" {
         add obj{
             OBJ_ID: 1049,
             TARGET: self,
-            ACTIVATE_GROUP: 1,
+            ACTIVATE_GROUP: true,
         }
     },
 
@@ -65,7 +65,7 @@ impl "group" {
         add obj{
             OBJ_ID: 1049,
             TARGET: self,
-            ACTIVATE_GROUP: 0,
+            ACTIVATE_GROUP: false,
         }
     },
 
@@ -81,11 +81,79 @@ impl "group" {
             LOCK_OBJECT_ROTATION: lock_object_rotation
         }
         wait(duration)
+    },
+
+    follow: (self, other, x_mod: 0, y_mod: 0, duration: 999){
+        add obj{
+            OBJ_ID: 1347,
+            X_MOD: x_mod,
+            Y_MOD: y_mod,
+            DURATION: duration,
+            TARGET: self,
+        }
+        //wouldnt make any sense to wait out the duration here
+    },
+
+    follow_player_y: (self, speed: 1, delay: 0, offset: 0, max_speed: 0, duration: 999){
+        add obj{
+            OBJ_ID: 1814,
+            SPEED : speed,
+            DELAY : delay,
+            Y_OFFSET : offset,
+            MAX_SPEED : max_speed,
+            DURATION: duration,
+        }
+        //wouldnt make any sense to wait out the duration here
+    },
+
+    move_to: (self, target, duration: 0, x_only: false, y_only: false, easing: NONE, easing_rate: 2) {
+        add obj{
+            OBJ_ID: 901,
+            TARGET: self,
+            USE_TARGET: true,
+
+            TARGET_POS_AXES: (){
+                if x_only && y_only {
+                    return 0
+                } else if x_only {
+                    return 1
+                } else if y_only {
+                    return 2
+                } else {
+                    return 0
+                }
+            }(),
+            TARGET_POS: target,
+            
+            DURATION: duration,
+            EASING: easing,
+            EASING_RATE: easing_rate,
+        }
+        wait(duration)
+    },
+
+    pulse: (self, r, g, b, fade_in: 0, hold: 0, fade_out: 0, exclusive: false, hsv: false) { //add an option for hsv?
+        add obj{
+            OBJ_ID: 1006,
+            TRIGGER_RED: r,
+            TRIGGER_GREEN: g,
+            TRIGGER_BLUE: b,
+            EXCLUSIVE: exclusive,
+            FADE_IN: fade_in,
+            HOLD: hold,
+            FADE_OUT: fade_out,
+            TARGET_COLOR: self,
+            PULSE_MODE: hsv,
+            TARGET_TYPE: 1 //group
+        }
+        wait(fade_in + hold + fade_out)
     }
+
+
 }
 
 impl "color" {
-    set: (self, r, g, b, duration: 0, opacity: 1, blending: 0){ //change blending to bool
+    set: (self, r, g, b, duration: 0, opacity: 1, blending: false){
         add obj{
             OBJ_ID: 899,
             DURATION: duration,
@@ -94,8 +162,26 @@ impl "color" {
             TRIGGER_BLUE: b,
             OPACITY: opacity,
             BLENDING: blending,
+            TARGET_COLOR: self,
         }
         wait(duration)
+    }
+
+    pulse: (self, r, g, b, fade_in: 0, hold: 0, fade_out: 0, exclusive: false, hsv: false) { //add an option for hsv?
+        add obj{
+            OBJ_ID: 1006,
+            TRIGGER_RED: r,
+            TRIGGER_GREEN: g,
+            TRIGGER_BLUE: b,
+            EXCLUSIVE: exclusive,
+            FADE_IN: fade_in,
+            HOLD: hold,
+            FADE_OUT: fade_out,
+            TARGET_COLOR: self,
+            PULSE_MODE: hsv,
+            TARGET_TYPE: 0 //color
+        }
+        wait(fade_in + hold + fade_out)
     }
 }
 
@@ -120,13 +206,15 @@ impl "item" {
         }
     },
 
-    on_count: (self, number: 0, function) {
-        add obj{
-            OBJ_ID: 1611,
-            TARGET: function,
-            COUNT: other,
-            ACTIVATE_GROUP: 1, 
-            ITEM: self,
+    count: (self, number: 0) {
+        return (function) {
+            add obj{
+                OBJ_ID: 1611,
+                TARGET: function,
+                COUNT: other,
+                ACTIVATE_GROUP: 1, 
+                ITEM: self,
+            }
         }
     },
 }
@@ -141,16 +229,18 @@ mut = (source){
             TYPE: "mutable",
             item: id
         }
-    } else {
-        if source.TYPE == "item" {
-            return {
-                TYPE: "mutable",
-                item: source
-            }
+    } else if source.TYPE == "item" {
+        return {
+            TYPE: "mutable",
+            item: source
         }
+    } else {
+        error "Can not make mut from this type"
     }
     
 }
+    
+
 
 impl "mutable" {
 
@@ -169,7 +259,29 @@ impl "mutable" {
                 }
                 mini_add(1)
                 mini_add(10)
-                mini_add(100)
+                
+            })
+            self.item.if_is(EQUAL_TO, 0, {
+                wait(0.05)
+                return
+            })
+        }
+        add!
+    },
+
+    reset: (self){
+        //almost the same
+        add = {
+            self.item.if_is(LARGER_THAN, 0, {
+                mini_add = (num){
+                    self.item.if_is(LARGER_THAN, num - 1, {
+                        self.item.add(-num)
+                        call_with_delay(0.05, add)
+                    })
+                }
+                mini_add(1)
+                
+                
             })
             self.item.if_is(EQUAL_TO, 0, {
                 wait(0.05)
@@ -189,15 +301,21 @@ impl "mutable" {
         new_mut = ?i
         self.copy_to(new_mut)
         new_mut
-    }
+    },
 
     _plus_: (self, other) {
         if other.TYPE == "number" {
-            new_mut = mut(?i)
-            self.copy_to(new_mut.item)
+            new_mut = self.clone()
             new_mut.item.add(other)
         }
-    } ,
+    },
+
+    _minus_: (self, other) {
+        if other.TYPE == "number" {
+            new_mut = self.clone()
+            new_mut.item.add(-other)
+        }
+    },
     
 
     to_const: (self, range) {
@@ -222,19 +340,103 @@ impl "mutable" {
 
 general_functions = {
     
-        
-    on_touch: (function) {
+    shake: (strength: 1, interval: 0, duration: 0.5){
+        add obj {
+            OBJ_ID: 1520,
+            STRENGTH: strength,
+            INTERVAL: interval,
+            DURATION: duration,
+        }
+        wait(duration)
+    },
 
+    disable_trail: (){
         add obj{
-            OBJ_ID: 1595,
-            HOLD_MODE: true,
-            TOGGLE_MODE: 1,
-            TARGET: function
+            OBJ_ID: 33,
         }
     },
 
+    enable_trail: (){
+        add obj{
+            OBJ_ID: 32,
+        }
+    },
+
+    show_player: (){
+        add obj{
+            OBJ_ID: 1613,
+        }
+    },
     
-    
+    hide_player: (){
+        add obj{
+            OBJ_ID: 1612,
+        }
+    },
+
+    toggle_bg_effect: (on: false) {
+        if on {
+            add obj{
+                OBJ_ID: 1818,
+            }
+        } else {
+            add obj{
+                OBJ_ID: 1819,
+            }
+        }
+    }
+        
+}
+
+// An event in spwn is a macro that returns a macro with one argument
+// which is the function that gets triggered on the event
+
+events = {
+    touch: () {
+        return (function){
+            add obj{
+                OBJ_ID: 1595,
+                HOLD_MODE: true,
+                TOGGLE_MODE: 1,
+                TARGET: function
+            }
+        }
+    },
+
+    collision: (a, b) {
+        return (function){
+            add obj{
+                OBJ_ID: 1815,
+                BLOCK_A: a,
+                BLOCK_B: b,
+                ACTIVATE_GROUP: true,
+                TARGET: function
+            }
+        }
+    },
+
+    collision_exit: (a, b) {
+        return (function){
+            add obj{
+                OBJ_ID: 1815,
+                BLOCK_A: a,
+                BLOCK_B: b,
+                ACTIVATE_GROUP: true,
+                ACTIVATE_ON_EXIT: true,
+                TARGET: function
+            }
+        }
+    },
+
+    death: (){
+        return (function) {
+            add obj{
+                OBJ_ID: 1812,
+                ACTIVATE_GROUP: true,
+                TARGET: function
+            }
+        }
+    }
 }
 
 
@@ -244,6 +446,7 @@ exports = {
     ..constants.easing_types,
     ..constants.comparisons,
     ..general_functions,
+    ..events,
     
     wait: wait,
 

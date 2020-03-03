@@ -59,7 +59,6 @@ pub enum Path {
 pub struct Definition {
     pub symbol: String,
     pub value: Expression,
-    pub props: Vec<(String, Vec<Argument>)>,
 }
 
 #[derive(Clone, PartialEq, Debug)]

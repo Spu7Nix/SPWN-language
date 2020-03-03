@@ -2,68 +2,66 @@
 use crate::ast;
 use crate::levelstring::*;
 use crate::native::*;
+use std::collections::HashMap;
 
 //use std::collections::HashMap;
+use crate::parser::ParseNotes;
+use std::fs;
 use std::path::PathBuf;
 
 use crate::compiler_types::*;
 //use ValSuccess::{Evaluatable, Literal};
 
-pub fn compile_spwn(statements: Vec<ast::Statement>, path: PathBuf) -> Globals {
+pub fn compile_spwn(
+    statements: Vec<ast::Statement>,
+    path: PathBuf,
+    gd_path: PathBuf,
+    notes: ParseNotes,
+) -> (Globals, String) {
     //context at the start of the program
 
     //variables that get changed throughout the compiling
     let mut globals = Globals {
-        closed_groups: Vec::new(),
-        closed_colors: Vec::new(),
-        closed_blocks: Vec::new(),
-        closed_items: Vec::new(),
+        closed_groups: notes.closed_groups,
+        closed_colors: notes.closed_colors,
+        closed_blocks: notes.closed_blocks,
+        closed_items: notes.closed_items,
         path: path,
         obj_list: Vec::new(),
-        highest_x: 0,
+        lowest_y: HashMap::new(),
         stored_values: Vec::new(),
     };
 
-    /*let file_content =
-        fs::read_to_string("C:/Users/spu7n/AppData/Local/GeometryDash/CCLocalLevels.dat")
-            .expect("Something went wrong reading the file");
-    let level_string = get_level_string(file_content);
+    println!("Loading level data...");
 
-    let objects = level_string.split(";");
+    let file_content =
+        fs::read_to_string(gd_path).expect("Your local geometry dash files were not found");
+    let level_string = get_level_string(file_content)
+        //remove previous spwn objects
+        .split(";")
+        .map(|obj| if obj.contains("108,7777") { "" } else { obj })
+        .collect::<Vec<&str>>()
+        .join(";");
+    get_used_ids(&level_string, &mut globals);
 
-    for obj in objects {
-        let props: Vec<&str> = obj.split(",").collect();
-        for i in (0..props.len() - 1).step_by(2) {
-            let key = props[i];
-            let value = props[i + 1];
-
-            match key {
-                "57" => {
-                    //GROUPS
-                    let groups = value.split(".");
-                    for g in groups {
-                        let group = Group {
-                            id: g.parse().unwrap(),
-                        };
-                        if !globals.closed_groups.contains(&group.id) {
-                            globals.closed_groups.push(group.id);
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    println!("{:?}", globals.closed_groups);*/
     let start_info = CompilerInfo {
         depth: 0,
         path: vec!["main scope".to_string()],
         line: statements[0].line,
     };
+    use std::time::Instant;
+
+    println!("Compiling script...");
+    let start_time = Instant::now();
 
     compile_scope(&statements, vec![Context::new()], &mut globals, start_info);
 
-    globals
+    println!(
+        "Compiled in {} milliseconds!",
+        start_time.elapsed().as_millis()
+    );
+
+    (globals, level_string)
 }
 
 pub fn compile_scope(
@@ -72,11 +70,6 @@ pub fn compile_scope(
     globals: &mut Globals,
     mut info: CompilerInfo,
 ) -> (Vec<Context>, Returns) {
-    for context in &mut contexts {
-        context.x = globals.highest_x;
-    }
-    (*globals).highest_x += 30;
-
     let mut statements_iter = statements.iter();
 
     let mut returns: Returns = Vec::new();
@@ -183,7 +176,6 @@ pub fn compile_scope(
             }
 
             If(if_stmt) => {
-                statement_type = "if";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
                     let (evaled, inner_returns) =
@@ -232,7 +224,6 @@ pub fn compile_scope(
             }
 
             Impl(imp) => {
-                statement_type = "impl";
                 let mut new_contexts: Vec<Context> = Vec::new();
                 for context in contexts.clone() {
                     let (evaled, inner_returns) = imp.symbol.to_value(
@@ -280,7 +271,9 @@ pub fn compile_scope(
                 /**/
             }
             Call(call) => {
-                statement_type = "call";
+                for context in &mut contexts {
+                    context.x += 1;
+                }
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
                     let (evaled, inner_returns) =
@@ -289,9 +282,10 @@ pub fn compile_scope(
                     all_values.extend(evaled);
                 }
                 contexts = Vec::new();
+                let mut obj_list = Vec::<GDObj>::new();
                 for (func, context) in all_values {
                     contexts.push(context.clone());
-                    (*globals).obj_list.push(
+                    obj_list.push(
                         GDObj {
                             obj_id: 1268,
                             groups: vec![context.start_group],
@@ -301,15 +295,18 @@ pub fn compile_scope(
                                 _ => panic!(compile_error("Not callable", info)),
                             },
 
-                            ..context_trigger(context.clone())
+                            ..context_trigger(context.clone(), globals)
                         }
                         .context_parameters(context.clone()),
                     );
                 }
+                (*globals).obj_list.extend(obj_list);
             }
 
             Add(v) => {
-                statement_type = "add";
+                for context in &mut contexts {
+                    context.x += 1;
+                }
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
                     let (evaled, inner_returns) = v.eval(context, globals, info.clone());
@@ -317,15 +314,16 @@ pub fn compile_scope(
                     all_values.extend(evaled);
                 }
                 contexts = Vec::new();
+                let mut obj_list = Vec::<GDObj>::new();
                 for (val, context) in all_values {
                     contexts.push(context.clone());
                     match val {
                         Value::Obj(obj) => {
-                            (*globals).obj_list.push(
+                            obj_list.push(
                                 GDObj {
                                     params: obj,
                                     groups: vec![context.start_group],
-                                    ..context_trigger(context.clone())
+                                    ..context_trigger(context.clone(), globals)
                                 }
                                 .context_parameters(context.clone()),
                             );
@@ -334,6 +332,7 @@ pub fn compile_scope(
                         _ => panic!(compile_error("Expected Object", info)),
                     }
                 }
+                (*globals).obj_list.extend(obj_list);
             }
             For(f) => {
                 statement_type = "for loop";
@@ -442,7 +441,11 @@ pub fn import_module(
         .parent()
         .expect("Your file must be in a folder to import modules!")
         .join(&path);
-    let parsed = crate::parse_spwn(&module_path);
+    let (parsed, notes) = crate::parse_spwn(&module_path);
+    (*globals).closed_groups.extend(notes.closed_groups);
+    (*globals).closed_colors.extend(notes.closed_colors);
+    (*globals).closed_blocks.extend(notes.closed_blocks);
+    (*globals).closed_items.extend(notes.closed_items);
     let (contexts, _) = compile_scope(&parsed, vec![Context::new()], globals, info.next("module"));
     if contexts.len() > 1 {
         panic!(

@@ -9,7 +9,9 @@ edition = "2018"
 [dependencies]
 pest = "2.0"
 pest_derive = "2.0"
-xmlparser = "0.11.0"
+quick-xml = "0.17.2"
 base64 = "0.2.1"
 libflate = "0.1.27"
 lazy_static = "1.4.0"
+
+crc32fast = "1.2.0"
