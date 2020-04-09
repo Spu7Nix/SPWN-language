@@ -18,8 +18,6 @@ pub fn compile_spwn(
     gd_path: PathBuf,
     notes: ParseNotes,
 ) -> (Globals, String) {
-    //context at the start of the program
-
     //variables that get changed throughout the compiling
     let mut globals = Globals {
         closed_groups: notes.closed_groups,
@@ -86,12 +84,11 @@ pub fn compile_scope(
         //find out what kind of statement this is
         //let start_time = Instant::now();
 
-        /*println!(
+        println!(
             "{} -> Compiling a statement in {} contexts",
-            path,
+            info.path.join(">"),
             contexts.len()
-        );*/
-        let mut statement_type: &str = "";
+        );
         use ast::StatementBody::*;
 
         let stored_context = if statement.arrow {
@@ -129,9 +126,9 @@ pub fn compile_scope(
                             };
                             new_context.variables.insert(
                                 def.symbol.clone(),
-                                store_value(Value::Func(start_group), globals),
+                                store_value(Value::Func(Function { start_group }), globals),
                             );
-                            all_values.push((Value::Func(start_group), context));
+                            all_values.push((Value::Func(Function { start_group }), context));
                             new_context.start_group = start_group;
                             let (_, inner_returns) = compile_scope(
                                 &f.statements,
@@ -290,7 +287,7 @@ pub fn compile_scope(
                             obj_id: 1268,
                             groups: vec![context.start_group],
                             target: match func {
-                                Value::Func(g) => g,
+                                Value::Func(g) => g.start_group,
                                 Value::Group(g) => g,
                                 _ => panic!(compile_error("Not callable", info)),
                             },
@@ -335,8 +332,6 @@ pub fn compile_scope(
                 (*globals).obj_list.extend(obj_list);
             }
             For(f) => {
-                statement_type = "for loop";
-
                 let mut all_arrays: Returns = Vec::new();
                 for context in contexts {
                     let (evaled, inner_returns) = f.array.eval(context, globals, info.clone());
@@ -380,7 +375,6 @@ pub fn compile_scope(
                 }
             }
             Return(val) => {
-                statement_type = "return";
                 let mut all_values: Returns = Vec::new();
                 for context in contexts.clone() {
                     let (evaled, inner_returns) =

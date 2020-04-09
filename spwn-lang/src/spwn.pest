@@ -14,11 +14,12 @@ retrn = {"return" ~ expr?}
 add_obj = {"add" ~ expr}
 implement = {"impl" ~ variable ~ dictionary}
 //async_call = {"->" ~ variable}
-for_loop = {"for" ~ symbol ~ "in" ~ expr ~ ss* ~ cmp_stmt}
+for_loop = {"for" ~ symbol ~ "in" ~ expr ~ lb? ~ cmp_stmt}
 error = {"error" ~ expr}
 
-if_stmt = {"if" ~ expr ~ ss* ~ cmp_stmt ~ ss* ~ ("else" ~ ss* ~ (cmp_stmt | if_else))?}
-if_else = {if_stmt}
+if_stmt = {"if" ~ expr ~ lb? ~ cmp_stmt ~ lb? ~ ("else" ~ lb? ~ (cmp_stmt | if_else))?}
+if_else = {if_stmt_container_i_need_for_some_reason}
+if_stmt_container_i_need_for_some_reason = {if_stmt}
 
 native_prop = {"#" ~ (private /*| id_define*/) ~ arguments}
     private =   {"private"}
@@ -32,15 +33,15 @@ cmp_stmt = {
 dict_def = {symbol ~ ":" ~ expr}
 dict_extract = {".." ~ expr}
 dictionary = {
-    "{" ~ ss* ~ ((dict_def | dict_extract) ~ "," ~ ss*)* ~ (dict_def | dict_extract)? ~ ss* ~ "}"
+    "{" ~ lb? ~ ((dict_def | dict_extract) ~ "," ~ lb?)* ~ (dict_def | dict_extract)? ~ lb? ~ "}"
 }
 
 array = {
-    "[" ~ ss* ~ (expr ~ "," ~ ss*)* ~ expr? ~ ss* ~ "]"
+    "[" ~ lb? ~ (expr ~ "," ~ lb?)* ~ expr? ~ lb? ~ "]"
 }
 
 obj = {
-    "obj" ~ "{" ~ ss* ~ (obj_prop ~ "," ~ ss*)* ~ obj_prop? ~ ss* ~ "}"
+    "obj" ~ "{" ~ lb? ~ (obj_prop ~ "," ~ lb?)* ~ obj_prop? ~ lb? ~ "}"
 }
 
 macro_def = {arguments_def ~ cmp_stmt}
@@ -73,7 +74,7 @@ expr = {(variable ~ operator)* ~ variable}
 
 operator = {("||" | "&&" | "==" | "!=" | "->") | 
 			(">" | "<" | ">=" | "<=") | 
-            ("/" | "*") | 
+            ("/" | "*" | "^") | 
             ("+" | "-")}
 
 unary_operator = {"-" | "!"}
@@ -91,6 +92,7 @@ symbol = ${(ASCII_ALPHA | "_") ~ (ASCII_ALPHA | ASCII_DIGIT | "_")*}
 string = {("\"" ~ (!"\"" ~ ANY)* ~ "\"") | ("'" ~ (!"'" ~ ANY)* ~ "'")}
 
 ss = _{(("\r" | "\n") | ";") ~ ("\r" | "\n")*}
+lb = _{("\r" | "\n")*}
 
 spwn = { SOI ~ ss* ~ (stmt ~ ss+)* ~ stmt? ~ EOI }
 

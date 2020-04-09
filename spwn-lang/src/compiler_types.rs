@@ -63,6 +63,11 @@ pub struct Macro {
     pub def_context: Context,
     pub body: Vec<ast::Statement>,
 }
+#[derive(Clone, Debug, PartialEq)]
+pub struct Function {
+    pub start_group: Group,
+    //pub all_groups: Vec<Group>,
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -72,7 +77,7 @@ pub enum Value {
     Item(Item),
     Number(f64),
     Bool(bool),
-    Func(Group),
+    Func(Function),
     Dict(HashMap<String, StoredValue>),
     Macro(Macro),
     Str(String),
@@ -525,6 +530,52 @@ impl ast::Expression {
                                 }
                             }
                         }
+                        "^" => {
+                            if let Some(Value::Macro(m)) = acum_val.member(
+                                "_to_the_power_of_".to_string(),
+                                &context,
+                                globals,
+                                info.clone(),
+                            ) {
+                                let (values, _) = execute_macro(
+                                    (
+                                        m,
+                                        vec![ast::Argument {
+                                            symbol: None,
+                                            value: ast::Expression {
+                                                values: vec![ast::Variable {
+                                                    value: ast::ValueLiteral::Resolved(val),
+                                                    path: Vec::new(),
+                                                    operator: None,
+                                                }],
+                                                operators: Vec::new(),
+                                            },
+                                        }],
+                                    ),
+                                    c2,
+                                    globals,
+                                    acum_val.clone(),
+                                    info.next("power"),
+                                );
+                                values
+                            } else {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = &val {
+                                        vec![(Value::Number(n.powf(*n2)), c2)]
+                                    } else {
+                                        panic!(compile_error(
+                                            "This type has no _to_the_power_of_ macro",
+                                            info
+                                        ))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _to_the_power_of_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            }
+                        }
                         "+" => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_plus_".to_string(),
@@ -648,65 +699,82 @@ pub fn execute_macro(
     parent: Value,
     info: CompilerInfo,
 ) -> (Returns, Returns) {
-    // second returns is for any compound statements in the args
-    let (evaled_args, inner_returns) = all_combinations(
-        args.iter().map(|x| x.value.clone()).collect(),
-        context.clone(),
-        globals,
-        info.clone(),
-    );
+    let mut inner_inner_returns = Vec::new();
     let mut new_contexts: Vec<Context> = Vec::new();
+    if !m.args.is_empty() {
+        // second returns is for any compound statements in the args
+        let (evaled_args, inner_returns) = all_combinations(
+            args.iter().map(|x| x.value.clone()).collect(),
+            context.clone(),
+            globals,
+            info.clone(),
+        );
+        inner_inner_returns.extend(inner_returns);
 
-    for (arg_values, mut new_context) in evaled_args {
-        new_context.variables = m.def_context.variables.clone();
-        let mut new_variables: HashMap<String, StoredValue> = HashMap::new();
+        for (arg_values, mut new_context) in evaled_args {
+            new_context.variables = m.def_context.variables.clone();
+            let mut new_variables: HashMap<String, StoredValue> = HashMap::new();
 
-        //parse each argument given into a local macro variable
-        for (i, arg) in args.iter().enumerate() {
-            match &arg.symbol {
-                Some(name) => {
-                    if m.args.iter().any(|e| e.0 == *name) {
-                        new_variables
-                            .insert(name.clone(), store_value(arg_values[i].clone(), globals));
-                    } else {
-                        panic!(compile_error(
-                            "This macro has no argument with this name!",
-                            info
-                        ))
+            //parse each argument given into a local macro variable
+            for (i, arg) in args.iter().enumerate() {
+                match &arg.symbol {
+                    Some(name) => {
+                        if m.args.iter().any(|e| e.0 == *name) {
+                            new_variables
+                                .insert(name.clone(), store_value(arg_values[i].clone(), globals));
+                        } else {
+                            panic!(compile_error(
+                                "This macro has no argument with this name!",
+                                info
+                            ))
+                        }
+                    }
+                    None => {
+                        new_variables.insert(
+                            m.args[if m.args[0].0 == "self" { i + 1 } else { i }]
+                                .0
+                                .clone(),
+                            store_value(arg_values[i].clone(), globals),
+                        );
                     }
                 }
-                None => {
-                    new_variables.insert(
-                        m.args[if m.args[0].0 == "self" { i + 1 } else { i }]
-                            .0
-                            .clone(),
-                        store_value(arg_values[i].clone(), globals),
-                    );
+            }
+            //insert defaults and check non-optional arguments
+            let mut m_args_iter = m.args.iter();
+            if m.args[0].0 == "self" {
+                new_variables.insert("self".to_string(), store_value(parent.clone(), globals));
+                m_args_iter.next();
+            }
+            for arg in m_args_iter {
+                if !new_variables.contains_key(&arg.0) {
+                    match &arg.1 {
+                        Some(default) => {
+                            new_variables
+                                .insert(arg.0.clone(), store_value(default.clone(), globals));
+                        }
+
+                        None => panic!(compile_error(
+                            &format!("Non-optional argument '{}' not satisfied!", arg.0),
+                            info
+                        )),
+                    }
                 }
             }
+
+            new_context.variables.extend(new_variables);
+
+            new_contexts.push(new_context);
         }
-        //insert defaults and check non-optional arguments
-        let mut m_args_iter = m.args.iter();
+    } else {
+        let mut new_context = context.clone();
+        new_context.variables = m.def_context.variables.clone();
+        /*let mut new_variables: HashMap<String, StoredValue> = HashMap::new();
+
         if m.args[0].0 == "self" {
             new_variables.insert("self".to_string(), store_value(parent.clone(), globals));
-            m_args_iter.next();
-        }
-        for arg in m_args_iter {
-            if !new_variables.contains_key(&arg.0) {
-                match &arg.1 {
-                    Some(default) => {
-                        new_variables.insert(arg.0.clone(), store_value(default.clone(), globals));
-                    }
-
-                    None => panic!(compile_error(
-                        &format!("Non-optional argument '{}' not satisfied!", arg.0),
-                        info
-                    )),
-                }
-            }
         }
 
-        new_context.variables.extend(new_variables);
+        new_context.variables.extend(new_variables);*/
 
         new_contexts.push(new_context);
     }
@@ -733,7 +801,7 @@ pub fn execute_macro(
                 )
             })
             .collect(),
-        inner_returns,
+        inner_inner_returns,
     )
 }
 
@@ -911,7 +979,7 @@ impl ast::Variable {
                     start_val.push((((*globals).stored_values[*value as usize]).clone(), context))
                 }
                 None => panic!(compile_error(
-                    &format!("The variable \"{}\" does not exist in this Func.", string),
+                    &format!("The variable \"{}\" does not exist in this Func. (variables that exist: {:?})", string, context.variables.keys().collect::<Vec<&String>>()),
                     info
                 )),
             },
@@ -957,7 +1025,7 @@ impl ast::Variable {
                             match v2 {
                                 Value::Number(n) => n.to_string(),
                                 Value::Str(s) => s,
-                                Value::Func(g) => g.id.to_string(),
+                                Value::Func(g) => g.start_group.id.to_string(),
 
                                 Value::Group(g) => g.id.to_string(),
                                 Value::Color(c) => c.id.to_string(),
@@ -1150,7 +1218,7 @@ impl ast::CompoundStatement {
         context: &Context,
         globals: &mut Globals,
         info: CompilerInfo,
-    ) -> (Group, Returns) {
+    ) -> (Function, Returns) {
         //create the function context
         let mut new_context = context.clone();
 
@@ -1163,15 +1231,13 @@ impl ast::CompoundStatement {
 
         new_context.start_group = start_group;
 
-        (
-            start_group,
-            compile_scope(
-                &self.statements,
-                vec![new_context],
-                globals,
-                info.next("function body"),
-            )
-            .1,
-        )
+        let (_, inner_returns) = compile_scope(
+            &self.statements,
+            vec![new_context],
+            globals,
+            info.next("function body"),
+        );
+
+        (Function { start_group }, inner_returns)
     }
 }

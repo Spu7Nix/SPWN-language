@@ -25,24 +25,22 @@ pub fn parse_spwn(path: &PathBuf) -> (Vec<ast::Statement>, ParseNotes) {
         .expect("unsuccessful parse")
         .next()
         .unwrap(); // get and unwrap the `spwn` rule; never fails
-    
     let mut notes = ParseNotes {
-        closed_groups :  Vec::new(),
-        closed_colors :  Vec::new(),
-        closed_blocks :  Vec::new(),
-        closed_items  :  Vec::new(),
+        closed_groups: Vec::new(),
+        closed_colors: Vec::new(),
+        closed_blocks: Vec::new(),
+        closed_items: Vec::new(),
     };
 
     let parsed = parse_statements(&mut parse_tree.into_inner(), &mut notes);
     (parsed, notes)
 }
 
-pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>, notes: &mut ParseNotes) -> Vec<ast::Statement> {
+pub fn parse_statements(
+    statements: &mut pest::iterators::Pairs<Rule>,
+    notes: &mut ParseNotes,
+) -> Vec<ast::Statement> {
     let mut stmts: Vec<ast::Statement> = vec![];
-
-    
-
-    
 
     for unpacked in statements {
         let mut inner = unpacked.clone().into_inner();
@@ -67,14 +65,12 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>, notes: &m
                         Rule::expr => ast::StatementBody::Definition(ast::Definition {
                             symbol: "*".to_string(),
                             value: parse_expr(first, notes),
-                            
                         }),
                         Rule::symbol => {
                             let value = parse_expr(inner.next().unwrap(), notes);
                             ast::StatementBody::Definition(ast::Definition {
                                 symbol: first.as_span().as_str().to_string(),
                                 value,
-                                
                             })
                         }
                         _ => unreachable!(),
@@ -90,14 +86,26 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>, notes: &m
                         condition: parse_expr(inner.next().unwrap(), notes),
                         if_body: parse_statements(&mut inner.next().unwrap().into_inner(), notes),
                         else_body: match inner.next() {
-                            Some(body) => Some(parse_statements(&mut body.into_inner(), notes)),
+                            Some(body) => match body.as_rule() {
+                                Rule::cmp_stmt => {
+                                    Some(parse_statements(&mut body.into_inner(), notes))
+                                }
+                                Rule::if_else => {
+                                    println!("else if");
+                                    let ret = Some(parse_statements(&mut body.into_inner(), notes));
+                                    println!("{:?}", ret);
+                                    ret
+                                }
+                                _ => unreachable!(),
+                            },
                             None => None,
                         },
                     })
                 }
-                Rule::add_obj => {
-                    ast::StatementBody::Add(parse_expr(statement.into_inner().next().unwrap(), notes))
-                }
+                Rule::add_obj => ast::StatementBody::Add(parse_expr(
+                    statement.into_inner().next().unwrap(),
+                    notes,
+                )),
 
                 Rule::for_loop => {
                     let mut inner = statement.into_inner();
@@ -152,7 +160,7 @@ pub fn parse_statements(statements: &mut pest::iterators::Pairs<Rule>, notes: &m
 }
 
 pub fn parse_path(pair: Pair<Rule>, notes: &mut ParseNotes) -> ast::Path {
-    let parse_args = |arg: Pair<Rule>| {
+    /*let parse_args = |arg: Pair<Rule>| {
         let mut argument = arg.into_inner();
         let first = argument.next().unwrap();
         match first.as_rule() {
@@ -166,7 +174,7 @@ pub fn parse_path(pair: Pair<Rule>, notes: &mut ParseNotes) -> ast::Path {
             },
             _ => unreachable!(),
         }
-    };
+    };*/
     let mut parse_args = |arg: Pair<Rule>| {
         let mut argument = arg.into_inner();
         let first = argument.next().unwrap();
@@ -214,21 +222,21 @@ pub fn parse_variable(pair: Pair<Rule>, notes: &mut ParseNotes) -> ast::Variable
         match pair.as_rule() {
             Rule::id => {
                 let number: u16;
-                let mut Func = pair.into_inner();
+                let mut scope = pair.into_inner();
                 let mut unspecified = false;
-                let first_value = Func.next().unwrap();
+                let first_value = scope.next().unwrap();
                 let class_name: String;
 
                 if first_value.as_rule() == Rule::number {
                     number = first_value.as_span().as_str().parse().unwrap();
-                    class_name = Func.next().unwrap().as_span().as_str().to_string();
+                    class_name = scope.next().unwrap().as_span().as_str().to_string();
 
                     match class_name.as_ref() {
                         "g" => (*notes).closed_groups.push(number),
                         "c" => (*notes).closed_colors.push(number),
                         "b" => (*notes).closed_blocks.push(number),
                         "i" => (*notes).closed_items.push(number),
-                        _ => unreachable!()
+                        _ => unreachable!(),
                     }
                 } else {
                     unspecified = true;
@@ -262,7 +270,10 @@ pub fn parse_variable(pair: Pair<Rule>, notes: &mut ParseNotes) -> ast::Variable
                         })
                         .collect(),
                     body: ast::CompoundStatement {
-                        statements: parse_statements(&mut inner.next().unwrap().into_inner(), notes),
+                        statements: parse_statements(
+                            &mut inner.next().unwrap().into_inner(),
+                            notes,
+                        ),
                     },
                 })
             }
@@ -331,13 +342,13 @@ fn parse_dict(pair: Pair<Rule>, notes: &mut ParseNotes) -> Vec<ast::DictDef> {
                 let mut inner = def.into_inner();
                 out.push(ast::DictDef::Def((
                     inner.next().unwrap().as_span().as_str().to_string(), //symbol
-                    parse_expr(inner.next().unwrap(), notes),                    //expression
+                    parse_expr(inner.next().unwrap(), notes),             //expression
                 )));
             }
 
             Rule::dict_extract => out.push(ast::DictDef::Extract(parse_expr(
-                def.into_inner().next().unwrap(), notes
-                
+                def.into_inner().next().unwrap(),
+                notes,
             ))),
 
             _ => unreachable!(),

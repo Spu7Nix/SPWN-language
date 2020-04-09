@@ -2,7 +2,7 @@
 
 use crate::compiler_types::*;
 use crate::levelstring::*;
-use std::collections::HashMap;
+//use std::collections::HashMap;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Group {
@@ -61,7 +61,7 @@ impl Value {
         member: String,
         context: &Context,
         globals: &mut Globals,
-        info: CompilerInfo,
+        _: CompilerInfo,
     ) -> Option<Value> {
         //println!("{:?}", context.implementations);
         let get_impl = |t: String, m: String| match context.implementations.get(&(t)) {
@@ -103,7 +103,7 @@ impl Value {
                 },
                 Value::Func(f) => {
                     if &member == "start_group" {
-                        Some(Value::Group(*f))
+                        Some(Value::Group(f.start_group))
                     } else {
                         get_impl(my_type.to_string(), member).clone()
                     }

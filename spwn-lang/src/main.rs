@@ -10,13 +10,16 @@ use parser::*;
 use std::env;
 use std::path::PathBuf;
 
-#[macro_use]
+//#[macro_use]
 extern crate lazy_static;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let script_path = PathBuf::from(&args[1]); //&args[1]
     let (statements, notes) = parse_spwn(&script_path);
+    for s in statements.iter() {
+        println!("{:?}\n\n", s);
+    }
     // for statement in statements.iter() {
     //     println!("{:?}\n\n", statement);
     // }

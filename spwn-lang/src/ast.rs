@@ -110,7 +110,7 @@ pub struct Variable {
     pub path: Vec<Path>,
 }
 
-impl Variable {
+/*impl Variable {
     pub fn to_expression(&self) -> Expression {
         if let ValueLiteral::Expression(e) = &self.value {
             if self.path.is_empty() {
@@ -122,7 +122,7 @@ impl Variable {
             operators: Vec::new(),
         }
     }
-}
+}*/
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Expression {

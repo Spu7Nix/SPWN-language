@@ -3,6 +3,7 @@ constants = import "constants.spwn"
 
 * = constants.obj_props
 * = constants.comparisons
+* = constants.easing_types
 
 wait = (time){
     add obj{
@@ -90,6 +91,7 @@ impl "group" {
             Y_MOD: y_mod,
             DURATION: duration,
             TARGET: self,
+            FOLLOW: other,
         }
         //wouldnt make any sense to wait out the duration here
     },
@@ -152,6 +154,8 @@ impl "group" {
 
 }
 
+
+
 impl "color" {
     set: (self, r, g, b, duration: 0, opacity: 1, blending: false){
         add obj{
@@ -165,7 +169,7 @@ impl "color" {
             TARGET_COLOR: self,
         }
         wait(duration)
-    }
+    },
 
     pulse: (self, r, g, b, fade_in: 0, hold: 0, fade_out: 0, exclusive: false, hsv: false) { //add an option for hsv?
         add obj{
@@ -211,9 +215,10 @@ impl "item" {
             add obj{
                 OBJ_ID: 1611,
                 TARGET: function,
-                COUNT: other,
+                COUNT: number,
                 ACTIVATE_GROUP: 1, 
                 ITEM: self,
+                COUNT_MULTI_ACTIVATE: true
             }
         }
     },
@@ -240,11 +245,28 @@ mut = (source){
     
 }
     
+supress_signal = (delay){
+    //if checker is 0, a signal can come through
+    //if checker is 1, it will be supressed
+    checker = mut(0)
+    -> (){
+        wait(delay)
+        checker.item.if_is(EQUAL_TO, 1, {
+            checker.item.add(-1)
+        })
+    }()
+    checker.item.if_is(EQUAL_TO, 0, {
+        checker.item.add(1)
+        return
+    })
+    
+
+}
 
 
 impl "mutable" {
 
-    add_to: (self, items) {
+    add_to: (self, items, speed: 1) {
         add = {
             
             self.item.if_is(LARGER_THAN, 0, {
@@ -257,19 +279,55 @@ impl "mutable" {
                         call_with_delay(0.05, add)
                     })
                 }
-                mini_add(1)
-                mini_add(10)
+
+                for i in 0->speed {
+                    mini_add(2^i)
+                }
+                
                 
             })
             self.item.if_is(EQUAL_TO, 0, {
                 wait(0.05)
+                supress_signal(0.06)
                 return
             })
         }
         add!
     },
 
-    reset: (self){
+    multiply: (self, factor, speed: 1) {
+        factor.item.if_is(EQUAL_TO, 0, {
+            self.reset(speed)
+            return
+        })
+
+        factor.item.if_is(LARGER_THAN, 1, {
+
+            reg = self.clone(speed)
+            
+
+            factor.item.add(-1)
+            wait(0.05)
+            mult = {
+                
+                factor.item.if_is(LARGER_THAN, 0, {
+                    reg.copy_to(self.item, speed)
+                    factor.item.add(-1)
+                    call_with_delay(0.05, mult)
+                })
+                factor.item.if_is(EQUAL_TO, 0, {
+                    wait(0.05)
+                    return
+                })
+            }
+            mult!
+        })
+
+        
+        
+    },
+
+    reset: (self, speed: 1){
         //almost the same
         add = {
             self.item.if_is(LARGER_THAN, 0, {
@@ -279,7 +337,10 @@ impl "mutable" {
                         call_with_delay(0.05, add)
                     })
                 }
-                mini_add(1)
+
+                for i in 0->speed {
+                    mini_add(3^i)
+                }
                 
                 
             })
@@ -291,22 +352,26 @@ impl "mutable" {
         add!
     },
 
-    copy_to: (self, item) {
+    copy_to: (self, item, speed: 1) {
         temp_storage = ?i
-        self.add_to([item, temp_storage])
-        mut(temp_storage).add_to([self.item])
+        self.add_to([item, temp_storage], speed)
+        mut(temp_storage).add_to([self.item], speed)
+        return
     },
 
-    clone: (self) {
+    clone: (self, speed: 1) {
         new_mut = ?i
-        self.copy_to(new_mut)
-        new_mut
+        self.copy_to(new_mut, speed)
+        return mut(new_mut)
     },
 
     _plus_: (self, other) {
         if other.TYPE == "number" {
             new_mut = self.clone()
             new_mut.item.add(other)
+        } else if other.TYPE == "mut" {
+            new_mut = self.clone()
+            other.clone().add_to([new_mut.item])
         }
     },
 
@@ -335,6 +400,8 @@ impl "mutable" {
         }
     }
 }
+
+
 
 
 
@@ -391,14 +458,33 @@ general_functions = {
 // An event in spwn is a macro that returns a macro with one argument
 // which is the function that gets triggered on the event
 
+on = (event, function){
+    event(function)
+}
+
 events = {
-    touch: () {
+    touch: (dual_side: false) {
         return (function){
             add obj{
                 OBJ_ID: 1595,
                 HOLD_MODE: true,
                 TOGGLE_MODE: 1,
-                TARGET: function
+                TARGET: function,
+                DUAL_MODE: dual_side,
+                
+            }
+        }
+    },
+
+    touch_end: (dual_side: false) {
+        return (function){
+            add obj{
+                OBJ_ID: 1595,
+                HOLD_MODE: true,
+                TOGGLE_MODE: 2,
+                TARGET: function,
+                DUAL_MODE: dual_side,
+                
             }
         }
     },
@@ -410,7 +496,8 @@ events = {
                 BLOCK_A: a,
                 BLOCK_B: b,
                 ACTIVATE_GROUP: true,
-                TARGET: function
+                TARGET: function,
+                
             }
         }
     },
@@ -423,7 +510,8 @@ events = {
                 BLOCK_B: b,
                 ACTIVATE_GROUP: true,
                 ACTIVATE_ON_EXIT: true,
-                TARGET: function
+                TARGET: function,
+                
             }
         }
     },
@@ -453,6 +541,7 @@ exports = {
 
     mut: mut,
     call_with_delay: call_with_delay,
+    on: on,
 
     
 

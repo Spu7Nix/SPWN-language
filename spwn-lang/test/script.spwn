@@ -1,11 +1,30 @@
+
+
 * = import "std.spwn"
 
-player = {
-	group: 2g,
-	block: 2b,
-}
+first = mut(3456)
 
-ground = 1b
+factor_inp = mut(7)
+
+factor = factor_inp.clone()
+
+result = ?i
+
+
+
+
+wait(2)
+
+mult = {
+	factor.item.if_is(LARGER_THAN, 0, {
+		factor.item.add(-1)
+		first.copy_to(result, 15)
+
+		call_with_delay(0.05, mult)
+	})
+}
+mult!
+
 
 
 

@@ -141,6 +141,7 @@ fn base_64_decrypt(encoded: Vec<u8>) -> Vec<u8> {
 
 use quick_xml::events::{BytesText, Event};
 use quick_xml::Reader;
+use std::io::BufReader;
 
 pub fn get_level_string(ls: String) -> String {
     //decrypting the savefile
@@ -151,15 +152,13 @@ pub fn get_level_string(ls: String) -> String {
         .replace("_", "/")
         .replace("\0", "");
     let b64 = base64::decode(replaced.as_str()).unwrap();
-    let mut decoder = gzip::Decoder::new(&b64[..]).unwrap();
-    let mut buf = Vec::new();
-    decoder.read_to_end(&mut buf).unwrap();
+    let decoder = gzip::Decoder::new(&b64[..]).unwrap();
 
     //println!("{}", String::from_utf8(buf[..1000].to_vec()).unwrap());
 
     //getting level string
 
-    let mut reader = Reader::from_str(std::str::from_utf8(&buf).unwrap());
+    let mut reader = Reader::from_reader(BufReader::new(decoder));
     reader.trim_text(true);
 
     let mut buf = Vec::new();
@@ -235,9 +234,7 @@ pub fn encrypt_level_string(ls: String, old_ls: String, path: PathBuf) {
         .replace("_", "/")
         .replace("\0", "");
     let b64 = base64::decode(replaced.as_str()).unwrap();
-    let mut decoder = gzip::Decoder::new(&b64[..]).unwrap();
-    let mut buf = Vec::new();
-    decoder.read_to_end(&mut buf).unwrap();
+    let decoder = gzip::Decoder::new(&b64[..]).unwrap();
 
     //encrypt the ls
     //encrypting level string
@@ -250,7 +247,7 @@ pub fn encrypt_level_string(ls: String, old_ls: String, path: PathBuf) {
 
     //setting level string
 
-    let mut reader = Reader::from_str(std::str::from_utf8(&buf).unwrap());
+    let mut reader = Reader::from_reader(BufReader::new(decoder));
     reader.trim_text(true);
 
     let mut writer = Writer::new(Cursor::new(Vec::new()));
@@ -261,7 +258,7 @@ pub fn encrypt_level_string(ls: String, old_ls: String, path: PathBuf) {
     let mut done = false;
     let mut k2_detected = false;
 
-    println!("{}", old_ls);
+    //println!("{}", old_ls);
 
     let full_ls = old_ls + &ls;
 
@@ -271,10 +268,6 @@ pub fn encrypt_level_string(ls: String, old_ls: String, path: PathBuf) {
             Ok(Event::Text(e)) => {
                 let text = e.unescape_and_decode(&reader).unwrap();
                 if k4_detected {
-                    
-
-                    
-                    
                     let encrypted_ls: String = {
                         let mut ls_encoder = gzip::Encoder::new(Vec::new()).unwrap();
                         ls_encoder.write_all(&full_ls.as_bytes()).unwrap();
