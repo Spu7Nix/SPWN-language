@@ -17,9 +17,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let script_path = PathBuf::from(&args[1]); //&args[1]
     let (statements, notes) = parse_spwn(&script_path);
-    for s in statements.iter() {
-        println!("{:?}\n\n", s);
-    }
+
     // for statement in statements.iter() {
     //     println!("{:?}\n\n", statement);
     // }
@@ -27,11 +25,7 @@ fn main() {
         .join("GeometryDash/CCLocalLevels.dat");
     let (mut compiled, old_ls) =
         compiler::compile_spwn(statements, script_path, gd_path.clone(), notes);
-    let mut level_string = String::new();
-
-    for trigger in compiled.obj_list {
-        level_string += &levelstring::serialize_trigger(trigger);
-    }
+    let level_string = levelstring::serialize_triggers(compiled.func_ids);
 
     compiled.closed_groups.sort();
     compiled.closed_groups.dedup();

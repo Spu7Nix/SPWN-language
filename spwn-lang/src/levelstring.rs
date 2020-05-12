@@ -8,8 +8,7 @@ pub struct GDObj {
     pub groups: Vec<Group>,
     pub target: Group,
     pub spawn_triggered: bool,
-    pub x: u32,
-    pub y: u16,
+    pub func_id: usize,
     pub params: Vec<(u16, String)>,
 }
 
@@ -48,7 +47,10 @@ pub fn get_used_ids(ls: &String, globals: &mut Globals) {
     }
 }
 
-pub fn serialize_trigger(trigger: GDObj) -> String {
+const START_HEIGHT: u16 = 10;
+const MAX_HEIGHT: u16 = 40;
+
+pub fn serialize_triggers(func_ids: Vec<FunctionID>) -> String {
     //println!("{:?}", trigger);
     fn group_string(list: Vec<Group>) -> String {
         let mut string = String::new();
@@ -58,44 +60,114 @@ pub fn serialize_trigger(trigger: GDObj) -> String {
         string.pop();
         string
     }
-    /*
-    let mut obj_string = format!(
-        "1,{},2,{},3,{},51,{}",
-        trigger.obj_id, trigger.x, trigger.y, trigger.target.id
-    );
-    */
 
-    let mut obj_string = String::new();
+    fn serialize_obj(trigger: GDObj, x: u32, y: u16) -> String {
+        let mut obj_string = String::new();
+        /*format!(
+            "1,{},2,{},3,{},51,{}",
+            trigger.obj_id,
+            if trigger.spawn_triggered {
+                x * 30 + 15
+            } else {
+                0
+            },
+            (80 - y) * 30 + 15,
+            trigger.target.id
+        );*/
 
-    let spawned = trigger.spawn_triggered && !trigger.params.iter().any(|x| x.0 == 62);
+        let spawned = trigger.spawn_triggered && !trigger.params.iter().any(|x| x.0 == 62);
 
-    let keys = [1, 2, 3, 51];
-    let values = [
-        trigger.obj_id as u32,
-        if spawned { trigger.x * 30 } else { 0 },
-        trigger.y as u32 * 30,
-        trigger.target.id as u32,
-    ];
+        let keys = [1, 2, 3, 51];
+        let values = [
+            trigger.obj_id as u32,
+            if trigger.spawn_triggered {
+                x * 30 + 15
+            } else {
+                0
+            },
+            ((80 - y) * 30 + 15) as u32,
+            trigger.target.id as u32,
+        ];
 
-    for i in 0..4 {
-        if !trigger.params.iter().any(|x| x.0 == keys[i]) {
-            obj_string += &format!("{},{},", keys[i].to_string(), values[i].to_string());
+        for i in 0..4 {
+            if !trigger.params.iter().any(|x| x.0 == keys[i]) {
+                obj_string += &format!("{},{},", keys[i].to_string(), values[i].to_string());
+            }
+        }
+
+        if spawned {
+            obj_string += "62,1,87,1,";
+        }
+
+        if !trigger.groups.is_empty() {
+            obj_string += &(String::from("57,") + &group_string(trigger.groups) + ",");
+        }
+
+        for param in trigger.params {
+            obj_string += &(param.0.to_string() + "," + &param.1 + ",");
+        }
+        obj_string + "108,777;" //spwn signiature and linked group
+    }
+
+    fn serialize_func_id(
+        id_index: usize,
+        func_ids: Vec<FunctionID>,
+        x_offset: u32,
+        y_offset: u16,
+    ) -> (String, u32) {
+        let id = func_ids[id_index].clone();
+
+        let mut obj_string = String::new();
+
+        let mut current_x = 0;
+        /*if !id.obj_list.is_empty() {
+            //add label
+            obj_string += &format!(
+                "1,914,2,{},3,{},31,{},32,0.5;",
+                x_offset * 30 + 15,
+                ((81 - START_HEIGHT) - y_offset) * 30 + 15,
+                base64::encode(id.name.as_bytes())
+            );
+        }*/
+
+        //add top layer
+        let possible_height = MAX_HEIGHT - (START_HEIGHT + y_offset); //30 is max (TODO: case for if y_offset is more than 30)
+
+        for (i, obj) in id.obj_list.iter().enumerate() {
+            let y_pos = (i as u16) % possible_height + START_HEIGHT + y_offset;
+            let x_pos = (i as f64 / possible_height as f64).floor() as u32 + x_offset;
+            obj_string += &serialize_obj(obj.clone(), x_pos, y_pos);
+        }
+        if !id.obj_list.is_empty() {
+            current_x += (id.obj_list.len() as f64 / possible_height as f64).floor() as u32 + 1;
+        }
+
+        //add all children
+        for (i, func_id) in func_ids.iter().enumerate() {
+            if func_id.parent == Some(id_index) {
+                let (child_string, new_length) =
+                    serialize_func_id(i, func_ids.clone(), current_x + x_offset, y_offset + 1);
+                obj_string += &child_string;
+                if new_length > 0 {
+                    current_x += new_length + 1;
+                }
+            }
+        }
+        (obj_string, current_x)
+    }
+
+    let mut full_obj_string = String::new();
+
+    let mut current_x = 0;
+    for (i, func_id) in func_ids.iter().enumerate() {
+        if func_id.parent == None {
+            let (obj_string, new_length) = serialize_func_id(i, func_ids.clone(), current_x, 0);
+            full_obj_string += &obj_string;
+
+            current_x += new_length;
         }
     }
-
-    if spawned {
-        obj_string += "62,1,87,1,";
-    }
-
-    if !trigger.groups.is_empty() {
-        obj_string += &(String::from("57,") + &group_string(trigger.groups) + ",");
-    }
-
-    for param in trigger.params {
-        obj_string += &(param.0.to_string() + "," + &param.1 + ",");
-    }
-
-    obj_string + "108,7777;" //spwn signiature
+    full_obj_string
 }
 /* PYTHON CODE IM USING
 def Xor(data,key):

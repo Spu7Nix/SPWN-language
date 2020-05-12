@@ -1,0 +1,18 @@
+* = import "std.spwn"
+
+a = mut(1i)
+b = mut(2i)
+
+a.item.add(20)
+b.item.add(5)
+
+
+wait(2)
+
+
+a.divide(b, 4)
+
+
+
+
+

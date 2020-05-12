@@ -91,9 +91,8 @@ pub fn parse_statements(
                                     Some(parse_statements(&mut body.into_inner(), notes))
                                 }
                                 Rule::if_else => {
-                                    println!("else if");
                                     let ret = Some(parse_statements(&mut body.into_inner(), notes));
-                                    println!("{:?}", ret);
+
                                     ret
                                 }
                                 _ => unreachable!(),

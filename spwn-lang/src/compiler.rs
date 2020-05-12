@@ -25,9 +25,15 @@ pub fn compile_spwn(
         closed_blocks: notes.closed_blocks,
         closed_items: notes.closed_items,
         path: path,
-        obj_list: Vec::new(),
+
         lowest_y: HashMap::new(),
         stored_values: Vec::new(),
+        func_ids: vec![FunctionID {
+            name: "main scope".to_string(),
+            parent: None,
+            width: None,
+            obj_list: Vec::new(),
+        }],
     };
 
     println!("Loading level data...");
@@ -37,7 +43,7 @@ pub fn compile_spwn(
     let level_string = get_level_string(file_content)
         //remove previous spwn objects
         .split(";")
-        .map(|obj| if obj.contains("108,7777") { "" } else { obj })
+        .map(|obj| if obj.contains(",108,777") { "" } else { obj })
         .collect::<Vec<&str>>()
         .join(";");
     get_used_ids(&level_string, &mut globals);
@@ -46,6 +52,7 @@ pub fn compile_spwn(
         depth: 0,
         path: vec!["main scope".to_string()],
         line: statements[0].line,
+        func_id: 0,
     };
     use std::time::Instant;
 
@@ -53,6 +60,39 @@ pub fn compile_spwn(
     let start_time = Instant::now();
 
     compile_scope(&statements, vec![Context::new()], &mut globals, start_info);
+
+    //delete all unused func ids
+
+    //let all func_id's parents be with objects
+    /*let mut new_func_ids = Vec::<FunctionID>::new();
+
+    println!("Func id len: {}", globals.func_ids.len());
+
+    for id in &globals.func_ids {
+        if !id.obj_list.is_empty() {
+            let mut new_id = id.clone();
+
+            loop {
+                match new_id.parent {
+                    Some(p) => {
+                        if globals.func_ids[p].obj_list.is_empty() {
+                            new_id.parent = globals.func_ids[p].parent;
+                        } else {
+                            break;
+                        }
+                    }
+                    None => break,
+                }
+            }
+
+            new_func_ids.push(new_id)
+        }
+    }
+
+    // PROBLEM: new parent ids point to indexes in the previous list, in which many items were deleted.
+    // Update the indexes to point to the corresponding items in the new list
+
+    globals.func_ids = new_func_ids;*/
 
     println!(
         "Compiled in {} milliseconds!",
@@ -89,6 +129,12 @@ pub fn compile_scope(
             info.path.join(">"),
             contexts.len()
         );
+        if contexts.is_empty() {
+            compile_error(
+                "No context! This is probably a bug, please contact sputnix.",
+                info.clone(),
+            );
+        }
         use ast::StatementBody::*;
 
         let stored_context = if statement.arrow {
@@ -130,12 +176,9 @@ pub fn compile_scope(
                             );
                             all_values.push((Value::Func(Function { start_group }), context));
                             new_context.start_group = start_group;
-                            let (_, inner_returns) = compile_scope(
-                                &f.statements,
-                                vec![new_context],
-                                globals,
-                                info.next("function body"),
-                            );
+                            let new_info = info.next(&def.symbol, globals, true);
+                            let (_, inner_returns) =
+                                compile_scope(&f.statements, vec![new_context], globals, new_info);
                             returns.extend(inner_returns);
                         } else {
                             let (evaled, inner_returns) =
@@ -175,10 +218,9 @@ pub fn compile_scope(
             If(if_stmt) => {
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
+                    let new_info = info.next("if condition", globals, false);
                     let (evaled, inner_returns) =
-                        if_stmt
-                            .condition
-                            .eval(context, globals, info.next("if condition"));
+                        if_stmt.condition.eval(context, globals, new_info);
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
@@ -189,24 +231,24 @@ pub fn compile_scope(
                         Value::Bool(b) => {
                             //internal if statement
                             if b {
+                                let new_info = info.next("if body", globals, true);
                                 let compiled = compile_scope(
                                     &if_stmt.if_body,
                                     vec![context],
                                     globals,
-                                    info.next("if body"),
+                                    new_info,
                                 );
                                 returns.extend(compiled.1);
+                                contexts.extend(compiled.0);
                             // TODO: add the returns from these scopes
                             } else {
                                 match &if_stmt.else_body {
                                     Some(body) => {
-                                        let compiled = compile_scope(
-                                            body,
-                                            vec![context],
-                                            globals,
-                                            info.next("else body"),
-                                        );
+                                        let new_info = info.next("else body", globals, true);
+                                        let compiled =
+                                            compile_scope(body, vec![context], globals, new_info);
                                         returns.extend(compiled.1);
+                                        contexts.extend(compiled.0);
                                     }
                                     None => {}
                                 };
@@ -223,20 +265,15 @@ pub fn compile_scope(
             Impl(imp) => {
                 let mut new_contexts: Vec<Context> = Vec::new();
                 for context in contexts.clone() {
-                    let (evaled, inner_returns) = imp.symbol.to_value(
-                        context.clone(),
-                        globals,
-                        info.next("implementation symbol"),
-                    );
+                    let new_info = info.next("implementation symbol", globals, false);
+                    let (evaled, inner_returns) =
+                        imp.symbol.to_value(context.clone(), globals, new_info);
                     returns.extend(inner_returns);
                     for (typ, c) in evaled {
                         if let Value::Str(s) = typ {
-                            let (evaled, inner_returns) = eval_dict(
-                                imp.members.clone(),
-                                c,
-                                globals,
-                                info.next("implementation"),
-                            );
+                            let new_info = info.next("implementation", globals, true);
+                            let (evaled, inner_returns) =
+                                eval_dict(imp.members.clone(), c, globals, new_info);
                             returns.extend(inner_returns);
                             for (val, c2) in evaled {
                                 let mut new_context = c2.clone();
@@ -268,9 +305,9 @@ pub fn compile_scope(
                 /**/
             }
             Call(call) => {
-                for context in &mut contexts {
+                /*for context in &mut contexts {
                     context.x += 1;
-                }
+                }*/
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
                     let (evaled, inner_returns) =
@@ -289,21 +326,21 @@ pub fn compile_scope(
                             target: match func {
                                 Value::Func(g) => g.start_group,
                                 Value::Group(g) => g,
-                                _ => panic!(compile_error("Not callable", info)),
+                                _ => panic!(compile_error("Not callable", info.clone())),
                             },
 
-                            ..context_trigger(context.clone(), globals)
+                            ..context_trigger(context.clone(), globals, info.clone())
                         }
                         .context_parameters(context.clone()),
                     );
                 }
-                (*globals).obj_list.extend(obj_list);
+                (*globals).func_ids[info.func_id].obj_list.extend(obj_list);
             }
 
             Add(v) => {
-                for context in &mut contexts {
+                /*for context in &mut contexts {
                     context.x += 1;
-                }
+                }*/
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
                     let (evaled, inner_returns) = v.eval(context, globals, info.clone());
@@ -320,7 +357,7 @@ pub fn compile_scope(
                                 GDObj {
                                     params: obj,
                                     groups: vec![context.start_group],
-                                    ..context_trigger(context.clone(), globals)
+                                    ..context_trigger(context.clone(), globals, info.clone())
                                 }
                                 .context_parameters(context.clone()),
                             );
@@ -329,7 +366,7 @@ pub fn compile_scope(
                         _ => panic!(compile_error("Expected Object", info)),
                     }
                 }
-                (*globals).obj_list.extend(obj_list);
+                (*globals).func_ids[info.func_id].obj_list.extend(obj_list);
             }
             For(f) => {
                 let mut all_arrays: Returns = Vec::new();
@@ -350,13 +387,9 @@ pub fn compile_scope(
                                         f.symbol.clone(),
                                         store_value(element.clone(), globals),
                                     ); //this will store a lot of values, maybe fix this sometime idk
-
-                                    let (end_contexts, inner_returns) = compile_scope(
-                                        &f.body,
-                                        vec![c],
-                                        globals,
-                                        info.next("for loop"),
-                                    );
+                                    let new_info = info.next("for loop", globals, false);
+                                    let (end_contexts, inner_returns) =
+                                        compile_scope(&f.body, vec![c], globals, new_info);
                                     returns.extend(inner_returns);
                                     new_contexts = end_contexts;
                                 }
@@ -377,8 +410,8 @@ pub fn compile_scope(
             Return(val) => {
                 let mut all_values: Returns = Vec::new();
                 for context in contexts.clone() {
-                    let (evaled, inner_returns) =
-                        val.eval(context, globals, info.next("return value"));
+                    let new_info = info.next("implementation symbol", globals, false);
+                    let (evaled, inner_returns) = val.eval(context, globals, new_info);
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
@@ -388,7 +421,8 @@ pub fn compile_scope(
 
             Error(e) => {
                 for context in contexts.clone() {
-                    let (evaled, _) = e.message.eval(context, globals, info.next("return value"));
+                    let new_info = info.next("return value", globals, false);
+                    let (evaled, _) = e.message.eval(context, globals, new_info);
                     for (msg, _) in evaled {
                         println!(
                             "ERROR: {:?}",
@@ -440,7 +474,8 @@ pub fn import_module(
     (*globals).closed_colors.extend(notes.closed_colors);
     (*globals).closed_blocks.extend(notes.closed_blocks);
     (*globals).closed_items.extend(notes.closed_items);
-    let (contexts, _) = compile_scope(&parsed, vec![Context::new()], globals, info.next("module"));
+    let new_info = info.next("module", globals, false);
+    let (contexts, _) = compile_scope(&parsed, vec![Context::new()], globals, new_info);
     if contexts.len() > 1 {
         panic!(
             "Imported files does not (currently) support context splitting in the main scope.

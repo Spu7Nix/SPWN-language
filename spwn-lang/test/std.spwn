@@ -84,7 +84,7 @@ impl "group" {
         wait(duration)
     },
 
-    follow: (self, other, x_mod: 0, y_mod: 0, duration: 999){
+    follow: (self, other, x_mod: 1, y_mod: 1, duration: 999){
         add obj{
             OBJ_ID: 1347,
             X_MOD: x_mod,
@@ -250,7 +250,7 @@ supress_signal = (delay){
     //if checker is 1, it will be supressed
     checker = mut(0)
     -> (){
-        wait(delay)
+        wait(delay * 2)
         checker.item.if_is(EQUAL_TO, 1, {
             checker.item.add(-1)
         })
@@ -266,22 +266,51 @@ supress_signal = (delay){
 
 impl "mutable" {
 
-    add_to: (self, items, speed: 1) {
+    add_to: (self, items, speed: 1, factor: 1) {
         add = {
             
+            
+            mini_add = (num){
+                self.item.if_is(LARGER_THAN, num - 1, {
+                    self.item.add(-num)
+                    for item in items {
+                        item.add(num * factor)
+                    }
+                    call_with_delay(0.05, add)
+                })
+            }
+
+            for i in 0->speed {
+                mini_add(3^i)
+            }
+                
+                
+            
+            self.item.if_is(EQUAL_TO, 0, {
+                wait(0.05)
+                supress_signal(0.06)
+                return
+            })
+        }
+        add!
+    },
+
+    subtract_from: (self, items, speed: 1) {
+        sub = {
+            
             self.item.if_is(LARGER_THAN, 0, {
-                mini_add = (num){
+                mini_sub = (num){
                     self.item.if_is(LARGER_THAN, num - 1, {
                         self.item.add(-num)
                         for item in items {
-                            item.add(num)
+                            item.add(-num)
                         }
-                        call_with_delay(0.05, add)
+                        call_with_delay(0.05, sub)
                     })
                 }
 
                 for i in 0->speed {
-                    mini_add(2^i)
+                    mini_sub(2^i)
                 }
                 
                 
@@ -292,39 +321,210 @@ impl "mutable" {
                 return
             })
         }
-        add!
+        sub!
     },
 
     multiply: (self, factor, speed: 1) {
-        factor.item.if_is(EQUAL_TO, 0, {
-            self.reset(speed)
-            return
-        })
-
-        factor.item.if_is(LARGER_THAN, 1, {
-
-            reg = self.clone(speed)
+        if factor.TYPE == "number" {
+            temp = mut(0)
+            self.add_to([temp.item], speed, factor)
+            temp.add_to([self.item], speed)
+        } else if factor.TYPE == "mutable" {
+            
+            temp = mut(0)
+            mini_mult = (num){
+                mult = {
+                    
+                    self.item.if_is(LARGER_THAN, num - 1, {
+                        self.item.add(-num)
+                        factor.copy_to(temp.item, speed, num)
+                        
+                        
+                        call_with_delay(0.1, mult)
+                    })
+                        
+                    self.item.if_is(SMALLER_THAN, num, {
+                        wait(0.1)
+                        supress_signal(0.11)
+                        return
+                    })
+                }
+                mult!
+            }
             
 
-            factor.item.add(-1)
-            wait(0.05)
-            mult = {
-                
-                factor.item.if_is(LARGER_THAN, 0, {
-                    reg.copy_to(self.item, speed)
-                    factor.item.add(-1)
-                    call_with_delay(0.05, mult)
-                })
-                factor.item.if_is(EQUAL_TO, 0, {
+            for i in speed->0 {
+                mini_mult(2^i)
+            }
+            
+            
+            -> factor.reset(speed)
+            temp.add_to([self.item], speed * 2)
+            
+        }
+    },
+
+
+    divide: (self, divisor, speed: 1, rest_item: ?i) {
+
+        if divisor.TYPE == "number"{
+            result = mut(0)
+
+            rest = mut(rest_item)
+
+            div = {
+                mini_div = (num) {
+                    self.item.if_is(LARGER_THAN, (divisor * num) - 1, {
+                        
+                        
+                        self.item.add(-(divisor * num))
+                        result.item.add(num)
+                        
+                        call_with_delay(0.05, div)
+                        
+                    })
+                }
+
+                for i in 0->speed {
+                    mini_div(i * 4 + 1)
+                }
+
+                self.item.if_is(SMALLER_THAN, divisor, {
+                    
                     wait(0.05)
-                    return
+                    self.add_to([rest.item], speed)
+                    result.add_to([self.item], speed)
+                    supress_signal(0.06)
+                    return rest
                 })
             }
-            mult!
-        })
+            div!
+        } else if divisor.TYPE == "mutable" {
+            result = mut(0)
+
+            // IDEA:
+            // every time it goes under, undo the previous operation to simulate comparison
+            
+            mini_div = (num){
+                div = {
+                    
+                    
+                    self.item.if_is(LARGER_THAN, 0, {
+                        //this basically subtracts divisor * num from self
+                        (){
+                            temp_storage = ?i
+                            cas = {
+                                mini_cas = (num2){
+                                    divisor.item.if_is(LARGER_THAN, num2 - 1, {
+                                        divisor.item.add(-num2)
+                                        temp_storage.add(num2)
+                                        self.item.add(-(num2 * num))
+
+
+                                        
+                                        call_with_delay(0.05, cas)
+                                    })
+                                }
+                    
+                                for i in 0->speed {
+                                    mini_cas(3^i)
+                                }
+                                    
+                                divisor.item.if_is(EQUAL_TO, 0, {
+                                    wait(0.1)
+                                    supress_signal(0.11)
+                                    mut(temp_storage).add_to([divisor.item], speed*2)
+                                    return
+                                })
+                            }
+                            cas!
+                        }()
+                        result.item.add(num)
+                        call_with_delay(0.1, div)
+                    })
+
+                    self.item.if_is(SMALLER_THAN, 1, {
+
+                        ret = {
+                            supress_signal(0.11)
+                            wait(0.1)
+                            return
+                        }
+                        
+                        supress_signal(0.06)
+                        self.item.if_is(SMALLER_THAN, 0, {
+                            result.item.add(-num)
+                            wait(0.1)
+                            divisor.copy_to(self.item, speed*2, factor = num)
+                            ret!
+                        })
+                        self.item.if_is(EQUAL_TO, 0, ret)
+                        
+                    })
+
+                    
+                }
+                div!
+            }
+            
+
+            
+            for i in speed->0 {
+                mini_div(8^i)
+                wait(0.1)
+            }
+            -> divisor.reset(speed)
+            self.add_to([rest_item], speed*2)
+            result.add_to([self.item], speed*2)
+            wait(0.2)
+            return mut(rest_item)
+            
+            
+         
+        }
 
         
-        
+    },
+
+    //will consume both numbers
+    compare: (self, other, speed: 1) {
+
+        comp = {
+            mini_comp = (num){
+                self.item.if_is(LARGER_THAN, num, {
+                    other.item.if_is(LARGER_THAN, num, {
+                        self.item.add(-num)
+                        other.item.add(-num)
+                        call_with_delay(0.05, comp)
+                    })
+                })
+            }
+            for i in 0->speed {
+                mini_comp(2^i)
+            }
+            self.item.if_is(EQUAL_TO, 0, {
+                other.item.if_is(LARGER_THAN, 0, {
+                    other.reset(speed)
+                    return 1
+                })
+            })
+
+            other.item.if_is(EQUAL_TO, 0, {
+                self.item.if_is(LARGER_THAN, 0, {
+                    self.reset(speed)
+                    return -1
+                })
+            })
+
+            other.item.if_is(EQUAL_TO, 0, {
+                self.item.if_is(EQUAL_TO, 0, {
+                    
+                    return 0
+                    
+                })
+            })
+            
+        }
     },
 
     reset: (self, speed: 1){
@@ -352,11 +552,37 @@ impl "mutable" {
         add!
     },
 
-    copy_to: (self, item, speed: 1) {
+    copy_to: (self, item, speed: 1, factor: 1) {
         temp_storage = ?i
-        self.add_to([item, temp_storage], speed)
-        mut(temp_storage).add_to([self.item], speed)
-        return
+        
+        add = {
+            
+            self.item.if_is(LARGER_THAN, 0, {
+                mini_add = (num){
+                    self.item.if_is(LARGER_THAN, num - 1, {
+                        self.item.add(-num)
+                        
+                        item.add(num * factor)
+                        temp_storage.add(num)
+                        
+                        call_with_delay(0.05, add)
+                    })
+                }
+
+                for i in 0->speed {
+                    mini_add(2^i)
+                }
+                
+                
+            })
+            self.item.if_is(EQUAL_TO, 0, {
+                wait(0.05)
+                supress_signal(0.06)
+                mut(temp_storage).add_to([self.item], speed)
+                return
+            })
+        }
+        add! 
     },
 
     clone: (self, speed: 1) {
@@ -530,14 +756,14 @@ events = {
 
 
 exports = {
-    //..constants.obj_props,
+    obj_props: constants.obj_props,
     ..constants.easing_types,
     ..constants.comparisons,
     ..general_functions,
     ..events,
     
     wait: wait,
-
+    supress_signal: supress_signal,
 
     mut: mut,
     call_with_delay: call_with_delay,

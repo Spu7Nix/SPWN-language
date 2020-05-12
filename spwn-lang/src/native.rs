@@ -27,30 +27,14 @@ pub struct Item {
     pub id: u16,
 }
 
-pub fn context_trigger(context: Context, globals: &mut Globals) -> GDObj {
+pub fn context_trigger(context: Context, globals: &mut Globals, info: CompilerInfo) -> GDObj {
     GDObj {
         obj_id: 0,
         groups: vec![context.start_group],
         target: Group { id: 0 },
         spawn_triggered: context.spawn_triggered,
         params: Vec::new(),
-        x: context.x,
-        y: 50
-            - match globals.lowest_y.get_mut(&context.x) {
-                Some(max) => {
-                    if context.y > *max {
-                        (*max) = context.y;
-                        context.y
-                    } else {
-                        (*max) += 1;
-                        *max
-                    }
-                }
-                None => {
-                    (*globals).lowest_y.insert(context.x, context.y);
-                    context.y
-                }
-            },
+        func_id: info.func_id,
     }
 }
 

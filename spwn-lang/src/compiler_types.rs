@@ -17,8 +17,6 @@ pub fn store_value(val: Value, globals: &mut Globals) -> StoredValue {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Context {
-    pub x: u32,
-    pub y: u16,
     pub start_group: Group,
     pub spawn_triggered: bool,
     pub variables: HashMap<String, StoredValue>,
@@ -29,16 +27,37 @@ pub struct CompilerInfo {
     pub depth: u8,
     pub path: Vec<String>,
     pub line: (usize, usize),
+    pub func_id: usize,
 }
 
 impl CompilerInfo {
-    pub fn next(&self, name: &str) -> CompilerInfo {
+    pub fn next(
+        &self,
+        name: &str,
+        globals: &mut Globals,
+        use_in_organization: bool,
+    ) -> CompilerInfo {
         let mut new_path = self.path.clone();
         new_path.push(name.to_string());
+
+        if use_in_organization {
+            (*globals).func_ids.push(FunctionID {
+                name: name.to_string(),
+                parent: Some(self.func_id),
+                obj_list: Vec::new(),
+                width: None,
+            });
+        }
+
         CompilerInfo {
             depth: self.depth + 1,
             path: new_path,
             line: self.line,
+            func_id: if use_in_organization {
+                (*globals).func_ids.len() - 1
+            } else {
+                self.func_id
+            },
         }
     }
 }
@@ -46,8 +65,6 @@ impl CompilerInfo {
 impl Context {
     pub fn new() -> Context {
         Context {
-            x: 0,
-            y: 0,
             start_group: Group { id: 0 },
             spawn_triggered: false,
             variables: HashMap::new(),
@@ -85,6 +102,13 @@ pub enum Value {
     Obj(Vec<(u16, String)>),
     Null,
 }
+#[derive(Clone, Debug, PartialEq)]
+pub struct FunctionID {
+    pub parent: Option<usize>, //index of parent id, if none it is a top-level id
+    pub width: Option<u32>,    //width of this id, is none when its not calculated yet
+    pub name: String,          //name of this id, used for the label
+    pub obj_list: Vec<GDObj>,  //list of objects in this function id
+}
 
 #[derive(Clone)]
 pub struct Globals {
@@ -93,10 +117,10 @@ pub struct Globals {
     pub closed_blocks: Vec<u16>,
     pub closed_items: Vec<u16>,
     pub path: PathBuf,
-    pub obj_list: Vec<GDObj>,
 
     pub lowest_y: HashMap<u32, u16>,
     pub stored_values: Vec<Value>,
+    pub func_ids: Vec<FunctionID>,
 }
 
 pub fn compile_error(msg: &str, info: CompilerInfo) -> String {
@@ -175,6 +199,7 @@ impl ast::Expression {
                             if let Some(Value::Macro(m)) =
                                 acum_val.member("_or_".to_string(), &context, globals, info.clone())
                             {
+                                let new_info = info.next("logical or", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -193,7 +218,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("logical or"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -218,6 +243,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("logical and", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -236,7 +262,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("logical and"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -261,6 +287,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("comparison", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -279,7 +306,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("comparison"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -307,6 +334,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("comparison", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -325,7 +353,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("comparison"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -353,6 +381,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("comparison", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -371,7 +400,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("comparison"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -399,6 +428,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("comparison", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -417,7 +447,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("comparison"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -445,6 +475,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("divide", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -463,7 +494,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("divide"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -491,6 +522,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("multiply", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -509,7 +541,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("multiply"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -537,6 +569,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("power", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -555,7 +588,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("power"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -583,6 +616,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("plus", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -601,7 +635,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("plus"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -626,6 +660,7 @@ impl ast::Expression {
                                 globals,
                                 info.clone(),
                             ) {
+                                let new_info = info.next("subtract", globals, false);
                                 let (values, _) = execute_macro(
                                     (
                                         m,
@@ -644,7 +679,7 @@ impl ast::Expression {
                                     c2,
                                     globals,
                                     acum_val.clone(),
-                                    info.next("subtract"),
+                                    new_info,
                                 );
                                 values
                             } else {
@@ -668,17 +703,24 @@ impl ast::Expression {
                         "==" => vec![(Value::Bool(val == acum_val), c2)],
                         "!=" => vec![(Value::Bool(val != acum_val), c2)],
                         "->" => vec![(
-                            Value::Array(
-                                (match &acum_val {
+                            Value::Array({
+                                let start = match &acum_val {
                                     Value::Number(n) => *n as i32,
                                     _ => panic!(compile_error("Both sides must be numbers", info)),
-                                }..match val {
+                                };
+                                let end = match val {
                                     Value::Number(n) => n as i32,
                                     _ => panic!(compile_error("Both sides must be numbers", info)),
-                                })
-                                    .map(|x| Value::Number(x as f64))
-                                    .collect(),
-                            ),
+                                };
+                                if start < end {
+                                    (start..end).collect::<Vec<i32>>()
+                                } else {
+                                    (end..start).rev().collect::<Vec<i32>>()
+                                }
+                                .into_iter()
+                                .map(|x| Value::Number(x as f64))
+                                .collect()
+                            }),
                             c2,
                         )],
                         _ => unreachable!(),
@@ -730,6 +772,9 @@ pub fn execute_macro(
                         }
                     }
                     None => {
+                        if (if m.args[0].0 == "self" { i + 1 } else { i }) > m.args.len() - 1 {
+                            panic!(compile_error("Too many arguments!", info))
+                        }
                         new_variables.insert(
                             m.args[if m.args[0].0 == "self" { i + 1 } else { i }]
                                 .0
@@ -778,7 +823,8 @@ pub fn execute_macro(
 
         new_contexts.push(new_context);
     }
-    let compiled = compile_scope(&m.body, new_contexts, globals, info.next("macro body"));
+    let new_info = info.next("macro body", globals, false);
+    let compiled = compile_scope(&m.body, new_contexts, globals, new_info);
     let returns = if compiled.1.is_empty() {
         compiled
             .0
@@ -956,8 +1002,9 @@ impl ast::Variable {
             )),
             ast::ValueLiteral::Number(num) => start_val.push((Value::Number(*num), context)),
             ast::ValueLiteral::Dictionary(dict) => {
+                let new_info = info.next("dictionary", globals, false);
                 let (new_out, new_inner_returns) =
-                    eval_dict(dict.clone(), context, globals, info.next("dictionary"));
+                    eval_dict(dict.clone(), context, globals, new_info);
                 start_val = new_out;
                 inner_returns = new_inner_returns;
             }
@@ -985,8 +1032,9 @@ impl ast::Variable {
             },
             ast::ValueLiteral::Str(s) => start_val.push((Value::Str(s.clone()), context)),
             ast::ValueLiteral::Array(a) => {
+                let new_info = info.next("array", globals, false);
                 let (evaled, returns) =
-                    all_combinations(a.clone(), context, globals, info.next("array"));
+                    all_combinations(a.clone(), context, globals, new_info);
                 inner_returns.extend(returns);
                 start_val = evaled
                     .iter()
@@ -1005,8 +1053,9 @@ impl ast::Variable {
                     all_expr.push(prop.0.clone());
                     all_expr.push(prop.1.clone());
                 }
+                let new_info = info.next("object", globals, false);
                 let (evaled, returns) =
-                    all_combinations(all_expr, context, globals, info.next("object"));
+                    all_combinations(all_expr, context, globals, new_info);
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, String)> = Vec::new();
@@ -1059,8 +1108,9 @@ impl ast::Variable {
                         all_expr.push(e.clone());
                     }
                 }
+                let new_info = info.next("macro argument", globals, false);
                 let (argument_possibilities, returns) =
-                    all_combinations(all_expr, context, globals, info.next("macro argument"));
+                    all_combinations(all_expr, context, globals, new_info);
                 inner_returns.extend(returns);
                 for defaults in argument_possibilities {
                     let mut args: Vec<(String, Option<Value>)> = Vec::new();
@@ -1135,7 +1185,8 @@ impl ast::Variable {
                     for (prev_v, prev_c, _) in with_parent.clone() {
                         match prev_v.clone() {
                             Value::Array(arr) => {
-                                let (evaled, returns) = i.eval(prev_c, globals, info.next("index"));
+                                let new_info = info.next("index", globals, false);
+                                let (evaled, returns) = i.eval(prev_c, globals, new_info);
                                 inner_returns.extend(returns);
                                 for index in evaled {
                                     match index.0 {
@@ -1153,6 +1204,8 @@ impl ast::Variable {
                             _ => panic!(compile_error("Cannot index this", info)),
                         }
                     }
+
+                    with_parent = new_out
                 }
 
                 ast::Path::Call(args) => {
@@ -1230,13 +1283,9 @@ impl ast::CompoundStatement {
         };
 
         new_context.start_group = start_group;
-
-        let (_, inner_returns) = compile_scope(
-            &self.statements,
-            vec![new_context],
-            globals,
-            info.next("function body"),
-        );
+        let new_info = info.next("function body", globals, true);
+        let (_, inner_returns) =
+            compile_scope(&self.statements, vec![new_context], globals, new_info);
 
         (Function { start_group }, inner_returns)
     }
