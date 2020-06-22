@@ -64,7 +64,12 @@ impl Value {
                 None => "dictionary".to_string(),
             },
 
-            Value::Func(_) => "function".to_string(),
+            Value::Func(f) => {
+                if member == "group" {
+                    return Some(Value::Group(f.start_group));
+                }
+                "function".to_string()
+            }
             Value::Group(_) => "group".to_string(),
             Value::Color(_) => "color".to_string(),
             Value::Block(_) => "block".to_string(),
@@ -73,10 +78,16 @@ impl Value {
             Value::Bool(_) => "boolean".to_string(),
             Value::Macro(_) => "macro".to_string(),
             Value::Str(_) => "string".to_string(),
-            Value::Array(_) => "array".to_string(),
+            Value::Array(a) => {
+                if member == "length" {
+                    return Some(Value::Number(a.len() as f64));
+                }
+                "array".to_string()
+            }
             Value::Obj(_) => "object".to_string(),
             Value::Null => "null".to_string(),
         };
+
         if member == TYPE_MEMBER_NAME {
             return Some(Value::Str(my_type.to_string()));
         } else {

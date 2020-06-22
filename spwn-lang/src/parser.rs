@@ -25,6 +25,8 @@ pub fn parse_spwn(path: &PathBuf) -> (Vec<ast::Statement>, ParseNotes) {
         .expect("unsuccessful parse")
         .next()
         .unwrap(); // get and unwrap the `spwn` rule; never fails
+
+    println!("got parse tree...");
     let mut notes = ParseNotes {
         closed_groups: Vec::new(),
         closed_colors: Vec::new(),

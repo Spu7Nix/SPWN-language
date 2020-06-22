@@ -73,7 +73,7 @@ number = @{("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*) ~ ("." ~ ASCII_DIGIT*)? }
 expr = {(variable ~ operator)* ~ variable}
 
 operator = {("||" | "&&" | "==" | "!=" | "->") | 
-			(">" | "<" | ">=" | "<=") | 
+			(">=" | "<=" | ">" | "<") | 
             ("/" | "*" | "^") | 
             ("+" | "-")}
 

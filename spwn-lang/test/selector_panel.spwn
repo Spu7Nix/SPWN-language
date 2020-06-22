@@ -1,0 +1,17 @@
+extract import "std"
+
+selector = 1g
+buttons = [2g, 3g, 4g, 5g, 6g, 7g, 8g, 9g]
+button_index = mut(0)
+
+on(touch(), {
+    button_index.add(1)
+
+    if button_index >= buttons.length {
+        button_index.add(-buttons.length)
+    } else {}
+
+    selected_button = buttons[button_index.to_const(0->buttons.length)]
+    
+    selector.move_to(selected_button)
+})

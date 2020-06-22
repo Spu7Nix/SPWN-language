@@ -113,7 +113,7 @@ exports = {
         GLOW_DISABLED : 96,
         ROTATION_SPEED : 97,
         DISABLE_ROTATION : 98,
-        COUNT_MULTI_ACTIVATE : 99,
+        COUNT_MULTI_ACTIVATE : 104,
         USE_TARGET : 100,
         TARGET_POS_AXES : 101,
         EDITOR_DISABLE : 102,

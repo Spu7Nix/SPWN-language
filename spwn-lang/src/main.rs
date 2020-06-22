@@ -16,8 +16,9 @@ extern crate lazy_static;
 fn main() {
     let args: Vec<String> = env::args().collect();
     let script_path = PathBuf::from(&args[1]); //&args[1]
+    println!("Starting...");
     let (statements, notes) = parse_spwn(&script_path);
-
+    println!("parsed!");
     // for statement in statements.iter() {
     //     println!("{:?}\n\n", statement);
     // }

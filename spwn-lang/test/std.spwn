@@ -189,6 +189,13 @@ impl "color" {
     }
 }
 
+impl "function" {
+
+    stop: (self) {
+        self.group.stop()
+    }
+}
+
 impl "item" {
     
     add: (self, amount) {
@@ -218,13 +225,14 @@ impl "item" {
                 COUNT: number,
                 ACTIVATE_GROUP: 1, 
                 ITEM: self,
-                COUNT_MULTI_ACTIVATE: true
+                COUNT_MULTI_ACTIVATE: true,
+                
             }
         }
     },
 }
 
-mut = (source){
+mut = (source: ?i){
     if source.TYPE == "number" {
         id = ?i
     
@@ -607,6 +615,63 @@ impl "mutable" {
             new_mut.item.add(-other)
         }
     },
+
+    _more_than_: (self, other) {
+        //TODO: add case for another mut
+        if other.TYPE == "number" {
+            self.item.if_is(LARGER_THAN, other, {
+                return true
+            })
+
+            self.item.if_is(SMALLER_THAN, other + 1, {
+                return false
+            })
+        }
+    },
+
+    _less_than_: (self, other) {
+        //TODO: add case for another mut
+        if other.TYPE == "number" {
+            self.item.if_is(SMALLER_THAN, other, {
+                return true
+            })
+
+            self.item.if_is(LARGER_THAN, other - 1, {
+                return false
+            })
+        }
+    },
+
+    _more_or_equal_: (self, other) {
+        //TODO: add case for another mut
+        if other.TYPE == "number" {
+            self.item.if_is(LARGER_THAN, other - 1, {
+                return true
+            })
+
+            self.item.if_is(SMALLER_THAN, other, {
+                return false
+            })
+        }
+    },
+
+    _less_or_equal_: (self, other) {
+        //TODO: add case for another mut
+        if other.TYPE == "number" {
+            self.item.if_is(SMALLER_THAN, other + 1, {
+                return true
+            })
+
+            self.item.if_is(LARGER_THAN, other, {
+                return false
+            })
+        }
+    },
+
+    add: (self, num) {
+        self.item.add(num)
+    },
+
     
 
     to_const: (self, range) {
@@ -618,7 +683,7 @@ impl "mutable" {
     },
     
 
-    as: (self, type) {
+    _as_: (self, type) {
         if type == "bool" {
             return self.to_const([0, 1]) == 1
         } else {
