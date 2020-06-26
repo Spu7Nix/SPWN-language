@@ -1,8 +1,8 @@
 mod ast;
-mod compiler;
-mod compiler_types;
-mod levelstring;
-mod native;
+//mod compiler;
+//mod compiler_types;
+//mod levelstring;
+//mod native;
 mod parser;
 
 use parser::*;
@@ -17,12 +17,14 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let script_path = PathBuf::from(&args[1]); //&args[1]
     println!("Starting...");
-    let (statements, notes) = parse_spwn(&script_path);
-    println!("parsed!");
+    //let (statements, notes) = parse_spwn(&script_path);
+
+    let parsed = parse_spwn(&script_path);
+    println!("parsed: {:?}", parsed);
     // for statement in statements.iter() {
     //     println!("{:?}\n\n", statement);
     // }
-    let gd_path = if cfg!(target_os = "windows") {
+    /*let gd_path = if cfg!(target_os = "windows") {
         PathBuf::from(std::env::var("localappdata").expect("No local app data"))
             .join("GeometryDash/CCLocalLevels.dat")
     } else if cfg!(target_os = "macos") {
@@ -44,5 +46,5 @@ fn main() {
 
     println!("Using {} groups", compiled.closed_groups.len());
     levelstring::encrypt_level_string(level_string, old_ls, gd_path);
-    println!("Written to save. You can now open Geometry Dash again!");
+    println!("Written to save. You can now open Geometry Dash again!");*/
 }

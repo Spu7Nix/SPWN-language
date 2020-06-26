@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crate::compiler_types::Value;
+//use crate::compiler_types::Value;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
@@ -44,8 +44,40 @@ pub enum ValueLiteral {
     Array(Vec<Expression>),
     Obj(Vec<(Expression, Expression)>),
     Macro(Macro),
-    Resolved(Value),
+    //Resolved(Value),
     Null,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum Operator {
+    Or,
+    And,
+    Equal,
+    NotEqual,
+    Arrow,
+    MoreOrEqual,
+    LessOrEqual,
+    More,
+    Less,
+    Divide,
+    Multiply,
+    Power,
+    Plus,
+    Minus,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum UnaryOperator {
+    Not,
+    Minus,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum IDClass {
+    Group,
+    Color,
+    Item,
+    Block,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -67,23 +99,23 @@ pub struct Argument {
     pub value: Expression,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+/*#[derive(Clone, PartialEq, Debug)]
 pub struct Event {
     pub symbol: String,
     pub args: Vec<Expression>,
     pub func: Variable,
-}
+}*/
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Call {
     pub function: Variable,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+/*#[derive(Clone, PartialEq, Debug)]
 pub struct Native {
     pub function: Variable,
     pub args: Vec<Argument>,
-}
+}*/
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
@@ -105,7 +137,7 @@ pub struct Error {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Variable {
-    pub operator: Option<String>,
+    pub operator: Option<UnaryOperator>,
     pub value: ValueLiteral,
     pub path: Vec<Path>,
 }
@@ -127,7 +159,7 @@ pub struct Variable {
 #[derive(Clone, PartialEq, Debug)]
 pub struct Expression {
     pub values: Vec<Variable>,
-    pub operators: Vec<String>,
+    pub operators: Vec<Operator>,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -152,7 +184,7 @@ pub struct If {
 pub struct ID {
     pub number: u16,
     pub unspecified: bool,
-    pub class_name: String,
+    pub class_name: IDClass,
 }
 
 #[derive(Debug)]

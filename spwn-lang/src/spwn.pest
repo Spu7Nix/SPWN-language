@@ -21,9 +21,7 @@ if_stmt = {"if" ~ expr ~ lb? ~ cmp_stmt ~ lb? ~ ("else" ~ lb? ~ (cmp_stmt | if_e
 if_else = {if_stmt_container_i_need_for_some_reason}
 if_stmt_container_i_need_for_some_reason = {if_stmt}
 
-native_prop = {"#" ~ (private /*| id_define*/) ~ arguments}
-    private =   {"private"}
-    //id_define = "id_define"
+
 
 
 cmp_stmt = {

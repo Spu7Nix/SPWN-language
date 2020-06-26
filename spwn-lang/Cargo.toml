@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-pest = "2.1.3"
-pest_derive = "2.1"
+# pest = "2.1.3"
+# pest_derive = "2.1"
 quick-xml = "0.17.2"
 base64 = "0.2.1"
 libflate = "0.1.27"
@@ -16,5 +16,4 @@ lazy_static = "1.4.0"
 
 crc32fast = "1.2.0"
 
-[profile.dev]
-debug-assertions = false
+logos = "0.11.4"
