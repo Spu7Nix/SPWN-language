@@ -79,7 +79,7 @@ pub enum Token {
     Assign,
 
     //VALUES
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
+    #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)|\$")]
     Symbol,
 
     #[regex(r"[0-9]+(.[0-9]+)?")]

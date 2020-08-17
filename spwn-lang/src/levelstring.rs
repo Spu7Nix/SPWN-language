@@ -1,6 +1,6 @@
 // useful things for dealing with gd level data
+use crate::builtin::*;
 use crate::compiler_types::*;
-use crate::native::*;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct GDObj {

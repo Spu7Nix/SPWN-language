@@ -1,8 +1,8 @@
 mod ast;
+mod builtin;
 mod compiler;
 mod compiler_types;
 mod levelstring;
-mod native;
 mod parser;
 
 use parser::*;
@@ -38,13 +38,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut compiled, old_ls) =
         compiler::compile_spwn(statements, script_path, gd_path.clone(), notes);
-    let level_string = levelstring::serialize_triggers(compiled.func_ids);
+    /*let level_string = levelstring::serialize_triggers(compiled.func_ids);
 
     compiled.closed_groups.sort();
     compiled.closed_groups.dedup();
 
     println!("Using {} groups", compiled.closed_groups.len());
     levelstring::encrypt_level_string(level_string, old_ls, gd_path);
-    println!("Written to save. You can now open Geometry Dash again!");
+    println!("Written to save. You can now open Geometry Dash again!");*/
     Ok(())
 }

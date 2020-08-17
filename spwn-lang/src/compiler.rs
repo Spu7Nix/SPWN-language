@@ -1,7 +1,7 @@
 //! Tools for compiling SPWN into GD object strings
 use crate::ast;
+use crate::builtin::*;
 use crate::levelstring::*;
-use crate::native::*;
 use std::collections::HashMap;
 
 //use std::collections::HashMap;
@@ -36,7 +36,7 @@ pub fn compile_spwn(
         }],
     };
 
-    println!("Loading level data...");
+    /*println!("Loading level data...");
 
     let file_content =
         fs::read_to_string(gd_path).expect("Your local geometry dash files were not found");
@@ -46,7 +46,7 @@ pub fn compile_spwn(
         .map(|obj| if obj.contains(",108,777") { "" } else { obj })
         .collect::<Vec<&str>>()
         .join(";");
-    get_used_ids(&level_string, &mut globals);
+    get_used_ids(&level_string, &mut globals);*/
 
     let start_info = CompilerInfo {
         depth: 0,
@@ -99,7 +99,7 @@ pub fn compile_spwn(
         start_time.elapsed().as_millis()
     );
 
-    (globals, level_string)
+    (globals, "level_string".to_string())
 }
 
 pub fn compile_scope(

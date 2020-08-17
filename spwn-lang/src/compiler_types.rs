@@ -1,6 +1,6 @@
 use crate::ast;
+use crate::builtin::*;
 use crate::levelstring::*;
-use crate::native::*;
 //use std::boxed::Box;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -100,7 +100,73 @@ pub enum Value {
     Str(String),
     Array(Vec<Value>),
     Obj(Vec<(u16, String)>),
+    Builtins,
+    BuiltinFunction(String),
     Null,
+}
+
+use std::fmt;
+
+const MAX_DICT_EL_DISPLAY: u16 = 10;
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Value::Group(g) => g.id.to_string() + "g",
+                Value::Color(c) => c.id.to_string() + "c",
+                Value::Block(b) => b.id.to_string() + "b",
+                Value::Item(i) => i.id.to_string() + "i",
+                Value::Number(n) => n.to_string(),
+                Value::Bool(b) => b.to_string(),
+                Value::Func(f) => format!("<function {}g>", f.start_group.id),
+                Value::Dict(d) => {
+                    let mut out = String::from("{\n");
+                    let mut count = 0;
+                    let mut d_iter = d.iter();
+                    for (key, val) in &mut d_iter {
+                        count += 1;
+
+                        if count > MAX_DICT_EL_DISPLAY {
+                            out += &format!("... ({} more)  ", d_iter.count());
+                            break;
+                        }
+                        out += &format!("{}: <pointer: {}>,\n", key, val);
+                    }
+                    out.pop();
+                    out.pop();
+                    out += "\n}";
+                    out
+                }
+                Value::Macro(_) => String::from("<macro>"),
+                Value::Str(s) => s.clone(),
+                Value::Array(a) => {
+                    let mut out = String::from("[");
+                    for val in a {
+                        out += &format!("{}, ", val);
+                    }
+                    out.pop();
+                    out.pop();
+                    out += "]";
+                    out
+                }
+                Value::Obj(o) => {
+                    let mut out = String::new();
+                    for (key, val) in o {
+                        out += &format!("{},{},", key, val);
+                    }
+                    out.pop();
+                    out += ";";
+                    out
+                }
+                Value::Builtins => String::from("SPWN"),
+                Value::BuiltinFunction(n) => format!("<built-in-function: {}>", n),
+                Value::Null => String::from("Null"),
+            }
+        )
+    }
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionID {
@@ -974,7 +1040,7 @@ impl ast::Variable {
                             Value::Group(Group { id: id.number })
                         }
                     }
-                    IDClass::Color  => {
+                    IDClass::Color => {
                         if id.unspecified {
                             Value::Color(Color {
                                 id: next_free(&mut globals.closed_colors),
@@ -983,7 +1049,7 @@ impl ast::Variable {
                             Value::Color(Color { id: id.number })
                         }
                     }
-                    IDClass::Block  => {
+                    IDClass::Block => {
                         if id.unspecified {
                             Value::Block(Block {
                                 id: next_free(&mut globals.closed_blocks),
@@ -992,7 +1058,7 @@ impl ast::Variable {
                             Value::Block(Block { id: id.number })
                         }
                     }
-                    IDClass::Item  => {
+                    IDClass::Item => {
                         if id.unspecified {
                             Value::Item(Item {
                                 id: next_free(&mut globals.closed_items),
@@ -1026,20 +1092,25 @@ impl ast::Variable {
             }
 
             ast::ValueLiteral::Bool(b) => start_val.push((Value::Bool(*b), context)),
-            ast::ValueLiteral::Symbol(string) => match context.variables.get(string) {
-                Some(value) => {
-                    start_val.push((((*globals).stored_values[*value as usize]).clone(), context))
+            ast::ValueLiteral::Symbol(string) => {
+                if string == "$" {
+                    start_val.push((Value::Builtins, context));
+                } else {
+                    match context.variables.get(string) {
+                        Some(value) => {
+                            start_val.push((((*globals).stored_values[*value as usize]).clone(), context))
+                        }
+                        None => panic!(compile_error(
+                            &format!("The variable \"{}\" does not exist in this Func. (variables that exist: {:?})", string, context.variables.keys().collect::<Vec<&String>>()),
+                            info
+                        )),
+                    }
                 }
-                None => panic!(compile_error(
-                    &format!("The variable \"{}\" does not exist in this Func. (variables that exist: {:?})", string, context.variables.keys().collect::<Vec<&String>>()),
-                    info
-                )),
-            },
+            }
             ast::ValueLiteral::Str(s) => start_val.push((Value::Str(s.clone()), context)),
             ast::ValueLiteral::Array(a) => {
                 let new_info = info.next("array", globals, false);
-                let (evaled, returns) =
-                    all_combinations(a.clone(), context, globals, new_info);
+                let (evaled, returns) = all_combinations(a.clone(), context, globals, new_info);
                 inner_returns.extend(returns);
                 start_val = evaled
                     .iter()
@@ -1059,8 +1130,7 @@ impl ast::Variable {
                     all_expr.push(prop.1.clone());
                 }
                 let new_info = info.next("object", globals, false);
-                let (evaled, returns) =
-                    all_combinations(all_expr, context, globals, new_info);
+                let (evaled, returns) = all_combinations(all_expr, context, globals, new_info);
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, String)> = Vec::new();
@@ -1226,6 +1296,33 @@ impl ast::Variable {
                                 );
                                 inner_returns.extend(returns);
                                 with_parent = evaled
+                                    .iter()
+                                    .map(|x| (x.0.clone(), x.1.clone(), v.clone()))
+                                    .collect();
+                            }
+
+                            Value::BuiltinFunction(name) => {
+                                let (evaled_args, returns) = all_combinations(
+                                    args.iter().map(|x| x.value.clone()).collect(),
+                                    cont.clone(),
+                                    globals,
+                                    info.clone(),
+                                );
+                                inner_returns.extend(returns);
+
+                                let mut all_values = Returns::new();
+
+                                for (args, context) in evaled_args {
+                                    let evaled = built_in_function(
+                                        name,
+                                        args.clone(),
+                                        info.clone(),
+                                        globals,
+                                    );
+                                    all_values.push((evaled, context))
+                                }
+
+                                with_parent = all_values
                                     .iter()
                                     .map(|x| (x.0.clone(), x.1.clone(), v.clone()))
                                     .collect();
