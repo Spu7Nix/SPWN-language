@@ -124,11 +124,11 @@ pub fn compile_scope(
         //find out what kind of statement this is
         //let start_time = Instant::now();
 
-        println!(
+        /*println!(
             "{} -> Compiling a statement in {} contexts",
             info.path.join(">"),
             contexts.len()
-        );
+        );*/
         if contexts.is_empty() {
             compile_error(
                 "No context! This is probably a bug, please contact sputnix.",
@@ -196,21 +196,34 @@ pub fn compile_scope(
                 }
                 contexts = Vec::new();
                 for (val, mut context) in all_values {
-                    if def.symbol == "*" {
-                        match val {
-                            Value::Dict(d) => {
-                                context.variables.extend(d.clone());
-                            }
-                            _ => panic!(compile_error(
-                                "Only dict can have their values extracted",
-                                info
-                            )),
+                    context
+                        .variables
+                        .insert(String::from(&def.symbol), store_value(val, globals));
+
+                    contexts.push(context);
+                }
+            }
+
+            Extract(val) => {
+                let mut all_values: Returns = Vec::new();
+                for context in contexts {
+                    let (evaled, inner_returns) = val.eval(context, globals, info.clone());
+                    returns.extend(inner_returns);
+                    all_values.extend(evaled);
+                }
+
+                contexts = Vec::new();
+                for (val, mut context) in all_values {
+                    match val {
+                        Value::Dict(d) => {
+                            context.variables.extend(d.clone());
                         }
-                    } else {
-                        context
-                            .variables
-                            .insert(String::from(&def.symbol), store_value(val, globals));
+                        _ => panic!(compile_error(
+                            "Only dict can have their values extracted",
+                            info
+                        )),
                     }
+
                     contexts.push(context);
                 }
             }
@@ -407,17 +420,27 @@ pub fn compile_scope(
                     }
                 }
             }
-            Return(val) => {
-                let mut all_values: Returns = Vec::new();
-                for context in contexts.clone() {
-                    let new_info = info.next("implementation symbol", globals, false);
-                    let (evaled, inner_returns) = val.eval(context, globals, new_info);
-                    returns.extend(inner_returns);
-                    all_values.extend(evaled);
+            Return(return_val) => match return_val {
+                Some(val) => {
+                    let mut all_values: Returns = Vec::new();
+                    for context in contexts.clone() {
+                        let new_info = info.next("implementation symbol", globals, false);
+                        let (evaled, inner_returns) = val.eval(context, globals, new_info);
+                        returns.extend(inner_returns);
+                        all_values.extend(evaled);
+                    }
+
+                    returns.extend(all_values);
                 }
 
-                returns.extend(all_values);
-            }
+                None => {
+                    let mut all_values: Returns = Vec::new();
+                    for context in contexts.clone() {
+                        all_values.push((Value::Null, context));
+                    }
+                    returns.extend(all_values);
+                }
+            },
 
             Error(e) => {
                 for context in contexts.clone() {

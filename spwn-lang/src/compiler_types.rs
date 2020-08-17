@@ -193,9 +193,12 @@ impl ast::Expression {
                 //what the value in acum becomes
                 let evaled = var.to_value(c, globals, info.clone());
                 inner_returns.extend(evaled.1);
+
+                use ast::Operator::*;
+
                 for (val, c2) in evaled.0 {
-                    let vals: Returns = match self.operators[i].as_ref() {
-                        "||" => {
+                    let vals: Returns = match self.operators[i] {
+                        Or => {
                             if let Some(Value::Macro(m)) =
                                 acum_val.member("_or_".to_string(), &context, globals, info.clone())
                             {
@@ -236,7 +239,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        "&&" => {
+                        And => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_and_".to_string(),
                                 &context,
@@ -280,7 +283,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        ">" => {
+                        More => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_more_than_".to_string(),
                                 &context,
@@ -327,7 +330,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        "<" => {
+                        Less => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_less_than_".to_string(),
                                 &context,
@@ -374,7 +377,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        ">=" => {
+                        MoreOrEqual => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_more_or_equal_".to_string(),
                                 &context,
@@ -421,7 +424,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        "<=" => {
+                        LessOrEqual => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_less_or_equal_".to_string(),
                                 &context,
@@ -468,7 +471,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        "/" => {
+                        Divide => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_divided_by_".to_string(),
                                 &context,
@@ -515,7 +518,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        "*" => {
+                        Multiply => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_times_".to_string(),
                                 &context,
@@ -562,7 +565,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        "^" => {
+                        Power => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_to_the_power_of_".to_string(),
                                 &context,
@@ -609,7 +612,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        "+" => {
+                        Plus => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_plus_".to_string(),
                                 &context,
@@ -653,7 +656,7 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        "-" => {
+                        Minus => {
                             if let Some(Value::Macro(m)) = acum_val.member(
                                 "_minus_".to_string(),
                                 &context,
@@ -700,9 +703,9 @@ impl ast::Expression {
                                 }
                             }
                         }
-                        "==" => vec![(Value::Bool(val == acum_val), c2)],
-                        "!=" => vec![(Value::Bool(val != acum_val), c2)],
-                        "->" => vec![(
+                        Equal => vec![(Value::Bool(val == acum_val), c2)],
+                        NotEqual => vec![(Value::Bool(val != acum_val), c2)],
+                        Range => vec![(
                             Value::Array({
                                 let start = match &acum_val {
                                     Value::Number(n) => *n as i32,
@@ -956,11 +959,13 @@ impl ast::Variable {
         let mut start_val: Vec<(Value, Context)> = Vec::new();
         let mut inner_returns = Returns::new();
 
+        use ast::IDClass;
+
         match &self.value {
             ast::ValueLiteral::Resolved(r) => start_val.push((r.clone(), context)),
             ast::ValueLiteral::ID(id) => start_val.push((
-                match id.class_name.as_ref() {
-                    "g" => {
+                match id.class_name {
+                    IDClass::Group => {
                         if id.unspecified {
                             Value::Group(Group {
                                 id: next_free(&mut globals.closed_groups),
@@ -969,7 +974,7 @@ impl ast::Variable {
                             Value::Group(Group { id: id.number })
                         }
                     }
-                    "c" => {
+                    IDClass::Color  => {
                         if id.unspecified {
                             Value::Color(Color {
                                 id: next_free(&mut globals.closed_colors),
@@ -978,7 +983,7 @@ impl ast::Variable {
                             Value::Color(Color { id: id.number })
                         }
                     }
-                    "b" => {
+                    IDClass::Block  => {
                         if id.unspecified {
                             Value::Block(Block {
                                 id: next_free(&mut globals.closed_blocks),
@@ -987,7 +992,7 @@ impl ast::Variable {
                             Value::Block(Block { id: id.number })
                         }
                     }
-                    "i" => {
+                    IDClass::Item  => {
                         if id.unspecified {
                             Value::Item(Item {
                                 id: next_free(&mut globals.closed_items),
@@ -1237,10 +1242,11 @@ impl ast::Variable {
             .map(|x| (x.0.clone(), x.1.clone()))
             .collect();
 
+        use ast::UnaryOperator;
         if let Some(o) = &self.operator {
             for final_value in &mut out {
-                match o.as_ref() {
-                    "-" => {
+                match o {
+                    UnaryOperator::Minus => {
                         if let Value::Number(n) = final_value.0 {
                             *final_value = (Value::Number(-n), final_value.1.clone());
                         } else {
@@ -1248,7 +1254,7 @@ impl ast::Variable {
                         }
                     }
 
-                    "!" => {
+                    UnaryOperator::Not => {
                         if let Value::Bool(b) = final_value.0 {
                             *final_value = (Value::Bool(!b), final_value.1.clone());
                         } else {

@@ -1,4 +1,4 @@
-*= import "std.spwn"
+extract import "std.spwn"
 
 board = [
 	[mut(1i ), mut(2i ), mut(3i ), mut(4i ), mut(5i ), mut(6i ), mut(7i )],
@@ -24,6 +24,7 @@ wait_for_ready = () {
 	closure!
 }
 
+monster = 993g
 
 
 gfb_vars = {
@@ -107,11 +108,11 @@ player_turn = mut(100i)
 player_turn.add(1)
 
 reset_selector_x = {
-	-> gfb_vars.x.add(-gfb_vars.x.to_const(1->7))
+	-> gfb_vars.x.add(-gfb_vars.x.to_const(1..7))
 }
 
 reset_selector_y = {
-	-> gfb_vars.y.add(-gfb_vars.y.to_const(1->6))
+	-> gfb_vars.y.add(-gfb_vars.y.to_const(1..6))
 }
 
 
@@ -355,7 +356,7 @@ find_threads = {
 on(collision(1b, 2b), {
 	allow_player_input.item.if_is(EQUAL_TO, 1, {
 		allow_player_input.add(-1)
-		-> gfb_vars.x.add(selected_col.to_const(1->7))
+		-> gfb_vars.x.add(selected_col.to_const(1..7))
 		gfb_vars.y.add(5)
 
 		gfb_move_to_air!
@@ -406,8 +407,8 @@ on(player_turn.item.count(-1), {
 	highest_index = mut(0)
 
 	reset_hindex = {
-		-> highest_index.add(-highest_index.to_const(1->7))
-		-> highest_index.add(gfb_vars.x.to_const(1->7))
+		-> highest_index.add(-highest_index.to_const(1..7))
+		-> highest_index.add(gfb_vars.x.to_const(1..7))
 	}
 
 	reset_hscore = {

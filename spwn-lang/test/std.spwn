@@ -1,12 +1,12 @@
 
 constants = import "constants.spwn"
 
-* = constants.obj_props
-* = constants.comparisons
-* = constants.easing_types
+extract constants.obj_props
+extract constants.comparisons
+extract constants.easing_types
 
 wait = (time){
-    add obj{
+    <+ obj{
         OBJ_ID: 1268,
         SPAWN_DURATION: time,
         TARGET: {
@@ -16,7 +16,7 @@ wait = (time){
 }
 
 call_with_delay = (time, function) {
-    add obj{
+    <+ obj{
         OBJ_ID: 1268,
         SPAWN_DURATION: time,
         TARGET: function
@@ -25,7 +25,7 @@ call_with_delay = (time, function) {
 
 impl "group" {
     move: (self, x, y, duration: 0, easing: NONE, easing_rate: 2) {
-        add obj{
+        <+ obj{
             OBJ_ID: 901,
             TARGET: self,
             MOVE_X: x * 3,
@@ -38,14 +38,14 @@ impl "group" {
     },
 
     stop: (self){
-        add obj{
+        <+ obj{
             OBJ_ID: 1616,
             TARGET: self,
         }
     },
 
     alpha: (self, opacity: 1, duration: 0){
-        add obj {
+        <+ obj {
             OBJ_ID: 1007,
             TARGET: self,
             OPACITY: opacity,
@@ -55,7 +55,7 @@ impl "group" {
     },
 
     toggle_on: (self){
-        add obj{
+        <+ obj{
             OBJ_ID: 1049,
             TARGET: self,
             ACTIVATE_GROUP: true,
@@ -63,7 +63,7 @@ impl "group" {
     },
 
     toggle_off: (self){
-        add obj{
+        <+ obj{
             OBJ_ID: 1049,
             TARGET: self,
             ACTIVATE_GROUP: false,
@@ -71,7 +71,7 @@ impl "group" {
     },
 
     rotate: (self, center, degrees, duration: 0, easing: 0, easing_rate: 0, lock_object_rotation: 0){
-        add obj{
+        <+ obj{
             OBJ_ID: 1346,
             TARGET: self,
             CENTER: center,
@@ -85,7 +85,7 @@ impl "group" {
     },
 
     follow: (self, other, x_mod: 1, y_mod: 1, duration: 999){
-        add obj{
+        <+ obj{
             OBJ_ID: 1347,
             X_MOD: x_mod,
             Y_MOD: y_mod,
@@ -97,7 +97,7 @@ impl "group" {
     },
 
     follow_player_y: (self, speed: 1, delay: 0, offset: 0, max_speed: 0, duration: 999){
-        add obj{
+        <+ obj{
             OBJ_ID: 1814,
             SPEED : speed,
             DELAY : delay,
@@ -109,7 +109,7 @@ impl "group" {
     },
 
     move_to: (self, target, duration: 0, x_only: false, y_only: false, easing: NONE, easing_rate: 2) {
-        add obj{
+        <+ obj{
             OBJ_ID: 901,
             TARGET: self,
             USE_TARGET: true,
@@ -135,7 +135,7 @@ impl "group" {
     },
 
     pulse: (self, r, g, b, fade_in: 0, hold: 0, fade_out: 0, exclusive: false, hsv: false) { //add an option for hsv?
-        add obj{
+        <+ obj{
             OBJ_ID: 1006,
             TRIGGER_RED: r,
             TRIGGER_GREEN: g,
@@ -158,7 +158,7 @@ impl "group" {
 
 impl "color" {
     set: (self, r, g, b, duration: 0, opacity: 1, blending: false){
-        add obj{
+        <+ obj{
             OBJ_ID: 899,
             DURATION: duration,
             TRIGGER_RED: r,
@@ -172,7 +172,7 @@ impl "color" {
     },
 
     pulse: (self, r, g, b, fade_in: 0, hold: 0, fade_out: 0, exclusive: false, hsv: false) { //add an option for hsv?
-        add obj{
+        <+ obj{
             OBJ_ID: 1006,
             TRIGGER_RED: r,
             TRIGGER_GREEN: g,
@@ -199,7 +199,7 @@ impl "function" {
 impl "item" {
     
     add: (self, amount) {
-        add obj{
+        <+ obj{
             OBJ_ID: 1817,
             COUNT: amount,
             ITEM: self,
@@ -207,7 +207,7 @@ impl "item" {
     },
 
     if_is: (self, comparison, other, function) {
-        add obj{
+        <+ obj{
             OBJ_ID: 1811,
             TARGET: function,
             COUNT: other,
@@ -219,7 +219,7 @@ impl "item" {
 
     count: (self, number: 0) {
         return (function) {
-            add obj{
+            <+ obj{
                 OBJ_ID: 1611,
                 TARGET: function,
                 COUNT: number,
@@ -288,7 +288,7 @@ impl "mutable" {
                 })
             }
 
-            for i in 0->speed {
+            for i in 0..speed {
                 mini_add(3^i)
             }
                 
@@ -317,7 +317,7 @@ impl "mutable" {
                     })
                 }
 
-                for i in 0->speed {
+                for i in 0..speed {
                     mini_sub(2^i)
                 }
                 
@@ -361,7 +361,7 @@ impl "mutable" {
             }
             
 
-            for i in speed->0 {
+            for i in speed..0 {
                 mini_mult(2^i)
             }
             
@@ -393,7 +393,7 @@ impl "mutable" {
                     })
                 }
 
-                for i in 0->speed {
+                for i in 0..speed {
                     mini_div(i * 4 + 1)
                 }
 
@@ -434,7 +434,7 @@ impl "mutable" {
                                     })
                                 }
                     
-                                for i in 0->speed {
+                                for i in 0..speed {
                                     mini_cas(3^i)
                                 }
                                     
@@ -477,7 +477,7 @@ impl "mutable" {
             
 
             
-            for i in speed->0 {
+            for i in speed..0 {
                 mini_div(8^i)
                 wait(0.1)
             }
@@ -507,7 +507,7 @@ impl "mutable" {
                     })
                 })
             }
-            for i in 0->speed {
+            for i in 0..speed {
                 mini_comp(2^i)
             }
             self.item.if_is(EQUAL_TO, 0, {
@@ -546,7 +546,7 @@ impl "mutable" {
                     })
                 }
 
-                for i in 0->speed {
+                for i in 0..speed {
                     mini_add(3^i)
                 }
                 
@@ -577,7 +577,7 @@ impl "mutable" {
                     })
                 }
 
-                for i in 0->speed {
+                for i in 0..speed {
                     mini_add(2^i)
                 }
                 
@@ -699,7 +699,7 @@ impl "mutable" {
 general_functions = {
     
     shake: (strength: 1, interval: 0, duration: 0.5){
-        add obj {
+        <+ obj {
             OBJ_ID: 1520,
             STRENGTH: strength,
             INTERVAL: interval,
@@ -709,36 +709,36 @@ general_functions = {
     },
 
     disable_trail: (){
-        add obj{
+        <+ obj{
             OBJ_ID: 33,
         }
     },
 
     enable_trail: (){
-        add obj{
+        <+ obj{
             OBJ_ID: 32,
         }
     },
 
     show_player: (){
-        add obj{
+        <+ obj{
             OBJ_ID: 1613,
         }
     },
     
     hide_player: (){
-        add obj{
+        <+ obj{
             OBJ_ID: 1612,
         }
     },
 
     toggle_bg_effect: (on: false) {
         if on {
-            add obj{
+            <+ obj{
                 OBJ_ID: 1818,
             }
         } else {
-            add obj{
+            <+ obj{
                 OBJ_ID: 1819,
             }
         }
@@ -756,7 +756,7 @@ on = (event, function){
 events = {
     touch: (dual_side: false) {
         return (function){
-            add obj{
+            <+ obj{
                 OBJ_ID: 1595,
                 HOLD_MODE: true,
                 TOGGLE_MODE: 1,
@@ -769,7 +769,7 @@ events = {
 
     touch_end: (dual_side: false) {
         return (function){
-            add obj{
+            <+ obj{
                 OBJ_ID: 1595,
                 HOLD_MODE: true,
                 TOGGLE_MODE: 2,
@@ -782,7 +782,7 @@ events = {
 
     collision: (a, b) {
         return (function){
-            add obj{
+            <+ obj{
                 OBJ_ID: 1815,
                 BLOCK_A: a,
                 BLOCK_B: b,
@@ -795,7 +795,7 @@ events = {
 
     collision_exit: (a, b) {
         return (function){
-            add obj{
+            <+ obj{
                 OBJ_ID: 1815,
                 BLOCK_A: a,
                 BLOCK_B: b,
@@ -809,7 +809,7 @@ events = {
 
     death: (){
         return (function) {
-            add obj{
+            <+ obj{
                 OBJ_ID: 1812,
                 ACTIVATE_GROUP: true,
                 TARGET: function
@@ -832,12 +832,7 @@ exports = {
 
     mut: mut,
     call_with_delay: call_with_delay,
-    on: on,
-
-    
-
-    
-    
+    on: on, 
 }
 
 

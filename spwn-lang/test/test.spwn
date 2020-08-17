@@ -1,10 +1,4 @@
-(a){
-	b()
-}
 
-
-
-
-
-
+-> gfb_vars.x.add(look_x.to_const([-1, 1]))
+-> gfb_vars.y.add(look_y.to_const([-1, 1]))
 

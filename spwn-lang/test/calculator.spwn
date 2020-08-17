@@ -1,6 +1,6 @@
 
 
-* = import "std.spwn"
+extract import "std.spwn"
 
 main = mut(1i)
 
@@ -45,7 +45,7 @@ show_secondary = (operator) {
 	operators = [82g, 83g, 84g, 85g]
 	-> second_display.alpha(0.5, 0.5)
 
-	for i in 0->4 {
+	for i in 0..4 {
 		if i == operator {
 			operators[i].toggle_on()
 		} else {
@@ -94,8 +94,8 @@ for d in digits {
 
 set_display = {
 	referance = main.clone(10)
-	for digit in 5->0 {
-		for i in 0->10 {
+	for digit in 5..0 {
+		for i in 0..10 {
 			lower_end = i * (10^digit)
 			higher_end = (i + 1) * (10^digit)
 			referance.item.if_is(LARGER_THAN, lower_end - 1, {
@@ -123,7 +123,7 @@ on(touch(true), {
 	loading.item.if_is(EQUAL_TO, 0, {
 		selected_button.item.add(1)
 		selected_button.item.if_is(EQUAL_TO, 16, {selected_button.item.add(-16)})
-		-> select_box.move_to(button_anchors[selected_button.to_const(0->16)])
+		-> select_box.move_to(button_anchors[selected_button.to_const(0..16)])
 	})
 })
 
@@ -209,7 +209,7 @@ on(collision(1b, 2b), {
 			//number panel
 			start_loading!
 			main.multiply(10, speed = 15)
-			-> main.item.add(selected_button.to_const(1->10))
+			-> main.item.add(selected_button.to_const(1..10))
 			set_display!
 			end_loading!
 		})
@@ -226,7 +226,7 @@ on(collision(1b, 2b), {
 
 			})
 			
-			operator = selected_button.to_const(12->16) - 12
+			operator = selected_button.to_const(12..16) - 12
 			last_pressed_operator.item.add(operator)
 			show_secondary(operator)
 			current_operator.item.add(operator)

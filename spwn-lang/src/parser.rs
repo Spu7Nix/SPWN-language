@@ -10,7 +10,22 @@ use std::path::PathBuf;
 use logos::Lexer;
 use logos::Logos;
 
-use std::iter::Peekable;
+/*#[derive(Debug)]
+pub enum SyntaxError {
+    ExpectedErr {
+        expected: String,
+        found: String,
+        pos: (usize, usize),
+    },
+    UnexpectedErr {
+        found: String,
+        pos: (usize, usize),
+    },
+    SyntaxError {
+        message: String,
+        pos: (usize, usize),
+    },
+}*/
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
 pub enum Token {
@@ -111,13 +126,13 @@ pub enum Token {
     Period,
 
     #[token("..")]
-    Extract,
+    DotDot,
 
     //KEY WORDS
     #[token("return")]
     Return,
 
-    #[token("add")]
+    #[token("<+")]
     Add,
 
     #[token("impl")]
@@ -144,12 +159,15 @@ pub enum Token {
     #[token("import")]
     Import,
 
+    #[token("extract")]
+    Extract,
+
     //STATEMENT SEPARATOR
-    #[regex(r"[\n\r;]+")]
+    #[regex(r"[\n\r;]([ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*|[\n\r;])*")]
     StatementSeparator,
 
     #[error]
-    #[regex(r"[ \t\f]+", logos::skip)]
+    #[regex(r"[ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*", logos::skip)]
     Error,
 }
 
@@ -177,9 +195,16 @@ impl<'a> Tokens<'a> {
     }
     fn next(&mut self, dont_skip_ss: bool) -> Option<Token> {
         if self.index == 0 {
-            self.index = 0;
-            //self.stack.shift();
-            let mut next_element = self.iter.next();
+            let mut next_element = match self.iter.next() {
+                Some(e) => Some(e),
+                None => {
+                    if dont_skip_ss {
+                        Some(Token::StatementSeparator)
+                    } else {
+                        None
+                    }
+                }
+            };
 
             if let Some(e) = next_element {
                 let slice = self.iter.slice().to_string();
@@ -188,15 +213,10 @@ impl<'a> Tokens<'a> {
             }
 
             if !dont_skip_ss && next_element == Some(Token::StatementSeparator) {
-                next_element = self.iter.next();
-
-                if let Some(e) = next_element {
-                    let slice = self.iter.slice().to_string();
-                    let range = self.iter.span();
-                    self.stack.push((e, slice, range));
-                }
+                self.next(false)
+            } else {
+                next_element
             }
-            next_element
         } else {
             self.index -= 1;
             if !dont_skip_ss
@@ -215,59 +235,69 @@ impl<'a> Tokens<'a> {
             if self.stack[len - self.index - 1].0 == Token::StatementSeparator {
                 self.index += 1;
             }
-            Some(self.stack[len - self.index - 1].0)
+            if len - self.index >= 1 {
+                Some(self.stack[len - self.index - 1].0)
+            } else {
+                None
+            }
         } else {
             None
         }
     }
 
-    fn current(&self) -> Option<Token> {
+    /*fn current(&self) -> Option<Token> {
         let len = self.stack.len();
         if len == 0 {
             None
         } else {
             Some(self.stack[len - self.index - 1].0)
         }
-    }
+    }*/
 
     fn slice(&self) -> String {
         self.stack[self.stack.len() - self.index - 1].1.clone()
     }
 
-    fn span(&self) -> core::ops::Range<usize> {
+    /*fn span(&self) -> core::ops::Range<usize> {
         self.stack[self.stack.len() - self.index - 1].2.clone()
-    }
+    }*/
 }
 
 //type TokenList = Peekable<Lexer<Token>>;
 
-pub fn parse_spwn(path: &PathBuf) -> Vec<ast::Statement> {
+pub fn parse_spwn(path: &PathBuf) -> (Vec<ast::Statement>, ParseNotes) {
     let unparsed = fs::read_to_string(path).expect("Something went wrong reading the file");
     let tokens_iter = Token::lexer(&unparsed);
-
-    let token_list: Vec<Token> = tokens_iter.clone().collect();
-    println!("{:?}", token_list);
 
     let mut tokens = Tokens::new(tokens_iter);
     let mut statements = Vec::<ast::Statement>::new();
 
+    let mut notes = ParseNotes {
+        closed_groups: Vec::new(),
+        closed_colors: Vec::new(),
+        closed_blocks: Vec::new(),
+        closed_items: Vec::new(),
+    };
+
     loop {
-        tokens.next(false);
+        //tokens.next(false);
         match tokens.next(false) {
             Some(_) => {
                 tokens.previous();
-                tokens.previous();
-                statements.push(parse_statement(&mut tokens))
+
+                //tokens.previous();
+
+                statements.push(parse_statement(&mut tokens, &mut notes))
             }
             None => break,
         }
 
-        println!(
+        /*println!(
             "\n{:?}\ncurrent: {:?}, {:?}",
             statements.last(),
             tokens.current(),
             tokens.slice()
-        );
+        );*/
 
         match tokens.next(true) {
             Some(Token::StatementSeparator) => {}
@@ -280,22 +310,20 @@ pub fn parse_spwn(path: &PathBuf) -> Vec<ast::Statement> {
         }
     }
 
-    statements
+    (statements, notes)
 }
 
-fn parse_cmp_stmt(tokens: &mut Tokens) -> Vec<ast::Statement> {
+fn parse_cmp_stmt(tokens: &mut Tokens, notes: &mut ParseNotes) -> Vec<ast::Statement> {
     let mut statements = Vec::<ast::Statement>::new();
     loop {
-        tokens.next(false);
         match tokens.next(false) {
-            Some(Token::ClosingCurlyBracket) | None => break,
-            _ => {
+            Some(Token::ClosingCurlyBracket) => break,
+            Some(_) => {
                 tokens.previous();
-                tokens.previous();
-                println!("statement done");
-
-                statements.push(parse_statement(tokens))
+                statements.push(parse_statement(tokens, notes));
+                //println!("statement done");
             }
+            None => panic!("File ended while parsing function"),
         }
 
         match tokens.next(true) {
@@ -312,36 +340,71 @@ fn parse_cmp_stmt(tokens: &mut Tokens) -> Vec<ast::Statement> {
     statements
 }
 
-pub fn parse_statement(tokens: &mut Tokens) -> ast::Statement {
-    match tokens.next(false) {
+pub fn parse_statement(tokens: &mut Tokens, notes: &mut ParseNotes) -> ast::Statement {
+    let first = tokens.next(false);
+    // println!(
+    //     "First token in statement: {:?}: {:?}",
+    //     first,
+    //     tokens.slice()
+    // );
+    let mut arrow = false;
+    let body = match first {
         Some(Token::Arrow) => {
-            tokens.previous();
             //parse async statement
-            let mut rest_of_statement = parse_statement(tokens);
+            let mut rest_of_statement = parse_statement(tokens, notes);
             if rest_of_statement.arrow {
                 //double arrow (throw error)
+                panic!("Unexpected double arrow!")
             }
-            rest_of_statement.arrow = true;
-            rest_of_statement
+            arrow = true;
+            rest_of_statement.body
         }
 
         Some(Token::Return) => {
             //parse return statement
-            ast::Statement {
-                body: ast::StatementBody::Return(parse_expr(tokens)),
-                arrow: false,
-                line: (0, 0),
+
+            match tokens.next(true) {
+                Some(Token::StatementSeparator) | Some(Token::ClosingCurlyBracket) => {
+                    tokens.previous();
+                    ast::StatementBody::Return(None)
+                }
+
+                _ => {
+                    tokens.previous();
+                    ast::StatementBody::Return(Some(parse_expr(tokens, notes)))
+                }
             }
         }
 
         Some(Token::If) => {
             //parse if statement
 
-            let condition = parse_expr(tokens);
-            let if_body = parse_cmp_stmt(tokens);
+            // println!("if statement");
+
+            let condition = parse_expr(tokens, notes);
+            match tokens.next(false) {
+                Some(Token::OpenCurlyBracket) => (),
+                a => panic!("Expected '{{', found {:?}: {:?}", a, tokens.slice()),
+            }
+            let if_body = parse_cmp_stmt(tokens, notes);
             let else_body = match tokens.next(false) {
-                Some(Token::Else) => Some(parse_cmp_stmt(tokens)),
-                _ => {
+                Some(Token::Else) => match tokens.next(false) {
+                    Some(Token::OpenCurlyBracket) => {
+                        // println!("else");
+                        Some(parse_cmp_stmt(tokens, notes))
+                    }
+                    Some(Token::If) => {
+                        tokens.previous();
+                        // println!("else if");
+
+                        Some(vec![parse_statement(tokens, notes)])
+                    }
+
+                    _ => panic!("Expected else body"),
+                },
+
+                a => {
+                    // println!("token after if stmt: {:?}", a);
                     tokens.previous();
                     None
                 }
@@ -353,11 +416,7 @@ pub fn parse_statement(tokens: &mut Tokens) -> ast::Statement {
                 else_body,
             };
 
-            ast::Statement {
-                body: ast::StatementBody::If(if_statement),
-                arrow: false,
-                line: (0, 0),
-            }
+            ast::StatementBody::If(if_statement)
         }
 
         Some(Token::For) => {
@@ -374,51 +433,39 @@ pub fn parse_statement(tokens: &mut Tokens) -> ast::Statement {
                 _ => panic!("Expected keyword 'in'"),
             };
 
-            let array = parse_expr(tokens);
-            let body = parse_cmp_stmt(tokens);
+            let array = parse_expr(tokens, notes);
+            match tokens.next(false) {
+                Some(Token::OpenCurlyBracket) => {}
+                _ => panic!("Expected open curly bracket: '{'"),
+            };
+            let body = parse_cmp_stmt(tokens, notes);
 
-            ast::Statement {
-                body: ast::StatementBody::For(ast::For {
-                    symbol,
-                    array,
-                    body,
-                }),
-                arrow: false,
-                line: (0, 0),
-            }
+            ast::StatementBody::For(ast::For {
+                symbol,
+                array,
+                body,
+            })
         }
 
-        Some(Token::Add) => {
-            //parse add object statement
-            ast::Statement {
-                body: ast::StatementBody::Add(parse_expr(tokens)),
-                arrow: false,
-                line: (0, 0),
-            }
-        }
+        Some(Token::Add) => ast::StatementBody::Add(parse_expr(tokens, notes)),
 
-        Some(Token::ErrorStatement) => {
-            //parse error statement
-            ast::Statement {
-                body: ast::StatementBody::Error(ast::Error {
-                    message: parse_expr(tokens),
-                }),
-                arrow: false,
-                line: (0, 0),
-            }
-        }
+        Some(Token::ErrorStatement) => ast::StatementBody::Error(ast::Error {
+            message: parse_expr(tokens, notes),
+        }),
 
         Some(Token::Implement) => {
             //parse impl statement
-            ast::Statement {
-                body: ast::StatementBody::Impl(ast::Implementation {
-                    symbol: parse_variable(tokens),
-                    members: parse_dict(tokens),
+            let symbol = parse_variable(tokens, notes);
+            match tokens.next(false) {
+                Some(Token::OpenCurlyBracket) => ast::StatementBody::Impl(ast::Implementation {
+                    symbol,
+                    members: parse_dict(tokens, notes),
                 }),
-                arrow: false,
-                line: (0, 0),
+                _ => panic!("Expected open curly bracket"),
             }
         }
+
+        Some(Token::Extract) => ast::StatementBody::Extract(parse_expr(tokens, notes)),
 
         Some(_) => {
             //either expression, call or definition, FIGURE OUT
@@ -428,43 +475,31 @@ pub fn parse_statement(tokens: &mut Tokens) -> ast::Statement {
                 //Def
                 tokens.previous();
 
-                println!("found def, current val: {:?}", tokens.current());
+                // println!("found def, current val: {:?}", tokens.current());
 
                 let symbol = tokens.slice();
 
                 tokens.next(false);
 
-                let value = parse_expr(tokens);
+                let value = parse_expr(tokens, notes);
                 //tokens.next(false);
-                ast::Statement {
-                    body: ast::StatementBody::Definition(ast::Definition { symbol, value }),
-                    arrow: false,
-                    line: (0, 0),
-                }
+                ast::StatementBody::Definition(ast::Definition { symbol, value })
             } else {
                 //expression or call
                 tokens.previous();
                 tokens.previous();
-                let expr = parse_expr(tokens);
+                let expr = parse_expr(tokens, notes);
                 if tokens.next(false) == Some(Token::Exclamation) {
                     //call
-                    println!("found call");
-                    ast::Statement {
-                        body: ast::StatementBody::Call(ast::Call {
-                            function: expr.values[0].clone(),
-                        }),
-                        arrow: false,
-                        line: (0, 0),
-                    }
+                    // println!("found call");
+                    ast::StatementBody::Call(ast::Call {
+                        function: expr.values[0].clone(),
+                    })
                 } else {
                     //expression statement
-                    println!("found expr");
+                    // println!("found expr");
                     tokens.previous();
-                    ast::Statement {
-                        body: ast::StatementBody::Expr(expr),
-                        arrow: false,
-                        line: (0, 0),
-                    }
+                    ast::StatementBody::Expr(expr)
                 }
             }
         }
@@ -473,14 +508,20 @@ pub fn parse_statement(tokens: &mut Tokens) -> ast::Statement {
             //end of input
             unimplemented!()
         }
+    };
+
+    ast::Statement {
+        body,
+        arrow,
+        line: (0, 0),
     }
 }
 
-fn parse_expr(tokens: &mut Tokens) -> ast::Expression {
+fn parse_expr(tokens: &mut Tokens, notes: &mut ParseNotes) -> ast::Expression {
     let mut values = Vec::<ast::Variable>::new();
     let mut operators = Vec::<ast::Operator>::new();
 
-    values.push(parse_variable(tokens));
+    values.push(parse_variable(tokens, notes));
     loop {
         let op = match tokens.next(false) {
             Some(t) => match parse_operator(&t) {
@@ -491,7 +532,7 @@ fn parse_expr(tokens: &mut Tokens) -> ast::Expression {
         };
 
         operators.push(op);
-        values.push(parse_variable(tokens));
+        values.push(parse_variable(tokens, notes));
     }
     tokens.previous();
 
@@ -500,7 +541,7 @@ fn parse_expr(tokens: &mut Tokens) -> ast::Expression {
 
 fn parse_operator(token: &Token) -> Option<ast::Operator> {
     match token {
-        Token::Arrow => Some(ast::Operator::Arrow),
+        Token::DotDot => Some(ast::Operator::Range),
         Token::Or => Some(ast::Operator::Or),
         Token::And => Some(ast::Operator::And),
         Token::Equal => Some(ast::Operator::Equal),
@@ -518,24 +559,98 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
     }
 }
 
-fn parse_dict(tokens: &mut Tokens) -> Vec<ast::DictDef> {
-    Vec::new()
+fn parse_dict(tokens: &mut Tokens, notes: &mut ParseNotes) -> Vec<ast::DictDef> {
+    let mut defs = Vec::<ast::DictDef>::new();
+
+    loop {
+        match tokens.next(false) {
+            Some(Token::Symbol) => {
+                let symbol = tokens.slice();
+
+                if tokens.next(false) == Some(Token::Colon) {
+                    let expr = parse_expr(tokens, notes);
+                    defs.push(ast::DictDef::Def((symbol, expr)));
+                } else {
+                    panic!("Expected colon")
+                }
+            }
+
+            Some(Token::DotDot) => {
+                let expr = parse_expr(tokens, notes);
+                defs.push(ast::DictDef::Extract(expr))
+            }
+
+            Some(Token::ClosingCurlyBracket) => break,
+
+            a => panic!(
+                "Expected either member definition, '..' or '}}', found {:?}: {:?}",
+                a,
+                tokens.slice()
+            ),
+        };
+        let next = tokens.next(false);
+
+        if next == Some(Token::ClosingCurlyBracket) {
+            break;
+        }
+
+        if next != Some(Token::Comma) {
+            panic!("Expected comma, found {:?}: {:?}", next, tokens.slice())
+        }
+    }
+    defs
 }
 
-fn parse_args(tokens: &mut Tokens) -> Vec<ast::Argument> {
+fn parse_object(
+    tokens: &mut Tokens,
+    notes: &mut ParseNotes,
+) -> Vec<(ast::Expression, ast::Expression)> {
+    let mut defs = Vec::<(ast::Expression, ast::Expression)>::new();
+
+    if tokens.next(false) != Some(Token::OpenCurlyBracket) {
+        panic!("Expected open curly bracket")
+    }
+
+    loop {
+        if tokens.next(false) == Some(Token::ClosingCurlyBracket) {
+            break;
+        } else {
+            tokens.previous();
+        }
+        let key = parse_expr(tokens, notes);
+        if tokens.next(false) != Some(Token::Colon) {
+            panic!("Expected colon")
+        }
+        let val = parse_expr(tokens, notes);
+
+        defs.push((key, val));
+
+        let next = tokens.next(false);
+
+        if next == Some(Token::ClosingCurlyBracket) {
+            break;
+        }
+
+        if next != Some(Token::Comma) {
+            panic!("Expected comma, found {:?}: {:?}", next, tokens.slice())
+        }
+    }
+    defs
+}
+
+fn parse_args(tokens: &mut Tokens, notes: &mut ParseNotes) -> Vec<ast::Argument> {
     let mut args = Vec::<ast::Argument>::new();
     loop {
         if tokens.next(false) == Some(Token::ClosingBracket) {
-            tokens.next(false);
             break;
         };
         args.push(match tokens.next(false) {
             Some(Token::Assign) => {
-                println!("assign ");
+                // println!("assign ");
                 tokens.previous();
                 let symbol = Some(tokens.slice());
                 tokens.next(false);
-                let value = parse_expr(tokens);
+                let value = parse_expr(tokens, notes);
                 //tokens.previous();
 
                 ast::Argument { symbol, value }
@@ -544,8 +659,8 @@ fn parse_args(tokens: &mut Tokens) -> Vec<ast::Argument> {
             Some(_) => {
                 tokens.previous();
                 tokens.previous();
-                println!("arg with no val");
-                let value = parse_expr(tokens);
+                // println!("arg with no val");
+                let value = parse_expr(tokens, notes);
 
                 ast::Argument {
                     symbol: None,
@@ -556,8 +671,10 @@ fn parse_args(tokens: &mut Tokens) -> Vec<ast::Argument> {
         });
 
         match tokens.next(false) {
-            Some(Token::Comma) => println!("comma"),
-            Some(Token::ClosingBracket) => break,
+            Some(Token::Comma) => (),
+            Some(Token::ClosingBracket) => {
+                break;
+            }
 
             Some(a) => panic!(
                 "Expected either comma or closing bracket, found {:?}: {}",
@@ -568,25 +685,26 @@ fn parse_args(tokens: &mut Tokens) -> Vec<ast::Argument> {
             None => panic!("file ended while parsing arguments"),
         }
     }
-    tokens.previous();
+    //tokens.previous();
 
     args
 }
 
-fn parse_arg_def(tokens: &mut Tokens) -> Vec<(String, Option<ast::Expression>)> {
+fn parse_arg_def(
+    tokens: &mut Tokens,
+    notes: &mut ParseNotes,
+) -> Vec<(String, Option<ast::Expression>)> {
     let mut args = Vec::<(String, Option<ast::Expression>)>::new();
     loop {
         if tokens.next(false) == Some(Token::ClosingBracket) {
-            println!("a ");
             break;
         };
         args.push(match tokens.next(false) {
             Some(Token::Colon) => {
-                println!("assign ");
                 tokens.previous();
                 let symbol = tokens.slice();
                 tokens.next(false);
-                let value = Some(parse_expr(tokens));
+                let value = Some(parse_expr(tokens, notes));
                 //tokens.previous();
 
                 (symbol, value)
@@ -595,14 +713,13 @@ fn parse_arg_def(tokens: &mut Tokens) -> Vec<(String, Option<ast::Expression>)> 
             Some(_) => {
                 tokens.previous();
 
-                println!("arg with no val");
                 (tokens.slice(), None)
             }
             None => panic!("file ended while parsing arguments"),
         });
 
         match tokens.next(false) {
-            Some(Token::Comma) => println!("comma"),
+            Some(Token::Comma) => (),
             Some(Token::ClosingBracket) => break,
 
             Some(a) => panic!(
@@ -619,9 +736,9 @@ fn parse_arg_def(tokens: &mut Tokens) -> Vec<(String, Option<ast::Expression>)> 
     args
 }
 
-fn parse_variable(tokens: &mut Tokens) -> ast::Variable {
+fn parse_variable(tokens: &mut Tokens, notes: &mut ParseNotes) -> ast::Variable {
     let mut first_token = tokens.next(false);
-    println!("first token in var: {:?}", first_token);
+    //println!("first token in var: {:?}, {}", first_token, tokens.slice());
     let operator = match first_token {
         Some(Token::Minus) => {
             first_token = tokens.next(false);
@@ -653,6 +770,15 @@ fn parse_variable(tokens: &mut Tokens) -> ast::Variable {
                 "?" => (true, 0),
                 _ => (false, text.parse().expect("invalid number")),
             };
+
+            if !unspecified {
+                match class_name {
+                    ast::IDClass::Group => (*notes).closed_groups.push(number),
+                    ast::IDClass::Color => (*notes).closed_colors.push(number),
+                    ast::IDClass::Item => (*notes).closed_items.push(number),
+                    ast::IDClass::Block => (*notes).closed_blocks.push(number),
+                }
+            }
             ast::ValueLiteral::ID(ast::ID {
                 class_name,
                 unspecified,
@@ -668,7 +794,7 @@ fn parse_variable(tokens: &mut Tokens) -> ast::Variable {
             let mut arr = Vec::new();
 
             loop {
-                arr.push(parse_expr(tokens));
+                arr.push(parse_expr(tokens, notes));
                 match tokens.next(false) {
                     Some(Token::Comma) => {
                         //accounting for trailing comma
@@ -696,9 +822,9 @@ fn parse_variable(tokens: &mut Tokens) -> ast::Variable {
 
         Some(Token::OpenBracket) => {
             //Either enclosed expression or macro definition
-            let parse_closed_expr = |tokens: &mut Tokens| {
+            let parse_closed_expr = |tokens: &mut Tokens, notes: &mut ParseNotes| {
                 //expr
-                let expr = ast::ValueLiteral::Expression(parse_expr(tokens));
+                let expr = ast::ValueLiteral::Expression(parse_expr(tokens, notes));
                 //consume closing bracket
                 match tokens.next(false) {
                     Some(Token::ClosingBracket) => expr,
@@ -706,13 +832,11 @@ fn parse_variable(tokens: &mut Tokens) -> ast::Variable {
                 }
             };
 
-            let parse_macro_def = |tokens: &mut Tokens| {
-                let args = parse_arg_def(tokens);
-
-                println!("{:?}", args);
+            let parse_macro_def = |tokens: &mut Tokens, notes: &mut ParseNotes| {
+                let args = parse_arg_def(tokens, notes);
 
                 let body = match tokens.next(false) {
-                    Some(Token::OpenCurlyBracket) => parse_cmp_stmt(tokens),
+                    Some(Token::OpenCurlyBracket) => parse_cmp_stmt(tokens, notes),
                     a => panic!("Expected opening curly bracket, found {:?}", a),
                 };
 
@@ -727,16 +851,15 @@ fn parse_variable(tokens: &mut Tokens) -> ast::Variable {
                     tokens.previous();
                     //tokens.previous();
 
-                    println!("nr1");
-                    parse_macro_def(tokens)
+                    parse_macro_def(tokens, notes)
                 }
 
                 Some(Token::Symbol) => match tokens.next(false) {
                     Some(Token::Comma) | Some(Token::Colon) => {
                         tokens.previous();
                         tokens.previous();
-                        println!("nr2");
-                        parse_macro_def(tokens)
+
+                        parse_macro_def(tokens, notes)
                     }
 
                     Some(Token::ClosingBracket) => match tokens.next(false) {
@@ -744,54 +867,58 @@ fn parse_variable(tokens: &mut Tokens) -> ast::Variable {
                             tokens.previous();
                             tokens.previous();
                             tokens.previous();
-                            println!("nr3");
-                            parse_macro_def(tokens)
+
+                            parse_macro_def(tokens, notes)
                         }
-                        a => {
+                        _ => {
                             tokens.previous();
                             tokens.previous();
                             tokens.previous();
-                            println!("expr reason: {:?}", a);
-                            parse_closed_expr(tokens)
+
+                            parse_closed_expr(tokens, notes)
                         }
                     },
 
-                    a => {
+                    _ => {
                         tokens.previous();
-                        println!("expr reason: {:?}", a);
-                        parse_closed_expr(tokens)
+                        tokens.previous();
+
+                        parse_closed_expr(tokens, notes)
                     }
                 },
-                a => {
+                _ => {
                     tokens.previous();
-                    println!("expr reason: {:?}", a);
-                    parse_closed_expr(tokens)
+
+                    parse_closed_expr(tokens, notes)
                 }
             }
         }
         Some(Token::OpenCurlyBracket) => {
             //either dictionary or function
             match tokens.next(false) {
-                Some(Token::Extract) => {
+                Some(Token::DotDot) => {
                     tokens.previous();
-                    ast::ValueLiteral::Dictionary(parse_dict(tokens))
+                    ast::ValueLiteral::Dictionary(parse_dict(tokens, notes))
                 }
                 _ => match tokens.next(false) {
                     Some(Token::Colon) => {
                         tokens.previous();
                         tokens.previous();
-                        ast::ValueLiteral::Dictionary(parse_dict(tokens))
+                        ast::ValueLiteral::Dictionary(parse_dict(tokens, notes))
                     }
                     _ => {
                         tokens.previous();
                         tokens.previous();
+
                         ast::ValueLiteral::CmpStmt(ast::CompoundStatement {
-                            statements: parse_cmp_stmt(tokens),
+                            statements: parse_cmp_stmt(tokens, notes),
                         })
                     }
                 },
             }
         }
+
+        Some(Token::Object) => ast::ValueLiteral::Obj(parse_object(tokens, notes)),
 
         _ => panic!("Not a value"),
     };
@@ -801,16 +928,16 @@ fn parse_variable(tokens: &mut Tokens) -> ast::Variable {
     loop {
         match tokens.next(true) {
             Some(Token::OpenSquareBracket) => {
-                let index = parse_expr(tokens);
+                let index = parse_expr(tokens, notes);
                 match tokens.next(false) {
                     Some(Token::ClosingSquareBracket) => path.push(ast::Path::Index(index)),
                     _ => panic!("Expected closing square bracket after index"),
                 }
             }
-            Some(Token::OpenBracket) => path.push(ast::Path::Call(parse_args(tokens))),
+            Some(Token::OpenBracket) => path.push(ast::Path::Call(parse_args(tokens, notes))),
             Some(Token::Period) => match tokens.next(false) {
                 Some(Token::Symbol) => path.push(ast::Path::Member(tokens.slice())),
-                _ => panic!("Expected member name"),
+                a => panic!("Expected member name, found {:?}", a),
             },
 
             _ => break,
@@ -824,387 +951,3 @@ fn parse_variable(tokens: &mut Tokens) -> ast::Variable {
         path,
     }
 }
-
-//OLD PEST PARSER
-/*#[derive(Parser)]
-#[grammar = "spwn.pest"]
-pub struct SPWNParser;
-
-pub struct ParseNotes {
-    pub closed_groups: Vec<u16>,
-    pub closed_colors: Vec<u16>,
-    pub closed_blocks: Vec<u16>,
-    pub closed_items: Vec<u16>,
-}
-
-pub fn parse_spwn(path: &PathBuf) -> (Vec<ast::Statement>, ParseNotes) {
-    let unparsed = fs::read_to_string(path).expect("Something went wrong reading the file");
-
-    let parse_tree = SPWNParser::parse(Rule::spwn, &unparsed)
-        .expect("unsuccessful parse")
-        .next()
-        .unwrap(); // get and unwrap the `spwn` rule; never fails
-
-    println!("got parse tree...");
-    let mut notes = ParseNotes {
-        closed_groups: Vec::new(),
-        closed_colors: Vec::new(),
-        closed_blocks: Vec::new(),
-        closed_items: Vec::new(),
-    };
-
-    let parsed = parse_statements(&mut parse_tree.into_inner(), &mut notes);
-    (parsed, notes)
-}
-
-pub fn parse_statements(
-    statements: &mut pest::iterators::Pairs<Rule>,
-    notes: &mut ParseNotes,
-) -> Vec<ast::Statement> {
-    let mut stmts: Vec<ast::Statement> = vec![];
-
-    for unpacked in statements {
-        let mut inner = unpacked.clone().into_inner();
-        let mut async_arrow = false;
-        let first_elem = match inner.next() {
-            Some(val) => val,
-            None => break, //EOF
-        };
-        let statement = match first_elem.as_rule() {
-            Rule::async_arrow => {
-                async_arrow = true;
-                inner.next().unwrap()
-            }
-            _ => first_elem,
-        };
-        stmts.push(ast::Statement {
-            body: match statement.as_rule() {
-                Rule::def => {
-                    let mut inner = statement.into_inner();
-                    let first = inner.next().unwrap();
-                    match first.as_rule() {
-                        Rule::expr => ast::StatementBody::Definition(ast::Definition {
-                            symbol: "*".to_string(),
-                            value: parse_expr(first, notes),
-                        }),
-                        Rule::symbol => {
-                            let value = parse_expr(inner.next().unwrap(), notes);
-                            ast::StatementBody::Definition(ast::Definition {
-                                symbol: first.as_span().as_str().to_string(),
-                                value,
-                            })
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-                Rule::call => ast::StatementBody::Call(ast::Call {
-                    function: parse_variable(statement.into_inner().next().unwrap(), notes),
-                }),
-
-                Rule::if_stmt => {
-                    let mut inner = statement.into_inner();
-                    ast::StatementBody::If(ast::If {
-                        condition: parse_expr(inner.next().unwrap(), notes),
-                        if_body: parse_statements(&mut inner.next().unwrap().into_inner(), notes),
-                        else_body: match inner.next() {
-                            Some(body) => match body.as_rule() {
-                                Rule::cmp_stmt => {
-                                    Some(parse_statements(&mut body.into_inner(), notes))
-                                }
-                                Rule::if_else => {
-                                    let ret = Some(parse_statements(&mut body.into_inner(), notes));
-
-                                    ret
-                                }
-                                _ => unreachable!(),
-                            },
-                            None => None,
-                        },
-                    })
-                }
-                Rule::add_obj => ast::StatementBody::Add(parse_expr(
-                    statement.into_inner().next().unwrap(),
-                    notes,
-                )),
-
-                Rule::for_loop => {
-                    let mut inner = statement.into_inner();
-                    ast::StatementBody::For(ast::For {
-                        symbol: inner.next().unwrap().as_span().as_str().to_string(),
-                        array: parse_expr(inner.next().unwrap(), notes),
-                        body: parse_statements(&mut inner.next().unwrap().into_inner(), notes),
-                    })
-                }
-
-                Rule::implement => {
-                    let mut inner = statement.into_inner();
-                    ast::StatementBody::Impl(ast::Implementation {
-                        symbol: parse_variable(inner.next().unwrap(), notes),
-                        members: parse_dict(inner.next().unwrap(), notes),
-                    })
-                }
-
-                Rule::error => ast::StatementBody::Error(ast::Error {
-                    message: parse_expr(statement.into_inner().next().unwrap(), notes),
-                }),
-
-                Rule::expr => ast::StatementBody::Expr(parse_expr(statement, notes)),
-                Rule::retrn => ast::StatementBody::Return(match statement.into_inner().next() {
-                    Some(expr) => parse_expr(expr, notes),
-
-                    None => ast::Expression {
-                        // null expression
-                        values: vec![ast::Variable {
-                            operator: None,
-                            value: ast::ValueLiteral::Null,
-                            path: Vec::new(),
-                        }],
-                        operators: Vec::new(),
-                    },
-                }),
-                Rule::EOI => ast::StatementBody::EOI,
-                _ => {
-                    println!(
-                        "{:?} is not added to parse_statements yet",
-                        statement.as_rule()
-                    );
-                    ast::StatementBody::EOI
-                }
-            },
-
-            arrow: async_arrow,
-            line: unpacked.as_span().start_pos().line_col(),
-        })
-    }
-    stmts
-}
-
-pub fn parse_path(pair: Pair<Rule>, notes: &mut ParseNotes) -> ast::Path {
-    /*let parse_args = |arg: Pair<Rule>| {
-        let mut argument = arg.into_inner();
-        let first = argument.next().unwrap();
-        match first.as_rule() {
-            Rule::symbol => ast::Argument {
-                symbol: Some(first.as_span().as_str().to_string()),
-                value: parse_expr(argument.next().unwrap(), notes),
-            },
-            Rule::expr => ast::Argument {
-                symbol: None,
-                value: parse_expr(first, notes),
-            },
-            _ => unreachable!(),
-        }
-    };*/
-    let mut parse_args = |arg: Pair<Rule>| {
-        let mut argument = arg.into_inner();
-        let first = argument.next().unwrap();
-        match first.as_rule() {
-            Rule::symbol => ast::Argument {
-                symbol: Some(first.as_span().as_str().to_string()),
-                value: parse_expr(argument.next().unwrap(), notes),
-            },
-            Rule::expr => ast::Argument {
-                symbol: None,
-                value: parse_expr(first, notes),
-            },
-            _ => unreachable!(),
-        }
-    };
-    match pair.as_rule() {
-        Rule::symbol => ast::Path::Member(pair.as_span().as_str().to_string()),
-
-        Rule::index => ast::Path::Index(parse_expr(pair.into_inner().next().unwrap(), notes)),
-
-        Rule::arguments => ast::Path::Call(pair.into_inner().map(|x| parse_args(x)).collect()),
-
-        _ => unreachable!(),
-    }
-}
-
-pub fn parse_variable(pair: Pair<Rule>, notes: &mut ParseNotes) -> ast::Variable {
-    let mut call_list = pair.into_inner();
-    let first = call_list.next().unwrap();
-
-    let value: ast::ValueLiteral;
-
-    let operator = match first.as_rule() {
-        Rule::unary_operator => {
-            value = parse_value(call_list.next().unwrap(), notes);
-            Some(first.as_span().as_str().to_string())
-        }
-        _ => {
-            value = parse_value(first, notes);
-            None
-        }
-    };
-    let path: Vec<ast::Path> = call_list.map(|x| parse_path(x, notes)).collect();
-    fn parse_value(pair: Pair<Rule>, notes: &mut ParseNotes) -> ast::ValueLiteral {
-        match pair.as_rule() {
-            Rule::id => {
-                let number: u16;
-                let mut scope = pair.into_inner();
-                let mut unspecified = false;
-                let first_value = scope.next().unwrap();
-                let class_name: String;
-
-                if first_value.as_rule() == Rule::number {
-                    number = first_value.as_span().as_str().parse().unwrap();
-                    class_name = scope.next().unwrap().as_span().as_str().to_string();
-
-                    match class_name.as_ref() {
-                        "g" => (*notes).closed_groups.push(number),
-                        "c" => (*notes).closed_colors.push(number),
-                        "b" => (*notes).closed_blocks.push(number),
-                        "i" => (*notes).closed_items.push(number),
-                        _ => unreachable!(),
-                    }
-                } else {
-                    unspecified = true;
-                    number = 0;
-                    class_name = first_value.as_span().as_str().to_string();
-                }
-
-                ast::ValueLiteral::ID(ast::ID {
-                    number,
-                    unspecified,
-                    class_name,
-                })
-            }
-
-            Rule::macro_def => {
-                let mut inner = pair.into_inner();
-                ast::ValueLiteral::Macro(ast::Macro {
-                    args: inner
-                        .next()
-                        .unwrap()
-                        .into_inner()
-                        .map(|arg| {
-                            let mut full = arg.into_inner();
-                            let name = full.next().unwrap().as_span().as_str().to_string();
-                            let default = match full.next() {
-                                Some(value) => Some(parse_expr(value, notes)),
-                                None => None,
-                            };
-
-                            (name, default)
-                        })
-                        .collect(),
-                    body: ast::CompoundStatement {
-                        statements: parse_statements(
-                            &mut inner.next().unwrap().into_inner(),
-                            notes,
-                        ),
-                    },
-                })
-            }
-
-            Rule::number => {
-                ast::ValueLiteral::Number(pair.as_span().as_str().parse().expect("invalid number"))
-            }
-
-            Rule::bool => ast::ValueLiteral::Bool(pair.as_span().as_str() == "true"),
-
-            Rule::dictionary => ast::ValueLiteral::Dictionary(parse_dict(pair, notes)),
-
-            Rule::cmp_stmt => ast::ValueLiteral::CmpStmt(ast::CompoundStatement {
-                statements: parse_statements(&mut pair.into_inner(), notes),
-            }),
-
-            Rule::obj => ast::ValueLiteral::Obj(
-                pair.into_inner()
-                    .map(|prop| {
-                        let mut inner = prop.into_inner();
-                        (
-                            parse_expr(inner.next().unwrap(), notes),
-                            parse_expr(inner.next().unwrap(), notes),
-                        )
-                    })
-                    .collect(),
-            ),
-
-            Rule::value_literal => parse_value(pair.into_inner().next().unwrap(), notes),
-            Rule::variable => parse_value(pair.into_inner().next().unwrap(), notes),
-            Rule::expr => ast::ValueLiteral::Expression(parse_expr(pair, notes)),
-            Rule::symbol => ast::ValueLiteral::Symbol(pair.as_span().as_str().to_string()),
-            Rule::string => {
-                ast::ValueLiteral::Str(ast::str_content(pair.as_span().as_str().to_string()))
-            }
-            Rule::array => {
-                ast::ValueLiteral::Array(pair.into_inner().map(|x| parse_expr(x, notes)).collect())
-            }
-            Rule::import => ast::ValueLiteral::Import(PathBuf::from(ast::str_content(
-                pair.into_inner()
-                    .next()
-                    .unwrap()
-                    .as_span()
-                    .as_str()
-                    .to_string(),
-            ))),
-            _ => {
-                println!("{:?} is not added to parse_values yet", pair.as_rule());
-                ast::ValueLiteral::Number(0.0)
-            }
-        }
-    }
-
-    ast::Variable {
-        value,
-        path,
-        operator,
-    }
-}
-
-fn parse_dict(pair: Pair<Rule>, notes: &mut ParseNotes) -> Vec<ast::DictDef> {
-    let mut out: Vec<ast::DictDef> = Vec::new();
-    for def in pair.into_inner() {
-        match def.as_rule() {
-            Rule::dict_def => {
-                let mut inner = def.into_inner();
-                out.push(ast::DictDef::Def((
-                    inner.next().unwrap().as_span().as_str().to_string(), //symbol
-                    parse_expr(inner.next().unwrap(), notes),             //expression
-                )));
-            }
-
-            Rule::dict_extract => out.push(ast::DictDef::Extract(parse_expr(
-                def.into_inner().next().unwrap(),
-                notes,
-            ))),
-
-            _ => unreachable!(),
-        };
-    }
-    out
-}
-
-fn parse_expr(pair: Pair<Rule>, notes: &mut ParseNotes) -> ast::Expression {
-    let mut values: Vec<ast::Variable> = Vec::new();
-    let mut operators: Vec<String> = Vec::new();
-
-    for item in pair.into_inner() {
-        match item.as_rule() {
-            Rule::operator => operators.push(item.as_span().as_str().to_string()),
-            _ => values.push(parse_variable(item, notes)),
-        }
-    }
-
-    ast::Expression { operators, values }
-}
-
-/*#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn decrypt() {
-        //not working on mac :(
-        let file_content = fs::read_to_string(
-            "/Users/August/Library/Application Support/GeometryDash/CCLocalLevels.dat",
-        )
-        .expect("Something went wrong reading the file");
-        println!(
-            "{}",
-            levelstring::get_level_string(file_content.to_string())
-        );
-    }
-}*/
-*/

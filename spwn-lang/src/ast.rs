@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-//use crate::compiler_types::Value;
+use crate::compiler_types::Value;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
@@ -23,11 +23,12 @@ pub enum StatementBody {
     Call(Call),
     Expr(Expression),
     Add(Expression),
-    Return(Expression),
+    Return(Option<Expression>),
     Impl(Implementation),
     If(If),
     For(For),
     Error(Error),
+    Extract(Expression),
     EOI,
 }
 #[derive(Clone, PartialEq, Debug)]
@@ -44,7 +45,7 @@ pub enum ValueLiteral {
     Array(Vec<Expression>),
     Obj(Vec<(Expression, Expression)>),
     Macro(Macro),
-    //Resolved(Value),
+    Resolved(Value),
     Null,
 }
 
@@ -54,7 +55,7 @@ pub enum Operator {
     And,
     Equal,
     NotEqual,
-    Arrow,
+    Range,
     MoreOrEqual,
     LessOrEqual,
     More,

@@ -1,8 +1,8 @@
 
 
-* = import "std.spwn"
+extract import "std.spwn"
 
-* = obj_props
+extract obj_props
 
 main = mut(1i)
 
@@ -22,7 +22,7 @@ set_to_random = {
 		[1155,462,5082,25410,84,378,2101,18150,198,1225,2475,210,19965,12705,132,232925,4125,1650,5500,13475,135,],
 	]
 	
-	num = numbers[difficulty.to_const(0->4)][random_num.to_const(0->21)]
+	num = numbers[difficulty.to_const(0..4)][random_num.to_const(0..21)]
 	main.item.add(num)
 }
 
@@ -106,8 +106,8 @@ for d in digits {
 
 set_display = {
 	referance = main.clone(10)
-	for digit in 5->0 {
-		for i in 0->10 {
+	for digit in 5..0 {
+		for i in 0..10 {
 			lower_end = i * (10^digit)
 			higher_end = (i + 1) * (10^digit)
 			referance.item.if_is(LARGER_THAN, lower_end - 1, {
@@ -134,7 +134,7 @@ select_box = 68g
 on(touch(true), {
 	selected_number.item.add(1)
 	selected_number.item.if_is(EQUAL_TO, 6, {selected_number.item.add(-6)})
-	-> select_box.move_to(button_anchors[selected_number.to_const(0->6)], 0)
+	-> select_box.move_to(button_anchors[selected_number.to_const(0..6)], 0)
 })
 
 check_if_solved = {
@@ -151,7 +151,7 @@ kill_player = {
 }
 
 on(collision(1b, 2b), {
-	divisor = [2,3,5,7,11][selected_number.to_const(0->5)]
+	divisor = [2,3,5,7,11][selected_number.to_const(0..5)]
 	rest = main.divide(divisor, 15)
 	rest.item.if_is(LARGER_THAN, 0, kill_player)
 	set_display!

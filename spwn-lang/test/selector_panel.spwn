@@ -11,7 +11,7 @@ on(touch(), {
         button_index.add(-buttons.length)
     } else {}
 
-    selected_button = buttons[button_index.to_const(0->buttons.length)]
+    selected_button = buttons[button_index.to_const(0..buttons.length)]
     
     selector.move_to(selected_button)
 })
