@@ -17,12 +17,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let script_path = PathBuf::from(&args[1]); //&args[1]
     println!("Parsing...");
-    let (statements, notes) = parse_spwn(&script_path);
+    let (statements, notes) = match parse_spwn(&script_path) {
+        Err(err) => {
+            eprintln!("{}", err);
+            std::process::exit(256);
+        }
+        Ok(p) => p,
+    };
 
     //println!("parsed: {:?}", statements);
     // for statement in statements.iter() {
     //     println!("{:?}\n\n", statement);
     // }
+
     let gd_path = if cfg!(target_os = "windows") {
         PathBuf::from(std::env::var("localappdata").expect("No local app data"))
             .join("GeometryDash/CCLocalLevels.dat")
@@ -38,13 +45,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut compiled, old_ls) =
         compiler::compile_spwn(statements, script_path, gd_path.clone(), notes);
-    /*let level_string = levelstring::serialize_triggers(compiled.func_ids);
+    let level_string = levelstring::serialize_triggers(compiled.func_ids);
 
     compiled.closed_groups.sort();
     compiled.closed_groups.dedup();
 
     println!("Using {} groups", compiled.closed_groups.len());
     levelstring::encrypt_level_string(level_string, old_ls, gd_path);
-    println!("Written to save. You can now open Geometry Dash again!");*/
+    println!("Written to save. You can now open Geometry Dash again!");
     Ok(())
 }

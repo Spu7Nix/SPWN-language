@@ -29,7 +29,7 @@ pub enum StatementBody {
     For(For),
     Error(Error),
     Extract(Expression),
-    EOI,
+    //EOI,
 }
 #[derive(Clone, PartialEq, Debug)]
 pub enum ValueLiteral {

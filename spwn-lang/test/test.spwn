@@ -1,6 +1,7 @@
-std = import "std.spwn"
 
 
-$.print(std)
+
+$.print("hello world")
+
 
 

@@ -36,7 +36,7 @@ pub fn compile_spwn(
         }],
     };
 
-    /*println!("Loading level data...");
+    println!("Loading level data...");
 
     let file_content =
         fs::read_to_string(gd_path).expect("Your local geometry dash files were not found");
@@ -46,7 +46,7 @@ pub fn compile_spwn(
         .map(|obj| if obj.contains(",108,777") { "" } else { obj })
         .collect::<Vec<&str>>()
         .join(";");
-    get_used_ids(&level_string, &mut globals);*/
+    get_used_ids(&level_string, &mut globals);
 
     let start_info = CompilerInfo {
         depth: 0,
@@ -99,7 +99,7 @@ pub fn compile_spwn(
         start_time.elapsed().as_millis()
     );
 
-    (globals, "level_string".to_string())
+    (globals, level_string)
 }
 
 pub fn compile_scope(
@@ -492,7 +492,7 @@ pub fn import_module(
         .parent()
         .expect("Your file must be in a folder to import modules!")
         .join(&path);
-    let (parsed, notes) = crate::parse_spwn(&module_path);
+    let (parsed, notes) = crate::parse_spwn(&module_path).unwrap();
     (*globals).closed_groups.extend(notes.closed_groups);
     (*globals).closed_colors.extend(notes.closed_colors);
     (*globals).closed_blocks.extend(notes.closed_blocks);

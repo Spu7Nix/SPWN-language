@@ -1,4 +1,4 @@
-extract import "std"
+extract import "std.spwn"
 
 selector = 1g
 buttons = [2g, 3g, 4g, 5g, 6g, 7g, 8g, 9g]
@@ -9,7 +9,7 @@ on(touch(), {
 
     if button_index >= buttons.length {
         button_index.add(-buttons.length)
-    } else {}
+    }
 
     selected_button = buttons[button_index.to_const(0..buttons.length)]
     
