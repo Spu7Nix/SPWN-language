@@ -11,15 +11,15 @@ wait = (time){
         SPAWN_DURATION: time,
         TARGET: {
             return
-        }
-    }
+        },
+    })
 }
 
 call_with_delay = (time, function) {
     $.add(obj{
         OBJ_ID: 1268,
         SPAWN_DURATION: time,
-        TARGET: function
+        TARGET: function,
     })
 }
 
