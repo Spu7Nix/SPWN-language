@@ -127,6 +127,7 @@ pub fn built_in_function(
     arguments: Vec<Value>,
     info: CompilerInfo,
     globals: &mut Globals,
+    context: Context,
 ) -> Value {
     match name {
         "print" => {
@@ -166,7 +167,25 @@ pub fn built_in_function(
         }
 
         "add" => {
-            //add object
+            if arguments.len() != 1 {
+                panic!(compile_error("Expected one argument", info))
+            }
+
+            match &arguments[0] {
+                Value::Obj(obj) => {
+                    let c_t = context_trigger(context.clone(), globals, info.clone());
+                    (*globals).func_ids[info.func_id].obj_list.push(
+                        GDObj {
+                            params: obj.clone(),
+                            groups: vec![context.start_group],
+                            ..c_t
+                        }
+                        .context_parameters(context.clone()),
+                    );
+                }
+
+                _ => panic!(compile_error("Expected Object", info)),
+            }
 
             Value::Null
         }

@@ -6,7 +6,7 @@ extract constants.comparisons
 extract constants.easing_types
 
 wait = (time){
-    <+ obj{
+    $.add( obj{
         OBJ_ID: 1268,
         SPAWN_DURATION: time,
         TARGET: {
@@ -16,16 +16,16 @@ wait = (time){
 }
 
 call_with_delay = (time, function) {
-    <+ obj{
+    $.add(obj{
         OBJ_ID: 1268,
         SPAWN_DURATION: time,
         TARGET: function
-    }
+    })
 }
 
 impl "group" {
     move: (self, x, y, duration: 0, easing: NONE, easing_rate: 2) {
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 901,
             TARGET: self,
             MOVE_X: x * 3,
@@ -33,45 +33,45 @@ impl "group" {
             DURATION: duration,
             EASING: easing,
             EASING_RATE: easing_rate,
-        }
+        })
         wait(duration)
     },
 
     stop: (self){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1616,
             TARGET: self,
-        }
+        })
     },
 
     alpha: (self, opacity: 1, duration: 0){
-        <+ obj {
+        $.add( obj {
             OBJ_ID: 1007,
             TARGET: self,
             OPACITY: opacity,
             DURATION: duration,
-        }
+        })
         wait(duration)
     },
 
     toggle_on: (self){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1049,
             TARGET: self,
             ACTIVATE_GROUP: true,
-        }
+        })
     },
 
     toggle_off: (self){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1049,
             TARGET: self,
             ACTIVATE_GROUP: false,
-        }
+        })
     },
 
     rotate: (self, center, degrees, duration: 0, easing: 0, easing_rate: 0, lock_object_rotation: 0){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1346,
             TARGET: self,
             CENTER: center,
@@ -80,36 +80,36 @@ impl "group" {
             EASING: easing,
             EASING_RATE: easing_rate,
             LOCK_OBJECT_ROTATION: lock_object_rotation
-        }
+        })
         wait(duration)
     },
 
     follow: (self, other, x_mod: 1, y_mod: 1, duration: 999){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1347,
             X_MOD: x_mod,
             Y_MOD: y_mod,
             DURATION: duration,
             TARGET: self,
             FOLLOW: other,
-        }
+        })
         //wouldnt make any sense to wait out the duration here
     },
 
     follow_player_y: (self, speed: 1, delay: 0, offset: 0, max_speed: 0, duration: 999){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1814,
             SPEED : speed,
             DELAY : delay,
             Y_OFFSET : offset,
             MAX_SPEED : max_speed,
             DURATION: duration,
-        }
+        })
         //wouldnt make any sense to wait out the duration here
     },
 
     move_to: (self, target, duration: 0, x_only: false, y_only: false, easing: NONE, easing_rate: 2) {
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 901,
             TARGET: self,
             USE_TARGET: true,
@@ -130,12 +130,12 @@ impl "group" {
             DURATION: duration,
             EASING: easing,
             EASING_RATE: easing_rate,
-        }
+        })
         wait(duration)
     },
 
     pulse: (self, r, g, b, fade_in: 0, hold: 0, fade_out: 0, exclusive: false, hsv: false) { //add an option for hsv?
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1006,
             TRIGGER_RED: r,
             TRIGGER_GREEN: g,
@@ -147,7 +147,7 @@ impl "group" {
             TARGET_COLOR: self,
             PULSE_MODE: hsv,
             TARGET_TYPE: 1 //group
-        }
+        })
         wait(fade_in + hold + fade_out)
     }
 
@@ -158,7 +158,7 @@ impl "group" {
 
 impl "color" {
     set: (self, r, g, b, duration: 0, opacity: 1, blending: false){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 899,
             DURATION: duration,
             TRIGGER_RED: r,
@@ -167,12 +167,12 @@ impl "color" {
             OPACITY: opacity,
             BLENDING: blending,
             TARGET_COLOR: self,
-        }
+        })
         wait(duration)
     },
 
     pulse: (self, r, g, b, fade_in: 0, hold: 0, fade_out: 0, exclusive: false, hsv: false) { //add an option for hsv?
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1006,
             TRIGGER_RED: r,
             TRIGGER_GREEN: g,
@@ -184,7 +184,7 @@ impl "color" {
             TARGET_COLOR: self,
             PULSE_MODE: hsv,
             TARGET_TYPE: 0 //color
-        }
+        })
         wait(fade_in + hold + fade_out)
     }
 }
@@ -199,27 +199,27 @@ impl "function" {
 impl "item" {
     
     add: (self, amount) {
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1817,
             COUNT: amount,
             ITEM: self,
-        }
+        })
     },
 
     if_is: (self, comparison, other, function) {
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1811,
             TARGET: function,
             COUNT: other,
             ACTIVATE_GROUP: 1, 
             COMPARISON: comparison, 
             ITEM: self,
-        }
+        })
     },
 
     count: (self, number: 0) {
         return (function) {
-            <+ obj{
+            $.add( obj{
                 OBJ_ID: 1611,
                 TARGET: function,
                 COUNT: number,
@@ -227,7 +227,7 @@ impl "item" {
                 ITEM: self,
                 COUNT_MULTI_ACTIVATE: true,
                 
-            }
+            })
         }
     },
 }
@@ -699,48 +699,48 @@ impl "mutable" {
 general_functions = {
     
     shake: (strength: 1, interval: 0, duration: 0.5){
-        <+ obj {
+        $.add( obj {
             OBJ_ID: 1520,
             STRENGTH: strength,
             INTERVAL: interval,
             DURATION: duration,
-        }
+        })
         wait(duration)
     },
 
     disable_trail: (){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 33,
-        }
+        })
     },
 
     enable_trail: (){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 32,
-        }
+        })
     },
 
     show_player: (){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1613,
-        }
+        })
     },
     
     hide_player: (){
-        <+ obj{
+        $.add( obj{
             OBJ_ID: 1612,
-        }
+        })
     },
 
     toggle_bg_effect: (on: false) {
         if on {
-            <+ obj{
+            $.add( obj{
                 OBJ_ID: 1818,
-            }
+            })
         } else {
-            <+ obj{
+            $.add( obj{
                 OBJ_ID: 1819,
-            }
+            })
         }
     }
         
@@ -756,46 +756,46 @@ on = (event, function){
 events = {
     touch: (dual_side: false) {
         return (function){
-            <+ obj{
+            $.add( obj{
                 OBJ_ID: 1595,
                 HOLD_MODE: true,
                 TOGGLE_MODE: 1,
                 TARGET: function,
                 DUAL_MODE: dual_side,
                 
-            }
+            })
         }
     },
 
     touch_end: (dual_side: false) {
         return (function){
-            <+ obj{
+            $.add( obj{
                 OBJ_ID: 1595,
                 HOLD_MODE: true,
                 TOGGLE_MODE: 2,
                 TARGET: function,
                 DUAL_MODE: dual_side,
                 
-            }
+            })
         }
     },
 
     collision: (a, b) {
         return (function){
-            <+ obj{
+            $.add( obj{
                 OBJ_ID: 1815,
                 BLOCK_A: a,
                 BLOCK_B: b,
                 ACTIVATE_GROUP: true,
                 TARGET: function,
                 
-            }
+            })
         }
     },
 
     collision_exit: (a, b) {
         return (function){
-            <+ obj{
+            $.add( obj{
                 OBJ_ID: 1815,
                 BLOCK_A: a,
                 BLOCK_B: b,
@@ -803,17 +803,17 @@ events = {
                 ACTIVATE_ON_EXIT: true,
                 TARGET: function,
                 
-            }
+            })
         }
     },
 
     death: (){
         return (function) {
-            <+ obj{
+            $.add( obj{
                 OBJ_ID: 1812,
                 ACTIVATE_GROUP: true,
                 TARGET: function
-            }
+            })
         }
     }
 }

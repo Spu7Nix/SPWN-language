@@ -170,9 +170,8 @@ pub enum Token {
     #[token("return")]
     Return,
 
-    #[token("<+")]
-    Add,
-
+    /*#[token("<+")]
+    Add,*/
     #[token("impl")]
     Implement,
 
@@ -541,8 +540,6 @@ pub fn parse_statement(
                 body,
             })
         }
-
-        Some(Token::Add) => ast::StatementBody::Add(parse_expr(tokens, notes)?),
 
         Some(Token::ErrorStatement) => ast::StatementBody::Error(ast::Error {
             message: parse_expr(tokens, notes)?,

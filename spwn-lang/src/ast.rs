@@ -22,7 +22,7 @@ pub enum StatementBody {
     Definition(Definition),
     Call(Call),
     Expr(Expression),
-    Add(Expression),
+
     Return(Option<Expression>),
     Impl(Implementation),
     If(If),

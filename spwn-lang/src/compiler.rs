@@ -350,37 +350,6 @@ pub fn compile_scope(
                 (*globals).func_ids[info.func_id].obj_list.extend(obj_list);
             }
 
-            Add(v) => {
-                /*for context in &mut contexts {
-                    context.x += 1;
-                }*/
-                let mut all_values: Returns = Vec::new();
-                for context in contexts {
-                    let (evaled, inner_returns) = v.eval(context, globals, info.clone());
-                    returns.extend(inner_returns);
-                    all_values.extend(evaled);
-                }
-                contexts = Vec::new();
-                let mut obj_list = Vec::<GDObj>::new();
-                for (val, context) in all_values {
-                    contexts.push(context.clone());
-                    match val {
-                        Value::Obj(obj) => {
-                            obj_list.push(
-                                GDObj {
-                                    params: obj,
-                                    groups: vec![context.start_group],
-                                    ..context_trigger(context.clone(), globals, info.clone())
-                                }
-                                .context_parameters(context.clone()),
-                            );
-                        }
-
-                        _ => panic!(compile_error("Expected Object", info)),
-                    }
-                }
-                (*globals).func_ids[info.func_id].obj_list.extend(obj_list);
-            }
             For(f) => {
                 let mut all_arrays: Returns = Vec::new();
                 for context in contexts {

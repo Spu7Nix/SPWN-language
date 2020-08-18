@@ -1318,6 +1318,7 @@ impl ast::Variable {
                                         args.clone(),
                                         info.clone(),
                                         globals,
+                                        context.clone(),
                                     );
                                     all_values.push((evaled, context))
                                 }
