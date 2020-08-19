@@ -50,6 +50,8 @@ pub fn get_used_ids(ls: &String, globals: &mut Globals) {
 const START_HEIGHT: u16 = 10;
 const MAX_HEIGHT: u16 = 40;
 
+pub const SPWN_SIGNATURE_GROUP: &str = "5555";
+
 pub fn serialize_triggers(func_ids: Vec<FunctionID>) -> String {
     //println!("{:?}", trigger);
     fn group_string(list: Vec<Group>) -> String {
@@ -100,13 +102,17 @@ pub fn serialize_triggers(func_ids: Vec<FunctionID>) -> String {
         }
 
         if !trigger.groups.is_empty() {
-            obj_string += &(String::from("57,") + &group_string(trigger.groups) + ",");
+            obj_string += &(String::from("57,")
+                + &group_string(trigger.groups)
+                + "."
+                + SPWN_SIGNATURE_GROUP
+                + ",");
         }
 
         for param in trigger.params {
             obj_string += &(param.0.to_string() + "," + &param.1 + ",");
         }
-        obj_string + "108,777;" //spwn signiature and linked group
+        obj_string + "108,1;" //linked group
     }
 
     fn serialize_func_id(

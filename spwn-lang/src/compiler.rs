@@ -43,7 +43,19 @@ pub fn compile_spwn(
     let level_string = get_level_string(file_content)
         //remove previous spwn objects
         .split(";")
-        .map(|obj| if obj.contains(",108,777") { "" } else { obj })
+        .map(|obj| {
+            let key_val: Vec<&str> = obj.split(",").collect();
+            let mut ret = obj;
+            for i in (0..key_val.len()).step_by(2) {
+                if key_val[i] == "57" {
+                    let mut groups = key_val[i + 1].split(".");
+                    if groups.any(|x| x == SPWN_SIGNATURE_GROUP) {
+                        ret = "";
+                    }
+                }
+            }
+            ret
+        })
         .collect::<Vec<&str>>()
         .join(";");
     get_used_ids(&level_string, &mut globals);
