@@ -1,24 +1,9 @@
-constants = import "constants.spwn"
+extract import "std.spwn"
 
-extract constants.obj_props
-extract constants.comparisons
-extract constants.easing_types
+num = mut(1)
 
-
-move = (group, x, y, duration: 0, easing: NONE, easing_rate: 2) {
-	$.add(obj{
-		OBJ_ID: 901,
-		TARGET: group,
-		MOVE_X: x * 3,
-		MOVE_Y: y * 3,
-		DURATION: duration,
-		EASING: easing,
-		EASING_RATE: easing_rate,
-	})
-	
+if num == 10 {
+	10g.move(100, 0, 0.5)
+} else {
+	10g.move(-100, 0, 0.5)
 }
-
-move(10g, 100, 100, 0.5)
-
-
-

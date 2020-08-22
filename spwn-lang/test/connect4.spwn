@@ -12,11 +12,13 @@ board = [
 // when this item turns to 1, it means the process can move forward
 ready_sign = ?i
 
+selector_obj = 40g
+
 wait_for_ready = () {
 	closure = {
 		on(ready_sign.count(1), {
 			ready_sign.add(-1)
-			wait(0.001)
+			wait(0.05)
 			closure.stop()
 			return
 		})
@@ -33,10 +35,20 @@ gfb_vars = {
 	result: mut(50i),
 }
 
+move_x = (amount) {
+	gfb_vars.x.add(amount)
+	selector_obj.move(20 * amount, 0)
+}
+
+move_y = (amount) {
+	gfb_vars.y.add(amount)
+	selector_obj.move(0, -20 * amount)
+}
+
 gfb_read = {
 	
-	for x in [0, 1, 2, 3, 4, 5, 6] {
-		for y in [0, 1, 2, 3, 4, 5] {
+	for x in 0..7 {
+		for y in 0..6 {
 			gfb_vars.x.item.if_is(EQUAL_TO, x, {
 				gfb_vars.y.item.if_is(EQUAL_TO, y, {
 					board[y][x].item.if_is(SMALLER_THAN, 0, {
@@ -89,6 +101,7 @@ write_to_board = () {
 allow_player_input = mut(1)
 
 selected_col = mut(3); //middle
+$.print("selected col: ", selected_col.item)
 selector_arrow = 1g
 
 
@@ -97,7 +110,8 @@ on(touch(dual_side = true), {
 	allow_player_input.item.if_is(EQUAL_TO, 1, {
 		selected_col.add(1)
 		selector_arrow.move(20, 0)
-		selected_col.item.if_is(EQUAL_TO, 7, {
+		
+		selected_col.item.if_is(LARGER_THAN, 6, {
 			selected_col.add(-7)
 			selector_arrow.move(-140, 0)
 		})
@@ -108,11 +122,11 @@ player_turn = mut(100i)
 player_turn.add(1)
 
 reset_selector_x = {
-	-> gfb_vars.x.add(-gfb_vars.x.to_const(1..7))
+	-> move_x(-gfb_vars.x.to_const(1..7))
 }
 
 reset_selector_y = {
-	-> gfb_vars.y.add(-gfb_vars.y.to_const(1..6))
+	-> move_y(-gfb_vars.y.to_const(1..6))
 }
 
 
@@ -130,9 +144,10 @@ gfb_move_to_air = {
 	() {
 		check = {
 			go_up = {
-				gfb_vars.y.add(-1)
+				move_y(-1)
 				reset_result!
-				call_with_delay(0.01, check)
+				call_with_delay(0.05, check)
+				//check!
 			}
 			get_from_board()
 
@@ -147,51 +162,75 @@ gfb_move_to_air = {
 	ready_sign.add(1)
 }
 
-//longest_player_thread = mut()
-//longest_ai_thread = mut()
+longest_player_thread = mut(?i)
+longest_ai_thread = mut(?i)
 
-/*find_threads = {
+reset_lpt = {
+	longest_player_thread.add(-longest_player_thread.to_const(1..4))
+}
+reset_lat = {
+	longest_ai_thread.add(-longest_ai_thread.to_const(1..4))
+}
+
+DEBUG_MODE = true
+
+find_threads = {
 	//look for a thread in each direction
 	go_to_next_sign = ?i
 
-	closure = {
-		on(go_to_next_sign.count(1), {
-			go_to_next_sign.add(-1)
-			wait(0.001)
-			closure.stop()
-			return
-		})
-	}
+	
 
 	wait_for_next_ready = () {
-		
+		closure = {
+			ret = {
+				//wait(0.05)
+				closure.stop()
+				return
+			}
+			on(go_to_next_sign.count(1), {
+				go_to_next_sign.add(-1)
+				ret!
+			})
+
+			on(go_to_next_sign.count(2), {
+				go_to_next_sign.add(-2)
+				ret!
+			})
+		}
 		closure!
 	}
 
 	look_x = mut(1)
 	look_y = mut(0)
 	thread_type = mut(0)
+	$.print("longest player thread:", longest_player_thread.item, "longest ai thread:", longest_ai_thread.item)
 
 	reset_thread_type = {
 		thread_type.add(-thread_type.to_const([-1, 1]))
 	}
 
-	check_dir = {
-		move_select = {
-			-> gfb_vars.x.add(look_x.to_const([-1, 1]))
-			-> gfb_vars.y.add(look_y.to_const([-1, 1]))
-		}
+	move_select = {
+		-> move_x(look_x.to_const([-1, 1]))
+		-> move_y(look_y.to_const([-1, 1]))
+	}
 
-		move_select_back = {
-			-> gfb_vars.x.add(-look_x.to_const([-1, 1]))
-			-> gfb_vars.y.add(-look_y.to_const([-1, 1]))
-		}
-	
+	move_select_back = {
+		-> move_x(-look_x.to_const([-1, 1]))
+		-> move_y(-look_y.to_const([-1, 1]))
+	}
+
+	check_dir = {
+		//wait(1)
+		
+		selector_obj.pulse(255, 0, 0, fade_out = 0.5)
 		move_select!
-		wait(0.01)
+		wait(0.05)
 		get_from_board()
 		
 		-> thread_type.add(gfb_vars.result.to_const([-1, 1]))
+		
+
+		
 	
 		gfb_vars.result.item.if_is(EQUAL_TO, 0, {
 			reset_result!
@@ -200,16 +239,17 @@ gfb_move_to_air = {
 		})
 
 		if_result_not_zero({
+			reset_result!
 			//second in thread
 			move_select!
-			wait(0.01)
+			wait(0.05)
 			get_from_board()
 
 			next = {
 				reset_result!
 				//third in thread
 				move_select!
-				wait(0.01)
+				wait(0.05)
 				get_from_board()
 
 				found = {
@@ -221,26 +261,29 @@ gfb_move_to_air = {
 					thread_type.item.if_is(EQUAL_TO, -1, {
 						longest_ai_thread.add(3)
 					})
-					closure.stop()
+					reset_result!
+					wait(0.05)
+					
 					//go out of function, no need to check the rest
+					go_to_next_sign.add(2) 
 					ready_sign.add(1) 
 				}
-
-				gfb_vars.result.item.if_is(EQUAL_TO, 0, {
+				failed3 = {
 					reset_result!
 					//check back
 					for i in [1, 2, 3, 4] { 
 						move_select_back!
 					}
 
-					wait(0.01)
+					wait(0.05)
 					get_from_board()
 					
 					-> gfb_vars.result.item.if_is(EQUAL_TO, thread_type.to_const([-1, 1]), {
 						move_select!
+						reset_result!
 						found!
 					})
-					gfb_vars.result.item.if_is(EQUAL_TO, 0, {
+					failed2 = {
 						//two in a row after target
 						reset_result!
 
@@ -259,57 +302,74 @@ gfb_move_to_air = {
 						})
 						move_select!
 						go_to_next_sign.add(1)
-					})
-				})
+					}
+					gfb_vars.result.item.if_is(EQUAL_TO, 0, failed2)
+					-> gfb_vars.result.item.if_is(EQUAL_TO, -thread_type.to_const([-1, 1]), failed2)
+				}
+				gfb_vars.result.item.if_is(EQUAL_TO, 0, failed3)
+				-> gfb_vars.result.item.if_is(EQUAL_TO, -thread_type.to_const([-1, 1]), failed3)
 
 				-> gfb_vars.result.item.if_is(EQUAL_TO, thread_type.to_const([-1, 1]), {
 					for i in [1, 2, 3] {
-						move_select_back!
+						move_select_back!	
 					}
 					found!
 				})
 
 			}
-			-> gfb_vars.result.item.if_is(EQUAL_TO, thread_type.to_const([-1, 1]), next)
-
-
-			gfb_vars.result.item.if_is(EQUAL_TO, 0, {
+			failed = {
 				reset_result!
 
 				thread_type.item.if_is(EQUAL_TO, 1, {
-					longest_player_thread.item.if_is(SMALLER_THAN, 1, {
+					longest_player_thread.item.if_is(EQUAL_TO, 0, {
 						longest_player_thread.add(1)
 					})
 				})
 
 				thread_type.item.if_is(EQUAL_TO, -1, {
-					longest_ai_thread.item.if_is(SMALLER_THAN, 1, {
+					longest_ai_thread.item.if_is(EQUAL_TO, 0, {
 						longest_ai_thread.add(1)
 					})
 				})
 				move_select_back!
+				wait(0.05)
 				move_select_back!
 				go_to_next_sign.add(1)
-			})
+			}
+			wait(0.05)
+			gfb_vars.result.item.if_is(EQUAL_TO, 0, failed)
+			-> gfb_vars.result.item.if_is(EQUAL_TO, -thread_type.to_const([-1, 1]), failed)
+			-> gfb_vars.result.item.if_is(EQUAL_TO, thread_type.to_const([-1, 1]), next)
+			
+
+			
 		})
 	}
+	
 
 
 	//look to the right
 	check_dir!
 	wait_for_next_ready()
 	reset_thread_type!
+	
 
+	
+	
 	//look to the left
 	look_x.add(-2)
+
+	//wait(0.05)
 
 	check_dir!
 	wait_for_next_ready()
 	reset_thread_type!
-
+	
 	//look down (0, 1)
 	look_x.add(1)
 	look_y.add(1)
+
+	//wait(0.05)
 
 	check_dir!
 	wait_for_next_ready()
@@ -319,12 +379,16 @@ gfb_move_to_air = {
 	look_x.add(1)
 	look_y.add(-2)
 
+	//wait(0.05)
+
 	check_dir!
 	wait_for_next_ready()
 	reset_thread_type!
 
 	//look top left (-1, -1)
 	look_x.add(-2)
+
+	//wait(0.05)
 	
 	check_dir!
 	wait_for_next_ready()
@@ -333,6 +397,8 @@ gfb_move_to_air = {
 	//look bottom right (1, 1)
 	look_y.add(2)
 	look_x.add(2)
+
+	//wait(0.05)
 	
 	check_dir!
 	wait_for_next_ready()
@@ -341,23 +407,40 @@ gfb_move_to_air = {
 	//look bottom left (-1, 1)
 	
 	look_x.add(-2)
+
+	//wait(0.05)
 	
 	check_dir!
 	wait_for_next_ready()
 	reset_thread_type!
+	
 
-	wait(0.05)
+	//wait(0.05)
+	
+
+	look_x.add(1)
+	look_y.add(-1)
+	
 
 	ready_sign.add(1)
-}*/
+}
+
+check_player_win = {
+	
+
+}
+
+player_wins_label = 10g
+player_wins_label.toggle_off()
+
 
 
 
 on(collision(1b, 2b), {
 	allow_player_input.item.if_is(EQUAL_TO, 1, {
 		
-		-> gfb_vars.x.add(selected_col.to_const(1..7))
-		gfb_vars.y.add(5)
+		-> move_x(selected_col.to_const(1..7))
+		move_y(5)
 
 		gfb_move_to_air!
 		wait_for_ready()
@@ -368,14 +451,29 @@ on(collision(1b, 2b), {
 
 			wait(0.05)
 			write_to_board()
+			
+			wait(0.05)
+			gfb_vars.result.add(-1)
+			wait(0.05)
+			find_threads!
+			wait_for_ready()
+			longest_player_thread.item.if_is(EQUAL_TO, 3, {
+				player_wins_label.toggle_on()
+			})
+			wait(0.05)
+			
+
+			reset_lpt!
+			reset_lat!
 			reset_selector_x!
 			reset_selector_y!
-			gfb_vars.result.add(-1)
+			//gfb_vars.result.add(-1)
 			//set to ai turn
+			//wait(0.05)
 			player_turn.add(-2)
 		})
 		gfb_vars.y.item.if_is(EQUAL_TO, -1, {
-			gfb_vars.y.add(1)
+			move_y(1)
 			reset_selector_x!
 		})
 			
@@ -387,7 +485,7 @@ on(player_turn.item.count(-1), {
 	//AI
 	check_column = (col, next) {
 		board [0][col].item.if_is(EQUAL_TO, 0, {
-			gfb_vars.x.add(col)
+			move_x(col)
 		})
 		board [0][col].item.if_is(EQUAL_TO, 1, next)
 		board [0][col].item.if_is(EQUAL_TO, -1, next)
@@ -409,7 +507,7 @@ on(player_turn.item.count(-1), {
 		})
 	})
 
-	gfb_vars.y.add(5)
+	move_y(5)
 	gfb_move_to_air!
 	wait_for_ready()
 
@@ -466,14 +564,14 @@ on(player_turn.item.count(-1), {
 			gfb_vars.x.item.if_is(LARGER_THAN, 6, done)
 			gfb_vars.x.item.if_is(SMALLER_THAN, 7, {
 				reset_selector_y!
-				gfb_vars.x.add(1)
+				move_x(1)
 				call_with_delay(0.05, check_column)
 			})
 			
 		}
 
 
-		gfb_vars.y.add(5)
+		move_y(5)
 		gfb_move_to_air!
 		wait_for_ready()
 

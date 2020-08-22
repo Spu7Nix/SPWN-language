@@ -3,7 +3,6 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
-use std::fs;
 use std::path::PathBuf;
 //use std::collections::HashMap;
 
@@ -304,8 +303,7 @@ impl<'a> Tokens<'a> {
 
 const STATEMENT_SEPARATOR_DESC: &str = "Statement separator (line-break or ';')";
 
-pub fn parse_spwn(path: &PathBuf) -> Result<(Vec<ast::Statement>, ParseNotes), SyntaxError> {
-    let unparsed = fs::read_to_string(path).expect("Something went wrong reading the file");
+pub fn parse_spwn(unparsed: String) -> Result<(Vec<ast::Statement>, ParseNotes), SyntaxError> {
     let tokens_iter = Token::lexer(&unparsed);
 
     let mut tokens = Tokens::new(tokens_iter);
@@ -383,7 +381,7 @@ fn parse_cmp_stmt(
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: (0, 0),
-                })
+                });
             }
         }
     }
@@ -532,7 +530,30 @@ pub fn parse_statement(
                     })
                 }
             };
-            let body = parse_cmp_stmt(tokens, notes)?;
+            let mut body = parse_cmp_stmt(tokens, notes)?;
+
+            //fix confusing gd behavior
+            if body.iter().all(|x| match x.body {
+                ast::StatementBody::Call(_) => true,
+                _ => false,
+            }) {
+                //maybe not the fastest way, but the syntax tree is just too large to just paste in
+                let new_statement = parse_spwn(String::from(
+                    "
+(){
+    $.add(obj {
+        1: 1268,
+        63: 0.05,
+        51: {
+            return
+        },
+    })
+}()
+                ",
+                ))?;
+
+                body.push(new_statement.0[0].clone());
+            }
 
             ast::StatementBody::For(ast::For {
                 symbol,
@@ -975,24 +996,27 @@ fn parse_variable(
             //Array
             let mut arr = Vec::new();
 
-            loop {
-                arr.push(parse_expr(tokens, notes)?);
-                match tokens.next(false) {
-                    Some(Token::Comma) => {
-                        //accounting for trailing comma
-                        if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
-                            break;
-                        } else {
-                            tokens.previous();
+            if tokens.next(false) != Some(Token::ClosingSquareBracket) {
+                tokens.previous();
+                loop {
+                    arr.push(parse_expr(tokens, notes)?);
+                    match tokens.next(false) {
+                        Some(Token::Comma) => {
+                            //accounting for trailing comma
+                            if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
+                                break;
+                            } else {
+                                tokens.previous();
+                            }
                         }
-                    }
-                    Some(Token::ClosingSquareBracket) => break,
-                    a => {
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "comma (',') or ']'".to_string(),
-                            found: format!("{:?}: {:?}", a, tokens.slice()),
-                            pos: (0, 0),
-                        })
+                        Some(Token::ClosingSquareBracket) => break,
+                        a => {
+                            return Err(SyntaxError::ExpectedErr {
+                                expected: "comma (',') or ']'".to_string(),
+                                found: format!("{:?}: {:?}", a, tokens.slice()),
+                                pos: (0, 0),
+                            })
+                        }
                     }
                 }
             }

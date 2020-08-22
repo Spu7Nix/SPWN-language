@@ -473,7 +473,9 @@ pub fn import_module(
         .parent()
         .expect("Your file must be in a folder to import modules!")
         .join(&path);
-    let (parsed, notes) = crate::parse_spwn(&module_path).unwrap();
+
+    let unparsed = fs::read_to_string(module_path).expect("Something went wrong reading the file");
+    let (parsed, notes) = crate::parse_spwn(unparsed).unwrap();
     (*globals).closed_groups.extend(notes.closed_groups);
     (*globals).closed_colors.extend(notes.closed_colors);
     (*globals).closed_blocks.extend(notes.closed_blocks);

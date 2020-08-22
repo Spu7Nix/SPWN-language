@@ -6,6 +6,7 @@ extract constants.comparisons
 extract constants.easing_types
 
 wait = (time){
+    
     $.add( obj{
         OBJ_ID: 1268,
         SPAWN_DURATION: time,
@@ -13,6 +14,7 @@ wait = (time){
             return
         },
     })
+    
 }
 
 call_with_delay = (time, function) {
@@ -34,6 +36,7 @@ impl "group" {
             EASING: easing,
             EASING_RATE: easing_rate,
         })
+        
         wait(duration)
     },
 
@@ -196,6 +199,8 @@ impl "function" {
     }
 }
 
+
+
 impl "item" {
     
     add: (self, amount) {
@@ -232,7 +237,7 @@ impl "item" {
     },
 }
 
-mut = (source: ?i){
+mut = (source: 0){
     if source.TYPE == "number" {
         id = ?i
     
@@ -246,6 +251,16 @@ mut = (source: ?i){
         return {
             TYPE: "mutable",
             item: source
+        }
+    } else if source.TYPE == "boolean" {
+        id = ?i
+    
+        if source {
+            id.add(1)
+        }
+        return {
+            TYPE: "mutable",
+            item: id
         }
     } else {
         error "Can not make mut from this type"
@@ -668,6 +683,36 @@ impl "mutable" {
         }
     },
 
+    _equal_: (self, other) {
+        if other.TYPE == "number" {
+            self.item.if_is(EQUAL_TO, other, {
+                return true
+            })
+
+            ret_false = {
+                return false
+            }
+
+            self.item.if_is(LARGER_THAN, other, ret_false)
+            self.item.if_is(SMALLER_THAN, other, ret_false)
+        }
+    },
+
+    _not_equal_: (self, other) {
+        if other.TYPE == "number" {
+            self.item.if_is(EQUAL_TO, other, {
+                return false
+            })
+
+            ret_true = {
+                return true
+            }
+
+            self.item.if_is(LARGER_THAN, other, ret_true)
+            self.item.if_is(SMALLER_THAN, other, ret_true)
+        }
+    },
+
     add: (self, num) {
         self.item.add(num)
     },
@@ -818,6 +863,20 @@ events = {
     }
 }
 
+impl "block" {
+    create_tracker_item: (self, other) {
+        item = ?i
+        on(events.collision(self, other), {
+            item.add(1)
+        })
+
+        on(events.collision_exit(self, other), {
+            item.add(-1)
+        })
+
+        return item
+    }
+}
 
 
 exports = {

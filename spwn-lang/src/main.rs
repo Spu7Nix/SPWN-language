@@ -12,12 +12,15 @@ use std::path::PathBuf;
 
 //#[macro_use]
 extern crate lazy_static;
+use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let script_path = PathBuf::from(&args[1]); //&args[1]
     println!("Parsing...");
-    let (statements, notes) = match parse_spwn(&script_path) {
+    let unparsed =
+        fs::read_to_string(script_path.clone()).expect("Something went wrong reading the file");
+    let (statements, notes) = match parse_spwn(unparsed) {
         Err(err) => {
             eprintln!("{}", err);
             std::process::exit(256);
