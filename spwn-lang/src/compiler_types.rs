@@ -15,7 +15,7 @@ pub fn store_value(val: Value, globals: &mut Globals) -> StoredValue {
     (globals.stored_values.len() as u32) - 1
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Context {
     pub start_group: Group,
     pub spawn_triggered: bool,
@@ -143,14 +143,18 @@ impl fmt::Display for Value {
                 Value::Macro(_) => String::from("<macro>"),
                 Value::Str(s) => s.clone(),
                 Value::Array(a) => {
-                    let mut out = String::from("[");
-                    for val in a {
-                        out += &format!("{}, ", val);
+                    if a.is_empty() {
+                        String::from("[]")
+                    } else {
+                        let mut out = String::from("[");
+                        for val in a {
+                            out += &format!("{}, ", val);
+                        }
+                        out.pop();
+                        out.pop();
+                        out += "]";
+                        out
                     }
-                    out.pop();
-                    out.pop();
-                    out += "]";
-                    out
                 }
                 Value::Obj(o) => {
                     let mut out = String::new();
@@ -515,6 +519,34 @@ impl ast::Expression {
                             globals,
                             info.clone(),
                         ),
+
+                        Modulo => handle_operator(
+                            acum_val.clone(),
+                            val,
+                            |acum_val, val| {
+                                if let Value::Number(n) = &acum_val {
+                                    if let Value::Number(n2) = val {
+                                        Value::Number(n % &n2)
+                                    } else {
+                                        panic!(compile_error(
+                                            "This type has no _mod_ macro",
+                                            info.clone()
+                                        ))
+                                    }
+                                } else {
+                                    panic!(compile_error(
+                                        "This type has no _mod_ macro",
+                                        info.clone()
+                                    ))
+                                }
+                            },
+                            "_mod_",
+                            "modulo",
+                            c2,
+                            globals,
+                            info.clone(),
+                        ),
+
                         Power => handle_operator(
                             acum_val.clone(),
                             val,
@@ -606,23 +638,7 @@ impl ast::Expression {
                         NotEqual => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
-                                if let Value::Bool(b) = &acum_val {
-                                    if let Value::Bool(b2) = &val {
-                                        Value::Bool(*b != *b2)
-                                    } else {
-                                        panic!(compile_error(
-                                            "This type has no _not_equal_ macro",
-                                            info.clone()
-                                        ))
-                                    }
-                                } else {
-                                    panic!(compile_error(
-                                        "This type has no _not_equal_ macro",
-                                        info.clone()
-                                    ))
-                                }
-                            },
+                            |acum_val, val| Value::Bool(acum_val != val),
                             "_not_equal_",
                             "logical not_equal",
                             c2,
@@ -751,6 +767,7 @@ pub fn execute_macro(
     }
     let new_info = info.next("macro body", globals, false);
     let compiled = compile_scope(&m.body, new_contexts, globals, new_info);
+
     let returns = if compiled.1.is_empty() {
         compiled
             .0
@@ -758,8 +775,62 @@ pub fn execute_macro(
             .map(|x| (Value::Null, x.clone()))
             .collect()
     } else {
-        compiled.1
+        if compiled.1.len() > 1 {
+            let mut return_vals = Vec::<(Value, u8, Vec<Context>)>::new();
+            for (val, c) in compiled.1 {
+                let mut found = false;
+                for val2 in &mut return_vals {
+                    if val == val2.0 {
+                        (*val2).1 += 1;
+                        (*val2).2.push(c.clone());
+                        found = true;
+                        break;
+                    }
+                }
+                if !found {
+                    return_vals.push((val, 1, vec![c]));
+                }
+            }
+
+            let mut rets = Returns::new();
+
+            for (val, count, c) in return_vals {
+                if count > 1 {
+                    let mut new_context = context.clone();
+                    new_context.spawn_triggered = true;
+                    //pick a start group
+                    let start_group = Group {
+                        id: next_free(&mut globals.closed_groups),
+                    };
+
+                    for cont in c {
+                        let obj = GDObj {
+                            obj_id: 1268,
+                            groups: vec![cont.start_group],
+                            target: start_group,
+
+                            ..context_trigger(cont.clone(), globals, info.clone())
+                        }
+                        .context_parameters(cont.clone());
+                        (*globals).func_ids[info.func_id].obj_list.push(obj);
+                    }
+
+                    new_context.start_group = start_group;
+
+                    rets.push((val, new_context))
+                } else {
+                    rets.push((val, c[0].clone()))
+                }
+                //compact the returns down to one function with a return
+
+                //create the function context
+            }
+            rets
+        } else {
+            compiled.1
+        }
     };
+
     (
         returns
             .iter()
@@ -924,7 +995,6 @@ impl ast::Variable {
                             Value::Item(Item { id: id.number })
                         }
                     }
-                    _ => unreachable!(),
                 },
                 context,
             )),
@@ -1216,8 +1286,6 @@ impl ast::Variable {
                             panic!(compile_error("Cannot nagate non-boolean value", info))
                         }
                     }
-
-                    _ => unreachable!(),
                 }
             }
         }

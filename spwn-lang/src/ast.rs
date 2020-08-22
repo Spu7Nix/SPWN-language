@@ -65,6 +65,7 @@ pub enum Operator {
     Power,
     Plus,
     Minus,
+    Modulo,
 }
 
 #[derive(Clone, PartialEq, Debug)]

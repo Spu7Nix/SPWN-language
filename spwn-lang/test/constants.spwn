@@ -26,6 +26,10 @@ exports = {
         LARGER_THAN : 1,
         SMALLER_THAN : 2
     },
+
+    colors: {
+        BG: 1000c
+    },
     
     obj_props : {
         OBJ_ID : 1,

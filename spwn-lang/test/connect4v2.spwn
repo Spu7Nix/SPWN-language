@@ -64,66 +64,173 @@ reader = {
 
 
 thread_readers = [
-	[[ 6b.create_tracker_item(1b),  6b.create_tracker_item(2b)], [ 7b.create_tracker_item(1b),  7b.create_tracker_item(2b)], [ 8b.create_tracker_item(1b),  8b.create_tracker_item(2b)]],
-	[[ 9b.create_tracker_item(1b),  9b.create_tracker_item(2b)], [10b.create_tracker_item(1b), 10b.create_tracker_item(2b)], [11b.create_tracker_item(1b), 11b.create_tracker_item(2b)]],
-	[[12b.create_tracker_item(1b), 12b.create_tracker_item(2b)], [13b.create_tracker_item(1b), 13b.create_tracker_item(2b)], [14b.create_tracker_item(1b), 14b.create_tracker_item(2b)]],
-	[[15b.create_tracker_item(1b), 15b.create_tracker_item(2b)], [16b.create_tracker_item(1b), 16b.create_tracker_item(2b)], [17b.create_tracker_item(1b), 17b.create_tracker_item(2b)]],
+	[[ 6b.create_tracker_item(1b),  6b.create_tracker_item(2b)],
+	[ 7b.create_tracker_item(1b),  7b.create_tracker_item(2b)],
+	[ 8b.create_tracker_item(1b),  8b.create_tracker_item(2b)]],
+
+	[[ 9b.create_tracker_item(1b),  9b.create_tracker_item(2b)],
+	[10b.create_tracker_item(1b), 10b.create_tracker_item(2b)],
+	[11b.create_tracker_item(1b), 11b.create_tracker_item(2b)]],
+
+	[[12b.create_tracker_item(1b), 12b.create_tracker_item(2b)],
+	[13b.create_tracker_item(1b), 13b.create_tracker_item(2b)],
+	[14b.create_tracker_item(1b), 14b.create_tracker_item(2b)]],
+
+	[[15b.create_tracker_item(1b), 15b.create_tracker_item(2b)],
+	[16b.create_tracker_item(1b), 16b.create_tracker_item(2b)],
+	[17b.create_tracker_item(1b), 17b.create_tracker_item(2b)]],
+
 	[], //up, useless
-	[[18b.create_tracker_item(1b), 18b.create_tracker_item(2b)], [19b.create_tracker_item(1b), 19b.create_tracker_item(2b)], [20b.create_tracker_item(1b), 20b.create_tracker_item(2b)]],
-	[[21b.create_tracker_item(1b), 21b.create_tracker_item(2b)], [22b.create_tracker_item(1b), 22b.create_tracker_item(2b)], [23b.create_tracker_item(1b), 23b.create_tracker_item(2b)]],
-	[[24b.create_tracker_item(1b), 24b.create_tracker_item(2b)], [25b.create_tracker_item(1b), 25b.create_tracker_item(2b)], [26b.create_tracker_item(1b), 26b.create_tracker_item(2b)]],
+
+	[[18b.create_tracker_item(1b), 18b.create_tracker_item(2b)],
+	[19b.create_tracker_item(1b), 19b.create_tracker_item(2b)],
+	[20b.create_tracker_item(1b), 20b.create_tracker_item(2b)]],
+
+	[[21b.create_tracker_item(1b), 21b.create_tracker_item(2b)],
+	[22b.create_tracker_item(1b), 22b.create_tracker_item(2b)],
+	[23b.create_tracker_item(1b), 23b.create_tracker_item(2b)]],
+
+	[[24b.create_tracker_item(1b), 24b.create_tracker_item(2b)],
+	[25b.create_tracker_item(1b), 25b.create_tracker_item(2b)],
+	[26b.create_tracker_item(1b), 26b.create_tracker_item(2b)]],
 ]
 
 longest_player_thread = mut(0)
 longest_ai_thread = mut(0)
 
+$.print(longest_player_thread.item, ",", longest_ai_thread.item)
+
+// when this item turns to 1, it means the process can move forward
+ready_sign = ?i
+
+$.print("ready_sign: ", ready_sign)
+
+wait_for_ready = () {
+	closure = {
+		on(ready_sign.count(1), {
+			ready_sign.add(-1)
+			wait(0.05)
+			closure.stop()
+			return
+		})
+	}
+
+	
+	closure!
+}
+
+
 find_threads = {
+	-> longest_player_thread.add(-longest_player_thread.to_const(1..4))
+	-> longest_ai_thread.add(-longest_ai_thread.to_const(1..4))
+	wait(0.3)
 	for i in 0..thread_readers.length {
 		t = thread_readers[i]
-		() {
-			ret = {return}
-			//player piece
-			t[0][0].if_is(EQUAL_TO, 1, {
-				t[1][0].if_is(EQUAL_TO, 1, {
-					t[2][0].if_is(EQUAL_TO, 1, {
-						//len = 3
+		$.print(t)
+		if t.length > 0 {
+			() {
+				//player piece
+				t[0][0].if_is(EQUAL_TO, 1, {
 
-						ret!
-					})
-	
-					t[2][0].if_is(EQUAL_TO, 0, {
-						oposite = thread_readers[i + 3]
-						if oposite.length != 0 {
-							oposite[1][0].if_is(EQUAL_TO, 1, {
-								//len = 3
-
-								ret!
-							})
-
-							oposite[1][0].if_is(EQUAL_TO, 0, {
-								//len = 2
-							})
-						}
-					})
-				})
-
-				t[1][0].if_is(EQUAL_TO, 0, {
-					//len = 1
-				})
-			})
-
-			//ai piece
-			t[0][1].if_is(EQUAL_TO, 1, {
-				
-			})
-
+					triple = {
+						-> longest_player_thread.add(
+							3 - longest_player_thread.to_const([0,1,2])
+						)
 			
-			t[0][0].if_is(EQUAL_TO, 0, {
-				//first piece is empty, so return
-				t[0][1].if_is(EQUAL_TO, 1, ret)
-			})
-		} ()
+						//leave
+						ready_sign.add(1)
+					}
+
+					double = {
+						//len = 2
+
+						-> longest_player_thread.add(
+							2 - longest_player_thread.to_const([0,1])
+						)
+
+						return
+					}
+					t[1][0].if_is(EQUAL_TO, 1, {
+						t[2][0].if_is(EQUAL_TO, 1, triple)
+		
+						t[2][0].if_is(EQUAL_TO, 0, {
+							oposite = thread_readers[(i + 4) % thread_readers.length]
+							if oposite.length != 0 {
+								oposite[1][0].if_is(EQUAL_TO, 1, triple)
+
+								oposite[1][0].if_is(EQUAL_TO, 0, double)
+							} else {
+								double
+							}
+						})
+					})
+
+					t[1][0].if_is(EQUAL_TO, 0, {
+						//len = 1
+						longest_player_thread.item.if_is(EQUAL_TO, 0, {
+							longest_player_thread.add(1)
+						})
+						return
+					})
+				})
+
+				//ai piece
+				t[0][1].if_is(EQUAL_TO, 1, {
+					triple = {
+						-> longest_ai_thread.add(
+							3 - longest_ai_thread.to_const([0, 1, 2])
+						)
+						
+						//leave
+						ready_sign.add(1)
+					}
+					double = {
+						//len = 2
+
+						-> longest_ai_thread.add(
+							2 - longest_ai_thread.to_const([0, 1])
+						)
+
+						return
+					}
+					t[1][1].if_is(EQUAL_TO, 1, {
+						t[2][1].if_is(EQUAL_TO, 1, triple)
+		
+						t[2][1].if_is(EQUAL_TO, 0, {
+							oposite = thread_readers[(i + 4) % thread_readers.length]
+							if oposite.length != 0 {
+								oposite[1][0].if_is(EQUAL_TO, 1, triple)
+
+								oposite[1][0].if_is(EQUAL_TO, 0, double)
+							} else {
+								double
+							}
+						})
+					})
+
+					t[1][1].if_is(EQUAL_TO, 0, {
+						//len = 1
+						longest_ai_thread.item.if_is(EQUAL_TO, 0, {
+							longest_ai_thread.add(1)
+						})
+						return
+					})
+				})
+
+				
+				t[0][0].if_is(EQUAL_TO, 0, {
+					//first piece is empty, so return
+					t[0][1].if_is(EQUAL_TO, 0, {
+						return
+					})
+				})
+			} ()
+			
+		}
+		
 	}
+	
+	ready_sign.add(1)
 }
 
 
@@ -136,26 +243,10 @@ move_reader_back = {
 	reader.group.move_to(origin)
 }
 
-// when this item turns to 1, it means the process can move forward
-ready_sign = ?i
-
-$.print("ready_sign: ", ready_sign)
-
-wait_for_ready = () {
-	closure = {
-		on(ready_sign.count(1), {
-			ready_sign.add(-1)
-			wait(0.01)
-			closure.stop()
-			return
-		})
-	}
-	closure!
-}
 
 turn = mut(1)
 
-$.print("turn: ", turn)
+
 
 y_pos = mut(0)
 
@@ -208,6 +299,14 @@ on(collision(3b, 4b), {
 				}()
 
 				-> y_pos.add(-y_pos.to_const(1..7))
+			
+				find_threads!
+				
+				wait_for_ready()
+				longest_player_thread.item.if_is(EQUAL_TO, 3, {
+					BG.pulse(0, 255, 0, fade_out = 1)
+				})
+
 				wait(0.05)
 				turn.add(-2)
 			})
@@ -274,7 +373,17 @@ on(turn.item.count(-1), {
 
 	-> y_pos.add(-y_pos.to_const(1..7))
 
+	find_threads!
+	wait_for_ready()
+	longest_ai_thread.item.if_is(EQUAL_TO, 3, {
+		BG.pulse(255, 0, 0, fade_out = 1)
+	})
+
 	turn.add(2)
 	allow_player_input.add(1)
 
+
+
+
+	
 })

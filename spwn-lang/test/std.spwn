@@ -184,9 +184,9 @@ impl "color" {
             FADE_IN: fade_in,
             HOLD: hold,
             FADE_OUT: fade_out,
-            TARGET_COLOR: self,
+            TARGET: self,
             PULSE_MODE: hsv,
-            TARGET_TYPE: 0 //color
+            //TARGET_TYPE: 0 //color
         })
         wait(fade_in + hold + fade_out)
     }
@@ -883,6 +883,7 @@ exports = {
     obj_props: constants.obj_props,
     ..constants.easing_types,
     ..constants.comparisons,
+    ..constants.colors,
     ..general_functions,
     ..events,
     

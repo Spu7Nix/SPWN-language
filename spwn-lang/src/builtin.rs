@@ -4,25 +4,25 @@ use crate::compiler_types::*;
 use crate::levelstring::*;
 //use std::collections::HashMap;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Group {
     pub id: u16,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 
 pub struct Color {
     pub id: u16,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Block {
     pub id: u16,
 }
 
 impl Block {}
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Item {
     pub id: u16,
 }
@@ -189,6 +189,8 @@ pub fn built_in_function(
 
             Value::Null
         }
+
+        "current_context" => Value::Str(format!("{:?}", context)),
 
         _ => panic!(compile_error(
             &format!("Nonexistant built-in-function: {}", name),

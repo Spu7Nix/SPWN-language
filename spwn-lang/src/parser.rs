@@ -97,6 +97,9 @@ pub enum Token {
     #[token("*")]
     Multiply,
 
+    #[token("%")]
+    Modulo,
+
     #[token("^")]
     Power,
 
@@ -119,7 +122,7 @@ pub enum Token {
     #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)|\$")]
     Symbol,
 
-    #[regex(r"[0-9]+(.[0-9]+)?")]
+    #[regex(r"[0-9]+(\.[0-9]+)?")]
     Number,
 
     #[regex("\"[^\n\r\"]*\"")]
@@ -674,6 +677,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Plus => Some(ast::Operator::Plus),
         Token::Minus => Some(ast::Operator::Minus),
         Token::Divide => Some(ast::Operator::Divide),
+        Token::Modulo => Some(ast::Operator::Modulo),
         _ => None,
     }
 }
@@ -939,11 +943,12 @@ fn parse_variable(
         Some(Token::Number) => ast::ValueLiteral::Number(match tokens.slice().parse() {
             Ok(n) => n,
             Err(err) => {
+                //println!("{}", tokens.slice());
                 return Err(SyntaxError::SyntaxError {
                     message: format!("Error when parsing number: {}", err),
 
                     pos: (0, 0),
-                })
+                });
             }
         }),
         Some(Token::StringLiteral) => ast::ValueLiteral::Str(ast::str_content(tokens.slice())),
@@ -968,7 +973,7 @@ fn parse_variable(
                                 message: format!("Error when parsing number: {}", err),
 
                                 pos: (0, 0),
-                            })
+                            });
                         }
                     },
                 ),

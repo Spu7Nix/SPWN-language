@@ -142,10 +142,10 @@ pub fn compile_scope(
             contexts.len()
         );*/
         if contexts.is_empty() {
-            compile_error(
+            panic!(compile_error(
                 "No context! This is probably a bug, please contact sputnix.",
                 info.clone(),
-            );
+            ))
         }
         use ast::StatementBody::*;
 
@@ -242,20 +242,20 @@ pub fn compile_scope(
 
             If(if_stmt) => {
                 let mut all_values: Returns = Vec::new();
-                for context in contexts {
+                for context in contexts.clone() {
                     let new_info = info.next("if condition", globals, false);
                     let (evaled, inner_returns) =
                         if_stmt.condition.eval(context, globals, new_info);
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
-                contexts = Vec::new();
 
                 for (val, context) in all_values {
                     match val {
                         Value::Bool(b) => {
                             //internal if statement
                             if b {
+                                contexts = Vec::new();
                                 let new_info = info.next("if body", globals, true);
                                 let compiled = compile_scope(
                                     &if_stmt.if_body,
@@ -265,10 +265,10 @@ pub fn compile_scope(
                                 );
                                 returns.extend(compiled.1);
                                 contexts.extend(compiled.0);
-                            // TODO: add the returns from these scopes
                             } else {
                                 match &if_stmt.else_body {
                                     Some(body) => {
+                                        contexts = Vec::new();
                                         let new_info = info.next("else body", globals, true);
                                         let compiled =
                                             compile_scope(body, vec![context], globals, new_info);
@@ -442,8 +442,6 @@ pub fn compile_scope(
                     info
                 ))
             }
-
-            EOI => {}
         }
         if let Some(c) = stored_context {
             //resetting the context if async
