@@ -72,6 +72,7 @@ pub enum Operator {
 pub enum UnaryOperator {
     Not,
     Minus,
+    Range,
 }
 
 #[derive(Clone, PartialEq, Debug)]

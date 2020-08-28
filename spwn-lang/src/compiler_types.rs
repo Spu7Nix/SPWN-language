@@ -1286,6 +1286,25 @@ impl ast::Variable {
                             panic!(compile_error("Cannot nagate non-boolean value", info))
                         }
                     }
+
+                    UnaryOperator::Range => {
+                        if let Value::Number(n) = final_value.0 {
+                            *final_value = (
+                                Value::Array(
+                                    (if n > 0.0 {
+                                        0..(n as i32)
+                                    } else {
+                                        (n as i32)..0
+                                    })
+                                    .map(|x| Value::Number(x as f64))
+                                    .collect(),
+                                ),
+                                final_value.1.clone(),
+                            );
+                        } else {
+                            panic!(compile_error("Expected number in range", info))
+                        }
+                    }
                 }
             }
         }

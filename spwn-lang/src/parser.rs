@@ -936,6 +936,11 @@ fn parse_variable(
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Not)
         }
+
+        Some(Token::DotDot) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::Range)
+        }
         _ => None,
     };
 
