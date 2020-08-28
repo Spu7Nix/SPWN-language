@@ -5,7 +5,7 @@ use crate::levelstring::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::compiler::{compile_scope, import_module, next_free};
+use crate::compiler::{compile_scope, import_module, next_free, RuntimeError};
 
 pub type Returns = Vec<(Value, Context)>;
 pub type Implementations = HashMap<String, HashMap<String, u32>>;
@@ -235,6 +235,19 @@ use ValSuccess::{Evaluatable, Literal};*/
     }
     out
 }*/
+
+/*
+
+a = 2
+b = 3
+
+c = a
+
+a = b
+b = c
+
+
+*/
 fn handle_operator<F>(
     value1: Value,
     value2: Value,
@@ -244,38 +257,40 @@ fn handle_operator<F>(
     context: Context,
     globals: &mut Globals,
     info: CompilerInfo,
-) -> Returns
+) -> Result<Returns, RuntimeError>
 where
-    F: FnOnce(Value, Value) -> Value,
+    F: FnOnce(Value, Value) -> Result<Value, RuntimeError>,
 {
-    if let Some(Value::Macro(m)) =
-        value1.member(macro_name.to_string(), &context, globals, info.clone())
-    {
-        let new_info = info.next(op_name, globals, false);
-        let (values, _) = execute_macro(
-            (
-                m,
-                vec![ast::Argument {
-                    symbol: None,
-                    value: ast::Expression {
-                        values: vec![ast::Variable {
-                            value: ast::ValueLiteral::Resolved(value2),
-                            path: Vec::new(),
-                            operator: None,
-                        }],
-                        operators: Vec::new(),
-                    },
-                }],
-            ),
-            context,
-            globals,
-            value1.clone(),
-            new_info,
-        );
-        values
-    } else {
-        vec![(op(value1, value2), context)]
-    }
+    Ok(
+        if let Some(Value::Macro(m)) =
+            value1.member(macro_name.to_string(), &context, globals, info.clone())
+        {
+            let new_info = info.next(op_name, globals, false);
+            let (values, _) = execute_macro(
+                (
+                    m,
+                    vec![ast::Argument {
+                        symbol: None,
+                        value: ast::Expression {
+                            values: vec![ast::Variable {
+                                value: ast::ValueLiteral::Resolved(value2),
+                                path: Vec::new(),
+                                operator: None,
+                            }],
+                            operators: Vec::new(),
+                        },
+                    }],
+                ),
+                context,
+                globals,
+                value1.clone(),
+                new_info,
+            )?;
+            values
+        } else {
+            vec![(op(value1, value2)?, context)]
+        },
+    )
 }
 
 impl ast::Expression {
@@ -284,19 +299,19 @@ impl ast::Expression {
         context: Context,
         globals: &mut Globals,
         info: CompilerInfo,
-    ) -> (Returns, Returns) {
+    ) -> Result<(Returns, Returns), RuntimeError> {
         //second returns is in case there are any values in the expression that includes a return statement
         let mut vals = self.values.iter();
         let first_value = vals
             .next()
             .unwrap()
-            .to_value(context.clone(), globals, info.clone());
+            .to_value(context.clone(), globals, info.clone())?;
         let mut acum = first_value.0;
         let mut inner_returns = first_value.1;
 
         if self.operators.is_empty() {
             //if only variable
-            return (acum, inner_returns);
+            return Ok((acum, inner_returns));
         }
 
         for (i, var) in vals.enumerate() {
@@ -304,7 +319,7 @@ impl ast::Expression {
             //every value in acum will be operated with the value of var in the corresponding context
             for (acum_val, c) in acum {
                 //what the value in acum becomes
-                let evaled = var.to_value(c, globals, info.clone());
+                let evaled = var.to_value(c, globals, info.clone())?;
                 inner_returns.extend(evaled.1);
 
                 use ast::Operator::*;
@@ -314,21 +329,21 @@ impl ast::Expression {
                         Or => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val| -> Result<Value, RuntimeError> {
                                 if let Value::Bool(b) = &acum_val {
                                     if let Value::Bool(b2) = &val {
-                                        Value::Bool(*b || *b2)
+                                        Ok(Value::Bool(*b || *b2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _or_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_or_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _or_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_or_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_or_",
@@ -336,25 +351,25 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         And => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
                                 if let Value::Bool(b) = &acum_val {
                                     if let Value::Bool(b2) = &val {
-                                        Value::Bool(*b && *b2)
+                                        Ok(Value::Bool(*b && *b2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _and_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_and_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _and_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_and_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_and_",
@@ -362,25 +377,25 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         More => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Bool(n > &n2)
+                                        Ok(Value::Bool(n > &n2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _more_than_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_more_than_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _more_than_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_more_than_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_more_than_",
@@ -388,25 +403,25 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         Less => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Bool(n < &n2)
+                                        Ok(Value::Bool(n < &n2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _less_than_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_less_than_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _less_than_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_less_than_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_less_than_",
@@ -414,25 +429,25 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         MoreOrEqual => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Bool(n >= &n2)
+                                        Ok(Value::Bool(n >= &n2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _more_or_equal_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_more_or_equal_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _more_or_equal_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_more_or_equal_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_more_or_equal_",
@@ -440,25 +455,25 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         LessOrEqual => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Bool(n <= &n2)
+                                        Ok(Value::Bool(n <= &n2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _less_or_equal_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_less_or_equal_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _less_or_equal_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_less_or_equal_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_less_or_equal_",
@@ -466,25 +481,25 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         Divide => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Number(n / &n2)
+                                        Ok(Value::Number(n / &n2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _divided_by_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_divided_by_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _divided_by_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_divided_by_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_divided_by_",
@@ -492,25 +507,25 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         Multiply => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Number(n * &n2)
+                                        Ok(Value::Number(n * &n2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _times_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_times_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _times_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_times_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_times_",
@@ -518,7 +533,7 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
 
                         Modulo => handle_operator(
                             acum_val.clone(),
@@ -526,18 +541,18 @@ impl ast::Expression {
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Number(n % &n2)
+                                        Ok(Value::Number(n % &n2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _mod_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_mod_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _mod_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_mod_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_mod_",
@@ -545,7 +560,7 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
 
                         Power => handle_operator(
                             acum_val.clone(),
@@ -553,44 +568,44 @@ impl ast::Expression {
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Number(n.powf(n2))
+                                        Ok(Value::Number(n.powf(n2)))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _to_the_power_of_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_pow_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _to_the_power_of_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_pow_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
-                            "_to_the_power_of_",
+                            "_pow_",
                             "power",
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         Plus => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Number(n + &n2)
+                                        Ok(Value::Number(n + &n2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _plus_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_plus_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _plus_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_plus_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_plus_",
@@ -598,25 +613,25 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         Minus => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
                                 if let Value::Number(n) = &acum_val {
                                     if let Value::Number(n2) = val {
-                                        Value::Number(n - &n2)
+                                        Ok(Value::Number(n - &n2))
                                     } else {
-                                        panic!(compile_error(
-                                            "This type has no _minus_ macro",
-                                            info.clone()
-                                        ))
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: "_minus_".to_string(),
+                                            pos: (0, 0),
+                                        });
                                     }
                                 } else {
-                                    panic!(compile_error(
-                                        "This type has no _minus_ macro",
-                                        info.clone()
-                                    ))
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: "_minus_".to_string(),
+                                        pos: (0, 0),
+                                    });
                                 }
                             },
                             "_minus_",
@@ -624,36 +639,48 @@ impl ast::Expression {
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         Equal => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| Value::Bool(acum_val == val),
+                            |acum_val, val| Ok(Value::Bool(acum_val == val)),
                             "_equal_",
                             "logical equal",
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         NotEqual => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| Value::Bool(acum_val != val),
+                            |acum_val, val| Ok(Value::Bool(acum_val != val)),
                             "_not_equal_",
                             "logical not_equal",
                             c2,
                             globals,
                             info.clone(),
-                        ),
+                        )?,
                         Range => vec![(
                             Value::Array({
                                 let start = match &acum_val.clone() {
                                     Value::Number(n) => *n as i32,
-                                    _ => panic!(compile_error("Both sides must be numbers", info)),
+                                    _ => {
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: "Both sides of range must be Numbers"
+                                                .to_string(),
+                                            pos: (0, 0),
+                                        })
+                                    }
                                 };
                                 let end = match val {
                                     Value::Number(n) => n as i32,
-                                    _ => panic!(compile_error("Both sides must be numbers", info)),
+                                    _ => {
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: "Both sides of range must be Numbers"
+                                                .to_string(),
+                                            pos: (0, 0),
+                                        })
+                                    }
                                 };
                                 if start < end {
                                     (start..end).collect::<Vec<i32>>()
@@ -672,7 +699,7 @@ impl ast::Expression {
             }
             acum = new_acum;
         }
-        (acum, inner_returns)
+        Ok((acum, inner_returns))
     }
 }
 
@@ -682,7 +709,7 @@ pub fn execute_macro(
     globals: &mut Globals,
     parent: Value,
     info: CompilerInfo,
-) -> (Returns, Returns) {
+) -> Result<(Returns, Returns), RuntimeError> {
     let mut inner_inner_returns = Vec::new();
     let mut new_contexts: Vec<Context> = Vec::new();
     if !m.args.is_empty() {
@@ -692,7 +719,7 @@ pub fn execute_macro(
             context.clone(),
             globals,
             info.clone(),
-        );
+        )?;
         inner_inner_returns.extend(inner_returns);
 
         for (arg_values, mut new_context) in evaled_args {
@@ -707,15 +734,18 @@ pub fn execute_macro(
                             new_variables
                                 .insert(name.clone(), store_value(arg_values[i].clone(), globals));
                         } else {
-                            panic!(compile_error(
-                                "This macro has no argument with this name!",
-                                info
-                            ))
+                            return Err(RuntimeError::UndefinedErr {
+                                undefined: name.clone(),
+                                pos: (0, 0),
+                            });
                         }
                     }
                     None => {
                         if (if m.args[0].0 == "self" { i + 1 } else { i }) > m.args.len() - 1 {
-                            panic!(compile_error("Too many arguments!", info))
+                            return Err(RuntimeError::RuntimeError {
+                                message: "Too many arguments!".to_string(),
+                                pos: (0, 0),
+                            });
                         }
                         new_variables.insert(
                             m.args[if m.args[0].0 == "self" { i + 1 } else { i }]
@@ -740,10 +770,15 @@ pub fn execute_macro(
                                 .insert(arg.0.clone(), store_value(default.clone(), globals));
                         }
 
-                        None => panic!(compile_error(
-                            &format!("Non-optional argument '{}' not satisfied!", arg.0),
-                            info
-                        )),
+                        None => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!(
+                                    "Non-optional argument '{}' not satisfied!",
+                                    arg.0
+                                ),
+                                pos: (0, 0),
+                            })
+                        }
                     }
                 }
             }
@@ -766,7 +801,7 @@ pub fn execute_macro(
         new_contexts.push(new_context);
     }
     let new_info = info.next("macro body", globals, false);
-    let compiled = compile_scope(&m.body, new_contexts, globals, new_info);
+    let compiled = compile_scope(&m.body, new_contexts, globals, new_info)?;
 
     let returns = if compiled.1.is_empty() {
         compiled
@@ -800,7 +835,7 @@ pub fn execute_macro(
                     new_context.spawn_triggered = true;
                     //pick a start group
                     let start_group = Group {
-                        id: next_free(&mut globals.closed_groups),
+                        id: next_free(&mut globals.closed_groups, ast::IDClass::Group)?,
                     };
 
                     for cont in c {
@@ -831,7 +866,7 @@ pub fn execute_macro(
         }
     };
 
-    (
+    Ok((
         returns
             .iter()
             .map(|x| {
@@ -845,7 +880,7 @@ pub fn execute_macro(
             })
             .collect(),
         inner_inner_returns,
-    )
+    ))
 }
 
 fn all_combinations(
@@ -853,7 +888,7 @@ fn all_combinations(
     context: Context,
     globals: &mut Globals,
     info: CompilerInfo,
-) -> (Vec<(Vec<Value>, Context)>, Returns) {
+) -> Result<(Vec<(Vec<Value>, Context)>, Returns), RuntimeError> {
     let mut out: Vec<(Vec<Value>, Context)> = Vec::new();
     let mut inner_returns = Returns::new();
     if a.is_empty() {
@@ -863,7 +898,10 @@ fn all_combinations(
         let mut a_iter = a.iter();
         //starts with all the combinations of the first expr
         let (start_values, start_returns) =
-            a_iter.next().unwrap().eval(context, globals, info.clone());
+            a_iter
+                .next()
+                .unwrap()
+                .eval(context, globals, info.clone())?;
         out.extend(
             start_values
                 .iter()
@@ -877,7 +915,7 @@ fn all_combinations(
             //run through all the lists in out
             for (inner_arr, c) in out.iter() {
                 //for each one, run through all the returns in that context
-                let (values, returns) = expr.eval(c.clone(), globals, info.clone());
+                let (values, returns) = expr.eval(c.clone(), globals, info.clone())?;
                 inner_returns.extend(returns);
                 for (v, c2) in values.iter() {
                     //push a new list with each return pushed to it
@@ -895,14 +933,14 @@ fn all_combinations(
             out = new_out;
         }
     }
-    (out, inner_returns)
+    Ok((out, inner_returns))
 }
 pub fn eval_dict(
     dict: Vec<ast::DictDef>,
     context: Context,
     globals: &mut Globals,
     info: CompilerInfo,
-) -> (Returns, Returns) {
+) -> Result<(Returns, Returns), RuntimeError> {
     let mut inner_returns = Returns::new();
     let (evaled, returns) = all_combinations(
         dict.iter()
@@ -914,7 +952,7 @@ pub fn eval_dict(
         context,
         globals,
         info.clone(),
-    );
+    )?;
     inner_returns.extend(returns);
     let mut out = Returns::new();
     for expressions in evaled {
@@ -931,7 +969,12 @@ pub fn eval_dict(
                 ast::DictDef::Extract(_) => {
                     dict_out.extend(match &expressions.0[expr_index] {
                         Value::Dict(d) => d.clone(),
-                        _ => panic!(compile_error("Cannot extract from this value", info)),
+                        a => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!("Cannot extract from this value: {}", a),
+                                pos: (0, 0),
+                            })
+                        }
                     });
                 }
             };
@@ -939,7 +982,7 @@ pub fn eval_dict(
         }
         out.push((Value::Dict(dict_out), expressions.1));
     }
-    (out, inner_returns)
+    Ok((out, inner_returns))
 }
 
 impl ast::Variable {
@@ -948,7 +991,7 @@ impl ast::Variable {
         context: Context,
         globals: &mut Globals,
         info: CompilerInfo,
-    ) -> (Returns, Returns) {
+    ) -> Result<(Returns, Returns), RuntimeError> {
         // TODO: Check if this variable has native functions called on it, and if not set this to false
         let mut start_val: Vec<(Value, Context)> = Vec::new();
         let mut inner_returns = Returns::new();
@@ -962,7 +1005,7 @@ impl ast::Variable {
                     IDClass::Group => {
                         if id.unspecified {
                             Value::Group(Group {
-                                id: next_free(&mut globals.closed_groups),
+                                id: next_free(&mut globals.closed_groups, ast::IDClass::Group)?,
                             })
                         } else {
                             Value::Group(Group { id: id.number })
@@ -971,7 +1014,7 @@ impl ast::Variable {
                     IDClass::Color => {
                         if id.unspecified {
                             Value::Color(Color {
-                                id: next_free(&mut globals.closed_colors),
+                                id: next_free(&mut globals.closed_colors, ast::IDClass::Color)?,
                             })
                         } else {
                             Value::Color(Color { id: id.number })
@@ -980,7 +1023,7 @@ impl ast::Variable {
                     IDClass::Block => {
                         if id.unspecified {
                             Value::Block(Block {
-                                id: next_free(&mut globals.closed_blocks),
+                                id: next_free(&mut globals.closed_blocks, ast::IDClass::Block)?,
                             })
                         } else {
                             Value::Block(Block { id: id.number })
@@ -989,7 +1032,7 @@ impl ast::Variable {
                     IDClass::Item => {
                         if id.unspecified {
                             Value::Item(Item {
-                                id: next_free(&mut globals.closed_items),
+                                id: next_free(&mut globals.closed_items, ast::IDClass::Item)?,
                             })
                         } else {
                             Value::Item(Item { id: id.number })
@@ -1002,18 +1045,18 @@ impl ast::Variable {
             ast::ValueLiteral::Dictionary(dict) => {
                 let new_info = info.next("dictionary", globals, false);
                 let (new_out, new_inner_returns) =
-                    eval_dict(dict.clone(), context, globals, new_info);
+                    eval_dict(dict.clone(), context, globals, new_info)?;
                 start_val = new_out;
                 inner_returns = new_inner_returns;
             }
             ast::ValueLiteral::CmpStmt(cmp_stmt) => {
-                let (evaled, returns) = cmp_stmt.to_scope(&context, globals, info.clone());
+                let (evaled, returns) = cmp_stmt.to_scope(&context, globals, info.clone())?;
                 inner_returns.extend(returns);
                 start_val.push((Value::Func(evaled), context));
             }
 
             ast::ValueLiteral::Expression(expr) => {
-                let (evaled, returns) = expr.eval(context, globals, info.clone());
+                let (evaled, returns) = expr.eval(context, globals, info.clone())?;
                 inner_returns.extend(returns);
                 start_val.extend(evaled.iter().cloned());
             }
@@ -1024,20 +1067,21 @@ impl ast::Variable {
                     start_val.push((Value::Builtins, context));
                 } else {
                     match context.variables.get(string) {
-                        Some(value) => {
-                            start_val.push((((*globals).stored_values[*value as usize]).clone(), context))
+                        Some(value) => start_val
+                            .push((((*globals).stored_values[*value as usize]).clone(), context)),
+                        None => {
+                            return Err(RuntimeError::UndefinedErr {
+                                undefined: string.clone(),
+                                pos: (0, 0),
+                            })
                         }
-                        None => panic!(compile_error(
-                            &format!("The variable \"{}\" does not exist in this Func. (variables that exist: {:?})", string, context.variables.keys().collect::<Vec<&String>>()),
-                            info
-                        )),
                     }
                 }
             }
             ast::ValueLiteral::Str(s) => start_val.push((Value::Str(s.clone()), context)),
             ast::ValueLiteral::Array(a) => {
                 let new_info = info.next("array", globals, false);
-                let (evaled, returns) = all_combinations(a.clone(), context, globals, new_info);
+                let (evaled, returns) = all_combinations(a.clone(), context, globals, new_info)?;
                 inner_returns.extend(returns);
                 start_val = evaled
                     .iter()
@@ -1046,7 +1090,7 @@ impl ast::Variable {
             }
             ast::ValueLiteral::Import(i) => {
                 let mut new_context = context.clone();
-                let (val, imp) = import_module(i, globals, info.clone());
+                let (val, imp) = import_module(i, globals, info.clone())?;
                 new_context.implementations.extend(imp);
                 start_val.push((val, new_context));
             }
@@ -1057,7 +1101,7 @@ impl ast::Variable {
                     all_expr.push(prop.1.clone());
                 }
                 let new_info = info.next("object", globals, false);
-                let (evaled, returns) = all_combinations(all_expr, context, globals, new_info);
+                let (evaled, returns) = all_combinations(all_expr, context, globals, new_info)?;
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, String)> = Vec::new();
@@ -1068,10 +1112,15 @@ impl ast::Variable {
                         obj.push((
                             match v {
                                 Value::Number(n) => n as u16,
-                                _ => panic!(compile_error(
-                                    "Expected number as object property",
-                                    info
-                                )),
+                                a => {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: format!(
+                                            "Expected number type as object key, found: {}",
+                                            a
+                                        ),
+                                        pos: (0, 0),
+                                    })
+                                }
                             },
                             match v2 {
                                 Value::Number(n) => n.to_string(),
@@ -1092,10 +1141,12 @@ impl ast::Variable {
                                 }
 
                                 //Value::Array(a) => {} TODO: Add this
-                                x => panic!(compile_error(
-                                    &format!("{:?} is not a valid object value", x),
-                                    info
-                                )),
+                                x => {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: format!("{} is not a valid object value", x),
+                                        pos: (0, 0),
+                                    })
+                                }
                             },
                         ))
                     }
@@ -1112,7 +1163,7 @@ impl ast::Variable {
                 }
                 let new_info = info.next("macro argument", globals, false);
                 let (argument_possibilities, returns) =
-                    all_combinations(all_expr, context, globals, new_info);
+                    all_combinations(all_expr, context, globals, new_info)?;
                 inner_returns.extend(returns);
                 for defaults in argument_possibilities {
                     let mut args: Vec<(String, Option<Value>)> = Vec::new();
@@ -1188,7 +1239,7 @@ impl ast::Variable {
                         match prev_v.clone() {
                             Value::Array(arr) => {
                                 let new_info = info.next("index", globals, false);
-                                let (evaled, returns) = i.eval(prev_c, globals, new_info);
+                                let (evaled, returns) = i.eval(prev_c, globals, new_info)?;
                                 inner_returns.extend(returns);
                                 for index in evaled {
                                     match index.0 {
@@ -1199,11 +1250,24 @@ impl ast::Variable {
                                                 prev_v.clone(),
                                             ));
                                         }
-                                        _ => panic!(compile_error("Index must be a number", info)),
+                                        a => {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: format!(
+                                                    "expected number in index, found {}",
+                                                    a
+                                                ),
+                                                pos: (0, 0),
+                                            })
+                                        }
                                     }
                                 }
                             }
-                            _ => panic!(compile_error("Cannot index this", info)),
+                            a => {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: format!("Cannot index this type: {}", a),
+                                    pos: (0, 0),
+                                })
+                            }
                         }
                     }
 
@@ -1220,7 +1284,7 @@ impl ast::Variable {
                                     globals,
                                     parent.clone(),
                                     info.clone(),
-                                );
+                                )?;
                                 inner_returns.extend(returns);
                                 with_parent = evaled
                                     .iter()
@@ -1234,7 +1298,7 @@ impl ast::Variable {
                                     cont.clone(),
                                     globals,
                                     info.clone(),
-                                );
+                                )?;
                                 inner_returns.extend(returns);
 
                                 let mut all_values = Returns::new();
@@ -1255,7 +1319,12 @@ impl ast::Variable {
                                     .map(|x| (x.0.clone(), x.1.clone(), v.clone()))
                                     .collect();
                             }
-                            _ => panic!(compile_error("not a macro", info)),
+                            a => {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: format!("Cannot call this type with arguments: {}", a),
+                                    pos: (0, 0),
+                                })
+                            }
                         }
                     }
                 }
@@ -1275,7 +1344,10 @@ impl ast::Variable {
                         if let Value::Number(n) = final_value.0 {
                             *final_value = (Value::Number(-n), final_value.1.clone());
                         } else {
-                            panic!(compile_error("Cannot make non number type negative!", info))
+                            return Err(RuntimeError::RuntimeError {
+                                message: "Cannot make non-number type negative".to_string(),
+                                pos: (0, 0),
+                            });
                         }
                     }
 
@@ -1283,7 +1355,10 @@ impl ast::Variable {
                         if let Value::Bool(b) = final_value.0 {
                             *final_value = (Value::Bool(!b), final_value.1.clone());
                         } else {
-                            panic!(compile_error("Cannot nagate non-boolean value", info))
+                            return Err(RuntimeError::RuntimeError {
+                                message: "Cannot negate non-boolean type".to_string(),
+                                pos: (0, 0),
+                            });
                         }
                     }
 
@@ -1309,7 +1384,7 @@ impl ast::Variable {
             }
         }
 
-        (out, inner_returns)
+        Ok((out, inner_returns))
     }
 }
 
@@ -1319,7 +1394,7 @@ impl ast::CompoundStatement {
         context: &Context,
         globals: &mut Globals,
         info: CompilerInfo,
-    ) -> (Function, Returns) {
+    ) -> Result<(Function, Returns), RuntimeError> {
         //create the function context
         let mut new_context = context.clone();
 
@@ -1327,14 +1402,14 @@ impl ast::CompoundStatement {
 
         //pick a start group
         let start_group = Group {
-            id: next_free(&mut globals.closed_groups),
+            id: next_free(&mut globals.closed_groups, ast::IDClass::Group)?,
         };
 
         new_context.start_group = start_group;
         let new_info = info.next("function body", globals, true);
         let (_, inner_returns) =
-            compile_scope(&self.statements, vec![new_context], globals, new_info);
+            compile_scope(&self.statements, vec![new_context], globals, new_info)?;
 
-        (Function { start_group }, inner_returns)
+        Ok((Function { start_group }, inner_returns))
     }
 }
