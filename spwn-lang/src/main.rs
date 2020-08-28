@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(p) => p,
     };
 
-    //println!("parsed: {:?}", statements);
+    // println!("parsed: {:?}", statements);
     // for statement in statements.iter() {
     //     println!("{:?}\n\n", statement);
     // }
@@ -47,14 +47,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let (mut compiled, old_ls) =
-        compiler::compile_spwn(statements, script_path, gd_path.clone(), notes);
+        match compiler::compile_spwn(statements, script_path, gd_path.clone(), notes) {
+            Err(err) => {
+                eprintln!("{}", err);
+                std::process::exit(256);
+            }
+            Ok(p) => p,
+        };
     let level_string = levelstring::serialize_triggers(compiled.func_ids);
 
     compiled.closed_groups.sort();
     compiled.closed_groups.dedup();
 
     println!("Using {} groups", compiled.closed_groups.len());
-    levelstring::encrypt_level_string(level_string, old_ls, gd_path);
-    println!("Written to save. You can now open Geometry Dash again!");
+
+    println!("level_string: {}", level_string);
+    //levelstring::encrypt_level_string(level_string, old_ls, gd_path);
+    //println!("Written to save. You can now open Geometry Dash again!");
     Ok(())
 }

@@ -5,26 +5,89 @@ use crate::levelstring::*;
 use std::collections::HashMap;
 
 //use std::collections::HashMap;
-use crate::parser::ParseNotes;
+use crate::parser::{ParseNotes, SyntaxError};
 use std::fs;
 use std::path::PathBuf;
 
 use crate::compiler_types::*;
 //use ValSuccess::{Evaluatable, Literal};
 
+#[derive(Debug)]
+pub enum RuntimeError {
+    UndefinedErr {
+        undefined: String,
+        pos: (usize, usize),
+    },
+
+    PackageSyntaxError {
+        err: SyntaxError,
+        pos: (usize, usize),
+    },
+
+    IDError {
+        id_class: ast::IDClass,
+        pos: (usize, usize),
+    },
+
+    RuntimeError {
+        message: String,
+        pos: (usize, usize),
+    },
+}
+
+impl std::fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        //write!(f, "SuperErrorSideKick is here!")
+        //let mut message = String::from("Runtime/compile error:");
+        match self {
+            RuntimeError::UndefinedErr { undefined, pos } => write!(
+                f,
+                "'{}' is not defined at line {}, pos {}",
+                undefined, pos.0, pos.1
+            ),
+            RuntimeError::PackageSyntaxError { err, pos } => write!(
+                f,
+                "Error when parsing library at line {}, pos {}: {}",
+                pos.0, pos.1, err
+            ),
+            RuntimeError::IDError { id_class, pos } => write!(
+                f,
+                "Ran out of {} at line {}, pos {}",
+                match id_class {
+                    ast::IDClass::Group => "groups",
+                    ast::IDClass::Color => "colors",
+                    ast::IDClass::Item => "item IDs",
+                    ast::IDClass::Block => "collision block IDs",
+                },
+                pos.0,
+                pos.1
+            ),
+            RuntimeError::RuntimeError { message, pos } => {
+                write!(f, "{} (line {}, pos {})", message, pos.0, pos.1)
+            }
+        }
+    }
+}
+
+impl std::error::Error for RuntimeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
     path: PathBuf,
     gd_path: PathBuf,
     notes: ParseNotes,
-) -> (Globals, String) {
+) -> Result<(Globals, String), RuntimeError> {
     //variables that get changed throughout the compiling
     let mut globals = Globals {
         closed_groups: notes.closed_groups,
         closed_colors: notes.closed_colors,
         closed_blocks: notes.closed_blocks,
         closed_items: notes.closed_items,
-        path: path,
+        path,
 
         lowest_y: HashMap::new(),
         stored_values: Vec::new(),
@@ -38,7 +101,7 @@ pub fn compile_spwn(
 
     println!("Loading level data...");
 
-    let file_content =
+    /*let file_content =
         fs::read_to_string(gd_path).expect("Your local geometry dash files were not found");
     let level_string = get_level_string(file_content)
         //remove previous spwn objects
@@ -58,7 +121,7 @@ pub fn compile_spwn(
         })
         .collect::<Vec<&str>>()
         .join(";");
-    get_used_ids(&level_string, &mut globals);
+    get_used_ids(&level_string, &mut globals);*/
 
     let start_info = CompilerInfo {
         depth: 0,
@@ -71,7 +134,7 @@ pub fn compile_spwn(
     println!("Compiling script...");
     let start_time = Instant::now();
 
-    compile_scope(&statements, vec![Context::new()], &mut globals, start_info);
+    compile_scope(&statements, vec![Context::new()], &mut globals, start_info)?;
 
     //delete all unused func ids
 
@@ -111,7 +174,7 @@ pub fn compile_spwn(
         start_time.elapsed().as_millis()
     );
 
-    (globals, level_string)
+    Ok((globals, "level_string".to_string()))
 }
 
 pub fn compile_scope(
@@ -119,7 +182,7 @@ pub fn compile_scope(
     mut contexts: Vec<Context>,
     globals: &mut Globals,
     mut info: CompilerInfo,
-) -> (Vec<Context>, Returns) {
+) -> Result<(Vec<Context>, Returns), RuntimeError> {
     let mut statements_iter = statements.iter();
 
     let mut returns: Returns = Vec::new();
@@ -142,10 +205,10 @@ pub fn compile_scope(
             contexts.len()
         );*/
         if contexts.is_empty() {
-            panic!(compile_error(
-                "No context! This is probably a bug, please contact sputnix.",
-                info.clone(),
-            ))
+            return Err(RuntimeError::RuntimeError {
+                message: "No context! This is probably a bug, please contact sputnix".to_string(),
+                pos: (0, 0),
+            });
         }
         use ast::StatementBody::*;
 
@@ -162,7 +225,7 @@ pub fn compile_scope(
                 let mut new_contexts: Vec<Context> = Vec::new();
                 for context in contexts {
                     //we dont care about the return value in this case
-                    let (evaled, inner_returns) = expr.eval(context, globals, info.clone());
+                    let (evaled, inner_returns) = expr.eval(context, globals, info.clone())?;
                     returns.extend(inner_returns);
                     new_contexts.extend(evaled.iter().map(|x| x.1.clone()));
                 }
@@ -180,7 +243,7 @@ pub fn compile_scope(
                             new_context.spawn_triggered = true;
                             //pick a start group
                             let start_group = Group {
-                                id: next_free(&mut globals.closed_groups),
+                                id: next_free(&mut globals.closed_groups, ast::IDClass::Group)?,
                             };
                             new_context.variables.insert(
                                 def.symbol.clone(),
@@ -190,17 +253,17 @@ pub fn compile_scope(
                             new_context.start_group = start_group;
                             let new_info = info.next(&def.symbol, globals, true);
                             let (_, inner_returns) =
-                                compile_scope(&f.statements, vec![new_context], globals, new_info);
+                                compile_scope(&f.statements, vec![new_context], globals, new_info)?;
                             returns.extend(inner_returns);
                         } else {
                             let (evaled, inner_returns) =
-                                def.value.eval(context, globals, info.clone());
+                                def.value.eval(context, globals, info.clone())?;
                             returns.extend(inner_returns);
                             all_values.extend(evaled);
                         }
                     } else {
                         let (evaled, inner_returns) =
-                            def.value.eval(context, globals, info.clone());
+                            def.value.eval(context, globals, info.clone())?;
                         returns.extend(inner_returns);
                         all_values.extend(evaled);
                     }
@@ -219,7 +282,7 @@ pub fn compile_scope(
             Extract(val) => {
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
-                    let (evaled, inner_returns) = val.eval(context, globals, info.clone());
+                    let (evaled, inner_returns) = val.eval(context, globals, info.clone())?;
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
@@ -230,10 +293,12 @@ pub fn compile_scope(
                         Value::Dict(d) => {
                             context.variables.extend(d.clone());
                         }
-                        _ => panic!(compile_error(
-                            "Only dict can have their values extracted",
-                            info
-                        )),
+                        a => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!("This type ({}) can not be extracted!", a),
+                                pos: (0, 0),
+                            })
+                        }
                     }
 
                     contexts.push(context);
@@ -245,7 +310,7 @@ pub fn compile_scope(
                 for context in contexts.clone() {
                     let new_info = info.next("if condition", globals, false);
                     let (evaled, inner_returns) =
-                        if_stmt.condition.eval(context, globals, new_info);
+                        if_stmt.condition.eval(context, globals, new_info)?;
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
@@ -262,7 +327,7 @@ pub fn compile_scope(
                                     vec![context],
                                     globals,
                                     new_info,
-                                );
+                                )?;
                                 returns.extend(compiled.1);
                                 contexts.extend(compiled.0);
                             } else {
@@ -271,7 +336,7 @@ pub fn compile_scope(
                                         contexts = Vec::new();
                                         let new_info = info.next("else body", globals, true);
                                         let compiled =
-                                            compile_scope(body, vec![context], globals, new_info);
+                                            compile_scope(body, vec![context], globals, new_info)?;
                                         returns.extend(compiled.1);
                                         contexts.extend(compiled.0);
                                     }
@@ -279,10 +344,15 @@ pub fn compile_scope(
                                 };
                             }
                         }
-                        _ => panic!(compile_error(
-                            "Expected boolean condition in if statement",
-                            info
-                        )),
+                        a => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!(
+                                    "Expected boolean condition in if statement, found {}",
+                                    a
+                                ),
+                                pos: (0, 0),
+                            })
+                        }
                     }
                 }
             }
@@ -292,13 +362,13 @@ pub fn compile_scope(
                 for context in contexts.clone() {
                     let new_info = info.next("implementation symbol", globals, false);
                     let (evaled, inner_returns) =
-                        imp.symbol.to_value(context.clone(), globals, new_info);
+                        imp.symbol.to_value(context.clone(), globals, new_info)?;
                     returns.extend(inner_returns);
                     for (typ, c) in evaled {
                         if let Value::Str(s) = typ {
                             let new_info = info.next("implementation", globals, true);
                             let (evaled, inner_returns) =
-                                eval_dict(imp.members.clone(), c, globals, new_info);
+                                eval_dict(imp.members.clone(), c, globals, new_info)?;
                             returns.extend(inner_returns);
                             for (val, c2) in evaled {
                                 let mut new_context = c2.clone();
@@ -320,14 +390,15 @@ pub fn compile_scope(
                             }
                         /**/
                         } else {
-                            panic!(compile_error("Must implement on a type (a string)", info));
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!("Implemening on types other than literal strings is currently not supported."),
+                                pos: (0,0)
+                            });
                         }
                     }
                 }
                 //println!("{:?}", new_contexts[0].implementations);
                 contexts = new_contexts;
-
-                /**/
             }
             Call(call) => {
                 /*for context in &mut contexts {
@@ -336,7 +407,7 @@ pub fn compile_scope(
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
                     let (evaled, inner_returns) =
-                        call.function.to_value(context, globals, info.clone());
+                        call.function.to_value(context, globals, info.clone())?;
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
@@ -351,7 +422,15 @@ pub fn compile_scope(
                             target: match func {
                                 Value::Func(g) => g.start_group,
                                 Value::Group(g) => g,
-                                _ => panic!(compile_error("Not callable", info.clone())),
+                                a => {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: format!(
+                                            "Expected function of group, found: {}",
+                                            a
+                                        ),
+                                        pos: (0, 0),
+                                    })
+                                }
                             },
 
                             ..context_trigger(context.clone(), globals, info.clone())
@@ -365,7 +444,7 @@ pub fn compile_scope(
             For(f) => {
                 let mut all_arrays: Returns = Vec::new();
                 for context in contexts {
-                    let (evaled, inner_returns) = f.array.eval(context, globals, info.clone());
+                    let (evaled, inner_returns) = f.array.eval(context, globals, info.clone())?;
                     returns.extend(inner_returns);
                     all_arrays.extend(evaled);
                 }
@@ -383,7 +462,7 @@ pub fn compile_scope(
                                     ); //this will store a lot of values, maybe fix this sometime idk
                                     let new_info = info.next("for loop", globals, false);
                                     let (end_contexts, inner_returns) =
-                                        compile_scope(&f.body, vec![c], globals, new_info);
+                                        compile_scope(&f.body, vec![c], globals, new_info)?;
                                     returns.extend(inner_returns);
                                     new_contexts = end_contexts;
                                 }
@@ -391,13 +470,12 @@ pub fn compile_scope(
                             contexts.extend(new_contexts);
                         }
 
-                        _ => panic!(compile_error(
-                            &format!(
-                                "Expected array, got {:?}",
-                                val.member("TYPE".to_string(), &context, globals, info.clone())
-                            ),
-                            info
-                        )),
+                        a => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!("{} is not iteratable!", a),
+                                pos: (0, 0),
+                            })
+                        }
                     }
                 }
             }
@@ -406,7 +484,7 @@ pub fn compile_scope(
                     let mut all_values: Returns = Vec::new();
                     for context in contexts.clone() {
                         let new_info = info.next("implementation symbol", globals, false);
-                        let (evaled, inner_returns) = val.eval(context, globals, new_info);
+                        let (evaled, inner_returns) = val.eval(context, globals, new_info)?;
                         returns.extend(inner_returns);
                         all_values.extend(evaled);
                     }
@@ -426,9 +504,9 @@ pub fn compile_scope(
             Error(e) => {
                 for context in contexts.clone() {
                     let new_info = info.next("return value", globals, false);
-                    let (evaled, _) = e.message.eval(context, globals, new_info);
+                    let (evaled, _) = e.message.eval(context, globals, new_info)?;
                     for (msg, _) in evaled {
-                        println!(
+                        eprintln!(
                             "ERROR: {:?}",
                             match msg {
                                 Value::Str(s) => s,
@@ -437,10 +515,10 @@ pub fn compile_scope(
                         );
                     }
                 }
-                panic!(compile_error(
-                    "Error statement, see message(s) above.",
-                    info
-                ))
+                return Err(RuntimeError::RuntimeError {
+                    message: "Error statement, see message(s) above.".to_string(),
+                    pos: (0, 0),
+                });
             }
         }
         if let Some(c) = stored_context {
@@ -457,14 +535,14 @@ pub fn compile_scope(
     }
 
     //(*globals).highest_x = context.x;
-    (contexts, returns)
+    Ok((contexts, returns))
 }
 
 pub fn import_module(
     path: &PathBuf,
     globals: &mut Globals,
     info: CompilerInfo,
-) -> (Value, Implementations) {
+) -> Result<(Value, Implementations), RuntimeError> {
     let module_path = globals
         .path
         .clone()
@@ -479,30 +557,36 @@ pub fn import_module(
     (*globals).closed_blocks.extend(notes.closed_blocks);
     (*globals).closed_items.extend(notes.closed_items);
     let new_info = info.next("module", globals, false);
-    let (contexts, _) = compile_scope(&parsed, vec![Context::new()], globals, new_info);
+    let (contexts, _) = compile_scope(&parsed, vec![Context::new()], globals, new_info)?;
     if contexts.len() > 1 {
-        panic!(
-            "Imported files does not (currently) support context splitting in the main scope.
-            Please remove any context splitting statements outside of function or macro definitions."
-        )
+        return Err(RuntimeError::RuntimeError {
+            message: "Imported files does not (currently) support context splitting in the main scope.
+            Please remove any context splitting statements outside of function or macro definitions.".to_string(),
+            pos: (0,0)
+        });
     }
-    (
+    Ok((
         match contexts[0].variables.get("exports") {
             Some(val) => (*globals).stored_values[*val as usize].clone(),
             None => Value::Null,
         },
         contexts[0].implementations.clone(),
-    )
+    ))
 }
 
 const ID_MAX: u16 = 999;
 
-pub fn next_free(ids: &mut Vec<u16>) -> u16 {
+pub fn next_free(ids: &mut Vec<u16>, id_class: ast::IDClass) -> Result<u16, RuntimeError> {
     for i in 1..ID_MAX {
         if !ids.contains(&i) {
             (*ids).push(i);
-            return i;
+            return Ok(i);
         }
     }
-    panic!("All ids of this type are used up!");
+
+    Err(RuntimeError::IDError {
+        id_class,
+        pos: (0, 0),
+    })
+    //panic!("All ids of this type are used up!");
 }

@@ -1,44 +1,8 @@
 extract import "std.spwn"
 
+for i in 1..
+10g.move(10, 20, 0.5)
 
 
 
-// when this item turns to 1, it means the process can move forward
-ready_sign = ?i
 
-$.print("ready_sign: ", ready_sign)
-
-wait_for_ready = () {
-	closure = {
-		on(ready_sign.count(1), {
-			ready_sign.add(-1)
-			wait(0.01)
-			closure.stop()
-			return
-		})
-	}
-
-	
-	closure!
-}
-
-
-find_threads = {
-	wait(0.1)
-	for i in 0..10 {
-		
-
-				
-		?i.if_is(EQUAL_TO, 0, {
-			//first piece is empty, so return
-			?i.if_is(EQUAL_TO, 1, {
-				return
-			})
-		})
-			
-		
-		
-	}
-	
-	ready_sign.add(1)
-}
