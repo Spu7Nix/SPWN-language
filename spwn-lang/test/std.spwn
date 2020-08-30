@@ -237,29 +237,31 @@ impl @item {
     },
 }
 
+type mut
+
 mut = (source: 0){
-    if source.TYPE == @number {
+    if source.type == @number {
         id = ?i
     
         id.add(source)
         
         return {
-            TYPE: @mut,
+            type: @mut,
             item: id
         }
-    } else if source.TYPE == @item {
+    } else if source.type == @item {
         return {
-            TYPE: @mut,
+            type: @mut,
             item: source
         }
-    } else if source.TYPE == @bool {
+    } else if source.type == @bool {
         id = ?i
     
         if source {
             id.add(1)
         }
         return {
-            TYPE: @mut,
+            type: @mut,
             item: id
         }
     } else {
@@ -348,11 +350,11 @@ impl @mut {
     },
 
     multiply: (self, factor, speed: 1) {
-        if factor.TYPE == @number {
+        if factor.type == @number {
             temp = mut(0)
             self.add_to([temp.item], speed, factor)
             temp.add_to([self.item], speed)
-        } else if factor.TYPE == @mut {
+        } else if factor.type == @mut {
             
             temp = mut(0)
             mini_mult = (num){
@@ -390,7 +392,7 @@ impl @mut {
 
     divide: (self, divisor, speed: 1, rest_item: ?i) {
 
-        if divisor.TYPE == @number {
+        if divisor.type == @number {
             result = mut(0)
 
             rest = mut(rest_item)
@@ -422,7 +424,7 @@ impl @mut {
                 })
             }
             div!
-        } else if divisor.TYPE == @mut {
+        } else if divisor.type == @mut {
             result = mut(0)
 
             // IDEA:
@@ -615,17 +617,17 @@ impl @mut {
     },
 
     _plus_: (self, other) {
-        if other.TYPE == @number {
+        if other.type == @number {
             new_mut = self.clone()
             new_mut.item.add(other)
-        } else if other.TYPE == @mut {
+        } else if other.type == @mut {
             new_mut = self.clone()
             other.clone().add_to([new_mut.item])
         }
     },
 
     _minus_: (self, other) {
-        if other.TYPE == @number {
+        if other.type == @number {
             new_mut = self.clone()
             new_mut.item.add(-other)
         }
@@ -633,7 +635,7 @@ impl @mut {
 
     _more_than_: (self, other) {
         //TODO: add case for another mut
-        if other.TYPE == @number {
+        if other.type == @number {
             self.item.if_is(LARGER_THAN, other, {
                 return true
             })
@@ -646,7 +648,7 @@ impl @mut {
 
     _less_than_: (self, other) {
         //TODO: add case for another mut
-        if other.TYPE == @number {
+        if other.type == @number {
             self.item.if_is(SMALLER_THAN, other, {
                 return true
             })
@@ -659,7 +661,7 @@ impl @mut {
 
     _more_or_equal_: (self, other) {
         //TODO: add case for another mut
-        if other.TYPE == @number {
+        if other.type == @number {
             self.item.if_is(LARGER_THAN, other - 1, {
                 return true
             })
@@ -672,7 +674,7 @@ impl @mut {
 
     _less_or_equal_: (self, other) {
         //TODO: add case for another mut
-        if other.TYPE == @number {
+        if other.type == @number {
             self.item.if_is(SMALLER_THAN, other + 1, {
                 return true
             })
@@ -684,7 +686,7 @@ impl @mut {
     },
 
     _equal_: (self, other) {
-        if other.TYPE == @number {
+        if other.type == @number {
             self.item.if_is(EQUAL_TO, other, {
                 return true
             })
@@ -699,7 +701,7 @@ impl @mut {
     },
 
     _not_equal_: (self, other) {
-        if other.TYPE == @number {
+        if other.type == @number {
             self.item.if_is(EQUAL_TO, other, {
                 return false
             })
@@ -728,8 +730,8 @@ impl @mut {
     },
     
 
-    _as_: (self, type) {
-        if type == @bool {
+    _as_: (self, _type) {
+        if _type == @bool {
             return self.to_const([0, 1]) == 1
         } else {
             error "Cannot convert to this type (mut can convert to a number using the mut.to_const macro)"

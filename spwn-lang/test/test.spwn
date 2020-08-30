@@ -1,9 +1,8 @@
-a = {
-	b: 100, 
-	c: 29,
-}
 
-$.print(a.c)
+
+macro = (@number a: 3, @string b: "hi") {
+
+}
 
 
 

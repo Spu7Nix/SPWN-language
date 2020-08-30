@@ -23,6 +23,8 @@ pub enum StatementBody {
     Call(Call),
     Expr(Expression),
 
+    TypeDef(String),
+
     Return(Option<Expression>),
     Impl(Implementation),
     If(If),

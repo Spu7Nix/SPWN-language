@@ -1094,12 +1094,10 @@ impl ast::Variable {
                     match globals.type_ids.get(name) {
                         Some(id) => Value::TypeIndicator(*id),
                         None => {
-                            //initialize type
-                            (*globals).type_id_count += 1;
-                            (*globals)
-                                .type_ids
-                                .insert(name.clone(), globals.type_id_count);
-                            Value::TypeIndicator(globals.type_id_count)
+                            return Err(RuntimeError::UndefinedErr {
+                                undefined: name.clone(),
+                                pos: (0, 0),
+                            });
                         }
                     },
                     context,

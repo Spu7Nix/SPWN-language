@@ -39,7 +39,7 @@ pub fn context_trigger(context: Context, _globals: &mut Globals, info: CompilerI
     }
 }
 
-const TYPE_MEMBER_NAME: &str = "TYPE";
+const TYPE_MEMBER_NAME: &str = "type";
 impl Value {
     pub fn member(
         &self,

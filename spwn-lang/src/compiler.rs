@@ -340,6 +340,15 @@ pub fn compile_scope(
                 }
             }
 
+            TypeDef(name) => {
+                //initialize type
+                (*globals).type_id_count += 1;
+                (*globals)
+                    .type_ids
+                    .insert(name.clone(), globals.type_id_count);
+                //Value::TypeIndicator(globals.type_id_count)
+            }
+
             If(if_stmt) => {
                 let mut all_values: Returns = Vec::new();
                 for context in contexts.clone() {

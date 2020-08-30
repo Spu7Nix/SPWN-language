@@ -11,7 +11,7 @@ use logos::Logos;
 
 use std::error::Error;
 use std::fmt;
-
+//TODO: add type defining statement
 #[derive(Debug)]
 pub enum SyntaxError {
     ExpectedErr {
@@ -206,6 +206,9 @@ pub enum Token {
 
     #[token("null")]
     Null,
+
+    #[token("type")]
+    Type,
 
     //STATEMENT SEPARATOR
     #[regex(r"[\n\r;]([ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*|[\n\r;])*")]
@@ -575,6 +578,17 @@ pub fn parse_statement(
             message: parse_expr(tokens, notes)?,
         }),
 
+        Some(Token::Type) => match tokens.next(false) {
+            Some(Token::Symbol) => ast::StatementBody::TypeDef(tokens.slice()),
+            a => {
+                return Err(SyntaxError::ExpectedErr {
+                    expected: "type name".to_string(),
+                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    pos: (0, 0),
+                })
+            }
+        },
+
         Some(Token::Implement) => {
             //parse impl statement
             let symbol = parse_variable(tokens, notes)?;
@@ -696,7 +710,7 @@ fn parse_dict(
 
     loop {
         match tokens.next(false) {
-            Some(Token::Symbol) => {
+            Some(Token::Symbol) | Some(Token::Type) => {
                 let symbol = tokens.slice();
 
                 match tokens.next(false) {
@@ -1207,7 +1221,9 @@ fn parse_variable(
             }
             Some(Token::OpenBracket) => path.push(ast::Path::Call(parse_args(tokens, notes)?)),
             Some(Token::Period) => match tokens.next(false) {
-                Some(Token::Symbol) => path.push(ast::Path::Member(tokens.slice())),
+                Some(Token::Symbol) | Some(Token::Type) => {
+                    path.push(ast::Path::Member(tokens.slice()))
+                }
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "member name".to_string(),
