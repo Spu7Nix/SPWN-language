@@ -1,3 +1,5 @@
+#![feature(arbitrary_enum_discriminant)]
+
 mod ast;
 mod builtin;
 mod compiler;
@@ -61,8 +63,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Using {} groups", compiled.closed_groups.len());
 
-    println!("level_string: {}", level_string);
-    //levelstring::encrypt_level_string(level_string, old_ls, gd_path);
-    //println!("Written to save. You can now open Geometry Dash again!");
+    //println!("level_string: {}", level_string);
+    levelstring::encrypt_level_string(level_string, old_ls, gd_path);
+    println!("Written to save. You can now open Geometry Dash again!");
     Ok(())
 }

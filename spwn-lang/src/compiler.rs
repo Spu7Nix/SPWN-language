@@ -33,6 +33,11 @@ pub enum RuntimeError {
         message: String,
         pos: (usize, usize),
     },
+
+    BuiltinError {
+        message: String,
+        pos: (usize, usize),
+    },
 }
 
 impl std::fmt::Display for RuntimeError {
@@ -65,6 +70,12 @@ impl std::fmt::Display for RuntimeError {
             RuntimeError::RuntimeError { message, pos } => {
                 write!(f, "{} (line {}, pos {})", message, pos.0, pos.1)
             }
+
+            RuntimeError::BuiltinError { message, pos } => write!(
+                f,
+                "Error when calling built-in-function: {} (line {}, pos {})",
+                message, pos.0, pos.1
+            ),
         }
     }
 }
@@ -90,6 +101,10 @@ pub fn compile_spwn(
         path,
 
         lowest_y: HashMap::new(),
+
+        type_ids: HashMap::new(),
+        type_id_count: 15,
+
         stored_values: Vec::new(),
         func_ids: vec![FunctionID {
             name: "main scope".to_string(),
@@ -99,9 +114,26 @@ pub fn compile_spwn(
         }],
     };
 
+    globals.type_ids.insert(String::from("group"), 0);
+    globals.type_ids.insert(String::from("color"), 1);
+    globals.type_ids.insert(String::from("block"), 2);
+    globals.type_ids.insert(String::from("item"), 3);
+    globals.type_ids.insert(String::from("number"), 4);
+    globals.type_ids.insert(String::from("bool"), 5);
+    globals.type_ids.insert(String::from("function"), 6);
+    globals.type_ids.insert(String::from("dictionary"), 7);
+    globals.type_ids.insert(String::from("macro"), 8);
+    globals.type_ids.insert(String::from("string"), 9);
+    globals.type_ids.insert(String::from("array"), 10);
+    globals.type_ids.insert(String::from("object"), 11);
+    globals.type_ids.insert(String::from("spwn"), 13);
+    globals.type_ids.insert(String::from("builtin"), 13);
+    globals.type_ids.insert(String::from("type"), 14);
+    globals.type_ids.insert(String::from("null"), 15);
+
     println!("Loading level data...");
 
-    /*let file_content =
+    let file_content =
         fs::read_to_string(gd_path).expect("Your local geometry dash files were not found");
     let level_string = get_level_string(file_content)
         //remove previous spwn objects
@@ -121,7 +153,7 @@ pub fn compile_spwn(
         })
         .collect::<Vec<&str>>()
         .join(";");
-    get_used_ids(&level_string, &mut globals);*/
+    get_used_ids(&level_string, &mut globals);
 
     let start_info = CompilerInfo {
         depth: 0,
@@ -174,7 +206,7 @@ pub fn compile_spwn(
         start_time.elapsed().as_millis()
     );
 
-    Ok((globals, "level_string".to_string()))
+    Ok((globals, level_string))
 }
 
 pub fn compile_scope(
@@ -295,7 +327,10 @@ pub fn compile_scope(
                         }
                         a => {
                             return Err(RuntimeError::RuntimeError {
-                                message: format!("This type ({}) can not be extracted!", a),
+                                message: format!(
+                                    "This type ({}) can not be extracted!",
+                                    a.to_str(globals)
+                                ),
                                 pos: (0, 0),
                             })
                         }
@@ -348,7 +383,7 @@ pub fn compile_scope(
                             return Err(RuntimeError::RuntimeError {
                                 message: format!(
                                     "Expected boolean condition in if statement, found {}",
-                                    a
+                                    a.to_str(globals)
                                 ),
                                 pos: (0, 0),
                             })
@@ -365,35 +400,40 @@ pub fn compile_scope(
                         imp.symbol.to_value(context.clone(), globals, new_info)?;
                     returns.extend(inner_returns);
                     for (typ, c) in evaled {
-                        if let Value::Str(s) = typ {
-                            let new_info = info.next("implementation", globals, true);
-                            let (evaled, inner_returns) =
-                                eval_dict(imp.members.clone(), c, globals, new_info)?;
-                            returns.extend(inner_returns);
-                            for (val, c2) in evaled {
-                                let mut new_context = c2.clone();
-                                if let Value::Dict(d) = val {
-                                    match new_context.implementations.get_mut(&s) {
-                                        Some(implementation) => {
-                                            for (key, val) in d.into_iter() {
-                                                (*implementation).insert(key, val);
+                        match typ {
+                            Value::TypeIndicator(s) => {
+                                let new_info = info.next("implementation", globals, true);
+                                let (evaled, inner_returns) =
+                                    eval_dict(imp.members.clone(), c, globals, new_info)?;
+                                returns.extend(inner_returns);
+                                for (val, c2) in evaled {
+                                    let mut new_context = c2.clone();
+                                    if let Value::Dict(d) = val {
+                                        match new_context.implementations.get_mut(&s) {
+                                            Some(implementation) => {
+                                                for (key, val) in d.into_iter() {
+                                                    (*implementation).insert(key, val);
+                                                }
+                                            }
+                                            None => {
+                                                new_context.implementations.insert(s.clone(), d);
                                             }
                                         }
-                                        None => {
-                                            new_context.implementations.insert(s.clone(), d);
-                                        }
+                                    } else {
+                                        unreachable!();
                                     }
-                                } else {
-                                    unreachable!();
+                                    new_contexts.push(new_context);
                                 }
-                                new_contexts.push(new_context);
                             }
-                        /**/
-                        } else {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!("Implemening on types other than literal strings is currently not supported."),
-                                pos: (0,0)
-                            });
+                            a => {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: format!(
+                                        "Expected type-indicator, found {}",
+                                        a.to_str(globals)
+                                    ),
+                                    pos: (0, 0),
+                                })
+                            }
                         }
                     }
                 }
@@ -426,7 +466,7 @@ pub fn compile_scope(
                                     return Err(RuntimeError::RuntimeError {
                                         message: format!(
                                             "Expected function of group, found: {}",
-                                            a
+                                            a.to_str(globals)
                                         ),
                                         pos: (0, 0),
                                     })
@@ -472,7 +512,7 @@ pub fn compile_scope(
 
                         a => {
                             return Err(RuntimeError::RuntimeError {
-                                message: format!("{} is not iteratable!", a),
+                                message: format!("{} is not iteratable!", a.to_str(globals)),
                                 pos: (0, 0),
                             })
                         }
@@ -551,7 +591,10 @@ pub fn import_module(
         .join(&path);
 
     let unparsed = fs::read_to_string(module_path).expect("Something went wrong reading the file");
-    let (parsed, notes) = crate::parse_spwn(unparsed).unwrap();
+    let (parsed, notes) = match crate::parse_spwn(unparsed) {
+        Ok(p) => p,
+        Err(err) => return Err(RuntimeError::PackageSyntaxError { err, pos: (0, 0) }),
+    };
     (*globals).closed_groups.extend(notes.closed_groups);
     (*globals).closed_colors.extend(notes.closed_colors);
     (*globals).closed_blocks.extend(notes.closed_blocks);

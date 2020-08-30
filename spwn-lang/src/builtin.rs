@@ -3,6 +3,7 @@
 use crate::compiler_types::*;
 use crate::levelstring::*;
 //use std::collections::HashMap;
+use crate::compiler::RuntimeError;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Group {
@@ -27,7 +28,7 @@ pub struct Item {
     pub id: u16,
 }
 
-pub fn context_trigger(context: Context, globals: &mut Globals, info: CompilerInfo) -> GDObj {
+pub fn context_trigger(context: Context, _globals: &mut Globals, info: CompilerInfo) -> GDObj {
     GDObj {
         obj_id: 0,
         groups: vec![context.start_group],
@@ -48,75 +49,61 @@ impl Value {
         _: CompilerInfo,
     ) -> Option<Value> {
         //println!("{:?}", context.implementations);
-        let get_impl = |t: String, m: String| match context.implementations.get(&(t)) {
+        let get_impl = |t: u16, m: String| match context.implementations.get(&(t)) {
             Some(imp) => match imp.get(&m) {
                 Some(mem) => Some((*globals).stored_values[*mem as usize].clone()),
                 None => None,
             },
             None => None,
         };
-        let my_type = match self {
-            Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
-                Some(value) => match (*globals).stored_values[*value as usize].clone() {
-                    Value::Str(s) => s,
-                    _ => unreachable!(),
-                },
-                None => "dictionary".to_string(),
-            },
-
-            Value::Func(f) => {
-                if member == "group" {
-                    return Some(Value::Group(f.start_group));
-                }
-                "function".to_string()
-            }
-            Value::Group(_) => "group".to_string(),
-            Value::Color(_) => "color".to_string(),
-            Value::Block(_) => "block".to_string(),
-            Value::Item(_) => "item".to_string(),
-            Value::Number(_) => "number".to_string(),
-            Value::Bool(_) => "boolean".to_string(),
-            Value::Macro(_) => "macro".to_string(),
-            Value::Str(a) => {
-                if member == "length" {
-                    return Some(Value::Number(a.len() as f64));
-                }
-                "string".to_string()
-            }
-            Value::Array(a) => {
-                if member == "length" {
-                    return Some(Value::Number(a.len() as f64));
-                }
-                "array".to_string()
-            }
-            Value::Obj(_) => "object".to_string(),
-            Value::Builtins => {
-                if member == "TYPE" {
-                    "SPWN".to_string()
-                } else {
-                    return Some(Value::BuiltinFunction(member));
-                }
-            }
-            Value::BuiltinFunction(_) => "built-in function".to_string(),
-            Value::Null => "null".to_string(),
-        };
-
         if member == TYPE_MEMBER_NAME {
-            return Some(Value::Str(my_type.to_string()));
+            Some(Value::TypeIndicator(match self {
+                Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
+                    Some(value) => match (*globals).stored_values[*value as usize].clone() {
+                        Value::TypeIndicator(s) => s,
+                        _ => unreachable!(),
+                    },
+                    None => TypeID::from(self),
+                },
+
+                _ => TypeID::from(self),
+            }))
         } else {
             match self {
+                Value::Func(f) => {
+                    if member == "group" {
+                        return Some(Value::Group(f.start_group));
+                    }
+                }
+
+                Value::Str(a) => {
+                    if member == "length" {
+                        return Some(Value::Number(a.len() as f64));
+                    }
+                }
+                Value::Array(a) => {
+                    if member == "length" {
+                        return Some(Value::Number(a.len() as f64));
+                    }
+                }
+                _ => (),
+            };
+
+            let my_type = TypeID::from(self);
+            match self {
+                Value::Builtins => Some(Value::BuiltinFunction(member)),
                 Value::Dict(dict) => match dict.get(&member) {
                     Some(value) => Some((*globals).stored_values[*value as usize].clone()),
-                    None => get_impl(my_type.to_string(), member).clone(),
+                    None => get_impl(my_type, member).clone(),
                 },
                 Value::Func(f) => {
                     if &member == "start_group" {
                         Some(Value::Group(f.start_group))
                     } else {
-                        get_impl(my_type.to_string(), member).clone()
+                        get_impl(my_type, member).clone()
                     }
                 }
-                _ => get_impl(my_type.to_string(), member).clone(),
+                _ => get_impl(my_type, member).clone(),
             }
         }
     }
@@ -128,21 +115,24 @@ pub fn built_in_function(
     info: CompilerInfo,
     globals: &mut Globals,
     context: Context,
-) -> Value {
-    match name {
+) -> Result<Value, RuntimeError> {
+    Ok(match name {
         "print" => {
             let mut out = String::new();
             for val in arguments {
-                out += &format!("{} ", val);
+                out += &val.to_str(globals);
             }
-            out.pop();
+            //out.pop();
             println!("{}", out);
             Value::Null
         }
 
         "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "floor" | "ceil" => {
             if arguments.len() != 1 {
-                panic!(compile_error("Expected one argument", info))
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected one error".to_string(),
+                    pos: (0, 0),
+                });
             }
 
             match &arguments[0] {
@@ -159,16 +149,21 @@ pub fn built_in_function(
                     _ => unreachable!(),
                 }),
 
-                a => panic!(compile_error(
-                    &format!("Expected number, found: {}", a),
-                    info
-                )),
+                a => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected number, found {}", a.to_str(globals)),
+                        pos: (0, 0),
+                    })
+                }
             }
         }
 
         "add" => {
             if arguments.len() != 1 {
-                panic!(compile_error("Expected one argument", info))
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected one error".to_string(),
+                    pos: (0, 0),
+                });
             }
 
             match &arguments[0] {
@@ -184,7 +179,12 @@ pub fn built_in_function(
                     );
                 }
 
-                _ => panic!(compile_error("Expected Object", info)),
+                a => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected object, found {}", a.to_str(globals)),
+                        pos: (0, 0),
+                    })
+                }
             }
 
             Value::Null
@@ -192,9 +192,11 @@ pub fn built_in_function(
 
         "current_context" => Value::Str(format!("{:?}", context)),
 
-        _ => panic!(compile_error(
-            &format!("Nonexistant built-in-function: {}", name),
-            info
-        )),
-    }
+        a => {
+            return Err(RuntimeError::RuntimeError {
+                message: format!("Nonexistant builtin-function: {}", a),
+                pos: (0, 0),
+            })
+        }
+    })
 }

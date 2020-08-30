@@ -25,7 +25,7 @@ call_with_delay = (time, function) {
     })
 }
 
-impl "group" {
+impl @group {
     move: (self, x, y, duration: 0, easing: NONE, easing_rate: 2) {
         $.add( obj{
             OBJ_ID: 901,
@@ -159,7 +159,7 @@ impl "group" {
 
 
 
-impl "color" {
+impl @color {
     set: (self, r, g, b, duration: 0, opacity: 1, blending: false){
         $.add( obj{
             OBJ_ID: 899,
@@ -192,7 +192,7 @@ impl "color" {
     }
 }
 
-impl "function" {
+impl @function {
 
     stop: (self) {
         self.group.stop()
@@ -201,7 +201,7 @@ impl "function" {
 
 
 
-impl "item" {
+impl @item {
     
     add: (self, amount) {
         $.add( obj{
@@ -238,28 +238,28 @@ impl "item" {
 }
 
 mut = (source: 0){
-    if source.TYPE == "number" {
+    if source.TYPE == @number {
         id = ?i
     
         id.add(source)
         
         return {
-            TYPE: "mutable",
+            TYPE: @mut,
             item: id
         }
-    } else if source.TYPE == "item" {
+    } else if source.TYPE == @item {
         return {
-            TYPE: "mutable",
+            TYPE: @mut,
             item: source
         }
-    } else if source.TYPE == "boolean" {
+    } else if source.TYPE == @bool {
         id = ?i
     
         if source {
             id.add(1)
         }
         return {
-            TYPE: "mutable",
+            TYPE: @mut,
             item: id
         }
     } else {
@@ -287,7 +287,7 @@ supress_signal = (delay){
 }
 
 
-impl "mutable" {
+impl @mut {
 
     add_to: (self, items, speed: 1, factor: 1) {
         add = {
@@ -348,11 +348,11 @@ impl "mutable" {
     },
 
     multiply: (self, factor, speed: 1) {
-        if factor.TYPE == "number" {
+        if factor.TYPE == @number {
             temp = mut(0)
             self.add_to([temp.item], speed, factor)
             temp.add_to([self.item], speed)
-        } else if factor.TYPE == "mutable" {
+        } else if factor.TYPE == @mut {
             
             temp = mut(0)
             mini_mult = (num){
@@ -390,7 +390,7 @@ impl "mutable" {
 
     divide: (self, divisor, speed: 1, rest_item: ?i) {
 
-        if divisor.TYPE == "number"{
+        if divisor.TYPE == @number {
             result = mut(0)
 
             rest = mut(rest_item)
@@ -422,7 +422,7 @@ impl "mutable" {
                 })
             }
             div!
-        } else if divisor.TYPE == "mutable" {
+        } else if divisor.TYPE == @mut {
             result = mut(0)
 
             // IDEA:
@@ -615,17 +615,17 @@ impl "mutable" {
     },
 
     _plus_: (self, other) {
-        if other.TYPE == "number" {
+        if other.TYPE == @number {
             new_mut = self.clone()
             new_mut.item.add(other)
-        } else if other.TYPE == "mut" {
+        } else if other.TYPE == @mut {
             new_mut = self.clone()
             other.clone().add_to([new_mut.item])
         }
     },
 
     _minus_: (self, other) {
-        if other.TYPE == "number" {
+        if other.TYPE == @number {
             new_mut = self.clone()
             new_mut.item.add(-other)
         }
@@ -633,7 +633,7 @@ impl "mutable" {
 
     _more_than_: (self, other) {
         //TODO: add case for another mut
-        if other.TYPE == "number" {
+        if other.TYPE == @number {
             self.item.if_is(LARGER_THAN, other, {
                 return true
             })
@@ -646,7 +646,7 @@ impl "mutable" {
 
     _less_than_: (self, other) {
         //TODO: add case for another mut
-        if other.TYPE == "number" {
+        if other.TYPE == @number {
             self.item.if_is(SMALLER_THAN, other, {
                 return true
             })
@@ -659,7 +659,7 @@ impl "mutable" {
 
     _more_or_equal_: (self, other) {
         //TODO: add case for another mut
-        if other.TYPE == "number" {
+        if other.TYPE == @number {
             self.item.if_is(LARGER_THAN, other - 1, {
                 return true
             })
@@ -672,7 +672,7 @@ impl "mutable" {
 
     _less_or_equal_: (self, other) {
         //TODO: add case for another mut
-        if other.TYPE == "number" {
+        if other.TYPE == @number {
             self.item.if_is(SMALLER_THAN, other + 1, {
                 return true
             })
@@ -684,7 +684,7 @@ impl "mutable" {
     },
 
     _equal_: (self, other) {
-        if other.TYPE == "number" {
+        if other.TYPE == @number {
             self.item.if_is(EQUAL_TO, other, {
                 return true
             })
@@ -699,7 +699,7 @@ impl "mutable" {
     },
 
     _not_equal_: (self, other) {
-        if other.TYPE == "number" {
+        if other.TYPE == @number {
             self.item.if_is(EQUAL_TO, other, {
                 return false
             })
@@ -729,7 +729,7 @@ impl "mutable" {
     
 
     _as_: (self, type) {
-        if type == "bool" {
+        if type == @bool {
             return self.to_const([0, 1]) == 1
         } else {
             error "Cannot convert to this type (mut can convert to a number using the mut.to_const macro)"
@@ -863,7 +863,7 @@ events = {
     }
 }
 
-impl "block" {
+impl @block {
     create_tracker_item: (self, other) {
         item = ?i
         on(events.collision(self, other), {

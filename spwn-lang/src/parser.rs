@@ -168,6 +168,9 @@ pub enum Token {
     #[token("..")]
     DotDot,
 
+    #[token("@")]
+    At,
+
     //KEY WORDS
     #[token("return")]
     Return,
@@ -200,6 +203,9 @@ pub enum Token {
 
     #[token("extract")]
     Extract,
+
+    #[token("null")]
+    Null,
 
     //STATEMENT SEPARATOR
     #[regex(r"[\n\r;]([ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*|[\n\r;])*")]
@@ -1000,6 +1006,7 @@ fn parse_variable(
         }
         Some(Token::True) => ast::ValueLiteral::Bool(true),
         Some(Token::False) => ast::ValueLiteral::Bool(false),
+        Some(Token::Null) => ast::ValueLiteral::Null,
         Some(Token::Symbol) => ast::ValueLiteral::Symbol(tokens.slice()),
 
         Some(Token::OpenSquareBracket) => {
@@ -1039,6 +1046,17 @@ fn parse_variable(
             a => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: "literal string".to_string(),
+                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    pos: (0, 0),
+                })
+            }
+        }),
+
+        Some(Token::At) => ast::ValueLiteral::TypeIndicator(match tokens.next(false) {
+            Some(Token::Symbol) => tokens.slice(),
+            a => {
+                return Err(SyntaxError::ExpectedErr {
+                    expected: "type name".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: (0, 0),
                 })

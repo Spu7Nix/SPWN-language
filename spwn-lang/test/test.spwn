@@ -1,7 +1,10 @@
-extract import "std.spwn"
+a = {
+	b: 100, 
+	c: 29,
+}
 
-for i in 1..
-10g.move(10, 20, 0.5)
+$.print(a.c)
+
 
 
 

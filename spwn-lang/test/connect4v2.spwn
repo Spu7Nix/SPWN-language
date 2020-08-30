@@ -103,6 +103,8 @@ $.print(longest_player_thread.item, ",", longest_ai_thread.item)
 // when this item turns to 1, it means the process can move forward
 ready_sign = ?i
 
+
+
 $.print("ready_sign: ", ready_sign)
 
 wait_for_ready = () {

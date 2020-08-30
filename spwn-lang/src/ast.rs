@@ -46,6 +46,7 @@ pub enum ValueLiteral {
     Obj(Vec<(Expression, Expression)>),
     Macro(Macro),
     Resolved(Value),
+    TypeIndicator(String),
     Null,
 }
 

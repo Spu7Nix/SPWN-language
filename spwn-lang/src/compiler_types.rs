@@ -7,8 +7,10 @@ use std::path::PathBuf;
 
 use crate::compiler::{compile_scope, import_module, next_free, RuntimeError};
 
+pub type TypeID = u16;
+
 pub type Returns = Vec<(Value, Context)>;
-pub type Implementations = HashMap<String, HashMap<String, u32>>;
+pub type Implementations = HashMap<TypeID, HashMap<String, u32>>;
 pub type StoredValue = u32; //index to stored value in globals.stored_values
 pub fn store_value(val: Value, globals: &mut Globals) -> StoredValue {
     (*globals).stored_values.push(val);
@@ -87,6 +89,7 @@ pub struct Function {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+
 pub enum Value {
     Group(Group),
     Color(Color),
@@ -102,76 +105,115 @@ pub enum Value {
     Obj(Vec<(u16, String)>),
     Builtins,
     BuiltinFunction(String),
+    TypeIndicator(TypeID),
     Null,
 }
 
-use std::fmt;
+impl std::convert::From<&Value> for TypeID {
+    //numeric representation of value
+    fn from(val: &Value) -> Self {
+        match val {
+            Value::Group(_) => 0,
+            Value::Color(_) => 1,
+            Value::Block(_) => 2,
+            Value::Item(_) => 3,
+            Value::Number(_) => 4,
+            Value::Bool(_) => 5,
+            Value::Func(_) => 6,
+            Value::Dict(_) => 7,
+            Value::Macro(_) => 8,
+            Value::Str(_) => 9,
+            Value::Array(_) => 10,
+            Value::Obj(_) => 11,
+            Value::Builtins => 12,
+            Value::BuiltinFunction(_) => 13,
+            Value::TypeIndicator(_) => 14,
+            Value::Null => 15,
+        }
+    }
+}
+
+//copied from https://stackoverflow.com/questions/59401720/how-do-i-find-the-key-for-a-value-in-a-hashmap
+fn find_key_for_value<'a>(map: &'a HashMap<String, u16>, value: u16) -> Option<&'a String> {
+    map.iter()
+        .find_map(|(key, &val)| if val == value { Some(key) } else { None })
+}
+
+//use std::fmt;
 
 const MAX_DICT_EL_DISPLAY: u16 = 10;
 
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Value::Group(g) => g.id.to_string() + "g",
-                Value::Color(c) => c.id.to_string() + "c",
-                Value::Block(b) => b.id.to_string() + "b",
-                Value::Item(i) => i.id.to_string() + "i",
-                Value::Number(n) => n.to_string(),
-                Value::Bool(b) => b.to_string(),
-                Value::Func(f) => format!("<function {}g>", f.start_group.id),
-                Value::Dict(d) => {
-                    let mut out = String::from("{\n");
-                    let mut count = 0;
-                    let mut d_iter = d.iter();
-                    for (key, val) in &mut d_iter {
-                        count += 1;
+impl Value {
+    pub fn to_str(&self, globals: &Globals) -> String {
+        match self {
+            Value::Group(g) => (g.id.to_string() + "g"),
+            Value::Color(c) => (c.id.to_string() + "c"),
+            Value::Block(b) => (b.id.to_string() + "b"),
+            Value::Item(i) => (i.id.to_string() + "i"),
+            Value::Number(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            Value::Func(f) => format!("<function {}g>", f.start_group.id),
+            Value::Dict(d) => {
+                let mut out = String::from("{\n");
+                let mut count = 0;
+                let mut d_iter = d.iter();
+                for (key, val) in &mut d_iter {
+                    count += 1;
 
-                        if count > MAX_DICT_EL_DISPLAY {
-                            out += &format!("... ({} more)  ", d_iter.count());
-                            break;
-                        }
-                        out += &format!("{}: <pointer: {}>,\n", key, val);
+                    if count > MAX_DICT_EL_DISPLAY {
+                        out += &format!("... ({} more)  ", d_iter.count());
+                        break;
                     }
-                    out.pop();
-                    out.pop();
-                    out += "\n}";
-                    out
+                    let stored_val = (*globals).stored_values[*val as usize].to_str(globals);
+                    out += &format!("{}: {},\n", key, stored_val);
                 }
-                Value::Macro(_) => String::from("<macro>"),
-                Value::Str(s) => s.clone(),
-                Value::Array(a) => {
-                    if a.is_empty() {
-                        String::from("[]")
-                    } else {
-                        let mut out = String::from("[");
-                        for val in a {
-                            out += &format!("{}, ", val);
-                        }
-                        out.pop();
-                        out.pop();
-                        out += "]";
-                        out
-                    }
-                }
-                Value::Obj(o) => {
-                    let mut out = String::new();
-                    for (key, val) in o {
-                        out += &format!("{},{},", key, val);
-                    }
-                    out.pop();
-                    out += ";";
-                    out
-                }
-                Value::Builtins => String::from("SPWN"),
-                Value::BuiltinFunction(n) => format!("<built-in-function: {}>", n),
-                Value::Null => String::from("Null"),
+                out.pop();
+                out.pop();
+
+                out += "\n}"; //why do i have to do this twice? idk
+
+                out
             }
-        )
+            Value::Macro(_) => "<macro>".to_string(),
+            Value::Str(s) => s.clone(),
+            Value::Array(a) => {
+                if a.is_empty() {
+                    "[]".to_string()
+                } else {
+                    let mut out = String::from("[");
+                    for val in a {
+                        out += &val.to_str(globals);
+                        out += ",";
+                    }
+                    out.pop();
+                    out += "]";
+
+                    out
+                }
+            }
+            Value::Obj(o) => {
+                let mut out = String::new();
+                for (key, val) in o {
+                    out += &format!("{},{},", key, val);
+                }
+                out.pop();
+                out += ";";
+                out
+            }
+            Value::Builtins => "SPWN".to_string(),
+            Value::BuiltinFunction(n) => format!("<built-in-function: {}>", n),
+            Value::Null => "Null".to_string(),
+            Value::TypeIndicator(id) => format!(
+                "@{}",
+                match find_key_for_value(&globals.type_ids, *id) {
+                    Some(name) => name,
+                    None => "[TYPE NOT FOUND]",
+                }
+            ),
+        }
     }
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionID {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id
@@ -190,64 +232,13 @@ pub struct Globals {
 
     pub lowest_y: HashMap<u32, u16>,
     pub stored_values: Vec<Value>,
+
+    pub type_ids: HashMap<String, u16>,
+    pub type_id_count: u16,
+
     pub func_ids: Vec<FunctionID>,
 }
 
-pub fn compile_error(msg: &str, info: CompilerInfo) -> String {
-    format!(
-        "
-{}
--~-~-~-~-~-~-~-~-~-~-~
-line: {}, position: {}
-Error: \"{}\"
-
-",
-        info.path.join("->"),
-        info.line.0,
-        info.line.1,
-        msg
-    )
-}
-
-/*#[derive(Debug)]
-pub enum ValSuccess {
-    Literal(Value),
-    Evaluatable((Value, Vec<Context>)),
-}
-
-use ValSuccess::{Evaluatable, Literal};*/
-
-/*fn add_contexts(evaled: Returns, new_contexts: &mut Vec<Context>) -> Vec<Value> {
-    let v = evaled.iter().map(|x| x.0.clone()).collect();
-    let c = evaled.iter().map(|x| x.1.clone());
-    (*new_contexts).extend(c);
-    v
-}*/
-
-/*fn into_tuple_vec<T1, T2>(vec1: Vec<T1>, vec2: Vec<T2>) -> Vec<(T1, T2)> {
-    if vec1.len() != vec2.len() {
-        panic!("not equal length of vectors");
-    }
-    let mut out: Vec<(T1, T2)> = Vec::new();
-
-    for i in 0..vec1.len() {
-        out.push((vec1[i].clone(), vec2[i].clone()));
-    }
-    out
-}*/
-
-/*
-
-a = 2
-b = 3
-
-c = a
-
-a = b
-b = c
-
-
-*/
 fn handle_operator<F>(
     value1: Value,
     value2: Value,
@@ -971,7 +962,10 @@ pub fn eval_dict(
                         Value::Dict(d) => d.clone(),
                         a => {
                             return Err(RuntimeError::RuntimeError {
-                                message: format!("Cannot extract from this value: {}", a),
+                                message: format!(
+                                    "Cannot extract from this value: {}",
+                                    a.to_str(globals)
+                                ),
                                 pos: (0, 0),
                             })
                         }
@@ -1094,6 +1088,23 @@ impl ast::Variable {
                 new_context.implementations.extend(imp);
                 start_val.push((val, new_context));
             }
+
+            ast::ValueLiteral::TypeIndicator(name) => {
+                start_val.push((
+                    match globals.type_ids.get(name) {
+                        Some(id) => Value::TypeIndicator(*id),
+                        None => {
+                            //initialize type
+                            (*globals).type_id_count += 1;
+                            (*globals)
+                                .type_ids
+                                .insert(name.clone(), globals.type_id_count);
+                            Value::TypeIndicator(globals.type_id_count)
+                        }
+                    },
+                    context,
+                ));
+            }
             ast::ValueLiteral::Obj(o) => {
                 let mut all_expr: Vec<ast::Expression> = Vec::new();
                 for prop in o {
@@ -1116,7 +1127,7 @@ impl ast::Variable {
                                     return Err(RuntimeError::RuntimeError {
                                         message: format!(
                                             "Expected number type as object key, found: {}",
-                                            a
+                                            a.to_str(globals)
                                         ),
                                         pos: (0, 0),
                                     })
@@ -1143,7 +1154,10 @@ impl ast::Variable {
                                 //Value::Array(a) => {} TODO: Add this
                                 x => {
                                     return Err(RuntimeError::RuntimeError {
-                                        message: format!("{} is not a valid object value", x),
+                                        message: format!(
+                                            "{} is not a valid object value",
+                                            x.to_str(globals)
+                                        ),
                                         pos: (0, 0),
                                     })
                                 }
@@ -1203,33 +1217,21 @@ impl ast::Variable {
         for p in &mut path_iter {
             match &p {
                 ast::Path::Member(m) => {
-                    with_parent = with_parent
-                        .iter()
-                        .map(|x| {
-                            (
-                                x.0.member(m.clone(), &x.1, globals, info.clone()).expect(
-                                    &compile_error(
-                                        &format!(
-                                            "'{}' does not have member '{}'!",
-                                            match x.0.member(
-                                                "TYPE".to_string(),
-                                                &x.1,
-                                                globals,
-                                                info.clone()
-                                            ) {
-                                                Some(Value::Str(s)) => s,
-                                                _ => unreachable!(),
-                                            },
-                                            m
-                                        ),
-                                        info.clone(),
-                                    ),
-                                ),
-                                x.1.clone(),
-                                x.0.clone(),
-                            )
-                        })
-                        .collect();
+                    for x in &mut with_parent {
+                        *x = (
+                            match x.0.member(m.clone(), &x.1, globals, info.clone()) {
+                                Some(m) => m,
+                                None => {
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: m.clone(),
+                                        pos: (0, 0),
+                                    })
+                                }
+                            },
+                            x.1.clone(),
+                            x.0.clone(),
+                        )
+                    }
                 }
 
                 ast::Path::Index(i) => {
@@ -1254,7 +1256,7 @@ impl ast::Variable {
                                             return Err(RuntimeError::RuntimeError {
                                                 message: format!(
                                                     "expected number in index, found {}",
-                                                    a
+                                                    a.to_str(globals)
                                                 ),
                                                 pos: (0, 0),
                                             })
@@ -1264,7 +1266,10 @@ impl ast::Variable {
                             }
                             a => {
                                 return Err(RuntimeError::RuntimeError {
-                                    message: format!("Cannot index this type: {}", a),
+                                    message: format!(
+                                        "Cannot index this type: {}",
+                                        a.to_str(globals)
+                                    ),
                                     pos: (0, 0),
                                 })
                             }
@@ -1310,7 +1315,7 @@ impl ast::Variable {
                                         info.clone(),
                                         globals,
                                         context.clone(),
-                                    );
+                                    )?;
                                     all_values.push((evaled, context))
                                 }
 
@@ -1321,7 +1326,10 @@ impl ast::Variable {
                             }
                             a => {
                                 return Err(RuntimeError::RuntimeError {
-                                    message: format!("Cannot call this type with arguments: {}", a),
+                                    message: format!(
+                                        "Cannot call this type with arguments: {}",
+                                        a.to_str(globals)
+                                    ),
                                     pos: (0, 0),
                                 })
                             }
@@ -1377,7 +1385,10 @@ impl ast::Variable {
                                 final_value.1.clone(),
                             );
                         } else {
-                            panic!(compile_error("Expected number in range", info))
+                            return Err(RuntimeError::RuntimeError {
+                                message: "Expected number in range".to_string(),
+                                pos: (0, 0),
+                            });
                         }
                     }
                 }
