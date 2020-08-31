@@ -16,27 +16,28 @@ use crate::compiler_types::*;
 pub enum RuntimeError {
     UndefinedErr {
         undefined: String,
-        pos: (usize, usize),
+        desc: String,
+        info: CompilerInfo,
     },
 
     PackageSyntaxError {
         err: SyntaxError,
-        pos: (usize, usize),
+        info: CompilerInfo,
     },
 
     IDError {
         id_class: ast::IDClass,
-        pos: (usize, usize),
+        info: CompilerInfo,
     },
 
     RuntimeError {
         message: String,
-        pos: (usize, usize),
+        info: CompilerInfo,
     },
 
     BuiltinError {
         message: String,
-        pos: (usize, usize),
+        info: CompilerInfo,
     },
 }
 
@@ -45,17 +46,21 @@ impl std::fmt::Display for RuntimeError {
         //write!(f, "SuperErrorSideKick is here!")
         //let mut message = String::from("Runtime/compile error:");
         match self {
-            RuntimeError::UndefinedErr { undefined, pos } => write!(
+            RuntimeError::UndefinedErr {
+                undefined,
+                desc,
+                info,
+            } => write!(
                 f,
-                "'{}' is not defined at line {}, pos {}",
-                undefined, pos.0, pos.1
+                "{} '{}' is not defined at line {}, pos {}",
+                desc, undefined, info.line.0, info.line.1
             ),
-            RuntimeError::PackageSyntaxError { err, pos } => write!(
+            RuntimeError::PackageSyntaxError { err, info } => write!(
                 f,
                 "Error when parsing library at line {}, pos {}: {}",
-                pos.0, pos.1, err
+                info.line.0, info.line.1, err
             ),
-            RuntimeError::IDError { id_class, pos } => write!(
+            RuntimeError::IDError { id_class, info } => write!(
                 f,
                 "Ran out of {} at line {}, pos {}",
                 match id_class {
@@ -64,17 +69,17 @@ impl std::fmt::Display for RuntimeError {
                     ast::IDClass::Item => "item IDs",
                     ast::IDClass::Block => "collision block IDs",
                 },
-                pos.0,
-                pos.1
+                info.line.0,
+                info.line.1
             ),
-            RuntimeError::RuntimeError { message, pos } => {
-                write!(f, "{} (line {}, pos {})", message, pos.0, pos.1)
+            RuntimeError::RuntimeError { message, info } => {
+                write!(f, "{} (line {}, pos {})", message, info.line.0, info.line.1)
             }
 
-            RuntimeError::BuiltinError { message, pos } => write!(
+            RuntimeError::BuiltinError { message, info } => write!(
                 f,
                 "Error when calling built-in-function: {} (line {}, pos {})",
-                message, pos.0, pos.1
+                message, info.line.0, info.line.1
             ),
         }
     }
@@ -171,7 +176,7 @@ pub fn compile_spwn(
     //delete all unused func ids
 
     //let all func_id's parents be with objects
-    /*let mut new_func_ids = Vec::<FunctionID>::new();
+    let mut new_func_ids = Vec::<FunctionID>::new();
 
     println!("Func id len: {}", globals.func_ids.len());
 
@@ -199,7 +204,7 @@ pub fn compile_spwn(
     // PROBLEM: new parent ids point to indexes in the previous list, in which many items were deleted.
     // Update the indexes to point to the corresponding items in the new list
 
-    globals.func_ids = new_func_ids;*/
+    globals.func_ids = new_func_ids;
 
     println!(
         "Compiled in {} milliseconds!",
@@ -239,7 +244,7 @@ pub fn compile_scope(
         if contexts.is_empty() {
             return Err(RuntimeError::RuntimeError {
                 message: "No context! This is probably a bug, please contact sputnix".to_string(),
-                pos: (0, 0),
+                info,
             });
         }
         use ast::StatementBody::*;
@@ -275,7 +280,11 @@ pub fn compile_scope(
                             new_context.spawn_triggered = true;
                             //pick a start group
                             let start_group = Group {
-                                id: next_free(&mut globals.closed_groups, ast::IDClass::Group)?,
+                                id: next_free(
+                                    &mut globals.closed_groups,
+                                    ast::IDClass::Group,
+                                    info.clone(),
+                                )?,
                             };
                             new_context.variables.insert(
                                 def.symbol.clone(),
@@ -325,13 +334,23 @@ pub fn compile_scope(
                         Value::Dict(d) => {
                             context.variables.extend(d.clone());
                         }
+                        Value::Builtins => {
+                            for name in BUILTIN_LIST.iter() {
+                                let p = store_value(
+                                    Value::BuiltinFunction(String::from(*name)),
+                                    globals,
+                                );
+
+                                context.variables.insert(String::from(*name), p);
+                            }
+                        }
                         a => {
                             return Err(RuntimeError::RuntimeError {
                                 message: format!(
                                     "This type ({}) can not be extracted!",
                                     a.to_str(globals)
                                 ),
-                                pos: (0, 0),
+                                info,
                             })
                         }
                     }
@@ -394,7 +413,7 @@ pub fn compile_scope(
                                     "Expected boolean condition in if statement, found {}",
                                     a.to_str(globals)
                                 ),
-                                pos: (0, 0),
+                                info,
                             })
                         }
                     }
@@ -414,6 +433,8 @@ pub fn compile_scope(
                                 let new_info = info.next("implementation", globals, true);
                                 let (evaled, inner_returns) =
                                     eval_dict(imp.members.clone(), c, globals, new_info)?;
+
+                                //Returns inside impl values dont really make sense do they
                                 returns.extend(inner_returns);
                                 for (val, c2) in evaled {
                                     let mut new_context = c2.clone();
@@ -440,7 +461,7 @@ pub fn compile_scope(
                                         "Expected type-indicator, found {}",
                                         a.to_str(globals)
                                     ),
-                                    pos: (0, 0),
+                                    info,
                                 })
                             }
                         }
@@ -477,7 +498,7 @@ pub fn compile_scope(
                                             "Expected function of group, found: {}",
                                             a.to_str(globals)
                                         ),
-                                        pos: (0, 0),
+                                        info,
                                     })
                                 }
                             },
@@ -522,7 +543,7 @@ pub fn compile_scope(
                         a => {
                             return Err(RuntimeError::RuntimeError {
                                 message: format!("{} is not iteratable!", a.to_str(globals)),
-                                pos: (0, 0),
+                                info,
                             })
                         }
                     }
@@ -566,7 +587,7 @@ pub fn compile_scope(
                 }
                 return Err(RuntimeError::RuntimeError {
                     message: "Error statement, see message(s) above.".to_string(),
-                    pos: (0, 0),
+                    info,
                 });
             }
         }
@@ -602,7 +623,7 @@ pub fn import_module(
     let unparsed = fs::read_to_string(module_path).expect("Something went wrong reading the file");
     let (parsed, notes) = match crate::parse_spwn(unparsed) {
         Ok(p) => p,
-        Err(err) => return Err(RuntimeError::PackageSyntaxError { err, pos: (0, 0) }),
+        Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
     };
     (*globals).closed_groups.extend(notes.closed_groups);
     (*globals).closed_colors.extend(notes.closed_colors);
@@ -614,7 +635,7 @@ pub fn import_module(
         return Err(RuntimeError::RuntimeError {
             message: "Imported files does not (currently) support context splitting in the main scope.
             Please remove any context splitting statements outside of function or macro definitions.".to_string(),
-            pos: (0,0)
+            info,
         });
     }
     Ok((
@@ -628,7 +649,11 @@ pub fn import_module(
 
 const ID_MAX: u16 = 999;
 
-pub fn next_free(ids: &mut Vec<u16>, id_class: ast::IDClass) -> Result<u16, RuntimeError> {
+pub fn next_free(
+    ids: &mut Vec<u16>,
+    id_class: ast::IDClass,
+    info: CompilerInfo,
+) -> Result<u16, RuntimeError> {
     for i in 1..ID_MAX {
         if !ids.contains(&i) {
             (*ids).push(i);
@@ -636,9 +661,6 @@ pub fn next_free(ids: &mut Vec<u16>, id_class: ast::IDClass) -> Result<u16, Runt
         }
     }
 
-    Err(RuntimeError::IDError {
-        id_class,
-        pos: (0, 0),
-    })
+    Err(RuntimeError::IDError { id_class, info })
     //panic!("All ids of this type are used up!");
 }

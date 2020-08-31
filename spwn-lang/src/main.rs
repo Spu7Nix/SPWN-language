@@ -20,8 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let script_path = PathBuf::from(&args[1]); //&args[1]
     println!("Parsing...");
-    let unparsed =
-        fs::read_to_string(script_path.clone()).expect("Something went wrong reading the file");
+    let unparsed = fs::read_to_string(script_path.clone())?;
     let (statements, notes) = match parse_spwn(unparsed) {
         Err(err) => {
             eprintln!("{}", err);

@@ -109,10 +109,10 @@ pub enum Value {
     Null,
 }
 
-impl std::convert::From<&Value> for TypeID {
+impl Value {
     //numeric representation of value
-    fn from(val: &Value) -> Self {
-        match val {
+    pub fn to_num(&self, globals: &Globals) -> TypeID {
+        match self {
             Value::Group(_) => 0,
             Value::Color(_) => 1,
             Value::Block(_) => 2,
@@ -120,7 +120,14 @@ impl std::convert::From<&Value> for TypeID {
             Value::Number(_) => 4,
             Value::Bool(_) => 5,
             Value::Func(_) => 6,
-            Value::Dict(_) => 7,
+            Value::Dict(d) => match d.get(TYPE_MEMBER_NAME) {
+                Some(member) => match globals.stored_values[*member as usize] {
+                    Value::TypeIndicator(t) => t,
+                    _ => unreachable!(),
+                },
+
+                None => 7,
+            },
             Value::Macro(_) => 8,
             Value::Str(_) => 9,
             Value::Array(_) => 10,
@@ -300,6 +307,8 @@ impl ast::Expression {
         let mut acum = first_value.0;
         let mut inner_returns = first_value.1;
 
+        let operator_macro_desc: String = String::from("operator macro member");
+
         if self.operators.is_empty() {
             //if only variable
             return Ok((acum, inner_returns));
@@ -327,13 +336,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_or_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_or_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -353,13 +364,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_and_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_and_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -379,13 +392,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_more_than_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_more_than_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -405,13 +420,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_less_than_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_less_than_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -431,13 +448,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_more_or_equal_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_more_or_equal_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -457,13 +476,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_less_or_equal_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_less_or_equal_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -483,13 +504,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_divided_by_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_divided_by_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -509,13 +532,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_times_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_times_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -536,13 +561,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_mod_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_mod_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -563,13 +590,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_pow_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_pow_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -589,13 +618,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_plus_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_plus_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -615,13 +646,15 @@ impl ast::Expression {
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_minus_".to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
+                                            desc: operator_macro_desc.clone(),
                                         });
                                     }
                                 } else {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: "_minus_".to_string(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: operator_macro_desc.clone(),
                                     });
                                 }
                             },
@@ -659,7 +692,7 @@ impl ast::Expression {
                                         return Err(RuntimeError::RuntimeError {
                                             message: "Both sides of range must be Numbers"
                                                 .to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
                                         })
                                     }
                                 };
@@ -669,7 +702,7 @@ impl ast::Expression {
                                         return Err(RuntimeError::RuntimeError {
                                             message: "Both sides of range must be Numbers"
                                                 .to_string(),
-                                            pos: (0, 0),
+                                            info: info.clone(),
                                         })
                                     }
                                 };
@@ -727,7 +760,8 @@ pub fn execute_macro(
                         } else {
                             return Err(RuntimeError::UndefinedErr {
                                 undefined: name.clone(),
-                                pos: (0, 0),
+                                info: info.clone(),
+                                desc: "macro argument".to_string(),
                             });
                         }
                     }
@@ -735,7 +769,7 @@ pub fn execute_macro(
                         if (if m.args[0].0 == "self" { i + 1 } else { i }) > m.args.len() - 1 {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Too many arguments!".to_string(),
-                                pos: (0, 0),
+                                info: info.clone(),
                             });
                         }
                         new_variables.insert(
@@ -767,7 +801,7 @@ pub fn execute_macro(
                                     "Non-optional argument '{}' not satisfied!",
                                     arg.0
                                 ),
-                                pos: (0, 0),
+                                info: info.clone(),
                             })
                         }
                     }
@@ -826,7 +860,11 @@ pub fn execute_macro(
                     new_context.spawn_triggered = true;
                     //pick a start group
                     let start_group = Group {
-                        id: next_free(&mut globals.closed_groups, ast::IDClass::Group)?,
+                        id: next_free(
+                            &mut globals.closed_groups,
+                            ast::IDClass::Group,
+                            info.clone(),
+                        )?,
                     };
 
                     for cont in c {
@@ -966,7 +1004,7 @@ pub fn eval_dict(
                                     "Cannot extract from this value: {}",
                                     a.to_str(globals)
                                 ),
-                                pos: (0, 0),
+                                info: info.clone(),
                             })
                         }
                     });
@@ -999,7 +1037,11 @@ impl ast::Variable {
                     IDClass::Group => {
                         if id.unspecified {
                             Value::Group(Group {
-                                id: next_free(&mut globals.closed_groups, ast::IDClass::Group)?,
+                                id: next_free(
+                                    &mut globals.closed_groups,
+                                    ast::IDClass::Group,
+                                    info.clone(),
+                                )?,
                             })
                         } else {
                             Value::Group(Group { id: id.number })
@@ -1008,7 +1050,11 @@ impl ast::Variable {
                     IDClass::Color => {
                         if id.unspecified {
                             Value::Color(Color {
-                                id: next_free(&mut globals.closed_colors, ast::IDClass::Color)?,
+                                id: next_free(
+                                    &mut globals.closed_colors,
+                                    ast::IDClass::Color,
+                                    info.clone(),
+                                )?,
                             })
                         } else {
                             Value::Color(Color { id: id.number })
@@ -1017,7 +1063,11 @@ impl ast::Variable {
                     IDClass::Block => {
                         if id.unspecified {
                             Value::Block(Block {
-                                id: next_free(&mut globals.closed_blocks, ast::IDClass::Block)?,
+                                id: next_free(
+                                    &mut globals.closed_blocks,
+                                    ast::IDClass::Block,
+                                    info.clone(),
+                                )?,
                             })
                         } else {
                             Value::Block(Block { id: id.number })
@@ -1026,7 +1076,11 @@ impl ast::Variable {
                     IDClass::Item => {
                         if id.unspecified {
                             Value::Item(Item {
-                                id: next_free(&mut globals.closed_items, ast::IDClass::Item)?,
+                                id: next_free(
+                                    &mut globals.closed_items,
+                                    ast::IDClass::Item,
+                                    info.clone(),
+                                )?,
                             })
                         } else {
                             Value::Item(Item { id: id.number })
@@ -1066,7 +1120,8 @@ impl ast::Variable {
                         None => {
                             return Err(RuntimeError::UndefinedErr {
                                 undefined: string.clone(),
-                                pos: (0, 0),
+                                info: info.clone(),
+                                desc: "variable".to_string(),
                             })
                         }
                     }
@@ -1096,7 +1151,8 @@ impl ast::Variable {
                         None => {
                             return Err(RuntimeError::UndefinedErr {
                                 undefined: name.clone(),
-                                pos: (0, 0),
+                                info: info.clone(),
+                                desc: "type".to_string(),
                             });
                         }
                     },
@@ -1127,7 +1183,7 @@ impl ast::Variable {
                                             "Expected number type as object key, found: {}",
                                             a.to_str(globals)
                                         ),
-                                        pos: (0, 0),
+                                        info: info.clone(),
                                     })
                                 }
                             },
@@ -1156,7 +1212,7 @@ impl ast::Variable {
                                             "{} is not a valid object value",
                                             x.to_str(globals)
                                         ),
-                                        pos: (0, 0),
+                                        info: info.clone(),
                                     })
                                 }
                             },
@@ -1222,7 +1278,8 @@ impl ast::Variable {
                                 None => {
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: m.clone(),
-                                        pos: (0, 0),
+                                        info: info.clone(),
+                                        desc: String::from("property"),
                                     })
                                 }
                             },
@@ -1256,7 +1313,7 @@ impl ast::Variable {
                                                     "expected number in index, found {}",
                                                     a.to_str(globals)
                                                 ),
-                                                pos: (0, 0),
+                                                info: info.clone(),
                                             })
                                         }
                                     }
@@ -1268,7 +1325,7 @@ impl ast::Variable {
                                         "Cannot index this type: {}",
                                         a.to_str(globals)
                                     ),
-                                    pos: (0, 0),
+                                    info: info.clone(),
                                 })
                             }
                         }
@@ -1328,7 +1385,7 @@ impl ast::Variable {
                                         "Cannot call this type with arguments: {}",
                                         a.to_str(globals)
                                     ),
-                                    pos: (0, 0),
+                                    info: info.clone(),
                                 })
                             }
                         }
@@ -1352,7 +1409,7 @@ impl ast::Variable {
                         } else {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Cannot make non-number type negative".to_string(),
-                                pos: (0, 0),
+                                info: info.clone(),
                             });
                         }
                     }
@@ -1363,7 +1420,7 @@ impl ast::Variable {
                         } else {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Cannot negate non-boolean type".to_string(),
-                                pos: (0, 0),
+                                info: info.clone(),
                             });
                         }
                     }
@@ -1385,7 +1442,7 @@ impl ast::Variable {
                         } else {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Expected number in range".to_string(),
-                                pos: (0, 0),
+                                info: info.clone(),
                             });
                         }
                     }
@@ -1411,7 +1468,11 @@ impl ast::CompoundStatement {
 
         //pick a start group
         let start_group = Group {
-            id: next_free(&mut globals.closed_groups, ast::IDClass::Group)?,
+            id: next_free(
+                &mut globals.closed_groups,
+                ast::IDClass::Group,
+                info.clone(),
+            )?,
         };
 
         new_context.start_group = start_group;

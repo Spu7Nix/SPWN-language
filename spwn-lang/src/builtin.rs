@@ -39,7 +39,7 @@ pub fn context_trigger(context: Context, _globals: &mut Globals, info: CompilerI
     }
 }
 
-const TYPE_MEMBER_NAME: &str = "type";
+pub const TYPE_MEMBER_NAME: &str = "type";
 impl Value {
     pub fn member(
         &self,
@@ -48,8 +48,7 @@ impl Value {
         globals: &mut Globals,
         _: CompilerInfo,
     ) -> Option<Value> {
-        //println!("{:?}", context.implementations);
-        let get_impl = |t: u16, m: String| match context.implementations.get(&(t)) {
+        let get_impl = |t: u16, m: String| match context.implementations.get(&t) {
             Some(imp) => match imp.get(&m) {
                 Some(mem) => Some((*globals).stored_values[*mem as usize].clone()),
                 None => None,
@@ -63,10 +62,10 @@ impl Value {
                         Value::TypeIndicator(s) => s,
                         _ => unreachable!(),
                     },
-                    None => TypeID::from(self),
+                    None => self.to_num(globals),
                 },
 
-                _ => TypeID::from(self),
+                _ => self.to_num(globals),
             }))
         } else {
             match self {
@@ -89,7 +88,8 @@ impl Value {
                 _ => (),
             };
 
-            let my_type = TypeID::from(self);
+            let my_type = self.to_num(globals);
+
             match self {
                 Value::Builtins => Some(Value::BuiltinFunction(member)),
                 Value::Dict(dict) => match dict.get(&member) {
@@ -108,6 +108,20 @@ impl Value {
         }
     }
 }
+
+pub const BUILTIN_LIST: [&str; 11] = [
+    "print",
+    "sin",
+    "cos",
+    "tan",
+    "asin",
+    "acos",
+    "atan",
+    "floor",
+    "ceil",
+    "add",
+    "current_context",
+];
 
 pub fn built_in_function(
     name: &str,
@@ -131,7 +145,7 @@ pub fn built_in_function(
             if arguments.len() != 1 {
                 return Err(RuntimeError::BuiltinError {
                     message: "Expected one error".to_string(),
-                    pos: (0, 0),
+                    info,
                 });
             }
 
@@ -152,7 +166,7 @@ pub fn built_in_function(
                 a => {
                     return Err(RuntimeError::BuiltinError {
                         message: format!("Expected number, found {}", a.to_str(globals)),
-                        pos: (0, 0),
+                        info,
                     })
                 }
             }
@@ -162,7 +176,7 @@ pub fn built_in_function(
             if arguments.len() != 1 {
                 return Err(RuntimeError::BuiltinError {
                     message: "Expected one error".to_string(),
-                    pos: (0, 0),
+                    info,
                 });
             }
 
@@ -182,7 +196,7 @@ pub fn built_in_function(
                 a => {
                     return Err(RuntimeError::BuiltinError {
                         message: format!("Expected object, found {}", a.to_str(globals)),
-                        pos: (0, 0),
+                        info,
                     })
                 }
             }
@@ -195,7 +209,7 @@ pub fn built_in_function(
         a => {
             return Err(RuntimeError::RuntimeError {
                 message: format!("Nonexistant builtin-function: {}", a),
-                pos: (0, 0),
+                info,
             })
         }
     })

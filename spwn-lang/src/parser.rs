@@ -229,6 +229,7 @@ pub struct ParseNotes {
 pub struct Tokens<'a> {
     iter: Lexer<'a, Token>,
     stack: Vec<(Token, String, core::ops::Range<usize>)>,
+    line_breaks: Vec<u32>,
     //index 0 = element of iter / last element in stack
     index: usize,
 }
@@ -238,6 +239,7 @@ impl<'a> Tokens<'a> {
         Tokens {
             iter,
             stack: Vec::new(),
+            line_breaks: vec![0],
             index: 0,
         }
     }
@@ -306,6 +308,26 @@ impl<'a> Tokens<'a> {
         self.stack[self.stack.len() - self.index - 1].1.clone()
     }
 
+    fn position(&self) -> (usize, usize) {
+        let file_pos = self.stack[self.stack.len() - self.index - 1].2.start;
+        /*println!(
+            "file pos: {}, line breaks: {:?}",
+            file_pos, self.line_breaks
+        );*/
+        for (i, lb) in self.line_breaks.iter().enumerate() {
+            let line_break = *lb as usize;
+            if line_break >= file_pos {
+                if i == 0 {
+                    return (1, file_pos + 1);
+                } else {
+                    return (i + 1, file_pos - self.line_breaks[i - 1] as usize);
+                }
+            }
+        }
+
+        (0, file_pos)
+    }
+
     /*fn span(&self) -> core::ops::Range<usize> {
         self.stack[self.stack.len() - self.index - 1].2.clone()
     }*/
@@ -315,7 +337,9 @@ impl<'a> Tokens<'a> {
 
 const STATEMENT_SEPARATOR_DESC: &str = "Statement separator (line-break or ';')";
 
-pub fn parse_spwn(unparsed: String) -> Result<(Vec<ast::Statement>, ParseNotes), SyntaxError> {
+pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNotes), SyntaxError> {
+    unparsed = unparsed.replace("\r\n", "\n");
+
     let tokens_iter = Token::lexer(&unparsed);
 
     let mut tokens = Tokens::new(tokens_iter);
@@ -327,6 +351,17 @@ pub fn parse_spwn(unparsed: String) -> Result<(Vec<ast::Statement>, ParseNotes),
         closed_blocks: Vec::new(),
         closed_items: Vec::new(),
     };
+
+    let mut line_breaks = Vec::<u32>::new();
+    let mut current_index: u32 = 0;
+
+    for line in unparsed.lines() {
+        current_index += line.len() as u32;
+        line_breaks.push(current_index);
+        current_index += 1; //line break char
+    }
+
+    tokens.line_breaks = line_breaks;
 
     loop {
         //tokens.next(false);
@@ -354,7 +389,7 @@ pub fn parse_spwn(unparsed: String) -> Result<(Vec<ast::Statement>, ParseNotes),
                 return Err(SyntaxError::ExpectedErr {
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
             None => break,
@@ -380,7 +415,7 @@ fn parse_cmp_stmt(
             None => {
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing a closure".to_string(),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
         }
@@ -392,7 +427,7 @@ fn parse_cmp_stmt(
                 return Err(SyntaxError::ExpectedErr {
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 });
             }
         }
@@ -415,14 +450,18 @@ pub fn parse_statement(
     let body = match first {
         Some(Token::Arrow) => {
             //parse async statement
-            let rest_of_statement = parse_statement(tokens, notes)?;
-            if rest_of_statement.arrow {
+            if tokens.next(false) == Some(Token::Arrow) {
                 //double arrow (throw error)
                 return Err(SyntaxError::UnexpectedErr {
                     found: "double arrow (-> ->)".to_string(),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 });
             }
+
+            tokens.previous();
+
+            let rest_of_statement = parse_statement(tokens, notes)?;
+
             arrow = true;
             rest_of_statement.body
         }
@@ -455,7 +494,7 @@ pub fn parse_statement(
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'{'".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
-                        pos: (0, 0),
+                        pos: tokens.position(),
                     })
                 }
             }
@@ -477,7 +516,7 @@ pub fn parse_statement(
                         return Err(SyntaxError::ExpectedErr {
                             expected: "'{' or 'if'".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
-                            pos: (0, 0),
+                            pos: tokens.position(),
                         })
                     }
                 },
@@ -507,7 +546,7 @@ pub fn parse_statement(
                     return Err(SyntaxError::ExpectedErr {
                         expected: "iterator variable name".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
-                        pos: (0, 0),
+                        pos: tokens.position(),
                     })
                 }
 
@@ -515,7 +554,7 @@ pub fn parse_statement(
                     return Err(SyntaxError::ExpectedErr {
                         expected: "iterator variable name".to_string(),
                         found: "None".to_string(),
-                        pos: (0, 0),
+                        pos: tokens.position(),
                     })
                 }
             };
@@ -526,7 +565,7 @@ pub fn parse_statement(
                     return Err(SyntaxError::ExpectedErr {
                         expected: "keyword 'in'".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
-                        pos: (0, 0),
+                        pos: tokens.position(),
                     })
                 }
             };
@@ -538,7 +577,7 @@ pub fn parse_statement(
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'{'".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
-                        pos: (0, 0),
+                        pos: tokens.position(),
                     })
                 }
             };
@@ -584,7 +623,7 @@ pub fn parse_statement(
                 return Err(SyntaxError::ExpectedErr {
                     expected: "type name".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
         },
@@ -601,7 +640,7 @@ pub fn parse_statement(
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'{'".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
-                        pos: (0, 0),
+                        pos: tokens.position(),
                     })
                 }
             }
@@ -655,7 +694,7 @@ pub fn parse_statement(
     Ok(ast::Statement {
         body,
         arrow,
-        line: (0, 0),
+        line: tokens.position(),
     })
 }
 
@@ -723,7 +762,7 @@ fn parse_dict(
                         return Err(SyntaxError::ExpectedErr {
                             expected: "':'".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
-                            pos: (0, 0),
+                            pos: tokens.position(),
                         });
                     }
                 }
@@ -740,7 +779,7 @@ fn parse_dict(
                 return Err(SyntaxError::ExpectedErr {
                     expected: "member definition, '..' or '}'".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 });
             }
         };
@@ -754,7 +793,7 @@ fn parse_dict(
             return Err(SyntaxError::ExpectedErr {
                 expected: "comma (',')".to_string(),
                 found: format!("{:?}: {:?}", next, tokens.slice()),
-                pos: (0, 0),
+                pos: tokens.position(),
             });
         }
     }
@@ -773,7 +812,7 @@ fn parse_object(
             return Err(SyntaxError::ExpectedErr {
                 expected: "'{'".to_string(),
                 found: format!("{:?}: {:?}", a, tokens.slice()),
-                pos: (0, 0),
+                pos: tokens.position(),
             })
         }
     }
@@ -791,7 +830,7 @@ fn parse_object(
                 return Err(SyntaxError::ExpectedErr {
                     expected: "':'".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
         }
@@ -809,7 +848,7 @@ fn parse_object(
             return Err(SyntaxError::ExpectedErr {
                 expected: "comma (',')".to_string(),
                 found: format!("{:?}: {:?}", next, tokens.slice()),
-                pos: (0, 0),
+                pos: tokens.position(),
             });
         }
     }
@@ -851,7 +890,7 @@ fn parse_args(
             None => {
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing macro arguments".to_string(),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
         });
@@ -866,14 +905,14 @@ fn parse_args(
                 return Err(SyntaxError::ExpectedErr {
                     expected: "comma (',') or ')'".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
 
             None => {
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing macro arguments".to_string(),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
         }
@@ -911,7 +950,7 @@ fn parse_arg_def(
             None => {
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing macro signature".to_string(),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
         });
@@ -924,14 +963,14 @@ fn parse_arg_def(
                 return Err(SyntaxError::ExpectedErr {
                     expected: "comma (',') or ')'".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
 
             None => {
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing macro signature".to_string(),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
         }
@@ -972,7 +1011,7 @@ fn parse_variable(
                 return Err(SyntaxError::SyntaxError {
                     message: format!("Error when parsing number: {}", err),
 
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 });
             }
         }),
@@ -997,7 +1036,7 @@ fn parse_variable(
                             return Err(SyntaxError::SyntaxError {
                                 message: format!("Error when parsing number: {}", err),
 
-                                pos: (0, 0),
+                                pos: tokens.position(),
                             });
                         }
                     },
@@ -1045,7 +1084,7 @@ fn parse_variable(
                             return Err(SyntaxError::ExpectedErr {
                                 expected: "comma (',') or ']'".to_string(),
                                 found: format!("{:?}: {:?}", a, tokens.slice()),
-                                pos: (0, 0),
+                                pos: tokens.position(),
                             })
                         }
                     }
@@ -1061,7 +1100,7 @@ fn parse_variable(
                 return Err(SyntaxError::ExpectedErr {
                     expected: "literal string".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
         }),
@@ -1072,7 +1111,7 @@ fn parse_variable(
                 return Err(SyntaxError::ExpectedErr {
                     expected: "type name".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: (0, 0),
+                    pos: tokens.position(),
                 })
             }
         }),
@@ -1091,7 +1130,7 @@ fn parse_variable(
                         return Err(SyntaxError::ExpectedErr {
                             expected: "')'".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
-                            pos: (0, 0),
+                            pos: tokens.position(),
                         })
                     }
                 }
@@ -1108,7 +1147,7 @@ fn parse_variable(
                         return Err(SyntaxError::ExpectedErr {
                             expected: "'{'".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
-                            pos: (0, 0),
+                            pos: tokens.position(),
                         })
                     }
                 };
@@ -1197,7 +1236,7 @@ fn parse_variable(
             return Err(SyntaxError::ExpectedErr {
                 expected: "a value".to_string(),
                 found: format!("{:?}: {:?}", a, tokens.slice()),
-                pos: (0, 0),
+                pos: tokens.position(),
             })
         }
     };
@@ -1214,7 +1253,7 @@ fn parse_variable(
                         return Err(SyntaxError::ExpectedErr {
                             expected: "]".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
-                            pos: (0, 0),
+                            pos: tokens.position(),
                         })
                     }
                 }
@@ -1228,7 +1267,7 @@ fn parse_variable(
                     return Err(SyntaxError::ExpectedErr {
                         expected: "member name".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
-                        pos: (0, 0),
+                        pos: tokens.position(),
                     })
                 }
             },

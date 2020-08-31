@@ -1,8 +1,26 @@
+/*extract import "std.spwn"
 
+a = mut(5)
 
-macro = (@number a: 3, @string b: "hi") {
+$.print(a)
 
+a.add(5)*/
+
+type thing
+
+impl @thing {
+	prop: 678
 }
+
+a = {
+	b: 100,
+	type: @thing
+}
+
+$.print(a.prop.s)
+
+
+
 
 
 
