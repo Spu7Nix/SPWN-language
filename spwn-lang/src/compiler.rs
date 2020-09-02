@@ -4,13 +4,11 @@ use crate::builtin::*;
 use crate::levelstring::*;
 use std::collections::HashMap;
 
-//use std::collections::HashMap;
 use crate::parser::{ParseNotes, SyntaxError};
 use std::fs;
 use std::path::PathBuf;
 
 use crate::compiler_types::*;
-//use ValSuccess::{Evaluatable, Literal};
 
 #[derive(Debug)]
 pub enum RuntimeError {
@@ -223,14 +221,6 @@ pub fn compile_scope(
     let mut statements_iter = statements.iter();
 
     let mut returns: Returns = Vec::new();
-
-    /*let indent = {
-        let mut new_string = String::new();
-        for _ in 0..info.depth {
-            new_string += "|-->";
-        }
-        new_string
-    };*/
 
     while let Some(statement) = statements_iter.next() {
         //find out what kind of statement this is
@@ -522,14 +512,15 @@ pub fn compile_scope(
                 for (val, context) in all_arrays {
                     match val {
                         Value::Array(arr) => {
+                            let iterator_val = store_value(Value::Null, globals);
                             let mut new_contexts = vec![context];
 
                             for element in arr {
                                 for mut c in new_contexts.clone() {
-                                    c.variables.insert(
-                                        f.symbol.clone(),
-                                        store_value(element.clone(), globals),
-                                    ); //this will store a lot of values, maybe fix this sometime idk
+                                    (*globals).stored_values[iterator_val as usize] =
+                                        element.clone();
+
+                                    c.variables.insert(f.symbol.clone(), iterator_val);
                                     let new_info = info.next("for loop", globals, false);
                                     let (end_contexts, inner_returns) =
                                         compile_scope(&f.body, vec![c], globals, new_info)?;
