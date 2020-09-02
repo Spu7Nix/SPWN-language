@@ -94,7 +94,7 @@ impl std::error::Error for RuntimeError {
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
     path: PathBuf,
-    gd_path: PathBuf,
+    gd_path: Option<PathBuf>,
     notes: ParseNotes,
 ) -> Result<(Globals, String), RuntimeError> {
     //variables that get changed throughout the compiling
@@ -138,27 +138,33 @@ pub fn compile_spwn(
 
     println!("Loading level data...");
 
-    let file_content =
-        fs::read_to_string(gd_path).expect("Your local geometry dash files were not found");
-    let level_string = get_level_string(file_content)
-        //remove previous spwn objects
-        .split(";")
-        .map(|obj| {
-            let key_val: Vec<&str> = obj.split(",").collect();
-            let mut ret = obj;
-            for i in (0..key_val.len()).step_by(2) {
-                if key_val[i] == "57" {
-                    let mut groups = key_val[i + 1].split(".");
-                    if groups.any(|x| x == SPWN_SIGNATURE_GROUP) {
-                        ret = "";
+    let level_string = match gd_path {
+        Some(gd_path) => {
+            let file_content =
+                fs::read_to_string(gd_path).expect("Your local geometry dash files were not found");
+            let level_string = get_level_string(file_content)
+                //remove previous spwn objects
+                .split(";")
+                .map(|obj| {
+                    let key_val: Vec<&str> = obj.split(",").collect();
+                    let mut ret = obj;
+                    for i in (0..key_val.len()).step_by(2) {
+                        if key_val[i] == "57" {
+                            let mut groups = key_val[i + 1].split(".");
+                            if groups.any(|x| x == SPWN_SIGNATURE_GROUP) {
+                                ret = "";
+                            }
+                        }
                     }
-                }
-            }
-            ret
-        })
-        .collect::<Vec<&str>>()
-        .join(";");
-    get_used_ids(&level_string, &mut globals);
+                    ret
+                })
+                .collect::<Vec<&str>>()
+                .join(";");
+            get_used_ids(&level_string, &mut globals);
+            level_string
+        }
+        None => String::new(),
+    };
 
     let start_info = CompilerInfo {
         depth: 0,
