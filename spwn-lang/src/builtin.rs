@@ -1,9 +1,9 @@
 //! Defining all native types (and functions?)
 
+use crate::compiler::RuntimeError;
 use crate::compiler_types::*;
 use crate::levelstring::*;
-//use std::collections::HashMap;
-use crate::compiler::RuntimeError;
+use std::collections::HashMap;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Group {
@@ -34,7 +34,7 @@ pub fn context_trigger(context: Context, _globals: &mut Globals, info: CompilerI
         groups: vec![context.start_group],
         target: Group { id: 0 },
         spawn_triggered: context.spawn_triggered,
-        params: Vec::new(),
+        params: HashMap::new(),
         func_id: info.func_id,
     }
 }
@@ -183,9 +183,15 @@ pub fn built_in_function(
             match &arguments[0] {
                 Value::Obj(obj) => {
                     let c_t = context_trigger(context.clone(), globals, info.clone());
+                    let mut obj_map = HashMap::<u16, String>::new();
+
+                    for p in obj {
+                        obj_map.insert(p.0, p.1.clone());
+                    }
+
                     (*globals).func_ids[info.func_id].obj_list.push(
                         GDObj {
-                            params: obj.clone(),
+                            params: obj_map.clone(),
                             groups: vec![context.start_group],
                             ..c_t
                         }

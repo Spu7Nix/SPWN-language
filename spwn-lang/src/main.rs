@@ -7,6 +7,8 @@ mod compiler_types;
 mod levelstring;
 mod parser;
 
+mod optimize;
+
 use parser::*;
 
 use std::env;
@@ -18,7 +20,21 @@ use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
-    let script_path = PathBuf::from(&args[1]); //&args[1]
+    let mut args_iter = args.iter();
+    args_iter.next();
+    let script_path = match args_iter.next() {
+        Some(a) => PathBuf::from(a),
+        None => return Err(std::boxed::Box::from("Expected script file argument")),
+    };
+
+    let mut gd_enabled = true;
+
+    for arg in args_iter {
+        if arg == "--no-gd" {
+            gd_enabled = false;
+        }
+    }
+
     println!("Parsing...");
     let unparsed = fs::read_to_string(script_path.clone())?;
     let (statements, notes) = match parse_spwn(unparsed) {
@@ -34,17 +50,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     println!("{:?}\n\n", statement);
     // }
 
-    let gd_path = if cfg!(target_os = "windows") {
-        PathBuf::from(std::env::var("localappdata").expect("No local app data"))
-            .join("GeometryDash/CCLocalLevels.dat")
-    } else if cfg!(target_os = "macos") {
-        PathBuf::from(std::env::var("HOME").expect("No home directory"))
-            .join("Library/Application Support/GeometryDash/CCLocalLevels.dat")
-    } else if cfg!(target_os = "linux") {
-        PathBuf::from(std::env::var("HOME").expect("No home directory"))
-            .join(".steam/steam/steamapps/compatdata/322170/pfx/drive_c/users/steamuser/Local Settings/Application Data/GeometryDash/CCLocalLevels.dat")
+    let gd_path = if gd_enabled {
+        Some(if cfg!(target_os = "windows") {
+            PathBuf::from(std::env::var("localappdata").expect("No local app data"))
+                .join("GeometryDash/CCLocalLevels.dat")
+        } else if cfg!(target_os = "macos") {
+            PathBuf::from(std::env::var("HOME").expect("No home directory"))
+                .join("Library/Application Support/GeometryDash/CCLocalLevels.dat")
+        } else if cfg!(target_os = "linux") {
+            PathBuf::from(std::env::var("HOME").expect("No home directory"))
+                .join(".steam/steam/steamapps/compatdata/322170/pfx/drive_c/users/steamuser/Local Settings/Application Data/GeometryDash/CCLocalLevels.dat")
+        } else {
+            panic!("Unsupported operating system");
+        })
     } else {
-        panic!("Unsupported operating system");
+        None
     };
 
     let (mut compiled, old_ls) =
@@ -55,7 +75,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(p) => p,
         };
-    let level_string = levelstring::serialize_triggers(compiled.func_ids);
+    let objects = levelstring::apply_fn_ids(compiled.func_ids);
+
+    let level_string = levelstring::serialize_triggers(objects);
 
     compiled.closed_groups.sort();
     compiled.closed_groups.dedup();
@@ -63,7 +85,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Using {} groups", compiled.closed_groups.len());
 
     //println!("level_string: {}", level_string);
-    levelstring::encrypt_level_string(level_string, old_ls, gd_path);
-    println!("Written to save. You can now open Geometry Dash again!");
+    match gd_path {
+        Some(gd_path) => {
+            levelstring::encrypt_level_string(level_string, old_ls, gd_path);
+            println!("Written to save. You can now open Geometry Dash again!");
+        }
+
+        None => println!("Output: {}", level_string),
+    };
+
     Ok(())
 }

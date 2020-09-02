@@ -1,7 +1,7 @@
 // useful things for dealing with gd level data
 use crate::builtin::*;
 use crate::compiler_types::*;
-
+use std::collections::HashMap;
 #[derive(Clone, PartialEq, Debug)]
 pub struct GDObj {
     pub obj_id: u16,
@@ -9,7 +9,7 @@ pub struct GDObj {
     pub target: Group,
     pub spawn_triggered: bool,
     pub func_id: usize,
-    pub params: Vec<(u16, String)>,
+    pub params: HashMap<u16, String>,
 }
 
 impl GDObj {
@@ -52,8 +52,7 @@ const MAX_HEIGHT: u16 = 40;
 
 pub const SPWN_SIGNATURE_GROUP: &str = "5555";
 
-pub fn serialize_triggers(func_ids: Vec<FunctionID>) -> String {
-    //println!("{:?}", trigger);
+pub fn serialize_triggers(objects: Vec<GDObj>) -> String {
     fn group_string(list: Vec<Group>) -> String {
         let mut string = String::new();
         for group in list.iter() {
@@ -63,7 +62,7 @@ pub fn serialize_triggers(func_ids: Vec<FunctionID>) -> String {
         string
     }
 
-    fn serialize_obj(trigger: GDObj, x: u32, y: u16) -> String {
+    fn serialize_obj(trigger: GDObj) -> String {
         let mut obj_string = String::new();
         /*format!(
             "1,{},2,{},3,{},51,{}",
@@ -77,22 +76,13 @@ pub fn serialize_triggers(func_ids: Vec<FunctionID>) -> String {
             trigger.target.id
         );*/
 
-        let spawned = trigger.spawn_triggered && !trigger.params.iter().any(|x| x.0 == 62);
+        let spawned = trigger.spawn_triggered && !trigger.params.iter().any(|x| *x.0 == 62);
 
-        let keys = [1, 2, 3, 51];
-        let values = [
-            trigger.obj_id as u32,
-            if trigger.spawn_triggered {
-                x * 30 + 15
-            } else {
-                0
-            },
-            ((80 - y) * 30 + 15) as u32,
-            trigger.target.id as u32,
-        ];
+        let keys = [1, 51];
+        let values = [trigger.obj_id as u32, trigger.target.id as u32];
 
         for i in 0..4 {
-            if !trigger.params.iter().any(|x| x.0 == keys[i]) {
+            if !trigger.params.iter().any(|x| *x.0 == keys[i]) {
                 obj_string += &format!("{},{},", keys[i].to_string(), values[i].to_string());
             }
         }
@@ -115,15 +105,26 @@ pub fn serialize_triggers(func_ids: Vec<FunctionID>) -> String {
         obj_string + "108,1;" //linked group
     }
 
-    fn serialize_func_id(
+    let mut full_obj_string = String::new();
+
+    for obj in objects {
+        full_obj_string += &serialize_obj(obj)
+    }
+    full_obj_string
+}
+
+pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
+    //println!("{:?}", trigger);
+
+    fn apply_fn_id(
         id_index: usize,
         func_ids: Vec<FunctionID>,
         x_offset: u32,
         y_offset: u16,
-    ) -> (String, u32) {
+    ) -> (Vec<GDObj>, u32) {
         let id = func_ids[id_index].clone();
 
-        let mut obj_string = String::new();
+        let mut objects = Vec::<GDObj>::new();
 
         let mut current_x = 0;
         /*if !id.obj_list.is_empty() {
@@ -142,7 +143,21 @@ pub fn serialize_triggers(func_ids: Vec<FunctionID>) -> String {
         for (i, obj) in id.obj_list.iter().enumerate() {
             let y_pos = (i as u16) % possible_height + START_HEIGHT + y_offset;
             let x_pos = (i as f64 / possible_height as f64).floor() as u32 + x_offset;
-            obj_string += &serialize_obj(obj.clone(), x_pos, y_pos);
+
+            let mut new_obj = obj.clone();
+            new_obj.params.insert(
+                2,
+                (if new_obj.spawn_triggered {
+                    x_pos * 30 + 15
+                } else {
+                    0
+                })
+                .to_string(),
+            );
+            new_obj
+                .params
+                .insert(3, ((80 - y_pos) * 30 + 15).to_string());
+            objects.push(new_obj);
         }
         if !id.obj_list.is_empty() {
             current_x += (id.obj_list.len() as f64 / possible_height as f64).floor() as u32 + 1;
@@ -152,28 +167,28 @@ pub fn serialize_triggers(func_ids: Vec<FunctionID>) -> String {
         for (i, func_id) in func_ids.iter().enumerate() {
             if func_id.parent == Some(id_index) {
                 let (child_string, new_length) =
-                    serialize_func_id(i, func_ids.clone(), current_x + x_offset, y_offset + 1);
-                obj_string += &child_string;
+                    apply_fn_id(i, func_ids.clone(), current_x + x_offset, y_offset + 1);
+                objects.extend(child_string);
                 if new_length > 0 {
                     current_x += new_length + 1;
                 }
             }
         }
-        (obj_string, current_x)
+        (objects, current_x)
     }
 
-    let mut full_obj_string = String::new();
+    let mut full_obj_list = Vec::<GDObj>::new();
 
     let mut current_x = 0;
     for (i, func_id) in func_ids.iter().enumerate() {
         if func_id.parent == None {
-            let (obj_string, new_length) = serialize_func_id(i, func_ids.clone(), current_x, 0);
-            full_obj_string += &obj_string;
+            let (objects, new_length) = apply_fn_id(i, func_ids.clone(), current_x, 0);
+            full_obj_list.extend(objects);
 
             current_x += new_length;
         }
     }
-    full_obj_string
+    full_obj_list
 }
 /* PYTHON CODE IM USING
 def Xor(data,key):
