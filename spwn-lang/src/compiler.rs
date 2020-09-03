@@ -161,7 +161,7 @@ pub fn compile_spwn(
             get_used_ids(&level_string, &mut globals);
             level_string
         }
-        None => String::new(),
+        None => String::from(""),
     };
 
     let start_info = CompilerInfo {
@@ -180,11 +180,11 @@ pub fn compile_spwn(
     //delete all unused func ids
 
     //let all func_id's parents be with objects
-    let mut new_func_ids = Vec::<FunctionID>::new();
+    //let mut new_func_ids = Vec::<FunctionID>::new();
 
-    println!("Func id len: {}", globals.func_ids.len());
+    //println!("Func id len: {}", globals.func_ids.len());
 
-    for id in &globals.func_ids {
+    /*for id in &globals.func_ids {
         if !id.obj_list.is_empty() {
             let mut new_id = id.clone();
 
@@ -203,12 +203,12 @@ pub fn compile_spwn(
 
             new_func_ids.push(new_id)
         }
-    }
+    }*/
 
     // PROBLEM: new parent ids point to indexes in the previous list, in which many items were deleted.
     // Update the indexes to point to the corresponding items in the new list
 
-    globals.func_ids = new_func_ids;
+    //globals.func_ids = new_func_ids;
 
     println!(
         "Compiled in {} milliseconds!",
@@ -481,23 +481,27 @@ pub fn compile_scope(
                 let mut obj_list = Vec::<GDObj>::new();
                 for (func, context) in all_values {
                     contexts.push(context.clone());
+                    let mut params = HashMap::new();
+                    params.insert(
+                        51,
+                        match func {
+                            Value::Func(g) => g.start_group.id.to_string(),
+                            Value::Group(g) => g.id.to_string(),
+                            a => {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: format!(
+                                        "Expected function or group, found: {}",
+                                        a.to_str(globals)
+                                    ),
+                                    info,
+                                })
+                            }
+                        },
+                    );
+                    params.insert(1, "1268".to_string());
                     obj_list.push(
                         GDObj {
-                            obj_id: 1268,
-                            groups: vec![context.start_group],
-                            target: match func {
-                                Value::Func(g) => g.start_group,
-                                Value::Group(g) => g,
-                                a => {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: format!(
-                                            "Expected function of group, found: {}",
-                                            a.to_str(globals)
-                                        ),
-                                        info,
-                                    })
-                                }
-                            },
+                            params,
 
                             ..context_trigger(context.clone(), globals, info.clone())
                         }

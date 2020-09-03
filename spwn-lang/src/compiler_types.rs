@@ -868,10 +868,11 @@ pub fn execute_macro(
                     };
 
                     for cont in c {
+                        let mut params = HashMap::new();
+                        params.insert(1, "1268".to_string());
+                        params.insert(51, start_group.id.to_string());
                         let obj = GDObj {
-                            obj_id: 1268,
-                            groups: vec![cont.start_group],
-                            target: start_group,
+                            params,
 
                             ..context_trigger(cont.clone(), globals, info.clone())
                         }

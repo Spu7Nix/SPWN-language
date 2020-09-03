@@ -9,6 +9,8 @@ mod parser;
 
 mod optimize;
 
+use optimize::optimize;
+
 use parser::*;
 
 use std::env;
@@ -75,9 +77,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Ok(p) => p,
         };
-    let objects = levelstring::apply_fn_ids(compiled.func_ids);
+
+    //println!("func ids: {:?}", compiled.func_ids);
+    let mut objects = levelstring::apply_fn_ids(compiled.func_ids);
+
+    println!("{} objects added", objects.len());
+
+    objects = optimize(objects);
+
+    println!("optimized to {} objects", objects.len());
 
     let level_string = levelstring::serialize_triggers(objects);
+
+    //let level_string = levelstring::serialize_triggers_old(compiled.func_ids);
+
+    //println!("{}", level_string);
 
     compiled.closed_groups.sort();
     compiled.closed_groups.dedup();

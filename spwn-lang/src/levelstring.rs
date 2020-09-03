@@ -4,19 +4,58 @@ use crate::compiler_types::*;
 use std::collections::HashMap;
 #[derive(Clone, PartialEq, Debug)]
 pub struct GDObj {
-    pub obj_id: u16,
+    /*pub obj_id: u16,
     pub groups: Vec<Group>,
     pub target: Group,
-    pub spawn_triggered: bool,
+    pub spawn_triggered: bool,*/
     pub func_id: usize,
     pub params: HashMap<u16, String>,
 }
 
 impl GDObj {
     pub fn context_parameters(&mut self, context: Context) -> GDObj {
-        self.groups = vec![context.start_group];
-        self.spawn_triggered = context.spawn_triggered;
+        self.params.insert(57, context.start_group.id.to_string());
+        self.params.insert(
+            62,
+            if context.spawn_triggered {
+                String::from("1")
+            } else {
+                String::from("0")
+            },
+        );
         (*self).clone()
+    }
+
+    pub fn get_groups(&self) -> Vec<Group> {
+        match self.params.get(&57) {
+            Some(group_string) => group_string
+                .split(".")
+                .map(|x| Group {
+                    id: x.parse::<u16>().unwrap(),
+                })
+                .collect(),
+            None => Vec::new(),
+        }
+    }
+
+    pub fn obj_id(&self) -> &str {
+        match self.params.get(&1) {
+            Some(num) => num,
+            None => "0",
+        }
+    }
+
+    pub fn get_pos(&self) -> (f64, f64) {
+        (
+            match self.params.get(&2) {
+                Some(x_pos) => x_pos.parse().unwrap(),
+                None => 0.0,
+            },
+            match self.params.get(&3) {
+                Some(y_pos) => y_pos.parse().unwrap(),
+                None => 0.0,
+            },
+        )
     }
 }
 
@@ -50,19 +89,19 @@ pub fn get_used_ids(ls: &String, globals: &mut Globals) {
 const START_HEIGHT: u16 = 10;
 const MAX_HEIGHT: u16 = 40;
 
-pub const SPWN_SIGNATURE_GROUP: &str = "5555";
+pub const SPWN_SIGNATURE_GROUP: &str = "1111";
 
 pub fn serialize_triggers(objects: Vec<GDObj>) -> String {
-    fn group_string(list: Vec<Group>) -> String {
+    /*fn group_string(list: Vec<Group>) -> String {
         let mut string = String::new();
         for group in list.iter() {
             string += &(group.id.to_string() + ".");
         }
         string.pop();
         string
-    }
+    }*/
 
-    fn serialize_obj(trigger: GDObj) -> String {
+    fn serialize_obj(mut trigger: GDObj) -> String {
         let mut obj_string = String::new();
         /*format!(
             "1,{},2,{},3,{},51,{}",
@@ -76,12 +115,25 @@ pub fn serialize_triggers(objects: Vec<GDObj>) -> String {
             trigger.target.id
         );*/
 
-        let spawned = trigger.spawn_triggered && !trigger.params.iter().any(|x| *x.0 == 62);
+        let spawned = match trigger.params.get(&62) {
+            Some(s) => *s == String::from("1"),
+            None => false,
+        };
+
+        /*let obj_id = match trigger.params.get(&1) {
+            Some(s) => s,
+            None => "0",
+        };
+
+        let target = match trigger.params.get(&51) {
+            Some(s) => s,
+            None => "0",
+        };
 
         let keys = [1, 51];
-        let values = [trigger.obj_id as u32, trigger.target.id as u32];
+        let values = [obj_id, trigger.target.id];
 
-        for i in 0..4 {
+        for i in 0..2 {
             if !trigger.params.iter().any(|x| *x.0 == keys[i]) {
                 obj_string += &format!("{},{},", keys[i].to_string(), values[i].to_string());
             }
@@ -97,11 +149,27 @@ pub fn serialize_triggers(objects: Vec<GDObj>) -> String {
                 + "."
                 + SPWN_SIGNATURE_GROUP
                 + ",");
+        }*/
+
+        if spawned {
+            obj_string += "87,1,";
         }
 
-        for param in trigger.params {
+        match trigger.params.get_mut(&57) {
+            Some(group_str) => (*group_str) += &format!(".{}", SPWN_SIGNATURE_GROUP),
+            None => {
+                trigger.params.insert(57, SPWN_SIGNATURE_GROUP.to_string());
+            }
+        };
+
+        let mut param_list = trigger.params.iter().collect::<Vec<(&u16, &String)>>();
+
+        param_list.sort_by(|a, b| (*a.0).cmp(b.0));
+
+        for param in param_list {
             obj_string += &(param.0.to_string() + "," + &param.1 + ",");
         }
+        //println!("{}", obj_string);
         obj_string + "108,1;" //linked group
     }
 
@@ -118,7 +186,7 @@ pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
 
     fn apply_fn_id(
         id_index: usize,
-        func_ids: Vec<FunctionID>,
+        func_ids: &Vec<FunctionID>,
         x_offset: u32,
         y_offset: u16,
     ) -> (Vec<GDObj>, u32) {
@@ -147,7 +215,7 @@ pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
             let mut new_obj = obj.clone();
             new_obj.params.insert(
                 2,
-                (if new_obj.spawn_triggered {
+                (if new_obj.params.get(&62) == Some(&String::from("1")) {
                     x_pos * 30 + 15
                 } else {
                     0
@@ -166,14 +234,16 @@ pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
         //add all children
         for (i, func_id) in func_ids.iter().enumerate() {
             if func_id.parent == Some(id_index) {
-                let (child_string, new_length) =
-                    apply_fn_id(i, func_ids.clone(), current_x + x_offset, y_offset + 1);
-                objects.extend(child_string);
+                let (obj, new_length) =
+                    apply_fn_id(i, func_ids, current_x + x_offset, y_offset + 1);
+                objects.extend(obj);
+
                 if new_length > 0 {
                     current_x += new_length + 1;
                 }
             }
         }
+
         (objects, current_x)
     }
 
@@ -182,7 +252,7 @@ pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
     let mut current_x = 0;
     for (i, func_id) in func_ids.iter().enumerate() {
         if func_id.parent == None {
-            let (objects, new_length) = apply_fn_id(i, func_ids.clone(), current_x, 0);
+            let (objects, new_length) = apply_fn_id(i, &func_ids, current_x, 0);
             full_obj_list.extend(objects);
 
             current_x += new_length;
@@ -211,6 +281,136 @@ def decrypt(ls):
     return(fin)
 */
 
+//<OLD>
+/*
+pub fn serialize_triggers_old(func_ids: Vec<FunctionID>) -> String {
+    //println!("{:?}", trigger);
+    fn group_string(list: Vec<Group>) -> String {
+        let mut string = String::new();
+        for group in list.iter() {
+            string += &(group.id.to_string() + ".");
+        }
+        string.pop();
+        string
+    }
+
+    fn serialize_obj(mut trigger: GDObj, x: u32, y: u16) -> String {
+        let mut obj_string = String::new();
+
+        let spawned = trigger.params.get(&62) == Some(&String::from("1"));
+
+        if spawned {
+            obj_string += "87,1,";
+        }
+
+        /*if !trigger.groups.is_empty() {
+            obj_string += &(String::from("57,")
+                + &group_string(trigger.groups)
+                + "."
+                + SPWN_SIGNATURE_GROUP
+                + ",");
+        }*/
+
+        match trigger.params.get_mut(&2) {
+            None => {
+                trigger.params.insert(
+                    2,
+                    if spawned {
+                        (x * 30 + 15).to_string()
+                    } else {
+                        "0".to_string()
+                    },
+                );
+            }
+
+            _ => (),
+        };
+
+        match trigger.params.get_mut(&3) {
+            None => {
+                trigger.params.insert(3, ((80 - y) * 30 + 15).to_string());
+            }
+
+            _ => (),
+        };
+
+        //((80 - y) * 30 + 15) as u32,)
+
+        match trigger.params.get_mut(&57) {
+            Some(group_str) => (*group_str) += &format!(".{}", SPWN_SIGNATURE_GROUP),
+            None => {
+                trigger.params.insert(57, SPWN_SIGNATURE_GROUP.to_string());
+            }
+        };
+
+        for param in trigger.params {
+            obj_string += &(param.0.to_string() + "," + &param.1 + ",");
+        }
+        obj_string + "108,1;" //linked group
+    }
+
+    fn serialize_func_id(
+        id_index: usize,
+        func_ids: Vec<FunctionID>,
+        x_offset: u32,
+        y_offset: u16,
+    ) -> (String, u32) {
+        let id = func_ids[id_index].clone();
+
+        let mut obj_string = String::new();
+
+        let mut current_x = 0;
+        /*if !id.obj_list.is_empty() {
+            //add label
+            obj_string += &format!(
+                "1,914,2,{},3,{},31,{},32,0.5;",
+                x_offset * 30 + 15,
+                ((81 - START_HEIGHT) - y_offset) * 30 + 15,
+                base64::encode(id.name.as_bytes())
+            );
+        }*/
+
+        //add top layer
+        let possible_height = MAX_HEIGHT - (START_HEIGHT + y_offset); //30 is max (TODO: case for if y_offset is more than 30)
+
+        for (i, obj) in id.obj_list.iter().enumerate() {
+            let y_pos = (i as u16) % possible_height + START_HEIGHT + y_offset;
+            let x_pos = (i as f64 / possible_height as f64).floor() as u32 + x_offset;
+            obj_string += &serialize_obj(obj.clone(), x_pos, y_pos);
+        }
+        if !id.obj_list.is_empty() {
+            current_x += (id.obj_list.len() as f64 / possible_height as f64).floor() as u32 + 1;
+        }
+
+        //add all children
+        for (i, func_id) in func_ids.iter().enumerate() {
+            if func_id.parent == Some(id_index) {
+                let (child_string, new_length) =
+                    serialize_func_id(i, func_ids.clone(), current_x + x_offset, y_offset + 1);
+                obj_string += &child_string;
+                if new_length > 0 {
+                    current_x += new_length + 1;
+                }
+            }
+        }
+        (obj_string, current_x)
+    }
+
+    let mut full_obj_string = String::new();
+
+    let mut current_x = 0;
+    for (i, func_id) in func_ids.iter().enumerate() {
+        if func_id.parent == None {
+            let (obj_string, new_length) = serialize_func_id(i, func_ids.clone(), current_x, 0);
+            full_obj_string += &obj_string;
+
+            current_x += new_length;
+        }
+    }
+    full_obj_string
+}
+*/
+//</OLD>
 use base64;
 use libflate::{gzip, zlib};
 use std::io::Read;

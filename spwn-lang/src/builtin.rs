@@ -29,11 +29,17 @@ pub struct Item {
 }
 
 pub fn context_trigger(context: Context, _globals: &mut Globals, info: CompilerInfo) -> GDObj {
+    let mut params = HashMap::new();
+    params.insert(57, context.start_group.id.to_string());
+    params.insert(
+        62,
+        if context.spawn_triggered {
+            String::from("1")
+        } else {
+            String::from("0")
+        },
+    );
     GDObj {
-        obj_id: 0,
-        groups: vec![context.start_group],
-        target: Group { id: 0 },
-        spawn_triggered: context.spawn_triggered,
         params: HashMap::new(),
         func_id: info.func_id,
     }
@@ -192,7 +198,7 @@ pub fn built_in_function(
                     (*globals).func_ids[info.func_id].obj_list.push(
                         GDObj {
                             params: obj_map.clone(),
-                            groups: vec![context.start_group],
+
                             ..c_t
                         }
                         .context_parameters(context.clone()),

@@ -1,15 +1,9 @@
 extract import "std.spwn"
+extract $
 
 
-for i in 0..5 {
-	10g.move(10, 10, 1)
-}
+10g.move(100, 0, 0.5)
 
+for i in 0..10 { wait(0.1) }
 
-
-
-
-
-
-
-
+10g.move(100, 0, 0.5)
