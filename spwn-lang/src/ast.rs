@@ -86,6 +86,8 @@ pub enum IDClass {
     Block,
 }
 
+pub type Tag = Vec<(String, Vec<Argument>)>;
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Path {
     Member(String),
@@ -122,11 +124,12 @@ pub struct Native {
     pub function: Variable,
     pub args: Vec<Argument>,
 }*/
-
+pub type ArgDef = (String, Option<Expression>, Tag);
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
-    pub args: Vec<(String, Option<Expression>)>,
+    pub args: Vec<ArgDef>,
     pub body: CompoundStatement,
+    pub properties: Tag,
 }
 
 #[derive(Clone, PartialEq, Debug)]

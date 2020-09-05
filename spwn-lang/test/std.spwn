@@ -26,7 +26,15 @@ call_with_delay = (time, function) {
 }
 
 impl @group {
-    move: (self, x, y, duration: 0, easing: NONE, easing_rate: 2) {
+    move: #[desc("Implementation of the move trigger")] 
+    (
+        self, 
+        #[desc("Units to move on the X axis")] x, 
+        #[desc("Units to move on the Y axis")] y, 
+        #[desc("Duration of movement")] duration: 0, 
+        easing: NONE, 
+        easing_rate: 2
+    ) {
         $.add( obj{
             OBJ_ID: 901,
             TARGET: self,
@@ -789,6 +797,28 @@ general_functions = {
                 OBJ_ID: 1819,
             })
         }
+    },
+
+    loop: (n, code, delay: 0.05, reset: true, reset_speed: 1) {
+        i = mut(?i)
+
+        func = {
+            code(i)
+            i.add(1)
+            i.item.if_is(SMALLER_THAN, n, {
+                call_with_delay(delay, func)
+            })
+
+            i.item.if_is(LARGER_THAN, n - 1, {
+                if reset {
+                    i.reset(reset_speed)
+                }
+                return
+            })
+        }
+
+        func!
+        
     }
         
 }

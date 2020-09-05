@@ -171,6 +171,9 @@ pub enum Token {
     #[token("@")]
     At,
 
+    #[token("#")]
+    Hash,
+
     //KEY WORDS
     #[token("return")]
     Return,
@@ -860,10 +863,12 @@ fn parse_args(
     notes: &mut ParseNotes,
 ) -> Result<Vec<ast::Argument>, SyntaxError> {
     let mut args = Vec::<ast::Argument>::new();
+
     loop {
         if tokens.next(false) == Some(Token::ClosingBracket) {
             break;
         };
+
         args.push(match tokens.next(false) {
             Some(Token::Assign) => {
                 // println!("assign ");
@@ -880,6 +885,7 @@ fn parse_args(
                 tokens.previous();
                 tokens.previous();
                 // println!("arg with no val");
+
                 let value = parse_expr(tokens, notes)?;
 
                 ast::Argument {
@@ -925,9 +931,10 @@ fn parse_args(
 fn parse_arg_def(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
-) -> Result<Vec<(String, Option<ast::Expression>)>, SyntaxError> {
-    let mut args = Vec::<(String, Option<ast::Expression>)>::new();
+) -> Result<Vec<ast::ArgDef>, SyntaxError> {
+    let mut args = Vec::<ast::ArgDef>::new();
     loop {
+        let properties = check_for_tag(tokens, notes)?;
         if tokens.next(false) == Some(Token::ClosingBracket) {
             break;
         };
@@ -939,13 +946,13 @@ fn parse_arg_def(
                 let value = Some(parse_expr(tokens, notes)?);
                 //tokens.previous();
 
-                (symbol, value)
+                (symbol, value, properties)
             }
 
             Some(_) => {
                 tokens.previous();
 
-                (tokens.slice(), None)
+                (tokens.slice(), None, properties)
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
@@ -980,12 +987,68 @@ fn parse_arg_def(
     Ok(args)
 }
 
+fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag, SyntaxError> {
+    match tokens.next(false) {
+        Some(Token::Hash) => {
+            //parse tag
+            match tokens.next(false) {
+                Some(Token::OpenSquareBracket) => (),
+                a => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'['".to_string(),
+                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        pos: tokens.position(),
+                    })
+                }
+            };
+
+            let mut contents = ast::Tag::new();
+
+            loop {
+                match tokens.next(false) {
+                    Some(Token::ClosingSquareBracket) => break,
+                    Some(Token::Symbol) => {
+                        let name = tokens.slice();
+                        let args = match tokens.next(false) {
+                            Some(Token::OpenBracket) => parse_args(tokens, notes)?,
+                            Some(Token::Comma) => Vec::new(),
+                            Some(Token::ClosingSquareBracket) => break,
+                            a => {
+                                return Err(SyntaxError::ExpectedErr {
+                                    expected: "either '(', ']' or comma (',')".to_string(),
+                                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                                    pos: tokens.position(),
+                                })
+                            }
+                        };
+                        contents.push((name, args));
+                    }
+                    a => {
+                        return Err(SyntaxError::ExpectedErr {
+                            expected: "either Symbol or ']'".to_string(),
+                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            pos: tokens.position(),
+                        })
+                    }
+                };
+            }
+
+            Ok(contents)
+        }
+        _ => {
+            tokens.previous();
+            Ok(Vec::new())
+        }
+    }
+}
+
 fn parse_variable(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
 ) -> Result<ast::Variable, SyntaxError> {
+    let properties = check_for_tag(tokens, notes)?;
     let mut first_token = tokens.next(false);
-    //println!("first token in var: {:?}, {}", first_token, tokens.slice());
+
     let operator = match first_token {
         Some(Token::Minus) => {
             first_token = tokens.next(false);
@@ -1155,6 +1218,7 @@ fn parse_variable(
                 Ok(ast::ValueLiteral::Macro(ast::Macro {
                     args,
                     body: ast::CompoundStatement { statements: body },
+                    properties,
                 }))
             };
             //tokens.next(false);

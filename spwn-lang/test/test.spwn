@@ -1,9 +1,23 @@
-extract import "std.spwn"
-extract $
 
 
-10g.move(100, 0, 0.5)
-
-for i in 0..10 { wait(0.1) }
-
-10g.move(100, 0, 0.5)
+move = #[desc("Implementation of the move trigger")] 
+(
+	self, 
+	#[desc("Units to move on the X axis")] x, 
+	#[desc("Units to move on the Y axis")] y, 
+	#[desc("Duration of movement")] duration: 0, 
+	easing: NONE, 
+	easing_rate: 2
+) {
+	$.add( obj{
+		OBJ_ID: 901,
+		TARGET: self,
+		MOVE_X: x * 3,
+		MOVE_Y: y * 3,
+		DURATION: duration,
+		EASING: easing,
+		EASING_RATE: easing_rate,
+	})
+	
+	wait(duration)
+},
