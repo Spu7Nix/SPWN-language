@@ -125,7 +125,7 @@ pub enum Token {
     #[regex(r"[0-9]+(\.[0-9]+)?")]
     Number,
 
-    #[regex("\"[^\n\r\"]*\"")]
+    #[regex("\"[^\n\r\"]*\"")] //FIX: make it not match \"
     StringLiteral,
 
     #[token("true")]
@@ -227,6 +227,17 @@ pub struct ParseNotes {
     pub closed_colors: Vec<u16>,
     pub closed_blocks: Vec<u16>,
     pub closed_items: Vec<u16>,
+}
+
+impl ParseNotes {
+    pub fn new() -> Self {
+        ParseNotes {
+            closed_groups: Vec::new(),
+            closed_colors: Vec::new(),
+            closed_blocks: Vec::new(),
+            closed_items: Vec::new(),
+        }
+    }
 }
 
 pub struct Tokens<'a> {
@@ -348,12 +359,7 @@ pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNot
     let mut tokens = Tokens::new(tokens_iter);
     let mut statements = Vec::<ast::Statement>::new();
 
-    let mut notes = ParseNotes {
-        closed_groups: Vec::new(),
-        closed_colors: Vec::new(),
-        closed_blocks: Vec::new(),
-        closed_items: Vec::new(),
-    };
+    let mut notes = ParseNotes::new();
 
     let mut line_breaks = Vec::<u32>::new();
     let mut current_index: u32 = 0;
@@ -1021,7 +1027,7 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
                                 })
                             }
                         };
-                        contents.push((name, args));
+                        contents.tags.push((name, args));
                     }
                     a => {
                         return Err(SyntaxError::ExpectedErr {
@@ -1037,7 +1043,7 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
         }
         _ => {
             tokens.previous();
-            Ok(Vec::new())
+            Ok(ast::Tag::new())
         }
     }
 }
@@ -1262,6 +1268,14 @@ fn parse_variable(
                         parse_closed_expr(tokens, notes)?
                     }
                 },
+
+                Some(Token::Hash) => {
+                    //CHANGE THIS
+                    tokens.previous();
+                    //tokens.previous();
+
+                    parse_macro_def(tokens, notes)?
+                }
                 _ => {
                     tokens.previous();
 

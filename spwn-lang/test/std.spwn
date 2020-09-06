@@ -48,14 +48,16 @@ impl @group {
         wait(duration)
     },
 
-    stop: (self){
+    stop: #[desc("Implementation of the stop trigger")]
+    (self){
         $.add( obj{
             OBJ_ID: 1616,
             TARGET: self,
         })
     },
 
-    alpha: (self, opacity: 1, duration: 0){
+    alpha: #[desc("Implementation of the alpha trigger")] 
+    (self, opacity: 1, duration: 0){
         $.add( obj {
             OBJ_ID: 1007,
             TARGET: self,
@@ -65,7 +67,9 @@ impl @group {
         wait(duration)
     },
 
-    toggle_on: (self){
+    toggle_on:
+    #[desc("Toggles the group on")] 
+    (self){
         $.add( obj{
             OBJ_ID: 1049,
             TARGET: self,
@@ -73,7 +77,8 @@ impl @group {
         })
     },
 
-    toggle_off: (self){
+    toggle_off: #[desc("Toggles the group off")] 
+    (self){
         $.add( obj{
             OBJ_ID: 1049,
             TARGET: self,
@@ -81,7 +86,16 @@ impl @group {
         })
     },
 
-    rotate: (self, center, degrees, duration: 0, easing: 0, easing_rate: 0, lock_object_rotation: 0){
+    rotate: #[desc("Implementation of the rotate trigger")] 
+    (
+        self, 
+        #[desc("Group of object to rotate around")] center, 
+        #[desc("Rotation in degrees")] degrees, 
+        #[desc("Duration of rotation")] duration: 0, 
+        #[desc("Easing type")] easing: 0, 
+        #[desc("Easing rate")] easing_rate: 0, 
+        #[desc("Only rotate positions of the objects, not the textures")] lock_object_rotation: false
+    ){
         $.add( obj{
             OBJ_ID: 1346,
             TARGET: self,
@@ -95,7 +109,15 @@ impl @group {
         wait(duration)
     },
 
-    follow: (self, other, x_mod: 1, y_mod: 1, duration: 999){
+    follow: 
+    #[desc("Implementation of the follow trigger")] 
+    (
+        self, 
+        #[desc("Group of object to follow")] other, 
+        #[desc("Multiplier for the movement on the X-axis")] x_mod: 1, 
+        #[desc("Multiplier for the movement on the Y-axis")] y_mod: 1, 
+        #[desc("Duration of following")] duration: 999
+    ){
         $.add( obj{
             OBJ_ID: 1347,
             X_MOD: x_mod,
@@ -107,7 +129,16 @@ impl @group {
         //wouldnt make any sense to wait out the duration here
     },
 
-    follow_player_y: (self, speed: 1, delay: 0, offset: 0, max_speed: 0, duration: 999){
+    follow_player_y:
+    #[desc("Implementation of the follow player Y trigger")] 
+    (
+        self, 
+        #[desc("Interpolation factor (?)")] speed: 1, 
+        #[desc("Delay of movement")]  delay: 0, 
+        #[desc("Offset on the Y-axis")] offset: 0, 
+        #[desc("Maximum speed")] max_speed: 0, 
+        #[desc("Duration of following")] duration: 999
+    ){
         $.add( obj{
             OBJ_ID: 1814,
             SPEED : speed,
@@ -119,7 +150,17 @@ impl @group {
         //wouldnt make any sense to wait out the duration here
     },
 
-    move_to: (self, target, duration: 0, x_only: false, y_only: false, easing: NONE, easing_rate: 2) {
+    move_to: 
+    #[desc("Implementation of the 'Move target' feature of the move trigger")]
+    (
+        self, 
+        #[desc("Group of the object to move to")] target, 
+        #[desc("Duration of movement")] duration: 0,
+        #[desc("Will move to the object only on the X-axis")] x_only: false, 
+        #[desc("Will move to the object only on the y-axis")] y_only: false, 
+        #[desc("Easing type")] easing: NONE, 
+        #[desc("Easing rate")] easing_rate: 2
+    ) {
         $.add( obj{
             OBJ_ID: 901,
             TARGET: self,
@@ -145,7 +186,19 @@ impl @group {
         wait(duration)
     },
 
-    pulse: (self, r, g, b, fade_in: 0, hold: 0, fade_out: 0, exclusive: false, hsv: false) { //add an option for hsv?
+    pulse: 
+    #[desc("Implementation of the pulse trigger for groups")]
+    (
+        self, 
+        #[desc("Red value of pulse color (or hue if HSV is enabled)")] r, 
+        #[desc("Green value of pulse color (or saturation if HSV is enabled)")] g, 
+        #[desc("Blue value of pulse color (or brightness/value if HSV is enabled)")] b, 
+        #[desc("Fade-in duration")] fade_in: 0, 
+        #[desc("Duration to hold the color")] hold: 0, 
+        #[desc("Fade-out duration")] fade_out: 0, 
+        #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: false,
+        #[desc("Toggle HSV mode")] hsv: false
+    ) {
         $.add( obj{
             OBJ_ID: 1006,
             TRIGGER_RED: r,
@@ -168,7 +221,17 @@ impl @group {
 
 
 impl @color {
-    set: (self, r, g, b, duration: 0, opacity: 1, blending: false){
+    set: 
+    #[desc("Implementation of the color trigger")]
+    (
+        self, 
+        #[desc("Red value of the target color")] r, 
+        #[desc("Green value of the target color")] g, 
+        #[desc("Blue value of the target color")] b, 
+        #[desc("Duration of color change")] duration: 0, 
+        #[desc("Opacity of target color")] opacity: 1, 
+        #[desc("Toggle blending on target color")] blending: false
+    ){
         $.add( obj{
             OBJ_ID: 899,
             DURATION: duration,
@@ -182,7 +245,18 @@ impl @color {
         wait(duration)
     },
 
-    pulse: (self, r, g, b, fade_in: 0, hold: 0, fade_out: 0, exclusive: false, hsv: false) { //add an option for hsv?
+    pulse: #[desc("Implementation of the pulse trigger for colors")]
+    (
+        self, 
+        #[desc("Red value of pulse color (or hue if HSV is enabled)")] r, 
+        #[desc("Green value of pulse color (or saturation if HSV is enabled)")] g, 
+        #[desc("Blue value of pulse color (or brightness/value if HSV is enabled)")] b, 
+        #[desc("Fade-in duration")] fade_in: 0, 
+        #[desc("Duration to hold the color")] hold: 0, 
+        #[desc("Fade-out duration")] fade_out: 0, 
+        #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: false,
+        #[desc("Toggle HSV mode")] hsv: false
+    ) {
         $.add( obj{
             OBJ_ID: 1006,
             TRIGGER_RED: r,
@@ -200,18 +274,22 @@ impl @color {
     }
 }
 
-impl @function {
+/*impl @function {
 
-    stop: (self) {
+    stop:
+
+    (self) {
         self.group.stop()
     }
-}
+}*/
 
 
 
 impl @item {
     
-    add: (self, amount) {
+    add:
+    #[desc("Implementation of the pickup trigger")]
+    (self, #[desc("Amount to add")] amount) {
         $.add( obj{
             OBJ_ID: 1817,
             COUNT: amount,
@@ -219,7 +297,14 @@ impl @item {
         })
     },
 
-    if_is: (self, comparison, other, function) {
+    if_is:
+    #[desc("Implementation of the instant count trigger")]
+    (
+        self, 
+        #[desc("Comparison mode")] comparison, 
+        #[desc("Number to compare with")] other, 
+        #[desc("Target function if comparison is 'true'")] function
+    ) {
         $.add( obj{
             OBJ_ID: 1811,
             TARGET: function,
@@ -230,7 +315,12 @@ impl @item {
         })
     },
 
-    count: (self, number: 0) {
+    count:
+    #[desc("Implementation of the count trigger (returns an event)")]
+    (
+        self, 
+        #[desc("Number to check against")] number: 0
+    ) {
         return (function) {
             $.add( obj{
                 OBJ_ID: 1611,
@@ -247,7 +337,9 @@ impl @item {
 
 type mut
 
-mut = (source: 0){
+mut = #[desc("Creates a new mut")] (
+    #[desc("Source (can be a number, item ID or boolean)")] source: 0
+){
     if source.type == @number {
         id = ?i
     
@@ -278,7 +370,9 @@ mut = (source: 0){
     
 }
     
-supress_signal = (delay){
+supress_signal = #[desc("Stops signal from coming past for some time")] (
+    #[desc("Time to supress signal")] delay
+){
     //if checker is 0, a signal can come through
     //if checker is 1, it will be supressed
     checker = mut(0)
@@ -299,7 +393,14 @@ supress_signal = (delay){
 
 impl @mut {
 
-    add_to: (self, items, speed: 1, factor: 1) {
+    add_to: 
+    #[desc("Adds the mut's value to all item IDs in a list, and resets the mut to 0 in the process")]
+    (
+        self, 
+        #[desc("Item IDs to add to")] items, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: 1, 
+        #[desc("Multiplyer for the value added")] factor: 1
+    ) {
         add = {
             
             
@@ -328,7 +429,13 @@ impl @mut {
         add!
     },
 
-    subtract_from: (self, items, speed: 1) {
+    subtract_from:
+    #[desc("Subtracts the mut's value from all item IDs in a list, and resets the mut to 0 in the process")]
+    (
+        self, 
+        #[desc("Item IDs to add to")] items, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: 1
+    ) {
         sub = {
             
             self.item.if_is(LARGER_THAN, 0, {
@@ -357,7 +464,13 @@ impl @mut {
         sub!
     },
 
-    multiply: (self, factor, speed: 1) {
+    multiply:
+    #[desc("Multiplies the value of the mut by some factor")]
+    (
+        self,
+        #[desc("Factor to multiply by, either another mut (very expensive) or a normal number")] factor,
+        #[desc("Speed of operation (higher number increases group usage)")] speed: 1
+    ) {
         if factor.type == @number {
             temp = mut(0)
             self.add_to([temp.item], speed, factor)
@@ -398,7 +511,13 @@ impl @mut {
     },
 
 
-    divide: (self, divisor, speed: 1, rest_item: ?i) {
+    divide: #[desc("Devides the value of the mut by some divisor")]
+    (
+        self, 
+        #[desc("Divisor to divide by, either another mut (very expensive) or a normal number")] divisor, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: 1, 
+        #[desc("Item ID to add the remainder of the division to")] rest_item: ?i
+    ) {
 
         if divisor.type == @number {
             result = mut(0)
@@ -520,7 +639,7 @@ impl @mut {
     },
 
     //will consume both numbers
-    compare: (self, other, speed: 1) {
+    /*compare: (self, other, speed: 1) {
 
         comp = {
             mini_comp = (num){
@@ -558,9 +677,13 @@ impl @mut {
             })
             
         }
-    },
+    },*/
 
-    reset: (self, speed: 1){
+    reset: #[desc("Resets mut to 0")]
+    (
+        self, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: 1
+    ){
         //almost the same
         add = {
             self.item.if_is(LARGER_THAN, 0, {
@@ -585,7 +708,13 @@ impl @mut {
         add!
     },
 
-    copy_to: (self, item, speed: 1, factor: 1) {
+    copy_to: #[desc("Copies the value of the mut to another item ID, without consuming the original")] 
+    (
+        self, 
+        #[desc("Item ID to copy to")]  item, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: 1, 
+        #[desc("Factor of to multiply the copy by")] factor: 1
+    ) {
         temp_storage = ?i
         
         add = {
@@ -618,7 +747,10 @@ impl @mut {
         add! 
     },
 
-    clone: (self, speed: 1) {
+    clone: #[desc("Copies the mut and returns the copy")] (
+        self, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: 1
+    ) {
         new_mut = ?i
         self.copy_to(new_mut, speed)
         return mut(new_mut)
@@ -723,13 +855,17 @@ impl @mut {
         }
     },
 
-    add: (self, num) {
+    add: #[desc("Implementation of the pickup trigger")]
+    (self, #[desc("Amount to add")] num) {
         self.item.add(num)
     },
 
     
 
-    to_const: (self, range) {
+    to_const: #[desc("Converts the mut into a normal number (very context-splitting, be careful)")] (
+        self, 
+        #[desc("Array of possible output values")] range
+    ) {
         for val in range {
             -> self.item.if_is(EQUAL_TO, val, {
                 return val
@@ -753,7 +889,12 @@ impl @mut {
 
 general_functions = {
     
-    shake: (strength: 1, interval: 0, duration: 0.5){
+    shake: #[desc("Implementation of the shake trigger")]
+    (
+        #[desc("Strength value")] strength: 1,
+        #[desc("Interval value")] interval: 0,
+        #[desc("Duration of shake")] duration: 0.5
+    ){
         $.add( obj {
             OBJ_ID: 1520,
             STRENGTH: strength,
@@ -763,31 +904,33 @@ general_functions = {
         wait(duration)
     },
 
-    disable_trail: (){
+    disable_trail: #[desc("Disables the player's trail")] (){
         $.add( obj{
             OBJ_ID: 33,
         })
     },
 
-    enable_trail: (){
+    enable_trail: #[desc("Enables the player's trail")] (){
         $.add( obj{
             OBJ_ID: 32,
         })
     },
 
-    show_player: (){
+    show_player: #[desc("Shows the player")] (){
         $.add( obj{
             OBJ_ID: 1613,
         })
     },
     
-    hide_player: (){
+    hide_player: #[desc("Hides the player")] (){
         $.add( obj{
             OBJ_ID: 1612,
         })
     },
 
-    toggle_bg_effect: (on: false) {
+    toggle_bg_effect: #[desc("Implementation of the bg effect on/off triggers")] (
+        #[desc("Weather to toggle bg effect on or off")] on: false
+    ) {
         if on {
             $.add( obj{
                 OBJ_ID: 1818,
@@ -799,17 +942,25 @@ general_functions = {
         }
     },
 
-    loop: (n, code, delay: 0.05, reset: true, reset_speed: 1) {
-        i = mut(?i)
+    loop: #[desc("Implementation of a spawn loop")] 
+    (
+        #[desc("Start value for the iterator")] start_val,
+        #[desc("End value for the iterator")] end_val, 
+        #[desc("Macro of the code that gets looped, should take the iterator (a mut) as the first argument")] code, 
+        #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: 0.05, 
+        #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: true, 
+        #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: 1
+    ) {
+        i = mut(start_val)
 
         func = {
             code(i)
             i.add(1)
-            i.item.if_is(SMALLER_THAN, n, {
+            i.item.if_is(SMALLER_THAN, end_val, {
                 call_with_delay(delay, func)
             })
 
-            i.item.if_is(LARGER_THAN, n - 1, {
+            i.item.if_is(LARGER_THAN, end_val - 1, {
                 if reset {
                     i.reset(reset_speed)
                 }
@@ -826,12 +977,18 @@ general_functions = {
 // An event in spwn is a macro that returns a macro with one argument
 // which is the function that gets triggered on the event
 
-on = (event, function){
+on = #[desc("Triggers a function every time an event fires")] (
+    #[desc("Event to trigger on")] event, 
+    #[desc("Function to trigger")] function
+){
     event(function)
 }
 
 events = {
-    touch: (dual_side: false) {
+    
+    touch: #[desc("Implementation of the touch trigger (returns an event)")] (
+        #[desc("Dual mode (only check for touch on the dual side)")] dual_side: false
+    ) {
         return (function){
             $.add( obj{
                 OBJ_ID: 1595,
@@ -844,7 +1001,9 @@ events = {
         }
     },
 
-    touch_end: (dual_side: false) {
+    touch_end: #[desc("Returns an event for when a touch ends")] (
+        #[desc("Dual mode (only check for touch on the dual side)")] dual_side: false
+    ) {
         return (function){
             $.add( obj{
                 OBJ_ID: 1595,
@@ -857,7 +1016,10 @@ events = {
         }
     },
 
-    collision: (a, b) {
+    collision: #[desc("Implementation of the collision trigger (returns an event)")] (
+        #[desc("Block A ID")] a, 
+        #[desc("Block B ID")] b
+    ) {
         return (function){
             $.add( obj{
                 OBJ_ID: 1815,
@@ -870,7 +1032,10 @@ events = {
         }
     },
 
-    collision_exit: (a, b) {
+    collision_exit: #[desc("Returns an event for when a collision exits")] (
+        #[desc("Block A ID")] a, 
+        #[desc("Block B ID")] b
+    ) {
         return (function){
             $.add( obj{
                 OBJ_ID: 1815,
@@ -884,7 +1049,7 @@ events = {
         }
     },
 
-    death: (){
+    death: #[desc("Returns an event for when the player dies")] (){
         return (function) {
             $.add( obj{
                 OBJ_ID: 1812,
@@ -896,7 +1061,11 @@ events = {
 }
 
 impl @block {
-    create_tracker_item: (self, other) {
+    create_tracker_item: #[desc("Returns an item ID that is 1 when the blocks are colliding and 0 when they are not")] 
+    (
+        self, 
+        #[desc("Block ID to check against")] other
+    ) {
         item = ?i
         on(events.collision(self, other), {
             item.add(1)

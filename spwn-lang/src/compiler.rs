@@ -96,43 +96,7 @@ pub fn compile_spwn(
     notes: ParseNotes,
 ) -> Result<(Globals, String), RuntimeError> {
     //variables that get changed throughout the compiling
-    let mut globals = Globals {
-        closed_groups: notes.closed_groups,
-        closed_colors: notes.closed_colors,
-        closed_blocks: notes.closed_blocks,
-        closed_items: notes.closed_items,
-        path,
-
-        lowest_y: HashMap::new(),
-
-        type_ids: HashMap::new(),
-        type_id_count: 15,
-
-        stored_values: Vec::new(),
-        func_ids: vec![FunctionID {
-            name: "main scope".to_string(),
-            parent: None,
-            width: None,
-            obj_list: Vec::new(),
-        }],
-    };
-
-    globals.type_ids.insert(String::from("group"), 0);
-    globals.type_ids.insert(String::from("color"), 1);
-    globals.type_ids.insert(String::from("block"), 2);
-    globals.type_ids.insert(String::from("item"), 3);
-    globals.type_ids.insert(String::from("number"), 4);
-    globals.type_ids.insert(String::from("bool"), 5);
-    globals.type_ids.insert(String::from("function"), 6);
-    globals.type_ids.insert(String::from("dictionary"), 7);
-    globals.type_ids.insert(String::from("macro"), 8);
-    globals.type_ids.insert(String::from("string"), 9);
-    globals.type_ids.insert(String::from("array"), 10);
-    globals.type_ids.insert(String::from("object"), 11);
-    globals.type_ids.insert(String::from("spwn"), 13);
-    globals.type_ids.insert(String::from("builtin"), 13);
-    globals.type_ids.insert(String::from("type"), 14);
-    globals.type_ids.insert(String::from("null"), 15);
+    let mut globals = Globals::new(notes, path);
 
     println!("Loading level data...");
 

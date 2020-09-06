@@ -47,13 +47,7 @@ pub fn context_trigger(context: Context, _globals: &mut Globals, info: CompilerI
 
 pub const TYPE_MEMBER_NAME: &str = "type";
 impl Value {
-    pub fn member(
-        &self,
-        member: String,
-        context: &Context,
-        globals: &mut Globals,
-        _: CompilerInfo,
-    ) -> Option<Value> {
+    pub fn member(&self, member: String, context: &Context, globals: &Globals) -> Option<Value> {
         let get_impl = |t: u16, m: String| match context.implementations.get(&t) {
             Some(imp) => match imp.get(&m) {
                 Some(mem) => Some((*globals).stored_values[*mem as usize].clone()),

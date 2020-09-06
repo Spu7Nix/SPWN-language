@@ -78,9 +78,10 @@ impl Context {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
-    pub args: Vec<(String, Option<Value>)>,
+    pub args: Vec<(String, Option<Value>, ast::Tag)>,
     pub def_context: Context,
     pub body: Vec<ast::Statement>,
+    pub tag: ast::Tag,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Function {
@@ -141,7 +142,7 @@ impl Value {
 }
 
 //copied from https://stackoverflow.com/questions/59401720/how-do-i-find-the-key-for-a-value-in-a-hashmap
-fn find_key_for_value<'a>(map: &'a HashMap<String, u16>, value: u16) -> Option<&'a String> {
+pub fn find_key_for_value<'a>(map: &'a HashMap<String, u16>, value: u16) -> Option<&'a String> {
     map.iter()
         .find_map(|(key, &val)| if val == value { Some(key) } else { None })
 }
@@ -181,7 +182,22 @@ impl Value {
 
                 out
             }
-            Value::Macro(_) => "<macro>".to_string(),
+            Value::Macro(m) => {
+                let mut out = String::from("(");
+                if !m.args.is_empty() {
+                    for arg in m.args.iter() {
+                        out += &arg.0;
+                        match arg.1.clone() {
+                            Some(val) => out += &format!(": {}", val.to_str(globals)),
+                            None => (),
+                        };
+                        out += ", ";
+                    }
+                    out.pop();
+                    out.pop();
+                }
+                out + ") { /* code omitted */ }"
+            }
             Value::Str(s) => s.clone(),
             Value::Array(a) => {
                 if a.is_empty() {
@@ -246,6 +262,50 @@ pub struct Globals {
     pub func_ids: Vec<FunctionID>,
 }
 
+impl Globals {
+    pub fn new(notes: crate::parser::ParseNotes, path: PathBuf) -> Self {
+        let mut globals = Globals {
+            closed_groups: notes.closed_groups,
+            closed_colors: notes.closed_colors,
+            closed_blocks: notes.closed_blocks,
+            closed_items: notes.closed_items,
+            path,
+
+            lowest_y: HashMap::new(),
+
+            type_ids: HashMap::new(),
+            type_id_count: 15,
+
+            stored_values: Vec::new(),
+            func_ids: vec![FunctionID {
+                name: "main scope".to_string(),
+                parent: None,
+                width: None,
+                obj_list: Vec::new(),
+            }],
+        };
+
+        globals.type_ids.insert(String::from("group"), 0);
+        globals.type_ids.insert(String::from("color"), 1);
+        globals.type_ids.insert(String::from("block"), 2);
+        globals.type_ids.insert(String::from("item"), 3);
+        globals.type_ids.insert(String::from("number"), 4);
+        globals.type_ids.insert(String::from("bool"), 5);
+        globals.type_ids.insert(String::from("function"), 6);
+        globals.type_ids.insert(String::from("dictionary"), 7);
+        globals.type_ids.insert(String::from("macro"), 8);
+        globals.type_ids.insert(String::from("string"), 9);
+        globals.type_ids.insert(String::from("array"), 10);
+        globals.type_ids.insert(String::from("object"), 11);
+        globals.type_ids.insert(String::from("spwn"), 13);
+        globals.type_ids.insert(String::from("builtin"), 13);
+        globals.type_ids.insert(String::from("type"), 14);
+        globals.type_ids.insert(String::from("null"), 15);
+
+        globals
+    }
+}
+
 fn handle_operator<F>(
     value1: Value,
     value2: Value,
@@ -260,9 +320,7 @@ where
     F: FnOnce(Value, Value) -> Result<Value, RuntimeError>,
 {
     Ok(
-        if let Some(Value::Macro(m)) =
-            value1.member(macro_name.to_string(), &context, globals, info.clone())
-        {
+        if let Some(Value::Macro(m)) = value1.member(macro_name.to_string(), &context, globals) {
             let new_info = info.next(op_name, globals, false);
             let (values, _) = execute_macro(
                 (
@@ -1235,7 +1293,7 @@ impl ast::Variable {
                     all_combinations(all_expr, context, globals, new_info)?;
                 inner_returns.extend(returns);
                 for defaults in argument_possibilities {
-                    let mut args: Vec<(String, Option<Value>)> = Vec::new();
+                    let mut args: Vec<(String, Option<Value>, ast::Tag)> = Vec::new();
                     let mut expr_index = 0;
                     for arg in m.args.iter() {
                         args.push((
@@ -1247,6 +1305,7 @@ impl ast::Variable {
                                 }
                                 None => None,
                             },
+                            arg.2.clone(),
                         ));
                     }
 
@@ -1255,6 +1314,7 @@ impl ast::Variable {
                             args,
                             body: m.body.statements.clone(),
                             def_context: defaults.1.clone(),
+                            tag: m.properties.clone(),
                         }),
                         defaults.1,
                     ))
@@ -1274,7 +1334,7 @@ impl ast::Variable {
                 ast::Path::Member(m) => {
                     for x in &mut with_parent {
                         *x = (
-                            match x.0.member(m.clone(), &x.1, globals, info.clone()) {
+                            match x.0.member(m.clone(), &x.1, globals) {
                                 Some(m) => m,
                                 None => {
                                     return Err(RuntimeError::UndefinedErr {

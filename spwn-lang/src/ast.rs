@@ -86,7 +86,41 @@ pub enum IDClass {
     Block,
 }
 
-pub type Tag = Vec<(String, Vec<Argument>)>;
+#[derive(Clone, PartialEq, Debug)]
+pub struct Tag {
+    pub tags: Vec<(String, Vec<Argument>)>,
+}
+
+impl Tag {
+    pub fn new() -> Self {
+        Tag { tags: Vec::new() }
+    }
+    pub fn get(&self, t: &str) -> Option<Vec<Argument>> {
+        for (key, args) in &self.tags {
+            if t == key {
+                return Some(args.clone());
+            }
+        }
+        return None;
+    }
+
+    pub fn get_desc(&self) -> Option<String> {
+        match self.get("desc") {
+            Some(args) => {
+                if args.is_empty() {
+                    None
+                } else {
+                    match &args[0].value.values[0].value {
+                        ValueLiteral::Str(s) => Some(s.clone()),
+                        a => Some(format!("{:?}", a)),
+                    }
+                }
+            }
+
+            None => None,
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Path {
