@@ -5,7 +5,9 @@ extract constants.obj_props
 extract constants.comparisons
 extract constants.easing_types
 
-wait = (time){
+wait = #[desc("Adds a delay before the next triggers")] (
+    #[desc("Delay time in seconds")] time
+){
     
     $.add( obj{
         OBJ_ID: 1268,
@@ -17,7 +19,10 @@ wait = (time){
     
 }
 
-call_with_delay = (time, function) {
+call_with_delay = #[desc("Call a function after a delay")] (
+    #[desc("Delay time in seconds")] time, 
+    #[desc("Function to call after the delay")] function
+) {
     $.add(obj{
         OBJ_ID: 1268,
         SPAWN_DURATION: time,

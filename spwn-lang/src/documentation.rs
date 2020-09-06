@@ -97,9 +97,9 @@ fn document_macro(mac: &Macro, globals: &Globals) -> String {
             }
 
             if arg.1 != None {
-                arg_string += &format!("### _{} (optional)_ ", arg.0);
+                arg_string += &format!(" _`{}` (optional)_ ", arg.0);
             } else {
-                arg_string += &format!("### **{}** _(obligatory)_", arg.0);
+                arg_string += &format!(" **`{}`** _(obligatory)_", arg.0);
             }
 
             if let Some(desc) = arg.2.get_desc() {
@@ -108,7 +108,7 @@ fn document_macro(mac: &Macro, globals: &Globals) -> String {
 
             if let Some(def_val) = arg.1.clone() {
                 arg_string += &format!(
-                    "\n\n_Default value:_\n\n{}",
+                    "\n\n_Default value:_\n\n{}\n\n",
                     document_val(&def_val, globals)
                 );
             }

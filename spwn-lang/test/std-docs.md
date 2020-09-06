@@ -4,16 +4,16 @@
 >
 >**Literal:** 
 > `{
->mut: (source: 0) { /* code omitted */ },
->call_with_delay: (time, function) { /* code omitted */ },
->NONE: 0,
->EXPONENTIAL_IN: 11,
->EXPONENTIAL_OUT: 12,
->on: (event, function) { /* code omitted */ },
+>BACK_IN: 17,
+>EASE_IN: 2,
+>loop: (start_val, end_val, code, delay: 0.05, reset: true, reset_speed: 1) { /* code omitted */ },
+>collision_exit: (a, b) { /* code omitted */ },
 >SINE_IN_OUT: 13,
->EXPONENTIAL_IN_OUT: 10,
->ELASTIC_IN: 5,
->EASE_IN_OUT: 1,
+>call_with_delay: (time, function) { /* code omitted */ },
+>BG: 1000c,
+>wait: (time) { /* code omitted */ },
+>SINE_IN: 14,
+>SMALLER_THAN: 2,
 >... (30 more)
 >}` 
 >
@@ -234,13 +234,15 @@
 >>>**Literal:** 
 >>> `(time, function) { /* code omitted */ }` 
 >>>
+>>>## Description: 
+>>> _Call a function after a delay_
 >>>## Arguments:
->>>>### **time** _(obligatory)_
+>>>> **`time`** _(obligatory)_: _Delay time in seconds_
 >>>
 >>>
 >>>
 >>>
->>>>### **function** _(obligatory)_
+>>>> **`function`** _(obligatory)_: _Function to call after the delay_
 >>>
 >>>
 >>>
@@ -257,12 +259,12 @@
 >>>## Description: 
 >>> _Implementation of the collision trigger (returns an event)_
 >>>## Arguments:
->>>>### **a** _(obligatory)_: _Block A ID_
+>>>> **`a`** _(obligatory)_: _Block A ID_
 >>>
 >>>
 >>>
 >>>
->>>>### **b** _(obligatory)_: _Block B ID_
+>>>> **`b`** _(obligatory)_: _Block B ID_
 >>>
 >>>
 >>>
@@ -279,12 +281,12 @@
 >>>## Description: 
 >>> _Returns an event for when a collision exits_
 >>>## Arguments:
->>>>### **a** _(obligatory)_: _Block A ID_
+>>>> **`a`** _(obligatory)_: _Block A ID_
 >>>
 >>>
 >>>
 >>>
->>>>### **b** _(obligatory)_: _Block B ID_
+>>>> **`b`** _(obligatory)_: _Block B ID_
 >>>
 >>>
 >>>
@@ -345,22 +347,22 @@
 >>>## Description: 
 >>> _Implementation of a spawn loop_
 >>>## Arguments:
->>>>### **start_val** _(obligatory)_: _Start value for the iterator_
+>>>> **`start_val`** _(obligatory)_: _Start value for the iterator_
 >>>
 >>>
 >>>
 >>>
->>>>### **end_val** _(obligatory)_: _End value for the iterator_
+>>>> **`end_val`** _(obligatory)_: _End value for the iterator_
 >>>
 >>>
 >>>
 >>>
->>>>### **code** _(obligatory)_: _Macro of the code that gets looped, should take the iterator (a mut) as the first argument_
+>>>> **`code`** _(obligatory)_: _Macro of the code that gets looped, should take the iterator (a mut) as the first argument_
 >>>
 >>>
 >>>
 >>>
->>>>### _delay (optional)_ : _Delay between loops (less than 0.05 may be unstable)_
+>>>> _`delay` (optional)_ : _Delay between loops (less than 0.05 may be unstable)_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -369,11 +371,13 @@
 >>>>>**Literal:** 
 >>>>> `0.05` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
 >>>
->>>>### _reset (optional)_ : _Weather to reset the iterator after looping (only disable if the loop is only triggered once)_
+>>>> _`reset` (optional)_ : _Weather to reset the iterator after looping (only disable if the loop is only triggered once)_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -382,11 +386,13 @@
 >>>>>**Literal:** 
 >>>>> `true` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
 >>>
->>>>### _reset_speed (optional)_ : _Operation speed of the reset of the iterator, if enabled_
+>>>> _`reset_speed` (optional)_ : _Operation speed of the reset of the iterator, if enabled_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -395,6 +401,8 @@
 >>>>>**Literal:** 
 >>>>> `1` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
@@ -411,7 +419,7 @@
 >>>## Description: 
 >>> _Creates a new mut_
 >>>## Arguments:
->>>>### _source (optional)_ : _Source (can be a number, item ID or boolean)_
+>>>> _`source` (optional)_ : _Source (can be a number, item ID or boolean)_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -420,6 +428,8 @@
 >>>>>**Literal:** 
 >>>>> `0` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
@@ -432,16 +442,16 @@
 >>>
 >>>**Literal:** 
 >>> `{
->>>DYNAMIC_BLOCK: 94,
->>>GLOW_DISABLED: 96,
+>>>RANDOMIZE_START: 106,
+>>>EDITOR_LAYER_2: 61,
+>>>SCALING: 32,
 >>>COPIED_COLOR_HVS: 49,
->>>PLAYER_COLOR_2: 16,
->>>Z_LAYER: 24,
->>>X: 2,
->>>YELLOW_TELEPORTATION_PORTAL_DISTANCE: 54,
->>>GROUPS: 57,
->>>DISABLE_ROTATION: 98,
->>>USE_TARGET: 100,
+>>>Z_ORDER: 25,
+>>>INTERVAL: 84,
+>>>BLENDING: 17,
+>>>COPIED_COLOR_ID: 50,
+>>>TRIGGER_RED: 7,
+>>>LOCK_TO_PLAYER_Y: 59,
 >>>... (83 more)
 >>>}` 
 >>>
@@ -1307,12 +1317,12 @@
 >>>## Description: 
 >>> _Triggers a function every time an event fires_
 >>>## Arguments:
->>>>### **event** _(obligatory)_: _Event to trigger on_
+>>>> **`event`** _(obligatory)_: _Event to trigger on_
 >>>
 >>>
 >>>
 >>>
->>>>### **function** _(obligatory)_: _Function to trigger_
+>>>> **`function`** _(obligatory)_: _Function to trigger_
 >>>
 >>>
 >>>
@@ -1329,7 +1339,7 @@
 >>>## Description: 
 >>> _Implementation of the shake trigger_
 >>>## Arguments:
->>>>### _strength (optional)_ : _Strength value_
+>>>> _`strength` (optional)_ : _Strength value_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -1338,11 +1348,13 @@
 >>>>>**Literal:** 
 >>>>> `1` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
 >>>
->>>>### _interval (optional)_ : _Interval value_
+>>>> _`interval` (optional)_ : _Interval value_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -1351,11 +1363,13 @@
 >>>>>**Literal:** 
 >>>>> `0` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
 >>>
->>>>### _duration (optional)_ : _Duration of shake_
+>>>> _`duration` (optional)_ : _Duration of shake_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -1364,6 +1378,8 @@
 >>>>>**Literal:** 
 >>>>> `0.5` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
@@ -1391,7 +1407,7 @@
 >>>## Description: 
 >>> _Stops signal from coming past for some time_
 >>>## Arguments:
->>>>### **delay** _(obligatory)_: _Time to supress signal_
+>>>> **`delay`** _(obligatory)_: _Time to supress signal_
 >>>
 >>>
 >>>
@@ -1408,7 +1424,7 @@
 >>>## Description: 
 >>> _Implementation of the bg effect on/off triggers_
 >>>## Arguments:
->>>>### _on (optional)_ : _Weather to toggle bg effect on or off_
+>>>> _`on` (optional)_ : _Weather to toggle bg effect on or off_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -1417,6 +1433,8 @@
 >>>>>**Literal:** 
 >>>>> `false` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
@@ -1433,7 +1451,7 @@
 >>>## Description: 
 >>> _Implementation of the touch trigger (returns an event)_
 >>>## Arguments:
->>>>### _dual_side (optional)_ : _Dual mode (only check for touch on the dual side)_
+>>>> _`dual_side` (optional)_ : _Dual mode (only check for touch on the dual side)_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -1442,6 +1460,8 @@
 >>>>>**Literal:** 
 >>>>> `false` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
@@ -1458,7 +1478,7 @@
 >>>## Description: 
 >>> _Returns an event for when a touch ends_
 >>>## Arguments:
->>>>### _dual_side (optional)_ : _Dual mode (only check for touch on the dual side)_
+>>>> _`dual_side` (optional)_ : _Dual mode (only check for touch on the dual side)_
 >>>>
 >>>>_Default value:_
 >>>>
@@ -1467,6 +1487,8 @@
 >>>>>**Literal:** 
 >>>>> `false` 
 >>>>>
+>>>>
+>>>>
 >>>
 >>>
 >>>
@@ -1480,8 +1502,10 @@
 >>>**Literal:** 
 >>> `(time) { /* code omitted */ }` 
 >>>
+>>>## Description: 
+>>> _Adds a delay before the next triggers_
 >>>## Arguments:
->>>>### **time** _(obligatory)_
+>>>> **`time`** _(obligatory)_: _Delay time in seconds_
 >>>
 >>>
 >>>
@@ -1504,7 +1528,7 @@
 >>## Description: 
 >> _Implementation of the alpha trigger_
 >>## Arguments:
->>>### _opacity (optional)_ 
+>>> _`opacity` (optional)_ 
 >>>
 >>>_Default value:_
 >>>
@@ -1513,11 +1537,13 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _duration (optional)_ 
+>>> _`duration` (optional)_ 
 >>>
 >>>_Default value:_
 >>>
@@ -1526,6 +1552,8 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -1542,12 +1570,12 @@
 >>## Description: 
 >> _Implementation of the follow trigger_
 >>## Arguments:
->>>### **other** _(obligatory)_: _Group of object to follow_
+>>> **`other`** _(obligatory)_: _Group of object to follow_
 >>
 >>
 >>
 >>
->>>### _x_mod (optional)_ : _Multiplier for the movement on the X-axis_
+>>> _`x_mod` (optional)_ : _Multiplier for the movement on the X-axis_
 >>>
 >>>_Default value:_
 >>>
@@ -1556,11 +1584,13 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _y_mod (optional)_ : _Multiplier for the movement on the Y-axis_
+>>> _`y_mod` (optional)_ : _Multiplier for the movement on the Y-axis_
 >>>
 >>>_Default value:_
 >>>
@@ -1569,11 +1599,13 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _duration (optional)_ : _Duration of following_
+>>> _`duration` (optional)_ : _Duration of following_
 >>>
 >>>_Default value:_
 >>>
@@ -1582,6 +1614,8 @@
 >>>>**Literal:** 
 >>>> `999` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -1598,7 +1632,7 @@
 >>## Description: 
 >> _Implementation of the follow player Y trigger_
 >>## Arguments:
->>>### _speed (optional)_ : _Interpolation factor (?)_
+>>> _`speed` (optional)_ : _Interpolation factor (?)_
 >>>
 >>>_Default value:_
 >>>
@@ -1607,11 +1641,13 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _delay (optional)_ : _Delay of movement_
+>>> _`delay` (optional)_ : _Delay of movement_
 >>>
 >>>_Default value:_
 >>>
@@ -1620,11 +1656,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _offset (optional)_ : _Offset on the Y-axis_
+>>> _`offset` (optional)_ : _Offset on the Y-axis_
 >>>
 >>>_Default value:_
 >>>
@@ -1633,11 +1671,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _max_speed (optional)_ : _Maximum speed_
+>>> _`max_speed` (optional)_ : _Maximum speed_
 >>>
 >>>_Default value:_
 >>>
@@ -1646,11 +1686,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _duration (optional)_ : _Duration of following_
+>>> _`duration` (optional)_ : _Duration of following_
 >>>
 >>>_Default value:_
 >>>
@@ -1659,6 +1701,8 @@
 >>>>**Literal:** 
 >>>> `999` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -1675,17 +1719,17 @@
 >>## Description: 
 >> _Implementation of the move trigger_
 >>## Arguments:
->>>### **x** _(obligatory)_: _Units to move on the X axis_
+>>> **`x`** _(obligatory)_: _Units to move on the X axis_
 >>
 >>
 >>
 >>
->>>### **y** _(obligatory)_: _Units to move on the Y axis_
+>>> **`y`** _(obligatory)_: _Units to move on the Y axis_
 >>
 >>
 >>
 >>
->>>### _duration (optional)_ : _Duration of movement_
+>>> _`duration` (optional)_ : _Duration of movement_
 >>>
 >>>_Default value:_
 >>>
@@ -1694,11 +1738,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _easing (optional)_ 
+>>> _`easing` (optional)_ 
 >>>
 >>>_Default value:_
 >>>
@@ -1707,11 +1753,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _easing_rate (optional)_ 
+>>> _`easing_rate` (optional)_ 
 >>>
 >>>_Default value:_
 >>>
@@ -1720,6 +1768,8 @@
 >>>>**Literal:** 
 >>>> `2` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -1736,12 +1786,12 @@
 >>## Description: 
 >> _Implementation of the Move target feature of the move trigger_
 >>## Arguments:
->>>### **target** _(obligatory)_: _Group of the object to move to_
+>>> **`target`** _(obligatory)_: _Group of the object to move to_
 >>
 >>
 >>
 >>
->>>### _duration (optional)_ : _Duration of movement_
+>>> _`duration` (optional)_ : _Duration of movement_
 >>>
 >>>_Default value:_
 >>>
@@ -1750,11 +1800,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _x_only (optional)_ : _Will move to the object only on the X-axis_
+>>> _`x_only` (optional)_ : _Will move to the object only on the X-axis_
 >>>
 >>>_Default value:_
 >>>
@@ -1763,11 +1815,13 @@
 >>>>**Literal:** 
 >>>> `false` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _y_only (optional)_ : _Will move to the object only on the y-axis_
+>>> _`y_only` (optional)_ : _Will move to the object only on the y-axis_
 >>>
 >>>_Default value:_
 >>>
@@ -1776,11 +1830,13 @@
 >>>>**Literal:** 
 >>>> `false` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _easing (optional)_ : _Easing type_
+>>> _`easing` (optional)_ : _Easing type_
 >>>
 >>>_Default value:_
 >>>
@@ -1789,11 +1845,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _easing_rate (optional)_ : _Easing rate_
+>>> _`easing_rate` (optional)_ : _Easing rate_
 >>>
 >>>_Default value:_
 >>>
@@ -1802,6 +1860,8 @@
 >>>>**Literal:** 
 >>>> `2` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -1818,22 +1878,22 @@
 >>## Description: 
 >> _Implementation of the pulse trigger for groups_
 >>## Arguments:
->>>### **r** _(obligatory)_: _Red value of pulse color (or hue if HSV is enabled)_
+>>> **`r`** _(obligatory)_: _Red value of pulse color (or hue if HSV is enabled)_
 >>
 >>
 >>
 >>
->>>### **g** _(obligatory)_: _Green value of pulse color (or saturation if HSV is enabled)_
+>>> **`g`** _(obligatory)_: _Green value of pulse color (or saturation if HSV is enabled)_
 >>
 >>
 >>
 >>
->>>### **b** _(obligatory)_: _Blue value of pulse color (or brightness/value if HSV is enabled)_
+>>> **`b`** _(obligatory)_: _Blue value of pulse color (or brightness/value if HSV is enabled)_
 >>
 >>
 >>
 >>
->>>### _fade_in (optional)_ : _Fade-in duration_
+>>> _`fade_in` (optional)_ : _Fade-in duration_
 >>>
 >>>_Default value:_
 >>>
@@ -1842,11 +1902,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _hold (optional)_ : _Duration to hold the color_
+>>> _`hold` (optional)_ : _Duration to hold the color_
 >>>
 >>>_Default value:_
 >>>
@@ -1855,11 +1917,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _fade_out (optional)_ : _Fade-out duration_
+>>> _`fade_out` (optional)_ : _Fade-out duration_
 >>>
 >>>_Default value:_
 >>>
@@ -1868,11 +1932,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _exclusive (optional)_ : _Weather to prioritize this pulse over simultaneous pulses_
+>>> _`exclusive` (optional)_ : _Weather to prioritize this pulse over simultaneous pulses_
 >>>
 >>>_Default value:_
 >>>
@@ -1881,11 +1947,13 @@
 >>>>**Literal:** 
 >>>> `false` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _hsv (optional)_ : _Toggle HSV mode_
+>>> _`hsv` (optional)_ : _Toggle HSV mode_
 >>>
 >>>_Default value:_
 >>>
@@ -1894,6 +1962,8 @@
 >>>>**Literal:** 
 >>>> `false` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -1910,17 +1980,17 @@
 >>## Description: 
 >> _Implementation of the rotate trigger_
 >>## Arguments:
->>>### **center** _(obligatory)_: _Group of object to rotate around_
+>>> **`center`** _(obligatory)_: _Group of object to rotate around_
 >>
 >>
 >>
 >>
->>>### **degrees** _(obligatory)_: _Rotation in degrees_
+>>> **`degrees`** _(obligatory)_: _Rotation in degrees_
 >>
 >>
 >>
 >>
->>>### _duration (optional)_ : _Duration of rotation_
+>>> _`duration` (optional)_ : _Duration of rotation_
 >>>
 >>>_Default value:_
 >>>
@@ -1929,11 +1999,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _easing (optional)_ : _Easing type_
+>>> _`easing` (optional)_ : _Easing type_
 >>>
 >>>_Default value:_
 >>>
@@ -1942,11 +2014,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _easing_rate (optional)_ : _Easing rate_
+>>> _`easing_rate` (optional)_ : _Easing rate_
 >>>
 >>>_Default value:_
 >>>
@@ -1955,11 +2029,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _lock_object_rotation (optional)_ : _Only rotate positions of the objects, not the textures_
+>>> _`lock_object_rotation` (optional)_ : _Only rotate positions of the objects, not the textures_
 >>>
 >>>_Default value:_
 >>>
@@ -1968,6 +2044,8 @@
 >>>>**Literal:** 
 >>>> `false` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2025,22 +2103,22 @@
 >>## Description: 
 >> _Implementation of the pulse trigger for colors_
 >>## Arguments:
->>>### **r** _(obligatory)_: _Red value of pulse color (or hue if HSV is enabled)_
+>>> **`r`** _(obligatory)_: _Red value of pulse color (or hue if HSV is enabled)_
 >>
 >>
 >>
 >>
->>>### **g** _(obligatory)_: _Green value of pulse color (or saturation if HSV is enabled)_
+>>> **`g`** _(obligatory)_: _Green value of pulse color (or saturation if HSV is enabled)_
 >>
 >>
 >>
 >>
->>>### **b** _(obligatory)_: _Blue value of pulse color (or brightness/value if HSV is enabled)_
+>>> **`b`** _(obligatory)_: _Blue value of pulse color (or brightness/value if HSV is enabled)_
 >>
 >>
 >>
 >>
->>>### _fade_in (optional)_ : _Fade-in duration_
+>>> _`fade_in` (optional)_ : _Fade-in duration_
 >>>
 >>>_Default value:_
 >>>
@@ -2049,11 +2127,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _hold (optional)_ : _Duration to hold the color_
+>>> _`hold` (optional)_ : _Duration to hold the color_
 >>>
 >>>_Default value:_
 >>>
@@ -2062,11 +2142,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _fade_out (optional)_ : _Fade-out duration_
+>>> _`fade_out` (optional)_ : _Fade-out duration_
 >>>
 >>>_Default value:_
 >>>
@@ -2075,11 +2157,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _exclusive (optional)_ : _Weather to prioritize this pulse over simultaneous pulses_
+>>> _`exclusive` (optional)_ : _Weather to prioritize this pulse over simultaneous pulses_
 >>>
 >>>_Default value:_
 >>>
@@ -2088,11 +2172,13 @@
 >>>>**Literal:** 
 >>>> `false` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _hsv (optional)_ : _Toggle HSV mode_
+>>> _`hsv` (optional)_ : _Toggle HSV mode_
 >>>
 >>>_Default value:_
 >>>
@@ -2101,6 +2187,8 @@
 >>>>**Literal:** 
 >>>> `false` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2117,22 +2205,22 @@
 >>## Description: 
 >> _Implementation of the color trigger_
 >>## Arguments:
->>>### **r** _(obligatory)_: _Red value of the target color_
+>>> **`r`** _(obligatory)_: _Red value of the target color_
 >>
 >>
 >>
 >>
->>>### **g** _(obligatory)_: _Green value of the target color_
+>>> **`g`** _(obligatory)_: _Green value of the target color_
 >>
 >>
 >>
 >>
->>>### **b** _(obligatory)_: _Blue value of the target color_
+>>> **`b`** _(obligatory)_: _Blue value of the target color_
 >>
 >>
 >>
 >>
->>>### _duration (optional)_ : _Duration of color change_
+>>> _`duration` (optional)_ : _Duration of color change_
 >>>
 >>>_Default value:_
 >>>
@@ -2141,11 +2229,13 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _opacity (optional)_ : _Opacity of target color_
+>>> _`opacity` (optional)_ : _Opacity of target color_
 >>>
 >>>_Default value:_
 >>>
@@ -2154,11 +2244,13 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _blending (optional)_ : _Toggle blending on target color_
+>>> _`blending` (optional)_ : _Toggle blending on target color_
 >>>
 >>>_Default value:_
 >>>
@@ -2167,6 +2259,8 @@
 >>>>**Literal:** 
 >>>> `false` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2188,7 +2282,7 @@
 >>## Description: 
 >> _Returns an item ID that is 1 when the blocks are colliding and 0 when they are not_
 >>## Arguments:
->>>### **other** _(obligatory)_: _Block ID to check against_
+>>> **`other`** _(obligatory)_: _Block ID to check against_
 >>
 >>
 >>
@@ -2210,7 +2304,7 @@
 >>## Description: 
 >> _Implementation of the pickup trigger_
 >>## Arguments:
->>>### **amount** _(obligatory)_: _Amount to add_
+>>> **`amount`** _(obligatory)_: _Amount to add_
 >>
 >>
 >>
@@ -2227,7 +2321,7 @@
 >>## Description: 
 >> _Implementation of the count trigger (returns an event)_
 >>## Arguments:
->>>### _number (optional)_ : _Number to check against_
+>>> _`number` (optional)_ : _Number to check against_
 >>>
 >>>_Default value:_
 >>>
@@ -2236,6 +2330,8 @@
 >>>>**Literal:** 
 >>>> `0` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2252,17 +2348,17 @@
 >>## Description: 
 >> _Implementation of the instant count trigger_
 >>## Arguments:
->>>### **comparison** _(obligatory)_: _Comparison mode_
+>>> **`comparison`** _(obligatory)_: _Comparison mode_
 >>
 >>
 >>
 >>
->>>### **other** _(obligatory)_: _Number to compare with_
+>>> **`other`** _(obligatory)_: _Number to compare with_
 >>
 >>
 >>
 >>
->>>### **function** _(obligatory)_: _Target function if comparison is true_
+>>> **`function`** _(obligatory)_: _Target function if comparison is true_
 >>
 >>
 >>
@@ -2282,7 +2378,7 @@
 >> `(self, _type) { /* code omitted */ }` 
 >>
 >>## Arguments:
->>>### **_type** _(obligatory)_
+>>> **`_type`** _(obligatory)_
 >>
 >>
 >>
@@ -2297,7 +2393,7 @@
 >> `(self, other) { /* code omitted */ }` 
 >>
 >>## Arguments:
->>>### **other** _(obligatory)_
+>>> **`other`** _(obligatory)_
 >>
 >>
 >>
@@ -2312,7 +2408,7 @@
 >> `(self, other) { /* code omitted */ }` 
 >>
 >>## Arguments:
->>>### **other** _(obligatory)_
+>>> **`other`** _(obligatory)_
 >>
 >>
 >>
@@ -2327,7 +2423,7 @@
 >> `(self, other) { /* code omitted */ }` 
 >>
 >>## Arguments:
->>>### **other** _(obligatory)_
+>>> **`other`** _(obligatory)_
 >>
 >>
 >>
@@ -2342,7 +2438,7 @@
 >> `(self, other) { /* code omitted */ }` 
 >>
 >>## Arguments:
->>>### **other** _(obligatory)_
+>>> **`other`** _(obligatory)_
 >>
 >>
 >>
@@ -2357,7 +2453,7 @@
 >> `(self, other) { /* code omitted */ }` 
 >>
 >>## Arguments:
->>>### **other** _(obligatory)_
+>>> **`other`** _(obligatory)_
 >>
 >>
 >>
@@ -2372,7 +2468,7 @@
 >> `(self, other) { /* code omitted */ }` 
 >>
 >>## Arguments:
->>>### **other** _(obligatory)_
+>>> **`other`** _(obligatory)_
 >>
 >>
 >>
@@ -2387,7 +2483,7 @@
 >> `(self, other) { /* code omitted */ }` 
 >>
 >>## Arguments:
->>>### **other** _(obligatory)_
+>>> **`other`** _(obligatory)_
 >>
 >>
 >>
@@ -2402,7 +2498,7 @@
 >> `(self, other) { /* code omitted */ }` 
 >>
 >>## Arguments:
->>>### **other** _(obligatory)_
+>>> **`other`** _(obligatory)_
 >>
 >>
 >>
@@ -2419,7 +2515,7 @@
 >>## Description: 
 >> _Implementation of the pickup trigger_
 >>## Arguments:
->>>### **num** _(obligatory)_: _Amount to add_
+>>> **`num`** _(obligatory)_: _Amount to add_
 >>
 >>
 >>
@@ -2436,12 +2532,12 @@
 >>## Description: 
 >> _Adds the muts value to all item IDs in a list, and resets the mut to 0 in the process_
 >>## Arguments:
->>>### **items** _(obligatory)_: _Item IDs to add to_
+>>> **`items`** _(obligatory)_: _Item IDs to add to_
 >>
 >>
 >>
 >>
->>>### _speed (optional)_ : _Speed of operation (higher number increases group usage)_
+>>> _`speed` (optional)_ : _Speed of operation (higher number increases group usage)_
 >>>
 >>>_Default value:_
 >>>
@@ -2450,11 +2546,13 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _factor (optional)_ : _Multiplyer for the value added_
+>>> _`factor` (optional)_ : _Multiplyer for the value added_
 >>>
 >>>_Default value:_
 >>>
@@ -2463,6 +2561,8 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2479,7 +2579,7 @@
 >>## Description: 
 >> _Copies the mut and returns the copy_
 >>## Arguments:
->>>### _speed (optional)_ : _Speed of operation (higher number increases group usage)_
+>>> _`speed` (optional)_ : _Speed of operation (higher number increases group usage)_
 >>>
 >>>_Default value:_
 >>>
@@ -2488,6 +2588,8 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2504,12 +2606,12 @@
 >>## Description: 
 >> _Copies the value of the mut to another item ID, without consuming the original_
 >>## Arguments:
->>>### **item** _(obligatory)_: _Item ID to copy to_
+>>> **`item`** _(obligatory)_: _Item ID to copy to_
 >>
 >>
 >>
 >>
->>>### _speed (optional)_ : _Speed of operation (higher number increases group usage)_
+>>> _`speed` (optional)_ : _Speed of operation (higher number increases group usage)_
 >>>
 >>>_Default value:_
 >>>
@@ -2518,11 +2620,13 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _factor (optional)_ : _Factor of to multiply the copy by_
+>>> _`factor` (optional)_ : _Factor of to multiply the copy by_
 >>>
 >>>_Default value:_
 >>>
@@ -2531,6 +2635,8 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2547,12 +2653,12 @@
 >>## Description: 
 >> _Devides the value of the mut by some divisor_
 >>## Arguments:
->>>### **divisor** _(obligatory)_: _Divisor to divide by, either another mut (very expensive) or a normal number_
+>>> **`divisor`** _(obligatory)_: _Divisor to divide by, either another mut (very expensive) or a normal number_
 >>
 >>
 >>
 >>
->>>### _speed (optional)_ : _Speed of operation (higher number increases group usage)_
+>>> _`speed` (optional)_ : _Speed of operation (higher number increases group usage)_
 >>>
 >>>_Default value:_
 >>>
@@ -2561,11 +2667,13 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
 >>
->>>### _rest_item (optional)_ : _Item ID to add the remainder of the division to_
+>>> _`rest_item` (optional)_ : _Item ID to add the remainder of the division to_
 >>>
 >>>_Default value:_
 >>>
@@ -2574,6 +2682,8 @@
 >>>>**Literal:** 
 >>>> `1i` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2590,12 +2700,12 @@
 >>## Description: 
 >> _Multiplies the value of the mut by some factor_
 >>## Arguments:
->>>### **factor** _(obligatory)_: _Factor to multiply by, either another mut (very expensive) or a normal number_
+>>> **`factor`** _(obligatory)_: _Factor to multiply by, either another mut (very expensive) or a normal number_
 >>
 >>
 >>
 >>
->>>### _speed (optional)_ : _Speed of operation (higher number increases group usage)_
+>>> _`speed` (optional)_ : _Speed of operation (higher number increases group usage)_
 >>>
 >>>_Default value:_
 >>>
@@ -2604,6 +2714,8 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2620,7 +2732,7 @@
 >>## Description: 
 >> _Resets mut to 0_
 >>## Arguments:
->>>### _speed (optional)_ : _Speed of operation (higher number increases group usage)_
+>>> _`speed` (optional)_ : _Speed of operation (higher number increases group usage)_
 >>>
 >>>_Default value:_
 >>>
@@ -2629,6 +2741,8 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2645,12 +2759,12 @@
 >>## Description: 
 >> _Subtracts the muts value from all item IDs in a list, and resets the mut to 0 in the process_
 >>## Arguments:
->>>### **items** _(obligatory)_: _Item IDs to add to_
+>>> **`items`** _(obligatory)_: _Item IDs to add to_
 >>
 >>
 >>
 >>
->>>### _speed (optional)_ : _Speed of operation (higher number increases group usage)_
+>>> _`speed` (optional)_ : _Speed of operation (higher number increases group usage)_
 >>>
 >>>_Default value:_
 >>>
@@ -2659,6 +2773,8 @@
 >>>>**Literal:** 
 >>>> `1` 
 >>>>
+>>>
+>>>
 >>
 >>
 >>
@@ -2675,7 +2791,7 @@
 >>## Description: 
 >> _Converts the mut into a normal number (very context-splitting, be careful)_
 >>## Arguments:
->>>### **range** _(obligatory)_: _Array of possible output values_
+>>> **`range`** _(obligatory)_: _Array of possible output values_
 >>
 >>
 >>
