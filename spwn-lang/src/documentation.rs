@@ -22,9 +22,11 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     )?;
 
     let mut doc = format!(
-        "# Documentation for {} \n",
+        "# Documentation for `{}` \n",
         path.file_stem().unwrap().to_str().unwrap()
     );
+
+    doc += "_This file was generated using `spwn doc [file name]`_\n";
 
     doc += &format!("## Exports:\n{}", document_val(&exports, &globals));
 
@@ -50,11 +52,31 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
 fn document_dict(dict: &HashMap<String, u32>, globals: &Globals) -> String {
     let mut doc = String::from("<details>\n<summary> View members </summary>\n");
 
-    let mut list: Vec<(&String, &u32)> = dict.iter().collect();
-    list.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut macro_list: Vec<(&String, &u32)> = dict
+        .iter()
+        .filter(
+            |x| match globals.stored_values.get(*x.1 as usize).unwrap() {
+                Value::Macro(_) => true,
+                _ => false,
+            },
+        )
+        .collect();
+    macro_list.sort_by(|a, b| a.0.cmp(&b.0));
 
-    for (key, val) in list.iter() {
-        let val_str = document_val(globals.stored_values.get(**val as usize).unwrap(), globals);
+    let mut val_list: Vec<(&String, &u32)> = dict
+        .iter()
+        .filter(
+            |x| match globals.stored_values.get(*x.1 as usize).unwrap() {
+                Value::Macro(_) => false,
+                _ => true,
+            },
+        )
+        .collect();
+    val_list.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let document_member = |key: &String, val: &u32| -> String {
+        let mut member_doc = String::new();
+        let val_str = document_val(globals.stored_values.get(*val as usize).unwrap(), globals);
 
         let mut formatted = String::new();
 
@@ -63,18 +85,39 @@ fn document_dict(dict: &HashMap<String, u32>, globals: &Globals) -> String {
         }
         formatted.pop();
 
-        doc += &format!(
+        member_doc += &format!(
             r#"
-> `{}`:
->
-{}
+**`{}`**:
 
+{}
+>
 "#,
             key, formatted
-        )
+        );
+        member_doc
+    };
+    if !macro_list.is_empty() {
+        if !val_list.is_empty() {
+            doc += "\n\n## Macros:\n\n";
+        }
+        for (key, val) in macro_list.iter() {
+            doc += &document_member(*key, *val)
+        }
     }
-
-    doc += "</details>\n\n";
+    if !val_list.is_empty() {
+        if !macro_list.is_empty() {
+            doc += "## Other values:\n\n<details>\n<summary> View </summary>\n";
+        }
+        for (key, val) in val_list.iter() {
+            doc += &document_member(*key, *val)
+        }
+        if !macro_list.is_empty() {
+            doc += "\n\n</details>\n\n";
+        }
+    }
+    if !macro_list.is_empty() {
+        doc += "</details>\n\n";
+    }
     doc
 }
 
@@ -86,7 +129,7 @@ fn document_macro(mac: &Macro, globals: &Globals) -> String {
         None => (),
     };
 
-    if !mac.args.is_empty() {
+    if !(mac.args.is_empty() || (mac.args.len() == 1 && mac.args[0].0 == "self")) {
         doc += "## Arguments:\n";
 
         for arg in &mac.args {
@@ -140,7 +183,12 @@ fn document_val(val: &Value, globals: &Globals) -> String {
         find_key_for_value(&globals.type_ids, type_id).expect("Implemented type was not found!");
 
     doc += &format!("**Type:** `{}` \n\n", type_name);
-    doc += &format!("**Literal:** \n `{}` \n\n", val.to_str(globals));
+    let literal = val.to_str(globals);
+    if literal.lines().count() > 1 {
+        doc += &format!("**Literal:** \n\n ```\n\n{}\n\n``` \n\n", literal);
+    } else {
+        doc += &format!("**Literal:** ```{}``` \n\n", literal);
+    }
 
     doc += &match &val {
         Value::Dict(d) => document_dict(d, globals),
@@ -148,7 +196,7 @@ fn document_val(val: &Value, globals: &Globals) -> String {
         _ => String::new(),
     };
 
-    add_arrows(&mut doc);
+    //add_arrows(&mut doc);
 
     doc += "\n";
     doc
