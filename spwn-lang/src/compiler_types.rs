@@ -9,13 +9,14 @@ use crate::compiler::{compile_scope, import_module, next_free, RuntimeError};
 
 pub type TypeID = u16;
 
-pub type Returns = Vec<(Value, Context)>;
-pub type Implementations = HashMap<TypeID, HashMap<String, u32>>;
-pub type StoredValue = u32; //index to stored value in globals.stored_values
+pub type Implementations = HashMap<TypeID, HashMap<String, StoredValue>>;
+pub type StoredValue = usize; //index to stored value in globals.stored_values
 pub fn store_value(val: Value, globals: &mut Globals) -> StoredValue {
     (*globals).stored_values.push(val);
-    (globals.stored_values.len() as u32) - 1
+    globals.stored_values.len() - 1
 }
+
+pub type Returns = Vec<(StoredValue, Context)>;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Context {
@@ -102,7 +103,7 @@ pub enum Value {
     Dict(HashMap<String, StoredValue>),
     Macro(Macro),
     Str(String),
-    Array(Vec<Value>),
+    Array(Vec<StoredValue>),
     Obj(Vec<(u16, String)>),
     Builtins,
     BuiltinFunction(String),
@@ -205,7 +206,7 @@ impl Value {
                 } else {
                     let mut out = String::from("[");
                     for val in a {
-                        out += &val.to_str(globals);
+                        out += &globals.stored_values[*val].to_str(globals);
                         out += ",";
                     }
                     out.pop();
@@ -262,6 +263,22 @@ pub struct Globals {
     pub func_ids: Vec<FunctionID>,
 }
 
+/*impl Globals {
+    pub fn get_stored_val(
+        &self,
+        p: StoredValue,
+        info: &CompilerInfo,
+    ) -> Result<Value, RuntimeError> {
+        match self.stored_values[p as usize] {
+            Some(val) => Ok(*val),
+            None => Err(RuntimeError::RuntimeError {
+                message: "Pointer points to no data!".to_string(),
+                info,
+            }),
+        }
+    }
+}*/
+
 impl Globals {
     pub fn new(notes: crate::parser::ParseNotes, path: PathBuf) -> Self {
         let mut globals = Globals {
@@ -307,8 +324,8 @@ impl Globals {
 }
 
 fn handle_operator<F>(
-    value1: Value,
-    value2: Value,
+    value1: StoredValue,
+    value2: StoredValue,
     op: F,
     macro_name: &str,
     op_name: &str,
@@ -317,32 +334,42 @@ fn handle_operator<F>(
     info: CompilerInfo,
 ) -> Result<Returns, RuntimeError>
 where
-    F: FnOnce(Value, Value) -> Result<Value, RuntimeError>,
+    F: FnOnce(StoredValue, StoredValue) -> Result<StoredValue, RuntimeError>,
 {
     Ok(
-        if let Some(Value::Macro(m)) = value1.member(macro_name.to_string(), &context, globals) {
-            let new_info = info.next(op_name, globals, false);
-            let (values, _) = execute_macro(
-                (
-                    m,
-                    vec![ast::Argument {
-                        symbol: None,
-                        value: ast::Expression {
-                            values: vec![ast::Variable {
-                                value: ast::ValueLiteral::Resolved(value2),
-                                path: Vec::new(),
-                                operator: None,
-                            }],
-                            operators: Vec::new(),
-                        },
-                    }],
-                ),
-                context,
-                globals,
-                value1.clone(),
-                new_info,
-            )?;
-            values
+        if let Some(val) =
+            globals.stored_values[value1]
+                .clone()
+                .member(macro_name.to_string(), &context, globals)
+        {
+            if let Value::Macro(m) = globals.stored_values[val].clone() {
+                let new_info = info.next(op_name, globals, false);
+                let (values, _) = execute_macro(
+                    (
+                        m,
+                        vec![ast::Argument {
+                            symbol: None,
+                            value: ast::Expression {
+                                values: vec![ast::Variable {
+                                    value: ast::ValueLiteral::Resolved(
+                                        globals.stored_values[value2].clone(),
+                                    ),
+                                    path: Vec::new(),
+                                    operator: None,
+                                }],
+                                operators: Vec::new(),
+                            },
+                        }],
+                    ),
+                    context,
+                    globals,
+                    globals.stored_values[value1].clone(),
+                    new_info,
+                )?;
+                values
+            } else {
+                vec![(op(value1, value2)?, context)]
+            }
         } else {
             vec![(op(value1, value2)?, context)]
         },
@@ -387,10 +414,10 @@ impl ast::Expression {
                         Or => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| -> Result<Value, RuntimeError> {
-                                if let Value::Bool(b) = &acum_val {
-                                    if let Value::Bool(b2) = &val {
-                                        Ok(Value::Bool(*b || *b2))
+                            |acum_val, val| -> Result<StoredValue, RuntimeError> {
+                                if let Value::Bool(b) = globals.stored_values[acum_val] {
+                                    if let Value::Bool(b2) = globals.stored_values[val] {
+                                        Ok(store_value(Value::Bool(b || b2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_or_".to_string(),
@@ -416,9 +443,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Bool(b) = &acum_val {
-                                    if let Value::Bool(b2) = &val {
-                                        Ok(Value::Bool(*b && *b2))
+                                if let Value::Bool(b) = globals.stored_values[acum_val] {
+                                    if let Value::Bool(b2) = globals.stored_values[val] {
+                                        Ok(store_value(Value::Bool(b && b2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_and_".to_string(),
@@ -444,9 +471,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Bool(n > &n2))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Bool(n > &n2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_more_than_".to_string(),
@@ -472,9 +499,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Bool(n < &n2))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Bool(n < &n2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_less_than_".to_string(),
@@ -500,9 +527,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Bool(n >= &n2))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Bool(n >= &n2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_more_or_equal_".to_string(),
@@ -528,9 +555,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Bool(n <= &n2))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Bool(n <= &n2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_less_or_equal_".to_string(),
@@ -556,9 +583,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Number(n / &n2))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Number(n / n2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_divided_by_".to_string(),
@@ -584,9 +611,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Number(n * &n2))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Number(n * n2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_times_".to_string(),
@@ -613,9 +640,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Number(n % &n2))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Number(n % n2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_mod_".to_string(),
@@ -642,9 +669,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Number(n.powf(n2)))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Number(n.powf(*n2)), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_pow_".to_string(),
@@ -670,9 +697,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Number(n + &n2))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Number(n + n2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_plus_".to_string(),
@@ -698,9 +725,9 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val| {
-                                if let Value::Number(n) = &acum_val {
-                                    if let Value::Number(n2) = val {
-                                        Ok(Value::Number(n - &n2))
+                                if let Value::Number(n) = &globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = &globals.stored_values[val] {
+                                        Ok(store_value(Value::Number(n - n2), globals))
                                     } else {
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: "_minus_".to_string(),
@@ -725,7 +752,7 @@ impl ast::Expression {
                         Equal => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| Ok(Value::Bool(acum_val == val)),
+                            |acum_val, val| Ok(store_value(Value::Bool(acum_val == val), globals)),
                             "_equal_",
                             "logical equal",
                             c2,
@@ -735,7 +762,7 @@ impl ast::Expression {
                         NotEqual => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| Ok(Value::Bool(acum_val != val)),
+                            |acum_val, val| Ok(store_value(Value::Bool(acum_val != val), globals)),
                             "_not_equal_",
                             "logical not_equal",
                             c2,
@@ -743,36 +770,39 @@ impl ast::Expression {
                             info.clone(),
                         )?,
                         Range => vec![(
-                            Value::Array({
-                                let start = match &acum_val.clone() {
-                                    Value::Number(n) => *n as i32,
-                                    _ => {
-                                        return Err(RuntimeError::RuntimeError {
-                                            message: "Both sides of range must be Numbers"
-                                                .to_string(),
-                                            info: info.clone(),
-                                        })
+                            store_value(
+                                Value::Array({
+                                    let start = match globals.stored_values[acum_val] {
+                                        Value::Number(n) => n as i32,
+                                        _ => {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: "Both sides of range must be Numbers"
+                                                    .to_string(),
+                                                info: info.clone(),
+                                            })
+                                        }
+                                    };
+                                    let end = match globals.stored_values[val] {
+                                        Value::Number(n) => n as i32,
+                                        _ => {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: "Both sides of range must be Numbers"
+                                                    .to_string(),
+                                                info: info.clone(),
+                                            })
+                                        }
+                                    };
+                                    if start < end {
+                                        (start..end).collect::<Vec<i32>>()
+                                    } else {
+                                        (end..start).rev().collect::<Vec<i32>>()
                                     }
-                                };
-                                let end = match val {
-                                    Value::Number(n) => n as i32,
-                                    _ => {
-                                        return Err(RuntimeError::RuntimeError {
-                                            message: "Both sides of range must be Numbers"
-                                                .to_string(),
-                                            info: info.clone(),
-                                        })
-                                    }
-                                };
-                                if start < end {
-                                    (start..end).collect::<Vec<i32>>()
-                                } else {
-                                    (end..start).rev().collect::<Vec<i32>>()
-                                }
-                                .into_iter()
-                                .map(|x| Value::Number(x as f64))
-                                .collect()
-                            }),
+                                    .into_iter()
+                                    .map(|x| store_value(Value::Number(x as f64), globals))
+                                    .collect()
+                                }),
+                                globals,
+                            ),
                             c2,
                         )],
                     };
@@ -813,8 +843,7 @@ pub fn execute_macro(
                 match &arg.symbol {
                     Some(name) => {
                         if m.args.iter().any(|e| e.0 == *name) {
-                            new_variables
-                                .insert(name.clone(), store_value(arg_values[i].clone(), globals));
+                            new_variables.insert(name.clone(), arg_values[i]);
                         } else {
                             return Err(RuntimeError::UndefinedErr {
                                 undefined: name.clone(),
@@ -834,7 +863,7 @@ pub fn execute_macro(
                             m.args[if m.args[0].0 == "self" { i + 1 } else { i }]
                                 .0
                                 .clone(),
-                            store_value(arg_values[i].clone(), globals),
+                            arg_values[1],
                         );
                     }
                 }
@@ -887,18 +916,14 @@ pub fn execute_macro(
     let compiled = compile_scope(&m.body, new_contexts, globals, new_info)?;
 
     let returns = if compiled.1.is_empty() {
-        compiled
-            .0
-            .iter()
-            .map(|x| (Value::Null, x.clone()))
-            .collect()
+        compiled.0.iter().map(|x| (1, x.clone())).collect()
     } else {
         if compiled.1.len() > 1 {
             let mut return_vals = Vec::<(Value, u8, Vec<Context>)>::new();
             for (val, c) in compiled.1 {
                 let mut found = false;
                 for val2 in &mut return_vals {
-                    if val == val2.0 {
+                    if globals.stored_values[val] == val2.0 {
                         (*val2).1 += 1;
                         (*val2).2.push(c.clone());
                         found = true;
@@ -906,7 +931,7 @@ pub fn execute_macro(
                     }
                 }
                 if !found {
-                    return_vals.push((val, 1, vec![c]));
+                    return_vals.push((globals.stored_values[val].clone(), 1, vec![c]));
                 }
             }
 
@@ -940,9 +965,9 @@ pub fn execute_macro(
 
                     new_context.start_group = start_group;
 
-                    rets.push((val, new_context))
+                    rets.push((store_value(val, globals), new_context))
                 } else {
-                    rets.push((val, c[0].clone()))
+                    rets.push((store_value(val, globals), c[0].clone()))
                 }
                 //compact the returns down to one function with a return
 
@@ -976,8 +1001,8 @@ fn all_combinations(
     context: Context,
     globals: &mut Globals,
     info: CompilerInfo,
-) -> Result<(Vec<(Vec<Value>, Context)>, Returns), RuntimeError> {
-    let mut out: Vec<(Vec<Value>, Context)> = Vec::new();
+) -> Result<(Vec<(Vec<StoredValue>, Context)>, Returns), RuntimeError> {
+    let mut out: Vec<(Vec<StoredValue>, Context)> = Vec::new();
     let mut inner_returns = Returns::new();
     if a.is_empty() {
         //if there are so value, there is only one combination
@@ -999,7 +1024,7 @@ fn all_combinations(
         //for the rest of the expressions
         for expr in a_iter {
             //all the new combinations end up in this
-            let mut new_out: Vec<(Vec<Value>, Context)> = Vec::new();
+            let mut new_out: Vec<(Vec<StoredValue>, Context)> = Vec::new();
             //run through all the lists in out
             for (inner_arr, c) in out.iter() {
                 //for each one, run through all the returns in that context
@@ -1049,29 +1074,28 @@ pub fn eval_dict(
         for def in dict.clone() {
             match def {
                 ast::DictDef::Def(d) => {
-                    dict_out.insert(
-                        d.0.clone(),
-                        store_value(expressions.0[expr_index].clone(), globals),
-                    );
+                    dict_out.insert(d.0.clone(), expressions.0[expr_index]);
                 }
                 ast::DictDef::Extract(_) => {
-                    dict_out.extend(match &expressions.0[expr_index] {
-                        Value::Dict(d) => d.clone(),
-                        a => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "Cannot extract from this value: {}",
-                                    a.to_str(globals)
-                                ),
-                                info: info.clone(),
-                            })
-                        }
-                    });
+                    dict_out.extend(
+                        match globals.stored_values[expressions.0[expr_index]].clone() {
+                            Value::Dict(d) => d.clone(),
+                            a => {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: format!(
+                                        "Cannot extract from this value: {}",
+                                        a.to_str(globals)
+                                    ),
+                                    info: info.clone(),
+                                })
+                            }
+                        },
+                    );
                 }
             };
             expr_index += 1;
         }
-        out.push((Value::Dict(dict_out), expressions.1));
+        out.push((store_value(Value::Dict(dict_out), globals), expressions.1));
     }
     Ok((out, inner_returns))
 }
@@ -1084,71 +1108,78 @@ impl ast::Variable {
         info: CompilerInfo,
     ) -> Result<(Returns, Returns), RuntimeError> {
         // TODO: Check if this variable has native functions called on it, and if not set this to false
-        let mut start_val: Vec<(Value, Context)> = Vec::new();
+        let mut start_val = Returns::new();
         let mut inner_returns = Returns::new();
 
         use ast::IDClass;
 
         match &self.value {
-            ast::ValueLiteral::Resolved(r) => start_val.push((r.clone(), context)),
+            ast::ValueLiteral::Resolved(r) => {
+                start_val.push((store_value(r.clone(), globals), context))
+            }
             ast::ValueLiteral::ID(id) => start_val.push((
-                match id.class_name {
-                    IDClass::Group => {
-                        if id.unspecified {
-                            Value::Group(Group {
-                                id: next_free(
-                                    &mut globals.closed_groups,
-                                    ast::IDClass::Group,
-                                    info.clone(),
-                                )?,
-                            })
-                        } else {
-                            Value::Group(Group { id: id.number })
+                store_value(
+                    match id.class_name {
+                        IDClass::Group => {
+                            if id.unspecified {
+                                Value::Group(Group {
+                                    id: next_free(
+                                        &mut globals.closed_groups,
+                                        ast::IDClass::Group,
+                                        info.clone(),
+                                    )?,
+                                })
+                            } else {
+                                Value::Group(Group { id: id.number })
+                            }
                         }
-                    }
-                    IDClass::Color => {
-                        if id.unspecified {
-                            Value::Color(Color {
-                                id: next_free(
-                                    &mut globals.closed_colors,
-                                    ast::IDClass::Color,
-                                    info.clone(),
-                                )?,
-                            })
-                        } else {
-                            Value::Color(Color { id: id.number })
+                        IDClass::Color => {
+                            if id.unspecified {
+                                Value::Color(Color {
+                                    id: next_free(
+                                        &mut globals.closed_colors,
+                                        ast::IDClass::Color,
+                                        info.clone(),
+                                    )?,
+                                })
+                            } else {
+                                Value::Color(Color { id: id.number })
+                            }
                         }
-                    }
-                    IDClass::Block => {
-                        if id.unspecified {
-                            Value::Block(Block {
-                                id: next_free(
-                                    &mut globals.closed_blocks,
-                                    ast::IDClass::Block,
-                                    info.clone(),
-                                )?,
-                            })
-                        } else {
-                            Value::Block(Block { id: id.number })
+                        IDClass::Block => {
+                            if id.unspecified {
+                                Value::Block(Block {
+                                    id: next_free(
+                                        &mut globals.closed_blocks,
+                                        ast::IDClass::Block,
+                                        info.clone(),
+                                    )?,
+                                })
+                            } else {
+                                Value::Block(Block { id: id.number })
+                            }
                         }
-                    }
-                    IDClass::Item => {
-                        if id.unspecified {
-                            Value::Item(Item {
-                                id: next_free(
-                                    &mut globals.closed_items,
-                                    ast::IDClass::Item,
-                                    info.clone(),
-                                )?,
-                            })
-                        } else {
-                            Value::Item(Item { id: id.number })
+                        IDClass::Item => {
+                            if id.unspecified {
+                                Value::Item(Item {
+                                    id: next_free(
+                                        &mut globals.closed_items,
+                                        ast::IDClass::Item,
+                                        info.clone(),
+                                    )?,
+                                })
+                            } else {
+                                Value::Item(Item { id: id.number })
+                            }
                         }
-                    }
-                },
+                    },
+                    globals,
+                ),
                 context,
             )),
-            ast::ValueLiteral::Number(num) => start_val.push((Value::Number(*num), context)),
+            ast::ValueLiteral::Number(num) => {
+                start_val.push((store_value(Value::Number(*num), globals), context))
+            }
             ast::ValueLiteral::Dictionary(dict) => {
                 let new_info = info.next("dictionary", globals, false);
                 let (new_out, new_inner_returns) =
@@ -1159,7 +1190,7 @@ impl ast::Variable {
             ast::ValueLiteral::CmpStmt(cmp_stmt) => {
                 let (evaled, returns) = cmp_stmt.to_scope(&context, globals, info.clone())?;
                 inner_returns.extend(returns);
-                start_val.push((Value::Func(evaled), context));
+                start_val.push((store_value(Value::Func(evaled), globals), context));
             }
 
             ast::ValueLiteral::Expression(expr) => {
@@ -1168,14 +1199,15 @@ impl ast::Variable {
                 start_val.extend(evaled.iter().cloned());
             }
 
-            ast::ValueLiteral::Bool(b) => start_val.push((Value::Bool(*b), context)),
+            ast::ValueLiteral::Bool(b) => {
+                start_val.push((store_value(Value::Bool(*b), globals), context))
+            }
             ast::ValueLiteral::Symbol(string) => {
                 if string == "$" {
-                    start_val.push((Value::Builtins, context));
+                    start_val.push((0, context));
                 } else {
                     match context.variables.get(string) {
-                        Some(value) => start_val
-                            .push((((*globals).stored_values[*value as usize]).clone(), context)),
+                        Some(value) => start_val.push((*value, context)),
                         None => {
                             return Err(RuntimeError::UndefinedErr {
                                 undefined: string.clone(),
@@ -1186,27 +1218,29 @@ impl ast::Variable {
                     }
                 }
             }
-            ast::ValueLiteral::Str(s) => start_val.push((Value::Str(s.clone()), context)),
+            ast::ValueLiteral::Str(s) => {
+                start_val.push((store_value(Value::Str(s.clone()), globals), context))
+            }
             ast::ValueLiteral::Array(a) => {
                 let new_info = info.next("array", globals, false);
                 let (evaled, returns) = all_combinations(a.clone(), context, globals, new_info)?;
                 inner_returns.extend(returns);
                 start_val = evaled
                     .iter()
-                    .map(|x| (Value::Array(x.0.clone()), x.1.clone()))
+                    .map(|x| (store_value(Value::Array(x.0.clone()), globals), x.1.clone()))
                     .collect();
             }
             ast::ValueLiteral::Import(i) => {
                 let mut new_context = context.clone();
                 let (val, imp) = import_module(i, globals, info.clone())?;
                 new_context.implementations.extend(imp);
-                start_val.push((val, new_context));
+                start_val.push((store_value(val, globals), new_context));
             }
 
             ast::ValueLiteral::TypeIndicator(name) => {
                 start_val.push((
                     match globals.type_ids.get(name) {
-                        Some(id) => Value::TypeIndicator(*id),
+                        Some(id) => store_value(Value::TypeIndicator(*id), globals),
                         None => {
                             return Err(RuntimeError::UndefinedErr {
                                 undefined: name.clone(),
@@ -1234,8 +1268,8 @@ impl ast::Variable {
                         let v2 = expressions[i * 2 + 1].clone();
 
                         obj.push((
-                            match v {
-                                Value::Number(n) => n as u16,
+                            match &globals.stored_values[v] {
+                                Value::Number(n) => *n as u16,
                                 a => {
                                     return Err(RuntimeError::RuntimeError {
                                         message: format!(
@@ -1246,9 +1280,9 @@ impl ast::Variable {
                                     })
                                 }
                             },
-                            match v2 {
+                            match &globals.stored_values[v2] {
                                 Value::Number(n) => n.to_string(),
-                                Value::Str(s) => s,
+                                Value::Str(s) => s.clone(),
                                 Value::Func(g) => g.start_group.id.to_string(),
 
                                 Value::Group(g) => g.id.to_string(),
@@ -1257,7 +1291,7 @@ impl ast::Variable {
                                 Value::Item(i) => i.id.to_string(),
 
                                 Value::Bool(b) => {
-                                    if b {
+                                    if *b {
                                         "1".to_string()
                                     } else {
                                         "0".to_string()
@@ -1277,7 +1311,7 @@ impl ast::Variable {
                             },
                         ))
                     }
-                    start_val.push((Value::Obj(obj), context));
+                    start_val.push((store_value(Value::Obj(obj), globals), context));
                 }
             }
 
@@ -1301,7 +1335,7 @@ impl ast::Variable {
                             match &arg.1 {
                                 Some(_) => {
                                     expr_index += 1;
-                                    Some(defaults.0[expr_index - 1].clone())
+                                    Some(globals.stored_values[defaults.0[expr_index - 1]].clone())
                                 }
                                 None => None,
                             },
@@ -1310,31 +1344,38 @@ impl ast::Variable {
                     }
 
                     start_val.push((
-                        Value::Macro(Macro {
-                            args,
-                            body: m.body.statements.clone(),
-                            def_context: defaults.1.clone(),
-                            tag: m.properties.clone(),
-                        }),
+                        store_value(
+                            Value::Macro(Macro {
+                                args,
+                                body: m.body.statements.clone(),
+                                def_context: defaults.1.clone(),
+                                tag: m.properties.clone(),
+                            }),
+                            globals,
+                        ),
                         defaults.1,
                     ))
                 }
             }
             //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
-            ast::ValueLiteral::Null => start_val.push((Value::Null, context)),
+            ast::ValueLiteral::Null => start_val.push((1, context)),
         };
 
         let mut path_iter = self.path.iter();
-        let mut with_parent: Vec<(Value, Context, Value)> = start_val
+        let mut with_parent: Vec<(StoredValue, Context, StoredValue)> = start_val
             .iter()
-            .map(|x| (x.0.clone(), x.1.clone(), Value::Null))
+            .map(|x| (x.0.clone(), x.1.clone(), 1))
             .collect();
         for p in &mut path_iter {
             match &p {
                 ast::Path::Member(m) => {
                     for x in &mut with_parent {
                         *x = (
-                            match x.0.member(m.clone(), &x.1, globals) {
+                            match globals.stored_values[x.0].clone().member(
+                                m.clone(),
+                                &x.1,
+                                globals,
+                            ) {
                                 Some(m) => m,
                                 None => {
                                     return Err(RuntimeError::UndefinedErr {
@@ -1351,19 +1392,19 @@ impl ast::Variable {
                 }
 
                 ast::Path::Index(i) => {
-                    let mut new_out: Vec<(Value, Context, Value)> = Vec::new();
+                    let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
 
                     for (prev_v, prev_c, _) in with_parent.clone() {
-                        match prev_v.clone() {
+                        match globals.stored_values[prev_v].clone() {
                             Value::Array(arr) => {
                                 let new_info = info.next("index", globals, false);
                                 let (evaled, returns) = i.eval(prev_c, globals, new_info)?;
                                 inner_returns.extend(returns);
                                 for index in evaled {
-                                    match index.0 {
+                                    match &globals.stored_values[index.0] {
                                         Value::Number(n) => {
                                             new_out.push((
-                                                arr[n as usize].clone(),
+                                                arr[*n as usize].clone(),
                                                 index.1,
                                                 prev_v.clone(),
                                             ));
@@ -1397,13 +1438,13 @@ impl ast::Variable {
 
                 ast::Path::Call(args) => {
                     for (v, cont, parent) in with_parent.clone().iter() {
-                        match v {
+                        match globals.stored_values[*v].clone() {
                             Value::Macro(m) => {
                                 let (evaled, returns) = execute_macro(
                                     (m.clone(), args.clone()),
                                     cont.clone(),
                                     globals,
-                                    parent.clone(),
+                                    globals.stored_values[*parent].clone(),
                                     info.clone(),
                                 )?;
                                 inner_returns.extend(returns);
@@ -1426,13 +1467,15 @@ impl ast::Variable {
 
                                 for (args, context) in evaled_args {
                                     let evaled = built_in_function(
-                                        name,
-                                        args.clone(),
+                                        &name,
+                                        args.iter()
+                                            .map(|x| globals.stored_values[*x].clone())
+                                            .collect(),
                                         info.clone(),
                                         globals,
                                         context.clone(),
                                     )?;
-                                    all_values.push((evaled, context))
+                                    all_values.push((store_value(evaled, globals), context))
                                 }
 
                                 with_parent = all_values
@@ -1465,8 +1508,11 @@ impl ast::Variable {
             for final_value in &mut out {
                 match o {
                     UnaryOperator::Minus => {
-                        if let Value::Number(n) = final_value.0 {
-                            *final_value = (Value::Number(-n), final_value.1.clone());
+                        if let Value::Number(n) = globals.stored_values[final_value.0] {
+                            *final_value = (
+                                store_value(Value::Number(-n), globals),
+                                final_value.1.clone(),
+                            );
                         } else {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Cannot make non-number type negative".to_string(),
@@ -1476,8 +1522,9 @@ impl ast::Variable {
                     }
 
                     UnaryOperator::Not => {
-                        if let Value::Bool(b) = final_value.0 {
-                            *final_value = (Value::Bool(!b), final_value.1.clone());
+                        if let Value::Bool(b) = globals.stored_values[final_value.0] {
+                            *final_value =
+                                (store_value(Value::Bool(!b), globals), final_value.1.clone());
                         } else {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Cannot negate non-boolean type".to_string(),
@@ -1487,16 +1534,19 @@ impl ast::Variable {
                     }
 
                     UnaryOperator::Range => {
-                        if let Value::Number(n) = final_value.0 {
+                        if let Value::Number(n) = globals.stored_values[final_value.0] {
                             *final_value = (
-                                Value::Array(
-                                    (if n > 0.0 {
-                                        0..(n as i32)
-                                    } else {
-                                        (n as i32)..0
-                                    })
-                                    .map(|x| Value::Number(x as f64))
-                                    .collect(),
+                                store_value(
+                                    Value::Array(
+                                        (if n > 0.0 {
+                                            0..(n as i32)
+                                        } else {
+                                            (n as i32)..0
+                                        })
+                                        .map(|x| store_value(Value::Number(x as f64), globals))
+                                        .collect(),
+                                    ),
+                                    globals,
                                 ),
                                 final_value.1.clone(),
                             );

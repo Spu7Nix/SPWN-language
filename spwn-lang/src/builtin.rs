@@ -47,42 +47,50 @@ pub fn context_trigger(context: Context, _globals: &mut Globals, info: CompilerI
 
 pub const TYPE_MEMBER_NAME: &str = "type";
 impl Value {
-    pub fn member(&self, member: String, context: &Context, globals: &Globals) -> Option<Value> {
+    pub fn member(
+        &self,
+        member: String,
+        context: &Context,
+        globals: &mut Globals,
+    ) -> Option<StoredValue> {
         let get_impl = |t: u16, m: String| match context.implementations.get(&t) {
             Some(imp) => match imp.get(&m) {
-                Some(mem) => Some((*globals).stored_values[*mem as usize].clone()),
+                Some(mem) => Some(*mem),
                 None => None,
             },
             None => None,
         };
         if member == TYPE_MEMBER_NAME {
-            Some(Value::TypeIndicator(match self {
-                Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
-                    Some(value) => match (*globals).stored_values[*value as usize].clone() {
-                        Value::TypeIndicator(s) => s,
-                        _ => unreachable!(),
+            Some(store_value(
+                Value::TypeIndicator(match self {
+                    Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
+                        Some(value) => match (*globals).stored_values[*value as usize].clone() {
+                            Value::TypeIndicator(s) => s,
+                            _ => unreachable!(),
+                        },
+                        None => self.to_num(globals),
                     },
-                    None => self.to_num(globals),
-                },
 
-                _ => self.to_num(globals),
-            }))
+                    _ => self.to_num(globals),
+                }),
+                globals,
+            ))
         } else {
             match self {
                 Value::Func(f) => {
                     if member == "group" {
-                        return Some(Value::Group(f.start_group));
+                        return Some(store_value(Value::Group(f.start_group), globals));
                     }
                 }
 
                 Value::Str(a) => {
                     if member == "length" {
-                        return Some(Value::Number(a.len() as f64));
+                        return Some(store_value(Value::Number(a.len() as f64), globals));
                     }
                 }
                 Value::Array(a) => {
                     if member == "length" {
-                        return Some(Value::Number(a.len() as f64));
+                        return Some(store_value(Value::Number(a.len() as f64), globals));
                     }
                 }
                 _ => (),
@@ -91,14 +99,14 @@ impl Value {
             let my_type = self.to_num(globals);
 
             match self {
-                Value::Builtins => Some(Value::BuiltinFunction(member)),
+                Value::Builtins => Some(store_value(Value::BuiltinFunction(member), globals)),
                 Value::Dict(dict) => match dict.get(&member) {
-                    Some(value) => Some((*globals).stored_values[*value as usize].clone()),
+                    Some(value) => Some(*value),
                     None => get_impl(my_type, member).clone(),
                 },
                 Value::Func(f) => {
                     if &member == "start_group" {
-                        Some(Value::Group(f.start_group))
+                        Some(store_value(Value::Group(f.start_group), globals))
                     } else {
                         get_impl(my_type, member).clone()
                     }

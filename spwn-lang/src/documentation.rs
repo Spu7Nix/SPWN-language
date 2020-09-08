@@ -28,55 +28,53 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
 
     doc += "_This file was generated using `spwn doc [file name]`_\n";
 
-    doc += &format!("## Exports:\n{}", document_val(&exports, &globals));
+    doc += &format!("## Exports:\n{}", document_val(&exports, &mut globals));
 
     doc += "## Type Implementations:\n";
 
-    let mut list: Vec<(&u16, &HashMap<String, u32>)> = implementations.iter().collect();
+    let mut list: Vec<(&u16, &HashMap<String, usize>)> = implementations.iter().collect();
     list.sort_by(|a, b| a.0.cmp(b.0));
 
     for (typ, dict) in list.iter() {
-        let type_name =
-            find_key_for_value(&globals.type_ids, **typ).expect("Implemented type was not found!");
+        let type_name = find_key_for_value(&globals.type_ids, **typ)
+            .expect("Implemented type was not found!")
+            .clone();
 
         doc += &format!(
             "### **@{}**: \n {}",
             type_name,
-            document_dict(dict, &globals)
+            document_dict(dict, &mut globals)
         );
     }
 
     Ok(doc)
 }
 
-fn document_dict(dict: &HashMap<String, u32>, globals: &Globals) -> String {
+fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String {
     let mut doc = String::from("<details>\n<summary> View members </summary>\n");
 
-    let mut macro_list: Vec<(&String, &u32)> = dict
+    let mut macro_list: Vec<(&String, &usize)> = dict
         .iter()
-        .filter(
-            |x| match globals.stored_values.get(*x.1 as usize).unwrap() {
-                Value::Macro(_) => true,
-                _ => false,
-            },
-        )
+        .filter(|x| match globals.stored_values.get(*x.1).unwrap() {
+            Value::Macro(_) => true,
+            _ => false,
+        })
         .collect();
     macro_list.sort_by(|a, b| a.0.cmp(&b.0));
 
-    let mut val_list: Vec<(&String, &u32)> = dict
+    let mut val_list: Vec<(&String, &usize)> = dict
         .iter()
-        .filter(
-            |x| match globals.stored_values.get(*x.1 as usize).unwrap() {
-                Value::Macro(_) => false,
-                _ => true,
-            },
-        )
+        .filter(|x| match globals.stored_values.get(*x.1).unwrap() {
+            Value::Macro(_) => false,
+            _ => true,
+        })
         .collect();
     val_list.sort_by(|a, b| a.0.cmp(&b.0));
 
-    let document_member = |key: &String, val: &u32| -> String {
+    let mut document_member = |key: &String, val: &usize| -> String {
         let mut member_doc = String::new();
-        let val_str = document_val(globals.stored_values.get(*val as usize).unwrap(), globals);
+        let inner_val = globals.stored_values.get(*val).unwrap().clone();
+        let val_str = document_val(&inner_val, globals);
 
         let mut formatted = String::new();
 
@@ -121,7 +119,7 @@ fn document_dict(dict: &HashMap<String, u32>, globals: &Globals) -> String {
     doc
 }
 
-fn document_macro(mac: &Macro, globals: &Globals) -> String {
+fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
     //description
     let mut doc = String::new();
     match mac.tag.get_desc() {
@@ -168,13 +166,12 @@ fn document_macro(mac: &Macro, globals: &Globals) -> String {
     doc
 }
 
-fn document_val(val: &Value, globals: &Globals) -> String {
+fn document_val(val: &Value, globals: &mut Globals) -> String {
     let mut doc = String::new();
-
-    let type_id = match val
+    let typ_index = val
         .member(TYPE_MEMBER_NAME.to_string(), &Context::new(), globals)
-        .unwrap()
-    {
+        .unwrap();
+    let type_id = match globals.stored_values[typ_index] {
         Value::TypeIndicator(t) => t,
         _ => unreachable!(),
     };

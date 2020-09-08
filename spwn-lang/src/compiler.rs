@@ -97,6 +97,9 @@ pub fn compile_spwn(
 ) -> Result<(Globals, String), RuntimeError> {
     //variables that get changed throughout the compiling
     let mut globals = Globals::new(notes, path);
+    //store at pos 0
+    store_value(Value::Builtins, &mut globals);
+    store_value(Value::Builtins, &mut globals);
 
     println!("Loading level data...");
 
@@ -250,7 +253,10 @@ pub fn compile_scope(
                                 def.symbol.clone(),
                                 store_value(Value::Func(Function { start_group }), globals),
                             );
-                            all_values.push((Value::Func(Function { start_group }), context));
+                            all_values.push((
+                                store_value(Value::Func(Function { start_group }), globals),
+                                context,
+                            ));
                             new_context.start_group = start_group;
                             let new_info = info.next(&def.symbol, globals, true);
                             let (_, inner_returns) =
@@ -272,9 +278,7 @@ pub fn compile_scope(
                 }
                 contexts = Vec::new();
                 for (val, mut context) in all_values {
-                    context
-                        .variables
-                        .insert(String::from(&def.symbol), store_value(val, globals));
+                    context.variables.insert(String::from(&def.symbol), val);
 
                     contexts.push(context);
                 }
@@ -290,7 +294,7 @@ pub fn compile_scope(
 
                 contexts = Vec::new();
                 for (val, mut context) in all_values {
-                    match val {
+                    match &globals.stored_values[val] {
                         Value::Dict(d) => {
                             context.variables.extend(d.clone());
                         }
@@ -339,10 +343,10 @@ pub fn compile_scope(
                 }
 
                 for (val, context) in all_values {
-                    match val {
+                    match &globals.stored_values[val] {
                         Value::Bool(b) => {
                             //internal if statement
-                            if b {
+                            if *b {
                                 contexts = Vec::new();
                                 let new_info = info.next("if body", globals, true);
                                 let compiled = compile_scope(
@@ -388,7 +392,7 @@ pub fn compile_scope(
                         imp.symbol.to_value(context.clone(), globals, new_info)?;
                     returns.extend(inner_returns);
                     for (typ, c) in evaled {
-                        match typ {
+                        match globals.stored_values[typ].clone() {
                             Value::TypeIndicator(s) => {
                                 let new_info = info.next("implementation", globals, true);
                                 let (evaled, inner_returns) =
@@ -398,15 +402,17 @@ pub fn compile_scope(
                                 returns.extend(inner_returns);
                                 for (val, c2) in evaled {
                                     let mut new_context = c2.clone();
-                                    if let Value::Dict(d) = val {
+                                    if let Value::Dict(d) = &globals.stored_values[val] {
                                         match new_context.implementations.get_mut(&s) {
                                             Some(implementation) => {
                                                 for (key, val) in d.into_iter() {
-                                                    (*implementation).insert(key, val);
+                                                    (*implementation).insert(key.clone(), *val);
                                                 }
                                             }
                                             None => {
-                                                new_context.implementations.insert(s.clone(), d);
+                                                new_context
+                                                    .implementations
+                                                    .insert(s.clone(), d.clone());
                                             }
                                         }
                                     } else {
@@ -448,7 +454,7 @@ pub fn compile_scope(
                     let mut params = HashMap::new();
                     params.insert(
                         51,
-                        match func {
+                        match &globals.stored_values[func] {
                             Value::Func(g) => g.start_group.id.to_string(),
                             Value::Group(g) => g.id.to_string(),
                             a => {
@@ -484,17 +490,14 @@ pub fn compile_scope(
                 }
                 contexts = Vec::new();
                 for (val, context) in all_arrays {
-                    match val {
+                    match globals.stored_values[val].clone() {
                         Value::Array(arr) => {
-                            let iterator_val = store_value(Value::Null, globals);
+                            //let iterator_val = store_value(Value::Null, globals);
                             let mut new_contexts = vec![context];
 
                             for element in arr {
                                 for mut c in new_contexts.clone() {
-                                    (*globals).stored_values[iterator_val as usize] =
-                                        element.clone();
-
-                                    c.variables.insert(f.symbol.clone(), iterator_val);
+                                    c.variables.insert(f.symbol.clone(), element);
                                     let new_info = info.next("for loop", globals, false);
                                     let (end_contexts, inner_returns) =
                                         compile_scope(&f.body, vec![c], globals, new_info)?;
@@ -530,7 +533,7 @@ pub fn compile_scope(
                 None => {
                     let mut all_values: Returns = Vec::new();
                     for context in contexts.clone() {
-                        all_values.push((Value::Null, context));
+                        all_values.push((store_value(Value::Null, globals), context));
                     }
                     returns.extend(all_values);
                 }
@@ -543,9 +546,9 @@ pub fn compile_scope(
                     for (msg, _) in evaled {
                         eprintln!(
                             "ERROR: {:?}",
-                            match msg {
+                            match &globals.stored_values[msg] {
                                 Value::Str(s) => s,
-                                _ => "no message".to_string(),
+                                _ => "no message",
                             }
                         );
                     }
