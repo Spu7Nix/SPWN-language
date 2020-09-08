@@ -334,7 +334,7 @@ fn handle_operator<F>(
     info: CompilerInfo,
 ) -> Result<Returns, RuntimeError>
 where
-    F: FnOnce(StoredValue, StoredValue) -> Result<StoredValue, RuntimeError>,
+    F: Fn(StoredValue, StoredValue, &mut Globals) -> Result<StoredValue, RuntimeError>,
 {
     Ok(
         if let Some(val) =
@@ -368,10 +368,10 @@ where
                 )?;
                 values
             } else {
-                vec![(op(value1, value2)?, context)]
+                vec![(op(value1, value2, globals)?, context)]
             }
         } else {
-            vec![(op(value1, value2)?, context)]
+            vec![(op(value1, value2, globals)?, context)]
         },
     )
 }
@@ -414,7 +414,10 @@ impl ast::Expression {
                         Or => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| -> Result<StoredValue, RuntimeError> {
+                            |acum_val,
+                             val,
+                             globals: &mut Globals|
+                             -> Result<StoredValue, RuntimeError> {
                                 if let Value::Bool(b) = globals.stored_values[acum_val] {
                                     if let Value::Bool(b2) = globals.stored_values[val] {
                                         Ok(store_value(Value::Bool(b || b2), globals))
@@ -442,7 +445,7 @@ impl ast::Expression {
                         And => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Bool(b) = globals.stored_values[acum_val] {
                                     if let Value::Bool(b2) = globals.stored_values[val] {
                                         Ok(store_value(Value::Bool(b && b2), globals))
@@ -470,7 +473,7 @@ impl ast::Expression {
                         More => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Bool(n > &n2), globals))
@@ -498,7 +501,7 @@ impl ast::Expression {
                         Less => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Bool(n < &n2), globals))
@@ -526,7 +529,7 @@ impl ast::Expression {
                         MoreOrEqual => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Bool(n >= &n2), globals))
@@ -554,7 +557,7 @@ impl ast::Expression {
                         LessOrEqual => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Bool(n <= &n2), globals))
@@ -582,7 +585,7 @@ impl ast::Expression {
                         Divide => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Number(n / n2), globals))
@@ -610,7 +613,7 @@ impl ast::Expression {
                         Multiply => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Number(n * n2), globals))
@@ -639,7 +642,7 @@ impl ast::Expression {
                         Modulo => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Number(n % n2), globals))
@@ -668,7 +671,7 @@ impl ast::Expression {
                         Power => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Number(n.powf(*n2)), globals))
@@ -696,7 +699,7 @@ impl ast::Expression {
                         Plus => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Number(n + n2), globals))
@@ -724,7 +727,7 @@ impl ast::Expression {
                         Minus => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| {
+                            |acum_val, val, globals| {
                                 if let Value::Number(n) = &globals.stored_values[acum_val] {
                                     if let Value::Number(n2) = &globals.stored_values[val] {
                                         Ok(store_value(Value::Number(n - n2), globals))
@@ -752,7 +755,15 @@ impl ast::Expression {
                         Equal => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| Ok(store_value(Value::Bool(acum_val == val), globals)),
+                            |acum_val, val, globals| {
+                                Ok(store_value(
+                                    Value::Bool(
+                                        globals.stored_values[acum_val]
+                                            == globals.stored_values[val],
+                                    ),
+                                    globals,
+                                ))
+                            },
                             "_equal_",
                             "logical equal",
                             c2,
@@ -762,7 +773,9 @@ impl ast::Expression {
                         NotEqual => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val| Ok(store_value(Value::Bool(acum_val != val), globals)),
+                            |acum_val, val, globals| {
+                                Ok(store_value(Value::Bool(acum_val != val), globals))
+                            },
                             "_not_equal_",
                             "logical not_equal",
                             c2,
@@ -863,7 +876,7 @@ pub fn execute_macro(
                             m.args[if m.args[0].0 == "self" { i + 1 } else { i }]
                                 .0
                                 .clone(),
-                            arg_values[1],
+                            arg_values[i],
                         );
                     }
                 }

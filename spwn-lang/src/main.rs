@@ -88,12 +88,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p) => p,
                     };
 
+                    println!("values: {}", compiled.stored_values.len());
+
                     //println!("func ids: {:?}", compiled.func_ids);
                     let mut objects = levelstring::apply_fn_ids(compiled.func_ids);
 
                     println!("{} objects added", objects.len());
 
-                    objects = optimize(objects);
+                    //objects = optimize(objects);
 
                     println!("optimized to {} objects", objects.len());
 

@@ -370,6 +370,7 @@ mut = #[desc("Creates a new mut")] (
             item: id
         }
     } else {
+        
         error "Can not make mut from this type"
     }
     
