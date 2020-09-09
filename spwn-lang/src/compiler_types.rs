@@ -582,7 +582,7 @@ impl ast::Expression {
                             globals,
                             info.clone(),
                         )?,
-                        Divide => handle_operator(
+                        Slash => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val, globals| {
@@ -610,7 +610,7 @@ impl ast::Expression {
                             globals,
                             info.clone(),
                         )?,
-                        Multiply => handle_operator(
+                        Star => handle_operator(
                             acum_val.clone(),
                             val,
                             |acum_val, val, globals| {
@@ -818,6 +818,145 @@ impl ast::Expression {
                             ),
                             c2,
                         )],
+                        //MUTABLE ONLY
+                        //ADD CHECk
+                        Assign => handle_operator(
+                            acum_val.clone(),
+                            val,
+                            |acum_val, val, globals| {
+                                globals.stored_values[acum_val] =
+                                    globals.stored_values[val].clone();
+                                Ok(acum_val)
+                            },
+                            "_assign_",
+                            "assign",
+                            c2,
+                            globals,
+                            info.clone(),
+                        )?,
+
+                        Add => handle_operator(
+                            acum_val.clone(),
+                            val,
+                            |acum_val, val, globals| {
+                                let gotten_val = globals.stored_values[val].clone();
+                                if let Value::Number(n) = &mut globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = gotten_val {
+                                        (*n) += n2;
+                                    } else {
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: "Cannot add this type to number".to_string(),
+                                            info: info.clone(),
+                                        });
+                                    }
+                                } else {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "'_add_' macro is not defined for this type."
+                                            .to_string(),
+                                        info: info.clone(),
+                                    });
+                                }
+                                Ok(acum_val)
+                            },
+                            "_add_",
+                            "add",
+                            c2,
+                            globals,
+                            info.clone(),
+                        )?,
+
+                        Subtract => handle_operator(
+                            acum_val.clone(),
+                            val,
+                            |acum_val, val, globals| {
+                                let gotten_val = globals.stored_values[val].clone();
+                                if let Value::Number(n) = &mut globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = gotten_val {
+                                        (*n) -= n2;
+                                    } else {
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: "Cannot subtract this type from number"
+                                                .to_string(),
+                                            info: info.clone(),
+                                        });
+                                    }
+                                } else {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "'_subtract_' macro is not defined for this type."
+                                            .to_string(),
+                                        info: info.clone(),
+                                    });
+                                }
+                                Ok(acum_val)
+                            },
+                            "_subtract_",
+                            "subtract",
+                            c2,
+                            globals,
+                            info.clone(),
+                        )?,
+
+                        Multiply => handle_operator(
+                            acum_val.clone(),
+                            val,
+                            |acum_val, val, globals| {
+                                let gotten_val = globals.stored_values[val].clone();
+                                if let Value::Number(n) = &mut globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = gotten_val {
+                                        (*n) *= n2;
+                                    } else {
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: "Cannot multiply this type by number"
+                                                .to_string(),
+                                            info: info.clone(),
+                                        });
+                                    }
+                                } else {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "'_multiply_' macro is not defined for this type."
+                                            .to_string(),
+                                        info: info.clone(),
+                                    });
+                                }
+                                Ok(acum_val)
+                            },
+                            "_multiply_",
+                            "multiply",
+                            c2,
+                            globals,
+                            info.clone(),
+                        )?,
+
+                        Divide => handle_operator(
+                            acum_val.clone(),
+                            val,
+                            |acum_val, val, globals| {
+                                let gotten_val = globals.stored_values[val].clone();
+                                if let Value::Number(n) = &mut globals.stored_values[acum_val] {
+                                    if let Value::Number(n2) = gotten_val {
+                                        (*n) /= n2;
+                                    } else {
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: "Cannot divide this type by number"
+                                                .to_string(),
+                                            info: info.clone(),
+                                        });
+                                    }
+                                } else {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "'_divide_' macro is not defined for this type."
+                                            .to_string(),
+                                        info: info.clone(),
+                                    });
+                                }
+                                Ok(acum_val)
+                            },
+                            "_divide_",
+                            "divide",
+                            c2,
+                            globals,
+                            info.clone(),
+                        )?,
                     };
                     new_acum.extend(vals);
                 }
@@ -1416,6 +1555,20 @@ impl ast::Variable {
                                 for index in evaled {
                                     match &globals.stored_values[index.0] {
                                         Value::Number(n) => {
+                                            let len = arr.len();
+                                            if (*n) < 0.0 {
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: format!("Index too low! Index is {}, but length is {}.", n, len),
+                                                    info,
+                                                });
+                                            }
+                                            if *n as usize >= len {
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: format!("Index too high! Index is {}, but length is {}.", n, len),
+                                                    info,
+                                                });
+                                            }
+
                                             new_out.push((
                                                 arr[*n as usize].clone(),
                                                 index.1,

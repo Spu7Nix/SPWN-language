@@ -179,11 +179,31 @@ pub fn built_in_function(
                 }
             }
         }
+        /*"append" => {
+            if arguments.len() != 1 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected one argument".to_string(),
+                    info,
+                });
+            }
 
+            match &arguments[0] {
+                Value::Array(a) => {
+                    let new_arr
+                }
+
+                a => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected object, found {}", a.to_str(globals)),
+                        info,
+                    })
+                }
+            }
+        }*/
         "add" => {
             if arguments.len() != 1 {
                 return Err(RuntimeError::BuiltinError {
-                    message: "Expected one error".to_string(),
+                    message: "Expected one argument".to_string(),
                     info,
                 });
             }

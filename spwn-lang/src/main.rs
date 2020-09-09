@@ -8,9 +8,9 @@ mod documentation;
 mod levelstring;
 mod parser;
 
-mod optimize;
+//mod optimize;
 
-use optimize::optimize;
+//use optimize::optimize;
 
 use parser::*;
 
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match &args_iter.next() {
         Some(a) => {
             match a as &str {
-                "run" => {
+                "build" => {
                     let script_path = match args_iter.next() {
                         Some(a) => PathBuf::from(a),
                         None => return Err(std::boxed::Box::from("Expected script file argument")),
@@ -88,10 +88,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p) => p,
                     };
 
-                    println!("values: {}", compiled.stored_values.len());
+                    println!("values: {:?}", compiled.stored_values.len());
 
                     //println!("func ids: {:?}", compiled.func_ids);
-                    let mut objects = levelstring::apply_fn_ids(compiled.func_ids);
+                    let objects = levelstring::apply_fn_ids(compiled.func_ids);
 
                     println!("{} objects added", objects.len());
 
@@ -126,7 +126,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "doc" => {
                     use std::fs::File;
                     use std::io::Write;
-                    let mut lib_path = match args_iter.next() {
+                    let lib_path = match args_iter.next() {
                         Some(a) => PathBuf::from(a),
                         None => return Err(std::boxed::Box::from("Expected script file argument")),
                     };

@@ -26,7 +26,7 @@ impl GDObj {
         (*self).clone()
     }
 
-    pub fn get_groups(&self) -> Vec<Group> {
+    /*pub fn get_groups(&self) -> Vec<Group> {
         match self.params.get(&57) {
             Some(group_string) => group_string
                 .split(".")
@@ -56,7 +56,7 @@ impl GDObj {
                 None => 0.0,
             },
         )
-    }
+    }*/
 }
 
 pub fn get_used_ids(ls: &String, globals: &mut Globals) {

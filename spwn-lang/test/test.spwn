@@ -1,5 +1,14 @@
+extract $
 
-
-macro = (num: @number = 10 ){
-
+impl @array {
+    factor: (self) {
+        let fac = 1
+        for n in self {
+            fac *= n
+        }
+        return fac
+    }
 }
+
+print((1..5).factor())
+

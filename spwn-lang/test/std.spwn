@@ -1,5 +1,5 @@
 
-constants = import "constants.spwn"
+let constants = import "constants.spwn"
 
 extract constants.obj_props
 extract constants.comparisons

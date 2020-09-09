@@ -95,7 +95,7 @@ pub enum Token {
     LessThan,
 
     #[token("*")]
-    Multiply,
+    Star,
 
     #[token("%")]
     Modulo,
@@ -110,13 +110,22 @@ pub enum Token {
     Minus,
 
     #[token("/")]
-    Divide,
+    Slash,
 
     #[token("!")]
     Exclamation,
 
     #[token("=")]
     Assign,
+
+    #[token("+=")]
+    Add,
+    #[token("-=")]
+    Subtract,
+    #[token("*=")]
+    Multiply,
+    #[token("/=")]
+    Divide,
 
     //VALUES
     #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)|\$")]
@@ -213,6 +222,9 @@ pub enum Token {
     #[token("type")]
     Type,
 
+    #[token("let")]
+    Let,
+
     //STATEMENT SEPARATOR
     #[regex(r"[\n\r;]([ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*|[\n\r;])*")]
     StatementSeparator,
@@ -227,6 +239,7 @@ pub struct ParseNotes {
     pub closed_colors: Vec<u16>,
     pub closed_blocks: Vec<u16>,
     pub closed_items: Vec<u16>,
+    //pub defined_vars: HashMap<String, usize>, //Name, num of uses
 }
 
 impl ParseNotes {
@@ -657,40 +670,47 @@ pub fn parse_statement(
 
         Some(Token::Extract) => ast::StatementBody::Extract(parse_expr(tokens, notes)?),
 
-        Some(_) => {
-            //either expression, call or definition, FIGURE OUT
-            //parse it
+        Some(Token::Let) => {
+            tokens.next(false);
+            let symbol = tokens.slice();
 
-            if tokens.next(false) == Some(Token::Assign) {
-                //Def
-                tokens.previous();
-
-                // println!("found def, current val: {:?}", tokens.current());
-
-                let symbol = tokens.slice();
-
-                tokens.next(false);
-
-                let value = parse_expr(tokens, notes)?;
-                //tokens.next(false);
-                ast::StatementBody::Definition(ast::Definition { symbol, value })
-            } else {
-                //expression or call
-                tokens.previous();
-                tokens.previous();
-                let expr = parse_expr(tokens, notes)?;
-                if tokens.next(false) == Some(Token::Exclamation) {
-                    //call
-                    // println!("found call");
-                    ast::StatementBody::Call(ast::Call {
-                        function: expr.values[0].clone(),
+            match tokens.next(false) {
+                Some(Token::Assign) => (),
+                _ => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'='".to_string(),
+                        found: tokens.slice(),
+                        pos: tokens.position(),
                     })
-                } else {
-                    //expression statement
-                    // println!("found expr");
-                    tokens.previous();
-                    ast::StatementBody::Expr(expr)
                 }
+            };
+
+            let value = parse_expr(tokens, notes)?;
+            //tokens.next(false);
+            ast::StatementBody::Definition(ast::Definition {
+                symbol,
+                value,
+                //mutable: true,
+            })
+        }
+
+        Some(_) => {
+            //expression or call
+            //constant statements are just assign, handled in compiler
+
+            tokens.previous();
+            let expr = parse_expr(tokens, notes)?;
+            if tokens.next(false) == Some(Token::Exclamation) {
+                //call
+                // println!("found call");
+                ast::StatementBody::Call(ast::Call {
+                    function: expr.values[0].clone(),
+                })
+            } else {
+                //expression statement
+                // println!("found expr");
+                tokens.previous();
+                ast::StatementBody::Expr(expr)
             }
         }
 
@@ -740,12 +760,18 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::LessOrEqual => Some(ast::Operator::LessOrEqual),
         Token::LessThan => Some(ast::Operator::Less),
         Token::MoreThan => Some(ast::Operator::More),
-        Token::Multiply => Some(ast::Operator::Multiply),
+        Token::Star => Some(ast::Operator::Star),
         Token::Power => Some(ast::Operator::Power),
         Token::Plus => Some(ast::Operator::Plus),
         Token::Minus => Some(ast::Operator::Minus),
-        Token::Divide => Some(ast::Operator::Divide),
+        Token::Slash => Some(ast::Operator::Slash),
         Token::Modulo => Some(ast::Operator::Modulo),
+
+        Token::Assign => Some(ast::Operator::Assign),
+        Token::Add => Some(ast::Operator::Add),
+        Token::Subtract => Some(ast::Operator::Subtract),
+        Token::Multiply => Some(ast::Operator::Multiply),
+        Token::Divide => Some(ast::Operator::Divide),
         _ => None,
     }
 }

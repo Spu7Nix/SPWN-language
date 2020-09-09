@@ -139,7 +139,12 @@ pub fn compile_spwn(
     };
     use std::time::Instant;
 
-    println!("Compiling script...");
+    println!(
+        "
+Compiling script...
+———————————————————————————
+"
+    );
     let start_time = Instant::now();
 
     compile_scope(&statements, vec![Context::new()], &mut globals, start_info)?;
@@ -178,7 +183,10 @@ pub fn compile_spwn(
     //globals.func_ids = new_func_ids;
 
     println!(
-        "Compiled in {} milliseconds!",
+        "
+———————————————————————————
+Compiled in {} milliseconds!
+",
         start_time.elapsed().as_millis()
     );
 

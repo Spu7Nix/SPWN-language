@@ -63,12 +63,18 @@ pub enum Operator {
     LessOrEqual,
     More,
     Less,
-    Divide,
-    Multiply,
+    Slash,
+    Star,
     Power,
     Plus,
     Minus,
     Modulo,
+
+    Assign,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -133,6 +139,7 @@ pub enum Path {
 pub struct Definition {
     pub symbol: String,
     pub value: Expression,
+    //pub mutable: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]

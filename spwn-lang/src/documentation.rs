@@ -1,5 +1,5 @@
 // tools for generating documentation for SPWN libraries
-use crate::ast::*;
+//use crate::ast::*;
 use crate::builtin::TYPE_MEMBER_NAME;
 use crate::compiler::{import_module, RuntimeError};
 use crate::compiler_types::{find_key_for_value, CompilerInfo, Context, Globals, Macro, Value};
