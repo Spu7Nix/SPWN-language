@@ -1,14 +1,18 @@
-extract $
-
-impl @array {
-    factor: (self) {
-        let fac = 1
-        for n in self {
-            fac *= n
-        }
-        return fac
-    }
+let wait = (time){
+    
+    $.add( obj{
+        1: 1268,
+        63: time,
+        51: {
+            return
+        },
+    })
+    
 }
 
-print((1..5).factor())
+let a = 10
+
+wait(1)
+
+a += 10
 

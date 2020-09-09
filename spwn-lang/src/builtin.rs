@@ -74,23 +74,24 @@ impl Value {
                     _ => self.to_num(globals),
                 }),
                 globals,
+                context,
             ))
         } else {
             match self {
                 Value::Func(f) => {
                     if member == "group" {
-                        return Some(store_value(Value::Group(f.start_group), globals));
+                        return Some(store_value(Value::Group(f.start_group), globals, context));
                     }
                 }
 
                 Value::Str(a) => {
                     if member == "length" {
-                        return Some(store_value(Value::Number(a.len() as f64), globals));
+                        return Some(store_value(Value::Number(a.len() as f64), globals, context));
                     }
                 }
                 Value::Array(a) => {
                     if member == "length" {
-                        return Some(store_value(Value::Number(a.len() as f64), globals));
+                        return Some(store_value(Value::Number(a.len() as f64), globals, context));
                     }
                 }
                 _ => (),
@@ -99,14 +100,18 @@ impl Value {
             let my_type = self.to_num(globals);
 
             match self {
-                Value::Builtins => Some(store_value(Value::BuiltinFunction(member), globals)),
+                Value::Builtins => Some(store_value(
+                    Value::BuiltinFunction(member),
+                    globals,
+                    context,
+                )),
                 Value::Dict(dict) => match dict.get(&member) {
                     Some(value) => Some(*value),
                     None => get_impl(my_type, member).clone(),
                 },
                 Value::Func(f) => {
                     if &member == "start_group" {
-                        Some(store_value(Value::Group(f.start_group), globals))
+                        Some(store_value(Value::Group(f.start_group), globals, context))
                     } else {
                         get_impl(my_type, member).clone()
                     }

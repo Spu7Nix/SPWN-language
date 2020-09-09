@@ -55,7 +55,7 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
 
     let mut macro_list: Vec<(&String, &usize)> = dict
         .iter()
-        .filter(|x| match globals.stored_values.get(*x.1).unwrap() {
+        .filter(|x| match globals.stored_values[*x.1] {
             Value::Macro(_) => true,
             _ => false,
         })
@@ -64,7 +64,7 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
 
     let mut val_list: Vec<(&String, &usize)> = dict
         .iter()
-        .filter(|x| match globals.stored_values.get(*x.1).unwrap() {
+        .filter(|x| match globals.stored_values[*x.1] {
             Value::Macro(_) => false,
             _ => true,
         })
@@ -73,7 +73,7 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
 
     let mut document_member = |key: &String, val: &usize| -> String {
         let mut member_doc = String::new();
-        let inner_val = globals.stored_values.get(*val).unwrap().clone();
+        let inner_val = globals.stored_values[*val].clone();
         let val_str = document_val(&inner_val, globals);
 
         let mut formatted = String::new();

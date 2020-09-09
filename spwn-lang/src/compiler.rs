@@ -97,9 +97,12 @@ pub fn compile_spwn(
 ) -> Result<(Globals, String), RuntimeError> {
     //variables that get changed throughout the compiling
     let mut globals = Globals::new(notes, path);
+    let start_context = Context::new();
     //store at pos 0
-    store_value(Value::Builtins, &mut globals);
-    store_value(Value::Builtins, &mut globals);
+    store_value(Value::Builtins, &mut globals, &start_context);
+    store_value(Value::Null, &mut globals, &start_context);
+
+    println!("{:?}", globals.stored_values.map);
 
     println!("Loading level data...");
 
@@ -147,7 +150,7 @@ Compiling script...
     );
     let start_time = Instant::now();
 
-    compile_scope(&statements, vec![Context::new()], &mut globals, start_info)?;
+    compile_scope(&statements, vec![start_context], &mut globals, start_info)?;
 
     //delete all unused func ids
 
@@ -259,10 +262,18 @@ pub fn compile_scope(
                             };
                             new_context.variables.insert(
                                 def.symbol.clone(),
-                                store_value(Value::Func(Function { start_group }), globals),
+                                store_value(
+                                    Value::Func(Function { start_group }),
+                                    globals,
+                                    &context,
+                                ),
                             );
                             all_values.push((
-                                store_value(Value::Func(Function { start_group }), globals),
+                                store_value(
+                                    Value::Func(Function { start_group }),
+                                    globals,
+                                    &context,
+                                ),
                                 context,
                             ));
                             new_context.start_group = start_group;
@@ -311,6 +322,7 @@ pub fn compile_scope(
                                 let p = store_value(
                                     Value::BuiltinFunction(String::from(*name)),
                                     globals,
+                                    &context,
                                 );
 
                                 context.variables.insert(String::from(*name), p);
@@ -541,7 +553,7 @@ pub fn compile_scope(
                 None => {
                     let mut all_values: Returns = Vec::new();
                     for context in contexts.clone() {
-                        all_values.push((store_value(Value::Null, globals), context));
+                        all_values.push((store_value(Value::Null, globals, &context), context));
                     }
                     returns.extend(all_values);
                 }

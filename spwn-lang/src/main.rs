@@ -88,7 +88,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p) => p,
                     };
 
-                    println!("values: {:?}", compiled.stored_values.len());
+                    println!(
+                        "values: {:?}",
+                        std::mem::size_of_val(&compiled.stored_values)
+                    );
 
                     //println!("func ids: {:?}", compiled.func_ids);
                     let objects = levelstring::apply_fn_ids(compiled.func_ids);
