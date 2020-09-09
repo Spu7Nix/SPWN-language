@@ -1,18 +1,10 @@
-let wait = (time){
-    
-    $.add( obj{
-        1: 1268,
-        63: time,
-        51: {
-            return
-        },
-    })
-    
-}
 
-let a = 10
+extract import "std.spwn"
+
+let a = (0)
 
 wait(1)
 
-a += 10
+a = 10
+
 

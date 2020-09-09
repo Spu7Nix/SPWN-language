@@ -4,14 +4,14 @@ extract import "std.spwn"
 
 extract obj_props
 
-main = mut(1i)
+main = counter(1i)
 
 
 //shows a number between 0 and 20
-random_num = mut(0)
+random_num = counter(0)
 
 //chose number
-difficulty = mut(0)
+difficulty = counter(0)
 
 
 set_to_random = {
@@ -126,7 +126,7 @@ set_to_random!
 call_with_delay(0.1, set_display)
 
 
-selected_number = mut(0)
+selected_number = counter(0)
 
 button_anchors = [63g, 64g, 65g, 66g, 67g, 69g]
 select_box = 68g

@@ -340,9 +340,9 @@ impl @item {
     },
 }
 
-type mut
+type counter
 
-mut = #[desc("Creates a new mut")] (
+counter = #[desc("Creates a new counter")] (
     #[desc("Source (can be a number, item ID or boolean)")] source: 0
 ){
     if source.type == @number {
@@ -351,12 +351,12 @@ mut = #[desc("Creates a new mut")] (
         id.add(source)
         
         return {
-            type: @mut,
+            type: @counter,
             item: id
         }
     } else if source.type == @item {
         return {
-            type: @mut,
+            type: @counter,
             item: source
         }
     } else if source.type == @bool {
@@ -366,12 +366,12 @@ mut = #[desc("Creates a new mut")] (
             id.add(1)
         }
         return {
-            type: @mut,
+            type: @counter,
             item: id
         }
     } else {
         
-        error "Can not make mut from this type"
+        error "Can not make counter from this type"
     }
     
 }
@@ -381,7 +381,7 @@ supress_signal = #[desc("Stops signal from coming past for some time")] (
 ){
     //if checker is 0, a signal can come through
     //if checker is 1, it will be supressed
-    checker = mut(0)
+    checker = counter(0)
     -> (){
         wait(delay * 2)
         checker.item.if_is(EQUAL_TO, 1, {
@@ -397,10 +397,10 @@ supress_signal = #[desc("Stops signal from coming past for some time")] (
 }
 
 
-impl @mut {
+impl @counter {
 
     add_to: 
-    #[desc("Adds the mut's value to all item IDs in a list, and resets the mut to 0 in the process")]
+    #[desc("Adds the counter's value to all item IDs in a list, and resets the counter to 0 in the process")]
     (
         self, 
         #[desc("Item IDs to add to")] items, 
@@ -436,7 +436,7 @@ impl @mut {
     },
 
     subtract_from:
-    #[desc("Subtracts the mut's value from all item IDs in a list, and resets the mut to 0 in the process")]
+    #[desc("Subtracts the counter's value from all item IDs in a list, and resets the counter to 0 in the process")]
     (
         self, 
         #[desc("Item IDs to add to")] items, 
@@ -471,19 +471,19 @@ impl @mut {
     },
 
     multiply:
-    #[desc("Multiplies the value of the mut by some factor")]
+    #[desc("Multiplies the value of the counter by some factor")]
     (
         self,
-        #[desc("Factor to multiply by, either another mut (very expensive) or a normal number")] factor,
+        #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor,
         #[desc("Speed of operation (higher number increases group usage)")] speed: 1
     ) {
         if factor.type == @number {
-            temp = mut(0)
+            temp = counter(0)
             self.add_to([temp.item], speed, factor)
             temp.add_to([self.item], speed)
-        } else if factor.type == @mut {
+        } else if factor.type == @counter {
             
-            temp = mut(0)
+            temp = counter(0)
             mini_mult = (num){
                 mult = {
                     
@@ -517,18 +517,18 @@ impl @mut {
     },
 
 
-    divide: #[desc("Devides the value of the mut by some divisor")]
+    divide: #[desc("Devides the value of the counter by some divisor")]
     (
         self, 
-        #[desc("Divisor to divide by, either another mut (very expensive) or a normal number")] divisor, 
+        #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: 1, 
         #[desc("Item ID to add the remainder of the division to")] rest_item: ?i
     ) {
 
         if divisor.type == @number {
-            result = mut(0)
+            result = counter(0)
 
-            rest = mut(rest_item)
+            rest = counter(rest_item)
 
             div = {
                 mini_div = (num) {
@@ -557,8 +557,8 @@ impl @mut {
                 })
             }
             div!
-        } else if divisor.type == @mut {
-            result = mut(0)
+        } else if divisor.type == @counter {
+            result = counter(0)
 
             // IDEA:
             // every time it goes under, undo the previous operation to simulate comparison
@@ -591,7 +591,7 @@ impl @mut {
                                 divisor.item.if_is(EQUAL_TO, 0, {
                                     wait(0.1)
                                     supress_signal(0.11)
-                                    mut(temp_storage).add_to([divisor.item], speed*2)
+                                    counter(temp_storage).add_to([divisor.item], speed*2)
                                     return
                                 })
                             }
@@ -635,7 +635,7 @@ impl @mut {
             self.add_to([rest_item], speed*2)
             result.add_to([self.item], speed*2)
             wait(0.2)
-            return mut(rest_item)
+            return counter(rest_item)
             
             
          
@@ -685,7 +685,7 @@ impl @mut {
         }
     },*/
 
-    reset: #[desc("Resets mut to 0")]
+    reset: #[desc("Resets counter to 0")]
     (
         self, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: 1
@@ -714,7 +714,7 @@ impl @mut {
         add!
     },
 
-    copy_to: #[desc("Copies the value of the mut to another item ID, without consuming the original")] 
+    copy_to: #[desc("Copies the value of the counter to another item ID, without consuming the original")] 
     (
         self, 
         #[desc("Item ID to copy to")]  item, 
@@ -746,41 +746,41 @@ impl @mut {
             self.item.if_is(EQUAL_TO, 0, {
                 wait(0.05)
                 supress_signal(0.06)
-                mut(temp_storage).add_to([self.item], speed)
+                counter(temp_storage).add_to([self.item], speed)
                 return
             })
         }
         add! 
     },
 
-    clone: #[desc("Copies the mut and returns the copy")] (
+    clone: #[desc("Copies the counter and returns the copy")] (
         self, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: 1
     ) {
-        new_mut = ?i
-        self.copy_to(new_mut, speed)
-        return mut(new_mut)
+        new_counter = ?i
+        self.copy_to(new_counter, speed)
+        return counter(new_counter)
     },
 
     _plus_: (self, other) {
         if other.type == @number {
-            new_mut = self.clone()
-            new_mut.item.add(other)
-        } else if other.type == @mut {
-            new_mut = self.clone()
-            other.clone().add_to([new_mut.item])
+            new_counter = self.clone()
+            new_counter.item.add(other)
+        } else if other.type == @counter {
+            new_counter = self.clone()
+            other.clone().add_to([new_counter.item])
         }
     },
 
     _minus_: (self, other) {
         if other.type == @number {
-            new_mut = self.clone()
-            new_mut.item.add(-other)
+            new_counter = self.clone()
+            new_counter.item.add(-other)
         }
     },
 
     _more_than_: (self, other) {
-        //TODO: add case for another mut
+        //TODO: add case for another counter
         if other.type == @number {
             self.item.if_is(LARGER_THAN, other, {
                 return true
@@ -793,7 +793,7 @@ impl @mut {
     },
 
     _less_than_: (self, other) {
-        //TODO: add case for another mut
+        //TODO: add case for another counter
         if other.type == @number {
             self.item.if_is(SMALLER_THAN, other, {
                 return true
@@ -806,7 +806,7 @@ impl @mut {
     },
 
     _more_or_equal_: (self, other) {
-        //TODO: add case for another mut
+        //TODO: add case for another counter
         if other.type == @number {
             self.item.if_is(LARGER_THAN, other - 1, {
                 return true
@@ -819,7 +819,7 @@ impl @mut {
     },
 
     _less_or_equal_: (self, other) {
-        //TODO: add case for another mut
+        //TODO: add case for another counter
         if other.type == @number {
             self.item.if_is(SMALLER_THAN, other + 1, {
                 return true
@@ -868,7 +868,7 @@ impl @mut {
 
     
 
-    to_const: #[desc("Converts the mut into a normal number (very context-splitting, be careful)")] (
+    to_const: #[desc("Converts the counter into a normal number (very context-splitting, be careful)")] (
         self, 
         #[desc("Array of possible output values")] range
     ) {
@@ -884,7 +884,7 @@ impl @mut {
         if _type == @bool {
             return self.to_const([0, 1]) == 1
         } else {
-            error "Cannot convert to this type (mut can convert to a number using the mut.to_const macro)"
+            error "Cannot convert to this type (counter can convert to a number using the counter.to_const macro)"
         }
     }
 }
@@ -952,12 +952,12 @@ general_functions = {
     (
         #[desc("Start value for the iterator")] start_val,
         #[desc("End value for the iterator")] end_val, 
-        #[desc("Macro of the code that gets looped, should take the iterator (a mut) as the first argument")] code, 
+        #[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument")] code, 
         #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: 0.05, 
         #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: true, 
         #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: 1
     ) {
-        i = mut(start_val)
+        i = counter(start_val)
 
         func = {
             code(i)
@@ -1097,7 +1097,7 @@ exports = {
     wait: wait,
     supress_signal: supress_signal,
 
-    mut: mut,
+    counter: counter,
     call_with_delay: call_with_delay,
     on: on, 
 }

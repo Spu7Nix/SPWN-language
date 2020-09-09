@@ -2,9 +2,9 @@
 
 extract import "std.spwn"
 
-main = mut(1i)
+main = counter(1i)
 
-secondary = mut(2i)
+secondary = counter(2i)
 second_display = 81g
 
 death = 92g
@@ -16,7 +16,7 @@ death.toggle_off()
 limit_text.toggle_off()
 no_text.toggle_off()
 
-remainder_display = mut(3i)
+remainder_display = counter(3i)
 show_remainder = {
 	91g.move(0, -30, 0.5, EASE_OUT)
 	wait(0.5)
@@ -28,7 +28,7 @@ second_display.alpha(0)
 loading_anim = 86g
 loading_anim.alpha(0)
 
-loading = mut(0) //0 = not loading, 1 = loading
+loading = counter(0) //0 = not loading, 1 = loading
 
 start_loading = {
 	-> loading_anim.alpha(1, 1)
@@ -108,13 +108,13 @@ set_display = {
 	}
 }
 
-last_pressed_operator = mut(0) //0 = +, 1 = -, 2 = *, 3 = /, 4 = =
+last_pressed_operator = counter(0) //0 = +, 1 = -, 2 = *, 3 = /, 4 = =
 
 wait(1)
 set_display!
 
 
-selected_button = mut(0)
+selected_button = counter(0)
 
 button_anchors = [75g, 63g, 64g, 65g, 66g, 67g, 69g, 72g, 73g, 74g, 76g, 90g, 77g, 78g, 79g, 80g]
 select_box = 68g
@@ -127,7 +127,7 @@ on(touch(true), {
 	})
 })
 
-current_operator = mut(0)
+current_operator = counter(0)
 
 check_valid = {
 	secondary.item.if_is(SMALLER_THAN, 0, {

@@ -3,8 +3,8 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
+use std::collections::HashMap;
 use std::path::PathBuf;
-//use std::collections::HashMap;
 
 use logos::Lexer;
 use logos::Logos;
@@ -239,7 +239,7 @@ pub struct ParseNotes {
     pub closed_colors: Vec<u16>,
     pub closed_blocks: Vec<u16>,
     pub closed_items: Vec<u16>,
-    //pub defined_vars: HashMap<String, usize>, //Name, num of uses
+    pub defined_vars: HashMap<String, usize>, //Name, last use
 }
 
 impl ParseNotes {
@@ -249,6 +249,7 @@ impl ParseNotes {
             closed_colors: Vec::new(),
             closed_blocks: Vec::new(),
             closed_items: Vec::new(),
+            defined_vars: HashMap::new(),
         }
     }
 }
@@ -353,6 +354,10 @@ impl<'a> Tokens<'a> {
         }
 
         (0, file_pos)
+    }
+
+    fn abs_position(&self) -> usize {
+        self.stack[self.stack.len() - self.index - 1].2.start
     }
 
     /*fn span(&self) -> core::ops::Range<usize> {
@@ -685,8 +690,12 @@ pub fn parse_statement(
                 }
             };
 
+            (*notes)
+                .defined_vars
+                .insert(symbol.clone(), tokens.abs_position());
+
             let value = parse_expr(tokens, notes)?;
-            //tokens.next(false);
+
             ast::StatementBody::Definition(ast::Definition {
                 symbol,
                 value,
@@ -695,22 +704,67 @@ pub fn parse_statement(
         }
 
         Some(_) => {
-            //expression or call
-            //constant statements are just assign, handled in compiler
+            //either expression, call or definition, FIGURE OUT
+            //parse it
 
-            tokens.previous();
-            let expr = parse_expr(tokens, notes)?;
-            if tokens.next(false) == Some(Token::Exclamation) {
-                //call
-                // println!("found call");
-                ast::StatementBody::Call(ast::Call {
-                    function: expr.values[0].clone(),
-                })
+            if tokens.next(false) == Some(Token::Assign) {
+                //Def?
+                match tokens.previous() {
+                    Some(Token::Symbol) => (),
+                    _ => {
+                        return Err(SyntaxError::ExpectedErr {
+                            expected: "symbol before '='".to_string(),
+                            found: tokens.slice(),
+                            pos: tokens.position(),
+                        })
+                    }
+                };
+
+                let symbol = tokens.slice();
+
+                if let Some(_) = notes.defined_vars.get(&symbol) {
+                    //expression or call
+                    tokens.previous();
+                    tokens.previous();
+                    let expr = parse_expr(tokens, notes)?;
+                    if tokens.next(false) == Some(Token::Exclamation) {
+                        //call
+                        // println!("found call");
+                        ast::StatementBody::Call(ast::Call {
+                            function: expr.values[0].clone(),
+                        })
+                    } else {
+                        //expression statement
+                        // println!("found expr");
+                        tokens.previous();
+                        ast::StatementBody::Expr(expr)
+                    }
+                } else {
+                    tokens.next(false);
+
+                    let value = parse_expr(tokens, notes)?;
+                    //tokens.next(false);
+                    ast::StatementBody::Definition(ast::Definition { symbol, value })
+                }
+
+            // println!("found def, current val: {:?}", tokens.current());
             } else {
-                //expression statement
-                // println!("found expr");
+                //expression or call
                 tokens.previous();
-                ast::StatementBody::Expr(expr)
+                tokens.previous();
+                let expr = parse_expr(tokens, notes)?;
+                if tokens.next(false) == Some(Token::Exclamation) {
+                    //call
+                    // println!("found call");
+                    ast::StatementBody::Call(ast::Call {
+                        function: expr.values[0].clone(),
+                    })
+                } else {
+                    //expression statement
+                    // println!("found expr");
+                    tokens.previous();
+                    ast::StatementBody::Expr(expr)
+                }
             }
         }
 

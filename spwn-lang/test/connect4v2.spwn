@@ -35,10 +35,10 @@ toggle_piece = (x, y, piece_type) {
 }
 
 selector_arrow = 85g
-selected_col = mut(3)
+selected_col = counter(3)
 
 
-allow_player_input = mut(true)
+allow_player_input = counter(true)
 
 on(touch(dual_side = true), {
 	allow_player_input.item.if_is(EQUAL_TO, 1, {
@@ -95,8 +95,8 @@ thread_readers = [
 	[26b.create_tracker_item(1b), 26b.create_tracker_item(2b)]],
 ]
 
-longest_player_thread = mut(0)
-longest_ai_thread = mut(0)
+longest_player_thread = counter(0)
+longest_ai_thread = counter(0)
 
 $.print(longest_player_thread.item, ",", longest_ai_thread.item)
 
@@ -246,11 +246,11 @@ move_reader_back = {
 }
 
 
-turn = mut(1)
+turn = counter(1)
 
 
 
-y_pos = mut(0)
+y_pos = counter(0)
 
 move_to_air = {
 
@@ -323,7 +323,7 @@ on(turn.item.count(-1), {
 	move_reader_back!
 	wait(0.05)
 
-	ai_selected = mut(0)
+	ai_selected = counter(0)
 
 	check_column = (move, next) {
 		reader.group.move(move * 20, 0)

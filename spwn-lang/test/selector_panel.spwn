@@ -2,7 +2,7 @@ extract import "std.spwn"
 
 selector = 1g
 buttons = [2g, 3g, 4g, 5g, 6g, 7g, 8g, 9g]
-button_index = mut(0)
+button_index = counter(0)
 
 on(touch(), {
     button_index.add(1)
