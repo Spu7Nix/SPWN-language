@@ -139,7 +139,7 @@ pub enum Path {
 pub struct Definition {
     pub symbol: String,
     pub value: Expression,
-    pub mutable: bool,
+    //pub mutable: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]

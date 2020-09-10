@@ -233,14 +233,107 @@ pub fn compile_scope(
 
         match &statement.body {
             Expr(expr) => {
-                let mut new_contexts: Vec<Context> = Vec::new();
-                for context in contexts {
-                    //we dont care about the return value in this case
-                    let (evaled, inner_returns) = expr.eval(context, globals, info.clone())?;
-                    returns.extend(inner_returns);
-                    new_contexts.extend(evaled.iter().map(|x| x.1.clone()));
+                //check for constant def
+
+                let is_assign =
+                    !expr.operators.is_empty() && expr.operators[0] == ast::Operator::Assign;
+                let mut symbol = String::new();
+                let is_symbol = !expr.values.is_empty()
+                    && expr.values[0].operator == None
+                    && expr.values[0].path.is_empty()
+                    && match &expr.values[0].value {
+                        ast::ValueLiteral::Symbol(s) => {
+                            symbol = s.clone();
+                            true
+                        }
+                        _ => false,
+                    };
+
+                let is_const_def = is_assign
+                    && is_symbol
+                    && !symbol.is_empty()
+                    && match contexts[0].variables.get(&symbol) {
+                        Some(_) => false,
+                        None => true,
+                    };
+                if is_const_def {
+                    let mut new_expr = expr.clone();
+                    new_expr.values.remove(0);
+                    new_expr.operators.remove(0);
+                    let def = ast::Definition {
+                        symbol: symbol.clone(),
+                        value: new_expr,
+                        //mutable: false,
+                    };
+
+                    // <COPIED CODE BECAUSE IM LAZY>
+
+                    let mut all_values: Returns = Vec::new();
+
+                    for context in contexts {
+                        if let ast::ValueLiteral::CmpStmt(f) = &def.value.values[0].value {
+                            if def.value.values.len() == 1 {
+                                //create the function context
+                                let mut new_context = context.clone();
+                                new_context.spawn_triggered = true;
+                                //pick a start group
+                                let start_group = Group {
+                                    id: next_free(
+                                        &mut globals.closed_groups,
+                                        ast::IDClass::Group,
+                                        info.clone(),
+                                    )?,
+                                };
+                                let stored = store_const_value(
+                                    Value::Func(Function { start_group }),
+                                    globals,
+                                    &context,
+                                );
+                                new_context.variables.insert(def.symbol.clone(), stored);
+                                all_values.push((stored, context));
+                                new_context.start_group = start_group;
+                                let new_info = info.next(&def.symbol, globals, true);
+                                let (_, inner_returns) = compile_scope(
+                                    &f.statements,
+                                    vec![new_context],
+                                    globals,
+                                    new_info,
+                                )?;
+                                returns.extend(inner_returns);
+                            } else {
+                                let (evaled, inner_returns) =
+                                    def.value.eval(context, globals, info.clone())?;
+                                returns.extend(inner_returns);
+                                all_values.extend(evaled);
+                            }
+                        } else {
+                            let (evaled, inner_returns) =
+                                def.value.eval(context, globals, info.clone())?;
+                            returns.extend(inner_returns);
+                            all_values.extend(evaled);
+                        }
+                        //copied because im lazy
+                    }
+                    contexts = Vec::new();
+                    for (val, mut context) in all_values {
+                        (*globals.stored_values.map.get_mut(&val).unwrap()).2 = false;
+
+                        context.variables.insert(String::from(&def.symbol), val);
+
+                        contexts.push(context);
+                    }
+
+                // </COPIED CODE BECAUSE IM LAZY>
+                } else {
+                    let mut new_contexts: Vec<Context> = Vec::new();
+                    for context in contexts {
+                        //we dont care about the return value in this case
+                        let (evaled, inner_returns) = expr.eval(context, globals, info.clone())?;
+                        returns.extend(inner_returns);
+                        new_contexts.extend(evaled.iter().map(|x| x.1.clone()));
+                    }
+                    contexts = new_contexts;
                 }
-                contexts = new_contexts;
             }
 
             Definition(def) => {
@@ -288,9 +381,9 @@ pub fn compile_scope(
                 }
                 contexts = Vec::new();
                 for (val, mut context) in all_values {
-                    if !def.mutable {
+                    /*if !def.mutable {
                         (*globals.stored_values.map.get_mut(&val).unwrap()).2 = false;
-                    }
+                    }*/
                     context.variables.insert(String::from(&def.symbol), val);
 
                     contexts.push(context);

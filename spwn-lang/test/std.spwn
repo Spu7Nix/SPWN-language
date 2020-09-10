@@ -710,6 +710,7 @@ impl @counter {
             })
             self.item.if_is(EQUAL_TO, 0, {
                 wait(0.05)
+                supress_signal(0.05)
                 return
             })
         }
@@ -852,18 +853,7 @@ impl @counter {
     },
 
     _not_equal_: (self, other) {
-        if other.type == @number {
-            self.item.if_is(EQUAL_TO, other, {
-                return false
-            })
-
-            ret_true = {
-                return true
-            }
-
-            self.item.if_is(LARGER_THAN, other, ret_true)
-            self.item.if_is(SMALLER_THAN, other, ret_true)
-        }
+        return !(self == other)
     },
 
     add: #[desc("Implementation of the pickup trigger")]
