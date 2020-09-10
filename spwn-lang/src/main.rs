@@ -54,9 +54,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
 
                     // println!("parsed: {:?}", statements);
-                    for statement in statements.iter() {
-                        println!("{:?}\n\n", statement);
-                    }
+                    // for statement in statements.iter() {
+                    //     println!("{:?}\n\n", statement);
+                    // }
 
                     let gd_path = if gd_enabled {
                         Some(if cfg!(target_os = "windows") {

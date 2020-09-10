@@ -468,11 +468,7 @@ pub fn parse_statement(
     notes: &mut ParseNotes,
 ) -> Result<ast::Statement, SyntaxError> {
     let first = tokens.next(false);
-    println!(
-        "First token in statement: {:?}: {:?}",
-        first,
-        tokens.slice()
-    );
+
     let mut arrow = false;
     let body = match first {
         Some(Token::Arrow) => {
@@ -699,7 +695,7 @@ pub fn parse_statement(
             ast::StatementBody::Definition(ast::Definition {
                 symbol,
                 value,
-                //mutable: true,
+                mutable: true,
             })
         }
 
@@ -746,7 +742,11 @@ pub fn parse_statement(
                     tokens.next(false);
                     let value = parse_expr(tokens, notes)?;
                     //tokens.next(false);
-                    ast::StatementBody::Definition(ast::Definition { symbol, value })
+                    ast::StatementBody::Definition(ast::Definition {
+                        symbol,
+                        value,
+                        mutable: false,
+                    })
                 }
 
             // println!("found def, current val: {:?}", tokens.current());
@@ -1136,12 +1136,6 @@ fn parse_variable(
 ) -> Result<ast::Variable, SyntaxError> {
     let properties = check_for_tag(tokens, notes)?;
     let mut first_token = tokens.next(false);
-
-    println!(
-        "First token in var: {:?}: {:?}",
-        first_token,
-        tokens.slice()
-    );
 
     let operator = match first_token {
         Some(Token::Minus) => {

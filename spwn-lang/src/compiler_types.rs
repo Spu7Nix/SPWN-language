@@ -1,3 +1,4 @@
+///types and functions used by the compiler
 use crate::ast;
 use crate::builtin::*;
 use crate::levelstring::*;
@@ -13,7 +14,7 @@ pub type Implementations = HashMap<TypeID, HashMap<String, StoredValue>>;
 pub type StoredValue = usize; //index to stored value in globals.stored_values
 
 pub struct ValStorage {
-    pub map: HashMap<usize, (Value, Group)>,
+    pub map: HashMap<usize, (Value, Group, bool)>, //val, fn context, mutable
 }
 
 impl std::ops::Index<usize> for ValStorage {
@@ -43,7 +44,17 @@ pub fn store_value(val: Value, globals: &mut Globals, context: &Context) -> Stor
     (*globals)
         .stored_values
         .map
-        .insert(index, (val, context.start_group));
+        .insert(index, (val, context.start_group, true));
+    (*globals).val_id += 1;
+    index
+}
+
+pub fn store_const_value(val: Value, globals: &mut Globals, context: &Context) -> StoredValue {
+    let index = globals.val_id;
+    (*globals)
+        .stored_values
+        .map
+        .insert(index, (val, context.start_group, false));
     (*globals).val_id += 1;
     index
 }
@@ -309,6 +320,32 @@ impl Globals {
             }),
         }
     }
+
+    pub fn assert_mutable(
+        &self,
+        p: StoredValue,
+        info: CompilerInfo,
+        attempted_op_macro: &str,
+    ) -> Result<(), RuntimeError> {
+        match self.stored_values.map.get(&p) {
+            Some(val) => {
+                if val.2 {
+                    Ok(())
+                } else {
+                    Err(RuntimeError::RuntimeError {
+                        message: format!(
+                            "
+This value is not mutable! 
+Consider defining it with 'let', or implementing a '{}' macro on its type.",
+                            attempted_op_macro
+                        ),
+                        info,
+                    })
+                }
+            }
+            None => unreachable!(),
+        }
+    }
 }
 
 impl Globals {
@@ -396,7 +433,7 @@ where
                     ),
                     context,
                     globals,
-                    globals.stored_values[value1].clone(),
+                    value1,
                     new_info,
                 )?;
                 values
@@ -761,7 +798,7 @@ impl ast::Expression {
                                 }
                             },
                             "_plus_",
-                            "add",
+                            "plus",
                             c2,
                             globals,
                             info.clone(),
@@ -789,7 +826,7 @@ impl ast::Expression {
                                 }
                             },
                             "_minus_",
-                            "subtract",
+                            "minus",
                             c2,
                             globals,
                             info.clone(),
@@ -820,7 +857,7 @@ impl ast::Expression {
                                 Ok(store_value(Value::Bool(acum_val != val), globals, c2))
                             },
                             "_not_equal_",
-                            "logical not_equal",
+                            "logical inequality",
                             c2,
                             globals,
                             info.clone(),
@@ -868,6 +905,7 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val, globals, c2| {
+                                globals.assert_mutable(acum_val, info.clone(), "_assign_")?;
                                 if acum_val_fn_context != c2.start_group {
                                     return Err(RuntimeError::RuntimeError {
                                         message: CANNOT_CHANGE_ERROR.to_string(),
@@ -890,6 +928,7 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val, globals, c2| {
+                                globals.assert_mutable(acum_val, info.clone(), "_add_")?;
                                 if acum_val_fn_context != c2.start_group {
                                     return Err(RuntimeError::RuntimeError {
                                         message: CANNOT_CHANGE_ERROR.to_string(),
@@ -926,6 +965,7 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val, globals, c2| {
+                                globals.assert_mutable(acum_val, info.clone(), "_subtract_")?;
                                 if acum_val_fn_context != c2.start_group {
                                     return Err(RuntimeError::RuntimeError {
                                         message: CANNOT_CHANGE_ERROR.to_string(),
@@ -963,6 +1003,7 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val, globals, c2| {
+                                globals.assert_mutable(acum_val, info.clone(), "_multiply_")?;
                                 if acum_val_fn_context != c2.start_group {
                                     return Err(RuntimeError::RuntimeError {
                                         message: CANNOT_CHANGE_ERROR.to_string(),
@@ -1000,6 +1041,7 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val, globals, c2| {
+                                globals.assert_mutable(acum_val, info.clone(), "_divide_")?;
                                 if acum_val_fn_context != c2.start_group {
                                     return Err(RuntimeError::RuntimeError {
                                         message: CANNOT_CHANGE_ERROR.to_string(),
@@ -1046,7 +1088,7 @@ pub fn execute_macro(
     (m, args): (Macro, Vec<ast::Argument>),
     context: Context,
     globals: &mut Globals,
-    parent: Value,
+    parent: StoredValue,
     info: CompilerInfo,
 ) -> Result<(Returns, Returns), RuntimeError> {
     let mut inner_inner_returns = Vec::new();
@@ -1098,10 +1140,7 @@ pub fn execute_macro(
             //insert defaults and check non-optional arguments
             let mut m_args_iter = m.args.iter();
             if m.args[0].0 == "self" {
-                new_variables.insert(
-                    "self".to_string(),
-                    store_value(parent.clone(), globals, &context),
-                );
+                new_variables.insert("self".to_string(), parent);
                 m_args_iter.next();
             }
             for arg in m_args_iter {
@@ -1708,7 +1747,7 @@ impl ast::Variable {
                                     (m.clone(), args.clone()),
                                     cont.clone(),
                                     globals,
-                                    globals.stored_values[*parent].clone(),
+                                    *parent,
                                     info.clone(),
                                 )?;
                                 inner_returns.extend(returns);

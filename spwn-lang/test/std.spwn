@@ -396,6 +396,8 @@ supress_signal = #[desc("Stops signal from coming past for some time")] (
 
 }
 
+DEFAULT_SPEED = 3
+
 
 impl @counter {
 
@@ -404,7 +406,7 @@ impl @counter {
     (
         self, 
         #[desc("Item IDs to add to")] items, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: 1, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED, 
         #[desc("Multiplyer for the value added")] factor: 1
     ) {
         add = {
@@ -440,7 +442,7 @@ impl @counter {
     (
         self, 
         #[desc("Item IDs to add to")] items, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: 1
+        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED
     ) {
         sub = {
             
@@ -475,7 +477,7 @@ impl @counter {
     (
         self,
         #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor,
-        #[desc("Speed of operation (higher number increases group usage)")] speed: 1
+        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED
     ) {
         if factor.type == @number {
             temp = counter(0)
@@ -521,7 +523,7 @@ impl @counter {
     (
         self, 
         #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: 1, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED, 
         #[desc("Item ID to add the remainder of the division to")] rest_item: ?i
     ) {
 
@@ -688,7 +690,7 @@ impl @counter {
     reset: #[desc("Resets counter to 0")]
     (
         self, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: 1
+        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED
     ){
         //almost the same
         add = {
@@ -718,7 +720,7 @@ impl @counter {
     (
         self, 
         #[desc("Item ID to copy to")]  item, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: 1, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED, 
         #[desc("Factor of to multiply the copy by")] factor: 1
     ) {
         temp_storage = ?i
@@ -755,7 +757,7 @@ impl @counter {
 
     clone: #[desc("Copies the counter and returns the copy")] (
         self, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: 1
+        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED
     ) {
         new_counter = ?i
         self.copy_to(new_counter, speed)
@@ -766,9 +768,11 @@ impl @counter {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.item.add(other)
+            return new_counter
         } else if other.type == @counter {
             new_counter = self.clone()
             other.clone().add_to([new_counter.item])
+            return new_counter
         }
     },
 
@@ -776,6 +780,7 @@ impl @counter {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.item.add(-other)
+            return new_counter
         }
     },
 
@@ -863,6 +868,27 @@ impl @counter {
 
     add: #[desc("Implementation of the pickup trigger")]
     (self, #[desc("Amount to add")] num) {
+        self.item.add(num)
+    },
+
+    _add_: (self, num) {
+        self.item.add(num)
+    },
+
+    _subtract_: (self, num) {
+        self.item.add(-num)
+    },
+
+    _multiply_: (self, num) {
+        self.multiply(num)
+    },
+
+    _divide_: (self, num) {
+        self.divide(num)
+    },
+
+    _assign_: (self, num) {
+        self.reset()
         self.item.add(num)
     },
 

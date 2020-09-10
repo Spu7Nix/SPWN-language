@@ -260,22 +260,13 @@ pub fn compile_scope(
                                     info.clone(),
                                 )?,
                             };
-                            new_context.variables.insert(
-                                def.symbol.clone(),
-                                store_value(
-                                    Value::Func(Function { start_group }),
-                                    globals,
-                                    &context,
-                                ),
+                            let stored = store_const_value(
+                                Value::Func(Function { start_group }),
+                                globals,
+                                &context,
                             );
-                            all_values.push((
-                                store_value(
-                                    Value::Func(Function { start_group }),
-                                    globals,
-                                    &context,
-                                ),
-                                context,
-                            ));
+                            new_context.variables.insert(def.symbol.clone(), stored);
+                            all_values.push((stored, context));
                             new_context.start_group = start_group;
                             let new_info = info.next(&def.symbol, globals, true);
                             let (_, inner_returns) =
@@ -297,6 +288,9 @@ pub fn compile_scope(
                 }
                 contexts = Vec::new();
                 for (val, mut context) in all_values {
+                    if !def.mutable {
+                        (*globals.stored_values.map.get_mut(&val).unwrap()).2 = false;
+                    }
                     context.variables.insert(String::from(&def.symbol), val);
 
                     contexts.push(context);

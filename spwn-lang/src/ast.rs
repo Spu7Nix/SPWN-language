@@ -139,7 +139,7 @@ pub enum Path {
 pub struct Definition {
     pub symbol: String,
     pub value: Expression,
-    //pub mutable: bool,
+    pub mutable: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -237,19 +237,9 @@ pub struct ID {
     pub class_name: IDClass,
 }
 
-#[derive(Debug)]
-pub struct File {
-    pub statements: Vec<Statement>,
-    eoi: EOI,
-}
-
 pub fn str_content(inp: String) -> String {
-    inp.clone()
-        .replace("\"", "")
-        .replace("'", "")
-        .replace("\r", "")
-        .replace("\n", "")
+    inp.clone().replace("\"", "")
+    /*.replace("'", "")
+    .replace("\r", "")
+    .replace("\n", "")*/
 }
-
-#[derive(Debug)]
-struct EOI;
