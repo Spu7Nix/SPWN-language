@@ -1,10 +1,6 @@
 
-extract import "std.spwn"
 
-let a = (0)
 
-wait(1)
 
-a = 10
 
 
