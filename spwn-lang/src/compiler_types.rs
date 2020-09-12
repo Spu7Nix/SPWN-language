@@ -122,7 +122,7 @@ impl Context {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
-    pub args: Vec<(String, Option<Value>, ast::Tag)>,
+    pub args: Vec<(String, Option<Value>, ast::Tag, Option<TypeID>)>,
     pub def_context: Context,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Tag,
@@ -231,8 +231,20 @@ impl Value {
                 if !m.args.is_empty() {
                     for arg in m.args.iter() {
                         out += &arg.0;
+                        match arg.3.clone() {
+                            Some(val) => {
+                                out += &format!(
+                                    ": @{}",
+                                    match find_key_for_value(&globals.type_ids, val) {
+                                        Some(s) => s,
+                                        None => "undefined",
+                                    }
+                                )
+                            }
+                            None => (),
+                        };
                         match arg.1.clone() {
-                            Some(val) => out += &format!(": {}", val.to_str(globals)),
+                            Some(val) => out += &format!(" = {}", val.to_str(globals)),
                             None => (),
                         };
                         out += ", ";
@@ -386,7 +398,7 @@ impl Globals {
         globals.type_ids.insert(String::from("object"), 11);
         globals.type_ids.insert(String::from("spwn"), 13);
         globals.type_ids.insert(String::from("builtin"), 13);
-        globals.type_ids.insert(String::from("type"), 14);
+        globals.type_ids.insert(String::from("type_indicator"), 14);
         globals.type_ids.insert(String::from("null"), 15);
 
         globals
@@ -1109,9 +1121,39 @@ pub fn execute_macro(
 
             //parse each argument given into a local macro variable
             for (i, arg) in args.iter().enumerate() {
+                let abs_index = if m.args[0].0 == "self" { i + 1 } else { i };
+
                 match &arg.symbol {
                     Some(name) => {
-                        if m.args.iter().any(|e| e.0 == *name) {
+                        let arg_def = m.args.iter().find(|e| e.0 == *name);
+                        if let Some(arg_def) = arg_def {
+                            //type check!!
+                            //maybe make type check function
+                            match arg_def.3 {
+                                Some(t) => {
+                                    let val = globals.stored_values[arg_values[i]].clone();
+                                    let type_of_val_index = val
+                                        .member(TYPE_MEMBER_NAME.to_string(), &context, globals)
+                                        .unwrap();
+
+                                    let type_of_val = match globals.stored_values[type_of_val_index]
+                                    {
+                                        Value::TypeIndicator(t) => t,
+                                        _ => unreachable!(),
+                                    };
+
+                                    if type_of_val != t {
+                                        return Err(RuntimeError::TypeError {
+                                            expected: Value::TypeIndicator(t).to_str(globals),
+                                            found: Value::TypeIndicator(type_of_val)
+                                                .to_str(globals),
+                                            info,
+                                        });
+                                    }
+                                }
+                                None => (),
+                            };
+
                             new_variables.insert(name.clone(), arg_values[i]);
                         } else {
                             return Err(RuntimeError::UndefinedErr {
@@ -1122,18 +1164,38 @@ pub fn execute_macro(
                         }
                     }
                     None => {
-                        if (if m.args[0].0 == "self" { i + 1 } else { i }) > m.args.len() - 1 {
+                        if (abs_index) > m.args.len() - 1 {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Too many arguments!".to_string(),
                                 info: info.clone(),
                             });
                         }
-                        new_variables.insert(
-                            m.args[if m.args[0].0 == "self" { i + 1 } else { i }]
-                                .0
-                                .clone(),
-                            arg_values[i],
-                        );
+
+                        //type check!!
+                        match m.args[abs_index].3 {
+                            Some(t) => {
+                                let val = globals.stored_values[arg_values[i]].clone();
+                                let type_of_val_index = val
+                                    .member(TYPE_MEMBER_NAME.to_string(), &context, globals)
+                                    .unwrap();
+
+                                let type_of_val = match globals.stored_values[type_of_val_index] {
+                                    Value::TypeIndicator(t) => t,
+                                    _ => unreachable!(),
+                                };
+
+                                if type_of_val != t {
+                                    return Err(RuntimeError::TypeError {
+                                        expected: Value::TypeIndicator(t).to_str(globals),
+                                        found: Value::TypeIndicator(type_of_val).to_str(globals),
+                                        info,
+                                    });
+                                }
+                            }
+                            None => (),
+                        };
+
+                        new_variables.insert(m.args[abs_index].0.clone(), arg_values[i]);
                     }
                 }
             }
@@ -1609,13 +1671,18 @@ impl ast::Variable {
                     if let Some(e) = &arg.1 {
                         all_expr.push(e.clone());
                     }
+
+                    if let Some(e) = &arg.3 {
+                        all_expr.push(e.clone());
+                    }
                 }
                 let new_info = info.next("macro argument", globals, false);
                 let (argument_possibilities, returns) =
                     all_combinations(all_expr, context.clone(), globals, new_info)?;
                 inner_returns.extend(returns);
                 for defaults in argument_possibilities {
-                    let mut args: Vec<(String, Option<Value>, ast::Tag)> = Vec::new();
+                    let mut args: Vec<(String, Option<Value>, ast::Tag, Option<TypeID>)> =
+                        Vec::new();
                     let mut expr_index = 0;
                     for arg in m.args.iter() {
                         args.push((
@@ -1628,6 +1695,19 @@ impl ast::Variable {
                                 None => None,
                             },
                             arg.2.clone(),
+                            match &arg.3 {
+                                Some(_) => {
+                                    expr_index += 1;
+                                    Some(match &globals.stored_values[defaults.0[expr_index - 1]] {
+                                        Value::TypeIndicator(t) => *t,
+                                        a => return Err(RuntimeError::RuntimeError {
+                                            message: format!("Expected TypeIndicator on argument definition, found: {}", a.to_str(globals)),
+                                            info,
+                                        })
+                                    })
+                                }
+                                None => None,
+                            },
                         ));
                     }
 

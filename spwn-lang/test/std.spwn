@@ -6,7 +6,7 @@ extract constants.comparisons
 extract constants.easing_types
 
 wait = #[desc("Adds a delay before the next triggers")] (
-    #[desc("Delay time in seconds")] time
+    #[desc("Delay time in seconds")] time: @number
 ){
     
     $.add( obj{
@@ -20,8 +20,8 @@ wait = #[desc("Adds a delay before the next triggers")] (
 }
 
 call_with_delay = #[desc("Call a function after a delay")] (
-    #[desc("Delay time in seconds")] time, 
-    #[desc("Function to call after the delay")] function
+    #[desc("Delay time in seconds")] time: @number, 
+    #[desc("Function to call after the delay")] function: @function
 ) {
     $.add(obj{
         OBJ_ID: 1268,
@@ -34,11 +34,11 @@ impl @group {
     move: #[desc("Implementation of the move trigger")] 
     (
         self, 
-        #[desc("Units to move on the X axis")] x, 
-        #[desc("Units to move on the Y axis")] y, 
-        #[desc("Duration of movement")] duration: 0, 
-        easing: NONE, 
-        easing_rate: 2
+        #[desc("Units to move on the X axis")] x: @number, 
+        #[desc("Units to move on the Y axis")] y: @number, 
+        #[desc("Duration of movement")] duration: @number = 0, 
+        easing: @number = NONE, 
+        easing_rate: @number = 2
     ) {
         $.add( obj{
             OBJ_ID: 901,
@@ -62,7 +62,7 @@ impl @group {
     },
 
     alpha: #[desc("Implementation of the alpha trigger")] 
-    (self, opacity: 1, duration: 0){
+    (self, opacity: @number = 1, duration: @number = 0){
         $.add( obj {
             OBJ_ID: 1007,
             TARGET: self,
@@ -94,12 +94,12 @@ impl @group {
     rotate: #[desc("Implementation of the rotate trigger")] 
     (
         self, 
-        #[desc("Group of object to rotate around")] center, 
-        #[desc("Rotation in degrees")] degrees, 
-        #[desc("Duration of rotation")] duration: 0, 
-        #[desc("Easing type")] easing: 0, 
-        #[desc("Easing rate")] easing_rate: 0, 
-        #[desc("Only rotate positions of the objects, not the textures")] lock_object_rotation: false
+        #[desc("Group of object to rotate around")] center: @group, 
+        #[desc("Rotation in degrees")] degrees: @number, 
+        #[desc("Duration of rotation")] duration: @number = 0, 
+        #[desc("Easing type")] easing: @number = 0, 
+        #[desc("Easing rate")] easing_rate: @number = 2, 
+        #[desc("Only rotate positions of the objects, not the textures")] lock_object_rotation: @bool = false
     ){
         $.add( obj{
             OBJ_ID: 1346,
@@ -115,13 +115,13 @@ impl @group {
     },
 
     follow: 
-    #[desc("Implementation of the follow trigger")] 
+    #[desc("Implementation of the follow trigger")]
     (
         self, 
-        #[desc("Group of object to follow")] other, 
-        #[desc("Multiplier for the movement on the X-axis")] x_mod: 1, 
-        #[desc("Multiplier for the movement on the Y-axis")] y_mod: 1, 
-        #[desc("Duration of following")] duration: 999
+        #[desc("Group of object to follow")] other: @group, 
+        #[desc("Multiplier for the movement on the X-axis")] x_mod: @number = 1, 
+        #[desc("Multiplier for the movement on the Y-axis")] y_mod: @number = 1, 
+        #[desc("Duration of following")] duration: @number = 999
     ){
         $.add( obj{
             OBJ_ID: 1347,
@@ -138,11 +138,11 @@ impl @group {
     #[desc("Implementation of the follow player Y trigger")] 
     (
         self, 
-        #[desc("Interpolation factor (?)")] speed: 1, 
-        #[desc("Delay of movement")]  delay: 0, 
-        #[desc("Offset on the Y-axis")] offset: 0, 
-        #[desc("Maximum speed")] max_speed: 0, 
-        #[desc("Duration of following")] duration: 999
+        #[desc("Interpolation factor (?)")] speed: @number = 1, 
+        #[desc("Delay of movement")]  delay: @number = 0, 
+        #[desc("Offset on the Y-axis")] offset: @number = 0, 
+        #[desc("Maximum speed")] max_speed: @number = 0, 
+        #[desc("Duration of following")] duration: @number = 999
     ){
         $.add( obj{
             OBJ_ID: 1814,
@@ -159,12 +159,12 @@ impl @group {
     #[desc("Implementation of the 'Move target' feature of the move trigger")]
     (
         self, 
-        #[desc("Group of the object to move to")] target, 
-        #[desc("Duration of movement")] duration: 0,
-        #[desc("Will move to the object only on the X-axis")] x_only: false, 
-        #[desc("Will move to the object only on the y-axis")] y_only: false, 
-        #[desc("Easing type")] easing: NONE, 
-        #[desc("Easing rate")] easing_rate: 2
+        #[desc("Group of the object to move to")] target: @group, 
+        #[desc("Duration of movement")] duration: @number = 0,
+        #[desc("Will move to the object only on the X-axis")] x_only: @bool = false, 
+        #[desc("Will move to the object only on the y-axis")] y_only: @bool = false, 
+        #[desc("Easing type")] easing: @number = NONE, 
+        #[desc("Easing rate")] easing_rate: @number = 2
     ) {
         $.add( obj{
             OBJ_ID: 901,
@@ -195,14 +195,14 @@ impl @group {
     #[desc("Implementation of the pulse trigger for groups")]
     (
         self, 
-        #[desc("Red value of pulse color (or hue if HSV is enabled)")] r, 
-        #[desc("Green value of pulse color (or saturation if HSV is enabled)")] g, 
-        #[desc("Blue value of pulse color (or brightness/value if HSV is enabled)")] b, 
-        #[desc("Fade-in duration")] fade_in: 0, 
-        #[desc("Duration to hold the color")] hold: 0, 
-        #[desc("Fade-out duration")] fade_out: 0, 
-        #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: false,
-        #[desc("Toggle HSV mode")] hsv: false
+        #[desc("Red value of pulse color (or hue if HSV is enabled)")] r: @number, 
+        #[desc("Green value of pulse color (or saturation if HSV is enabled)")] g: @number, 
+        #[desc("Blue value of pulse color (or brightness/value if HSV is enabled)")] b: @number, 
+        #[desc("Fade-in duration")] fade_in: @number = 0, 
+        #[desc("Duration to hold the color")] hold: @number = 0, 
+        #[desc("Fade-out duration")] fade_out: @number = 0, 
+        #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: @bool = false,
+        #[desc("Toggle HSV mode")] hsv: @bool = false
     ) {
         $.add( obj{
             OBJ_ID: 1006,
@@ -230,12 +230,12 @@ impl @color {
     #[desc("Implementation of the color trigger")]
     (
         self, 
-        #[desc("Red value of the target color")] r, 
-        #[desc("Green value of the target color")] g, 
-        #[desc("Blue value of the target color")] b, 
-        #[desc("Duration of color change")] duration: 0, 
-        #[desc("Opacity of target color")] opacity: 1, 
-        #[desc("Toggle blending on target color")] blending: false
+        #[desc("Red value of the target color")] r: @number, 
+        #[desc("Green value of the target color")] g: @number, 
+        #[desc("Blue value of the target color")] b: @number, 
+        #[desc("Duration of color change")] duration: @number = 0, 
+        #[desc("Opacity of target color")] opacity: @number = 1, 
+        #[desc("Toggle blending on target color")] blending: @bool = false
     ){
         $.add( obj{
             OBJ_ID: 899,
@@ -253,14 +253,14 @@ impl @color {
     pulse: #[desc("Implementation of the pulse trigger for colors")]
     (
         self, 
-        #[desc("Red value of pulse color (or hue if HSV is enabled)")] r, 
-        #[desc("Green value of pulse color (or saturation if HSV is enabled)")] g, 
-        #[desc("Blue value of pulse color (or brightness/value if HSV is enabled)")] b, 
-        #[desc("Fade-in duration")] fade_in: 0, 
-        #[desc("Duration to hold the color")] hold: 0, 
-        #[desc("Fade-out duration")] fade_out: 0, 
-        #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: false,
-        #[desc("Toggle HSV mode")] hsv: false
+        #[desc("Red value of pulse color (or hue if HSV is enabled)")] r: @number, 
+        #[desc("Green value of pulse color (or saturation if HSV is enabled)")] g: @number, 
+        #[desc("Blue value of pulse color (or brightness/value if HSV is enabled)")] b: @number, 
+        #[desc("Fade-in duration")] fade_in: @number = 0, 
+        #[desc("Duration to hold the color")] hold: @number = 0, 
+        #[desc("Fade-out duration")] fade_out: @number = 0, 
+        #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: @bool = false,
+        #[desc("Toggle HSV mode")] hsv: @bool = false
     ) {
         $.add( obj{
             OBJ_ID: 1006,
@@ -294,7 +294,7 @@ impl @item {
     
     add:
     #[desc("Implementation of the pickup trigger")]
-    (self, #[desc("Amount to add")] amount) {
+    (self, #[desc("Amount to add")] amount: @number) {
         $.add( obj{
             OBJ_ID: 1817,
             COUNT: amount,
@@ -306,9 +306,9 @@ impl @item {
     #[desc("Implementation of the instant count trigger")]
     (
         self, 
-        #[desc("Comparison mode")] comparison, 
-        #[desc("Number to compare with")] other, 
-        #[desc("Target function if comparison is 'true'")] function
+        #[desc("Comparison mode")] comparison: @number, 
+        #[desc("Number to compare with")] other: @number, 
+        #[desc("Target function if comparison is 'true'")] function: @function
     ) {
         $.add( obj{
             OBJ_ID: 1811,
@@ -324,7 +324,7 @@ impl @item {
     #[desc("Implementation of the count trigger (returns an event)")]
     (
         self, 
-        #[desc("Number to check against")] number: 0
+        #[desc("Number to check against")] number: @number = 0
     ) {
         return (function) {
             $.add( obj{
@@ -343,7 +343,7 @@ impl @item {
 type counter
 
 counter = #[desc("Creates a new counter")] (
-    #[desc("Source (can be a number, item ID or boolean)")] source: 0
+    #[desc("Source (can be a number, item ID or boolean)")] source = 0
 ){
     if source.type == @number {
         id = ?i
@@ -377,7 +377,7 @@ counter = #[desc("Creates a new counter")] (
 }
     
 supress_signal = #[desc("Stops signal from coming past for some time")] (
-    #[desc("Time to supress signal")] delay
+    #[desc("Time to supress signal")] delay: @number
 ){
     //if checker is 0, a signal can come through
     //if checker is 1, it will be supressed
@@ -405,9 +405,9 @@ impl @counter {
     #[desc("Adds the counter's value to all item IDs in a list, and resets the counter to 0 in the process")]
     (
         self, 
-        #[desc("Item IDs to add to")] items, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED, 
-        #[desc("Multiplyer for the value added")] factor: 1
+        #[desc("Item IDs to add to")] items: @array, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
+        #[desc("Multiplyer for the value added")] factor: @number = 1
     ) {
         add = {
             
@@ -441,8 +441,8 @@ impl @counter {
     #[desc("Subtracts the counter's value from all item IDs in a list, and resets the counter to 0 in the process")]
     (
         self, 
-        #[desc("Item IDs to add to")] items, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED
+        #[desc("Item IDs to add to")] items: @array, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
         sub = {
             
@@ -477,7 +477,7 @@ impl @counter {
     (
         self,
         #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor,
-        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
         if factor.type == @number {
             temp = counter(0)
@@ -523,8 +523,8 @@ impl @counter {
     (
         self, 
         #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED, 
-        #[desc("Item ID to add the remainder of the division to")] rest_item: ?i
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
+        #[desc("Item ID to add the remainder of the division to")] rest_item: @item = ?i
     ) {
 
         if divisor.type == @number {
@@ -647,7 +647,7 @@ impl @counter {
     },
 
     //will consume both numbers
-    /*compare: (self, other, speed: 1) {
+    /*compare: (self, other, speed = 1) {
 
         comp = {
             mini_comp = (num){
@@ -690,7 +690,7 @@ impl @counter {
     reset: #[desc("Resets counter to 0")]
     (
         self, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ){
         //almost the same
         add = {
@@ -720,9 +720,9 @@ impl @counter {
     copy_to: #[desc("Copies the value of the counter to another item ID, without consuming the original")] 
     (
         self, 
-        #[desc("Item ID to copy to")]  item, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED, 
-        #[desc("Factor of to multiply the copy by")] factor: 1
+        #[desc("Item ID to copy to")]  item: @item, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
+        #[desc("Factor of to multiply the copy by")] factor: @number = 1
     ) {
         temp_storage = ?i
         
@@ -758,7 +758,7 @@ impl @counter {
 
     clone: #[desc("Copies the counter and returns the copy")] (
         self, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: DEFAULT_SPEED
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
         new_counter = ?i
         self.copy_to(new_counter, speed)
@@ -857,7 +857,7 @@ impl @counter {
     },
 
     add: #[desc("Implementation of the pickup trigger")]
-    (self, #[desc("Amount to add")] num) {
+    (self, #[desc("Amount to add")] num: @number) {
         self.item.add(num)
     },
 
@@ -886,7 +886,7 @@ impl @counter {
 
     to_const: #[desc("Converts the counter into a normal number (very context-splitting, be careful)")] (
         self, 
-        #[desc("Array of possible output values")] range
+        #[desc("Array of possible output values")] range: @array
     ) {
         for val in range {
             -> self.item.if_is(EQUAL_TO, val, {
@@ -896,7 +896,7 @@ impl @counter {
     },
     
 
-    _as_: (self, _type) {
+    _as_: (self, _type: @type_indicator) {
         if _type == @bool {
             return self.to_const([0, 1]) == 1
         } else {
@@ -913,9 +913,9 @@ general_functions = {
     
     shake: #[desc("Implementation of the shake trigger")]
     (
-        #[desc("Strength value")] strength: 1,
-        #[desc("Interval value")] interval: 0,
-        #[desc("Duration of shake")] duration: 0.5
+        #[desc("Strength value")] strength: @number = 1,
+        #[desc("Interval value")] interval: @number = 0,
+        #[desc("Duration of shake")] duration: @number = 0.5
     ){
         $.add( obj {
             OBJ_ID: 1520,
@@ -951,7 +951,7 @@ general_functions = {
     },
 
     toggle_bg_effect: #[desc("Implementation of the bg effect on/off triggers")] (
-        #[desc("Weather to toggle bg effect on or off")] on: false
+        #[desc("Weather to toggle bg effect on or off")] on: @bool = false
     ) {
         if on {
             $.add( obj{
@@ -966,12 +966,12 @@ general_functions = {
 
     loop: #[desc("Implementation of a spawn loop")] 
     (
-        #[desc("Start value for the iterator")] start_val,
-        #[desc("End value for the iterator")] end_val, 
-        #[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument")] code, 
-        #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: 0.05, 
-        #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: true, 
-        #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: 1
+        #[desc("Start value for the iterator")] start_val: @number,
+        #[desc("End value for the iterator")] end_val: @number, 
+        #[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument")] code: @macro, 
+        #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number = 0.05, 
+        #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true, 
+        #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1
     ) {
         i = counter(start_val)
 
@@ -1000,8 +1000,8 @@ general_functions = {
 // which is the function that gets triggered on the event
 
 on = #[desc("Triggers a function every time an event fires")] (
-    #[desc("Event to trigger on")] event, 
-    #[desc("Function to trigger")] function
+    #[desc("Event to trigger on")] event: @macro, 
+    #[desc("Function to trigger")] function: @function
 ){
     event(function)
 }
@@ -1009,7 +1009,7 @@ on = #[desc("Triggers a function every time an event fires")] (
 events = {
     
     touch: #[desc("Implementation of the touch trigger (returns an event)")] (
-        #[desc("Dual mode (only check for touch on the dual side)")] dual_side: false
+        #[desc("Dual mode (only check for touch on the dual side)")] dual_side = false
     ) {
         return (function){
             $.add( obj{
@@ -1024,7 +1024,7 @@ events = {
     },
 
     touch_end: #[desc("Returns an event for when a touch ends")] (
-        #[desc("Dual mode (only check for touch on the dual side)")] dual_side: false
+        #[desc("Dual mode (only check for touch on the dual side)")] dual_side = false
     ) {
         return (function){
             $.add( obj{

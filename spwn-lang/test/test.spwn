@@ -1,23 +1,4 @@
 extract import "std.spwn"
+extract $
 
-a = counter(10)
-
-$.print(a)
-
-a += 5
-
-wait(1)
-
-a -= 1
-
-wait(1)
-
-a *= 6
-
-wait(1)
-
-a /= 4
-
-wait(1)
-
-a = 6728
+print(?i.if_is)

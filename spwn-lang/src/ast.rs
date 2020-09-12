@@ -165,7 +165,8 @@ pub struct Native {
     pub function: Variable,
     pub args: Vec<Argument>,
 }*/
-pub type ArgDef = (String, Option<Expression>, Tag);
+//                 name         def value     props       type ind.
+pub type ArgDef = (String, Option<Expression>, Tag, Option<Expression>);
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
     pub args: Vec<ArgDef>,

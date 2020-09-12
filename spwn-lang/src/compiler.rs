@@ -28,6 +28,12 @@ pub enum RuntimeError {
         info: CompilerInfo,
     },
 
+    TypeError {
+        expected: String,
+        found: String,
+        info: CompilerInfo,
+    },
+
     RuntimeError {
         message: String,
         info: CompilerInfo,
@@ -70,6 +76,17 @@ impl std::fmt::Display for RuntimeError {
                 info.line.0,
                 info.line.1
             ),
+
+            RuntimeError::TypeError {
+                expected,
+                found,
+                info,
+            } => write!(
+                f,
+                "Type mismatch: expected {}, found {} (line {}, pos {})",
+                expected, found, info.line.0, info.line.1
+            ),
+
             RuntimeError::RuntimeError { message, info } => {
                 write!(f, "{} (line {}, pos {})", message, info.line.0, info.line.1)
             }

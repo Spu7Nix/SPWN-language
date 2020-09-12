@@ -61,21 +61,16 @@ impl Value {
             None => None,
         };
         if member == TYPE_MEMBER_NAME {
-            Some(store_value(
-                Value::TypeIndicator(match self {
-                    Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
-                        Some(value) => match (*globals).stored_values[*value as usize].clone() {
-                            Value::TypeIndicator(s) => s,
-                            _ => unreachable!(),
-                        },
-                        None => self.to_num(globals),
-                    },
+            Some(match self {
+                Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
+                    Some(value) => *value,
+                    None => {
+                        store_value(Value::TypeIndicator(self.to_num(globals)), globals, context)
+                    }
+                },
 
-                    _ => self.to_num(globals),
-                }),
-                globals,
-                context,
-            ))
+                _ => store_value(Value::TypeIndicator(self.to_num(globals)), globals, context),
+            })
         } else {
             match self {
                 Value::Func(f) => {
