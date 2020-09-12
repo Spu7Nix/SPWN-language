@@ -617,10 +617,13 @@ pub fn compile_scope(
                     match globals.stored_values[val].clone() {
                         Value::Array(arr) => {
                             //let iterator_val = store_value(Value::Null, globals);
+                            let scope_vars = context.variables.clone();
+
                             let mut new_contexts = vec![context];
 
                             for element in arr {
                                 for mut c in new_contexts.clone() {
+                                    c.variables = scope_vars.clone();
                                     c.variables.insert(f.symbol.clone(), element);
                                     let new_info = info.next("for loop", globals, false);
                                     let (end_contexts, inner_returns) =
