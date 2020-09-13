@@ -733,6 +733,90 @@ pub fn parse_statement(
     })
 }
 
+fn operator_precedence(op: &ast::Operator) -> u8 {
+    use ast::Operator::*;
+    match op {
+        Power => 8,
+
+        Modulo => 7,
+        Star => 7,
+        Slash => 7,
+
+        Plus => 6,
+        Minus => 6,
+
+        Range => 5,
+
+        MoreOrEqual => 4,
+        LessOrEqual => 4,
+        More => 3,
+        Less => 3,
+
+        Equal => 2,
+        NotEqual => 2,
+
+        Or => 1,
+        And => 1,
+
+        Assign => 0,
+        Add => 0,
+        Subtract => 0,
+        Multiply => 0,
+        Divide => 0,
+    }
+}
+
+fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
+    if expr.operators.len() <= 1 {
+        return expr;
+    } else {
+        let mut lowest = 10;
+
+        for op in &expr.operators {
+            let p = operator_precedence(op);
+            if p < lowest {
+                lowest = p
+            };
+        }
+
+        let mut new_expr = ast::Expression {
+            operators: Vec::new(),
+            values: Vec::new(),
+        };
+
+        loop {
+            let mut didnt_break = true;
+            for (i, op) in expr.operators.iter().enumerate() {
+                if operator_precedence(op) == lowest {
+                    new_expr.operators.push(*op);
+                    new_expr.values.push(
+                        fix_precedence(ast::Expression {
+                            operators: expr.operators[..i].to_vec(),
+                            values: expr.values[..(i + 1)].to_vec(),
+                        })
+                        .to_variable(),
+                    );
+
+                    expr = ast::Expression {
+                        operators: expr.operators[(i + 1)..].to_vec(),
+                        values: expr.values[(i + 1)..].to_vec(),
+                    };
+                    didnt_break = false;
+                    break;
+                }
+            }
+            println!("{:?}", expr);
+            if didnt_break || expr.operators.is_empty() {
+                break;
+            }
+        }
+
+        new_expr.values.push(expr.to_variable());
+
+        return new_expr;
+    }
+}
+
 fn parse_expr(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
@@ -769,7 +853,7 @@ fn parse_expr(
     }
     tokens.previous();
 
-    Ok(ast::Expression { values, operators })
+    Ok(fix_precedence(ast::Expression { values, operators }))
 }
 
 fn parse_operator(token: &Token) -> Option<ast::Operator> {

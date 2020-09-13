@@ -1,4 +1,2 @@
-extract import "std.spwn"
-extract $
 
-print(?i.if_is)
+$.print(2 + 2 * 5..5 * 6)

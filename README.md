@@ -19,7 +19,7 @@ coming soon ish
 - [ ] finish documentation
 - [ ] stop interpreting on return
 - [ ] break statement, continue statement
-- [ ] operation order
+- [x] operation order
 
 # Todo at some point
 

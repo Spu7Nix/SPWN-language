@@ -52,7 +52,7 @@ pub enum ValueLiteral {
     Null,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Operator {
     Or,
     And,
@@ -211,6 +211,15 @@ pub struct Variable {
 pub struct Expression {
     pub values: Vec<Variable>,
     pub operators: Vec<Operator>,
+}
+impl Expression {
+    pub fn to_variable(&self) -> Variable {
+        Variable {
+            operator: None,
+            value: ValueLiteral::Expression(self.clone()),
+            path: Vec::new(),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
