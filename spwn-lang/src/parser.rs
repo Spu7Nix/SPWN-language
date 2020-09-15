@@ -789,13 +789,15 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
             for (i, op) in expr.operators.iter().enumerate() {
                 if operator_precedence(op) == lowest {
                     new_expr.operators.push(*op);
-                    new_expr.values.push(
+                    new_expr.values.push(if i == 0 {
+                        expr.values[0].clone()
+                    } else {
                         fix_precedence(ast::Expression {
                             operators: expr.operators[..i].to_vec(),
                             values: expr.values[..(i + 1)].to_vec(),
                         })
-                        .to_variable(),
-                    );
+                        .to_variable()
+                    });
 
                     expr = ast::Expression {
                         operators: expr.operators[(i + 1)..].to_vec(),
@@ -805,7 +807,7 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
                     break;
                 }
             }
-            println!("{:?}", expr);
+            //println!("{:?}", expr);
             if didnt_break || expr.operators.is_empty() {
                 break;
             }

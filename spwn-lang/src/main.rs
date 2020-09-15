@@ -53,10 +53,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p) => p,
                     };
 
-                    // println!("parsed: {:?}", statements);
-                    // for statement in statements.iter() {
-                    //     println!("{:?}\n\n", statement);
-                    // }
+                    //println!("parsed: {:?}", statements);
+                    for statement in statements.iter() {
+                        println!("{}\n", statement);
+                    }
 
                     let gd_path = if gd_enabled {
                         Some(if cfg!(target_os = "windows") {
@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("values: {:?}", compiled.stored_values.map.iter().count());
 
                     //println!("func ids: {:?}", compiled.func_ids);
-                    let objects = levelstring::apply_fn_ids(compiled.func_ids);
+                    let mut objects = levelstring::apply_fn_ids(compiled.func_ids);
 
                     println!("{} objects added", objects.len());
 
