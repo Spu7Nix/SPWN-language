@@ -1,7 +1,7 @@
 
 
-if a == b {
-	hello()
-} else if b == a {
-	bye()
+impl something {
+    a: 10,
+    b: 1293,
+    c: "hello"
 }

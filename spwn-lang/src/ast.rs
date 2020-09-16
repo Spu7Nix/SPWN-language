@@ -2,8 +2,6 @@
 
 use std::path::PathBuf;
 
-use std::fmt;
-
 use crate::compiler_types::Value;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -12,30 +10,11 @@ pub enum DictDef {
     Extract(Expression),
 }
 
-impl fmt::Display for DictDef {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DictDef::Def((name, expr)) => write!(f, "{}: {}", name, expr),
-            DictDef::Extract(expr) => write!(f, "..{}", expr),
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub struct Statement {
     pub body: StatementBody,
     pub arrow: bool, //context changing
     pub line: (usize, usize),
-}
-
-impl fmt::Display for Statement {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.arrow {
-            write!(f, "->{};\n", self.body)
-        } else {
-            write!(f, "{};\n", self.body)
-        }
-    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -55,26 +34,6 @@ pub enum StatementBody {
     //EOI,
 }
 
-impl fmt::Display for StatementBody {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            StatementBody::Definition(def) => write!(f, "{}", def),
-            StatementBody::Call(call) => write!(f, "{}", call),
-            StatementBody::Expr(x) => write!(f, "{}", x),
-            StatementBody::TypeDef(x) => write!(f, "type {}", x),
-            StatementBody::Return(x) => match x {
-                Some(expr) => write!(f, "return {}", expr),
-                None => write!(f, "return"),
-            },
-            StatementBody::Impl(x) => write!(f, "{}", x),
-            StatementBody::If(x) => write!(f, "{}", x),
-            StatementBody::For(x) => write!(f, "{}", x),
-            StatementBody::Error(x) => write!(f, "{}", x),
-            StatementBody::Extract(x) => write!(f, "extract {}", x),
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum ValueLiteral {
     ID(ID),
@@ -92,76 +51,6 @@ pub enum ValueLiteral {
     Resolved(Value),
     TypeIndicator(String),
     Null,
-}
-
-impl fmt::Display for ValueLiteral {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use ValueLiteral::*;
-        match self {
-            ID(x) => write!(f, "{}", x),
-            Number(x) => write!(f, "{}", x),
-            CmpStmt(x) => write!(f, "{}", x),
-            Dictionary(x) => {
-                if x.is_empty() {
-                    return write!(f, "{{}}");
-                }
-                let mut out = String::from("{\n");
-
-                let mut d_iter = x.iter();
-                for def in &mut d_iter {
-                    out += &format!("{},\n", def);
-                }
-                out.pop();
-                out.pop();
-
-                out += "\n}"; //why do i have to do this twice? idk
-
-                write!(f, "{}", out)
-            }
-            Array(x) => {
-                if x.is_empty() {
-                    return write!(f, "[]");
-                }
-                let mut out = String::from("[");
-
-                let mut d_iter = x.iter();
-                for def in &mut d_iter {
-                    out += &format!("{},", def);
-                }
-                out.pop();
-
-                out += "]";
-
-                write!(f, "{}", out)
-            }
-            Symbol(x) => write!(f, "{}", x),
-            Bool(x) => write!(f, "{}", x),
-            Expression(x) => write!(f, "({})", x),
-            Str(x) => write!(f, "\"{}\"", x),
-            Import(x) => write!(f, "import {:?}", x),
-            Obj(x) => {
-                if x.is_empty() {
-                    return write!(f, "{{}}");
-                }
-                let mut out = String::from("{\n");
-
-                let mut d_iter = x.iter();
-                for (def1, def2) in &mut d_iter {
-                    out += &format!("{}:{},\n", def1, def2);
-                }
-                out.pop();
-                out.pop();
-
-                out += "\n}"; //why do i have to do this twice? idk
-
-                write!(f, "{}", out)
-            }
-            Macro(x) => write!(f, "{:?}", x),
-            Resolved(_) => write!(f, "<val>"),
-            TypeIndicator(x) => write!(f, "@{}", x),
-            Null => write!(f, "null"),
-        }
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -189,56 +78,11 @@ pub enum Operator {
     Divide,
 }
 
-impl fmt::Display for Operator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Operator::Or => "||",
-                Operator::And => "&&",
-                Operator::Equal => "==",
-                Operator::NotEqual => "!=",
-                Operator::Range => "..",
-                Operator::MoreOrEqual => ">=",
-                Operator::LessOrEqual => "<=",
-                Operator::More => ">",
-                Operator::Less => "<",
-                Operator::Slash => "/",
-                Operator::Star => "*",
-                Operator::Power => "^",
-                Operator::Plus => "+",
-                Operator::Minus => "-",
-                Operator::Modulo => "%",
-                Operator::Assign => "=",
-                Operator::Add => "+=",
-                Operator::Subtract => "-=",
-                Operator::Multiply => "*=",
-                Operator::Divide => "/=",
-            },
-        )
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum UnaryOperator {
     Not,
     Minus,
     Range,
-}
-
-impl fmt::Display for UnaryOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                UnaryOperator::Not => "!",
-                UnaryOperator::Minus => "-",
-                UnaryOperator::Range => "..",
-            },
-        )
-    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -247,21 +91,6 @@ pub enum IDClass {
     Color,
     Item,
     Block,
-}
-
-impl fmt::Display for IDClass {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                IDClass::Group => "g",
-                IDClass::Color => "c",
-                IDClass::Item => "i",
-                IDClass::Block => "b",
-            },
-        )
-    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -290,7 +119,7 @@ impl Tag {
                 } else {
                     match &args[0].value.values[0].value {
                         ValueLiteral::Str(s) => Some(s.clone()),
-                        a => Some(format!("{}", a)),
+                        a => Some(format!("{}", a.fmt(0))),
                     }
                 }
             }
@@ -307,31 +136,6 @@ pub enum Path {
     Call(Vec<Argument>),
 }
 
-impl fmt::Display for Path {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Path::Member(def) => write!(f, ".{}", def),
-            Path::Index(call) => write!(f, "[{}]", call),
-            Path::Call(x) => {
-                if x.is_empty() {
-                    return write!(f, "()");
-                }
-                let mut out = String::from("(");
-
-                let mut d_iter = x.iter();
-                for def in &mut d_iter {
-                    out += &format!("{},", def);
-                }
-                out.pop();
-
-                out += ")";
-
-                write!(f, "{}", out)
-            }
-        }
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub struct Definition {
     pub symbol: String,
@@ -339,26 +143,10 @@ pub struct Definition {
     //pub mutable: bool,
 }
 
-impl fmt::Display for Definition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "let {} = {}", self.symbol, self.value)
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub struct Argument {
     pub symbol: Option<String>,
     pub value: Expression,
-}
-
-impl fmt::Display for Argument {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(symbol) = &self.symbol {
-            write!(f, "{} = {}", symbol, self.value)
-        } else {
-            write!(f, "{}", self.value)
-        }
-    }
 }
 
 /*#[derive(Clone, PartialEq, Debug)]
@@ -371,12 +159,6 @@ pub struct Event {
 #[derive(Clone, PartialEq, Debug)]
 pub struct Call {
     pub function: Variable,
-}
-
-impl fmt::Display for Call {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}!", self.function)
-    }
 }
 
 /*#[derive(Clone, PartialEq, Debug)]
@@ -400,29 +182,9 @@ pub struct For {
     pub body: Vec<Statement>,
 }
 
-impl fmt::Display for For {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "for {} in {} {{\n{}\n}}",
-            self.symbol,
-            self.array,
-            CompoundStatement {
-                statements: self.body.clone()
-            }
-        )
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub struct Error {
     pub message: Expression,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "error {}", self.message)
-    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -430,23 +192,6 @@ pub struct Variable {
     pub operator: Option<UnaryOperator>,
     pub value: ValueLiteral,
     pub path: Vec<Path>,
-}
-
-impl fmt::Display for Variable {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut out = String::new();
-        if let Some(op) = &self.operator {
-            out += &format!("{}", op);
-        }
-
-        out += &format!("{}", self.value);
-
-        for p in &self.path {
-            out += &format!("{}", p);
-        }
-
-        write!(f, "{}", out)
-    }
 }
 
 /*impl Variable {
@@ -468,18 +213,6 @@ pub struct Expression {
     pub values: Vec<Variable>,
     pub operators: Vec<Operator>,
 }
-impl fmt::Display for Expression {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut out = String::new();
-        for (i, op) in self.operators.iter().enumerate() {
-            out += &format!("{}{}", self.values[i], *op);
-        }
-
-        out += &format!("{}", self.values.last().unwrap());
-
-        write!(f, "{}", out)
-    }
-}
 
 impl Expression {
     pub fn to_variable(&self) -> Variable {
@@ -496,41 +229,10 @@ pub struct CompoundStatement {
     pub statements: Vec<Statement>,
 }
 
-impl fmt::Display for CompoundStatement {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut out = String::new();
-
-        for s in &self.statements {
-            out += &format!("{}", s);
-        }
-
-        write!(f, "{}", out)
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub struct Implementation {
     pub symbol: Variable,
     pub members: Vec<DictDef>,
-}
-
-impl fmt::Display for Implementation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut out = format!("impl {}{{", self.symbol);
-        if self.members.is_empty() {
-            out += "}";
-        } else {
-            for s in &self.members {
-                out += &format!("{},\n", s);
-            }
-
-            out.pop();
-            out.pop();
-            out += "\n}";
-        }
-
-        write!(f, "{}", out)
-    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -540,44 +242,11 @@ pub struct If {
     pub else_body: Option<Vec<Statement>>,
 }
 
-impl fmt::Display for If {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut out = format!(
-            "if {} {{\n{}\n}}",
-            self.condition,
-            CompoundStatement {
-                statements: self.if_body.clone()
-            }
-        );
-
-        if let Some(body) = &self.else_body {
-            out += &format!(
-                "else {{\n{}\n}}",
-                CompoundStatement {
-                    statements: body.clone()
-                }
-            );
-        }
-
-        write!(f, "{}", out)
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub struct ID {
     pub number: u16,
     pub unspecified: bool,
     pub class_name: IDClass,
-}
-
-impl fmt::Display for ID {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.unspecified {
-            write!(f, "?{}", self.class_name)
-        } else {
-            write!(f, "{}{}", self.number, self.class_name)
-        }
-    }
 }
 
 pub fn str_content(inp: String) -> String {

@@ -5,6 +5,7 @@ mod builtin;
 mod compiler;
 mod compiler_types;
 mod documentation;
+mod fmt;
 mod levelstring;
 mod parser;
 
@@ -45,6 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     println!("Parsing...");
                     let unparsed = fs::read_to_string(script_path.clone())?;
+
                     let (statements, notes) = match parse_spwn(unparsed) {
                         Err(err) => {
                             eprintln!("{}", err);
@@ -52,11 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         Ok(p) => p,
                     };
-
                     //println!("parsed: {:?}", statements);
-                    for statement in statements.iter() {
-                        println!("{}\n", statement);
-                    }
 
                     let gd_path = if gd_enabled {
                         Some(if cfg!(target_os = "windows") {
@@ -142,6 +140,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     let mut output_file = File::create(output_path)?;
                     output_file.write_all(documentation.as_bytes())?;
+                    Ok(())
+                }
+
+                "format" => {
+                    use std::fs::File;
+                    use std::io::Write;
+                    let script_path = match args_iter.next() {
+                        Some(a) => PathBuf::from(a),
+                        None => return Err(std::boxed::Box::from("Expected script file argument")),
+                    };
+
+                    println!("Parsing...");
+                    let unparsed = fs::read_to_string(script_path.clone())?;
+
+                    let (parsed, _) = match parse_spwn(unparsed) {
+                        Err(err) => {
+                            eprintln!("{}", err);
+                            std::process::exit(256);
+                        }
+                        Ok(p) => p,
+                    };
+
+                    let formatted = fmt::format(parsed);
+
+                    let mut output_file = File::create("test/formatted.spwn")?;
+                    output_file.write_all(formatted.as_bytes())?;
+
                     Ok(())
                 }
 
