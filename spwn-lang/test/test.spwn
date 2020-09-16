@@ -1,5 +1,14 @@
 
+extract import "std.spwn"
 
-impl something {
-    a: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+a = counter(21762)
+b = counter(12783)
+
+
+
+
+if a == b {
+	BG.pulse(255, 0, 0, fade_out = 0.5)
+} else {
+	BG.pulse(0, 0, 0, fade_out = 0.5)
 }

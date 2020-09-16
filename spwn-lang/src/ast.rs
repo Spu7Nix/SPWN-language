@@ -14,7 +14,7 @@ pub enum DictDef {
 #[derive(Clone, PartialEq, Debug)]
 pub struct Statement {
     pub body: StatementBody,
-    pub arrow: bool, //context changing
+    pub arrow: bool, /*context changing */
     pub line: (usize, usize),
 }
 

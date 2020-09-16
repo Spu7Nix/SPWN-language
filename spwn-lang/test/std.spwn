@@ -647,45 +647,16 @@ impl @counter {
     },
 
     //will consume both numbers
-    /*compare: (self, other, speed = 1) {
-
-        comp = {
-            mini_comp = (num){
-                self.item.if_is(LARGER_THAN, num, {
-                    other.item.if_is(LARGER_THAN, num, {
-                        self.item.add(-num)
-                        other.item.add(-num)
-                        call_with_delay(0.05, comp)
-                    })
-                })
-            }
-            for i in 0..speed {
-                mini_comp(2^i)
-            }
-            self.item.if_is(EQUAL_TO, 0, {
-                other.item.if_is(LARGER_THAN, 0, {
-                    other.reset(speed)
-                    return 1
-                })
-            })
-
-            other.item.if_is(EQUAL_TO, 0, {
-                self.item.if_is(LARGER_THAN, 0, {
-                    self.reset(speed)
-                    return -1
-                })
-            })
-
-            other.item.if_is(EQUAL_TO, 0, {
-                self.item.if_is(EQUAL_TO, 0, {
-                    
-                    return 0
-                    
-                })
-            })
-            
+    compare: (self, other, speed = DEFAULT_SPEED) {
+        other.subtract_from([self.item], speed)
+        if self == 0 {
+            return 0
+        } else if self > 0 {
+            return 1
+        } else {
+            return -1
         }
-    },*/
+    },
 
     reset: #[desc("Resets counter to 0")]
     (
@@ -795,6 +766,11 @@ impl @counter {
             self.item.if_is(SMALLER_THAN, other + 1, {
                 return false
             })
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == 1
         }
     },
 
@@ -808,6 +784,11 @@ impl @counter {
             self.item.if_is(LARGER_THAN, other - 1, {
                 return false
             })
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == -1
         }
     },
 
@@ -821,6 +802,11 @@ impl @counter {
             self.item.if_is(SMALLER_THAN, other, {
                 return false
             })
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == 1 || cmp == 0
         }
     },
 
@@ -834,6 +820,11 @@ impl @counter {
             self.item.if_is(LARGER_THAN, other, {
                 return false
             })
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == -1 || cmp == 0
         }
     },
 
@@ -849,6 +840,11 @@ impl @counter {
 
             self.item.if_is(LARGER_THAN, other, ret_false)
             self.item.if_is(SMALLER_THAN, other, ret_false)
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == 0
         }
     },
 
@@ -902,6 +898,27 @@ impl @counter {
         } else {
             error "Cannot convert to this type (counter can convert to a number using the counter.to_const macro)"
         }
+    }
+}
+
+impl @array {
+    max: (self, minval = 0) {
+        let highest = minval
+        for el in self {
+            if el > highest {
+                highest = el
+            }
+        }
+        return highest
+    },
+    min: (self, max_val = 999999999999) {
+        let lowest = max_val
+        for el in self {
+            if el < lowest {
+                lowest = el
+            }
+        }
+        return lowest
     }
 }
 
@@ -1102,7 +1119,7 @@ impl @block {
 }
 
 
-exports = {
+return {
     obj_props: constants.obj_props,
     ..constants.easing_types,
     ..constants.comparisons,

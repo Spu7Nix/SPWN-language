@@ -1,4 +1,4 @@
-exports = {
+return {
     easing_types : {
         NONE : 0,
         EASE_IN_OUT : 1,

@@ -1580,10 +1580,8 @@ impl ast::Variable {
                     .collect();
             }
             ast::ValueLiteral::Import(i) => {
-                let mut new_context = context.clone();
-                let (val, imp) = import_module(i, globals, info.clone())?;
-                new_context.implementations.extend(imp);
-                start_val.push((store_value(val, globals, &context), new_context));
+                //let mut new_contexts = context.clone();
+                start_val = import_module(i, &context, globals, info.clone())?;
             }
 
             ast::ValueLiteral::TypeIndicator(name) => {

@@ -106,6 +106,9 @@ impl std::error::Error for RuntimeError {
     }
 }
 
+const NULL_STORAGE: usize = 1;
+const BUILTIN_STORAGE: usize = 0;
+
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
     path: PathBuf,
@@ -703,11 +706,25 @@ pub fn compile_scope(
     Ok((contexts, returns))
 }
 
+fn merge_impl(target: &mut Implementations, source: &Implementations) {
+    for (key, imp) in source.iter() {
+        match target.get_mut(key) {
+            Some(target_imp) => {
+                (*target_imp).extend(imp.iter().map(|x| (x.0.clone(), x.1.clone())))
+            }
+            None => {
+                (*target).insert(*key, imp.clone());
+            }
+        }
+    }
+}
+
 pub fn import_module(
     path: &PathBuf,
+    context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
-) -> Result<(Value, Implementations), RuntimeError> {
+) -> Result<Returns, RuntimeError> {
     let module_path = globals
         .path
         .clone()
@@ -725,21 +742,31 @@ pub fn import_module(
     (*globals).closed_blocks.extend(notes.closed_blocks);
     (*globals).closed_items.extend(notes.closed_items);
     let new_info = info.next("module", globals, false);
-    let (contexts, _) = compile_scope(&parsed, vec![Context::new()], globals, new_info)?;
-    if contexts.len() > 1 {
-        return Err(RuntimeError::RuntimeError {
-            message: "Imported files does not (currently) support context splitting in the main scope.
-            Please remove any context splitting statements outside of function or macro definitions.".to_string(),
-            info,
-        });
-    }
-    Ok((
-        match contexts[0].variables.get("exports") {
-            Some(val) => (*globals).stored_values[*val as usize].clone(),
-            None => Value::Null,
-        },
-        contexts[0].implementations.clone(),
-    ))
+    let (contexts, returns) = compile_scope(&parsed, vec![Context::new()], globals, new_info)?;
+
+    Ok(if returns.is_empty() {
+        contexts
+            .iter()
+            .map(|x| {
+                let mut new_context = context.clone();
+                new_context.spawn_triggered = x.spawn_triggered;
+                new_context.start_group = x.start_group;
+                merge_impl(&mut new_context.implementations, &x.implementations);
+                (NULL_STORAGE, new_context)
+            })
+            .collect()
+    } else {
+        returns
+            .iter()
+            .map(|(val, x)| {
+                let mut new_context = context.clone();
+                new_context.spawn_triggered = x.spawn_triggered;
+                new_context.start_group = x.start_group;
+                merge_impl(&mut new_context.implementations, &x.implementations);
+                (*val, new_context)
+            })
+            .collect()
+    })
 }
 
 const ID_MAX: u16 = 999;

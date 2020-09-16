@@ -30,16 +30,26 @@ fn element_list(elements: &Vec<impl SpwnFmt>, open: char, closing: char, ind: u1
     let mut elem_text = Vec::<String>::new();
     let mut sum = 0;
 
-    for el in elements {
+    let last = elements.len() - 1;
+
+    for (i, el) in elements.iter().enumerate() {
         let text = el.fmt(0);
-        sum += text.len();
+
+        sum += text.lines().next().unwrap().len();
+
         elem_text.push(text)
     }
 
     let vertical = if elements.len() == 1 {
         sum > 150
     } else {
-        sum > 100 || elem_text.iter().any(|x| x.len() > 50 || x.contains("\n"))
+        elem_text.iter().enumerate().any(|(i, x)| {
+            if i != last {
+                x.len() > 50 || x.contains("\n")
+            } else {
+                sum > 100
+            }
+        })
     };
 
     if vertical {
@@ -61,12 +71,19 @@ fn element_list(elements: &Vec<impl SpwnFmt>, open: char, closing: char, ind: u1
         out + &format!("{}{}", tabs(ind), closing)
     } else {
         let mut out = format!("{}", open);
+        let last_elem = elem_text.pop().unwrap();
+        let iter = elem_text.iter();
 
-        for el in &elem_text {
+        for el in iter {
             out += &format!("{}, ", el);
         }
-        out.pop();
-        out.pop();
+
+        let mut last_elem_lines = last_elem.lines();
+        out += &last_elem_lines.next().unwrap();
+
+        for line in last_elem_lines {
+            out += &format!("\n{}{}", tabs(ind), line);
+        }
 
         out.push(closing);
         out
@@ -94,7 +111,7 @@ impl SpwnFmt for Statement {
 
 impl SpwnFmt for StatementBody {
     fn fmt(&self, ind: u16) -> String {
-        match self {
+        let main = match self {
             StatementBody::Definition(def) => format!("{}", def.fmt(ind)),
             StatementBody::Call(call) => format!("{}", call.fmt(ind)),
             StatementBody::Expr(x) => format!("{}", x.fmt(ind)),
@@ -108,6 +125,12 @@ impl SpwnFmt for StatementBody {
             StatementBody::For(x) => format!("{}", x.fmt(ind)),
             StatementBody::Error(x) => format!("{}", x.fmt(ind)),
             StatementBody::Extract(x) => format!("extract {}", x.fmt(ind)),
+        };
+        let last = main.chars().last().unwrap();
+        if last == '}' || last == '!' {
+            main
+        } else {
+            main + ";"
         }
     }
 }
@@ -218,7 +241,11 @@ impl SpwnFmt for Expression {
     fn fmt(&self, ind: u16) -> String {
         let mut out = String::new();
         for (i, op) in self.operators.iter().enumerate() {
-            out += &format!("{} {} ", self.values[i].fmt(ind), (*op).fmt(ind));
+            if let Operator::Range = op {
+                out += &format!("{}{}", self.values[i].fmt(ind), (*op).fmt(ind));
+            } else {
+                out += &format!("{} {} ", self.values[i].fmt(ind), (*op).fmt(ind));
+            }
         }
 
         out += &format!("{}", self.values.last().unwrap().fmt(ind));
@@ -317,8 +344,7 @@ impl SpwnFmt for CompoundStatement {
 
 impl SpwnFmt for Implementation {
     fn fmt(&self, ind: u16) -> String {
-        format!("impl SpwnFmt for {} ", self.symbol.fmt(ind))
-            + &element_list(&self.members, '{', '}', ind)
+        format!("impl {} ", self.symbol.fmt(ind)) + &element_list(&self.members, '{', '}', ind)
     }
 }
 
