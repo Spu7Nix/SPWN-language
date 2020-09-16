@@ -1,7 +1,5 @@
 
 
 impl something {
-    a: 10,
-    b: 1293,
-    c: "hello"
+    a: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 }

@@ -2,6 +2,10 @@
 
 use crate::ast::*;
 
+pub trait SpwnFmt {
+    fn fmt(&self, ind: u16) -> String;
+}
+
 fn tabs(num: u16) -> String {
     let mut out = String::new();
     for _ in 0..num {
@@ -18,7 +22,58 @@ pub fn format(input: Vec<Statement>) -> String {
     out
 }
 
-impl DictDef {
+fn element_list(elements: &Vec<impl SpwnFmt>, open: char, closing: char, ind: u16) -> String {
+    if elements.is_empty() {
+        return format!("{}{}", open, closing);
+    }
+
+    let mut elem_text = Vec::<String>::new();
+    let mut sum = 0;
+
+    for el in elements {
+        let text = el.fmt(0);
+        sum += text.len();
+        elem_text.push(text)
+    }
+
+    let vertical = if elements.len() == 1 {
+        sum > 150
+    } else {
+        sum > 100 || elem_text.iter().any(|x| x.len() > 50 || x.contains("\n"))
+    };
+
+    if vertical {
+        let mut out = format!("{}\n", open);
+
+        for el in &elem_text {
+            for line in el.lines() {
+                out += &format!("{}{}\n", tabs(ind + 1), line);
+            }
+            out.pop();
+            out += ",\n";
+        }
+        /*if elements.len() == 1 {
+            out.pop();
+            out.pop();
+            out += "\n";
+        }*/
+
+        out + &format!("{}{}", tabs(ind), closing)
+    } else {
+        let mut out = format!("{}", open);
+
+        for el in &elem_text {
+            out += &format!("{}, ", el);
+        }
+        out.pop();
+        out.pop();
+
+        out.push(closing);
+        out
+    }
+}
+
+impl SpwnFmt for DictDef {
     fn fmt(&self, ind: u16) -> String {
         match self {
             DictDef::Def((name, expr)) => format!("{}{}: {}", tabs(ind), name, expr.fmt(ind)),
@@ -27,17 +82,17 @@ impl DictDef {
     }
 }
 
-impl Statement {
+impl SpwnFmt for Statement {
     fn fmt(&self, ind: u16) -> String {
         if self.arrow {
-            format!("->{}\n", self.body.fmt(ind))
+            format!("-> {}\n", self.body.fmt(ind))
         } else {
             format!("{}\n", self.body.fmt(ind))
         }
     }
 }
 
-impl StatementBody {
+impl SpwnFmt for StatementBody {
     fn fmt(&self, ind: u16) -> String {
         match self {
             StatementBody::Definition(def) => format!("{}", def.fmt(ind)),
@@ -57,69 +112,29 @@ impl StatementBody {
     }
 }
 
-impl ValueLiteral {
-    pub fn fmt(&self, ind: u16) -> String {
+//for object def
+impl SpwnFmt for (Expression, Expression) {
+    fn fmt(&self, ind: u16) -> String {
+        format!("{}: {}", self.0.fmt(ind), self.1.fmt(ind))
+    }
+}
+
+impl SpwnFmt for ValueLiteral {
+    fn fmt(&self, ind: u16) -> String {
         use ValueLiteral::*;
         match self {
             ID(x) => format!("{}", x.fmt(ind)),
             Number(x) => format!("{}", x),
-            CmpStmt(x) => format!("{{\n{}{}}}", x.fmt(ind + 1), tabs(ind)),
-            Dictionary(x) => {
-                if x.is_empty() {
-                    return format!("{}{{}}", tabs(ind));
-                }
-                let mut out = format!("{}{{\n", tabs(ind));
-
-                let mut d_iter = x.iter();
-                for def in &mut d_iter {
-                    out += &format!("{},\n", def.fmt(ind + 1));
-                }
-                out.pop();
-                out.pop();
-
-                out += &format!("{}\n}}", tabs(ind)); //why do i have to do this twice? idk
-
-                format!("{}", out)
-            }
-            Array(x) => {
-                if x.is_empty() {
-                    return format!("[]");
-                }
-                let mut out = String::from("[");
-
-                let mut d_iter = x.iter();
-                for def in &mut d_iter {
-                    out += &format!("{},", def.fmt(ind));
-                }
-                out.pop();
-
-                out += "]";
-
-                format!("{}", out)
-            }
+            CmpStmt(x) => format!("{{\n{}\n{}}}", x.fmt(ind + 1), tabs(ind)),
+            Dictionary(x) => element_list(x, '{', '}', ind),
+            Array(x) => element_list(x, '[', ']', ind),
             Symbol(x) => format!("{}", x),
             Bool(x) => format!("{}", x),
             Expression(x) => format!("({})", x.fmt(ind)),
             Str(x) => format!("\"{}\"", x),
             Import(x) => format!("import {:?}", x),
-            Obj(x) => {
-                if x.is_empty() {
-                    return format!("{}{{}}", tabs(ind));
-                }
-                let mut out = format!("{}{{\n", tabs(ind));
-
-                let mut d_iter = x.iter();
-                for (def1, def2) in &mut d_iter {
-                    out += &format!("{}:{},\n", def1.fmt(ind), def2.fmt(ind));
-                }
-                out.pop();
-                out.pop();
-
-                out += &format!("{}\n}}", tabs(ind)); //why do i have to do this twice? idk
-
-                format!("{}", out)
-            }
-            Macro(x) => format!("{:?}", x.fmt(ind)),
+            Obj(x) => element_list(x, '{', '}', ind),
+            Macro(x) => format!("{}", x.fmt(ind)),
             Resolved(_) => format!("<val>"),
             TypeIndicator(x) => format!("@{}", x),
             Null => format!("null"),
@@ -127,7 +142,7 @@ impl ValueLiteral {
     }
 }
 
-impl IDClass {
+impl SpwnFmt for IDClass {
     fn fmt(&self, ind: u16) -> String {
         format!(
             "{}",
@@ -141,32 +156,17 @@ impl IDClass {
     }
 }
 
-impl Path {
+impl SpwnFmt for Path {
     fn fmt(&self, ind: u16) -> String {
         match self {
             Path::Member(def) => format!(".{}", def),
             Path::Index(call) => format!("[{}]", call.fmt(ind)),
-            Path::Call(x) => {
-                if x.is_empty() {
-                    return format!("()");
-                }
-                let mut out = String::from("(");
-
-                let mut d_iter = x.iter();
-                for def in &mut d_iter {
-                    out += &format!("{},", def.fmt(ind));
-                }
-                out.pop();
-
-                out += ")";
-
-                format!("{}", out)
-            }
+            Path::Call(x) => element_list(x, '(', ')', ind),
         }
     }
 }
 
-impl Argument {
+impl SpwnFmt for Argument {
     fn fmt(&self, ind: u16) -> String {
         if let Some(symbol) = &self.symbol {
             format!("{} = {}", symbol, self.value.fmt(ind))
@@ -176,28 +176,29 @@ impl Argument {
     }
 }
 
-impl Call {
+impl SpwnFmt for Call {
     fn fmt(&self, ind: u16) -> String {
         format!("{}!", self.function.fmt(ind))
     }
 }
 
-impl For {
+impl SpwnFmt for For {
     fn fmt(&self, ind: u16) -> String {
         format!(
-            "for {} in {} {{\n{}\n}}",
+            "for {} in {} {{\n{}\n{}}}",
             self.symbol,
             self.array.fmt(ind),
             CompoundStatement {
                 statements: self.body.clone()
             }
-            .fmt(ind)
+            .fmt(ind + 1),
+            tabs(ind)
         )
     }
 }
 
-impl Variable {
-    pub fn fmt(&self, ind: u16) -> String {
+impl SpwnFmt for Variable {
+    fn fmt(&self, ind: u16) -> String {
         let mut out = String::new();
         if let Some(op) = &self.operator {
             out += &format!("{}", op.fmt(ind));
@@ -213,7 +214,7 @@ impl Variable {
     }
 }
 
-impl Expression {
+impl SpwnFmt for Expression {
     fn fmt(&self, ind: u16) -> String {
         let mut out = String::new();
         for (i, op) in self.operators.iter().enumerate() {
@@ -226,7 +227,7 @@ impl Expression {
     }
 }
 
-impl ID {
+impl SpwnFmt for ID {
     fn fmt(&self, ind: u16) -> String {
         if self.unspecified {
             format!("?{}", self.class_name.fmt(ind))
@@ -236,7 +237,7 @@ impl ID {
     }
 }
 
-impl Operator {
+impl SpwnFmt for Operator {
     fn fmt(&self, ind: u16) -> String {
         format!(
             "{}",
@@ -266,7 +267,7 @@ impl Operator {
     }
 }
 
-impl UnaryOperator {
+impl SpwnFmt for UnaryOperator {
     fn fmt(&self, ind: u16) -> String {
         format!(
             "{}",
@@ -279,19 +280,28 @@ impl UnaryOperator {
     }
 }
 
-impl Definition {
+impl SpwnFmt for Definition {
     fn fmt(&self, ind: u16) -> String {
         format!("let {} = {}", self.symbol, self.value.fmt(ind))
     }
 }
 
-impl Error {
+impl SpwnFmt for Error {
     fn fmt(&self, ind: u16) -> String {
         format!("error {}", self.message.fmt(ind))
     }
 }
 
-impl CompoundStatement {
+fn trim_newline(s: &mut String) {
+    if s.ends_with('\n') {
+        s.pop();
+        if s.ends_with('\r') {
+            s.pop();
+        }
+    }
+}
+
+impl SpwnFmt for CompoundStatement {
     fn fmt(&self, ind: u16) -> String {
         let mut out = String::new();
 
@@ -299,96 +309,92 @@ impl CompoundStatement {
             out += &format!("{}{}", tabs(ind), s.fmt(ind));
         }
 
-        format!("{}", out)
+        trim_newline(&mut out);
+
+        out
     }
 }
 
-impl Implementation {
+impl SpwnFmt for Implementation {
     fn fmt(&self, ind: u16) -> String {
-        let mut out = format!("impl {} {{", self.symbol.fmt(ind));
-        if self.members.is_empty() {
-            out += "}";
-        } else {
-            for s in &self.members {
-                out += &format!("\n{}{},", tabs(ind + 1), s.fmt(ind));
-            }
-
-            out.pop();
-            out.pop();
-            out += "\n}";
-        }
-
-        format!("{}", out)
+        format!("impl SpwnFmt for {} ", self.symbol.fmt(ind))
+            + &element_list(&self.members, '{', '}', ind)
     }
 }
 
-impl If {
+impl SpwnFmt for If {
     fn fmt(&self, ind: u16) -> String {
         let mut out = format!(
-            "if {} {{\n{}\n}}",
+            "if {} {{\n{}\n{}}}",
             self.condition.fmt(ind),
             CompoundStatement {
                 statements: self.if_body.clone()
             }
-            .fmt(ind)
+            .fmt(ind + 1),
+            tabs(ind)
         );
 
         if let Some(body) = &self.else_body {
             out += &format!(
-                "else {{\n{}\n}}",
+                " else {{\n{}\n{}}}",
                 CompoundStatement {
                     statements: body.clone()
                 }
-                .fmt(ind)
+                .fmt(ind + 1),
+                tabs(ind)
             );
         }
 
-        format!("{}", out)
+        out
     }
 }
 
-impl Macro {
+impl SpwnFmt for ArgDef {
+    fn fmt(&self, ind: u16) -> String {
+        let (name, value, tag, typ) = self;
+
+        let mut out = tag.fmt(ind);
+        out += name;
+        if let Some(expr) = typ {
+            out += &format!(": {}", expr.fmt(ind));
+        }
+
+        if let Some(expr) = value {
+            out += &format!(" = {}", expr.fmt(ind));
+        }
+        out
+    }
+}
+
+impl SpwnFmt for Macro {
     fn fmt(&self, ind: u16) -> String {
         let mut out = String::new();
 
         out += &self.properties.fmt(ind);
 
-        out += "(";
-        for (name, value, tag, typ) in &self.args {
-            out += &tag.fmt(ind);
-            out += name;
-            if let Some(expr) = typ {
-                out += &format!(": {}", expr.fmt(ind));
-            }
-
-            if let Some(expr) = value {
-                out += &format!(" = {}", expr.fmt(ind));
-            }
-
-            out += ",";
-        }
-        out += &format!("{{{}\n{}}}", &self.body.fmt(ind + 1), tabs(ind));
+        out += &element_list(&self.args, '(', ')', ind);
+        out += &format!(" {{\n{}\n{}}}", &self.body.fmt(ind + 1), tabs(ind));
         out
     }
 }
 
-impl Tag {
+impl SpwnFmt for (String, Vec<Argument>) {
+    fn fmt(&self, ind: u16) -> String {
+        self.0.clone() + &element_list(&self.1, '(', ')', ind)
+    }
+}
+
+impl SpwnFmt for Tag {
     fn fmt(&self, ind: u16) -> String {
         if self.tags.is_empty() {
             return String::new();
         }
-        let mut out = String::from("#[");
-        for t in &self.tags {
-            out += &t.0;
-            out += "(";
-            for a in &t.1 {
-                out += &a.fmt(ind);
-                out += ",";
-            }
-            out += "), ";
-        }
-        out += "] ";
 
-        out
+        let text = String::from("#") + &element_list(&self.tags, '[', ']', ind);
+        if text.len() > 60 {
+            text + "\n" + &tabs(ind)
+        } else {
+            text + " "
+        }
     }
 }

@@ -1,4 +1,4 @@
-#![feature(arbitrary_enum_discriminant)]
+//#![feature(arbitrary_enum_discriminant)]
 
 mod ast;
 mod builtin;

@@ -1,5 +1,6 @@
 //! Abstract Syntax Tree (AST) type definitions
 
+use crate::fmt::SpwnFmt;
 use std::path::PathBuf;
 
 use crate::compiler_types::Value;
