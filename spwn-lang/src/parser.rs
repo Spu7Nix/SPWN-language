@@ -1237,7 +1237,7 @@ fn parse_variable(
     };
 
     let value = match first_token {
-        Some(Token::Number) => ast::ValueLiteral::Number(match tokens.slice().parse() {
+        Some(Token::Number) => ast::ValueBody::Number(match tokens.slice().parse() {
             Ok(n) => n,
             Err(err) => {
                 //println!("{}", tokens.slice());
@@ -1248,7 +1248,7 @@ fn parse_variable(
                 });
             }
         }),
-        Some(Token::StringLiteral) => ast::ValueLiteral::Str(ast::str_content(tokens.slice())),
+        Some(Token::StringLiteral) => ast::ValueBody::Str(ast::str_content(tokens.slice())),
         Some(Token::ID) => {
             let mut text = tokens.slice();
             let class_name = match text.pop().unwrap() {
@@ -1284,16 +1284,16 @@ fn parse_variable(
                     ast::IDClass::Block => (*notes).closed_blocks.push(number),
                 }
             }
-            ast::ValueLiteral::ID(ast::ID {
+            ast::ValueBody::ID(ast::ID {
                 class_name,
                 unspecified,
                 number,
             })
         }
-        Some(Token::True) => ast::ValueLiteral::Bool(true),
-        Some(Token::False) => ast::ValueLiteral::Bool(false),
-        Some(Token::Null) => ast::ValueLiteral::Null,
-        Some(Token::Symbol) => ast::ValueLiteral::Symbol(tokens.slice()),
+        Some(Token::True) => ast::ValueBody::Bool(true),
+        Some(Token::False) => ast::ValueBody::Bool(false),
+        Some(Token::Null) => ast::ValueBody::Null,
+        Some(Token::Symbol) => ast::ValueBody::Symbol(tokens.slice()),
 
         Some(Token::OpenSquareBracket) => {
             //Array
@@ -1324,10 +1324,10 @@ fn parse_variable(
                 }
             }
 
-            ast::ValueLiteral::Array(arr)
+            ast::ValueBody::Array(arr)
         }
 
-        Some(Token::Import) => ast::ValueLiteral::Import(match tokens.next(false) {
+        Some(Token::Import) => ast::ValueBody::Import(match tokens.next(false) {
             Some(Token::StringLiteral) => PathBuf::from(ast::str_content(tokens.slice())),
             a => {
                 return Err(SyntaxError::ExpectedErr {
@@ -1338,7 +1338,7 @@ fn parse_variable(
             }
         }),
 
-        Some(Token::At) => ast::ValueLiteral::TypeIndicator(match tokens.next(false) {
+        Some(Token::At) => ast::ValueBody::TypeIndicator(match tokens.next(false) {
             Some(Token::Symbol) => tokens.slice(),
             a => {
                 return Err(SyntaxError::ExpectedErr {
@@ -1352,7 +1352,7 @@ fn parse_variable(
         Some(Token::OpenBracket) => {
             let parse_macro_def = |tokens: &mut Tokens,
                                    notes: &mut ParseNotes|
-             -> Result<ast::ValueLiteral, SyntaxError> {
+             -> Result<ast::ValueBody, SyntaxError> {
                 let args = parse_arg_def(tokens, notes)?;
 
                 let body = match tokens.next(false) {
@@ -1366,7 +1366,7 @@ fn parse_variable(
                     }
                 };
 
-                Ok(ast::ValueLiteral::Macro(ast::Macro {
+                Ok(ast::ValueBody::Macro(ast::Macro {
                     args,
                     body: ast::CompoundStatement { statements: body },
                     properties,
@@ -1384,7 +1384,7 @@ fn parse_variable(
                             _ => {
                                 test_tokens.previous();
                                 (*tokens) = test_tokens;
-                                ast::ValueLiteral::Expression(expr)
+                                ast::ValueBody::Expression(expr)
                             }
                         },
                         Some(Token::Comma) => parse_macro_def(tokens, notes)?,
@@ -1409,9 +1409,9 @@ fn parse_variable(
             //Either enclosed expression or macro definition
             let parse_closed_expr = |tokens: &mut Tokens,
                                      notes: &mut ParseNotes|
-             -> Result<ast::ValueLiteral, SyntaxError> {
+             -> Result<ast::ValueBody, SyntaxError> {
                 //expr
-                let expr = ast::ValueLiteral::Expression(parse_expr(tokens, notes)?);
+                let expr = ast::ValueBody::Expression(parse_expr(tokens, notes)?);
                 //consume closing bracket
                 match tokens.next(false) {
                     Some(Token::ClosingBracket) => Ok(expr),
@@ -1427,7 +1427,7 @@ fn parse_variable(
 
             let parse_macro_def = |tokens: &mut Tokens,
                                    notes: &mut ParseNotes|
-             -> Result<ast::ValueLiteral, SyntaxError> {
+             -> Result<ast::ValueBody, SyntaxError> {
                 let args = parse_arg_def(tokens, notes)?;
 
                 let body = match tokens.next(false) {
@@ -1441,7 +1441,7 @@ fn parse_variable(
                     }
                 };
 
-                Ok(ast::ValueLiteral::Macro(ast::Macro {
+                Ok(ast::ValueBody::Macro(ast::Macro {
                     args,
                     body: ast::CompoundStatement { statements: body },
                     properties,
@@ -1509,19 +1509,19 @@ fn parse_variable(
             match tokens.next(false) {
                 Some(Token::DotDot) => {
                     tokens.previous();
-                    ast::ValueLiteral::Dictionary(parse_dict(tokens, notes)?)
+                    ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
                 }
                 _ => match tokens.next(false) {
                     Some(Token::Colon) => {
                         tokens.previous();
                         tokens.previous();
-                        ast::ValueLiteral::Dictionary(parse_dict(tokens, notes)?)
+                        ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
                     }
                     _ => {
                         tokens.previous();
                         tokens.previous();
 
-                        ast::ValueLiteral::CmpStmt(ast::CompoundStatement {
+                        ast::ValueBody::CmpStmt(ast::CompoundStatement {
                             statements: parse_cmp_stmt(tokens, notes)?,
                         })
                     }
@@ -1529,7 +1529,7 @@ fn parse_variable(
             }
         }
 
-        Some(Token::Object) => ast::ValueLiteral::Obj(parse_object(tokens, notes)?),
+        Some(Token::Object) => ast::ValueBody::Obj(parse_object(tokens, notes)?),
 
         a => {
             return Err(SyntaxError::ExpectedErr {
@@ -1578,7 +1578,10 @@ fn parse_variable(
 
     Ok(ast::Variable {
         operator,
-        value,
+        value: ast::ValueLiteral {
+            body: value,
+            comment: (None, None),
+        },
         path,
     })
 }

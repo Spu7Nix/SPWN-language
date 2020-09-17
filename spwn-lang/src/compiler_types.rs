@@ -433,9 +433,9 @@ where
                             symbol: None,
                             value: ast::Expression {
                                 values: vec![ast::Variable {
-                                    value: ast::ValueLiteral::Resolved(
+                                    value: ast::ValueLiteral::new(ast::ValueBody::Resolved(
                                         globals.stored_values[value2].clone(),
-                                    ),
+                                    )),
                                     path: Vec::new(),
                                     operator: None,
                                 }],
@@ -1449,11 +1449,11 @@ impl ast::Variable {
 
         use ast::IDClass;
 
-        match &self.value {
-            ast::ValueLiteral::Resolved(r) => {
+        match &self.value.body {
+            ast::ValueBody::Resolved(r) => {
                 start_val.push((store_value(r.clone(), globals, &context), context.clone()))
             }
-            ast::ValueLiteral::ID(id) => start_val.push((
+            ast::ValueBody::ID(id) => start_val.push((
                 store_value(
                     match id.class_name {
                         IDClass::Group => {
@@ -1514,18 +1514,18 @@ impl ast::Variable {
                 ),
                 context.clone(),
             )),
-            ast::ValueLiteral::Number(num) => start_val.push((
+            ast::ValueBody::Number(num) => start_val.push((
                 store_value(Value::Number(*num), globals, &context),
                 context.clone(),
             )),
-            ast::ValueLiteral::Dictionary(dict) => {
+            ast::ValueBody::Dictionary(dict) => {
                 let new_info = info.next("dictionary", globals, false);
                 let (new_out, new_inner_returns) =
                     eval_dict(dict.clone(), context.clone(), globals, new_info)?;
                 start_val = new_out;
                 inner_returns = new_inner_returns;
             }
-            ast::ValueLiteral::CmpStmt(cmp_stmt) => {
+            ast::ValueBody::CmpStmt(cmp_stmt) => {
                 let (evaled, returns) = cmp_stmt.to_scope(&context, globals, info.clone())?;
                 inner_returns.extend(returns);
                 start_val.push((
@@ -1534,17 +1534,17 @@ impl ast::Variable {
                 ));
             }
 
-            ast::ValueLiteral::Expression(expr) => {
+            ast::ValueBody::Expression(expr) => {
                 let (evaled, returns) = expr.eval(context.clone(), globals, info.clone())?;
                 inner_returns.extend(returns);
                 start_val.extend(evaled.iter().cloned());
             }
 
-            ast::ValueLiteral::Bool(b) => start_val.push((
+            ast::ValueBody::Bool(b) => start_val.push((
                 store_value(Value::Bool(*b), globals, &context),
                 context.clone(),
             )),
-            ast::ValueLiteral::Symbol(string) => {
+            ast::ValueBody::Symbol(string) => {
                 if string == "$" {
                     start_val.push((0, context.clone()));
                 } else {
@@ -1560,11 +1560,11 @@ impl ast::Variable {
                     }
                 }
             }
-            ast::ValueLiteral::Str(s) => start_val.push((
+            ast::ValueBody::Str(s) => start_val.push((
                 store_value(Value::Str(s.clone()), globals, &context),
                 context.clone(),
             )),
-            ast::ValueLiteral::Array(a) => {
+            ast::ValueBody::Array(a) => {
                 let new_info = info.next("array", globals, false);
                 let (evaled, returns) =
                     all_combinations(a.clone(), context.clone(), globals, new_info)?;
@@ -1579,12 +1579,12 @@ impl ast::Variable {
                     })
                     .collect();
             }
-            ast::ValueLiteral::Import(i) => {
+            ast::ValueBody::Import(i) => {
                 //let mut new_contexts = context.clone();
                 start_val = import_module(i, &context, globals, info.clone())?;
             }
 
-            ast::ValueLiteral::TypeIndicator(name) => {
+            ast::ValueBody::TypeIndicator(name) => {
                 start_val.push((
                     match globals.type_ids.get(name) {
                         Some(id) => store_value(Value::TypeIndicator(*id), globals, &context),
@@ -1599,7 +1599,7 @@ impl ast::Variable {
                     context.clone(),
                 ));
             }
-            ast::ValueLiteral::Obj(o) => {
+            ast::ValueBody::Obj(o) => {
                 let mut all_expr: Vec<ast::Expression> = Vec::new();
                 for prop in o {
                     all_expr.push(prop.0.clone());
@@ -1663,7 +1663,7 @@ impl ast::Variable {
                 }
             }
 
-            ast::ValueLiteral::Macro(m) => {
+            ast::ValueBody::Macro(m) => {
                 let mut all_expr: Vec<ast::Expression> = Vec::new();
                 for arg in &m.args {
                     if let Some(e) = &arg.1 {
@@ -1725,7 +1725,7 @@ impl ast::Variable {
                 }
             }
             //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
-            ast::ValueLiteral::Null => start_val.push((1, context.clone())),
+            ast::ValueBody::Null => start_val.push((1, context.clone())),
         };
 
         let mut path_iter = self.path.iter();

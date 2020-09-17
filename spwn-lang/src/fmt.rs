@@ -142,9 +142,9 @@ impl SpwnFmt for (Expression, Expression) {
     }
 }
 
-impl SpwnFmt for ValueLiteral {
+impl SpwnFmt for ValueBody {
     fn fmt(&self, ind: u16) -> String {
-        use ValueLiteral::*;
+        use ValueBody::*;
         match self {
             ID(x) => format!("{}", x.fmt(ind)),
             Number(x) => format!("{}", x),
@@ -162,6 +162,12 @@ impl SpwnFmt for ValueLiteral {
             TypeIndicator(x) => format!("@{}", x),
             Null => format!("null"),
         }
+    }
+}
+
+impl SpwnFmt for ValueLiteral {
+    fn fmt(&self, ind: u16) -> String {
+        self.body.fmt(ind)
     }
 }
 

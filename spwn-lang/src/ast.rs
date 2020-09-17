@@ -34,9 +34,23 @@ pub enum StatementBody {
     Extract(Expression),
     //EOI,
 }
+#[derive(Clone, PartialEq, Debug)]
+pub struct ValueLiteral {
+    pub body: ValueBody,
+    pub comment: (Option<String>, Option<String>),
+}
+
+impl ValueLiteral {
+    pub fn new(body: ValueBody) -> Self {
+        ValueLiteral {
+            body,
+            comment: (None, None),
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum ValueLiteral {
+pub enum ValueBody {
     ID(ID),
     Number(f64),
     CmpStmt(CompoundStatement),
@@ -118,8 +132,8 @@ impl Tag {
                 if args.is_empty() {
                     None
                 } else {
-                    match &args[0].value.values[0].value {
-                        ValueLiteral::Str(s) => Some(s.clone()),
+                    match &args[0].value.values[0].value.body {
+                        ValueBody::Str(s) => Some(s.clone()),
                         a => Some(format!("{}", a.fmt(0))),
                     }
                 }
@@ -219,7 +233,7 @@ impl Expression {
     pub fn to_variable(&self) -> Variable {
         Variable {
             operator: None,
-            value: ValueLiteral::Expression(self.clone()),
+            value: ValueLiteral::new(ValueBody::Expression(self.clone())),
             path: Vec::new(),
         }
     }

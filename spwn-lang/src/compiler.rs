@@ -261,8 +261,8 @@ pub fn compile_scope(
                 let is_symbol = !expr.values.is_empty()
                     && expr.values[0].operator == None
                     && expr.values[0].path.is_empty()
-                    && match &expr.values[0].value {
-                        ast::ValueLiteral::Symbol(s) => {
+                    && match &expr.values[0].value.body {
+                        ast::ValueBody::Symbol(s) => {
                             symbol = s.clone();
                             true
                         }
@@ -291,7 +291,7 @@ pub fn compile_scope(
                     let mut all_values: Returns = Vec::new();
 
                     for context in contexts {
-                        if let ast::ValueLiteral::CmpStmt(f) = &def.value.values[0].value {
+                        if let ast::ValueBody::CmpStmt(f) = &def.value.values[0].value.body {
                             if def.value.values.len() == 1 {
                                 //create the function context
                                 let mut new_context = context.clone();
@@ -360,7 +360,7 @@ pub fn compile_scope(
                 let mut all_values: Returns = Vec::new();
 
                 for context in contexts {
-                    if let ast::ValueLiteral::CmpStmt(f) = &def.value.values[0].value {
+                    if let ast::ValueBody::CmpStmt(f) = &def.value.values[0].value.body {
                         if def.value.values.len() == 1 {
                             //create the function context
                             let mut new_context = context.clone();
