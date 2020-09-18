@@ -11,6 +11,7 @@ fn tabs(num: u16) -> String {
     for _ in 0..num {
         out += "\t";
     }
+
     out
 }
 
@@ -101,11 +102,19 @@ impl SpwnFmt for DictDef {
 
 impl SpwnFmt for Statement {
     fn fmt(&self, ind: u16) -> String {
-        if self.arrow {
+        let mut out = String::new();
+        if let Some(comment) = &self.comment.0 {
+            out += comment;
+        }
+        out += &if self.arrow {
             format!("-> {}\n", self.body.fmt(ind))
         } else {
             format!("{}\n", self.body.fmt(ind))
+        };
+        if let Some(comment) = &self.comment.1 {
+            out += comment;
         }
+        out
     }
 }
 
@@ -167,7 +176,15 @@ impl SpwnFmt for ValueBody {
 
 impl SpwnFmt for ValueLiteral {
     fn fmt(&self, ind: u16) -> String {
-        self.body.fmt(ind)
+        let mut out = String::new();
+        if let Some(comment) = &self.comment.0 {
+            out += comment;
+        }
+        out += &self.body.fmt(ind);
+        if let Some(comment) = &self.comment.1 {
+            out += comment;
+        }
+        out
     }
 }
 

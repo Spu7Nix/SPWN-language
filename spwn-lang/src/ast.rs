@@ -11,11 +11,14 @@ pub enum DictDef {
     Extract(Expression),
 }
 
+pub type Comment = (Option<String>, Option<String>);
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct Statement {
     pub body: StatementBody,
     pub arrow: bool, /*context changing */
     pub line: (usize, usize),
+    pub comment: Comment,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -37,7 +40,7 @@ pub enum StatementBody {
 #[derive(Clone, PartialEq, Debug)]
 pub struct ValueLiteral {
     pub body: ValueBody,
-    pub comment: (Option<String>, Option<String>),
+    pub comment: Comment,
 }
 
 impl ValueLiteral {

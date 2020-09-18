@@ -1,14 +1,11 @@
-
-extract import "std.spwn"
-
-a = counter(21762)
-b = counter(12783)
+//hello
 
 
-
-
-if a == b {
-	BG.pulse(255, 0, 0, fade_out = 0.5)
+//hello
+if a == /*hello*/ b /*hello*/ {
+	a()
+	
 } else {
-	BG.pulse(0, 0, 0, fade_out = 0.5)
+	b()
 }
+
