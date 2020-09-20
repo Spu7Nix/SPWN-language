@@ -1,17 +1,21 @@
-extract import "std.spwn"
+//hello
+
+extract import "std.spwn";
+
+//groups defined in level
+//tst
 
 selector = 1g
-buttons = [2g, 3g, 4g, 5g, 6g, 7g, 8g, 9g]
-button_index = counter(0)
+options = [2g, 3g, 4g, 5g, 6g, 7g]
+
+//keeps track of what option is selected
+selected = counter(0)
 
 on(touch(), {
-    button_index.add(1)
-
-    if button_index >= buttons.length {
-        button_index.add(-buttons.length)
+    -> selector.move_to(options[selected.to_const(0..options.length)])
+    wait(0.05)
+    selected += 1
+    if selected == options.length {
+        selected -= options.length
     }
-
-    selected_button = buttons[button_index.to_const(0..buttons.length)]
-    
-    selector.move_to(selected_button)
 })

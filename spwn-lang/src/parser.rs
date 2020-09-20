@@ -276,7 +276,8 @@ impl<'a> Tokens<'a> {
     }
     fn next(&mut self, ss: bool, comment: bool) -> Option<Token> {
         if self.index == 0 {
-            let next_element = match self.iter.next() {
+            let next_element = self.iter.next();
+            /* {
                 Some(e) => Some(e),
                 None => {
                     if ss {
@@ -285,7 +286,7 @@ impl<'a> Tokens<'a> {
                         None
                     }
                 }
-            };
+            };*/
 
             if let Some(e) = next_element {
                 let slice = self.iter.slice().to_string();
@@ -315,7 +316,7 @@ impl<'a> Tokens<'a> {
         }
     }
     fn previous(&mut self) -> Option<Token> {
-        self.index += 1;
+        /*self.index += 1;
         let len = self.stack.len();
         if len > self.index {
             if self.stack[len - self.index - 1].0 == Token::StatementSeparator
@@ -329,17 +330,38 @@ impl<'a> Tokens<'a> {
             }
         } else {
             None
+        }*/
+        self.previous_no_ignore(false, false)
+    }
+
+    fn previous_no_ignore(&mut self, ss: bool, comment: bool) -> Option<Token> {
+        self.index += 1;
+        let len = self.stack.len();
+        if len > self.index {
+            if (!ss && self.stack[len - self.index - 1].0 == Token::StatementSeparator)
+                || (!comment && self.stack[len - self.index - 1].0 == Token::Comment)
+            {
+                self.previous_no_ignore(ss, comment)
+            } else if len - self.index >= 1 {
+                Some(self.stack[len - self.index - 1].0)
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 
-    /*fn current(&self) -> Option<Token> {
+    fn current(&self) -> Option<Token> {
         let len = self.stack.len();
         if len == 0 {
+            None
+        } else if len - self.index < 1 {
             None
         } else {
             Some(self.stack[len - self.index - 1].0)
         }
-    }*/
+    }
 
     fn slice(&self) -> String {
         self.stack[self.stack.len() - self.index - 1].1.clone()
@@ -387,9 +409,17 @@ pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNot
 
     /*{
         let mut test = tokens.clone();
-        for i in 0..10 {
-            println!("{}: {:?}, {}", i, test.next(true, true), test.slice());
+
+        for _ in 0..100 {
+            println!("{:?}", test.next(true, true));
         }
+
+        /*println!(
+            "{:?}",
+            test.iter
+                .spanned()
+                .collect::<Vec<(Token, std::ops::Range<usize>)>>()
+        );*/
     }*/
     let mut statements = Vec::<ast::Statement>::new();
 
@@ -408,9 +438,9 @@ pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNot
 
     loop {
         //tokens.next(false, false);
-        match tokens.next(false, false) {
+        match tokens.next(false, true) {
             Some(_) => {
-                tokens.previous();
+                tokens.previous_no_ignore(false, true);
 
                 //tokens.previous();
 
@@ -448,10 +478,10 @@ fn parse_cmp_stmt(
 ) -> Result<Vec<ast::Statement>, SyntaxError> {
     let mut statements = Vec::<ast::Statement>::new();
     loop {
-        match tokens.next(false, false) {
+        match tokens.next(false, true) {
             Some(Token::ClosingCurlyBracket) => break,
             Some(_) => {
-                tokens.previous();
+                tokens.previous_no_ignore(false, true);
                 statements.push(parse_statement(tokens, notes)?);
                 //println!("statement done");
             }
@@ -723,8 +753,8 @@ pub fn parse_statement(
 
             //expression or call
             //tokens.previous();
-            tokens.previous();
-            let expr = parse_expr(tokens, notes, true, false)?;
+            tokens.previous_no_ignore(false, true);
+            let expr = parse_expr(tokens, notes, true, true)?;
             if tokens.next(false, false) == Some(Token::Exclamation) {
                 //call
                 // println!("found call");
@@ -734,7 +764,7 @@ pub fn parse_statement(
             } else {
                 //expression statement
                 // println!("found expr");
-                tokens.previous();
+                tokens.previous_no_ignore(false, true);
                 ast::StatementBody::Expr(expr)
             }
         }
@@ -746,6 +776,10 @@ pub fn parse_statement(
     };
 
     let comment_after = check_for_comment(tokens);
+    /*println!(
+        "current token after stmt post comment: {}: ",
+        tokens.slice()
+    );*/
 
     Ok(ast::Statement {
         body,
@@ -756,32 +790,47 @@ pub fn parse_statement(
 }
 
 fn check_for_comment(tokens: &mut Tokens) -> Option<String> {
-    let mut result = match tokens.next(false, true) {
+    let mut comment_found = false;
+    //let mut line_break_start = false;
+
+    let mut result = String::new();
+    /*match tokens.next(false, true) {
         Some(Token::Comment) => tokens.slice(),
+        //Some(Token::StatementSeparator) => String::from("\r\n"),
         _ => {
-            tokens.previous();
+            //println!("comment not found: \"{}\"", tokens.slice());
+            tokens.previous_no_ignore(false, true);
+
             return None;
         }
-    };
+    };*/
 
     loop {
         result += &match tokens.next(true, true) {
-            Some(Token::Comment) => tokens.slice(),
-            Some(Token::StatementSeparator) => String::from("\r\n"),
-            _ => {
-                tokens.previous();
-                break;
+            Some(Token::Comment) => {
+                comment_found = true;
+                tokens.slice()
             }
-        };
-        match result.chars().last().unwrap() {
-            ' ' | '\n' | '\t' => (),
+            Some(Token::StatementSeparator) => {
+                if !result.ends_with("\n") {
+                    String::from("\r\n")
+                } else {
+                    String::new()
+                }
+            }
             _ => {
-                result += " ";
+                tokens.previous_no_ignore(false, true);
+
+                break;
             }
         };
     }
 
-    Some(result)
+    if comment_found {
+        Some(result)
+    } else {
+        None
+    }
 }
 
 fn operator_precedence(op: &ast::Operator) -> u8 {
@@ -905,7 +954,7 @@ fn parse_expr(
         operators.push(op);
         values.push(parse_variable(tokens, notes, check_for_comments)?);
     }
-    tokens.previous();
+    tokens.previous_no_ignore(false, true);
 
     Ok(fix_precedence(ast::Expression { values, operators }))
 }
@@ -1258,7 +1307,7 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
             Ok(contents)
         }
         _ => {
-            tokens.previous();
+            tokens.previous_no_ignore(false, true);
             Ok(ast::Tag::new())
         }
     }
@@ -1275,6 +1324,9 @@ fn parse_variable(
     } else {
         None
     };
+    /*if tokens.stack.len() - tokens.index > 0 {
+        println!("current token after val pre comment: {}: ", tokens.slice());
+    }*/
     let mut first_token = tokens.next(false, false);
 
     let operator = match first_token {
@@ -1632,7 +1684,7 @@ fn parse_variable(
             _ => break,
         }
     }
-    tokens.previous();
+    tokens.previous_no_ignore(false, true);
 
     let comment_after = if check_for_comments {
         check_for_comment(tokens)
@@ -1640,12 +1692,14 @@ fn parse_variable(
         None
     };
 
+    /*if tokens.stack.len() - tokens.index > 0 {
+        println!("current token after val post comment: {}: ", tokens.slice());
+    }*/
+
     Ok(ast::Variable {
         operator,
-        value: ast::ValueLiteral {
-            body: value,
-            comment: (preceding_comment, comment_after),
-        },
+        value: ast::ValueLiteral { body: value },
+        comment: (preceding_comment, comment_after),
         path,
     })
 }

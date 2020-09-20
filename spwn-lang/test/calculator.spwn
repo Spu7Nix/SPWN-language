@@ -148,8 +148,7 @@ solve = {
 	}
 	current_operator.item.if_is(EQUAL_TO, 0, {
 		//plus
-		main.add_to([secondary.item], speed = 10)
-		
+		main.add_to([secondary.item], speed = 10,)
 		last_pressed_operator.item.if_is(EQUAL_TO, 4, move_from_secondary)
 		set_display!
 		check_valid!

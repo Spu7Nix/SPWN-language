@@ -40,14 +40,14 @@ pub enum StatementBody {
 #[derive(Clone, PartialEq, Debug)]
 pub struct ValueLiteral {
     pub body: ValueBody,
-    pub comment: Comment,
+    //pub comment: Comment,
 }
 
 impl ValueLiteral {
     pub fn new(body: ValueBody) -> Self {
         ValueLiteral {
             body,
-            comment: (None, None),
+            //comment: (None, None),
         }
     }
 }
@@ -210,6 +210,7 @@ pub struct Variable {
     pub operator: Option<UnaryOperator>,
     pub value: ValueLiteral,
     pub path: Vec<Path>,
+    pub comment: Comment,
 }
 
 /*impl Variable {
@@ -238,6 +239,7 @@ impl Expression {
             operator: None,
             value: ValueLiteral::new(ValueBody::Expression(self.clone())),
             path: Vec::new(),
+            comment: (None, None),
         }
     }
 }

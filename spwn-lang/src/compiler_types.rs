@@ -438,6 +438,7 @@ where
                                     )),
                                     path: Vec::new(),
                                     operator: None,
+                                    comment: (None, None),
                                 }],
                                 operators: Vec::new(),
                             },
