@@ -77,6 +77,14 @@ pub struct CompilerInfo {
 }
 
 impl CompilerInfo {
+    pub fn new() -> Self {
+        CompilerInfo {
+            depth: 0,
+            path: vec!["main scope".to_string()],
+            line: (0, 0),
+            func_id: 0,
+        }
+    }
     pub fn next(
         &self,
         name: &str,

@@ -396,7 +396,7 @@ supress_signal = #[desc("Stops signal from coming past for some time")] (
 
 }
 
-DEFAULT_SPEED = 3
+let DEFAULT_SPEED = 3
 
 
 impl @counter {
@@ -483,7 +483,7 @@ impl @counter {
             temp = counter(0)
             self.add_to([temp.item], speed, factor)
             temp.add_to([self.item], speed)
-        } else if factor.type == @counter {
+        }/* else if factor.type == @counter {
             
             temp = counter(0)
             mini_mult = (num){
@@ -515,7 +515,7 @@ impl @counter {
             -> factor.reset(speed)
             temp.add_to([self.item], speed * 2)
             
-        }
+        }*/
     },
 
 
@@ -745,6 +745,8 @@ impl @counter {
             new_counter = self.clone()
             other.clone().add_to([new_counter.item])
             return new_counter
+        } else {
+            error "Cannot add counter with this type"
         }
     },
 
@@ -753,6 +755,8 @@ impl @counter {
             new_counter = self.clone()
             new_counter.item.add(-other)
             return new_counter
+        } else {
+            error "Cannot subtract counter with this type"
         }
     },
 
@@ -771,6 +775,8 @@ impl @counter {
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             return cmp == 1
+        } else {
+            error "Cannot compare counter with this type"
         }
     },
 
@@ -789,6 +795,8 @@ impl @counter {
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             return cmp == -1
+        } else {
+            error "Cannot compare counter with this type"
         }
     },
 
@@ -807,6 +815,8 @@ impl @counter {
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             return cmp == 1 || cmp == 0
+        } else {
+            error "Cannot compare counter with this type"
         }
     },
 
@@ -825,6 +835,8 @@ impl @counter {
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             return cmp == -1 || cmp == 0
+        } else {
+            error "Cannot compare counter with this type"
         }
     },
 
@@ -845,6 +857,8 @@ impl @counter {
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             return cmp == 0
+        } else {
+            error "Cannot compare counter with this type"
         }
     },
 
@@ -858,24 +872,55 @@ impl @counter {
     },
 
     _add_: (self, num) {
-        self.item.add(num)
+        if num.type == @number {
+            self.add(num)
+        } else if num.type == @counter {
+            num.clone().add_to([self])
+        } else {
+            error "Cannot add this type to counter"
+        }
     },
 
     _subtract_: (self, num) {
-        self.item.add(-num)
+        if num.type == @number {
+            self.add(-num)
+        } else if num.type == @counter {
+            num.clone().subtract_from([self])
+        } else {
+            error "Cannot subtract this type from counter"
+        }
     },
 
     _multiply_: (self, num) {
-        self.multiply(num)
+        
+        if num.type == @number {
+            self.multiply(num)
+        }/* else if num.type == @counter {
+            self.multiply(num.clone())
+        } else {
+            error "Cannot multiply counter by this type"
+        }*/
     },
 
     _divide_: (self, num) {
-        self.divide(num)
+        if num.type == @number {
+            self.divide(num)
+        } else if num.type == @counter {
+            self.divide(num.clone())
+        } else {
+            error "Cannot divide counter by this type"
+        }
     },
 
     _assign_: (self, num) {
         self.reset()
-        self.item.add(num)
+        if num.type == @number {
+            self.item.add(num)
+        } else if num.type == @counter {
+            num.clone().add_to([self])
+        } else {
+            error "Cannot assign this type to counter"
+        }
     },
 
     
@@ -988,13 +1033,14 @@ general_functions = {
         #[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument")] code: @macro, 
         #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number = 0.05, 
         #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true, 
-        #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1
+        #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1,
+        #[desc("Incrementation of the iterator")] increment: @number = 1
     ) {
         i = counter(start_val)
 
         func = {
             code(i)
-            i.add(1)
+            i.add(increment)
             i.item.if_is(SMALLER_THAN, end_val, {
                 call_with_delay(delay, func)
             })
@@ -1132,7 +1178,11 @@ return {
 
     counter: counter,
     call_with_delay: call_with_delay,
-    on: on, 
+    on: on,
+
+    operation_scale: (new: @number) {
+        DEFAULT_SPEED = new
+    }
 }
 
 

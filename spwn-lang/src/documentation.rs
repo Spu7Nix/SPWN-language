@@ -10,8 +10,9 @@ use std::path::PathBuf;
 pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     let mut globals = Globals::new(ParseNotes::new(), path.clone());
 
-    let (exports, implementations) = import_module(
+    let module = import_module(
         path,
+        &Context::new(),
         &mut globals,
         CompilerInfo {
             depth: 0,
@@ -21,10 +22,21 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
         },
     )?;
 
+    if module.len() > 1 {
+        return Err(RuntimeError::RuntimeError {
+            message: "Documentation of context-splitting libraries is not yet supported!"
+                .to_string(),
+            info: CompilerInfo::new(),
+        });
+    }
+
     let mut doc = format!(
         "# Documentation for `{}` \n",
         path.file_stem().unwrap().to_str().unwrap()
     );
+
+    let exports = globals.stored_values[module[0].0].clone();
+    let implementations = &module[0].1.implementations;
 
     doc += "_This file was generated using `spwn doc [file name]`_\n";
 

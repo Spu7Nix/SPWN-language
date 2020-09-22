@@ -4,7 +4,7 @@ mod ast;
 mod builtin;
 mod compiler;
 mod compiler_types;
-//mod documentation;
+mod documentation;
 mod fmt;
 mod levelstring;
 mod parser;
@@ -121,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(())
                 }
 
-                /*"doc" => {
+                "doc" => {
                     use std::fs::File;
                     use std::io::Write;
                     let lib_path = match args_iter.next() {
@@ -141,7 +141,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut output_file = File::create(output_path)?;
                     output_file.write_all(documentation.as_bytes())?;
                     Ok(())
-                }*/
+                }
                 "format" => {
                     use std::fs::File;
                     use std::io::Write;

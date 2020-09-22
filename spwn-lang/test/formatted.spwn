@@ -184,14 +184,14 @@ find_threads = {
 	    })
 	    if_result_not_zero({
 	        reset_result!
-	    
+	        
 	        //second in thread
 	        move_select!
 	        wait(0.05)
 	        get_from_board()
 	        next = {
 	    	    reset_result!
-	    
+	    	    
 	    	    //third in thread
 	    	    move_select!
 	    	    wait(0.05)
@@ -213,7 +213,7 @@ find_threads = {
 	    	    }
 	    	    failed3 = {
 	    		    reset_result!
-	    
+	    		    
 	    		    //check back
 	    		    for i in [1, 2, 3, 4] {
 	    			    move_select_back!
@@ -297,14 +297,14 @@ find_threads = {
     check_dir!
     wait_for_next_ready()
     reset_thread_type!
-
+    
     //look to the left
     look_x.add(-2)    //wait(0.05)
 
     check_dir!
     wait_for_next_ready()
     reset_thread_type!
-
+    
     //look down (0, 1)
     look_x.add(1)
     look_y.add(1)    //wait(0.05)
@@ -312,7 +312,7 @@ find_threads = {
     check_dir!
     wait_for_next_ready()
     reset_thread_type!
-
+    
     //look top right (1, -1)
     look_x.add(1)
     look_y.add(-2)    //wait(0.05)
@@ -320,14 +320,14 @@ find_threads = {
     check_dir!
     wait_for_next_ready()
     reset_thread_type!
-
+    
     //look top left (-1, -1)
     look_x.add(-2)    //wait(0.05)
 
     check_dir!
     wait_for_next_ready()
     reset_thread_type!
-
+    
     //look bottom right (1, 1)
     look_y.add(2)
     look_x.add(2)    //wait(0.05)
@@ -335,14 +335,14 @@ find_threads = {
     check_dir!
     wait_for_next_ready()
     reset_thread_type!
-
+    
     //look bottom left (-1, 1)
     look_x.add(-2)    //wait(0.05)
 
     check_dir!
     wait_for_next_ready()
     reset_thread_type!
-
+    
     //wait(0.05)
     look_x.add(1)
     look_y.add(-1)
@@ -379,7 +379,7 @@ on(collision(1b, 2b), {
             reset_lat!
             reset_selector_x!
             reset_selector_y!
-        
+            
             //gfb_vars.result.add(-1)
             //set to ai turn
             //wait(0.05)

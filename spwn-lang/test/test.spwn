@@ -1,10 +1,14 @@
+extract import "std.spwn"
+operation_scale(10)
 
-for i in 1..10 {
-	/*
-	do stuff
-		do stuff
-do stuff
-	*/
-	hello()
-}
 
+
+c = counter(1i)
+c.add(2)
+
+
+
+loop(0, 16, (){
+	
+	c *= 2
+})
