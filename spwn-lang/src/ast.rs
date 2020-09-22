@@ -94,6 +94,7 @@ pub enum Operator {
     Subtract,
     Multiply,
     Divide,
+    As,
 }
 
 #[derive(Clone, PartialEq, Debug)]

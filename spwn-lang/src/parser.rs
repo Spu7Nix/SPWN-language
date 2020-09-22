@@ -127,6 +127,9 @@ pub enum Token {
     #[token("/=")]
     Divide,
 
+    #[token("as")]
+    As,
+
     //VALUES
     #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)|\$")]
     Symbol,
@@ -352,7 +355,7 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    fn current(&self) -> Option<Token> {
+    /*fn current(&self) -> Option<Token> {
         let len = self.stack.len();
         if len == 0 {
             None
@@ -361,7 +364,7 @@ impl<'a> Tokens<'a> {
         } else {
             Some(self.stack[len - self.index - 1].0)
         }
-    }
+    }*/
 
     fn slice(&self) -> String {
         self.stack[self.stack.len() - self.index - 1].1.clone()
@@ -836,6 +839,7 @@ fn check_for_comment(tokens: &mut Tokens) -> Option<String> {
 fn operator_precedence(op: &ast::Operator) -> u8 {
     use ast::Operator::*;
     match op {
+        As => 9,
         Power => 8,
 
         Modulo => 7,
@@ -982,6 +986,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Subtract => Some(ast::Operator::Subtract),
         Token::Multiply => Some(ast::Operator::Multiply),
         Token::Divide => Some(ast::Operator::Divide),
+        Token::As => Some(ast::Operator::As),
         _ => None,
     }
 }

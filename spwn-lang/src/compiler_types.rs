@@ -945,6 +945,22 @@ impl ast::Expression {
                             info.clone(),
                         )?,
 
+                        As => handle_operator(
+                            acum_val.clone(),
+                            val,
+                            |acum_val, val, globals, c2| {
+                                Err(RuntimeError::RuntimeError {
+                                    message: "No _as_ macro defined for this type!".to_string(),
+                                    info: info.clone(),
+                                })
+                            },
+                            "_as_",
+                            "as",
+                            c2,
+                            globals,
+                            info.clone(),
+                        )?,
+
                         Add => handle_operator(
                             acum_val.clone(),
                             val,
