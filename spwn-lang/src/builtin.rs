@@ -64,29 +64,52 @@ impl Value {
             Some(match self {
                 Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
                     Some(value) => *value,
-                    None => {
-                        store_value(Value::TypeIndicator(self.to_num(globals)), globals, context)
-                    }
+                    None => store_value(
+                        Value::TypeIndicator(self.to_num(globals)),
+                        1,
+                        globals,
+                        context,
+                    ),
                 },
 
-                _ => store_value(Value::TypeIndicator(self.to_num(globals)), globals, context),
+                _ => store_value(
+                    Value::TypeIndicator(self.to_num(globals)),
+                    1,
+                    globals,
+                    context,
+                ),
             })
         } else {
             match self {
                 Value::Func(f) => {
                     if member == "group" {
-                        return Some(store_value(Value::Group(f.start_group), globals, context));
+                        return Some(store_value(
+                            Value::Group(f.start_group),
+                            1,
+                            globals,
+                            context,
+                        ));
                     }
                 }
 
                 Value::Str(a) => {
                     if member == "length" {
-                        return Some(store_value(Value::Number(a.len() as f64), globals, context));
+                        return Some(store_value(
+                            Value::Number(a.len() as f64),
+                            1,
+                            globals,
+                            context,
+                        ));
                     }
                 }
                 Value::Array(a) => {
                     if member == "length" {
-                        return Some(store_value(Value::Number(a.len() as f64), globals, context));
+                        return Some(store_value(
+                            Value::Number(a.len() as f64),
+                            1,
+                            globals,
+                            context,
+                        ));
                     }
                 }
                 _ => (),
@@ -97,6 +120,7 @@ impl Value {
             match self {
                 Value::Builtins => Some(store_value(
                     Value::BuiltinFunction(member),
+                    1,
                     globals,
                     context,
                 )),
@@ -106,7 +130,12 @@ impl Value {
                 },
                 Value::Func(f) => {
                     if &member == "start_group" {
-                        Some(store_value(Value::Group(f.start_group), globals, context))
+                        Some(store_value(
+                            Value::Group(f.start_group),
+                            1,
+                            globals,
+                            context,
+                        ))
                     } else {
                         get_impl(my_type, member).clone()
                     }

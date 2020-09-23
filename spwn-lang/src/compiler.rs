@@ -119,8 +119,8 @@ pub fn compile_spwn(
     let mut globals = Globals::new(notes, path);
     let start_context = Context::new();
     //store at pos 0
-    store_value(Value::Builtins, &mut globals, &start_context);
-    store_value(Value::Null, &mut globals, &start_context);
+    store_value(Value::Builtins, 1, &mut globals, &start_context);
+    store_value(Value::Null, 1, &mut globals, &start_context);
 
     println!("{:?}", globals.stored_values.map);
 
@@ -226,6 +226,8 @@ pub fn compile_scope(
 
     let mut returns: Returns = Vec::new();
 
+    globals.stored_values.increment_lifetimes();
+
     while let Some(statement) = statements_iter.next() {
         //find out what kind of statement this is
         //let start_time = Instant::now();
@@ -306,6 +308,7 @@ pub fn compile_scope(
                                 };
                                 let stored = store_const_value(
                                     Value::Func(Function { start_group }),
+                                    1,
                                     globals,
                                     &context,
                                 );
@@ -350,7 +353,10 @@ pub fn compile_scope(
                         //we dont care about the return value in this case
                         let (evaled, inner_returns) = expr.eval(context, globals, info.clone())?;
                         returns.extend(inner_returns);
-                        new_contexts.extend(evaled.iter().map(|x| x.1.clone()));
+                        new_contexts.extend(evaled.iter().map(|x| {
+                            //globals.stored_values.map.remove(&x.0);
+                            x.1.clone()
+                        }));
                     }
                     contexts = new_contexts;
                 }
@@ -375,6 +381,7 @@ pub fn compile_scope(
                             };
                             let stored = store_const_value(
                                 Value::Func(Function { start_group }),
+                                1,
                                 globals,
                                 &context,
                             );
@@ -428,6 +435,7 @@ pub fn compile_scope(
                             for name in BUILTIN_LIST.iter() {
                                 let p = store_value(
                                     Value::BuiltinFunction(String::from(*name)),
+                                    1,
                                     globals,
                                     &context,
                                 );
@@ -528,6 +536,7 @@ pub fn compile_scope(
                                 //Returns inside impl values dont really make sense do they
                                 returns.extend(inner_returns);
                                 for (val, c2) in evaled {
+                                    globals.stored_values.increment_single_lifetime(val, 1000);
                                     let mut new_context = c2.clone();
                                     if let Value::Dict(d) = &globals.stored_values[val] {
                                         match new_context.implementations.get_mut(&s) {
@@ -663,7 +672,7 @@ pub fn compile_scope(
                 None => {
                     let mut all_values: Returns = Vec::new();
                     for context in contexts.clone() {
-                        all_values.push((store_value(Value::Null, globals, &context), context));
+                        all_values.push((store_value(Value::Null, 1, globals, &context), context));
                     }
                     returns.extend(all_values);
                 }
@@ -701,6 +710,15 @@ pub fn compile_scope(
             start_time.elapsed().as_millis(),
         );*/
     }
+
+    //return values need longer lifetimes
+    for (val, _) in &returns {
+        globals.stored_values.increment_single_lifetime(*val, 1);
+    }
+
+    globals.stored_values.decrement_lifetimes();
+    //collect garbage
+    globals.stored_values.clean_up();
 
     //(*globals).highest_x = context.x;
     Ok((contexts, returns))

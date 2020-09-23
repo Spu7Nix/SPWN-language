@@ -13,8 +13,8 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     let mut globals = Globals::new(ParseNotes::new(), path.clone());
     let start_context = Context::new();
 
-    store_value(Value::Builtins, &mut globals, &start_context);
-    store_value(Value::Null, &mut globals, &start_context);
+    store_value(Value::Builtins, 1, &mut globals, &start_context);
+    store_value(Value::Null, 1, &mut globals, &start_context);
 
     let module = import_module(
         path,

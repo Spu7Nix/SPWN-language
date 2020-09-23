@@ -1,3 +1,4 @@
-import "libtest.spwn"
+//import "libtest.spwn"
+extract import "std.spwn"
 
-$.print("hello")
+10g.move(10, 10)
