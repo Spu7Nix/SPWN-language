@@ -3,7 +3,7 @@
 use crate::fmt::SpwnFmt;
 use std::path::PathBuf;
 
-use crate::compiler_types::Value;
+use crate::compiler_types::StoredValue;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
@@ -66,7 +66,7 @@ pub enum ValueBody {
     Array(Vec<Expression>),
     Obj(Vec<(Expression, Expression)>),
     Macro(Macro),
-    Resolved(Value),
+    Resolved(StoredValue),
     TypeIndicator(String),
     Null,
 }
@@ -166,6 +166,23 @@ pub struct Definition {
 pub struct Argument {
     pub symbol: Option<String>,
     pub value: Expression,
+}
+
+impl Argument {
+    pub fn from(val: StoredValue) -> Self {
+        Argument {
+            symbol: None,
+            value: Expression {
+                values: vec![Variable {
+                    value: ValueLiteral::new(ValueBody::Resolved(val)),
+                    path: Vec::new(),
+                    operator: None,
+                    comment: (None, None),
+                }],
+                operators: Vec::new(),
+            },
+        }
+    }
 }
 
 /*#[derive(Clone, PartialEq, Debug)]

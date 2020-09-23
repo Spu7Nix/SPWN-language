@@ -129,7 +129,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         None => return Err(std::boxed::Box::from("Expected script file argument")),
                     };
 
-                    let documentation = documentation::document_lib(&lib_path)?;
+                    let documentation = match documentation::document_lib(&lib_path) {
+                        Ok(doc) => doc,
+                        Err(e) => {
+                            eprintln!("{}", e);
+                            std::process::exit(256);
+                        }
+                    };
 
                     let mut output_path = lib_path.clone();
                     output_path.pop();

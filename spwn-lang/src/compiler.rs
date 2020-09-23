@@ -164,7 +164,7 @@ pub fn compile_spwn(
 
     println!(
         "
-Compiling script...
+Building script...
 ———————————————————————————
 "
     );
@@ -208,7 +208,7 @@ Compiling script...
     println!(
         "
 ———————————————————————————
-Compiled in {} milliseconds!
+Built in {} milliseconds!
 ",
         start_time.elapsed().as_millis()
     );

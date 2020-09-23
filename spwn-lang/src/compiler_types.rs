@@ -199,6 +199,132 @@ pub fn find_key_for_value<'a>(map: &'a HashMap<String, u16>, value: u16) -> Opti
         .find_map(|(key, &val)| if val == value { Some(key) } else { None })
 }
 
+pub fn convert_type(
+    val: Value,
+    typ: TypeID,
+    info: CompilerInfo,
+    globals: &Globals,
+) -> Result<Value, RuntimeError> {
+    if typ == 9 {
+        return Ok(Value::Str(val.to_str(globals)));
+    }
+
+    Ok(match &val {
+        Value::Number(n) => match typ {
+            0 => Value::Group(Group { id: *n as u16 }),
+            1 => Value::Color(Color { id: *n as u16 }),
+            2 => Value::Block(Block { id: *n as u16 }),
+            3 => Value::Item(Item { id: *n as u16 }),
+            4 => Value::Number(*n),
+            5 => Value::Bool(*n != 0.0),
+
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "Number can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info,
+                })
+            }
+        },
+
+        Value::Group(g) => match typ {
+            0 => val,
+            4 => Value::Number(g.id as f64),
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "Group can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info,
+                })
+            }
+        },
+
+        Value::Color(c) => match typ {
+            1 => val,
+            4 => Value::Number(c.id as f64),
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "Color can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info,
+                })
+            }
+        },
+
+        Value::Block(b) => match typ {
+            2 => val,
+            4 => Value::Number(b.id as f64),
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "Block ID can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info,
+                })
+            }
+        },
+
+        Value::Item(i) => match typ {
+            3 => val,
+            4 => Value::Number(i.id as f64),
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "Item ID can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info,
+                })
+            }
+        },
+
+        Value::Bool(b) => match typ {
+            5 => val,
+            4 => Value::Number(if *b { 1.0 } else { 0.0 }),
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "Boolean can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info,
+                })
+            }
+        },
+
+        Value::Func(f) => match typ {
+            6 => val,
+            0 => Value::Group(f.start_group),
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "Function can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info,
+                })
+            }
+        },
+
+        _ => {
+            return Err(RuntimeError::RuntimeError {
+                message: format!(
+                    "This value can't be converted to '{}'!",
+                    find_key_for_value(&globals.type_ids, typ).unwrap()
+                ),
+                info,
+            })
+        }
+    })
+}
+
 //use std::fmt;
 
 const MAX_DICT_EL_DISPLAY: u16 = 10;
@@ -434,23 +560,35 @@ where
         {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
                 let new_info = info.next(op_name, globals, false);
+                if m.args.is_empty() {
+                    return Err(RuntimeError::RuntimeError {
+                        message: String::from("Expected at least one argument in operator macro"),
+                        info: new_info,
+                    });
+                }
+                let val2 = globals.stored_values[value2].clone();
+
+                if let Some(target_typ) = m.args[0].3 {
+                    let val2storedtyp = val2
+                        .member(TYPE_MEMBER_NAME.to_string(), &context, globals)
+                        .unwrap();
+                    let val2typ = match &globals.stored_values[val2storedtyp] {
+                        Value::TypeIndicator(t) => t,
+                        _ => unreachable!(),
+                    };
+
+                    if *val2typ != target_typ {
+                        //if types dont match, act as if there is no macro at all
+                        return Ok(vec![(op(value1, value2, globals, &context)?, context)]);
+                    }
+                }
+
                 let (values, _) = execute_macro(
                     (
                         m,
-                        vec![ast::Argument {
-                            symbol: None,
-                            value: ast::Expression {
-                                values: vec![ast::Variable {
-                                    value: ast::ValueLiteral::new(ast::ValueBody::Resolved(
-                                        globals.stored_values[value2].clone(),
-                                    )),
-                                    path: Vec::new(),
-                                    operator: None,
-                                    comment: (None, None),
-                                }],
-                                operators: Vec::new(),
-                            },
-                        }],
+                        //copies argument so the original value can't be mutated
+                        //prevents side effects and shit
+                        vec![ast::Argument::from(store_value(val2, globals, &context))],
                     ),
                     context,
                     globals,
@@ -949,10 +1087,24 @@ impl ast::Expression {
                             acum_val.clone(),
                             val,
                             |acum_val, val, globals, c2| {
-                                Err(RuntimeError::RuntimeError {
-                                    message: "No _as_ macro defined for this type!".to_string(),
-                                    info: info.clone(),
-                                })
+                                if let Value::TypeIndicator(t) = &globals.stored_values[val] {
+                                    Ok(store_value(
+                                        convert_type(
+                                            globals.stored_values[acum_val].clone(),
+                                            *t,
+                                            info.clone(),
+                                            globals,
+                                        )?,
+                                        globals,
+                                        &c2,
+                                    ))
+                                } else {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "Expected a type-indicator to convert to!"
+                                            .to_string(),
+                                        info: info.clone(),
+                                    });
+                                }
                             },
                             "_as_",
                             "as",
@@ -1475,9 +1627,7 @@ impl ast::Variable {
         use ast::IDClass;
 
         match &self.value.body {
-            ast::ValueBody::Resolved(r) => {
-                start_val.push((store_value(r.clone(), globals, &context), context.clone()))
-            }
+            ast::ValueBody::Resolved(r) => start_val.push((*r, context.clone())),
             ast::ValueBody::ID(id) => start_val.push((
                 store_value(
                     match id.class_name {

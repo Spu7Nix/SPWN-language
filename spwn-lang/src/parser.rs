@@ -460,7 +460,7 @@ pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNot
         );*/
 
         match tokens.next(true, false) {
-            Some(Token::StatementSeparator) => {}
+            Some(Token::StatementSeparator) | None => {}
             Some(a) => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),

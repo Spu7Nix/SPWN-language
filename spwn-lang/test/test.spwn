@@ -1,14 +1,3 @@
-extract import "std.spwn"
-operation_scale(10)
+import "libtest.spwn"
 
-
-
-c = counter(1i)
-c.add(2)
-
-
-
-loop(0, 16, (){
-	
-	c *= 2
-})
+$.print("hello")

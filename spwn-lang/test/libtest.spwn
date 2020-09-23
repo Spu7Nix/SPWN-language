@@ -1,5 +1,7 @@
-
 //for testing spwn libraries
+
 extract import "std.spwn"
+
 a = counter(0)
+
 return a.to_const(0..10)

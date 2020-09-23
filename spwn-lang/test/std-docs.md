@@ -8,16 +8,16 @@ _This file was generated using `spwn doc [file name]`_
  ```
 
 {
-SINE_IN_OUT: 13,
-hide_player: () { /* code omitted */ },
-BOUNCE_OUT: 9,
-EXPONENTIAL_IN_OUT: 10,
-supress_signal: (delay: @number) { /* code omitted */ },
-BOUNCE_IN_OUT: 7,
-EASE_IN: 2,
 on: (event: @macro, function: @function) { /* code omitted */ },
-ELASTIC_IN: 5,
-show_player: () { /* code omitted */ },
+EASE_OUT: 3,
+ELASTIC_OUT: 6,
+operation_scale: (new: @number) { /* code omitted */ },
+SINE_IN: 14,
+loop: (start_val: @number, end_val: @number, code: @macro, delay: @number = 0.05, reset: @bool = true, reset_speed: @number = 1, increment: @number = 1) { /* code omitted */ },
+BOUNCE_OUT: 9,
+toggle_bg_effect: (on: @bool = false) { /* code omitted */ },
+BOUNCE_IN_OUT: 7,
+EXPONENTIAL_OUT: 12,
 ... (31 more)
 }
 
@@ -694,16 +694,16 @@ show_player: () { /* code omitted */ },
 > ```
 >
 >{
->HVS_ENABLED: 41,
->COLOR: 21,
->ACTIVATE_GROUP: 56,
->PLAYER_COLOR_2: 16,
->COUNT: 77,
->COLOR_2_HVS: 44,
->Y_OFFSET: 92,
->MOVE_X: 28,
->MAX_SPEED: 105,
->PORTAL_CHECKED: 13,
+>DISABLE_ROTATION: 98,
+>TARGET: 51,
+>ITEM: 80,
+>RANDOMIZE_START: 106,
+>TRIGGER_RED: 7,
+>ROTATION: 6,
+>TARGET_POS: 71,
+>DUAL_MODE: 89,
+>COLOR_2: 22,
+>EXCLUSIVE: 86,
 >... (83 more)
 >}
 >

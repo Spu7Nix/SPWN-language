@@ -2,17 +2,23 @@
 //use crate::ast::*;
 use crate::builtin::TYPE_MEMBER_NAME;
 use crate::compiler::{import_module, RuntimeError};
-use crate::compiler_types::{find_key_for_value, CompilerInfo, Context, Globals, Macro, Value};
+use crate::compiler_types::{
+    find_key_for_value, store_value, CompilerInfo, Context, Globals, Macro, Value,
+};
 use crate::parser::ParseNotes;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     let mut globals = Globals::new(ParseNotes::new(), path.clone());
+    let start_context = Context::new();
+
+    store_value(Value::Builtins, &mut globals, &start_context);
+    store_value(Value::Null, &mut globals, &start_context);
 
     let module = import_module(
         path,
-        &Context::new(),
+        &start_context,
         &mut globals,
         CompilerInfo {
             depth: 0,
