@@ -162,6 +162,8 @@ pub fn compile_spwn(
     };
     use std::time::Instant;
 
+    //println!("Importing standard library...");
+
     println!(
         "
 Building script...
@@ -743,14 +745,29 @@ pub fn import_module(
     globals: &mut Globals,
     info: CompilerInfo,
 ) -> Result<Returns, RuntimeError> {
-    let module_path = globals
+    let mut module_path = globals
         .path
         .clone()
         .parent()
         .expect("Your file must be in a folder to import modules!")
         .join(&path);
 
-    let unparsed = fs::read_to_string(module_path).expect("Something went wrong reading the file");
+    if module_path.is_dir() {
+        module_path = module_path.join("lib.spwn");
+    }
+
+    let unparsed = match fs::read_to_string(&module_path) {
+        Ok(content) => content,
+        Err(e) => {
+            return Err(RuntimeError::RuntimeError {
+                message: format!(
+                    "Something went wrong when opening library file ({:?}): {}",
+                    module_path, e
+                ),
+                info,
+            })
+        }
+    };
     let (parsed, notes) = match crate::parse_spwn(unparsed) {
         Ok(p) => p,
         Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
@@ -759,8 +776,13 @@ pub fn import_module(
     (*globals).closed_colors.extend(notes.closed_colors);
     (*globals).closed_blocks.extend(notes.closed_blocks);
     (*globals).closed_items.extend(notes.closed_items);
+
+    let stored_path = globals.path.clone();
+    (*globals).path = module_path;
+
     let new_info = info.next("module", globals, false);
     let (contexts, returns) = compile_scope(&parsed, vec![Context::new()], globals, new_info)?;
+    (*globals).path = stored_path;
 
     Ok(if returns.is_empty() {
         contexts

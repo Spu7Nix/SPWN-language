@@ -1,6 +1,6 @@
 //hello
 
-extract import "std.spwn";
+extract import "./std";
 
 //groups defined in level
 //tst

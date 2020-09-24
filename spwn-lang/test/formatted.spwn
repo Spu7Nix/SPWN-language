@@ -1,4 +1,4 @@
-let constants = import "constants.spwn"
+let constants = import "./std"
 extract constants.obj_props
 extract constants.comparisons
 extract constants.easing_types
@@ -349,39 +349,39 @@ impl @counter {
     	    temp.add_to([self.item], speed)
         }
     
-        /* else if factor.type == @counter {
+        else if factor.type == @counter {
     		    
-    		    temp = counter(0)
-    		    mini_mult = (num){
-    			    mult = {
-    				    
-    				    self.item.if_is(LARGER_THAN, num - 1, {
-    					    self.item.add(-num)
-    					    factor.copy_to(temp.item, speed, num)
-    					    
-    					    
-    					    call_with_delay(0.1, mult)
-    				    })
-    					    
-    				    self.item.if_is(SMALLER_THAN, num, {
-    					    wait(0.1)
-    					    supress_signal(0.11)
-    					    return
-    				    })
-    			    }
-    			    mult!
-    		    }
-    		    
-    
-    		    for i in speed..0 {
-    			    mini_mult(2^i)
-    		    }
-    		    
-    		    
-    		    -> factor.reset(speed)
-    		    temp.add_to([self.item], speed * 2)
-    		    
-    	    }*/
+            temp = counter(0)
+            mini_mult = (num){
+                mult = {
+                    
+                    self.item.if_is(LARGER_THAN, num - 1, {
+                        self.item.add(-num)
+                        factor.copy_to(temp.item, speed, num)
+                        
+                        
+                        call_with_delay(0.1, mult)
+                    })
+                        
+                    self.item.if_is(SMALLER_THAN, num, {
+                        wait(0.1)
+                        supress_signal(0.11)
+                        return
+                    })
+                }
+                mult!
+            }
+            
+
+            for i in speed..0 {
+                mini_mult(2^i)
+            }
+            
+            
+            -> factor.reset(speed)
+            temp.add_to([self.item], speed * 2)
+            
+        }
     },
     divide: #[desc("Devides the value of the counter by some divisor")] (
         self,

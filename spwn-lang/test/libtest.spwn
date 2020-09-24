@@ -1,6 +1,6 @@
 //for testing spwn libraries
 
-extract import "std.spwn"
+extract import "./std"
 
 a = counter(0)
 

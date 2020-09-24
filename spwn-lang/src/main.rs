@@ -22,6 +22,8 @@ use std::path::PathBuf;
 extern crate lazy_static;
 use std::fs;
 
+pub const STD_PATH: &str = "../std";
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let mut args_iter = args.iter();

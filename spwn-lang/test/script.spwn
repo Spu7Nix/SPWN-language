@@ -1,6 +1,6 @@
 
 
-extract import "std.spwn"
+extract import "./std"
 
 extract obj_props
 

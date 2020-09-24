@@ -1,5 +1,5 @@
 //import "libtest.spwn"
-extract import "std.spwn"
+extract import "../std"
 
 wait(1)
 

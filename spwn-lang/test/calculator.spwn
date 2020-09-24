@@ -1,6 +1,6 @@
 
 
-extract import "std.spwn"
+extract import "./std"
 
 main = counter(1i)
 
