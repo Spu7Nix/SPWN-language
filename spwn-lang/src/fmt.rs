@@ -261,7 +261,12 @@ impl SpwnFmt for ValueBody {
             Expression(x) => format!("({})", x.fmt(ind)),
             Str(x) => format!("\"{}\"", x),
             Import(x) => format!("import {:?}", x),
-            Obj(x) => element_list(x, '{', '}', ind),
+            Obj(x) => {
+                (match x.mode {
+                    ObjectMode::Object => "obj".to_string(),
+                    ObjectMode::Trigger => "trigger".to_string(),
+                }) + &element_list(&x.props, '{', '}', ind)
+            }
             Macro(x) => format!("{}", x.fmt(ind)),
             Resolved(_) => format!("<val>"),
             TypeIndicator(x) => format!("@{}", x),

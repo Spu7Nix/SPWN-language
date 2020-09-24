@@ -1,4 +1,15 @@
 //import "libtest.spwn"
 extract import "std.spwn"
 
-10g.move(10, 10)
+wait(1)
+
+extract obj_props
+
+$.add(obj {
+	OBJ_ID: 1,
+	X: 10,
+	Y: 10
+})
+
+/* 1,1268,2,0,3,2115,51,1,57,0.1111,62,0,63,1,108,1;
+1,1,2,0,3,2085,57,1111,*/

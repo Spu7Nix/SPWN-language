@@ -213,6 +213,9 @@ pub enum Token {
     #[token("obj")]
     Object,
 
+    #[token("trigger")]
+    Trigger,
+
     #[token("import")]
     Import,
 
@@ -1644,7 +1647,15 @@ fn parse_variable(
             }
         }
 
-        Some(Token::Object) => ast::ValueBody::Obj(parse_object(tokens, notes)?),
+        Some(Token::Object) => ast::ValueBody::Obj(ast::ObjectLiteral {
+            props: parse_object(tokens, notes)?,
+            mode: ast::ObjectMode::Object,
+        }),
+
+        Some(Token::Trigger) => ast::ValueBody::Obj(ast::ObjectLiteral {
+            props: parse_object(tokens, notes)?,
+            mode: ast::ObjectMode::Trigger,
+        }),
 
         a => {
             return Err(SyntaxError::ExpectedErr {

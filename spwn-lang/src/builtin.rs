@@ -1,5 +1,6 @@
 //! Defining all native types (and functions?)
 
+use crate::ast::ObjectMode;
 use crate::compiler::RuntimeError;
 use crate::compiler_types::*;
 use crate::levelstring::*;
@@ -42,6 +43,7 @@ pub fn context_trigger(context: Context, _globals: &mut Globals, info: CompilerI
     GDObj {
         params: HashMap::new(),
         func_id: info.func_id,
+        mode: ObjectMode::Trigger,
     }
 }
 
@@ -238,7 +240,7 @@ pub fn built_in_function(
             }
 
             match &arguments[0] {
-                Value::Obj(obj) => {
+                Value::Obj(obj, mode) => {
                     let c_t = context_trigger(context.clone(), globals, info.clone());
                     let mut obj_map = HashMap::<u16, String>::new();
 
@@ -246,14 +248,19 @@ pub fn built_in_function(
                         obj_map.insert(p.0, p.1.clone());
                     }
 
-                    (*globals).func_ids[info.func_id].obj_list.push(
-                        GDObj {
+                    (*globals).func_ids[info.func_id].obj_list.push(match mode {
+                        ObjectMode::Object => GDObj {
                             params: obj_map.clone(),
-
+                            func_id: info.func_id,
+                            mode: ObjectMode::Object,
+                        },
+                        ObjectMode::Trigger => GDObj {
+                            params: obj_map.clone(),
+                            mode: ObjectMode::Trigger,
                             ..c_t
                         }
                         .context_parameters(context.clone()),
-                    );
+                    });
                 }
 
                 a => {

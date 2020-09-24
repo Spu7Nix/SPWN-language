@@ -1,4 +1,5 @@
 // useful things for dealing with gd level data
+use crate::ast::ObjectMode;
 use crate::builtin::*;
 use crate::compiler_types::*;
 use std::collections::HashMap;
@@ -10,6 +11,7 @@ pub struct GDObj {
     pub spawn_triggered: bool,*/
     pub func_id: usize,
     pub params: HashMap<u16, String>,
+    pub mode: ObjectMode,
 }
 
 impl GDObj {
@@ -90,7 +92,7 @@ const START_HEIGHT: u16 = 10;
 const MAX_HEIGHT: u16 = 40;
 
 pub const SPWN_SIGNATURE_GROUP: &str = "1111";
-
+//use crate::ast::ObjectMode;
 pub fn serialize_triggers(objects: Vec<GDObj>) -> String {
     /*fn group_string(list: Vec<Group>) -> String {
         let mut string = String::new();
@@ -103,74 +105,52 @@ pub fn serialize_triggers(objects: Vec<GDObj>) -> String {
 
     fn serialize_obj(mut trigger: GDObj) -> String {
         let mut obj_string = String::new();
-        /*format!(
-            "1,{},2,{},3,{},51,{}",
-            trigger.obj_id,
-            if trigger.spawn_triggered {
-                x * 30 + 15
-            } else {
-                0
-            },
-            (80 - y) * 30 + 15,
-            trigger.target.id
-        );*/
+        match trigger.mode {
+            ObjectMode::Object => {
+                match trigger.params.get_mut(&57) {
+                    Some(group_str) => (*group_str) += &format!(".{}", SPWN_SIGNATURE_GROUP),
+                    None => {
+                        trigger.params.insert(57, SPWN_SIGNATURE_GROUP.to_string());
+                    }
+                };
 
-        let spawned = match trigger.params.get(&62) {
-            Some(s) => *s == String::from("1"),
-            None => false,
-        };
+                let mut param_list = trigger.params.iter().collect::<Vec<(&u16, &String)>>();
 
-        /*let obj_id = match trigger.params.get(&1) {
-            Some(s) => s,
-            None => "0",
-        };
+                param_list.sort_by(|a, b| (*a.0).cmp(b.0));
 
-        let target = match trigger.params.get(&51) {
-            Some(s) => s,
-            None => "0",
-        };
+                for param in param_list {
+                    obj_string += &(param.0.to_string() + "," + &param.1 + ",");
+                }
 
-        let keys = [1, 51];
-        let values = [obj_id, trigger.target.id];
+                obj_string + ";"
+            }
+            ObjectMode::Trigger => {
+                let spawned = match trigger.params.get(&62) {
+                    Some(s) => *s == String::from("1"),
+                    None => false,
+                };
 
-        for i in 0..2 {
-            if !trigger.params.iter().any(|x| *x.0 == keys[i]) {
-                obj_string += &format!("{},{},", keys[i].to_string(), values[i].to_string());
+                if spawned {
+                    obj_string += "87,1,";
+                }
+
+                match trigger.params.get_mut(&57) {
+                    Some(group_str) => (*group_str) += &format!(".{}", SPWN_SIGNATURE_GROUP),
+                    None => {
+                        trigger.params.insert(57, SPWN_SIGNATURE_GROUP.to_string());
+                    }
+                };
+
+                let mut param_list = trigger.params.iter().collect::<Vec<(&u16, &String)>>();
+
+                param_list.sort_by(|a, b| (*a.0).cmp(b.0));
+
+                for param in param_list {
+                    obj_string += &(param.0.to_string() + "," + &param.1 + ",");
+                }
+                obj_string + "108,1;" //linked group
             }
         }
-
-        if spawned {
-            obj_string += "62,1,87,1,";
-        }
-
-        if !trigger.groups.is_empty() {
-            obj_string += &(String::from("57,")
-                + &group_string(trigger.groups)
-                + "."
-                + SPWN_SIGNATURE_GROUP
-                + ",");
-        }*/
-
-        if spawned {
-            obj_string += "87,1,";
-        }
-
-        match trigger.params.get_mut(&57) {
-            Some(group_str) => (*group_str) += &format!(".{}", SPWN_SIGNATURE_GROUP),
-            None => {
-                trigger.params.insert(57, SPWN_SIGNATURE_GROUP.to_string());
-            }
-        };
-
-        let mut param_list = trigger.params.iter().collect::<Vec<(&u16, &String)>>();
-
-        param_list.sort_by(|a, b| (*a.0).cmp(b.0));
-
-        for param in param_list {
-            obj_string += &(param.0.to_string() + "," + &param.1 + ",");
-        }
-        //println!("{}", obj_string);
-        obj_string + "108,1;" //linked group
     }
 
     let mut full_obj_string = String::new();
@@ -209,23 +189,30 @@ pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
         let possible_height = MAX_HEIGHT - (START_HEIGHT + y_offset); //30 is max (TODO: case for if y_offset is more than 30)
 
         for (i, obj) in id.obj_list.iter().enumerate() {
-            let y_pos = (i as u16) % possible_height + START_HEIGHT + y_offset;
-            let x_pos = (i as f64 / possible_height as f64).floor() as u32 + x_offset;
+            match obj.mode {
+                ObjectMode::Object => {
+                    objects.push(obj.clone());
+                }
+                ObjectMode::Trigger => {
+                    let y_pos = (i as u16) % possible_height + START_HEIGHT + y_offset;
+                    let x_pos = (i as f64 / possible_height as f64).floor() as u32 + x_offset;
 
-            let mut new_obj = obj.clone();
-            new_obj.params.insert(
-                2,
-                (if new_obj.params.get(&62) == Some(&String::from("1")) {
-                    x_pos * 30 + 15
-                } else {
-                    0
-                })
-                .to_string(),
-            );
-            new_obj
-                .params
-                .insert(3, ((80 - y_pos) * 30 + 15).to_string());
-            objects.push(new_obj);
+                    let mut new_obj = obj.clone();
+                    new_obj.params.insert(
+                        2,
+                        (if new_obj.params.get(&62) == Some(&String::from("1")) {
+                            x_pos * 30 + 15
+                        } else {
+                            0
+                        })
+                        .to_string(),
+                    );
+                    new_obj
+                        .params
+                        .insert(3, ((80 - y_pos) * 30 + 15).to_string());
+                    objects.push(new_obj);
+                }
+            }
         }
         if !id.obj_list.is_empty() {
             current_x += (id.obj_list.len() as f64 / possible_height as f64).floor() as u32 + 1;

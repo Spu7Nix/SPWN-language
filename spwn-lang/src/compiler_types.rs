@@ -214,7 +214,7 @@ pub enum Value {
     Macro(Macro),
     Str(String),
     Array(Vec<StoredValue>),
-    Obj(Vec<(u16, String)>),
+    Obj(Vec<(u16, String)>, ast::ObjectMode),
     Builtins,
     BuiltinFunction(String),
     TypeIndicator(TypeID),
@@ -243,7 +243,10 @@ impl Value {
             Value::Macro(_) => 8,
             Value::Str(_) => 9,
             Value::Array(_) => 10,
-            Value::Obj(_) => 11,
+            Value::Obj(_, mode) => match mode {
+                ast::ObjectMode::Object => 11,
+                ast::ObjectMode::Trigger => 16,
+            },
             Value::Builtins => 12,
             Value::BuiltinFunction(_) => 13,
             Value::TypeIndicator(_) => 14,
@@ -463,7 +466,7 @@ impl Value {
                     out
                 }
             }
-            Value::Obj(o) => {
+            Value::Obj(o, _) => {
                 let mut out = String::new();
                 for (key, val) in o {
                     out += &format!("{},{},", key, val);
@@ -593,6 +596,7 @@ impl Globals {
         globals.type_ids.insert(String::from("builtin"), 13);
         globals.type_ids.insert(String::from("type_indicator"), 14);
         globals.type_ids.insert(String::from("null"), 15);
+        globals.type_ids.insert(String::from("trigger"), 16);
 
         globals
     }
@@ -1839,7 +1843,7 @@ impl ast::Variable {
             }
             ast::ValueBody::Obj(o) => {
                 let mut all_expr: Vec<ast::Expression> = Vec::new();
-                for prop in o {
+                for prop in &o.props {
                     all_expr.push(prop.0.clone());
                     all_expr.push(prop.1.clone());
                 }
@@ -1849,7 +1853,7 @@ impl ast::Variable {
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, String)> = Vec::new();
-                    for i in 0..(o.len()) {
+                    for i in 0..(o.props.len()) {
                         let v = expressions[i * 2].clone();
                         let v2 = expressions[i * 2 + 1].clone();
 
@@ -1897,7 +1901,10 @@ impl ast::Variable {
                             },
                         ))
                     }
-                    start_val.push((store_value(Value::Obj(obj), 1, globals, &context), context));
+                    start_val.push((
+                        store_value(Value::Obj(obj, o.mode), 1, globals, &context),
+                        context,
+                    ));
                 }
             }
 

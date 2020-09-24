@@ -64,11 +64,23 @@ pub enum ValueBody {
     Str(String),
     Import(PathBuf),
     Array(Vec<Expression>),
-    Obj(Vec<(Expression, Expression)>),
+    Obj(ObjectLiteral),
     Macro(Macro),
     Resolved(StoredValue),
     TypeIndicator(String),
     Null,
+}
+
+#[derive(Clone, PartialEq, Debug, Copy)]
+pub enum ObjectMode {
+    Object,
+    Trigger,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct ObjectLiteral {
+    pub props: Vec<(Expression, Expression)>,
+    pub mode: ObjectMode,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]

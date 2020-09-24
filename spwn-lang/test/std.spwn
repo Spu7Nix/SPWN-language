@@ -9,7 +9,7 @@ wait = #[desc("Adds a delay before the next triggers")] (
     #[desc("Delay time in seconds")] time: @number
 ){
     
-    $.add( obj{
+    $.add( trigger{
         OBJ_ID: 1268,
         SPAWN_DURATION: time,
         TARGET: {
@@ -23,7 +23,7 @@ call_with_delay = #[desc("Call a function after a delay")] (
     #[desc("Delay time in seconds")] time: @number, 
     #[desc("Function to call after the delay")] function: @function
 ) {
-    $.add(obj{
+    $.add(trigger{
         OBJ_ID: 1268,
         SPAWN_DURATION: time,
         TARGET: function,
@@ -40,7 +40,7 @@ impl @group {
         easing: @number = NONE, 
         easing_rate: @number = 2
     ) {
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 901,
             TARGET: self,
             MOVE_X: x * 3,
@@ -55,7 +55,7 @@ impl @group {
 
     stop: #[desc("Implementation of the stop trigger")]
     (self){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1616,
             TARGET: self,
         })
@@ -63,7 +63,7 @@ impl @group {
 
     alpha: #[desc("Implementation of the alpha trigger")] 
     (self, opacity: @number = 1, duration: @number = 0){
-        $.add( obj {
+        $.add( trigger {
             OBJ_ID: 1007,
             TARGET: self,
             OPACITY: opacity,
@@ -75,7 +75,7 @@ impl @group {
     toggle_on:
     #[desc("Toggles the group on")] 
     (self){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1049,
             TARGET: self,
             ACTIVATE_GROUP: true,
@@ -84,7 +84,7 @@ impl @group {
 
     toggle_off: #[desc("Toggles the group off")] 
     (self){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1049,
             TARGET: self,
             ACTIVATE_GROUP: false,
@@ -101,7 +101,7 @@ impl @group {
         #[desc("Easing rate")] easing_rate: @number = 2, 
         #[desc("Only rotate positions of the objects, not the textures")] lock_object_rotation: @bool = false
     ){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1346,
             TARGET: self,
             CENTER: center,
@@ -123,7 +123,7 @@ impl @group {
         #[desc("Multiplier for the movement on the Y-axis")] y_mod: @number = 1, 
         #[desc("Duration of following")] duration: @number = 999
     ){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1347,
             X_MOD: x_mod,
             Y_MOD: y_mod,
@@ -144,7 +144,7 @@ impl @group {
         #[desc("Maximum speed")] max_speed: @number = 0, 
         #[desc("Duration of following")] duration: @number = 999
     ){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1814,
             SPEED : speed,
             DELAY : delay,
@@ -166,7 +166,7 @@ impl @group {
         #[desc("Easing type")] easing: @number = NONE, 
         #[desc("Easing rate")] easing_rate: @number = 2
     ) {
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 901,
             TARGET: self,
             USE_TARGET: true,
@@ -204,7 +204,7 @@ impl @group {
         #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: @bool = false,
         #[desc("Toggle HSV mode")] hsv: @bool = false
     ) {
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1006,
             TRIGGER_RED: r,
             TRIGGER_GREEN: g,
@@ -237,7 +237,7 @@ impl @color {
         #[desc("Opacity of target color")] opacity: @number = 1, 
         #[desc("Toggle blending on target color")] blending: @bool = false
     ){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 899,
             DURATION: duration,
             TRIGGER_RED: r,
@@ -262,7 +262,7 @@ impl @color {
         #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: @bool = false,
         #[desc("Toggle HSV mode")] hsv: @bool = false
     ) {
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1006,
             TRIGGER_RED: r,
             TRIGGER_GREEN: g,
@@ -295,7 +295,7 @@ impl @item {
     add:
     #[desc("Implementation of the pickup trigger")]
     (self, #[desc("Amount to add")] amount: @number) {
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1817,
             COUNT: amount,
             ITEM: self,
@@ -310,7 +310,7 @@ impl @item {
         #[desc("Number to compare with")] other: @number, 
         #[desc("Target function if comparison is 'true'")] function: @function
     ) {
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1811,
             TARGET: function,
             COUNT: other,
@@ -327,7 +327,7 @@ impl @item {
         #[desc("Number to check against")] number: @number = 0
     ) {
         return (function) {
-            $.add( obj{
+            $.add( trigger{
                 OBJ_ID: 1611,
                 TARGET: function,
                 COUNT: number,
@@ -979,7 +979,7 @@ general_functions = {
         #[desc("Interval value")] interval: @number = 0,
         #[desc("Duration of shake")] duration: @number = 0.5
     ){
-        $.add( obj {
+        $.add( trigger {
             OBJ_ID: 1520,
             STRENGTH: strength,
             INTERVAL: interval,
@@ -989,25 +989,25 @@ general_functions = {
     },
 
     disable_trail: #[desc("Disables the player's trail")] (){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 33,
         })
     },
 
     enable_trail: #[desc("Enables the player's trail")] (){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 32,
         })
     },
 
     show_player: #[desc("Shows the player")] (){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1613,
         })
     },
     
     hide_player: #[desc("Hides the player")] (){
-        $.add( obj{
+        $.add( trigger{
             OBJ_ID: 1612,
         })
     },
@@ -1016,11 +1016,11 @@ general_functions = {
         #[desc("Weather to toggle bg effect on or off")] on: @bool = false
     ) {
         if on {
-            $.add( obj{
+            $.add( trigger{
                 OBJ_ID: 1818,
             })
         } else {
-            $.add( obj{
+            $.add( trigger{
                 OBJ_ID: 1819,
             })
         }
@@ -1075,7 +1075,7 @@ events = {
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side = false
     ) {
         return (function){
-            $.add( obj{
+            $.add( trigger{
                 OBJ_ID: 1595,
                 HOLD_MODE: true,
                 TOGGLE_MODE: 1,
@@ -1090,7 +1090,7 @@ events = {
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side = false
     ) {
         return (function){
-            $.add( obj{
+            $.add( trigger{
                 OBJ_ID: 1595,
                 HOLD_MODE: true,
                 TOGGLE_MODE: 2,
@@ -1106,7 +1106,7 @@ events = {
         #[desc("Block B ID")] b
     ) {
         return (function){
-            $.add( obj{
+            $.add( trigger{
                 OBJ_ID: 1815,
                 BLOCK_A: a,
                 BLOCK_B: b,
@@ -1122,7 +1122,7 @@ events = {
         #[desc("Block B ID")] b
     ) {
         return (function){
-            $.add( obj{
+            $.add( trigger{
                 OBJ_ID: 1815,
                 BLOCK_A: a,
                 BLOCK_B: b,
@@ -1136,7 +1136,7 @@ events = {
 
     death: #[desc("Returns an event for when the player dies")] (){
         return (function) {
-            $.add( obj{
+            $.add( trigger{
                 OBJ_ID: 1812,
                 ACTIVATE_GROUP: true,
                 TARGET: function
