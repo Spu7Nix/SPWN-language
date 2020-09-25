@@ -22,6 +22,7 @@ fn traverse(
                     //only continue if this is the only connection to this trigger
                     if count_inputs(&obj.0, group_map) > 1 {
                         return vec![(current_chain, true)];
+                        
                     }
 
                     match group_map.get(group) {

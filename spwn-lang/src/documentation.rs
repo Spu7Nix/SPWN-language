@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     let mut globals = Globals::new(ParseNotes::new(), path.clone());
+    //println!("{:?}", globals);
     let start_context = Context::new();
 
     store_value(Value::Builtins, 1, &mut globals, &start_context);
@@ -45,6 +46,32 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     let implementations = &module[0].1.implementations;
 
     doc += "_This file was generated using `spwn doc [file name]`_\n";
+
+    let used_groups = globals.closed_groups.len();
+    let used_colors = globals.closed_colors.len();
+    let used_blocks = globals.closed_blocks.len();
+    let used_items = globals.closed_items.len();
+
+    let total_objects = globals.func_ids.iter().fold(0, |mut sum, val| {
+        sum += val.obj_list.len();
+        sum
+    });
+
+    //if used_groups > 0 || used_colors > 0 || used_blocks > 0 || used_used > 0 {
+    doc += "## Info:\n";
+    //}
+
+    doc += &format!(
+        "
+- Uses {} groups
+- Uses {} colors
+- Uses {} block IDs
+- Uses {} item IDs
+
+- Adds {} objects
+",
+        used_groups, used_colors, used_blocks, used_items, total_objects
+    );
 
     doc += &format!("## Exports:\n{}", document_val(&exports, &mut globals));
 
@@ -166,10 +193,9 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
             }
 
             if let Some(def_val) = arg.1.clone() {
-                arg_string += &format!(
-                    "\n\n_Default value:_\n\n{}\n\n",
-                    document_val(&def_val, globals)
-                );
+                let val = &globals.stored_values[def_val].clone();
+                arg_string +=
+                    &format!("\n\n_Default value:_\n\n{}\n\n", document_val(val, globals));
             }
 
             add_arrows(&mut arg_string);

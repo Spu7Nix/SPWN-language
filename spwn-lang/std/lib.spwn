@@ -483,7 +483,7 @@ impl @counter {
             temp = counter(0)
             self.add_to([temp.item], speed, factor)
             temp.add_to([self.item], speed)
-        }/* else if factor.type == @counter {
+        } else if factor.type == @counter {
             
             temp = counter(0)
             mini_mult = (num){
@@ -515,22 +515,22 @@ impl @counter {
             -> factor.reset(speed)
             temp.add_to([self.item], speed * 2)
             
-        }*/
+        }
     },
 
 
     divide: #[desc("Devides the value of the counter by some divisor")]
     (
         self, 
-        #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor, 
+        #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor,
+        #[desc("Counter to set to the remainder value")] remainder: @counter = {id: ?i, type: @counter},
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
-        #[desc("Item ID to add the remainder of the division to")] rest_item: @item = ?i
+        
     ) {
+        
 
         if divisor.type == @number {
             result = counter(0)
-
-            rest = counter(rest_item)
 
             div = {
                 mini_div = (num) {
@@ -552,15 +552,16 @@ impl @counter {
                 self.item.if_is(SMALLER_THAN, divisor, {
                     
                     wait(0.05)
-                    self.add_to([rest.item], speed)
+                    self.add_to([remainder.item], speed)
                     result.add_to([self.item], speed)
                     supress_signal(0.06)
-                    return rest
+                    return remainder
                 })
             }
             div!
         } else if divisor.type == @counter {
             result = counter(0)
+            remainder.reset(speed)
 
             // IDEA:
             // every time it goes under, undo the previous operation to simulate comparison
@@ -634,10 +635,11 @@ impl @counter {
                 wait(0.1)
             }
             -> divisor.reset(speed)
-            self.add_to([rest_item], speed*2)
+            self.add_to([remainder.item], speed*2)
+            
             result.add_to([self.item], speed*2)
             wait(0.2)
-            return counter(rest_item)
+            return remainder
             
             
          

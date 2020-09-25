@@ -139,6 +139,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     };
 
+                    //println!("doc {:?}", documentation);
+
                     let mut output_path = lib_path.clone();
                     output_path.pop();
                     output_path.push(PathBuf::from(format!(
@@ -146,8 +148,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         lib_path.file_stem().unwrap().to_str().unwrap()
                     )));
 
-                    let mut output_file = File::create(output_path)?;
+                    let mut output_file = File::create(&output_path)?;
                     output_file.write_all(documentation.as_bytes())?;
+                    println!("written to {:?}", output_path);
                     Ok(())
                 }
                 "format" => {

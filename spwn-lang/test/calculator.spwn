@@ -1,6 +1,6 @@
 
 
-extract import "./std"
+extract import "../std"
 
 main = counter(1i)
 
@@ -181,7 +181,7 @@ solve = {
 			death.toggle_on()
 			no_text.toggle_on()
 		})
-		secondary.divide(main, 4, rest_item = remainder_display.item)
+		secondary.divide(main, remainder_display, 4)
 		show_remainder!
 		
 

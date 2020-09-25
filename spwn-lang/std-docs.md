@@ -1,5 +1,13 @@
 # Documentation for `std` 
 _This file was generated using `spwn doc [file name]`_
+## Info:
+
+- Uses 0 groups
+- Uses 1 colors
+- Uses 0 block IDs
+- Uses 1 item IDs
+
+- Adds 0 objects
 ## Exports:
 **Type:** `dictionary` 
 
@@ -8,16 +16,16 @@ _This file was generated using `spwn doc [file name]`_
  ```
 
 {
+EXPONENTIAL_IN_OUT: 10,
+wait: (time: @number) { /* code omitted */ },
+call_with_delay: (time: @number, function: @function) { /* code omitted */ },
 on: (event: @macro, function: @function) { /* code omitted */ },
-EASE_OUT: 3,
-ELASTIC_OUT: 6,
-operation_scale: (new: @number) { /* code omitted */ },
-SINE_IN: 14,
-loop: (start_val: @number, end_val: @number, code: @macro, delay: @number = 0.05, reset: @bool = true, reset_speed: @number = 1, increment: @number = 1) { /* code omitted */ },
-BOUNCE_OUT: 9,
-toggle_bg_effect: (on: @bool = false) { /* code omitted */ },
-BOUNCE_IN_OUT: 7,
-EXPONENTIAL_OUT: 12,
+BACK_OUT: 18,
+disable_trail: () { /* code omitted */ },
+touch_end: (dual_side = false) { /* code omitted */ },
+supress_signal: (delay: @number) { /* code omitted */ },
+hide_player: () { /* code omitted */ },
+EXPONENTIAL_IN: 11,
 ... (31 more)
 }
 
@@ -694,16 +702,16 @@ EXPONENTIAL_OUT: 12,
 > ```
 >
 >{
->DISABLE_ROTATION: 98,
->TARGET: 51,
->ITEM: 80,
->RANDOMIZE_START: 106,
->TRIGGER_RED: 7,
->ROTATION: 6,
->TARGET_POS: 71,
->DUAL_MODE: 89,
->COLOR_2: 22,
->EXCLUSIVE: 86,
+>INTERVAL: 84,
+>ANIMATION_SPEED: 107,
+>MAX_SPEED: 105,
+>DYNAMIC_BLOCK: 94,
+>HOLD_MODE: 81,
+>COLOR_2_HVS_ENABLED: 42,
+>ANIMATION_ID: 76,
+>COLOR: 21,
+>TRIGGER_GREEN: 8,
+>CENTER: 71,
 >... (83 more)
 >}
 >
@@ -2857,12 +2865,65 @@ EXPONENTIAL_OUT: 12,
 
 >**Type:** `macro` 
 >
->**Literal:** ```(self, divisor, speed: @number = 3, rest_item: @item = 1i) { /* code omitted */ }``` 
+>**Literal:** 
+>
+> ```
+>
+>(self, divisor, remainder: @counter = {
+>id: 1i,
+>type: @counter
+>}, speed: @number = 3) { /* code omitted */ }
+>
+>``` 
 >
 >## Description: 
 > _Devides the value of the counter by some divisor_
 >## Arguments:
 >> **`divisor`** _(obligatory)_: _Divisor to divide by, either another counter (very expensive) or a normal number_
+>
+>
+>
+>
+>> _`remainder` (optional)_ : _Counter to set to the remainder value_
+>>
+>>_Default value:_
+>>
+>>**Type:** `counter` 
+>>
+>>**Literal:** 
+>>
+>> ```
+>>
+>>{
+>>id: 1i,
+>>type: @counter
+>>}
+>>
+>>``` 
+>>
+>><details>
+>><summary> View members </summary>
+>>
+>>**`id`**:
+>>
+>>>**Type:** `item` 
+>>>
+>>>**Literal:** ```1i``` 
+>>>
+>>>
+>>>
+>>
+>>**`type`**:
+>>
+>>>**Type:** `type_indicator` 
+>>>
+>>>**Literal:** ```@counter``` 
+>>>
+>>>
+>>>
+>>
+>>
+>>
 >
 >
 >
@@ -2874,21 +2935,6 @@ EXPONENTIAL_OUT: 12,
 >>**Type:** `number` 
 >>
 >>**Literal:** ```3``` 
->>
->>
->>
->>
->
->
->
->
->> _`rest_item` (optional)_ : _Item ID to add the remainder of the division to_
->>
->>_Default value:_
->>
->>**Type:** `item` 
->>
->>**Literal:** ```1i``` 
 >>
 >>
 >>

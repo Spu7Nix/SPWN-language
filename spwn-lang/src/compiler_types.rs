@@ -83,6 +83,13 @@ impl ValStorage {
                     self.increment_single_lifetime(e, amount)
                 }
             }
+            Value::Macro(m) => {
+                for (_, e, _, _) in m.args {
+                    if let Some(val) = e {
+                        self.increment_single_lifetime(val, amount)
+                    }
+                }
+            }
             _ => (),
         };
     }
@@ -189,7 +196,7 @@ impl Context {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
-    pub args: Vec<(String, Option<Value>, ast::Tag, Option<TypeID>)>,
+    pub args: Vec<(String, Option<StoredValue>, ast::Tag, Option<TypeID>)>,
     pub def_context: Context,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Tag,
@@ -440,7 +447,9 @@ impl Value {
                             None => (),
                         };
                         match arg.1.clone() {
-                            Some(val) => out += &format!(" = {}", val.to_str(globals)),
+                            Some(val) => {
+                                out += &format!(" = {}", globals.stored_values[val].to_str(globals))
+                            }
                             None => (),
                         };
                         out += ", ";
@@ -568,7 +577,7 @@ impl Globals {
             lowest_y: HashMap::new(),
 
             type_ids: HashMap::new(),
-            type_id_count: 15,
+            type_id_count: 0,
 
             val_id: 0,
             stored_values: ValStorage::new(),
@@ -597,6 +606,8 @@ impl Globals {
         globals.type_ids.insert(String::from("type_indicator"), 14);
         globals.type_ids.insert(String::from("null"), 15);
         globals.type_ids.insert(String::from("trigger"), 16);
+
+        globals.type_id_count = globals.type_ids.len() as u16;
 
         globals
     }
@@ -1452,10 +1463,7 @@ pub fn execute_macro(
                 if !new_variables.contains_key(&arg.0) {
                     match &arg.1 {
                         Some(default) => {
-                            new_variables.insert(
-                                arg.0.clone(),
-                                store_value(default.clone(), 1, globals, &context),
-                            );
+                            new_variables.insert(arg.0.clone(), *default);
                         }
 
                         None => {
@@ -1924,7 +1932,7 @@ impl ast::Variable {
                     all_combinations(all_expr, context.clone(), globals, new_info)?;
                 inner_returns.extend(returns);
                 for defaults in argument_possibilities {
-                    let mut args: Vec<(String, Option<Value>, ast::Tag, Option<TypeID>)> =
+                    let mut args: Vec<(String, Option<StoredValue>, ast::Tag, Option<TypeID>)> =
                         Vec::new();
                     let mut expr_index = 0;
                     for arg in m.args.iter() {
@@ -1933,7 +1941,7 @@ impl ast::Variable {
                             match &arg.1 {
                                 Some(_) => {
                                     expr_index += 1;
-                                    Some(globals.stored_values[defaults.0[expr_index - 1]].clone())
+                                    Some(defaults.0[expr_index - 1])
                                 }
                                 None => None,
                             },
