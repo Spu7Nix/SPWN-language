@@ -733,7 +733,7 @@ pub fn parse_statement(
 
         Some(Token::Extract) => ast::StatementBody::Extract(parse_expr(tokens, notes, true, true)?),
 
-        Some(Token::Let) => {
+        /*Some(Token::Let) => {
             tokens.next(false, false);
             let symbol = tokens.slice();
 
@@ -759,8 +759,7 @@ pub fn parse_statement(
                 value,
                 //mutable: true,
             })
-        }
-
+        }*/
         Some(_) => {
             //either expression, call or definition, FIGURE OUT
             //parse it
@@ -1374,6 +1373,11 @@ fn parse_variable(
         Some(Token::DotDot) => {
             first_token = tokens.next(false, false);
             Some(ast::UnaryOperator::Range)
+        }
+
+        Some(Token::Let) => {
+            first_token = tokens.next(false, false);
+            Some(ast::UnaryOperator::Let)
         }
         _ => None,
     };

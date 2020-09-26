@@ -335,7 +335,11 @@ pub fn compile_scope(
                             let (evaled, inner_returns) =
                                 def.value.eval(context, globals, info.clone())?;
                             returns.extend(inner_returns);
-                            all_values.extend(evaled);
+                            all_values.extend(
+                                evaled.iter().map(|x| {
+                                    (clone_value(x.0, 1, globals, &x.1, true), x.1.clone())
+                                }),
+                            );
                         }
                         //copied because im lazy
                     }
@@ -364,7 +368,7 @@ pub fn compile_scope(
                 }
             }
 
-            Definition(def) => {
+            /*Definition(def) => {
                 let mut all_values: Returns = Vec::new();
 
                 for context in contexts {
@@ -417,8 +421,7 @@ pub fn compile_scope(
 
                     contexts.push(context);
                 }
-            }
-
+            }*/
             Extract(val) => {
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {

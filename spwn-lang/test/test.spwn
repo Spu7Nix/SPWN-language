@@ -1,5 +1,16 @@
-
-extract import "../std"
 extract $
-a = counter(0)
-print(@counter::{id: a.to_const(0..10)})
+
+let a
+let b
+
+a = 10
+b = 15
+
+
+c = a
+
+a = b
+b = c
+
+print(a, b)
+

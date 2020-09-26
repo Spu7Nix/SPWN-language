@@ -216,7 +216,7 @@ impl SpwnFmt for Statement {
 impl SpwnFmt for StatementBody {
     fn fmt(&self, ind: Indent) -> String {
         let main = match self {
-            StatementBody::Definition(def) => format!("{}", def.fmt(ind)),
+            //StatementBody::Definition(def) => format!("{}", def.fmt(ind)),
             StatementBody::Call(call) => format!("{}", call.fmt(ind)),
             StatementBody::Expr(x) => format!("{}", x.fmt(ind)),
             StatementBody::TypeDef(x) => format!("type {}", x),
@@ -441,6 +441,7 @@ impl SpwnFmt for UnaryOperator {
                 UnaryOperator::Not => "!",
                 UnaryOperator::Minus => "-",
                 UnaryOperator::Range => "..",
+                UnaryOperator::Let => "let ",
             },
         )
     }

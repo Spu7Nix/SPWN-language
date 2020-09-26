@@ -14,7 +14,7 @@ coming soon ish
 
 - [x] Finish mutable variables
 - [ ] Type annotations for function arguments, variable definitions etc.
-- [ ] `as` operator for automatically changing type
+- [x] `as` operator for automatically changing type
 - [ ] suffix operators, make ! an operator instead of a statement
 - [ ] finish documentation
 - [ ] stop interpreting on return
@@ -26,3 +26,5 @@ coming soon ish
 - [ ] implement live editor features
 - [ ] make it work on mac (and linux?)
 - [ ] fix post-compile optimizations
+- [ ] escaped characters in string
+- [ ] nested comments

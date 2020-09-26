@@ -23,7 +23,7 @@ pub struct Statement {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum StatementBody {
-    Definition(Definition),
+    //Definition(Definition),
     Call(Call),
     Expr(Expression),
 
@@ -126,6 +126,7 @@ pub enum UnaryOperator {
     Not,
     Minus,
     Range,
+    Let,
 }
 
 #[derive(Clone, PartialEq, Debug)]

@@ -116,6 +116,21 @@ pub fn store_value(
     index
 }
 
+pub fn clone_value(
+    index: usize,
+    lifetime: u16,
+    globals: &mut Globals,
+    context: &Context,
+    constant: bool,
+) -> StoredValue {
+    let old_val = globals.stored_values[index].clone();
+    if constant {
+        store_const_value(old_val, lifetime, globals, context)
+    } else {
+        store_value(old_val, lifetime, globals, context)
+    }
+}
+
 pub fn store_const_value(
     val: Value,
     lifetime: u16,
@@ -1714,6 +1729,9 @@ impl ast::Variable {
         let mut start_val = Returns::new();
         let mut inner_returns = Returns::new();
 
+        let define_new = self.operator == Some(ast::UnaryOperator::Let);
+        let mut defined = true;
+
         use ast::IDClass;
 
         match &self.value.body {
@@ -1827,11 +1845,19 @@ impl ast::Variable {
                     match context.variables.get(string) {
                         Some(value) => start_val.push((*value, context.clone())),
                         None => {
-                            return Err(RuntimeError::UndefinedErr {
-                                undefined: string.clone(),
-                                info: info.clone(),
-                                desc: "variable".to_string(),
-                            })
+                            if define_new {
+                                let stored = store_value(Value::Null, 1, globals, &context);
+                                let mut new_context = context.clone();
+                                new_context.variables.insert(string.clone(), stored);
+                                start_val.push((stored, new_context));
+                                defined = false;
+                            } else {
+                                return Err(RuntimeError::UndefinedErr {
+                                    undefined: string.clone(),
+                                    info: info.clone(),
+                                    desc: "variable".to_string(),
+                                });
+                            }
                         }
                     }
                 }
@@ -2014,22 +2040,45 @@ impl ast::Variable {
             .map(|x| (x.0.clone(), x.1.clone(), 1))
             .collect();
         for p in &mut path_iter {
+            if !defined {
+                use crate::fmt::SpwnFmt;
+                return Err(RuntimeError::RuntimeError {
+                    message: format!("Cannot run {} on an undefined value", p.fmt(0)),
+                    info,
+                });
+            }
             match &p {
                 ast::Path::Member(m) => {
                     for x in &mut with_parent {
+                        let val = globals.stored_values[x.0].clone();
                         *x = (
-                            match globals.stored_values[x.0].clone().member(
-                                m.clone(),
-                                &x.1,
-                                globals,
-                            ) {
+                            match val.member(m.clone(), &x.1, globals) {
                                 Some(m) => m,
                                 None => {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: m.clone(),
-                                        info: info.clone(),
-                                        desc: String::from("property"),
-                                    })
+                                    if define_new {
+                                        let stored = store_value(Value::Null, 1, globals, &context);
+                                        match &mut globals.stored_values[x.0] {
+                                            Value::Dict(d) => {
+                                                (*d).insert(m.clone(), stored);
+                                            }
+                                            _ => {
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: format!(
+                                                    "Cannot edit members of non-dictionary value"
+                                                ),
+                                                    info,
+                                                })
+                                            }
+                                        }
+                                        defined = false;
+                                        stored
+                                    } else {
+                                        return Err(RuntimeError::UndefinedErr {
+                                            undefined: m.clone(),
+                                            info: info.clone(),
+                                            desc: "member".to_string(),
+                                        });
+                                    }
                                 }
                             },
                             x.1.clone(),
@@ -2289,6 +2338,8 @@ impl ast::Variable {
                             });
                         }
                     }
+
+                    UnaryOperator::Let => (),
 
                     UnaryOperator::Range => {
                         if let Value::Number(n) = globals.stored_values[final_value.0] {
