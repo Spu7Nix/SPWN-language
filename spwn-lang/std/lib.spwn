@@ -703,6 +703,7 @@ impl @counter {
             
             self.item.if_is(LARGER_THAN, 0, {
                 mini_add = (num){
+                    
                     self.item.if_is(LARGER_THAN, num - 1, {
                         self.item.add(-num)
                         

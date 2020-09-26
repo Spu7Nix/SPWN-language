@@ -271,6 +271,7 @@ impl SpwnFmt for ValueBody {
             Resolved(_) => format!("<val>"),
             TypeIndicator(x) => format!("@{}", x),
             Null => format!("null"),
+            SelfVal => format!("self"),
         }
     }
 }

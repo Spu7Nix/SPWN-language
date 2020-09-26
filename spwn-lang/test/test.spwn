@@ -1,13 +1,6 @@
 
+extract import "../std"
 
+mac = 1g.move
 
-let saturation = 1.0, brightness = 1.0;
-let is_in_circle = sq(c_pos.x - mouseX) + sq(c_pos.y - mouseY) <= 1;
-
-if is_in_circle {
-	one_over_sqrt2 = 1 / sqrt(2)
-	sqrt2 = sqrt(2)
-	saturation = (clamp(mouseX - c_pos.x, -sqrt2, sqrt2) * one_over_sqrt2) / 2 + 0.5;
-	brightness = (clamp(mouseY - c_pos.y, -sqrt2, sqrt2) * one_over_sqrt2) / 2 + 0.5;
-}
-
+mac(10, 10, 9)

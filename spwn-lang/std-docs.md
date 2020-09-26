@@ -16,16 +16,16 @@ _This file was generated using `spwn doc [file name]`_
  ```
 
 {
-EXPONENTIAL_IN_OUT: 10,
-wait: (time: @number) { /* code omitted */ },
-call_with_delay: (time: @number, function: @function) { /* code omitted */ },
-on: (event: @macro, function: @function) { /* code omitted */ },
+SMALLER_THAN: 2,
 BACK_OUT: 18,
-disable_trail: () { /* code omitted */ },
-touch_end: (dual_side = false) { /* code omitted */ },
-supress_signal: (delay: @number) { /* code omitted */ },
-hide_player: () { /* code omitted */ },
+BACK_IN_OUT: 16,
+collision: (a, b) { /* code omitted */ },
+wait: (time: @number) { /* code omitted */ },
+on: (event: @macro, function: @function) { /* code omitted */ },
+EASE_IN: 2,
+BOUNCE_IN: 8,
 EXPONENTIAL_IN: 11,
+EXPONENTIAL_IN_OUT: 10,
 ... (31 more)
 }
 
@@ -702,16 +702,16 @@ EXPONENTIAL_IN: 11,
 > ```
 >
 >{
->INTERVAL: 84,
->ANIMATION_SPEED: 107,
+>Z_LAYER: 24,
+>DONT_ENTER: 67,
+>COPIED_COLOR_ID: 50,
+>COUNT_MULTI_ACTIVATE: 104,
+>EDITOR_DISABLE: 102,
 >MAX_SPEED: 105,
->DYNAMIC_BLOCK: 94,
->HOLD_MODE: 81,
->COLOR_2_HVS_ENABLED: 42,
->ANIMATION_ID: 76,
->COLOR: 21,
->TRIGGER_GREEN: 8,
->CENTER: 71,
+>MAIN_ONLY: 65,
+>HVS: 43,
+>EXCLUSIVE: 86,
+>HIGH_DETAIL: 103,
 >... (83 more)
 >}
 >
@@ -2870,8 +2870,8 @@ EXPONENTIAL_IN: 11,
 > ```
 >
 >(self, divisor, remainder: @counter = {
->id: 1i,
->type: @counter
+>type: @counter,
+>id: 1i
 >}, speed: @number = 3) { /* code omitted */ }
 >
 >``` 
@@ -2895,8 +2895,8 @@ EXPONENTIAL_IN: 11,
 >> ```
 >>
 >>{
->>id: 1i,
->>type: @counter
+>>type: @counter,
+>>id: 1i
 >>}
 >>
 >>``` 

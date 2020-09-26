@@ -42,7 +42,13 @@ impl std::ops::IndexMut<usize> for ValStorage {
 impl ValStorage {
     pub fn new() -> Self {
         ValStorage {
-            map: HashMap::new(),
+            map: vec![
+                (0, (Value::Builtins, Group { id: 0 }, false, 1)),
+                (1, (Value::Null, Group { id: 0 }, false, 1)),
+            ]
+            .iter()
+            .cloned()
+            .collect(),
         }
     }
 
@@ -132,6 +138,7 @@ pub struct Context {
     pub start_group: Group,
     pub spawn_triggered: bool,
     pub variables: HashMap<String, StoredValue>,
+    //pub self_val: Option<StoredValue>,
     pub implementations: Implementations,
 }
 #[derive(Debug, Clone)]
@@ -190,6 +197,7 @@ impl Context {
             variables: HashMap::new(),
             //return_val: Box::new(Value::Null),
             implementations: HashMap::new(),
+            //self_val: None,
         }
     }
 }
@@ -567,6 +575,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
 
 impl Globals {
     pub fn new(notes: crate::parser::ParseNotes, path: PathBuf) -> Self {
+        let storage = ValStorage::new();
         let mut globals = Globals {
             closed_groups: notes.closed_groups,
             closed_colors: notes.closed_colors,
@@ -579,8 +588,8 @@ impl Globals {
             type_ids: HashMap::new(),
             type_id_count: 0,
 
-            val_id: 0,
-            stored_values: ValStorage::new(),
+            val_id: storage.map.len(),
+            stored_values: storage,
             func_ids: vec![FunctionID {
                 name: "main scope".to_string(),
                 parent: None,
@@ -1456,7 +1465,14 @@ pub fn execute_macro(
             //insert defaults and check non-optional arguments
             let mut m_args_iter = m.args.iter();
             if m.args[0].0 == "self" {
-                new_variables.insert("self".to_string(), parent);
+                if globals.stored_values[parent] == Value::Null {
+                    return Err(RuntimeError::RuntimeError {
+                        message: "
+This macro requires a parent (a \"self\" value), but it seems to have been called alone (or on a null value).
+Should be used like this: value.macro(arguments)".to_string(), info
+                    });
+                }
+                new_context.variables.insert("self".to_string(), parent);
                 m_args_iter.next();
             }
             for arg in m_args_iter {
@@ -1702,6 +1718,16 @@ impl ast::Variable {
 
         match &self.value.body {
             ast::ValueBody::Resolved(r) => start_val.push((*r, context.clone())),
+            ast::ValueBody::SelfVal => {
+                if let Some(val) = context.variables.get("self") {
+                    start_val.push((*val, context.clone()))
+                } else {
+                    return Err(RuntimeError::RuntimeError {
+                        message: "Cannot use \"self\" outside of macros!".to_string(),
+                        info,
+                    });
+                }
+            }
             ast::ValueBody::ID(id) => start_val.push((
                 store_value(
                     match id.class_name {

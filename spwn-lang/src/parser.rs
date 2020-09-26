@@ -3,6 +3,8 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
+use crate::builtin::TYPE_MEMBER_NAME;
+
 //use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -230,6 +232,9 @@ pub enum Token {
 
     #[token("let")]
     Let,
+
+    #[token("self")]
+    SelfVal,
 
     //COMMENT
     #[regex(r"/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*")]
@@ -1183,6 +1188,7 @@ fn parse_arg_def(
     notes: &mut ParseNotes,
 ) -> Result<Vec<ast::ArgDef>, SyntaxError> {
     let mut args = Vec::<ast::ArgDef>::new();
+
     loop {
         let properties = check_for_tag(tokens, notes)?;
         if tokens.next(false, false) == Some(Token::ClosingBracket) {
@@ -1190,7 +1196,12 @@ fn parse_arg_def(
         };
         args.push(match tokens.next(false, false) {
             Some(Token::Assign) => {
-                tokens.previous();
+                if tokens.previous() == Some(Token::SelfVal) {
+                    return Err(SyntaxError::SyntaxError {
+                        message: "\"self\" argument cannot have a default value".to_string(),
+                        pos: tokens.position(),
+                    });
+                }
                 let symbol = tokens.slice();
                 tokens.next(false, false);
                 let value = Some(parse_expr(tokens, notes, true, true)?);
@@ -1200,7 +1211,12 @@ fn parse_arg_def(
             }
 
             Some(Token::Colon) => {
-                tokens.previous();
+                if tokens.previous() == Some(Token::SelfVal) {
+                    return Err(SyntaxError::SyntaxError {
+                        message: "\"self\" argument cannot have explicit type".to_string(),
+                        pos: tokens.position(),
+                    });
+                }
                 let symbol = tokens.slice();
                 tokens.next(false, false);
                 let type_value = Some(parse_expr(tokens, notes, false, true)?);
@@ -1229,7 +1245,12 @@ fn parse_arg_def(
             }
 
             Some(_) => {
-                tokens.previous();
+                if tokens.previous() == Some(Token::SelfVal) && !args.is_empty() {
+                    return Err(SyntaxError::SyntaxError {
+                        message: "\"self\" argument must be the first argument".to_string(),
+                        pos: tokens.position(),
+                    });
+                }
 
                 (tokens.slice(), None, properties, None)
             }
@@ -1411,6 +1432,7 @@ fn parse_variable(
         Some(Token::True) => ast::ValueBody::Bool(true),
         Some(Token::False) => ast::ValueBody::Bool(false),
         Some(Token::Null) => ast::ValueBody::Null,
+        Some(Token::SelfVal) => ast::ValueBody::SelfVal,
         Some(Token::Symbol) => ast::ValueBody::Symbol(tokens.slice()),
 
         Some(Token::OpenSquareBracket) => {
@@ -1456,16 +1478,20 @@ fn parse_variable(
             }
         }),
 
-        Some(Token::At) => ast::ValueBody::TypeIndicator(match tokens.next(false, false) {
-            Some(Token::Symbol) => tokens.slice(),
-            a => {
-                return Err(SyntaxError::ExpectedErr {
-                    expected: "type name".to_string(),
-                    found: format!("{:?}: {:?}", a, tokens.slice()),
-                    pos: tokens.position(),
-                })
-            }
-        }),
+        Some(Token::At) => {
+            let type_name = match tokens.next(false, false) {
+                Some(Token::Symbol) => tokens.slice(),
+                a => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "type name".to_string(),
+                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        pos: tokens.position(),
+                    })
+                }
+            };
+
+            ast::ValueBody::TypeIndicator(type_name)
+        }
 
         Some(Token::OpenBracket) => {
             let parse_macro_def = |tokens: &mut Tokens,
@@ -1517,9 +1543,9 @@ fn parse_variable(
                     }
                 }
 
-                Err(e) => match parse_macro_def(tokens, notes) {
+                Err(_) => match parse_macro_def(tokens, notes) {
                     Ok(mac) => mac,
-                    Err(_) => return Err(e),
+                    Err(e) => return Err(e),
                 },
             }
 

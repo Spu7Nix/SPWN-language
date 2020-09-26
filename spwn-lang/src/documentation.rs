@@ -2,9 +2,7 @@
 //use crate::ast::*;
 use crate::builtin::TYPE_MEMBER_NAME;
 use crate::compiler::{import_module, RuntimeError};
-use crate::compiler_types::{
-    find_key_for_value, store_value, CompilerInfo, Context, Globals, Macro, Value,
-};
+use crate::compiler_types::{find_key_for_value, CompilerInfo, Context, Globals, Macro, Value};
 use crate::parser::ParseNotes;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -14,8 +12,8 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     //println!("{:?}", globals);
     let start_context = Context::new();
 
-    store_value(Value::Builtins, 1, &mut globals, &start_context);
-    store_value(Value::Null, 1, &mut globals, &start_context);
+    // store_value(Value::Builtins, 1, &mut globals, &start_context);
+    // store_value(Value::Null, 1, &mut globals, &start_context);
 
     let module = import_module(
         path,

@@ -68,7 +68,19 @@ pub enum ValueBody {
     Macro(Macro),
     Resolved(StoredValue),
     TypeIndicator(String),
+    SelfVal,
     Null,
+}
+
+impl ValueBody {
+    pub fn to_variable(&self) -> Variable {
+        Variable {
+            value: ValueLiteral { body: self.clone() },
+            operator: None,
+            comment: (None, None),
+            path: Vec::new(),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -243,9 +255,9 @@ pub struct Variable {
     pub comment: Comment,
 }
 
-/*impl Variable {
+impl Variable {
     pub fn to_expression(&self) -> Expression {
-        if let ValueLiteral::Expression(e) = &self.value {
+        if let ValueBody::Expression(e) = &self.value.body {
             if self.path.is_empty() {
                 return e.to_owned();
             }
@@ -255,7 +267,7 @@ pub struct Variable {
             operators: Vec::new(),
         }
     }
-}*/
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Expression {
