@@ -175,8 +175,10 @@ impl Tag {
 #[derive(Clone, PartialEq, Debug)]
 pub enum Path {
     Member(String),
+    Associated(String),
     Index(Expression),
     Call(Vec<Argument>),
+    Constructor(Vec<DictDef>),
 }
 
 #[derive(Clone, PartialEq, Debug)]

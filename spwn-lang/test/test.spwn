@@ -1,6 +1,5 @@
 
 extract import "../std"
-
-mac = 1g.move
-
-mac(10, 10, 9)
+extract $
+a = counter(0)
+print(@counter::{id: a.to_const(0..10)})

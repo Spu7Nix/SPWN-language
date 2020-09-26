@@ -3,7 +3,7 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
-use crate::builtin::TYPE_MEMBER_NAME;
+//use crate::builtin::TYPE_MEMBER_NAME;
 
 //use std::collections::HashMap;
 use std::path::PathBuf;
@@ -175,6 +175,9 @@ pub enum Token {
 
     #[token(":")]
     Colon,
+
+    #[token("::")]
+    DoubleColon,
 
     #[token(".")]
     Period,
@@ -468,7 +471,7 @@ pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNot
         );*/
 
         match tokens.next(true, false) {
-            Some(Token::StatementSeparator) | None => {}
+            Some(Token::StatementSeparator) => {}
             Some(a) => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),
@@ -1717,6 +1720,22 @@ fn parse_variable(
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "member name".to_string(),
+                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        pos: tokens.position(),
+                    })
+                }
+            },
+
+            Some(Token::DoubleColon) => match tokens.next(false, false) {
+                Some(Token::Symbol) | Some(Token::Type) => {
+                    path.push(ast::Path::Associated(tokens.slice()))
+                }
+                Some(Token::OpenCurlyBracket) => {
+                    path.push(ast::Path::Constructor(parse_dict(tokens, notes)?))
+                }
+                a => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "associated member name".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
                     })

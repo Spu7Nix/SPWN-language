@@ -300,6 +300,8 @@ impl SpwnFmt for Path {
     fn fmt(&self, ind: Indent) -> String {
         match self {
             Path::Member(def) => format!(".{}", def),
+            Path::Associated(def) => format!("::{}", def),
+            Path::Constructor(dict) => format!("::{}", element_list(dict, '{', '}', ind)),
             Path::Index(call) => format!("[{}]", call.fmt(ind)),
             Path::Call(x) => element_list(x, '(', ')', ind),
         }

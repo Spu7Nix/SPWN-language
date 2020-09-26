@@ -2038,6 +2038,63 @@ impl ast::Variable {
                     }
                 }
 
+                ast::Path::Associated(a) => {
+                    for x in &mut with_parent {
+                        *x = (
+                            match &globals.stored_values[x.0] {
+                                Value::TypeIndicator(t) => match x.1.implementations.get(&t) {
+                                    Some(imp) => match imp.get(a) {
+                                        Some(val) => {
+                                            if let Value::Macro(m) = &globals.stored_values[*val] {
+                                                if !m.args.is_empty() && m.args[0].0 == "self" {
+                                                    return Err(RuntimeError::RuntimeError {
+                                                        message: "Cannot access method (macro with a \"self\" argument) using \"::\"".to_string(),
+                                                        info: info.clone(),
+                                                    });
+                                                }
+                                            }
+                                            *val
+                                        }
+                                        None => {
+                                            let type_name =
+                                                find_key_for_value(&globals.type_ids, *t).unwrap();
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: format!(
+                                                    "No {} property on type @{}",
+                                                    a, type_name
+                                                ),
+                                                info: info.clone(),
+                                            });
+                                        }
+                                    },
+                                    None => {
+                                        let type_name =
+                                            find_key_for_value(&globals.type_ids, *t).unwrap();
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: format!(
+                                                "No values are implemented on @{}",
+                                                type_name
+                                            ),
+                                            info: info.clone(),
+                                        });
+                                    }
+                                },
+                                a => {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: format!(
+                                            "Expected type indicator, found: {}",
+                                            a.to_str(globals)
+                                        ),
+                                        info: info.clone(),
+                                    })
+                                }
+                            },
+                            x.1.clone(),
+                            x.0.clone(),
+                        )
+                    }
+                }
+
                 ast::Path::Index(i) => {
                     let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
 
@@ -2094,6 +2151,42 @@ impl ast::Variable {
                         }
                     }
 
+                    with_parent = new_out
+                }
+
+                ast::Path::Constructor(defs) => {
+                    let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
+
+                    for (prev_v, prev_c, _) in &with_parent {
+                        match globals.stored_values[*prev_v].clone() {
+                            Value::TypeIndicator(t) => {
+                                let (dicts, returns) = ast::ValueBody::Dictionary(defs.clone())
+                                    .to_variable()
+                                    .to_value(prev_c.clone(), globals, info.clone())?;
+                                inner_returns.extend(returns);
+                                for dict in &dicts {
+                                    let stored_type =
+                                        store_value(Value::TypeIndicator(t), 1, globals, &context);
+                                    if let Value::Dict(map) = &mut globals.stored_values[dict.0] {
+                                        (*map).insert(TYPE_MEMBER_NAME.to_string(), stored_type);
+                                    } else {
+                                        unreachable!()
+                                    }
+
+                                    new_out.push((dict.0, dict.1.clone(), *prev_v));
+                                }
+                            }
+                            a => {
+                                return Err(RuntimeError::RuntimeError {
+                                message: format!(
+                                    "Attempted to construct on a value that is not a type indicator: {}",
+                                    a.to_str(globals)
+                                ),
+                                info: info.clone(),
+                            });
+                            }
+                        }
+                    }
                     with_parent = new_out
                 }
 

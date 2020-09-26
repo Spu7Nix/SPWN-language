@@ -341,40 +341,6 @@ impl @item {
 }
 
 type counter
-
-counter = #[desc("Creates a new counter")] (
-    #[desc("Source (can be a number, item ID or boolean)")] source = 0
-){
-    if source.type == @number {
-        id = ?i
-    
-        id.add(source)
-        
-        return {
-            type: @counter,
-            item: id
-        }
-    } else if source.type == @item {
-        return {
-            type: @counter,
-            item: source
-        }
-    } else if source.type == @bool {
-        id = ?i
-    
-        if source {
-            id.add(1)
-        }
-        return {
-            type: @counter,
-            item: id
-        }
-    } else {
-        
-        error "Can not make counter from this type"
-    }
-    
-}
     
 supress_signal = #[desc("Stops signal from coming past for some time")] (
     #[desc("Time to supress signal")] delay: @number
@@ -400,6 +366,39 @@ let DEFAULT_SPEED = 3
 
 
 impl @counter {
+
+    new: #[desc("Creates a new counter")] (
+        #[desc("Source (can be a number, item ID or boolean)")] source = 0
+    ){
+        if source.type == @number {
+            id = ?i
+        
+            id.add(source)
+            
+            return {
+                type: @counter,
+                item: id
+            }
+        } else if source.type == @item {
+            return {
+                type: @counter,
+                item: source
+            }
+        } else if source.type == @bool {
+            id = ?i
+        
+            if source {
+                id.add(1)
+            }
+            return {
+                type: @counter,
+                item: id
+            }
+        } else {
+            error "Can not make counter from this type"
+        }
+        
+    },
 
     add_to: 
     #[desc("Adds the counter's value to all item IDs in a list, and resets the counter to 0 in the process")]
@@ -1179,7 +1178,7 @@ return {
     wait: wait,
     supress_signal: supress_signal,
 
-    counter: counter,
+    counter: @counter::new,
     call_with_delay: call_with_delay,
     on: on,
 
