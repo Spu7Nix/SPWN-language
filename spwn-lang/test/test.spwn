@@ -1,14 +1,11 @@
-extract $
-
-let a = {
-	a: 10,
-	b: 20,
+impl @number {
+	_plus_: (self, other) {
+		return $._plus_(self, other)
+	}
 }
 
-let a.c = 40
+$.print(10 + 3)
 
-a.c += 40
 
-print(a)
 
 

@@ -27,7 +27,7 @@ pub struct Item {
     pub id: u16,
 }
 
-pub fn context_trigger(context: Context, _globals: &mut Globals, info: CompilerInfo) -> GDObj {
+pub fn context_trigger(context: Context, info: CompilerInfo) -> GDObj {
     let mut params = HashMap::new();
     params.insert(57, context.start_group.id.to_string());
     params.insert(
@@ -146,7 +146,7 @@ impl Value {
     }
 }
 
-pub const BUILTIN_LIST: [&str; 11] = [
+pub const BUILTIN_LIST: [&str; 31] = [
     "print",
     "sin",
     "cos",
@@ -158,20 +158,46 @@ pub const BUILTIN_LIST: [&str; 11] = [
     "ceil",
     "add",
     "current_context",
+    //operators
+    "_or_",
+    "_and_",
+    "_more_than_",
+    "_less_than_",
+    "_more_or_equal_",
+    "_less_or_equal_",
+    "_divided_by_",
+    "_times_",
+    "_mod_",
+    "_pow_",
+    "_plus_",
+    "_minus_",
+    "_equal_",
+    "_not_equal_",
+    "_assign_",
+    "_as_",
+    "_add_",
+    "_subtract_",
+    "_multiply_",
+    "_divide_",
 ];
+
+const CANNOT_CHANGE_ERROR: &str = "
+Cannot change a variable that was defined in another group/function context
+(consider using a counter)
+";
 
 pub fn built_in_function(
     name: &str,
-    arguments: Vec<Value>,
+    arguments: Vec<StoredValue>,
     info: CompilerInfo,
     globals: &mut Globals,
-    context: Context,
+    context: &Context,
 ) -> Result<Value, RuntimeError> {
     Ok(match name {
         "print" => {
             let mut out = String::new();
             for val in arguments {
-                out += &val.to_str(globals);
+                out += &globals.stored_values[val].to_str(globals);
             }
             //out.pop();
             println!("{}", out);
@@ -186,7 +212,7 @@ pub fn built_in_function(
                 });
             }
 
-            match &arguments[0] {
+            match &globals.stored_values[arguments[0]] {
                 Value::Number(n) => Value::Number(match name {
                     "sin" => n.sin(),
                     "cos" => n.cos(),
@@ -208,27 +234,7 @@ pub fn built_in_function(
                 }
             }
         }
-        /*"append" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected one argument".to_string(),
-                    info,
-                });
-            }
 
-            match &arguments[0] {
-                Value::Array(a) => {
-                    let new_arr
-                }
-
-                a => {
-                    return Err(RuntimeError::BuiltinError {
-                        message: format!("Expected object, found {}", a.to_str(globals)),
-                        info,
-                    })
-                }
-            }
-        }*/
         "add" => {
             if arguments.len() != 1 {
                 return Err(RuntimeError::BuiltinError {
@@ -237,9 +243,9 @@ pub fn built_in_function(
                 });
             }
 
-            match &arguments[0] {
+            match &globals.stored_values[arguments[0]] {
                 Value::Obj(obj, mode) => {
-                    let c_t = context_trigger(context.clone(), globals, info.clone());
+                    let c_t = context_trigger(context.clone(), info.clone());
                     let mut obj_map = HashMap::<u16, String>::new();
 
                     for p in obj {
@@ -273,6 +279,307 @@ pub fn built_in_function(
         }
 
         "current_context" => Value::Str(format!("{:?}", context)),
+
+        "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
+        | "_less_or_equal_" | "_divided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
+        | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_as_" | "_add_" | "_subtract_"
+        | "_multiply_" | "_divide_" => {
+            if arguments.len() != 2 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected two arguments".to_string(),
+                    info,
+                });
+            }
+            let acum_val = arguments[0];
+            let val = arguments[1];
+            let c2 = &context;
+
+            let a_type = globals.get_type_str(val);
+            let b_type = globals.get_type_str(acum_val);
+
+            let acum_val_fn_context = globals.get_val_fn_context(acum_val, info.clone())?;
+            let mutable = globals.is_mutable(acum_val);
+            let val_b = globals.stored_values[val].clone();
+            let val_a = &mut globals.stored_values[acum_val];
+
+            fn mutable_err(info: CompilerInfo, attempted_op_macro: &str) -> RuntimeError {
+                RuntimeError::RuntimeError {
+                    message: format!(
+                        "
+This value is not mutable! 
+Consider defining it with 'let', or implementing a '{}' macro on its type.",
+                        attempted_op_macro
+                    ),
+                    info,
+                }
+            }
+
+            match name {
+                "_or_" => match (val_a, val_b) {
+                    (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a || b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "bool and bool".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_and_" => match (val_a, val_b) {
+                    (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a && b),
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "bool and bool".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_more_than_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Bool(*a > b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_less_than_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Bool(*a < b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_more_or_equal_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Bool(*a >= b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_less_or_equal_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Bool(*a <= b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_divided_by_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Number(*a / b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_times_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Number(*a * b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_mod_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Number(*a % b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_pow_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Number(a.powf(b)),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_plus_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Number(*a + b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_minus_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Number(*a - b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info: info.clone(),
+                        })
+                    }
+                },
+                "_equal_" => {
+                    Value::Bool(globals.stored_values[acum_val] == globals.stored_values[val])
+                }
+                "_not_equal_" => {
+                    Value::Bool(globals.stored_values[acum_val] != globals.stored_values[val])
+                }
+                "_assign_" => {
+                    if !mutable {
+                        return Err(mutable_err(info, "_assign_"));
+                    }
+                    if acum_val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info: info.clone(),
+                        });
+                    }
+
+                    globals.stored_values[acum_val] = globals.stored_values[val].clone();
+                    globals.stored_values[acum_val].clone()
+                }
+                "_as_" => match globals.stored_values[val] {
+                    Value::TypeIndicator(t) => convert_type(
+                        globals.stored_values[acum_val].clone(),
+                        t,
+                        info.clone(),
+                        globals,
+                    )?,
+
+                    _ => {
+                        return Err(RuntimeError::RuntimeError {
+                            message: "Expected a type-indicator to convert to!".to_string(),
+                            info: info.clone(),
+                        });
+                    }
+                },
+                "_add_" => {
+                    if !mutable {
+                        return Err(mutable_err(info, "_add_"));
+                    }
+                    if acum_val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info: info.clone(),
+                        });
+                    }
+
+                    match (val_a, val_b) {
+                        (Value::Number(a), Value::Number(b)) => (*a) += b,
+
+                        _ => {
+                            return Err(RuntimeError::TypeError {
+                                expected: "number and number".to_string(),
+                                found: format!("{} and {}", a_type, b_type),
+                                info: info.clone(),
+                            })
+                        }
+                    };
+                    Value::Null
+                }
+                "_subtract_" => {
+                    if !mutable {
+                        return Err(mutable_err(info, "_subtract_"));
+                    }
+                    if acum_val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info: info.clone(),
+                        });
+                    }
+
+                    match (val_a, val_b) {
+                        (Value::Number(a), Value::Number(b)) => (*a) -= b,
+
+                        _ => {
+                            return Err(RuntimeError::TypeError {
+                                expected: "number and number".to_string(),
+                                found: format!("{} and {}", a_type, b_type),
+                                info: info.clone(),
+                            })
+                        }
+                    };
+                    Value::Null
+                }
+                "_multiply_" => {
+                    if !mutable {
+                        return Err(mutable_err(info, "_multiply_"));
+                    }
+                    if acum_val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info: info.clone(),
+                        });
+                    }
+
+                    match (val_a, val_b) {
+                        (Value::Number(a), Value::Number(b)) => (*a) *= b,
+
+                        _ => {
+                            return Err(RuntimeError::TypeError {
+                                expected: "number and number".to_string(),
+                                found: format!("{} and {}", a_type, b_type),
+                                info: info.clone(),
+                            })
+                        }
+                    };
+                    Value::Null
+                }
+                "_divide_" => {
+                    if !mutable {
+                        return Err(mutable_err(info, "_divide_"));
+                    }
+                    if acum_val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info: info.clone(),
+                        });
+                    }
+
+                    match (val_a, val_b) {
+                        (Value::Number(a), Value::Number(b)) => (*a) /= b,
+
+                        _ => {
+                            return Err(RuntimeError::TypeError {
+                                expected: "number and number".to_string(),
+                                found: format!("{} and {}", a_type, b_type),
+                                info: info.clone(),
+                            })
+                        }
+                    };
+                    Value::Null
+                }
+                _ => unreachable!(),
+            }
+        }
 
         a => {
             return Err(RuntimeError::RuntimeError {

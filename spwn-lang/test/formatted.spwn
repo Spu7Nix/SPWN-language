@@ -1,9 +1,5 @@
 extract $
-let a
-let b
-a = 10
-b = 15
-c = a
-a = b
-b = c
-print(a, b)
+impl @number {_plus_: (self, other) {
+    return self + other
+}}
+print(10 + 3)

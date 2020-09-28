@@ -560,31 +560,29 @@ impl Globals {
             }),
         }
     }
-
-    pub fn assert_mutable(
-        &self,
-        p: StoredValue,
-        info: CompilerInfo,
-        attempted_op_macro: &str,
-    ) -> Result<(), RuntimeError> {
+    pub fn is_mutable(&self, p: StoredValue) -> bool {
         match self.stored_values.map.get(&p) {
-            Some(val) => {
-                if val.2 {
-                    Ok(())
-                } else {
-                    Err(RuntimeError::RuntimeError {
-                        message: format!(
-                            "
-This value is not mutable! 
-Consider defining it with 'let', or implementing a '{}' macro on its type.",
-                            attempted_op_macro
-                        ),
-                        info,
-                    })
-                }
-            }
+            Some(val) => val.2,
             None => unreachable!(),
         }
+    }
+
+    pub fn get_type_str(&self, p: StoredValue) -> String {
+        let val = &self.stored_values[p];
+        let typ = match val {
+            Value::Dict(d) => {
+                if let Some(s) = d.get(TYPE_MEMBER_NAME) {
+                    match self.stored_values[*s] {
+                        Value::TypeIndicator(t) => t,
+                        _ => unreachable!(),
+                    }
+                } else {
+                    val.to_num(self)
+                }
+            }
+            _ => val.to_num(self),
+        };
+        find_key_for_value(&self.type_ids, typ).unwrap().clone()
     }
 }
 
@@ -637,19 +635,14 @@ impl Globals {
     }
 }
 
-fn handle_operator<F>(
+fn handle_operator(
     value1: StoredValue,
     value2: StoredValue,
-    op: F,
     macro_name: &str,
-    op_name: &str,
     context: Context,
     globals: &mut Globals,
     info: CompilerInfo,
-) -> Result<Returns, RuntimeError>
-where
-    F: Fn(StoredValue, StoredValue, &mut Globals, &Context) -> Result<StoredValue, RuntimeError>,
-{
+) -> Result<Returns, RuntimeError> {
     Ok(
         if let Some(val) =
             globals.stored_values[value1]
@@ -657,7 +650,7 @@ where
                 .member(macro_name.to_string(), &context, globals)
         {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
-                let new_info = info.next(op_name, globals, false);
+                let new_info = info.next("operator", globals, false);
                 if m.args.is_empty() {
                     return Err(RuntimeError::RuntimeError {
                         message: String::from("Expected at least one argument in operator macro"),
@@ -677,7 +670,21 @@ where
 
                     if *val2typ != target_typ {
                         //if types dont match, act as if there is no macro at all
-                        return Ok(vec![(op(value1, value2, globals, &context)?, context)]);
+                        return Ok(vec![(
+                            store_value(
+                                built_in_function(
+                                    macro_name,
+                                    vec![value1, value2],
+                                    info,
+                                    globals,
+                                    &context,
+                                )?,
+                                1,
+                                globals,
+                                &context,
+                            ),
+                            context,
+                        )]);
                     }
                 }
 
@@ -695,10 +702,32 @@ where
                 )?;
                 values
             } else {
-                vec![(op(value1, value2, globals, &context)?, context)]
+                vec![(
+                    store_value(
+                        built_in_function(
+                            macro_name,
+                            vec![value1, value2],
+                            info,
+                            globals,
+                            &context,
+                        )?,
+                        1,
+                        globals,
+                        &context,
+                    ),
+                    context,
+                )]
             }
         } else {
-            vec![(op(value1, value2, globals, &context)?, context)]
+            vec![(
+                store_value(
+                    built_in_function(macro_name, vec![value1, value2], info, globals, &context)?,
+                    1,
+                    globals,
+                    &context,
+                ),
+                context,
+            )]
         },
     )
 }
@@ -750,31 +779,7 @@ impl ast::Expression {
                         Or => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val,
-                             val,
-                             globals: &mut Globals,
-                             c2: &Context|
-                             -> Result<StoredValue, RuntimeError> {
-                                if let Value::Bool(b) = globals.stored_values[acum_val] {
-                                    if let Value::Bool(b2) = globals.stored_values[val] {
-                                        Ok(store_value(Value::Bool(b || b2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_or_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_or_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_or_",
-                            "logical or",
                             c2,
                             globals,
                             info.clone(),
@@ -782,27 +787,7 @@ impl ast::Expression {
                         And => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Bool(b) = globals.stored_values[acum_val] {
-                                    if let Value::Bool(b2) = globals.stored_values[val] {
-                                        Ok(store_value(Value::Bool(b && b2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_and_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_and_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_and_",
-                            "logical and",
                             c2,
                             globals,
                             info.clone(),
@@ -810,27 +795,7 @@ impl ast::Expression {
                         More => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Bool(n > n2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_more_than_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_more_than_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_more_than_",
-                            "comparison",
                             c2,
                             globals,
                             info.clone(),
@@ -838,27 +803,7 @@ impl ast::Expression {
                         Less => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Bool(n < &n2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_less_than_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_less_than_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_less_than_",
-                            "comparison",
                             c2,
                             globals,
                             info.clone(),
@@ -866,27 +811,7 @@ impl ast::Expression {
                         MoreOrEqual => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Bool(n >= &n2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_more_or_equal_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_more_or_equal_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_more_or_equal_",
-                            "comparison",
                             c2,
                             globals,
                             info.clone(),
@@ -894,27 +819,7 @@ impl ast::Expression {
                         LessOrEqual => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Bool(n <= &n2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_less_or_equal_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_less_or_equal_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_less_or_equal_",
-                            "comparison",
                             c2,
                             globals,
                             info.clone(),
@@ -922,27 +827,7 @@ impl ast::Expression {
                         Slash => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2: &Context| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Number(n / n2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_divided_by_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_divided_by_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_divided_by_",
-                            "divide",
                             c2,
                             globals,
                             info.clone(),
@@ -950,27 +835,7 @@ impl ast::Expression {
                         Star => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Number(n * n2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_times_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_times_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_times_",
-                            "multiply",
                             c2,
                             globals,
                             info.clone(),
@@ -979,27 +844,7 @@ impl ast::Expression {
                         Modulo => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Number(n % n2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_mod_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_mod_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_mod_",
-                            "modulo",
                             c2,
                             globals,
                             info.clone(),
@@ -1008,27 +853,7 @@ impl ast::Expression {
                         Power => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Number(n.powf(*n2)), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_pow_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_pow_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_pow_",
-                            "power",
                             c2,
                             globals,
                             info.clone(),
@@ -1036,27 +861,7 @@ impl ast::Expression {
                         Plus => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Number(n + n2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_plus_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_plus_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_plus_",
-                            "plus",
                             c2,
                             globals,
                             info.clone(),
@@ -1064,27 +869,7 @@ impl ast::Expression {
                         Minus => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::Number(n) = &globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = &globals.stored_values[val] {
-                                        Ok(store_value(Value::Number(n - n2), 1, globals, c2))
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: "_minus_".to_string(),
-                                            info: info.clone(),
-                                            desc: operator_macro_desc.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::UndefinedErr {
-                                        undefined: "_minus_".to_string(),
-                                        info: info.clone(),
-                                        desc: operator_macro_desc.clone(),
-                                    });
-                                }
-                            },
                             "_minus_",
-                            "minus",
                             c2,
                             globals,
                             info.clone(),
@@ -1092,19 +877,7 @@ impl ast::Expression {
                         Equal => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                Ok(store_value(
-                                    Value::Bool(
-                                        globals.stored_values[acum_val]
-                                            == globals.stored_values[val],
-                                    ),
-                                    1,
-                                    globals,
-                                    c2,
-                                ))
-                            },
                             "_equal_",
-                            "logical equal",
                             c2,
                             globals,
                             info.clone(),
@@ -1112,11 +885,7 @@ impl ast::Expression {
                         NotEqual => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                Ok(store_value(Value::Bool(acum_val != val), 1, globals, c2))
-                            },
                             "_not_equal_",
-                            "logical inequality",
                             c2,
                             globals,
                             info.clone(),
@@ -1164,21 +933,7 @@ impl ast::Expression {
                         Assign => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                globals.assert_mutable(acum_val, info.clone(), "_assign_")?;
-                                if acum_val_fn_context != c2.start_group {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: CANNOT_CHANGE_ERROR.to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-
-                                globals.stored_values[acum_val] =
-                                    globals.stored_values[val].clone();
-                                Ok(acum_val)
-                            },
                             "_assign_",
-                            "assign",
                             c2,
                             globals,
                             info.clone(),
@@ -1187,29 +942,7 @@ impl ast::Expression {
                         As => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                if let Value::TypeIndicator(t) = &globals.stored_values[val] {
-                                    Ok(store_value(
-                                        convert_type(
-                                            globals.stored_values[acum_val].clone(),
-                                            *t,
-                                            info.clone(),
-                                            globals,
-                                        )?,
-                                        1,
-                                        globals,
-                                        &c2,
-                                    ))
-                                } else {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: "Expected a type-indicator to convert to!"
-                                            .to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-                            },
                             "_as_",
-                            "as",
                             c2,
                             globals,
                             info.clone(),
@@ -1218,35 +951,7 @@ impl ast::Expression {
                         Add => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                globals.assert_mutable(acum_val, info.clone(), "_add_")?;
-                                if acum_val_fn_context != c2.start_group {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: CANNOT_CHANGE_ERROR.to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-                                let gotten_val = globals.stored_values[val].clone();
-                                if let Value::Number(n) = &mut globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = gotten_val {
-                                        (*n) += n2;
-                                    } else {
-                                        return Err(RuntimeError::RuntimeError {
-                                            message: "Cannot add this type to number".to_string(),
-                                            info: info.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: "'_add_' macro is not defined for this type."
-                                            .to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-                                Ok(acum_val)
-                            },
                             "_add_",
-                            "add",
                             c2,
                             globals,
                             info.clone(),
@@ -1255,36 +960,7 @@ impl ast::Expression {
                         Subtract => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                globals.assert_mutable(acum_val, info.clone(), "_subtract_")?;
-                                if acum_val_fn_context != c2.start_group {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: CANNOT_CHANGE_ERROR.to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-                                let gotten_val = globals.stored_values[val].clone();
-                                if let Value::Number(n) = &mut globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = gotten_val {
-                                        (*n) -= n2;
-                                    } else {
-                                        return Err(RuntimeError::RuntimeError {
-                                            message: "Cannot subtract this type from number"
-                                                .to_string(),
-                                            info: info.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: "'_subtract_' macro is not defined for this type."
-                                            .to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-                                Ok(acum_val)
-                            },
                             "_subtract_",
-                            "subtract",
                             c2,
                             globals,
                             info.clone(),
@@ -1293,36 +969,7 @@ impl ast::Expression {
                         Multiply => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                globals.assert_mutable(acum_val, info.clone(), "_multiply_")?;
-                                if acum_val_fn_context != c2.start_group {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: CANNOT_CHANGE_ERROR.to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-                                let gotten_val = globals.stored_values[val].clone();
-                                if let Value::Number(n) = &mut globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = gotten_val {
-                                        (*n) *= n2;
-                                    } else {
-                                        return Err(RuntimeError::RuntimeError {
-                                            message: "Cannot multiply this type by number"
-                                                .to_string(),
-                                            info: info.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: "'_multiply_' macro is not defined for this type."
-                                            .to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-                                Ok(acum_val)
-                            },
                             "_multiply_",
-                            "multiply",
                             c2,
                             globals,
                             info.clone(),
@@ -1331,36 +978,7 @@ impl ast::Expression {
                         Divide => handle_operator(
                             acum_val.clone(),
                             val,
-                            |acum_val, val, globals, c2| {
-                                globals.assert_mutable(acum_val, info.clone(), "_divide_")?;
-                                if acum_val_fn_context != c2.start_group {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: CANNOT_CHANGE_ERROR.to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-                                let gotten_val = globals.stored_values[val].clone();
-                                if let Value::Number(n) = &mut globals.stored_values[acum_val] {
-                                    if let Value::Number(n2) = gotten_val {
-                                        (*n) /= n2;
-                                    } else {
-                                        return Err(RuntimeError::RuntimeError {
-                                            message: "Cannot divide this type by number"
-                                                .to_string(),
-                                            info: info.clone(),
-                                        });
-                                    }
-                                } else {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: "'_divide_' macro is not defined for this type."
-                                            .to_string(),
-                                        info: info.clone(),
-                                    });
-                                }
-                                Ok(acum_val)
-                            },
                             "_divide_",
-                            "divide",
                             c2,
                             globals,
                             info.clone(),
@@ -1574,7 +1192,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
                         let obj = GDObj {
                             params,
 
-                            ..context_trigger(cont.clone(), globals, info.clone())
+                            ..context_trigger(cont.clone(), info.clone())
                         }
                         .context_parameters(cont.clone());
                         (*globals).func_ids[info.func_id].obj_list.push(obj);
@@ -2253,12 +1871,10 @@ impl ast::Variable {
                                 for (args, context) in evaled_args {
                                     let evaled = built_in_function(
                                         &name,
-                                        args.iter()
-                                            .map(|x| globals.stored_values[*x].clone())
-                                            .collect(),
+                                        args,
                                         info.clone(),
                                         globals,
-                                        context.clone(),
+                                        &context,
                                     )?;
                                     all_values
                                         .push((store_value(evaled, 1, globals, &context), context))
