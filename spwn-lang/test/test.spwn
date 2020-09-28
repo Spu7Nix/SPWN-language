@@ -1,9 +1,14 @@
 extract $
 
-@number::_plus_ = (self, other: @number) {
-	return self - other
+let a = {
+	a: 10,
+	b: 20,
 }
 
-print(10 + 7) //3
+let a.c = 40
+
+a.c += 40
+
+print(a)
 
 

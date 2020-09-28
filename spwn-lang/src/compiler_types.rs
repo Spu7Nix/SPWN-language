@@ -2487,7 +2487,14 @@ impl ast::Variable {
                     match val.member(m.clone(), &context, globals) {
                         Some(s) => current_ptr = s,
                         None => {
-                            if let Value::Dict(d) = &mut globals.stored_values[current_ptr] {
+                            let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
+                            if !stored.2 {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: format!("Cannot edit members of a constant value"),
+                                    info: info.clone(),
+                                });
+                            }
+                            if let Value::Dict(d) = &mut stored.0 {
                                 (*d).insert(m.clone(), value);
                                 defined = false;
                                 current_ptr = value;
