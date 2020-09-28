@@ -1,12 +1,9 @@
 extract $
 
-let a = {
-	hello: "world"
+@number::_plus_ = (self, other: @number) {
+	return self - other
 }
 
-a.hi = 10
-a.hi = 11
-
-print(a)
+print(10 + 7) //3
 
 

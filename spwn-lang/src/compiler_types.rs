@@ -2362,11 +2362,23 @@ impl ast::Variable {
 
         Ok((out, inner_returns))
     }
-    pub fn is_defined(&self, context: &Context, globals: &Globals) -> bool {
+
+    //more like is_undefinable
+    pub fn is_defined(&self, context: &Context, globals: &mut Globals) -> bool {
+        // use crate::fmt::SpwnFmt;
+        // println!("hello? {}", self.fmt(0));
         let mut current_ptr = match &self.value.body {
             ast::ValueBody::Symbol(a) => {
                 if let Some(ptr) = context.variables.get(a) {
                     *ptr
+                } else {
+                    return false;
+                }
+            }
+
+            ast::ValueBody::TypeIndicator(t) => {
+                if let Some(typ) = globals.type_ids.get(t) {
+                    store_const_value(Value::TypeIndicator(*typ), 1, globals, context)
                 } else {
                     return false;
                 }
@@ -2387,10 +2399,25 @@ impl ast::Variable {
                         return true;
                     }
                 }
-                ast::Path::Associated(m) => unimplemented!(),
+                ast::Path::Associated(m) => match &globals.stored_values[current_ptr] {
+                    Value::TypeIndicator(t) => match context.implementations.get(t) {
+                        Some(imp) => {
+                            if let Some(val) = imp.get(m) {
+                                current_ptr = *val;
+                            } else {
+                                return false;
+                            }
+                        }
+                        None => return false,
+                    },
+                    _ => {
+                        return true;
+                    }
+                },
                 _ => return true,
             }
         }
+
         true
     }
 
@@ -2427,9 +2454,20 @@ impl ast::Variable {
                 }
             }
 
+            ast::ValueBody::TypeIndicator(t) => {
+                if let Some(typ) = globals.type_ids.get(t) {
+                    store_const_value(Value::TypeIndicator(*typ), 1, globals, context)
+                } else {
+                    return Err(RuntimeError::RuntimeError {
+                        message: format!("Use a type statement to define a new type: type {}", t),
+                        info: info.clone(),
+                    });
+                }
+            }
+
             a => {
                 return Err(RuntimeError::RuntimeError {
-                    message: format!("Expected symbol, found {}", a.fmt(0)),
+                    message: format!("Expected symbol or type-indicator, found {}", a.fmt(0)),
                     info: info.clone(),
                 })
             }
@@ -2446,7 +2484,7 @@ impl ast::Variable {
             match p {
                 ast::Path::Member(m) => {
                     let val = globals.stored_values[current_ptr].clone();
-                    let member = match val.member(m.clone(), &context, globals) {
+                    match val.member(m.clone(), &context, globals) {
                         Some(s) => current_ptr = s,
                         None => {
                             if let Value::Dict(d) = &mut globals.stored_values[current_ptr] {
@@ -2464,7 +2502,37 @@ impl ast::Variable {
                         }
                     };
                 }
-                ast::Path::Associated(m) => unimplemented!(),
+                ast::Path::Associated(m) => {
+                    match &globals.stored_values[current_ptr] {
+                        Value::TypeIndicator(t) => match context.implementations.get_mut(t) {
+                            Some(imp) => {
+                                if let Some(val) = imp.get(m) {
+                                    current_ptr = *val;
+                                } else {
+                                    (*imp).insert(m.clone(), value);
+                                    defined = false;
+                                    current_ptr = value;
+                                }
+                            }
+                            None => {
+                                let mut new_imp = HashMap::new();
+                                new_imp.insert(m.clone(), value);
+                                context.implementations.insert(*t, new_imp);
+                                defined = false;
+                                current_ptr = value;
+                            }
+                        },
+                        a => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!(
+                                    "Expected a type-indicator to define an implementation on, found {}",
+                                    a.to_str(globals)
+                                ),
+                                info: info.clone(),
+                            });
+                        }
+                    };
+                }
                 _ => {
                     return Err(RuntimeError::RuntimeError {
                         message: format!("Cannot run {} in a definition expression", p.fmt(0)),
