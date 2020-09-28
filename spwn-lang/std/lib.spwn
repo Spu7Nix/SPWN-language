@@ -341,13 +341,15 @@ impl @item {
 }
 
 type counter
+
+
     
 supress_signal = #[desc("Stops signal from coming past for some time")] (
     #[desc("Time to supress signal")] delay: @number
 ){
     //if checker is 0, a signal can come through
     //if checker is 1, it will be supressed
-    checker = counter(0)
+    checker = @counter::new(0)
     -> (){
         wait(delay * 2)
         checker.item.if_is(EQUAL_TO, 1, {
@@ -479,12 +481,12 @@ impl @counter {
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
         if factor.type == @number {
-            temp = counter(0)
+            temp = @counter::new(0)
             self.add_to([temp.item], speed, factor)
             temp.add_to([self.item], speed)
         } else if factor.type == @counter {
             
-            temp = counter(0)
+            temp = @counter::new(0)
             mini_mult = (num){
                 mult = {
                     
@@ -529,7 +531,7 @@ impl @counter {
         
 
         if divisor.type == @number {
-            result = counter(0)
+            result = @counter::new(0)
 
             div = {
                 mini_div = (num) {
@@ -559,7 +561,7 @@ impl @counter {
             }
             div!
         } else if divisor.type == @counter {
-            result = counter(0)
+            result = @counter::new(0)
             remainder.reset(speed)
 
             // IDEA:
@@ -593,7 +595,7 @@ impl @counter {
                                 divisor.item.if_is(EQUAL_TO, 0, {
                                     wait(0.1)
                                     supress_signal(0.11)
-                                    counter(temp_storage).add_to([divisor.item], speed*2)
+                                    @counter::new(temp_storage).add_to([divisor.item], speed*2)
                                     return
                                 })
                             }
@@ -722,7 +724,7 @@ impl @counter {
             self.item.if_is(EQUAL_TO, 0, {
                 wait(0.05)
                 supress_signal(0.06)
-                counter(temp_storage).add_to([self.item], speed)
+                @counter::new(temp_storage).add_to([self.item], speed)
                 return
             })
         }
@@ -735,7 +737,7 @@ impl @counter {
     ) {
         new_counter = ?i
         self.copy_to(new_counter, speed)
-        return counter(new_counter)
+        return @counter::new(new_counter)
     },
 
     _plus_: (self, other) {
@@ -1038,7 +1040,7 @@ general_functions = {
         #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1,
         #[desc("Incrementation of the iterator")] increment: @number = 1
     ) {
-        i = counter(start_val)
+        i = @counter::new(start_val)
 
         func = {
             code(i)

@@ -106,8 +106,8 @@ impl std::error::Error for RuntimeError {
     }
 }
 
-const NULL_STORAGE: usize = 1;
-const BUILTIN_STORAGE: usize = 0;
+pub const NULL_STORAGE: usize = 1;
+pub const BUILTIN_STORAGE: usize = 0;
 
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
@@ -254,52 +254,31 @@ pub fn compile_scope(
         };
 
         info.line = statement.line;
-
+        use crate::fmt::SpwnFmt;
         match &statement.body {
             Expr(expr) => {
-                //check for constant def
+                let mut new_contexts: Vec<Context> = Vec::new();
+                for context in contexts {
+                    let is_assign = !expr.operators.is_empty()
+                        && expr.operators[0] == ast::Operator::Assign
+                        && !expr.values[0].is_defined(&context, globals);
 
-                let is_assign =
-                    !expr.operators.is_empty() && expr.operators[0] == ast::Operator::Assign;
-                let mut symbol = String::new();
-                let is_symbol = !expr.values.is_empty()
-                    && expr.values[0].operator == None
-                    && expr.values[0].path.is_empty()
-                    && match &expr.values[0].value.body {
-                        ast::ValueBody::Symbol(s) => {
-                            symbol = s.clone();
-                            true
-                        }
-                        _ => false,
-                    };
+                    if is_assign {
+                        let mut new_expr = expr.clone();
+                        let symbol = new_expr.values.remove(0);
+                        new_expr.operators.remove(0); //assign operator
+                        let constant = symbol.operator != Some(ast::UnaryOperator::Let);
 
-                let is_const_def = is_assign
-                    && is_symbol
-                    && !symbol.is_empty()
-                    && match contexts[0].variables.get(&symbol) {
-                        Some(_) => false,
-                        None => true,
-                    };
-                if is_const_def {
-                    let mut new_expr = expr.clone();
-                    new_expr.values.remove(0);
-                    new_expr.operators.remove(0);
-                    let def = ast::Definition {
-                        symbol: symbol.clone(),
-                        value: new_expr,
-                        //mutable: false,
-                    };
+                        //let mut new_context = context.clone();
 
-                    // <COPIED CODE BECAUSE IM LAZY>
+                        match (new_expr.values.len() == 1, &new_expr.values[0].value.body) {
+                            (true, ast::ValueBody::CmpStmt(f)) => {
+                                //to account for recursion
 
-                    let mut all_values: Returns = Vec::new();
-
-                    for context in contexts {
-                        if let ast::ValueBody::CmpStmt(f) = &def.value.values[0].value.body {
-                            if def.value.values.len() == 1 {
                                 //create the function context
                                 let mut new_context = context.clone();
-                                new_context.spawn_triggered = true;
+                                let storage = symbol.define(&mut new_context, globals, &info)?;
+
                                 //pick a start group
                                 let start_group = Group {
                                     id: next_free(
@@ -308,16 +287,13 @@ pub fn compile_scope(
                                         info.clone(),
                                     )?,
                                 };
-                                let stored = store_const_value(
-                                    Value::Func(Function { start_group }),
-                                    1,
-                                    globals,
-                                    &context,
-                                );
-                                new_context.variables.insert(def.symbol.clone(), stored);
-                                all_values.push((stored, context));
+                                //store value
+                                globals.stored_values[storage] =
+                                    Value::Func(Function { start_group });
+
                                 new_context.start_group = start_group;
-                                let new_info = info.next(&def.symbol, globals, true);
+
+                                let new_info = info.next(&symbol.fmt(0), globals, true);
                                 let (_, inner_returns) = compile_scope(
                                     &f.statements,
                                     vec![new_context],
@@ -325,47 +301,44 @@ pub fn compile_scope(
                                     new_info,
                                 )?;
                                 returns.extend(inner_returns);
-                            } else {
-                                let (evaled, inner_returns) =
-                                    def.value.eval(context, globals, info.clone())?;
-                                returns.extend(inner_returns);
-                                all_values.extend(evaled);
+
+                                let mut after_context = context.clone();
+
+                                let var_storage =
+                                    symbol.define(&mut after_context, globals, &info)?;
+
+                                globals.stored_values[var_storage] =
+                                    Value::Func(Function { start_group });
+
+                                new_contexts.push(after_context);
                             }
-                        } else {
-                            let (evaled, inner_returns) =
-                                def.value.eval(context, globals, info.clone())?;
-                            returns.extend(inner_returns);
-                            all_values.extend(
-                                evaled.iter().map(|x| {
-                                    (clone_value(x.0, 1, globals, &x.1, true), x.1.clone())
-                                }),
-                            );
+                            _ => {
+                                let (evaled, inner_returns) =
+                                    new_expr.eval(context, globals, info.clone(), constant)?;
+                                returns.extend(inner_returns);
+                                for (e, c2) in evaled {
+                                    let mut new_context = c2.clone();
+                                    let storage =
+                                        symbol.define(&mut new_context, globals, &info)?;
+                                    //clone the value so as to not share the reference
+                                    globals.stored_values[storage] =
+                                        globals.stored_values[e].clone();
+                                    new_contexts.push(new_context);
+                                }
+                            }
                         }
-                        //copied because im lazy
-                    }
-                    contexts = Vec::new();
-                    for (val, mut context) in all_values {
-                        (*globals.stored_values.map.get_mut(&val).unwrap()).2 = false;
-
-                        context.variables.insert(String::from(&def.symbol), val);
-
-                        contexts.push(context);
-                    }
-
-                // </COPIED CODE BECAUSE IM LAZY>
-                } else {
-                    let mut new_contexts: Vec<Context> = Vec::new();
-                    for context in contexts {
+                    } else {
                         //we dont care about the return value in this case
-                        let (evaled, inner_returns) = expr.eval(context, globals, info.clone())?;
+                        let (evaled, inner_returns) =
+                            expr.eval(context, globals, info.clone(), false)?;
                         returns.extend(inner_returns);
                         new_contexts.extend(evaled.iter().map(|x| {
                             //globals.stored_values.map.remove(&x.0);
                             x.1.clone()
                         }));
                     }
-                    contexts = new_contexts;
                 }
+                contexts = new_contexts;
             }
 
             /*Definition(def) => {
@@ -425,7 +398,7 @@ pub fn compile_scope(
             Extract(val) => {
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
-                    let (evaled, inner_returns) = val.eval(context, globals, info.clone())?;
+                    let (evaled, inner_returns) = val.eval(context, globals, info.clone(), true)?;
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
@@ -477,7 +450,7 @@ pub fn compile_scope(
                 for context in contexts.clone() {
                     let new_info = info.next("if condition", globals, false);
                     let (evaled, inner_returns) =
-                        if_stmt.condition.eval(context, globals, new_info)?;
+                        if_stmt.condition.eval(context, globals, new_info, true)?;
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
@@ -529,14 +502,15 @@ pub fn compile_scope(
                 for context in contexts.clone() {
                     let new_info = info.next("implementation symbol", globals, false);
                     let (evaled, inner_returns) =
-                        imp.symbol.to_value(context.clone(), globals, new_info)?;
+                        imp.symbol
+                            .to_value(context.clone(), globals, new_info, true)?;
                     returns.extend(inner_returns);
                     for (typ, c) in evaled {
                         match globals.stored_values[typ].clone() {
                             Value::TypeIndicator(s) => {
                                 let new_info = info.next("implementation", globals, true);
                                 let (evaled, inner_returns) =
-                                    eval_dict(imp.members.clone(), c, globals, new_info)?;
+                                    eval_dict(imp.members.clone(), c, globals, new_info, true)?;
 
                                 //Returns inside impl values dont really make sense do they
                                 returns.extend(inner_returns);
@@ -584,7 +558,8 @@ pub fn compile_scope(
                 let mut all_values: Returns = Vec::new();
                 for context in contexts {
                     let (evaled, inner_returns) =
-                        call.function.to_value(context, globals, info.clone())?;
+                        call.function
+                            .to_value(context, globals, info.clone(), true)?;
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
@@ -625,7 +600,8 @@ pub fn compile_scope(
             For(f) => {
                 let mut all_arrays: Returns = Vec::new();
                 for context in contexts {
-                    let (evaled, inner_returns) = f.array.eval(context, globals, info.clone())?;
+                    let (evaled, inner_returns) =
+                        f.array.eval(context, globals, info.clone(), true)?;
                     returns.extend(inner_returns);
                     all_arrays.extend(evaled);
                 }
@@ -667,7 +643,7 @@ pub fn compile_scope(
                     let mut all_values: Returns = Vec::new();
                     for context in contexts.clone() {
                         let new_info = info.next("implementation symbol", globals, false);
-                        let (evaled, inner_returns) = val.eval(context, globals, new_info)?;
+                        let (evaled, inner_returns) = val.eval(context, globals, new_info, true)?;
                         returns.extend(inner_returns);
                         all_values.extend(evaled);
                     }
@@ -687,7 +663,7 @@ pub fn compile_scope(
             Error(e) => {
                 for context in contexts.clone() {
                     let new_info = info.next("return value", globals, false);
-                    let (evaled, _) = e.message.eval(context, globals, new_info)?;
+                    let (evaled, _) = e.message.eval(context, globals, new_info, true)?;
                     for (msg, _) in evaled {
                         eprintln!(
                             "ERROR: {:?}",

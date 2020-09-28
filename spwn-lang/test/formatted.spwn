@@ -1,5 +1,9 @@
 extract $
-let a = 10
-let b = a
-b += 10
-print(a)
+let a
+let b
+a = 10
+b = 15
+c = a
+a = b
+b = c
+print(a, b)

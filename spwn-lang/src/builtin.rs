@@ -22,8 +22,6 @@ pub struct Block {
     pub id: u16,
 }
 
-impl Block {}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Item {
     pub id: u16,

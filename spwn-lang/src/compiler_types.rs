@@ -6,7 +6,7 @@ use crate::levelstring::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::compiler::{compile_scope, import_module, next_free, RuntimeError};
+use crate::compiler::{compile_scope, import_module, next_free, RuntimeError, NULL_STORAGE};
 
 pub type TypeID = u16;
 
@@ -714,13 +714,14 @@ impl ast::Expression {
         context: Context,
         globals: &mut Globals,
         info: CompilerInfo,
+        constant: bool,
     ) -> Result<(Returns, Returns), RuntimeError> {
         //second returns is in case there are any values in the expression that includes a return statement
         let mut vals = self.values.iter();
-        let first_value = vals
-            .next()
-            .unwrap()
-            .to_value(context.clone(), globals, info.clone())?;
+        let first_value =
+            vals.next()
+                .unwrap()
+                .to_value(context.clone(), globals, info.clone(), constant)?;
         let mut acum = first_value.0;
         let mut inner_returns = first_value.1;
 
@@ -736,7 +737,7 @@ impl ast::Expression {
             //every value in acum will be operated with the value of var in the corresponding context
             for (acum_val, c) in acum {
                 //what the value in acum becomes
-                let evaled = var.to_value(c, globals, info.clone())?;
+                let evaled = var.to_value(c, globals, info.clone(), constant)?;
                 inner_returns.extend(evaled.1);
 
                 use ast::Operator::*;
@@ -1390,6 +1391,7 @@ pub fn execute_macro(
             context.clone(),
             globals,
             info.clone(),
+            true,
         )?;
         inner_inner_returns.extend(inner_returns);
 
@@ -1616,6 +1618,7 @@ fn all_combinations(
     context: Context,
     globals: &mut Globals,
     info: CompilerInfo,
+    constant: bool,
 ) -> Result<(Vec<(Vec<StoredValue>, Context)>, Returns), RuntimeError> {
     let mut out: Vec<(Vec<StoredValue>, Context)> = Vec::new();
     let mut inner_returns = Returns::new();
@@ -1629,7 +1632,7 @@ fn all_combinations(
             a_iter
                 .next()
                 .unwrap()
-                .eval(context, globals, info.clone())?;
+                .eval(context, globals, info.clone(), constant)?;
         out.extend(
             start_values
                 .iter()
@@ -1643,7 +1646,7 @@ fn all_combinations(
             //run through all the lists in out
             for (inner_arr, c) in out.iter() {
                 //for each one, run through all the returns in that context
-                let (values, returns) = expr.eval(c.clone(), globals, info.clone())?;
+                let (values, returns) = expr.eval(c.clone(), globals, info.clone(), constant)?;
                 inner_returns.extend(returns);
                 for (v, c2) in values.iter() {
                     //push a new list with each return pushed to it
@@ -1668,6 +1671,7 @@ pub fn eval_dict(
     context: Context,
     globals: &mut Globals,
     info: CompilerInfo,
+    constant: bool,
 ) -> Result<(Returns, Returns), RuntimeError> {
     let mut inner_returns = Returns::new();
     let (evaled, returns) = all_combinations(
@@ -1680,6 +1684,7 @@ pub fn eval_dict(
         context.clone(),
         globals,
         info.clone(),
+        constant,
     )?;
     inner_returns.extend(returns);
     let mut out = Returns::new();
@@ -1724,13 +1729,14 @@ impl ast::Variable {
         context: Context,
         globals: &mut Globals,
         info: CompilerInfo,
+        //mut define_new: bool,
+        constant: bool,
     ) -> Result<(Returns, Returns), RuntimeError> {
         // TODO: Check if this variable has native functions called on it, and if not set this to false
         let mut start_val = Returns::new();
         let mut inner_returns = Returns::new();
 
-        let define_new = self.operator == Some(ast::UnaryOperator::Let);
-        let mut defined = true;
+        //let mut defined = true;
 
         use ast::IDClass;
 
@@ -1815,7 +1821,7 @@ impl ast::Variable {
             ast::ValueBody::Dictionary(dict) => {
                 let new_info = info.next("dictionary", globals, false);
                 let (new_out, new_inner_returns) =
-                    eval_dict(dict.clone(), context.clone(), globals, new_info)?;
+                    eval_dict(dict.clone(), context.clone(), globals, new_info, constant)?;
                 start_val = new_out;
                 inner_returns = new_inner_returns;
             }
@@ -1829,7 +1835,8 @@ impl ast::Variable {
             }
 
             ast::ValueBody::Expression(expr) => {
-                let (evaled, returns) = expr.eval(context.clone(), globals, info.clone())?;
+                let (evaled, returns) =
+                    expr.eval(context.clone(), globals, info.clone(), constant)?;
                 inner_returns.extend(returns);
                 start_val.extend(evaled.iter().cloned());
             }
@@ -1845,19 +1852,11 @@ impl ast::Variable {
                     match context.variables.get(string) {
                         Some(value) => start_val.push((*value, context.clone())),
                         None => {
-                            if define_new {
-                                let stored = store_value(Value::Null, 1, globals, &context);
-                                let mut new_context = context.clone();
-                                new_context.variables.insert(string.clone(), stored);
-                                start_val.push((stored, new_context));
-                                defined = false;
-                            } else {
-                                return Err(RuntimeError::UndefinedErr {
-                                    undefined: string.clone(),
-                                    info: info.clone(),
-                                    desc: "variable".to_string(),
-                                });
-                            }
+                            return Err(RuntimeError::UndefinedErr {
+                                undefined: string.clone(),
+                                info: info.clone(),
+                                desc: "variable".to_string(),
+                            });
                         }
                     }
                 }
@@ -1869,7 +1868,7 @@ impl ast::Variable {
             ast::ValueBody::Array(a) => {
                 let new_info = info.next("array", globals, false);
                 let (evaled, returns) =
-                    all_combinations(a.clone(), context.clone(), globals, new_info)?;
+                    all_combinations(a.clone(), context.clone(), globals, new_info, constant)?;
                 inner_returns.extend(returns);
                 start_val = evaled
                     .iter()
@@ -1909,7 +1908,7 @@ impl ast::Variable {
                 }
                 let new_info = info.next("object", globals, false);
                 let (evaled, returns) =
-                    all_combinations(all_expr, context.clone(), globals, new_info)?;
+                    all_combinations(all_expr, context.clone(), globals, new_info, constant)?;
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, String)> = Vec::new();
@@ -1981,7 +1980,7 @@ impl ast::Variable {
                 }
                 let new_info = info.next("macro argument", globals, false);
                 let (argument_possibilities, returns) =
-                    all_combinations(all_expr, context.clone(), globals, new_info)?;
+                    all_combinations(all_expr, context.clone(), globals, new_info, constant)?;
                 inner_returns.extend(returns);
                 for defaults in argument_possibilities {
                     let mut args: Vec<(String, Option<StoredValue>, ast::Tag, Option<TypeID>)> =
@@ -2040,13 +2039,13 @@ impl ast::Variable {
             .map(|x| (x.0.clone(), x.1.clone(), 1))
             .collect();
         for p in &mut path_iter {
-            if !defined {
-                use crate::fmt::SpwnFmt;
-                return Err(RuntimeError::RuntimeError {
-                    message: format!("Cannot run {} on an undefined value", p.fmt(0)),
-                    info,
-                });
-            }
+            // if !defined {
+            //     use crate::fmt::SpwnFmt;
+            //     return Err(RuntimeError::RuntimeError {
+            //         message: format!("Cannot run {} on an undefined value", p.fmt(0)),
+            //         info,
+            //     });
+            // }
             match &p {
                 ast::Path::Member(m) => {
                     for x in &mut with_parent {
@@ -2055,30 +2054,11 @@ impl ast::Variable {
                             match val.member(m.clone(), &x.1, globals) {
                                 Some(m) => m,
                                 None => {
-                                    if define_new {
-                                        let stored = store_value(Value::Null, 1, globals, &context);
-                                        match &mut globals.stored_values[x.0] {
-                                            Value::Dict(d) => {
-                                                (*d).insert(m.clone(), stored);
-                                            }
-                                            _ => {
-                                                return Err(RuntimeError::RuntimeError {
-                                                    message: format!(
-                                                    "Cannot edit members of non-dictionary value"
-                                                ),
-                                                    info,
-                                                })
-                                            }
-                                        }
-                                        defined = false;
-                                        stored
-                                    } else {
-                                        return Err(RuntimeError::UndefinedErr {
-                                            undefined: m.clone(),
-                                            info: info.clone(),
-                                            desc: "member".to_string(),
-                                        });
-                                    }
+                                    return Err(RuntimeError::UndefinedErr {
+                                        undefined: m.clone(),
+                                        info: info.clone(),
+                                        desc: "member".to_string(),
+                                    });
                                 }
                             },
                             x.1.clone(),
@@ -2151,7 +2131,8 @@ impl ast::Variable {
                         match globals.stored_values[prev_v].clone() {
                             Value::Array(arr) => {
                                 let new_info = info.next("index", globals, false);
-                                let (evaled, returns) = i.eval(prev_c, globals, new_info)?;
+                                let (evaled, returns) =
+                                    i.eval(prev_c, globals, new_info, constant)?;
                                 inner_returns.extend(returns);
                                 for index in evaled {
                                     match &globals.stored_values[index.0] {
@@ -2211,7 +2192,7 @@ impl ast::Variable {
                             Value::TypeIndicator(t) => {
                                 let (dicts, returns) = ast::ValueBody::Dictionary(defs.clone())
                                     .to_variable()
-                                    .to_value(prev_c.clone(), globals, info.clone())?;
+                                    .to_value(prev_c.clone(), globals, info.clone(), constant)?;
                                 inner_returns.extend(returns);
                                 for dict in &dicts {
                                     let stored_type =
@@ -2263,6 +2244,7 @@ impl ast::Variable {
                                     cont.clone(),
                                     globals,
                                     info.clone(),
+                                    constant,
                                 )?;
                                 inner_returns.extend(returns);
 
@@ -2379,6 +2361,126 @@ impl ast::Variable {
         }
 
         Ok((out, inner_returns))
+    }
+    pub fn is_defined(&self, context: &Context, globals: &Globals) -> bool {
+        let mut current_ptr = match &self.value.body {
+            ast::ValueBody::Symbol(a) => {
+                if let Some(ptr) = context.variables.get(a) {
+                    *ptr
+                } else {
+                    return false;
+                }
+            }
+
+            _ => return true,
+        };
+
+        for p in &self.path {
+            match p {
+                ast::Path::Member(m) => {
+                    if let Value::Dict(d) = &globals.stored_values[current_ptr] {
+                        match d.get(m) {
+                            Some(s) => current_ptr = *s,
+                            None => return false,
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+                ast::Path::Associated(m) => unimplemented!(),
+                _ => return true,
+            }
+        }
+        true
+    }
+
+    pub fn define(
+        &self,
+        //value: StoredValue,
+        context: &mut Context,
+        globals: &mut Globals,
+        info: &CompilerInfo,
+    ) -> Result<StoredValue, RuntimeError> {
+        // when None, the value is already defined
+        use crate::fmt::SpwnFmt;
+        let mut defined = true;
+
+        let value = match &self.operator {
+            Some(ast::UnaryOperator::Let) => store_value(Value::Null, 1, globals, context),
+            None => store_const_value(Value::Null, 1, globals, context),
+            a => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!("Cannot use operator {:?} in definition", a),
+                    info: info.clone(),
+                })
+            }
+        };
+
+        let mut current_ptr = match &self.value.body {
+            ast::ValueBody::Symbol(a) => {
+                if let Some(ptr) = context.variables.get(a) {
+                    *ptr
+                } else {
+                    (*context).variables.insert(a.clone(), value);
+                    defined = false;
+                    value
+                }
+            }
+
+            a => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!("Expected symbol, found {}", a.fmt(0)),
+                    info: info.clone(),
+                })
+            }
+        };
+
+        for p in &self.path {
+            if !defined {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!("Cannot run {} on an undefined value", p.fmt(0)),
+                    info: info.clone(),
+                });
+            }
+
+            match p {
+                ast::Path::Member(m) => {
+                    let val = globals.stored_values[current_ptr].clone();
+                    let member = match val.member(m.clone(), &context, globals) {
+                        Some(s) => current_ptr = s,
+                        None => {
+                            if let Value::Dict(d) = &mut globals.stored_values[current_ptr] {
+                                (*d).insert(m.clone(), value);
+                                defined = false;
+                                current_ptr = value;
+                            } else {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: format!(
+                                        "Cannot edit members of a non-dictionary value"
+                                    ),
+                                    info: info.clone(),
+                                });
+                            }
+                        }
+                    };
+                }
+                ast::Path::Associated(m) => unimplemented!(),
+                _ => {
+                    return Err(RuntimeError::RuntimeError {
+                        message: format!("Cannot run {} in a definition expression", p.fmt(0)),
+                        info: info.clone(),
+                    })
+                }
+            }
+        }
+        if defined {
+            Err(RuntimeError::RuntimeError {
+                message: format!("{} is already defined!", self.fmt(0)),
+                info: info.clone(),
+            })
+        } else {
+            Ok(current_ptr)
+        }
     }
 }
 

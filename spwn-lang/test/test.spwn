@@ -1,16 +1,12 @@
 extract $
 
-let a
-let b
+let a = {
+	hello: "world"
+}
 
-a = 10
-b = 15
+a.hi = 10
+a.hi = 11
 
+print(a)
 
-c = a
-
-a = b
-b = c
-
-print(a, b)
 
