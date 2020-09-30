@@ -1,13 +1,14 @@
 extract import "../std"
 extract $
 
-
-for i in 0..30 {
-	if i % 2 == 0 {
-		100g.move(10, 20, 0.5)
-	} else {
-		100g.move(10, -20, 0.5)
-	}
+mac = (a) {
+	a += 10
 }
+
+let a = 0
+
+mac(a)
+
+print(a)
 
 

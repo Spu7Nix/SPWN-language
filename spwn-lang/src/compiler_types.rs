@@ -116,20 +116,49 @@ pub fn store_value(
     index
 }
 
-// pub fn clone_value(
-//     index: usize,
-//     lifetime: u16,
-//     globals: &mut Globals,
-//     context: &Context,
-//     constant: bool,
-// ) -> StoredValue {
-//     let old_val = globals.stored_values[index].clone();
-//     if constant {
-//         store_const_value(old_val, lifetime, globals, context)
-//     } else {
-//         store_value(old_val, lifetime, globals, context)
-//     }
-// }
+pub fn clone_value(
+    index: usize,
+    lifetime: u16,
+    globals: &mut Globals,
+    context: &Context,
+    constant: bool,
+) -> StoredValue {
+    let mut old_val = globals.stored_values[index].clone();
+
+    match &old_val {
+        Value::Array(arr) => {
+            old_val = Value::Array(
+                arr.iter()
+                    .map(|x| clone_value(*x, lifetime, globals, context, constant))
+                    .collect(),
+            );
+        }
+
+        Value::Dict(arr) => {
+            old_val = Value::Dict(
+                arr.iter()
+                    .map(|(k, v)| {
+                        (
+                            k.clone(),
+                            clone_value(*v, lifetime, globals, context, constant),
+                        )
+                    })
+                    .collect(),
+            );
+        }
+        _ => (),
+    };
+
+    //clone all inner values
+    //do the thing
+    //bing bang
+    //profit
+    if constant {
+        store_const_value(old_val, lifetime, globals, context)
+    } else {
+        store_value(old_val, lifetime, globals, context)
+    }
+}
 
 pub fn store_const_value(
     val: Value,
@@ -1148,7 +1177,10 @@ pub fn execute_macro(
                             None => (),
                         };
 
-                        new_variables.insert(m.args[abs_index].0.clone(), arg_values[i]);
+                        new_variables.insert(
+                            m.args[abs_index].0.clone(),
+                            clone_value(arg_values[i], 1, globals, &context, true),
+                        );
                     }
                 }
             }
@@ -1162,6 +1194,7 @@ This macro requires a parent (a \"self\" value), but it seems to have been calle
 Should be used like this: value.macro(arguments)".to_string(), info
                     });
                 }
+                //self doesn't need to be cloned, as it is a referance (kinda)
                 new_context.variables.insert("self".to_string(), parent);
                 m_args_iter.next();
             }
@@ -1169,7 +1202,10 @@ Should be used like this: value.macro(arguments)".to_string(), info
                 if !new_variables.contains_key(&arg.0) {
                     match &arg.1 {
                         Some(default) => {
-                            new_variables.insert(arg.0.clone(), *default);
+                            new_variables.insert(
+                                arg.0.clone(),
+                                clone_value(*default, 1, globals, &context, true),
+                            );
                         }
 
                         None => {

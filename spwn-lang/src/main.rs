@@ -112,11 +112,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     //let level_string = levelstring::serialize_triggers_old(compiled.func_ids);
 
-                    //println!("{}", level_string);
+                    println!("\nScript:");
+                    for (i, len) in [
+                        compiled.closed_groups,
+                        compiled.closed_colors,
+                        compiled.closed_blocks,
+                        compiled.closed_items,
+                    ]
+                    .iter()
+                    .enumerate()
+                    {
+                        if *len > 0 {
+                            println!(
+                                "{} {}",
+                                len,
+                                ["groups", "colors", "block IDs", "item IDs"][i]
+                            );
+                        }
+                    }
+
+                    println!("\nLevel:");
                     for (i, len) in used_ids.iter().enumerate() {
                         if *len > 0 {
                             println!(
-                                "Using {} {}",
+                                "{} {}",
                                 len,
                                 ["groups", "colors", "block IDs", "item IDs"][i]
                             );
@@ -126,7 +145,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     //println!("level_string: {}", level_string);
                     match gd_path {
                         Some(gd_path) => {
-                            println!("Writing back to savefile...");
+                            println!("\nWriting back to savefile...");
                             levelstring::encrypt_level_string(new_ls, level_string, gd_path);
                             println!("Written to save. You can now open Geometry Dash again!");
                         }

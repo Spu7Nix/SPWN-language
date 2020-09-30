@@ -968,6 +968,9 @@ impl @array {
             }
         }
         return lowest
+    },
+    push: (self, value) {
+        $.append(self, value)
     }
 }
 

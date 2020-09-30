@@ -213,7 +213,7 @@ impl Value {
     }
 }
 
-pub const BUILTIN_LIST: [&str; 31] = [
+pub const BUILTIN_LIST: [&str; 32] = [
     "print",
     "sin",
     "cos",
@@ -225,6 +225,7 @@ pub const BUILTIN_LIST: [&str; 31] = [
     "ceil",
     "add",
     "current_context",
+    "append",
     //operators
     "_or_",
     "_and_",
@@ -337,6 +338,45 @@ pub fn built_in_function(
                 a => {
                     return Err(RuntimeError::BuiltinError {
                         message: format!("Expected object, found {}", a.to_str(globals)),
+                        info,
+                    })
+                }
+            }
+
+            Value::Null
+        }
+
+        "append" => {
+            if arguments.len() != 2 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected two arguments, the first one being an array and the other being the value to append.".to_string(),
+                    info,
+                });
+            }
+            if !globals.is_mutable(arguments[0]) {
+                return Err(RuntimeError::BuiltinError {
+                    message: String::from("This array is not mutable"),
+                    info,
+                });
+            }
+            //set lifetime to the lifetime of the array
+
+            let cloned = clone_value(
+                arguments[1],
+                globals.stored_values.map.get(&arguments[0]).unwrap().3,
+                globals,
+                context,
+                globals.is_mutable(arguments[1]),
+            );
+
+            let typ = globals.get_type_str(arguments[0]);
+
+            match &mut globals.stored_values[arguments[0]] {
+                Value::Array(arr) => (*arr).push(cloned),
+
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected array, found @{}", typ),
                         info,
                     })
                 }
