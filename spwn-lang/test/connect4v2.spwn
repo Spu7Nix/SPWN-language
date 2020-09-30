@@ -248,7 +248,7 @@ move_reader_back = {
 
 turn = counter(1)
 
-
+type @hello
 
 y_pos = counter(0)
 
@@ -384,7 +384,9 @@ on(turn.item.count(-1), {
 	turn.add(2)
 	allow_player_input.add(1)
 
-
+	/*
+	hello
+	*/
 
 
 	

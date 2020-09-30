@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         None
                     };
 
-                    let (mut compiled, old_ls) = match compiler::compile_spwn(
+                    let compiled = match compiler::compile_spwn(
                         statements,
                         script_path,
                         gd_path.clone(),
@@ -88,32 +88,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p) => p,
                     };
 
-                    println!("values: {:?}", compiled.stored_values.map.iter().count());
+                    let level_string = if let Some(gd_path) = &gd_path {
+                        println!("Reading savefile...");
+
+                        let file_content = fs::read_to_string(gd_path)?;
+                        let mut level_string = levelstring::get_level_string(file_content);
+                        levelstring::remove_spwn_objects(&mut level_string);
+                        level_string
+                    } else {
+                        String::new()
+                    };
 
                     //println!("func ids: {:?}", compiled.func_ids);
-                    let mut objects = levelstring::apply_fn_ids(compiled.func_ids);
+                    let objects = levelstring::apply_fn_ids(compiled.func_ids);
 
                     println!("{} objects added", objects.len());
 
                     //objects = optimize(objects);
 
-                    println!("optimized to {} objects", objects.len());
+                    //println!("optimized to {} objects", objects.len());
 
-                    let level_string = levelstring::serialize_triggers(objects);
+                    let (new_ls, used_ids) = levelstring::append_objects(objects, &level_string)?;
 
                     //let level_string = levelstring::serialize_triggers_old(compiled.func_ids);
 
                     //println!("{}", level_string);
-
-                    compiled.closed_groups.sort();
-                    compiled.closed_groups.dedup();
-
-                    println!("Using {} groups", compiled.closed_groups.len());
+                    for (i, len) in used_ids.iter().enumerate() {
+                        if *len > 0 {
+                            println!(
+                                "Using {} {}",
+                                len,
+                                ["groups", "colors", "block IDs", "item IDs"][i]
+                            );
+                        }
+                    }
 
                     //println!("level_string: {}", level_string);
                     match gd_path {
                         Some(gd_path) => {
-                            levelstring::encrypt_level_string(level_string, old_ls, gd_path);
+                            println!("Writing back to savefile...");
+                            levelstring::encrypt_level_string(new_ls, level_string, gd_path);
                             println!("Written to save. You can now open Geometry Dash again!");
                         }
 

@@ -6,38 +6,105 @@ use crate::compiler_types::*;
 use crate::levelstring::*;
 use std::collections::HashMap;
 
+pub type ArbitraryID = u16;
+pub type SpecificID = u16;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Group {
-    pub id: u16,
+pub enum ID {
+    Specific(SpecificID),
+    Arbitrary(ArbitraryID), // will be given specific ids at the end of compilation
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Group {
+    pub id: ID,
+}
 
+impl Group {
+    pub fn new(id: SpecificID) -> Self {
+        //creates new specific group
+        Group {
+            id: ID::Specific(id),
+        }
+    }
+
+    pub fn next_free(counter: &mut ArbitraryID) -> Self {
+        //creates new specific group
+        (*counter) += 1;
+        Group {
+            id: ID::Arbitrary(*counter),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Color {
-    pub id: u16,
+    pub id: ID,
+}
+
+impl Color {
+    pub fn new(id: SpecificID) -> Self {
+        //creates new specific color
+        Self {
+            id: ID::Specific(id),
+        }
+    }
+
+    pub fn next_free(counter: &mut ArbitraryID) -> Self {
+        //creates new specific color
+        (*counter) += 1;
+        Self {
+            id: ID::Arbitrary(*counter),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Block {
-    pub id: u16,
+    pub id: ID,
 }
 
+impl Block {
+    pub fn new(id: SpecificID) -> Self {
+        //creates new specific block
+        Self {
+            id: ID::Specific(id),
+        }
+    }
+
+    pub fn next_free(counter: &mut ArbitraryID) -> Self {
+        //creates new specific block
+        (*counter) += 1;
+        Self {
+            id: ID::Arbitrary(*counter),
+        }
+    }
+}
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Item {
-    pub id: u16,
+    pub id: ID,
+}
+
+impl Item {
+    pub fn new(id: SpecificID) -> Self {
+        //creates new specific item id
+        Self {
+            id: ID::Specific(id),
+        }
+    }
+
+    pub fn next_free(counter: &mut ArbitraryID) -> Self {
+        //creates new specific item id
+        (*counter) += 1;
+        Self {
+            id: ID::Arbitrary(*counter),
+        }
+    }
 }
 
 pub fn context_trigger(context: Context, info: CompilerInfo) -> GDObj {
     let mut params = HashMap::new();
-    params.insert(57, context.start_group.id.to_string());
-    params.insert(
-        62,
-        if context.spawn_triggered {
-            String::from("1")
-        } else {
-            String::from("0")
-        },
-    );
+    params.insert(57, ObjParam::GroupList(vec![context.start_group]));
+    params.insert(62, ObjParam::Bool(context.spawn_triggered));
     GDObj {
         params: HashMap::new(),
         func_id: info.func_id,
@@ -246,7 +313,7 @@ pub fn built_in_function(
             match &globals.stored_values[arguments[0]] {
                 Value::Obj(obj, mode) => {
                     let c_t = context_trigger(context.clone(), info.clone());
-                    let mut obj_map = HashMap::<u16, String>::new();
+                    let mut obj_map = HashMap::<u16, ObjParam>::new();
 
                     for p in obj {
                         obj_map.insert(p.0, p.1.clone());

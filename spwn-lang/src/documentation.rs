@@ -45,10 +45,10 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
 
     doc += "_This file was generated using `spwn doc [file name]`_\n";
 
-    let used_groups = globals.closed_groups.len();
-    let used_colors = globals.closed_colors.len();
-    let used_blocks = globals.closed_blocks.len();
-    let used_items = globals.closed_items.len();
+    let used_groups = globals.closed_groups;
+    let used_colors = globals.closed_colors;
+    let used_blocks = globals.closed_blocks;
+    let used_items = globals.closed_items;
 
     let total_objects = globals.func_ids.iter().fold(0, |mut sum, val| {
         sum += val.obj_list.len();

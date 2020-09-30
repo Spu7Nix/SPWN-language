@@ -1,11 +1,13 @@
-impl @number {
-	_plus_: (self, other) {
-		return $._plus_(self, other)
+extract import "../std"
+extract $
+
+
+for i in 0..30 {
+	if i % 2 == 0 {
+		100g.move(10, 20, 0.5)
+	} else {
+		100g.move(10, -20, 0.5)
 	}
 }
-
-$.print(10 + 3)
-
-
 
 

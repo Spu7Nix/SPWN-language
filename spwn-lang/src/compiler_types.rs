@@ -6,7 +6,7 @@ use crate::levelstring::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::compiler::{compile_scope, import_module, next_free, RuntimeError, NULL_STORAGE};
+use crate::compiler::{compile_scope, import_module, RuntimeError, BUILTIN_STORAGE, NULL_STORAGE};
 
 pub type TypeID = u16;
 
@@ -43,8 +43,8 @@ impl ValStorage {
     pub fn new() -> Self {
         ValStorage {
             map: vec![
-                (0, (Value::Builtins, Group { id: 0 }, false, 1)),
-                (1, (Value::Null, Group { id: 0 }, false, 1)),
+                (BUILTIN_STORAGE, (Value::Builtins, Group::new(0), false, 1)),
+                (NULL_STORAGE, (Value::Null, Group::new(0), false, 1)),
             ]
             .iter()
             .cloned()
@@ -116,20 +116,20 @@ pub fn store_value(
     index
 }
 
-pub fn clone_value(
-    index: usize,
-    lifetime: u16,
-    globals: &mut Globals,
-    context: &Context,
-    constant: bool,
-) -> StoredValue {
-    let old_val = globals.stored_values[index].clone();
-    if constant {
-        store_const_value(old_val, lifetime, globals, context)
-    } else {
-        store_value(old_val, lifetime, globals, context)
-    }
-}
+// pub fn clone_value(
+//     index: usize,
+//     lifetime: u16,
+//     globals: &mut Globals,
+//     context: &Context,
+//     constant: bool,
+// ) -> StoredValue {
+//     let old_val = globals.stored_values[index].clone();
+//     if constant {
+//         store_const_value(old_val, lifetime, globals, context)
+//     } else {
+//         store_value(old_val, lifetime, globals, context)
+//     }
+// }
 
 pub fn store_const_value(
     val: Value,
@@ -207,7 +207,7 @@ impl CompilerInfo {
 impl Context {
     pub fn new() -> Context {
         Context {
-            start_group: Group { id: 0 },
+            start_group: Group::new(0),
             spawn_triggered: false,
             variables: HashMap::new(),
             //return_val: Box::new(Value::Null),
@@ -244,7 +244,7 @@ pub enum Value {
     Macro(Macro),
     Str(String),
     Array(Vec<StoredValue>),
-    Obj(Vec<(u16, String)>, ast::ObjectMode),
+    Obj(Vec<(u16, ObjParam)>, ast::ObjectMode),
     Builtins,
     BuiltinFunction(String),
     TypeIndicator(TypeID),
@@ -303,10 +303,10 @@ pub fn convert_type(
 
     Ok(match &val {
         Value::Number(n) => match typ {
-            0 => Value::Group(Group { id: *n as u16 }),
-            1 => Value::Color(Color { id: *n as u16 }),
-            2 => Value::Block(Block { id: *n as u16 }),
-            3 => Value::Item(Item { id: *n as u16 }),
+            0 => Value::Group(Group::new(*n as u16)),
+            1 => Value::Color(Color::new(*n as u16)),
+            2 => Value::Block(Block::new(*n as u16)),
+            3 => Value::Item(Item::new(*n as u16)),
             4 => Value::Number(*n),
             5 => Value::Bool(*n != 0.0),
 
@@ -323,7 +323,15 @@ pub fn convert_type(
 
         Value::Group(g) => match typ {
             0 => val,
-            4 => Value::Number(g.id as f64),
+            4 => Value::Number(match g.id {
+                ID::Specific(n) => n as f64,
+                _ => return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "This group isn't known at this time, and can therefore not be converted to a number!",
+                    ),
+                    info,
+                })
+            }),
             _ => {
                 return Err(RuntimeError::RuntimeError {
                     message: format!(
@@ -337,7 +345,15 @@ pub fn convert_type(
 
         Value::Color(c) => match typ {
             1 => val,
-            4 => Value::Number(c.id as f64),
+            4 => Value::Number(match c.id {
+                ID::Specific(n) => n as f64,
+                _ => return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "This color isn't known at this time, and can therefore not be converted to a number!",
+                    ),
+                    info,
+                })
+            }),
             _ => {
                 return Err(RuntimeError::RuntimeError {
                     message: format!(
@@ -351,7 +367,15 @@ pub fn convert_type(
 
         Value::Block(b) => match typ {
             2 => val,
-            4 => Value::Number(b.id as f64),
+            4 => Value::Number(match b.id {
+                ID::Specific(n) => n as f64,
+                _ => return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "This block ID isn't known at this time, and can therefore not be converted to a number!",
+                    ),
+                    info,
+                })
+            }),
             _ => {
                 return Err(RuntimeError::RuntimeError {
                     message: format!(
@@ -365,7 +389,15 @@ pub fn convert_type(
 
         Value::Item(i) => match typ {
             3 => val,
-            4 => Value::Number(i.id as f64),
+            4 => Value::Number(match i.id {
+                ID::Specific(n) => n as f64,
+                _ => return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "This item ID isn't known at this time, and can therefore not be converted to a number!",
+                    ),
+                    info,
+                })
+            }),
             _ => {
                 return Err(RuntimeError::RuntimeError {
                     message: format!(
@@ -424,13 +456,43 @@ const MAX_DICT_EL_DISPLAY: u16 = 10;
 impl Value {
     pub fn to_str(&self, globals: &Globals) -> String {
         match self {
-            Value::Group(g) => (g.id.to_string() + "g"),
-            Value::Color(c) => (c.id.to_string() + "c"),
-            Value::Block(b) => (b.id.to_string() + "b"),
-            Value::Item(i) => (i.id.to_string() + "i"),
+            Value::Group(g) => {
+                (if let ID::Specific(id) = g.id {
+                    id.to_string()
+                } else {
+                    "?".to_string()
+                }) + "g"
+            }
+            Value::Color(c) => {
+                (if let ID::Specific(id) = c.id {
+                    id.to_string()
+                } else {
+                    "?".to_string()
+                }) + "c"
+            }
+            Value::Block(b) => {
+                (if let ID::Specific(id) = b.id {
+                    id.to_string()
+                } else {
+                    "?".to_string()
+                }) + "b"
+            }
+            Value::Item(i) => {
+                (if let ID::Specific(id) = i.id {
+                    id.to_string()
+                } else {
+                    "?".to_string()
+                }) + "i"
+            }
             Value::Number(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::Func(f) => format!("<function {}g>", f.start_group.id),
+            Value::Func(f) => format!("<function {}g>", {
+                (if let ID::Specific(id) = f.start_group.id {
+                    id.to_string()
+                } else {
+                    "?".to_string()
+                }) + "g"
+            }),
             Value::Dict(d) => {
                 let mut out = String::from("{\n");
                 let mut count = 0;
@@ -501,7 +563,7 @@ impl Value {
             Value::Obj(o, _) => {
                 let mut out = String::new();
                 for (key, val) in o {
-                    out += &format!("{},{},", key, val);
+                    out += &format!("{},{},", key, "val");
                 }
                 out.pop();
                 out += ";";
@@ -530,10 +592,12 @@ pub struct FunctionID {
 }
 
 pub struct Globals {
-    pub closed_groups: Vec<u16>,
-    pub closed_colors: Vec<u16>,
-    pub closed_blocks: Vec<u16>,
-    pub closed_items: Vec<u16>,
+    //counters for arbitrary groups
+    pub closed_groups: u16,
+    pub closed_colors: u16,
+    pub closed_blocks: u16,
+    pub closed_items: u16,
+
     pub path: PathBuf,
 
     pub lowest_y: HashMap<u32, u16>,
@@ -590,10 +654,10 @@ impl Globals {
     pub fn new(notes: crate::parser::ParseNotes, path: PathBuf) -> Self {
         let storage = ValStorage::new();
         let mut globals = Globals {
-            closed_groups: notes.closed_groups,
-            closed_colors: notes.closed_colors,
-            closed_blocks: notes.closed_blocks,
-            closed_items: notes.closed_items,
+            closed_groups: 0,
+            closed_colors: 0,
+            closed_blocks: 0,
+            closed_items: 0,
             path,
 
             lowest_y: HashMap::new(),
@@ -732,11 +796,6 @@ fn handle_operator(
     )
 }
 
-const CANNOT_CHANGE_ERROR: &str = "
-Cannot change a variable that was defined in another group/function context
-(consider using a counter)
-";
-
 impl ast::Expression {
     pub fn eval(
         &self,
@@ -754,8 +813,6 @@ impl ast::Expression {
         let mut acum = first_value.0;
         let mut inner_returns = first_value.1;
 
-        let operator_macro_desc: String = String::from("operator macro member");
-
         if self.operators.is_empty() {
             //if only variable
             return Ok((acum, inner_returns));
@@ -770,8 +827,6 @@ impl ast::Expression {
                 inner_returns.extend(evaled.1);
 
                 use ast::Operator::*;
-
-                let acum_val_fn_context = globals.get_val_fn_context(acum_val, info.clone())?;
 
                 for (val, c2) in evaled.0 {
                     //let val_fn_context = globals.get_val_fn_context(val, info.clone());
@@ -1177,18 +1232,12 @@ Should be used like this: value.macro(arguments)".to_string(), info
                     let mut new_context = context.clone();
                     new_context.spawn_triggered = true;
                     //pick a start group
-                    let start_group = Group {
-                        id: next_free(
-                            &mut globals.closed_groups,
-                            ast::IDClass::Group,
-                            info.clone(),
-                        )?,
-                    };
+                    let start_group = Group::next_free(&mut globals.closed_groups);
 
                     for cont in c {
                         let mut params = HashMap::new();
-                        params.insert(1, "1268".to_string());
-                        params.insert(51, start_group.id.to_string());
+                        params.insert(1, ObjParam::Number(1268.0));
+                        params.insert(51, ObjParam::Group(start_group));
                         let obj = GDObj {
                             params,
 
@@ -1375,54 +1424,30 @@ impl ast::Variable {
                     match id.class_name {
                         IDClass::Group => {
                             if id.unspecified {
-                                Value::Group(Group {
-                                    id: next_free(
-                                        &mut globals.closed_groups,
-                                        ast::IDClass::Group,
-                                        info.clone(),
-                                    )?,
-                                })
+                                Value::Group(Group::next_free(&mut globals.closed_groups))
                             } else {
-                                Value::Group(Group { id: id.number })
+                                Value::Group(Group::new(id.number))
                             }
                         }
                         IDClass::Color => {
                             if id.unspecified {
-                                Value::Color(Color {
-                                    id: next_free(
-                                        &mut globals.closed_colors,
-                                        ast::IDClass::Color,
-                                        info.clone(),
-                                    )?,
-                                })
+                                Value::Color(Color::next_free(&mut globals.closed_colors))
                             } else {
-                                Value::Color(Color { id: id.number })
+                                Value::Color(Color::new(id.number))
                             }
                         }
                         IDClass::Block => {
                             if id.unspecified {
-                                Value::Block(Block {
-                                    id: next_free(
-                                        &mut globals.closed_blocks,
-                                        ast::IDClass::Block,
-                                        info.clone(),
-                                    )?,
-                                })
+                                Value::Block(Block::next_free(&mut globals.closed_blocks))
                             } else {
-                                Value::Block(Block { id: id.number })
+                                Value::Block(Block::new(id.number))
                             }
                         }
                         IDClass::Item => {
                             if id.unspecified {
-                                Value::Item(Item {
-                                    id: next_free(
-                                        &mut globals.closed_items,
-                                        ast::IDClass::Item,
-                                        info.clone(),
-                                    )?,
-                                })
+                                Value::Item(Item::next_free(&mut globals.closed_items))
                             } else {
-                                Value::Item(Item { id: id.number })
+                                Value::Item(Item::new(id.number))
                             }
                         }
                     },
@@ -1529,7 +1554,7 @@ impl ast::Variable {
                     all_combinations(all_expr, context.clone(), globals, new_info, constant)?;
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
-                    let mut obj: Vec<(u16, String)> = Vec::new();
+                    let mut obj: Vec<(u16, ObjParam)> = Vec::new();
                     for i in 0..(o.props.len()) {
                         let v = expressions[i * 2].clone();
                         let v2 = expressions[i * 2 + 1].clone();
@@ -1548,22 +1573,16 @@ impl ast::Variable {
                                 }
                             },
                             match &globals.stored_values[v2] {
-                                Value::Number(n) => n.to_string(),
-                                Value::Str(s) => s.clone(),
-                                Value::Func(g) => g.start_group.id.to_string(),
+                                Value::Number(n) => ObjParam::Number(*n),
+                                Value::Str(s) => ObjParam::Text(s.clone()),
+                                Value::Func(g) => ObjParam::Group(g.start_group),
 
-                                Value::Group(g) => g.id.to_string(),
-                                Value::Color(c) => c.id.to_string(),
-                                Value::Block(b) => b.id.to_string(),
-                                Value::Item(i) => i.id.to_string(),
+                                Value::Group(g) => ObjParam::Group(*g),
+                                Value::Color(c) => ObjParam::Color(*c),
+                                Value::Block(b) => ObjParam::Block(*b),
+                                Value::Item(i) => ObjParam::Item(*i),
 
-                                Value::Bool(b) => {
-                                    if *b {
-                                        "1".to_string()
-                                    } else {
-                                        "0".to_string()
-                                    }
-                                }
+                                Value::Bool(b) => ObjParam::Bool(*b),
 
                                 //Value::Array(a) => {} TODO: Add this
                                 x => {
@@ -2188,13 +2207,7 @@ impl ast::CompoundStatement {
         new_context.spawn_triggered = true;
 
         //pick a start group
-        let start_group = Group {
-            id: next_free(
-                &mut globals.closed_groups,
-                ast::IDClass::Group,
-                info.clone(),
-            )?,
-        };
+        let start_group = Group::next_free(&mut globals.closed_groups);
 
         new_context.start_group = start_group;
         let new_info = info.next("function body", globals, true);

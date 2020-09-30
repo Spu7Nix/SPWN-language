@@ -114,45 +114,13 @@ pub fn compile_spwn(
     path: PathBuf,
     gd_path: Option<PathBuf>,
     notes: ParseNotes,
-) -> Result<(Globals, String), RuntimeError> {
+) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
     let mut globals = Globals::new(notes, path);
     let start_context = Context::new();
     //store at pos 0
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
-
-    println!("{:?}", globals.stored_values.map);
-
-    println!("Loading level data...");
-
-    let level_string = match gd_path {
-        Some(gd_path) => {
-            let file_content =
-                fs::read_to_string(gd_path).expect("Your local geometry dash files were not found");
-            let level_string = get_level_string(file_content)
-                //remove previous spwn objects
-                .split(";")
-                .map(|obj| {
-                    let key_val: Vec<&str> = obj.split(",").collect();
-                    let mut ret = obj;
-                    for i in (0..key_val.len()).step_by(2) {
-                        if key_val[i] == "57" {
-                            let mut groups = key_val[i + 1].split(".");
-                            if groups.any(|x| x == SPWN_SIGNATURE_GROUP) {
-                                ret = "";
-                            }
-                        }
-                    }
-                    ret
-                })
-                .collect::<Vec<&str>>()
-                .join(";");
-            get_used_ids(&level_string, &mut globals);
-            level_string
-        }
-        None => String::from(""),
-    };
 
     let start_info = CompilerInfo {
         depth: 0,
@@ -174,39 +142,6 @@ Building script...
 
     compile_scope(&statements, vec![start_context], &mut globals, start_info)?;
 
-    //delete all unused func ids
-
-    //let all func_id's parents be with objects
-    //let mut new_func_ids = Vec::<FunctionID>::new();
-
-    //println!("Func id len: {}", globals.func_ids.len());
-
-    /*for id in &globals.func_ids {
-        if !id.obj_list.is_empty() {
-            let mut new_id = id.clone();
-
-            loop {
-                match new_id.parent {
-                    Some(p) => {
-                        if globals.func_ids[p].obj_list.is_empty() {
-                            new_id.parent = globals.func_ids[p].parent;
-                        } else {
-                            break;
-                        }
-                    }
-                    None => break,
-                }
-            }
-
-            new_func_ids.push(new_id)
-        }
-    }*/
-
-    // PROBLEM: new parent ids point to indexes in the previous list, in which many items were deleted.
-    // Update the indexes to point to the corresponding items in the new list
-
-    //globals.func_ids = new_func_ids;
-
     println!(
         "
 ———————————————————————————
@@ -215,7 +150,7 @@ Built in {} milliseconds!
         start_time.elapsed().as_millis()
     );
 
-    Ok((globals, level_string))
+    Ok(globals)
 }
 
 pub fn compile_scope(
@@ -280,13 +215,7 @@ pub fn compile_scope(
                                 let storage = symbol.define(&mut new_context, globals, &info)?;
 
                                 //pick a start group
-                                let start_group = Group {
-                                    id: next_free(
-                                        &mut globals.closed_groups,
-                                        ast::IDClass::Group,
-                                        info.clone(),
-                                    )?,
-                                };
+                                let start_group = Group::next_free(&mut globals.closed_groups);
                                 //store value
                                 globals.stored_values[storage] =
                                     Value::Func(Function { start_group });
@@ -571,8 +500,8 @@ pub fn compile_scope(
                     params.insert(
                         51,
                         match &globals.stored_values[func] {
-                            Value::Func(g) => g.start_group.id.to_string(),
-                            Value::Group(g) => g.id.to_string(),
+                            Value::Func(g) => ObjParam::Group(g.start_group),
+                            Value::Group(g) => ObjParam::Group(*g),
                             a => {
                                 return Err(RuntimeError::RuntimeError {
                                     message: format!(
@@ -584,7 +513,7 @@ pub fn compile_scope(
                             }
                         },
                     );
-                    params.insert(1, "1268".to_string());
+                    params.insert(1, ObjParam::Number(1268.0));
                     obj_list.push(
                         GDObj {
                             params,
@@ -752,10 +681,10 @@ pub fn import_module(
         Ok(p) => p,
         Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
     };
-    (*globals).closed_groups.extend(notes.closed_groups);
-    (*globals).closed_colors.extend(notes.closed_colors);
-    (*globals).closed_blocks.extend(notes.closed_blocks);
-    (*globals).closed_items.extend(notes.closed_items);
+    // (*globals).closed_groups.extend(notes.closed_groups);
+    // (*globals).closed_colors.extend(notes.closed_colors);
+    // (*globals).closed_blocks.extend(notes.closed_blocks);
+    // (*globals).closed_items.extend(notes.closed_items);
 
     let stored_path = globals.path.clone();
     (*globals).path = module_path;
@@ -789,20 +718,20 @@ pub fn import_module(
     })
 }
 
-const ID_MAX: u16 = 999;
+// const ID_MAX: u16 = 999;
 
-pub fn next_free(
-    ids: &mut Vec<u16>,
-    id_class: ast::IDClass,
-    info: CompilerInfo,
-) -> Result<u16, RuntimeError> {
-    for i in 1..ID_MAX {
-        if !ids.contains(&i) {
-            (*ids).push(i);
-            return Ok(i);
-        }
-    }
+// pub fn next_free(
+//     ids: &mut Vec<u16>,
+//     id_class: ast::IDClass,
+//     info: CompilerInfo,
+// ) -> Result<ID, RuntimeError> {
+//     for i in 1..ID_MAX {
+//         if !ids.contains(&i) {
+//             (*ids).push(i);
+//             return Ok(i);
+//         }
+//     }
 
-    Err(RuntimeError::IDError { id_class, info })
-    //panic!("All ids of this type are used up!");
-}
+//     Err(RuntimeError::IDError { id_class, info })
+//     //panic!("All ids of this type are used up!");
+// }

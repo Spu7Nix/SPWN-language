@@ -2,7 +2,49 @@
 use crate::ast::ObjectMode;
 use crate::builtin::*;
 use crate::compiler_types::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum ObjParam {
+    Group(Group),
+    Color(Color),
+    Block(Block),
+    Item(Item),
+    Number(f64),
+    Bool(bool),
+    Text(String),
+    GroupList(Vec<Group>),
+}
+
+use std::fmt;
+
+impl fmt::Display for ObjParam {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ObjParam::Group(Group { id })
+            | ObjParam::Color(Color { id })
+            | ObjParam::Block(Block { id })
+            | ObjParam::Item(Item { id }) => match id {
+                ID::Specific(id) => write!(f, "{}", id),
+                _ => write!(f, "0"),
+            },
+            ObjParam::Number(n) => write!(f, "{}", n),
+            ObjParam::Bool(b) => write!(f, "{}", if *b { "1" } else { "0" }),
+            ObjParam::Text(t) => write!(f, "{}", t),
+            ObjParam::GroupList(list) => {
+                let mut out = String::new();
+                for g in list {
+                    match g.id {
+                        ID::Specific(id) => out += &(id.to_string() + "."),
+                        _ => (),
+                    };
+                }
+                out.pop();
+                write!(f, "{}", out)
+            }
+        }
+    }
+}
 #[derive(Clone, PartialEq, Debug)]
 pub struct GDObj {
     /*pub obj_id: u16,
@@ -10,58 +52,61 @@ pub struct GDObj {
     pub target: Group,
     pub spawn_triggered: bool,*/
     pub func_id: usize,
-    pub params: HashMap<u16, String>,
+    pub params: HashMap<u16, ObjParam>,
     pub mode: ObjectMode,
 }
 
 impl GDObj {
     pub fn context_parameters(&mut self, context: Context) -> GDObj {
-        self.params.insert(57, context.start_group.id.to_string());
-        self.params.insert(
-            62,
-            if context.spawn_triggered {
-                String::from("1")
-            } else {
-                String::from("0")
-            },
-        );
+        self.params
+            .insert(57, ObjParam::GroupList(vec![context.start_group]));
+        self.params
+            .insert(62, ObjParam::Bool(context.spawn_triggered));
         (*self).clone()
     }
 
     pub fn get_groups(&self) -> Vec<Group> {
         match self.params.get(&57) {
-            Some(group_string) => group_string
-                .split(".")
-                .map(|x| Group {
-                    id: x.parse::<u16>().unwrap(),
-                })
-                .collect(),
+            Some(group_string) => match group_string {
+                ObjParam::GroupList(l) => l.clone(),
+                _ => unreachable!(),
+            },
+
             None => Vec::new(),
         }
     }
 
-    pub fn obj_id(&self) -> &str {
+    pub fn obj_id(&self) -> u16 {
         match self.params.get(&1) {
-            Some(num) => num,
-            None => "0",
+            Some(num) => match num {
+                ObjParam::Number(n) => *n as u16,
+                _ => unreachable!(),
+            },
+            None => 0,
         }
     }
 
     pub fn get_pos(&self) -> (f64, f64) {
         (
             match self.params.get(&2) {
-                Some(x_pos) => x_pos.parse().unwrap(),
-                None => 0.0,
+                Some(ObjParam::Number(n)) => *n,
+                _ => 0.0,
             },
             match self.params.get(&3) {
-                Some(y_pos) => y_pos.parse().unwrap(),
-                None => 0.0,
+                Some(ObjParam::Number(n)) => *n,
+                _ => 0.0,
             },
         )
     }
 }
 
-pub fn get_used_ids(ls: &String, globals: &mut Globals) {
+pub fn get_used_ids(ls: &String) -> [HashSet<u16>; 4] {
+    let mut out = [
+        HashSet::<u16>::new(),
+        HashSet::<u16>::new(),
+        HashSet::<u16>::new(),
+        HashSet::<u16>::new(),
+    ];
     let objects = ls.split(";");
     for obj in objects {
         let props: Vec<&str> = obj.split(",").collect();
@@ -74,11 +119,9 @@ pub fn get_used_ids(ls: &String, globals: &mut Globals) {
                     //GROUPS
                     let groups = value.split(".");
                     for g in groups {
-                        let group = Group {
-                            id: g.parse().unwrap(),
-                        };
-                        if !globals.closed_groups.contains(&group.id) {
-                            (*globals).closed_groups.push(group.id);
+                        let group = g.parse().unwrap();
+                        if !out[0].contains(&group) {
+                            out[0].insert(group);
                         }
                     }
                 }
@@ -86,48 +129,178 @@ pub fn get_used_ids(ls: &String, globals: &mut Globals) {
             }
         }
     }
+    out
 }
 
 const START_HEIGHT: u16 = 10;
 const MAX_HEIGHT: u16 = 40;
 
-pub const SPWN_SIGNATURE_GROUP: &str = "1111";
+pub const SPWN_SIGNATURE_GROUP: Group = Group {
+    id: ID::Specific(1111),
+};
 //use crate::ast::ObjectMode;
-pub fn serialize_triggers(objects: Vec<GDObj>) -> String {
-    /*fn group_string(list: Vec<Group>) -> String {
-        let mut string = String::new();
-        for group in list.iter() {
-            string += &(group.id.to_string() + ".");
+
+pub fn remove_spwn_objects(file_content: &mut String) {
+    let spwn_group = match SPWN_SIGNATURE_GROUP.id {
+        ID::Specific(n) => n.to_string(),
+        _ => unreachable!(),
+    };
+    (*file_content) = file_content
+        //remove previous spwn objects
+        .split(";")
+        .map(|obj| {
+            let key_val: Vec<&str> = obj.split(",").collect();
+            let mut ret = obj;
+            for i in (0..key_val.len()).step_by(2) {
+                if key_val[i] == "57" {
+                    let mut groups = key_val[i + 1].split(".");
+                    if groups.any(|x| x == spwn_group) {
+                        ret = "";
+                    }
+                }
+            }
+            ret
+        })
+        .collect::<Vec<&str>>()
+        .join(";");
+}
+
+//returns the string to be appended to the old string
+pub fn append_objects(
+    mut objects: Vec<GDObj>,
+    old_ls: &String,
+) -> Result<(String, [usize; 4]), String> {
+    let mut closed_ids = get_used_ids(&old_ls);
+
+    //collect all specific ids mentioned into closed_[id] lists
+    for obj in &objects {
+        for (_, prop) in &obj.params {
+            let class_index;
+            let id;
+            match prop {
+                ObjParam::Group(g) => {
+                    class_index = 0;
+                    id = g.id;
+                }
+                ObjParam::Color(g) => {
+                    class_index = 1;
+                    id = g.id;
+                }
+                ObjParam::Block(g) => {
+                    class_index = 2;
+                    id = g.id;
+                }
+                ObjParam::Item(g) => {
+                    class_index = 3;
+                    id = g.id;
+                }
+                _ => continue,
+            }
+            match id {
+                ID::Specific(i) => {
+                    closed_ids[class_index].insert(i);
+                }
+                _ => continue,
+            }
         }
-        string.pop();
-        string
-    }*/
+    }
+
+    //find new ids for all the arbitrary ones
+    let mut id_maps: [HashMap<ArbitraryID, SpecificID>; 4] = [
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+    ];
+
+    const ID_MAX: u16 = 999;
+
+    for obj in &mut objects {
+        for (_, prop) in &mut obj.params {
+            let class_index;
+            let ids: Vec<&mut ID>;
+            match prop {
+                ObjParam::Group(g) => {
+                    class_index = 0;
+                    ids = vec![&mut g.id];
+                }
+                ObjParam::GroupList(g) => {
+                    class_index = 0;
+                    ids = g.iter_mut().map(|x| &mut x.id).collect();
+                }
+                ObjParam::Color(g) => {
+                    class_index = 1;
+                    ids = vec![&mut g.id];
+                }
+                ObjParam::Block(g) => {
+                    class_index = 2;
+                    ids = vec![&mut g.id];
+                }
+                ObjParam::Item(g) => {
+                    class_index = 3;
+                    ids = vec![&mut g.id];
+                }
+                _ => continue,
+            }
+            for id in ids {
+                match &id {
+                    ID::Arbitrary(i) => {
+                        *id = ID::Specific(match id_maps[class_index].get(i) {
+                            Some(a) => *a,
+                            None => {
+                                let mut out = None;
+                                for i in 1..ID_MAX {
+                                    if !closed_ids[class_index].contains(&i) {
+                                        out = Some(i);
+                                        closed_ids[class_index].insert(i);
+                                        break;
+                                    }
+                                }
+                                if let Some(id) = out {
+                                    id_maps[class_index].insert(*i, id);
+                                    id
+                                } else {
+                                    return Err(format!(
+                                        "This level exeeds the {} limit!",
+                                        ["group", "color", "block ID", "item ID"][class_index]
+                                    ));
+                                }
+                            }
+                        })
+                    }
+                    _ => continue,
+                }
+            }
+        }
+    }
 
     fn serialize_obj(mut trigger: GDObj) -> String {
         let mut obj_string = String::new();
         match trigger.mode {
             ObjectMode::Object => {
                 match trigger.params.get_mut(&57) {
-                    Some(group_str) => (*group_str) += &format!(".{}", SPWN_SIGNATURE_GROUP),
-                    None => {
-                        trigger.params.insert(57, SPWN_SIGNATURE_GROUP.to_string());
+                    Some(ObjParam::GroupList(l)) => (*l).push(SPWN_SIGNATURE_GROUP),
+                    _ => {
+                        trigger
+                            .params
+                            .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP));
                     }
                 };
 
-                let mut param_list = trigger.params.iter().collect::<Vec<(&u16, &String)>>();
+                let mut param_list = trigger.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
 
                 param_list.sort_by(|a, b| (*a.0).cmp(b.0));
 
                 for param in param_list {
-                    obj_string += &(param.0.to_string() + "," + &param.1 + ",");
+                    obj_string += &format!("{},{},", param.0, param.1);
                 }
 
                 obj_string + ";"
             }
             ObjectMode::Trigger => {
                 let spawned = match trigger.params.get(&62) {
-                    Some(s) => *s == String::from("1"),
-                    None => false,
+                    Some(ObjParam::Bool(b)) => *b,
+                    _ => false,
                 };
 
                 if spawned {
@@ -135,18 +308,20 @@ pub fn serialize_triggers(objects: Vec<GDObj>) -> String {
                 }
 
                 match trigger.params.get_mut(&57) {
-                    Some(group_str) => (*group_str) += &format!(".{}", SPWN_SIGNATURE_GROUP),
-                    None => {
-                        trigger.params.insert(57, SPWN_SIGNATURE_GROUP.to_string());
+                    Some(ObjParam::GroupList(l)) => (*l).push(SPWN_SIGNATURE_GROUP),
+                    _ => {
+                        trigger
+                            .params
+                            .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP));
                     }
                 };
 
-                let mut param_list = trigger.params.iter().collect::<Vec<(&u16, &String)>>();
+                let mut param_list = trigger.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
 
                 param_list.sort_by(|a, b| (*a.0).cmp(b.0));
 
                 for param in param_list {
-                    obj_string += &(param.0.to_string() + "," + &param.1 + ",");
+                    obj_string += &format!("{},{},", param.0, param.1);
                 }
                 obj_string + "108,1;" //linked group
             }
@@ -158,7 +333,15 @@ pub fn serialize_triggers(objects: Vec<GDObj>) -> String {
     for obj in objects {
         full_obj_string += &serialize_obj(obj)
     }
-    full_obj_string
+    Ok((
+        full_obj_string,
+        [
+            closed_ids[0].len(),
+            closed_ids[1].len(),
+            closed_ids[2].len(),
+            closed_ids[3].len(),
+        ],
+    ))
 }
 
 pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
@@ -200,16 +383,15 @@ pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
                     let mut new_obj = obj.clone();
                     new_obj.params.insert(
                         2,
-                        (if new_obj.params.get(&62) == Some(&String::from("1")) {
-                            x_pos * 30 + 15
+                        if new_obj.params.get(&62) == Some(&ObjParam::Bool(true)) {
+                            ObjParam::Number((x_pos * 30 + 15) as f64)
                         } else {
-                            0
-                        })
-                        .to_string(),
+                            ObjParam::Number(0.0)
+                        },
                     );
                     new_obj
                         .params
-                        .insert(3, ((80 - y_pos) * 30 + 15).to_string());
+                        .insert(3, ObjParam::Number(((80 - y_pos) * 30 + 15) as f64));
                     objects.push(new_obj);
                 }
             }
