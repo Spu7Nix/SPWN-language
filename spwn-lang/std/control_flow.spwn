@@ -1,0 +1,53 @@
+constants = import "constants.spwn"
+
+extract constants.obj_props
+extract constants.comparisons
+
+wait = #[desc("Adds a delay before the next triggers")] (
+	#[desc("Delay time in seconds")] time: @number
+){
+	
+	$.add( trigger{
+		OBJ_ID: 1268,
+		SPAWN_DURATION: time,
+		TARGET: {
+			return
+		},
+	})
+	
+}
+
+return {
+	wait: wait,
+	
+	call_with_delay: #[desc("Call a function after a delay")] (
+		#[desc("Delay time in seconds")] time: @number, 
+		#[desc("Function to call after the delay")] function: @function
+	) {
+		$.add(trigger{
+			OBJ_ID: 1268,
+			SPAWN_DURATION: time,
+			TARGET: function,
+		})
+	},
+
+	supress_signal: #[desc("Stops signal from coming past for some time")] (
+		#[desc("Time to supress signal")] delay: @number
+	){
+		//if checker is 0, a signal can come through
+		//if checker is 1, it will be supressed
+		checker = @counter::new(0)
+		-> (){
+			wait(delay * 2)
+			checker.item.if_is(EQUAL_TO, 1, {
+				checker.item.add(-1)
+			})
+		}()
+		checker.item.if_is(EQUAL_TO, 0, {
+			checker.item.add(1)
+			return
+		})
+		
+	
+	}
+}

@@ -1,0 +1,589 @@
+
+
+extract import "control_flow.spwn"
+extract import "constants.spwn".comparisons
+let DEFAULT_SPEED = 3
+type counter
+
+impl @counter {
+
+    new: #[desc("Creates a new counter")] (
+        #[desc("Source (can be a number, item ID or boolean)")] source = 0
+    ){
+        if source.type == @number {
+            id = ?i
+        
+            id.add(source)
+            
+            return {
+                type: @counter,
+                item: id
+            }
+        } else if source.type == @item {
+            return {
+                type: @counter,
+                item: source
+            }
+        } else if source.type == @bool {
+            id = ?i
+        
+            if source {
+                id.add(1)
+            }
+            return {
+                type: @counter,
+                item: id
+            }
+        } else {
+            error "Can not make counter from this type"
+        }
+        
+    },
+
+    add_to: 
+    #[desc("Adds the counter's value to all item IDs in a list, and resets the counter to 0 in the process")]
+    (
+        self, 
+        #[desc("Item IDs to add to")] items: @array, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
+        #[desc("Multiplyer for the value added")] factor: @number = 1
+    ) {
+        add = {
+            
+            
+            mini_add = (num){
+                self.item.if_is(LARGER_THAN, num - 1, {
+                    self.item.add(-num)
+                    for item in items {
+                        item.add(num * factor)
+                    }
+                    call_with_delay(0.05, add)
+                })
+            }
+
+            for i in 0..speed {
+                mini_add(3^i)
+            }
+                
+                
+            
+            self.item.if_is(EQUAL_TO, 0, {
+                wait(0.05)
+                supress_signal(0.06)
+                return
+            })
+        }
+        add!
+    },
+
+    subtract_from:
+    #[desc("Subtracts the counter's value from all item IDs in a list, and resets the counter to 0 in the process")]
+    (
+        self, 
+        #[desc("Item IDs to add to")] items: @array, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
+    ) {
+        sub = {
+            
+            self.item.if_is(LARGER_THAN, 0, {
+                mini_sub = (num){
+                    self.item.if_is(LARGER_THAN, num - 1, {
+                        self.item.add(-num)
+                        for item in items {
+                            item.add(-num)
+                        }
+                        call_with_delay(0.05, sub)
+                    })
+                }
+
+                for i in 0..speed {
+                    mini_sub(2^i)
+                }
+                
+                
+            })
+            self.item.if_is(EQUAL_TO, 0, {
+                wait(0.05)
+                supress_signal(0.06)
+                return
+            })
+        }
+        sub!
+    },
+
+    multiply:
+    #[desc("Multiplies the value of the counter by some factor")]
+    (
+        self,
+        #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor,
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
+    ) {
+        if factor.type == @number {
+            temp = @counter::new(0)
+            self.add_to([temp.item], speed, factor)
+            temp.add_to([self.item], speed)
+        } else if factor.type == @counter {
+            
+            temp = @counter::new(0)
+            mini_mult = (num){
+                mult = {
+                    
+                    self.item.if_is(LARGER_THAN, num - 1, {
+                        self.item.add(-num)
+                        factor.copy_to(temp.item, speed, num)
+                        
+                        
+                        call_with_delay(0.1, mult)
+                    })
+                        
+                    self.item.if_is(SMALLER_THAN, num, {
+                        wait(0.1)
+                        supress_signal(0.11)
+                        return
+                    })
+                }
+                mult!
+            }
+            
+
+            for i in speed..0 {
+                mini_mult(2^i)
+            }
+            
+            
+            -> factor.reset(speed)
+            temp.add_to([self.item], speed * 2)
+            
+        }
+    },
+
+
+    divide: #[desc("Devides the value of the counter by some divisor")]
+    (
+        self, 
+        #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor,
+        #[desc("Counter to set to the remainder value")] remainder: @counter = {id: ?i, type: @counter},
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
+        
+    ) {
+        
+
+        if divisor.type == @number {
+            result = @counter::new(0)
+
+            div = {
+                mini_div = (num) {
+                    self.item.if_is(LARGER_THAN, (divisor * num) - 1, {
+                        
+                        
+                        self.item.add(-(divisor * num))
+                        result.item.add(num)
+                        
+                        call_with_delay(0.05, div)
+                        
+                    })
+                }
+
+                for i in 0..speed {
+                    mini_div(i * 4 + 1)
+                }
+
+                self.item.if_is(SMALLER_THAN, divisor, {
+                    
+                    wait(0.05)
+                    self.add_to([remainder.item], speed)
+                    result.add_to([self.item], speed)
+                    supress_signal(0.06)
+                    return remainder
+                })
+            }
+            div!
+        } else if divisor.type == @counter {
+            result = @counter::new(0)
+            remainder.reset(speed)
+
+            // IDEA:
+            // every time it goes under, undo the previous operation to simulate comparison
+            
+            mini_div = (num){
+                div = {
+                    
+                    
+                    self.item.if_is(LARGER_THAN, 0, {
+                        //this basically subtracts divisor * num from self
+                        (){
+                            temp_storage = ?i
+                            cas = {
+                                mini_cas = (num2){
+                                    divisor.item.if_is(LARGER_THAN, num2 - 1, {
+                                        divisor.item.add(-num2)
+                                        temp_storage.add(num2)
+                                        self.item.add(-(num2 * num))
+
+
+                                        
+                                        call_with_delay(0.05, cas)
+                                    })
+                                }
+                    
+                                for i in 0..speed {
+                                    mini_cas(3^i)
+                                }
+                                    
+                                divisor.item.if_is(EQUAL_TO, 0, {
+                                    wait(0.1)
+                                    supress_signal(0.11)
+                                    @counter::new(temp_storage).add_to([divisor.item], speed*2)
+                                    return
+                                })
+                            }
+                            cas!
+                        }()
+                        result.item.add(num)
+                        call_with_delay(0.1, div)
+                    })
+
+                    self.item.if_is(SMALLER_THAN, 1, {
+
+                        ret = {
+                            supress_signal(0.11)
+                            wait(0.1)
+                            return
+                        }
+                        
+                        supress_signal(0.06)
+                        self.item.if_is(SMALLER_THAN, 0, {
+                            result.item.add(-num)
+                            wait(0.1)
+                            divisor.copy_to(self.item, speed*2, factor = num)
+                            ret!
+                        })
+                        self.item.if_is(EQUAL_TO, 0, ret)
+                        
+                    })
+
+                    
+                }
+                div!
+            }
+            
+
+            
+            for i in speed..0 {
+                mini_div(8^i)
+                wait(0.1)
+            }
+            -> divisor.reset(speed)
+            self.add_to([remainder.item], speed*2)
+            
+            result.add_to([self.item], speed*2)
+            wait(0.2)
+            return remainder
+            
+            
+         
+        }
+
+        
+    },
+
+    //will consume both numbers
+    compare: (self, other, speed = DEFAULT_SPEED) {
+        other.subtract_from([self.item], speed)
+        if self == 0 {
+            return 0
+        } else if self > 0 {
+            return 1
+        } else {
+            return -1
+        }
+    },
+
+    reset: #[desc("Resets counter to 0")]
+    (
+        self, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
+    ){
+        //almost the same
+        add = {
+            self.item.if_is(LARGER_THAN, 0, {
+                mini_add = (num){
+                    self.item.if_is(LARGER_THAN, num - 1, {
+                        self.item.add(-num)
+                        call_with_delay(0.05, add)
+                    })
+                }
+
+                for i in 0..speed {
+                    mini_add(3^i)
+                }
+                
+                
+            })
+            self.item.if_is(EQUAL_TO, 0, {
+                wait(0.05)
+                supress_signal(0.05)
+                return
+            })
+        }
+        add!
+    },
+
+    copy_to: #[desc("Copies the value of the counter to another item ID, without consuming the original")] 
+    (
+        self, 
+        #[desc("Item ID to copy to")]  item: @item, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
+        #[desc("Factor of to multiply the copy by")] factor: @number = 1
+    ) {
+        temp_storage = ?i
+        
+        add = {
+            
+            self.item.if_is(LARGER_THAN, 0, {
+                mini_add = (num){
+                    
+                    self.item.if_is(LARGER_THAN, num - 1, {
+                        self.item.add(-num)
+                        
+                        item.add(num * factor)
+                        temp_storage.add(num)
+                        
+                        call_with_delay(0.05, add)
+                    })
+                }
+
+                for i in 0..speed {
+                    mini_add(2^i)
+                }
+                
+                
+            })
+            self.item.if_is(EQUAL_TO, 0, {
+                wait(0.05)
+                supress_signal(0.06)
+                @counter::new(temp_storage).add_to([self.item], speed)
+                return
+            })
+        }
+        add! 
+    },
+
+    clone: #[desc("Copies the counter and returns the copy")] (
+        self, 
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
+    ) {
+        new_counter = ?i
+        self.copy_to(new_counter, speed)
+        return @counter::new(new_counter)
+    },
+
+    _plus_: (self, other) {
+        if other.type == @number {
+            new_counter = self.clone()
+            new_counter.item.add(other)
+            return new_counter
+        } else if other.type == @counter {
+            new_counter = self.clone()
+            other.clone().add_to([new_counter.item])
+            return new_counter
+        } else {
+            error "Cannot add counter with this type"
+        }
+    },
+
+    _minus_: (self, other) {
+        if other.type == @number {
+            new_counter = self.clone()
+            new_counter.item.add(-other)
+            return new_counter
+        } else {
+            error "Cannot subtract counter with this type"
+        }
+    },
+
+    _more_than_: (self, other) {
+        //TODO: add case for another counter
+        if other.type == @number {
+            self.item.if_is(LARGER_THAN, other, {
+                return true
+            })
+
+            self.item.if_is(SMALLER_THAN, other + 1, {
+                return false
+            })
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == 1
+        } else {
+            error "Cannot compare counter with this type"
+        }
+    },
+
+    _less_than_: (self, other) {
+        //TODO: add case for another counter
+        if other.type == @number {
+            self.item.if_is(SMALLER_THAN, other, {
+                return true
+            })
+
+            self.item.if_is(LARGER_THAN, other - 1, {
+                return false
+            })
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == -1
+        } else {
+            error "Cannot compare counter with this type"
+        }
+    },
+
+    _more_or_equal_: (self, other) {
+        //TODO: add case for another counter
+        if other.type == @number {
+            self.item.if_is(LARGER_THAN, other - 1, {
+                return true
+            })
+
+            self.item.if_is(SMALLER_THAN, other, {
+                return false
+            })
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == 1 || cmp == 0
+        } else {
+            error "Cannot compare counter with this type"
+        }
+    },
+
+    _less_or_equal_: (self, other) {
+        //TODO: add case for another counter
+        if other.type == @number {
+            self.item.if_is(SMALLER_THAN, other + 1, {
+                return true
+            })
+
+            self.item.if_is(LARGER_THAN, other, {
+                return false
+            })
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == -1 || cmp == 0
+        } else {
+            error "Cannot compare counter with this type"
+        }
+    },
+
+    _equal_: (self, other) {
+        if other.type == @number {
+            self.item.if_is(EQUAL_TO, other, {
+                return true
+            })
+
+            ret_false = {
+                return false
+            }
+
+            self.item.if_is(LARGER_THAN, other, ret_false)
+            self.item.if_is(SMALLER_THAN, other, ret_false)
+        } else if other.type == @counter {
+            self_clone = self.clone()
+            other_clone = other.clone()
+            cmp = self_clone.compare(other_clone)
+            return cmp == 0
+        } else {
+            error "Cannot compare counter with this type"
+        }
+    },
+
+    _not_equal_: (self, other) {
+        return !(self == other)
+    },
+
+    add: #[desc("Implementation of the pickup trigger")]
+    (self, #[desc("Amount to add")] num: @number) {
+        self.item.add(num)
+    },
+
+    _add_: (self, num) {
+        if num.type == @number {
+            self.add(num)
+        } else if num.type == @counter {
+            num.clone().add_to([self])
+        } else {
+            error "Cannot add this type to counter"
+        }
+    },
+
+    _subtract_: (self, num) {
+        if num.type == @number {
+            self.add(-num)
+        } else if num.type == @counter {
+            num.clone().subtract_from([self])
+        } else {
+            error "Cannot subtract this type from counter"
+        }
+    },
+
+    _multiply_: (self, num) {
+        
+        if num.type == @number {
+            self.multiply(num)
+        }/* else if num.type == @counter {
+            self.multiply(num.clone())
+        } else {
+            error "Cannot multiply counter by this type"
+        }*/
+    },
+
+    _divide_: (self, num) {
+        if num.type == @number {
+            self.divide(num)
+        } else if num.type == @counter {
+            self.divide(num.clone())
+        } else {
+            error "Cannot divide counter by this type"
+        }
+    },
+
+    _assign_: (self, num) {
+        self.reset()
+        if num.type == @number {
+            self.item.add(num)
+        } else if num.type == @counter {
+            num.clone().add_to([self])
+        } else {
+            error "Cannot assign this type to counter"
+        }
+    },
+
+    
+
+    to_const: #[desc("Converts the counter into a normal number (very context-splitting, be careful)")] (
+        self, 
+        #[desc("Array of possible output values")] range: @array
+    ) {
+        for val in range {
+            -> self.item.if_is(EQUAL_TO, val, {
+                return val
+            }) 
+        }
+    },
+    
+
+    _as_: (self, _type: @type_indicator) {
+        if _type == @bool {
+            return self.to_const([0, 1]) == 1
+        } else {
+            error "Cannot convert to this type (counter can convert to a number using the counter.to_const macro)"
+        }
+    }
+}

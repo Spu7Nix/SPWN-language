@@ -1,14 +1,7 @@
 extract import "../std"
-extract $
 
-mac = (a) {
-	a += 10
+for i in 0..5 {
+	BG.set(255, 0, 0, 0.5)
 }
-
-let a = 0
-
-mac(a)
-
-print(a)
 
 

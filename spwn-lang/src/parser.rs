@@ -273,7 +273,7 @@ impl ParseNotes {
 #[derive(Clone)]
 pub struct Tokens<'a> {
     iter: Lexer<'a, Token>,
-    stack: Vec<(Token, String, core::ops::Range<usize>)>,
+    stack: Vec<(Option<Token>, String, core::ops::Range<usize>)>,
     line_breaks: Vec<u32>,
     //index 0 = element of iter / last element in stack
     index: usize,
@@ -302,14 +302,12 @@ impl<'a> Tokens<'a> {
                 }
             };*/
 
-            if let Some(e) = next_element {
-                let slice = self.iter.slice().to_string();
-                let range = self.iter.span();
-                /*if self.stack.len() > 4 {
-                    self.stack.remove(0);
-                }*/
-                self.stack.push((e, slice, range));
-            }
+            let slice = self.iter.slice().to_string();
+            let range = self.iter.span();
+            /*if self.stack.len() > 4 {
+                self.stack.remove(0);
+            }*/
+            self.stack.push((next_element, slice, range));
 
             if (!ss && next_element == Some(Token::StatementSeparator))
                 || (!comment && next_element == Some(Token::Comment))
@@ -320,12 +318,15 @@ impl<'a> Tokens<'a> {
             }
         } else {
             self.index -= 1;
-            if (!ss && self.stack[self.stack.len() - self.index - 1].0 == Token::StatementSeparator)
-                || (!comment && self.stack[self.stack.len() - self.index - 1].0 == Token::Comment)
+            if (!ss
+                && self.stack[self.stack.len() - self.index - 1].0
+                    == Some(Token::StatementSeparator))
+                || (!comment
+                    && self.stack[self.stack.len() - self.index - 1].0 == Some(Token::Comment))
             {
                 self.next(ss, comment)
             } else {
-                Some(self.stack[self.stack.len() - self.index - 1].0)
+                self.stack[self.stack.len() - self.index - 1].0
             }
         }
     }
@@ -352,12 +353,12 @@ impl<'a> Tokens<'a> {
         self.index += 1;
         let len = self.stack.len();
         if len > self.index {
-            if (!ss && self.stack[len - self.index - 1].0 == Token::StatementSeparator)
-                || (!comment && self.stack[len - self.index - 1].0 == Token::Comment)
+            if (!ss && self.stack[len - self.index - 1].0 == Some(Token::StatementSeparator))
+                || (!comment && self.stack[len - self.index - 1].0 == Some(Token::Comment))
             {
                 self.previous_no_ignore(ss, comment)
             } else if len - self.index >= 1 {
-                Some(self.stack[len - self.index - 1].0)
+                self.stack[len - self.index - 1].0
             } else {
                 None
             }

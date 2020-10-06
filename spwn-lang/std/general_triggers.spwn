@@ -1,0 +1,92 @@
+constants = import "constants.spwn"
+
+extract constants.obj_props
+extract import "control_flow.spwn"
+
+return {
+    
+    shake: #[desc("Implementation of the shake trigger")]
+    (
+        #[desc("Strength value")] strength: @number = 1,
+        #[desc("Interval value")] interval: @number = 0,
+        #[desc("Duration of shake")] duration: @number = 0.5
+    ){
+        $.add( trigger {
+            OBJ_ID: 1520,
+            STRENGTH: strength,
+            INTERVAL: interval,
+            DURATION: duration,
+        })
+        wait(duration)
+    },
+
+    disable_trail: #[desc("Disables the player's trail")] (){
+        $.add( trigger{
+            OBJ_ID: 33,
+        })
+    },
+
+    enable_trail: #[desc("Enables the player's trail")] (){
+        $.add( trigger{
+            OBJ_ID: 32,
+        })
+    },
+
+    show_player: #[desc("Shows the player")] (){
+        $.add( trigger{
+            OBJ_ID: 1613,
+        })
+    },
+    
+    hide_player: #[desc("Hides the player")] (){
+        $.add( trigger{
+            OBJ_ID: 1612,
+        })
+    },
+
+    toggle_bg_effect: #[desc("Implementation of the bg effect on/off triggers")] (
+        #[desc("Weather to toggle bg effect on or off")] on: @bool = false
+    ) {
+        if on {
+            $.add( trigger{
+                OBJ_ID: 1818,
+            })
+        } else {
+            $.add( trigger{
+                OBJ_ID: 1819,
+            })
+        }
+    },
+
+    loop: #[desc("Implementation of a spawn loop")] 
+    (
+        #[desc("Start value for the iterator")] start_val: @number,
+        #[desc("End value for the iterator")] end_val: @number, 
+        #[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument")] code: @macro, 
+        #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number = 0.05, 
+        #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true, 
+        #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1,
+        #[desc("Incrementation of the iterator")] increment: @number = 1
+    ) {
+        i = @counter::new(start_val)
+
+        func = {
+            code(i)
+            i.add(increment)
+            i.item.if_is(SMALLER_THAN, end_val, {
+                call_with_delay(delay, func)
+            })
+
+            i.item.if_is(LARGER_THAN, end_val - 1, {
+                if reset {
+                    i.reset(reset_speed)
+                }
+                return
+            })
+        }
+
+        func!
+        
+    }
+        
+}

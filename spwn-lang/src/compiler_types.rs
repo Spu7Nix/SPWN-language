@@ -95,6 +95,10 @@ impl ValStorage {
                         self.increment_single_lifetime(val, amount)
                     }
                 }
+
+                for (_, v) in m.def_context.variables.iter() {
+                    self.increment_single_lifetime(*v, amount)
+                }
             }
             _ => (),
         };
@@ -125,7 +129,7 @@ pub fn clone_value(
 ) -> StoredValue {
     let mut old_val = globals.stored_values[index].clone();
 
-    match &old_val {
+    match &mut old_val {
         Value::Array(arr) => {
             old_val = Value::Array(
                 arr.iter()
@@ -145,6 +149,18 @@ pub fn clone_value(
                     })
                     .collect(),
             );
+        }
+
+        Value::Macro(m) => {
+            for arg in &mut m.args {
+                if let Some(def_val) = &mut arg.1 {
+                    (*def_val) = clone_value(*def_val, lifetime, globals, context, constant);
+                }
+            }
+
+            for (_, v) in m.def_context.variables.iter_mut() {
+                (*v) = clone_value(*v, lifetime, globals, context, constant)
+            }
         }
         _ => (),
     };
@@ -189,6 +205,7 @@ pub struct Context {
 pub struct CompilerInfo {
     pub depth: u8,
     pub path: Vec<String>,
+    pub current_file: PathBuf,
     pub line: (usize, usize),
     pub func_id: usize,
 }
@@ -198,6 +215,7 @@ impl CompilerInfo {
         CompilerInfo {
             depth: 0,
             path: vec!["main scope".to_string()],
+            current_file: PathBuf::new(),
             line: (0, 0),
             func_id: 0,
         }
@@ -224,6 +242,7 @@ impl CompilerInfo {
             depth: self.depth + 1,
             path: new_path,
             line: self.line,
+            current_file: self.current_file.clone(),
             func_id: if use_in_organization {
                 (*globals).func_ids.len() - 1
             } else {
@@ -250,6 +269,7 @@ impl Context {
 pub struct Macro {
     pub args: Vec<(String, Option<StoredValue>, ast::Tag, Option<TypeID>)>,
     pub def_context: Context,
+    pub def_file: PathBuf,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Tag,
 }
@@ -1238,7 +1258,8 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
         new_contexts.push(new_context);
     }
-    let new_info = info.next("macro body", globals, false);
+    let mut new_info = info.next("macro body", globals, false);
+    new_info.current_file = m.def_file;
     let compiled = compile_scope(&m.body, new_contexts, globals, new_info)?;
 
     let returns = if compiled.1.is_empty() {
@@ -1665,7 +1686,9 @@ impl ast::Variable {
                             match &arg.1 {
                                 Some(_) => {
                                     expr_index += 1;
-                                    Some(defaults.0[expr_index - 1])
+                                    Some(
+                                        clone_value(defaults.0[expr_index - 1], 1, globals, &defaults.1, true)
+                                    )
                                 }
                                 None => None,
                             },
@@ -1692,6 +1715,7 @@ impl ast::Variable {
                                 args,
                                 body: m.body.statements.clone(),
                                 def_context: defaults.1.clone(),
+                                def_file: info.current_file.clone(),
                                 tag: m.properties.clone(),
                             }),
                             1,

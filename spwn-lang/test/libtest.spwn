@@ -1,7 +1,5 @@
 //for testing spwn libraries
 
-extract import "./std"
+extract import "sublibtest.spwn"
 
-a = counter(0)
-
-return a.to_const(0..10)
+return a

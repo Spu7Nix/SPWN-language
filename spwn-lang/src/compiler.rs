@@ -49,6 +49,7 @@ impl std::fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //write!(f, "SuperErrorSideKick is here!")
         //let mut message = String::from("Runtime/compile error:");
+
         match self {
             RuntimeError::UndefinedErr {
                 undefined,
@@ -56,17 +57,18 @@ impl std::fmt::Display for RuntimeError {
                 info,
             } => write!(
                 f,
-                "{} '{}' is not defined at line {}, pos {}",
-                desc, undefined, info.line.0, info.line.1
+                "{:#?}:\n{} '{}' is not defined at line {}, pos {}",
+                info.current_file, desc, undefined, info.line.0, info.line.1
             ),
             RuntimeError::PackageSyntaxError { err, info } => write!(
                 f,
-                "Error when parsing library at line {}, pos {}: {}",
-                info.line.0, info.line.1, err
+                "{:#?}:\nError when parsing library at line {}, pos {}: {}",
+                info.current_file, info.line.0, info.line.1, err
             ),
             RuntimeError::IDError { id_class, info } => write!(
                 f,
-                "Ran out of {} at line {}, pos {}",
+                "{:#?}:\nRan out of {} at line {}, pos {}",
+                info.current_file,
                 match id_class {
                     ast::IDClass::Group => "groups",
                     ast::IDClass::Color => "colors",
@@ -83,18 +85,20 @@ impl std::fmt::Display for RuntimeError {
                 info,
             } => write!(
                 f,
-                "Type mismatch: expected {}, found {} (line {}, pos {})",
-                expected, found, info.line.0, info.line.1
+                "{:#?}:\nType mismatch: expected {}, found {} (line {}, pos {})",
+                info.current_file, expected, found, info.line.0, info.line.1
             ),
 
-            RuntimeError::RuntimeError { message, info } => {
-                write!(f, "{} (line {}, pos {})", message, info.line.0, info.line.1)
-            }
+            RuntimeError::RuntimeError { message, info } => write!(
+                f,
+                "{:#?}:\n{} (line {}, pos {})",
+                info.current_file, message, info.line.0, info.line.1
+            ),
 
             RuntimeError::BuiltinError { message, info } => write!(
                 f,
-                "Error when calling built-in-function: {} (line {}, pos {})",
-                message, info.line.0, info.line.1
+                "{:#?}:\nError when calling built-in-function: {} (line {}, pos {})",
+                info.current_file, message, info.line.0, info.line.1
             ),
         }
     }
@@ -116,7 +120,7 @@ pub fn compile_spwn(
     notes: ParseNotes,
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
-    let mut globals = Globals::new(notes, path);
+    let mut globals = Globals::new(notes, path.clone());
     let start_context = Context::new();
     //store at pos 0
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
@@ -126,6 +130,7 @@ pub fn compile_spwn(
         depth: 0,
         path: vec!["main scope".to_string()],
         line: statements[0].line,
+        current_file: path,
         func_id: 0,
     };
     use std::time::Instant;
@@ -334,9 +339,15 @@ pub fn compile_scope(
 
                 contexts = Vec::new();
                 for (val, mut context) in all_values {
-                    match &globals.stored_values[val] {
+                    match globals.stored_values[val].clone() {
                         Value::Dict(d) => {
-                            context.variables.extend(d.clone());
+                            context.variables.extend(
+                                d.iter()
+                                    .map(|(k, v)| {
+                                        (k.clone(), clone_value(*v, 1, globals, &context, false))
+                                    })
+                                    .collect::<HashMap<String, StoredValue>>(),
+                            );
                         }
                         Value::Builtins => {
                             for name in BUILTIN_LIST.iter() {
@@ -689,7 +700,8 @@ pub fn import_module(
     let stored_path = globals.path.clone();
     (*globals).path = module_path;
 
-    let new_info = info.next("module", globals, false);
+    let mut new_info = info.next("module", globals, false);
+    new_info.current_file = path.clone();
     let (contexts, returns) = compile_scope(&parsed, vec![Context::new()], globals, new_info)?;
     (*globals).path = stored_path;
 

@@ -22,6 +22,7 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
         CompilerInfo {
             depth: 0,
             path: vec!["main scope".to_string()],
+            current_file: path.clone(),
             line: (0, 0),
             func_id: 0,
         },

@@ -1,0 +1,52 @@
+constants = import "constants.spwn"
+extract constants.obj_props
+
+impl @item {
+    
+    add:
+    #[desc("Implementation of the pickup trigger")]
+    (self, #[desc("Amount to add")] amount: @number) {
+        $.add( trigger{
+            OBJ_ID: 1817,
+            COUNT: amount,
+            ITEM: self,
+        })
+    },
+
+    if_is:
+    #[desc("Implementation of the instant count trigger")]
+    (
+        self, 
+        #[desc("Comparison mode")] comparison: @number, 
+        #[desc("Number to compare with")] other: @number, 
+        #[desc("Target function if comparison is 'true'")] function: @function
+    ) {
+        $.add( trigger{
+            OBJ_ID: 1811,
+            TARGET: function,
+            COUNT: other,
+            ACTIVATE_GROUP: 1, 
+            COMPARISON: comparison, 
+            ITEM: self,
+        })
+    },
+
+    count:
+    #[desc("Implementation of the count trigger (returns an event)")]
+    (
+        self, 
+        #[desc("Number to check against")] number: @number = 0
+    ) {
+        return (function) {
+            $.add( trigger{
+                OBJ_ID: 1611,
+                TARGET: function,
+                COUNT: number,
+                ACTIVATE_GROUP: 1, 
+                ITEM: self,
+                COUNT_MULTI_ACTIVATE: true,
+                
+            })
+        }
+    },
+}
