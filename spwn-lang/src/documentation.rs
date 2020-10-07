@@ -15,18 +15,7 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
 
-    let module = import_module(
-        path,
-        &start_context,
-        &mut globals,
-        CompilerInfo {
-            depth: 0,
-            path: vec!["main scope".to_string()],
-            current_file: path.clone(),
-            line: (0, 0),
-            func_id: 0,
-        },
-    )?;
+    let module = import_module(path, &start_context, &mut globals, CompilerInfo::new())?;
 
     if module.len() > 1 {
         return Err(RuntimeError::RuntimeError {

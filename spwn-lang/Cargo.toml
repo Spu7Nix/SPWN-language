@@ -17,3 +17,5 @@ lazy_static = "1.4.0"
 crc32fast = "1.2.0"
 
 logos = "0.11.4"
+
+ansi_term = "0.12.1"

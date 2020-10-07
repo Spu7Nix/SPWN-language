@@ -11,6 +11,8 @@ use std::path::PathBuf;
 
 use crate::compiler_types::*;
 
+use ansi_term::Colour;
+
 #[derive(Debug)]
 pub enum RuntimeError {
     UndefinedErr {
@@ -40,48 +42,113 @@ pub enum RuntimeError {
         info: CompilerInfo,
     },
 }
+pub fn error_intro(pos: crate::parser::FileRange, file: &PathBuf) -> String {
+    let path_str = format!(
+        "{}:{}:{}",
+        file.to_string_lossy().to_string(),
+        pos.0 .0,
+        pos.0 .1 + 1
+    );
+
+    let line = if pos.0 .0 == pos.1 .0 {
+        use std::io::BufRead;
+        match fs::File::open(&file) {
+            Ok(file) => match std::io::BufReader::new(file).lines().nth(pos.0 .0 - 1) {
+                Some(line) => match line {
+                    Ok(line) => {
+                        let line_num = pos.1 .0.to_string();
+                        let start = Colour::Blue.bold().paint(line_num.clone() + " | ");
+
+                        let mut spacing = String::new();
+
+                        for _ in 0..line_num.len() {
+                            spacing += " ";
+                        }
+
+                        let start_empty = Colour::Blue.bold().paint(spacing + " | ");
+
+                        let squiggly_line = Colour::Red.bold().paint("^");
+
+                        let mut out = format!(
+                            "{}\n{}{}\n{}",
+                            start_empty,
+                            start,
+                            line.replace("\t", " "),
+                            start_empty
+                        );
+
+                        for _ in 0..(pos.0 .1) {
+                            out += " ";
+                        }
+                        for _ in 0..(pos.1 .1 - pos.0 .1) {
+                            out += &format!("{}", squiggly_line);
+                        }
+                        out + "\n"
+                    }
+                    Err(_) => String::new(),
+                },
+                None => String::new(),
+            },
+            Err(_) => String::new(),
+        }
+    } else {
+        String::new()
+    };
+
+    let err_msg = Colour::Red.bold().paint("Error");
+
+    format!("{} at {}\n{}", err_msg, path_str, line)
+}
 
 impl std::fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        //write!(f, "SuperErrorSideKick is here!")
-        //let mut message = String::from("Runtime/compile error:");
+        let info = match self {
+            RuntimeError::UndefinedErr {
+                undefined: _,
+                desc: _,
+                info,
+            } => info,
+            RuntimeError::PackageSyntaxError { err: _, info } => info,
+
+            RuntimeError::TypeError {
+                expected: _,
+                found: _,
+                info,
+            } => info,
+
+            RuntimeError::RuntimeError { message: _, info } => info,
+
+            RuntimeError::BuiltinError { message: _, info } => info,
+        };
+
+        let start = error_intro(info.pos, &info.current_file);
 
         match self {
             RuntimeError::UndefinedErr {
                 undefined,
                 desc,
-                info,
-            } => write!(
-                f,
-                "{:#?}:\n{} '{}' is not defined at line {}, pos {}",
-                info.current_file, desc, undefined, info.line.0, info.line.1
-            ),
-            RuntimeError::PackageSyntaxError { err, info } => write!(
-                f,
-                "{:#?}:\nError when parsing library at line {}, pos {}: {}",
-                info.current_file, info.line.0, info.line.1, err
-            ),
+                info: _,
+            } => write!(f, "{}{} '{}' is not defined", start, desc, undefined,),
+            RuntimeError::PackageSyntaxError { err, info: _ } => {
+                write!(f, "{}Error when parsing library: {}", start, err)
+            }
 
             RuntimeError::TypeError {
                 expected,
                 found,
-                info,
+                info: _,
             } => write!(
                 f,
-                "{:#?}:\nType mismatch: expected {}, found {} (line {}, pos {})",
-                info.current_file, expected, found, info.line.0, info.line.1
+                "{}Type mismatch: expected {}, found {}",
+                start, expected, found,
             ),
 
-            RuntimeError::RuntimeError { message, info } => write!(
-                f,
-                "{:#?}:\n{} (line {}, pos {})",
-                info.current_file, message, info.line.0, info.line.1
-            ),
+            RuntimeError::RuntimeError { message, info: _ } => write!(f, "{}{}", start, message,),
 
-            RuntimeError::BuiltinError { message, info } => write!(
+            RuntimeError::BuiltinError { message, info: _ } => write!(
                 f,
-                "{:#?}:\nError when calling built-in-function: {} (line {}, pos {})",
-                info.current_file, message, info.line.0, info.line.1
+                "{}Error when calling built-in-function: {}",
+                start, message,
             ),
         }
     }
@@ -112,7 +179,7 @@ pub fn compile_spwn(
     let start_info = CompilerInfo {
         depth: 0,
         path: vec!["main scope".to_string()],
-        line: statements[0].line,
+        pos: statements[0].pos,
         current_file: path,
         func_id: 0,
     };
@@ -203,7 +270,7 @@ pub fn compile_scope(
             None
         };
 
-        info.line = statement.line;
+        info.pos = statement.pos;
         use crate::fmt::SpwnFmt;
         match &statement.body {
             Expr(expr) => {
@@ -615,12 +682,15 @@ pub fn compile_scope(
                     let new_info = info.next("return value", globals, false);
                     let (evaled, _) = e.message.eval(context, globals, new_info, true)?;
                     for (msg, _) in evaled {
+                        let exclam = Colour::Red.bold().paint("!");
                         eprintln!(
-                            "ERROR: {:?}",
+                            "{} {} {}",
+                            exclam,
                             match &globals.stored_values[msg] {
                                 Value::Str(s) => s,
                                 _ => "no message",
-                            }
+                            },
+                            exclam
                         );
                     }
                 }
@@ -684,6 +754,8 @@ pub fn import_module(
 
     if module_path.is_dir() {
         module_path = module_path.join("lib.spwn");
+    } else if module_path.extension().is_none() {
+        module_path.set_extension("spwn");
     }
 
     let unparsed = match fs::read_to_string(&module_path) {
@@ -691,28 +763,56 @@ pub fn import_module(
         Err(e) => {
             return Err(RuntimeError::RuntimeError {
                 message: format!(
-                    "Something went wrong when opening library file ({:?}): {}",
-                    module_path, e
+                    "Something went wrong when opening library file ({}): {}",
+                    module_path.to_string_lossy(),
+                    e
                 ),
                 info,
             })
         }
     };
-    let (parsed, notes) = match crate::parse_spwn(unparsed) {
+    let (parsed, notes) = match crate::parse_spwn(unparsed, module_path.clone()) {
         Ok(p) => p,
         Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
     };
-    // (*globals).closed_groups.extend(notes.closed_groups);
-    // (*globals).closed_colors.extend(notes.closed_colors);
-    // (*globals).closed_blocks.extend(notes.closed_blocks);
-    // (*globals).closed_items.extend(notes.closed_items);
+
+    let mut start_context = Context::new();
+
+    if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
+        let standard_lib = import_module(
+            &PathBuf::from(STD_PATH),
+            &start_context,
+            globals,
+            info.clone(),
+        )?;
+
+        if standard_lib.len() != 1 {
+            return Err(RuntimeError::RuntimeError {
+                message: "The standard library can not split the context".to_string(),
+                info: info.clone(),
+            });
+        }
+
+        start_context = standard_lib[0].1.clone();
+
+        if let Value::Dict(d) = &globals.stored_values[standard_lib[0].0] {
+            start_context.variables.extend(d.clone());
+        } else {
+            return Err(RuntimeError::RuntimeError {
+                message: "The standard library must return a dictionary".to_string(),
+                info: info.clone(),
+            });
+        }
+    }
 
     let stored_path = globals.path.clone();
-    (*globals).path = module_path;
+    (*globals).path = module_path.clone();
 
     let mut new_info = info.next("module", globals, false);
-    new_info.current_file = path.clone();
-    let (contexts, returns) = compile_scope(&parsed, vec![Context::new()], globals, new_info)?;
+
+    new_info.current_file = module_path;
+
+    let (contexts, returns) = compile_scope(&parsed, vec![start_context], globals, new_info)?;
     (*globals).path = stored_path;
 
     Ok(if returns.is_empty() {

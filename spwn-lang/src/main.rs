@@ -19,10 +19,12 @@ use std::env;
 use std::path::PathBuf;
 
 //#[macro_use]
-extern crate lazy_static;
+
 use std::fs;
 
 pub const STD_PATH: &str = "../std";
+
+const ERROR_EXIT_CODE: i32 = 1;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -49,10 +51,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("Parsing...");
                     let unparsed = fs::read_to_string(script_path.clone())?;
 
-                    let (statements, notes) = match parse_spwn(unparsed) {
+                    let (statements, notes) = match parse_spwn(unparsed, script_path.clone()) {
                         Err(err) => {
-                            eprintln!("{}", err);
-                            std::process::exit(256);
+                            eprintln!("{}\n", err);
+                            std::process::exit(ERROR_EXIT_CODE);
                         }
                         Ok(p) => p,
                     };
@@ -82,8 +84,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         notes,
                     ) {
                         Err(err) => {
-                            eprintln!("{}", err);
-                            std::process::exit(256);
+                            eprintln!("{}\n", err);
+                            std::process::exit(ERROR_EXIT_CODE);
                         }
                         Ok(p) => p,
                     };
@@ -167,8 +169,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let documentation = match documentation::document_lib(&lib_path) {
                         Ok(doc) => doc,
                         Err(e) => {
-                            eprintln!("{}", e);
-                            std::process::exit(256);
+                            eprintln!("{}\n", e);
+                            std::process::exit(ERROR_EXIT_CODE);
                         }
                     };
 
@@ -197,10 +199,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("Parsing...");
                     let unparsed = fs::read_to_string(script_path.clone())?;
 
-                    let (parsed, _) = match parse_spwn(unparsed) {
+                    let (parsed, _) = match parse_spwn(unparsed, script_path) {
                         Err(err) => {
-                            eprintln!("{}", err);
-                            std::process::exit(256);
+                            eprintln!("{}\n", err);
+                            std::process::exit(ERROR_EXIT_CODE);
                         }
                         Ok(p) => p,
                     };
@@ -215,7 +217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 a => {
                     eprintln!("Unknown command: {}", a);
-                    std::process::exit(256);
+                    std::process::exit(ERROR_EXIT_CODE);
                 }
             }
         }

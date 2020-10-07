@@ -4,7 +4,7 @@ use crate::fmt::SpwnFmt;
 use std::path::PathBuf;
 
 use crate::compiler_types::StoredValue;
-
+use crate::parser::FileRange;
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
     Def((String, Expression)),
@@ -17,7 +17,7 @@ pub type Comment = (Option<String>, Option<String>);
 pub struct Statement {
     pub body: StatementBody,
     pub arrow: bool, /*context changing */
-    pub line: (usize, usize),
+    pub pos: FileRange,
     pub comment: Comment,
 }
 
@@ -77,6 +77,7 @@ impl ValueBody {
         Variable {
             value: ValueLiteral { body: self.clone() },
             operator: None,
+            pos: ((0, 0), (0, 0)),
             comment: (None, None),
             path: Vec::new(),
         }
@@ -204,6 +205,7 @@ impl Argument {
                     value: ValueLiteral::new(ValueBody::Resolved(val)),
                     path: Vec::new(),
                     operator: None,
+                    pos: ((0, 0), (0, 0)),
                     comment: (None, None),
                 }],
                 operators: Vec::new(),
@@ -255,6 +257,7 @@ pub struct Variable {
     pub operator: Option<UnaryOperator>,
     pub value: ValueLiteral,
     pub path: Vec<Path>,
+    pub pos: FileRange,
     pub comment: Comment,
 }
 
@@ -283,6 +286,7 @@ impl Expression {
         Variable {
             operator: None,
             value: ValueLiteral::new(ValueBody::Expression(self.clone())),
+            pos: ((0, 0), (0, 0)),
             path: Vec::new(),
             comment: (None, None),
         }

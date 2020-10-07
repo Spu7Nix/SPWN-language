@@ -13,21 +13,28 @@ use logos::Logos;
 
 use std::error::Error;
 use std::fmt;
+
+use crate::compiler::error_intro;
+
+pub type FileRange = ((usize, usize), (usize, usize));
 //TODO: add type defining statement
 #[derive(Debug)]
 pub enum SyntaxError {
     ExpectedErr {
         expected: String,
         found: String,
-        pos: (usize, usize),
+        pos: FileRange,
+        file: PathBuf,
     },
     UnexpectedErr {
         found: String,
-        pos: (usize, usize),
+        pos: FileRange,
+        file: PathBuf,
     },
     SyntaxError {
         message: String,
-        pos: (usize, usize),
+        pos: FileRange,
+        file: PathBuf,
     },
 }
 
@@ -39,23 +46,25 @@ impl fmt::Display for SyntaxError {
                 expected,
                 found,
                 pos,
+                file,
             } => write!(
                 f,
-                "SyntaxError: Expected {}, found {} (line {}, position {})",
-                expected, found, pos.0, pos.1
+                "{}SyntaxError: Expected {}, found {}",
+                error_intro(*pos, file),
+                expected,
+                found
             ),
 
-            SyntaxError::UnexpectedErr { found, pos } => write!(
+            SyntaxError::UnexpectedErr { found, pos, file } => write!(
                 f,
-                "SyntaxError: Unexpected {} on line {}, position {}",
-                found, pos.0, pos.1
+                "{}SyntaxError: Unexpected {}",
+                error_intro(*pos, file),
+                found
             ),
 
-            SyntaxError::SyntaxError { message, pos } => write!(
-                f,
-                "SyntaxError: {}, (line {}, position {})",
-                message, pos.0, pos.1
-            ),
+            SyntaxError::SyntaxError { message, pos, file } => {
+                write!(f, "{}SyntaxError: {}", error_intro(*pos, file), message)
+            }
         }
     }
 }
@@ -254,12 +263,14 @@ pub enum Token {
 
 pub struct ParseNotes {
     pub tag: ast::Tag,
+    pub file: PathBuf,
 }
 
 impl ParseNotes {
-    pub fn new() -> Self {
+    pub fn new(path: PathBuf) -> Self {
         ParseNotes {
             tag: ast::Tag::new(),
+            file: path,
         }
     }
 }
@@ -376,24 +387,42 @@ impl<'a> Tokens<'a> {
         self.stack[self.stack.len() - self.index - 1].1.clone()
     }
 
-    fn position(&self) -> (usize, usize) {
-        let file_pos = self.stack[self.stack.len() - self.index - 1].2.start;
+    fn position(&self) -> ((usize, usize), (usize, usize)) {
+        if self.stack.len() - self.index <= 0 {
+            return ((1, 0), (1, 0));
+        }
+        let file_pos1 = self.stack[self.stack.len() - self.index - 1].2.start;
+        let file_pos2 = self.stack[self.stack.len() - self.index - 1].2.end;
         /*println!(
             "file pos: {}, line breaks: {:?}",
             file_pos, self.line_breaks
         );*/
+        let mut found_pos_1 = false;
+        let mut found_pos_2 = false;
+        let mut out = ((1, file_pos1), (1, file_pos2));
+
         for (i, lb) in self.line_breaks.iter().enumerate() {
             let line_break = *lb as usize;
-            if line_break >= file_pos {
+            if !found_pos_1 && line_break >= file_pos1 {
                 if i == 0 {
-                    return (1, file_pos + 1);
+                    out.0 = (1, file_pos1);
                 } else {
-                    return (i + 1, file_pos - self.line_breaks[i - 1] as usize);
+                    out.0 = (i + 1, file_pos1 - self.line_breaks[i - 1] as usize - 1);
                 }
+                found_pos_1 = true;
+            }
+
+            if !found_pos_2 && line_break >= file_pos2 {
+                if i == 0 {
+                    out.1 = (1, file_pos2);
+                } else {
+                    out.1 = (i + 1, file_pos2 - self.line_breaks[i - 1] as usize - 1);
+                }
+                found_pos_2 = true;
             }
         }
 
-        (0, file_pos)
+        out
     }
 
     /*fn abs_position(&self) -> usize {
@@ -409,7 +438,10 @@ impl<'a> Tokens<'a> {
 
 const STATEMENT_SEPARATOR_DESC: &str = "Statement separator (line-break or ';')";
 
-pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNotes), SyntaxError> {
+pub fn parse_spwn(
+    mut unparsed: String,
+    path: PathBuf,
+) -> Result<(Vec<ast::Statement>, ParseNotes), SyntaxError> {
     unparsed = unparsed.replace("\r\n", "\n");
 
     let tokens_iter = Token::lexer(&unparsed);
@@ -432,7 +464,7 @@ pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNot
     }*/
     let mut statements = Vec::<ast::Statement>::new();
 
-    let mut notes = ParseNotes::new();
+    let mut notes = ParseNotes::new(path);
 
     let mut line_breaks = Vec::<u32>::new();
     let mut current_index: u32 = 0;
@@ -474,6 +506,7 @@ pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNot
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
             None => break,
@@ -500,6 +533,7 @@ fn parse_cmp_stmt(
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing a closure".to_string(),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
         }
@@ -512,6 +546,7 @@ fn parse_cmp_stmt(
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 });
             }
         }
@@ -528,6 +563,8 @@ pub fn parse_statement(
 
     let first = tokens.next(false, false);
 
+    let (start_pos, _) = tokens.position();
+
     let mut arrow = false;
     let body = match first {
         Some(Token::Arrow) => {
@@ -537,6 +574,7 @@ pub fn parse_statement(
                 return Err(SyntaxError::UnexpectedErr {
                     found: "double arrow (-> ->)".to_string(),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 });
             }
 
@@ -577,6 +615,7 @@ pub fn parse_statement(
                         expected: "'{'".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
             }
@@ -599,6 +638,7 @@ pub fn parse_statement(
                             expected: "'{' or 'if'".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
                             pos: tokens.position(),
+                            file: notes.file.clone(),
                         })
                     }
                 },
@@ -629,6 +669,7 @@ pub fn parse_statement(
                         expected: "iterator variable name".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
 
@@ -637,6 +678,7 @@ pub fn parse_statement(
                         expected: "iterator variable name".to_string(),
                         found: "None".to_string(),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
             };
@@ -648,6 +690,7 @@ pub fn parse_statement(
                         expected: "keyword 'in'".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
             };
@@ -660,6 +703,7 @@ pub fn parse_statement(
                         expected: "'{'".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
             };
@@ -671,8 +715,9 @@ pub fn parse_statement(
                 _ => false,
             }) {
                 //maybe not the fastest way, but the syntax tree is just too large to just paste in
-                let new_statement = parse_spwn(String::from(
-                    "
+                let new_statement = parse_spwn(
+                    String::from(
+                        "
 (){
     $.add(obj {
         1: 1268,
@@ -683,7 +728,9 @@ pub fn parse_statement(
     })
 }()
                 ",
-                ))?;
+                    ),
+                    PathBuf::new(),
+                )?;
 
                 body.push(new_statement.0[0].clone());
             }
@@ -706,6 +753,7 @@ pub fn parse_statement(
                     expected: "type name".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
         },
@@ -723,6 +771,7 @@ pub fn parse_statement(
                         expected: "'{'".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
             }
@@ -784,6 +833,7 @@ pub fn parse_statement(
             unimplemented!()
         }
     };
+    let (_, end_pos) = tokens.position();
 
     let comment_after = check_for_comment(tokens);
     /*println!(
@@ -794,7 +844,7 @@ pub fn parse_statement(
     Ok(ast::Statement {
         body,
         arrow,
-        line: tokens.position(),
+        pos: (start_pos, end_pos),
         comment: (preceding_comment, comment_after),
     })
 }
@@ -1020,6 +1070,7 @@ fn parse_dict(
                             expected: "':'".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
                             pos: tokens.position(),
+                            file: notes.file.clone(),
                         });
                     }
                 }
@@ -1037,6 +1088,7 @@ fn parse_dict(
                     expected: "member definition, '..' or '}'".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 });
             }
         };
@@ -1051,6 +1103,7 @@ fn parse_dict(
                 expected: "comma (',')".to_string(),
                 found: format!("{:?}: {:?}", next, tokens.slice()),
                 pos: tokens.position(),
+                file: notes.file.clone(),
             });
         }
     }
@@ -1070,6 +1123,7 @@ fn parse_object(
                 expected: "'{'".to_string(),
                 found: format!("{:?}: {:?}", a, tokens.slice()),
                 pos: tokens.position(),
+                file: notes.file.clone(),
             })
         }
     }
@@ -1088,6 +1142,7 @@ fn parse_object(
                     expected: "':'".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
         }
@@ -1106,6 +1161,7 @@ fn parse_object(
                 expected: "comma (',')".to_string(),
                 found: format!("{:?}: {:?}", next, tokens.slice()),
                 pos: tokens.position(),
+                file: notes.file.clone(),
             });
         }
     }
@@ -1126,7 +1182,19 @@ fn parse_args(
         args.push(match tokens.next(false, false) {
             Some(Token::Assign) => {
                 // println!("assign ");
-                tokens.previous();
+                match tokens.previous() {
+                    Some(Token::Symbol) => (),
+                    Some(a) => {
+                        return Err(SyntaxError::ExpectedErr {
+                            expected: "Argument name".to_string(),
+                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            pos: tokens.position(),
+                            file: notes.file.clone(),
+                        })
+                    }
+
+                    None => unreachable!(),
+                };
                 let symbol = Some(tokens.slice());
                 tokens.next(false, false);
                 let value = parse_expr(tokens, notes, true, true)?;
@@ -1151,6 +1219,7 @@ fn parse_args(
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing macro arguments".to_string(),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
         });
@@ -1166,6 +1235,7 @@ fn parse_args(
                     expected: "comma (',') or ')'".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
 
@@ -1173,6 +1243,7 @@ fn parse_args(
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing macro arguments".to_string(),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
         }
@@ -1199,6 +1270,7 @@ fn parse_arg_def(
                     return Err(SyntaxError::SyntaxError {
                         message: "\"self\" argument cannot have a default value".to_string(),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     });
                 }
                 let symbol = tokens.slice();
@@ -1214,6 +1286,7 @@ fn parse_arg_def(
                     return Err(SyntaxError::SyntaxError {
                         message: "\"self\" argument cannot have explicit type".to_string(),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     });
                 }
                 let symbol = tokens.slice();
@@ -1238,6 +1311,7 @@ fn parse_arg_def(
                         return Err(SyntaxError::SyntaxError {
                             message: "File ended while parsing macro signature".to_string(),
                             pos: tokens.position(),
+                            file: notes.file.clone(),
                         })
                     }
                 }
@@ -1248,6 +1322,7 @@ fn parse_arg_def(
                     return Err(SyntaxError::SyntaxError {
                         message: "\"self\" argument must be the first argument".to_string(),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     });
                 }
 
@@ -1257,6 +1332,7 @@ fn parse_arg_def(
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing macro signature".to_string(),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
         });
@@ -1270,6 +1346,7 @@ fn parse_arg_def(
                     expected: "comma (',') or ')'".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
 
@@ -1277,6 +1354,7 @@ fn parse_arg_def(
                 return Err(SyntaxError::SyntaxError {
                     message: "File ended while parsing macro signature".to_string(),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
         }
@@ -1287,7 +1365,9 @@ fn parse_arg_def(
 }
 
 fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag, SyntaxError> {
-    match tokens.next(false, false) {
+    let first = tokens.next(false, false);
+
+    match first {
         Some(Token::Hash) => {
             //parse tag
             match tokens.next(false, false) {
@@ -1297,6 +1377,7 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
                         expected: "'['".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
             };
@@ -1311,12 +1392,16 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
                         let args = match tokens.next(false, false) {
                             Some(Token::OpenBracket) => parse_args(tokens, notes)?,
                             Some(Token::Comma) => Vec::new(),
-                            Some(Token::ClosingSquareBracket) => break,
+                            Some(Token::ClosingSquareBracket) => {
+                                contents.tags.push((name, Vec::new()));
+                                break;
+                            }
                             a => {
                                 return Err(SyntaxError::ExpectedErr {
                                     expected: "either '(', ']' or comma (',')".to_string(),
                                     found: format!("{:?}: {:?}", a, tokens.slice()),
                                     pos: tokens.position(),
+                                    file: notes.file.clone(),
                                 })
                             }
                         };
@@ -1327,6 +1412,7 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
                             expected: "either Symbol or ']'".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
                             pos: tokens.position(),
+                            file: notes.file.clone(),
                         })
                     }
                 };
@@ -1346,16 +1432,19 @@ fn parse_variable(
     notes: &mut ParseNotes,
     check_for_comments: bool,
 ) -> Result<ast::Variable, SyntaxError> {
-    let properties = check_for_tag(tokens, notes)?;
     let preceding_comment = if check_for_comments {
         check_for_comment(tokens)
     } else {
         None
     };
+
+    let properties = check_for_tag(tokens, notes)?;
+
     /*if tokens.stack.len() - tokens.index > 0 {
         println!("current token after val pre comment: {}: ", tokens.slice());
     }*/
     let mut first_token = tokens.next(false, false);
+    let (start_pos, _) = tokens.position();
 
     let operator = match first_token {
         Some(Token::Minus) => {
@@ -1388,6 +1477,7 @@ fn parse_variable(
                     message: format!("Error when parsing number: {}", err),
 
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 });
             }
         }),
@@ -1413,6 +1503,7 @@ fn parse_variable(
                                 message: format!("Error when parsing number: {}", err),
 
                                 pos: tokens.position(),
+                                file: notes.file.clone(),
                             });
                         }
                     },
@@ -1454,6 +1545,7 @@ fn parse_variable(
                                 expected: "comma (',') or ']'".to_string(),
                                 found: format!("{:?}: {:?}", a, tokens.slice()),
                                 pos: tokens.position(),
+                                file: notes.file.clone(),
                             })
                         }
                     }
@@ -1470,6 +1562,7 @@ fn parse_variable(
                     expected: "literal string".to_string(),
                     found: format!("{:?}: {:?}", a, tokens.slice()),
                     pos: tokens.position(),
+                    file: notes.file.clone(),
                 })
             }
         }),
@@ -1482,6 +1575,7 @@ fn parse_variable(
                         expected: "type name".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
             };
@@ -1502,6 +1596,7 @@ fn parse_variable(
                             expected: "'{'".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
                             pos: tokens.position(),
+                            file: notes.file.clone(),
                         })
                     }
                 };
@@ -1534,6 +1629,7 @@ fn parse_variable(
                                 expected: "')', ':' or comma (',')".to_string(),
                                 found: format!("{:?}: {:?}", a, test_tokens.slice()),
                                 pos: tokens.position(),
+                                file: notes.file.clone(),
                             })
                         }
                     }
@@ -1684,6 +1780,7 @@ fn parse_variable(
                 expected: "a value".to_string(),
                 found: format!("{:?}: {:?}", a, tokens.slice()),
                 pos: tokens.position(),
+                file: notes.file.clone(),
             })
         }
     };
@@ -1701,6 +1798,7 @@ fn parse_variable(
                             expected: "]".to_string(),
                             found: format!("{:?}: {:?}", a, tokens.slice()),
                             pos: tokens.position(),
+                            file: notes.file.clone(),
                         })
                     }
                 }
@@ -1715,6 +1813,7 @@ fn parse_variable(
                         expected: "member name".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
             },
@@ -1731,6 +1830,7 @@ fn parse_variable(
                         expected: "associated member name".to_string(),
                         found: format!("{:?}: {:?}", a, tokens.slice()),
                         pos: tokens.position(),
+                        file: notes.file.clone(),
                     })
                 }
             },
@@ -1739,6 +1839,8 @@ fn parse_variable(
         }
     }
     tokens.previous_no_ignore(false, true);
+
+    let (_, end_pos) = tokens.position();
 
     let comment_after = if check_for_comments {
         check_for_comment(tokens)
@@ -1753,6 +1855,7 @@ fn parse_variable(
     Ok(ast::Variable {
         operator,
         value: ast::ValueLiteral { body: value },
+        pos: (start_pos, end_pos),
         comment: (preceding_comment, comment_after),
         path,
     })

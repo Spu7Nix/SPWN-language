@@ -2,6 +2,8 @@
 use crate::ast;
 use crate::builtin::*;
 use crate::levelstring::*;
+
+use crate::parser::FileRange;
 //use std::boxed::Box;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -206,7 +208,7 @@ pub struct CompilerInfo {
     pub depth: u8,
     pub path: Vec<String>,
     pub current_file: PathBuf,
-    pub line: (usize, usize),
+    pub pos: FileRange,
     pub func_id: usize,
 }
 
@@ -216,7 +218,7 @@ impl CompilerInfo {
             depth: 0,
             path: vec!["main scope".to_string()],
             current_file: PathBuf::new(),
-            line: (0, 0),
+            pos: ((0, 0), (0, 0)),
             func_id: 0,
         }
     }
@@ -241,7 +243,7 @@ impl CompilerInfo {
         CompilerInfo {
             depth: self.depth + 1,
             path: new_path,
-            line: self.line,
+            pos: self.pos,
             current_file: self.current_file.clone(),
             func_id: if use_in_organization {
                 (*globals).func_ids.len() - 1
@@ -1452,7 +1454,7 @@ impl ast::Variable {
         &self,
         context: Context,
         globals: &mut Globals,
-        info: CompilerInfo,
+        mut info: CompilerInfo,
         //mut define_new: bool,
         constant: bool,
     ) -> Result<(Returns, Returns), RuntimeError> {
@@ -1463,6 +1465,8 @@ impl ast::Variable {
         //let mut defined = true;
 
         use ast::IDClass;
+
+        info.pos = self.pos;
 
         match &self.value.body {
             ast::ValueBody::Resolved(r) => start_val.push((*r, context.clone())),
