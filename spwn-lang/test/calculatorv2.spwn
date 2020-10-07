@@ -1,5 +1,5 @@
 // rewrite of the calculator with a more modern version of spwn
-extract import "../std"
+
 
 death = 92g
 

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
-    let mut globals = Globals::new(ParseNotes::new(), path.clone());
+    let mut globals = Globals::new(path.clone());
     //println!("{:?}", globals);
     let start_context = Context::new();
 

@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let compiled = match compiler::compile_spwn(
                         statements,
                         script_path,
-                        gd_path.clone(),
+                        //gd_path.clone(),
                         notes,
                     ) {
                         Err(err) => {

@@ -1,4 +1,4 @@
-extract import "./std"
+
 
 player_pieces = [
 	[ 1g,  3g,  5g,  7g,  9g, 11g, 13g],

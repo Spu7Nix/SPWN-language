@@ -700,7 +700,7 @@ impl Globals {
 }
 
 impl Globals {
-    pub fn new(notes: crate::parser::ParseNotes, path: PathBuf) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         let storage = ValStorage::new();
         let mut globals = Globals {
             closed_groups: 0,

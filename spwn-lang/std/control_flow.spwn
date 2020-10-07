@@ -1,3 +1,5 @@
+#[no_std]
+
 constants = import "constants.spwn"
 
 extract constants.obj_props

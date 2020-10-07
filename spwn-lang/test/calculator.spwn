@@ -1,7 +1,5 @@
 
 
-extract import "../std"
-
 main = counter(1i)
 
 secondary = counter(2i)

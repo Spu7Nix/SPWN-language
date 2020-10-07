@@ -2,6 +2,7 @@
 use crate::ast;
 use crate::builtin::*;
 use crate::levelstring::*;
+use crate::STD_PATH;
 use std::collections::HashMap;
 
 use crate::parser::{ParseNotes, SyntaxError};
@@ -20,11 +21,6 @@ pub enum RuntimeError {
 
     PackageSyntaxError {
         err: SyntaxError,
-        info: CompilerInfo,
-    },
-
-    IDError {
-        id_class: ast::IDClass,
         info: CompilerInfo,
     },
 
@@ -65,19 +61,6 @@ impl std::fmt::Display for RuntimeError {
                 "{:#?}:\nError when parsing library at line {}, pos {}: {}",
                 info.current_file, info.line.0, info.line.1, err
             ),
-            RuntimeError::IDError { id_class, info } => write!(
-                f,
-                "{:#?}:\nRan out of {} at line {}, pos {}",
-                info.current_file,
-                match id_class {
-                    ast::IDClass::Group => "groups",
-                    ast::IDClass::Color => "colors",
-                    ast::IDClass::Item => "item IDs",
-                    ast::IDClass::Block => "collision block IDs",
-                },
-                info.line.0,
-                info.line.1
-            ),
 
             RuntimeError::TypeError {
                 expected,
@@ -116,12 +99,12 @@ pub const BUILTIN_STORAGE: usize = 0;
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
     path: PathBuf,
-    gd_path: Option<PathBuf>,
+    //gd_path: Option<PathBuf>,
     notes: ParseNotes,
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
-    let mut globals = Globals::new(notes, path.clone());
-    let start_context = Context::new();
+    let mut globals = Globals::new(path.clone());
+    let mut start_context = Context::new();
     //store at pos 0
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
@@ -144,6 +127,33 @@ Building script...
 "
     );
     let start_time = Instant::now();
+
+    if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
+        let standard_lib = import_module(
+            &PathBuf::from(STD_PATH),
+            &start_context,
+            &mut globals,
+            start_info.clone(),
+        )?;
+
+        if standard_lib.len() != 1 {
+            return Err(RuntimeError::RuntimeError {
+                message: "The standard library can not split the context".to_string(),
+                info: start_info.clone(),
+            });
+        }
+
+        start_context = standard_lib[0].1.clone();
+
+        if let Value::Dict(d) = &globals.stored_values[standard_lib[0].0] {
+            start_context.variables.extend(d.clone());
+        } else {
+            return Err(RuntimeError::RuntimeError {
+                message: "The standard library must return a dictionary".to_string(),
+                info: start_info.clone(),
+            });
+        }
+    }
 
     compile_scope(&statements, vec![start_context], &mut globals, start_info)?;
 

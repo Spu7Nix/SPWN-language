@@ -1,4 +1,4 @@
-extract import "./std"
+
 
 board = [
 	[mut(1i ), mut(2i ), mut(3i ), mut(4i ), mut(5i ), mut(6i ), mut(7i )],

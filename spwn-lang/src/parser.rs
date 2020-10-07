@@ -253,19 +253,13 @@ pub enum Token {
 }
 
 pub struct ParseNotes {
-    pub closed_groups: Vec<u16>,
-    pub closed_colors: Vec<u16>,
-    pub closed_blocks: Vec<u16>,
-    pub closed_items: Vec<u16>,
+    pub tag: ast::Tag,
 }
 
 impl ParseNotes {
     pub fn new() -> Self {
         ParseNotes {
-            closed_groups: Vec::new(),
-            closed_colors: Vec::new(),
-            closed_blocks: Vec::new(),
-            closed_items: Vec::new(),
+            tag: ast::Tag::new(),
         }
     }
 }
@@ -451,6 +445,8 @@ pub fn parse_spwn(mut unparsed: String) -> Result<(Vec<ast::Statement>, ParseNot
 
     tokens.line_breaks = line_breaks;
 
+    let start_tag = check_for_tag(&mut tokens, &mut notes)?;
+    notes.tag = start_tag;
     loop {
         //tokens.next(false, false);
         match tokens.next(false, true) {
@@ -1423,14 +1419,6 @@ fn parse_variable(
                 ),
             };
 
-            if !unspecified {
-                match class_name {
-                    ast::IDClass::Group => (*notes).closed_groups.push(number),
-                    ast::IDClass::Color => (*notes).closed_colors.push(number),
-                    ast::IDClass::Item => (*notes).closed_items.push(number),
-                    ast::IDClass::Block => (*notes).closed_blocks.push(number),
-                }
-            }
             ast::ValueBody::ID(ast::ID {
                 class_name,
                 unspecified,
