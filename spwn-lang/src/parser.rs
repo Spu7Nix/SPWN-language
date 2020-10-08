@@ -261,6 +261,32 @@ pub enum Token {
     Error,
 }
 
+impl Token {
+    fn typ(&self) -> &'static str {
+        use Token::*;
+        match self {
+            Arrow | Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan
+            | LessThan | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign
+            | Add | Subtract | Multiply | Divide | As => "operator",
+            Symbol => "identifier",
+            Number => "number literal",
+            StringLiteral => "string literal",
+            True | False => "boolean literal",
+            ID => "ID literal",
+
+            Comma | OpenCurlyBracket | ClosingCurlyBracket | OpenSquareBracket
+            | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
+            | Period | DotDot | At | Hash => "terminator",
+
+            Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
+            | Import | Extract | Null | Type | Let | SelfVal => "keyword",
+            Comment => "comment",
+            StatementSeparator => "statement separator",
+            Error => "unknown",
+        }
+    }
+}
+
 pub struct ParseNotes {
     pub tag: ast::Tag,
     pub file: PathBuf,
@@ -504,7 +530,7 @@ pub fn parse_spwn(
             Some(a) => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),
-                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    found: format!("{}: \"{}\"", a.typ(), tokens.slice()),
                     pos: tokens.position(),
                     file: notes.file.clone(),
                 })
@@ -544,7 +570,14 @@ fn parse_cmp_stmt(
             a => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),
-                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    found: format!(
+                        "{}: \"{}\"",
+                        match a {
+                            Some(t) => t.typ(),
+                            None => "EOF",
+                        },
+                        tokens.slice()
+                    ),
                     pos: tokens.position(),
                     file: notes.file.clone(),
                 });
@@ -613,7 +646,14 @@ pub fn parse_statement(
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'{'".to_string(),
-                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     })
@@ -636,7 +676,14 @@ pub fn parse_statement(
                     a => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "'{' or 'if'".to_string(),
-                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            found: format!(
+                                "{}: \"{}\"",
+                                match a {
+                                    Some(t) => t.typ(),
+                                    None => "EOF",
+                                },
+                                tokens.slice()
+                            ),
                             pos: tokens.position(),
                             file: notes.file.clone(),
                         })
@@ -667,7 +714,7 @@ pub fn parse_statement(
                 Some(a) => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "iterator variable name".to_string(),
-                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        found: format!("{}: \"{}\"", a.typ(), tokens.slice()),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     })
@@ -688,7 +735,14 @@ pub fn parse_statement(
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "keyword 'in'".to_string(),
-                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     })
@@ -701,7 +755,14 @@ pub fn parse_statement(
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'{'".to_string(),
-                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     })
@@ -751,7 +812,14 @@ pub fn parse_statement(
             a => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: "type name".to_string(),
-                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    found: format!(
+                        "{}: \"{}\"",
+                        match a {
+                            Some(t) => t.typ(),
+                            None => "EOF",
+                        },
+                        tokens.slice()
+                    ),
                     pos: tokens.position(),
                     file: notes.file.clone(),
                 })
@@ -769,7 +837,14 @@ pub fn parse_statement(
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'{'".to_string(),
-                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     })
@@ -1068,7 +1143,14 @@ fn parse_dict(
                     a => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "':'".to_string(),
-                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            found: format!(
+                                "{}: \"{}\"",
+                                match a {
+                                    Some(t) => t.typ(),
+                                    None => "EOF",
+                                },
+                                tokens.slice()
+                            ),
                             pos: tokens.position(),
                             file: notes.file.clone(),
                         });
@@ -1086,7 +1168,14 @@ fn parse_dict(
             a => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: "member definition, '..' or '}'".to_string(),
-                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    found: format!(
+                        "{}: \"{}\"",
+                        match a {
+                            Some(t) => t.typ(),
+                            None => "EOF",
+                        },
+                        tokens.slice()
+                    ),
                     pos: tokens.position(),
                     file: notes.file.clone(),
                 });
@@ -1121,7 +1210,14 @@ fn parse_object(
         a => {
             return Err(SyntaxError::ExpectedErr {
                 expected: "'{'".to_string(),
-                found: format!("{:?}: {:?}", a, tokens.slice()),
+                found: format!(
+                    "{}: \"{}\"",
+                    match a {
+                        Some(t) => t.typ(),
+                        None => "EOF",
+                    },
+                    tokens.slice()
+                ),
                 pos: tokens.position(),
                 file: notes.file.clone(),
             })
@@ -1140,7 +1236,14 @@ fn parse_object(
             a => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: "':'".to_string(),
-                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    found: format!(
+                        "{}: \"{}\"",
+                        match a {
+                            Some(t) => t.typ(),
+                            None => "EOF",
+                        },
+                        tokens.slice()
+                    ),
                     pos: tokens.position(),
                     file: notes.file.clone(),
                 })
@@ -1187,7 +1290,7 @@ fn parse_args(
                     Some(a) => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "Argument name".to_string(),
-                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            found: format!("{}: \"{}\"", a.typ(), tokens.slice()),
                             pos: tokens.position(),
                             file: notes.file.clone(),
                         })
@@ -1233,7 +1336,7 @@ fn parse_args(
             Some(a) => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: "comma (',') or ')'".to_string(),
-                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    found: format!("{}: \"{}\"", a.typ(), tokens.slice()),
                     pos: tokens.position(),
                     file: notes.file.clone(),
                 })
@@ -1344,7 +1447,7 @@ fn parse_arg_def(
             Some(a) => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: "comma (',') or ')'".to_string(),
-                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    found: format!("{}: \"{}\"", a.typ(), tokens.slice()),
                     pos: tokens.position(),
                     file: notes.file.clone(),
                 })
@@ -1375,7 +1478,14 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'['".to_string(),
-                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     })
@@ -1399,7 +1509,14 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
                             a => {
                                 return Err(SyntaxError::ExpectedErr {
                                     expected: "either '(', ']' or comma (',')".to_string(),
-                                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                                    found: format!(
+                                        "{}: \"{}\"",
+                                        match a {
+                                            Some(t) => t.typ(),
+                                            None => "EOF",
+                                        },
+                                        tokens.slice()
+                                    ),
                                     pos: tokens.position(),
                                     file: notes.file.clone(),
                                 })
@@ -1410,7 +1527,14 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
                     a => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "either Symbol or ']'".to_string(),
-                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            found: format!(
+                                "{}: \"{}\"",
+                                match a {
+                                    Some(t) => t.typ(),
+                                    None => "EOF",
+                                },
+                                tokens.slice()
+                            ),
                             pos: tokens.position(),
                             file: notes.file.clone(),
                         })
@@ -1543,7 +1667,14 @@ fn parse_variable(
                         a => {
                             return Err(SyntaxError::ExpectedErr {
                                 expected: "comma (',') or ']'".to_string(),
-                                found: format!("{:?}: {:?}", a, tokens.slice()),
+                                found: format!(
+                                    "{}: \"{}\"",
+                                    match a {
+                                        Some(t) => t.typ(),
+                                        None => "EOF",
+                                    },
+                                    tokens.slice()
+                                ),
                                 pos: tokens.position(),
                                 file: notes.file.clone(),
                             })
@@ -1560,7 +1691,14 @@ fn parse_variable(
             a => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: "literal string".to_string(),
-                    found: format!("{:?}: {:?}", a, tokens.slice()),
+                    found: format!(
+                        "{}: \"{}\"",
+                        match a {
+                            Some(t) => t.typ(),
+                            None => "EOF",
+                        },
+                        tokens.slice()
+                    ),
                     pos: tokens.position(),
                     file: notes.file.clone(),
                 })
@@ -1573,7 +1711,14 @@ fn parse_variable(
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "type name".to_string(),
-                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     })
@@ -1594,7 +1739,14 @@ fn parse_variable(
                     a => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "'{'".to_string(),
-                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            found: format!(
+                                "{}: \"{}\"",
+                                match a {
+                                    Some(t) => t.typ(),
+                                    None => "EOF",
+                                },
+                                tokens.slice()
+                            ),
                             pos: tokens.position(),
                             file: notes.file.clone(),
                         })
@@ -1654,7 +1806,7 @@ fn parse_variable(
                     a => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "')'".to_string(),
-                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            found: format!("{}: \"{}\"", match a {Some(t) => t.typ(), None => "EOF"}, tokens.slice()),
                             pos: tokens.position(),
                         })
                     }
@@ -1671,7 +1823,7 @@ fn parse_variable(
                     a => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "'{'".to_string(),
-                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            found: format!("{}: \"{}\"", match a {Some(t) => t.typ(), None => "EOF"}, tokens.slice()),
                             pos: tokens.position(),
                         })
                     }
@@ -1778,7 +1930,14 @@ fn parse_variable(
         a => {
             return Err(SyntaxError::ExpectedErr {
                 expected: "a value".to_string(),
-                found: format!("{:?}: {:?}", a, tokens.slice()),
+                found: format!(
+                    "{}: \"{}\"",
+                    match a {
+                        Some(t) => t.typ(),
+                        None => "EOF",
+                    },
+                    tokens.slice()
+                ),
                 pos: tokens.position(),
                 file: notes.file.clone(),
             })
@@ -1796,7 +1955,14 @@ fn parse_variable(
                     a => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "]".to_string(),
-                            found: format!("{:?}: {:?}", a, tokens.slice()),
+                            found: format!(
+                                "{}: \"{}\"",
+                                match a {
+                                    Some(t) => t.typ(),
+                                    None => "EOF",
+                                },
+                                tokens.slice()
+                            ),
                             pos: tokens.position(),
                             file: notes.file.clone(),
                         })
@@ -1811,7 +1977,14 @@ fn parse_variable(
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "member name".to_string(),
-                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     })
@@ -1828,7 +2001,14 @@ fn parse_variable(
                 a => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "associated member name".to_string(),
-                        found: format!("{:?}: {:?}", a, tokens.slice()),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     })

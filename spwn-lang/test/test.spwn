@@ -1,6 +1,15 @@
 
-let a = 10
+a = counter(10)
+//why does this work
 
+if a.to_const(0..10) == 1 {
+	$.print("hi")
+}
+//should print 10 times
+$.print("hello")
 
+//should throw error
 
-a += 10g
+let 4 = 4
+fn = (){return 100};
+fn() = 4
