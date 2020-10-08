@@ -1,23 +1,23 @@
 // rewrite of the calculator with a more modern version of spwn
 
 
-death = 92g
+death_group = 92g
 
 limit_text = 93g
 no_text = 94g
 
-death.toggle_off()
+death_group.toggle_off()
 limit_text.toggle_off()
 no_text.toggle_off()
 
-main = counter(1i)
+main = counter(1i, false)
 
 secondary = counter(2i)
 second_display = 81g
 
 
 
-remainder_display = counter(3i)
+remainder_display = counter(3i, false)
 show_remainder = {
 	91g.move(0, -30, 0.5, EASE_OUT)
 	wait(0.5)
@@ -29,7 +29,7 @@ second_display.alpha(0)
 loading_anim = 86g
 loading_anim.alpha(0)
 
-loading = counter(0) //0 = not loading, 1 = loading
+loading = counter(0, false) //0 = not loading, 1 = loading
 
 start_loading = {
 	-> loading_anim.alpha(1, 1)
@@ -92,8 +92,8 @@ set_display = {
 	}
 }
 
-last_pressed_operator = counter(0) //0 = +, 1 = -, 2 = *, 3 = /, 4 = =
-current_operator = counter(0)
+last_pressed_operator = counter(0, false) //0 = +, 1 = -, 2 = *, 3 = /, 4 = =
+current_operator = counter(0, false)
 
 wait(1)
 set_display!
@@ -111,6 +111,7 @@ on(touch(true), {
 		-> if selected_button == button_anchors.length {
 			selected_button -= button_anchors.length
 		}
+		wait(0.05)
 		-> select_box.move_to(
 			button_anchors[
 				selected_button.to_const(0..button_anchors.length)
@@ -121,7 +122,7 @@ on(touch(true), {
 
 check_valid = {
 	if secondary < 0 || secondary >= 99999 {
-		death.toggle_on()
+		death_group.toggle_on()
 		limit_text.toggle_on()
 	}
 }
@@ -149,7 +150,7 @@ solve = {
 		}
 		set_display!
 		
-		current_operator.item.add(-1)
+		current_operator.add(-1)
 		check_valid!
 		end_loading!
 	} else if current_operator == 2 {
@@ -160,13 +161,13 @@ solve = {
 			move_from_secondary!
 		}
 		set_display!
-		current_operator.item.add(-2)
+		current_operator.add(-2)
 		check_valid!
 		end_loading!
-	} else if current_operator == 3 {
+	}/* else if current_operator == 3 {
 		//divide
 		-> if main == 0 {
-			death.toggle_on()
+			death_group.toggle_on()
 			no_text.toggle_on()
 		}
 		secondary.divide(main, remainder_display, 3)
@@ -177,10 +178,10 @@ solve = {
 			move_from_secondary!
 		}
 		set_display!
-		current_operator -= 3
+		current_operator.add(-3)
 		check_valid!
 		end_loading!
-	} else {
+	}*/ else {
 		-> second_display.alpha(0, 0.5)
 	}
 	
@@ -211,14 +212,14 @@ on(collision(1b, 2b), {
 			}
 			
 			operator = selected_button.to_const(12..16) - 12
-			last_pressed_operator += operator
+			last_pressed_operator.add(operator)
 			show_secondary(operator)
-			current_operator += operator
+			current_operator.add(operator)
 			
 			
 		} else if selected_button == 10 {
 			//equals
-			last_pressed_operator += 4
+			last_pressed_operator.add(4)
 			solve!
 		} else {
 			//reset

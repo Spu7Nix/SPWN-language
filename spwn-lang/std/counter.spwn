@@ -8,12 +8,18 @@ type counter
 impl @counter {
 
     new: #[desc("Creates a new counter")] (
-        #[desc("Source (can be a number, item ID or boolean)")] source = 0
+        #[desc("Source (can be a number, item ID or boolean)")] source = 0,
+        #[desc("Adds a delay if a value gets added to the new item (to avoid confusing behavior)")] delay = true
     ){
         if source.type == @number {
             id = ?i
-        
-            id.add(source)
+            
+            if source != 0 {
+                id.add(source)
+                if delay {
+                    wait(0.05)
+                }
+            }
             
             return {
                 type: @counter,
@@ -29,6 +35,9 @@ impl @counter {
         
             if source {
                 id.add(1)
+                if delay {
+                    wait(0.05)
+                }
             }
             return {
                 type: @counter,
@@ -119,12 +128,12 @@ impl @counter {
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
         if factor.type == @number {
-            temp = @counter::new(0)
+            temp = @counter::new(0, false)
             self.add_to([temp.item], speed, factor)
             temp.add_to([self.item], speed)
         } else if factor.type == @counter {
             
-            temp = @counter::new(0)
+            temp = @counter::new(0, false)
             mini_mult = (num){
                 mult = {
                     
@@ -169,7 +178,7 @@ impl @counter {
         
 
         if divisor.type == @number {
-            result = @counter::new(0)
+            result = @counter::new(0, false)
 
             div = {
                 mini_div = (num) {
@@ -199,7 +208,7 @@ impl @counter {
             }
             div!
         } else if divisor.type == @counter {
-            result = @counter::new(0)
+            result = @counter::new(0, false)
             remainder.reset(speed)
 
             // IDEA:
@@ -233,7 +242,7 @@ impl @counter {
                                 divisor.item.if_is(EQUAL_TO, 0, {
                                     wait(0.1)
                                     supress_signal(0.11)
-                                    @counter::new(temp_storage).add_to([divisor.item], speed*2)
+                                    @counter::new(temp_storage, false).add_to([divisor.item], speed*2)
                                     return
                                 })
                             }
@@ -362,7 +371,7 @@ impl @counter {
             self.item.if_is(EQUAL_TO, 0, {
                 wait(0.05)
                 supress_signal(0.06)
-                @counter::new(temp_storage).add_to([self.item], speed)
+                @counter::new(temp_storage, false).add_to([self.item], speed)
                 return
             })
         }
@@ -375,7 +384,7 @@ impl @counter {
     ) {
         new_counter = ?i
         self.copy_to(new_counter, speed)
-        return @counter::new(new_counter)
+        return @counter::new(new_counter, false)
     },
 
     _plus_: (self, other) {
@@ -516,6 +525,7 @@ impl @counter {
     _add_: (self, num) {
         if num.type == @number {
             self.add(num)
+            wait(0.05)
         } else if num.type == @counter {
             num.clone().add_to([self])
         } else {
@@ -526,6 +536,7 @@ impl @counter {
     _subtract_: (self, num) {
         if num.type == @number {
             self.add(-num)
+            wait(0.05)
         } else if num.type == @counter {
             num.clone().subtract_from([self])
         } else {
@@ -537,11 +548,11 @@ impl @counter {
         
         if num.type == @number {
             self.multiply(num)
-        }/* else if num.type == @counter {
+        } else if num.type == @counter {
             self.multiply(num.clone())
         } else {
             error "Cannot multiply counter by this type"
-        }*/
+        }
     },
 
     _divide_: (self, num) {

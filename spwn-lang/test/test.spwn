@@ -1,15 +1,17 @@
+extract $
 
-a = counter(10)
-//why does this work
+c = counter(1)
 
-if a.to_const(0..10) == 1 {
-	$.print("hi")
+
+
+c.item.if_is(EQUAL_TO, 1, {
+	10g.move(10, 0, 0.6)
+})
+
+ret_false = {
+	10g.move(-10, 0, 0.6)
 }
-//should print 10 times
-$.print("hello")
 
-//should throw error
+c.item.if_is(LARGER_THAN, 1, ret_false)
+c.item.if_is(SMALLER_THAN, 1, ret_false)
 
-let 4 = 4
-fn = (){return 100};
-fn() = 4

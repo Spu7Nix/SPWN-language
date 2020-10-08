@@ -5,12 +5,12 @@ main = counter(1i)
 secondary = counter(2i)
 second_display = 81g
 
-death = 92g
+deathgroup = 92g
 
 limit_text = 93g
 no_text = 94g
 
-death.toggle_off()
+deathgroup.toggle_off()
 limit_text.toggle_off()
 no_text.toggle_off()
 
@@ -129,11 +129,11 @@ current_operator = counter(0)
 
 check_valid = {
 	secondary.item.if_is(SMALLER_THAN, 0, {
-		death.toggle_on()
+		deathgroup.toggle_on()
 		limit_text.toggle_on()
 	})
 	secondary.item.if_is(LARGER_THAN, 99998, {
-		death.toggle_on()
+		deathgroup.toggle_on()
 		limit_text.toggle_on()
 	})
 }
@@ -176,7 +176,7 @@ solve = {
 	current_operator.item.if_is(EQUAL_TO, 3, {
 		//divide
 		main.item.if_is(EQUAL_TO, 0, {
-			death.toggle_on()
+			deathgroup.toggle_on()
 			no_text.toggle_on()
 		})
 		secondary.divide(main, remainder_display, 4)

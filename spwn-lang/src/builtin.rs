@@ -104,7 +104,7 @@ impl Item {
 pub fn context_trigger(context: Context, info: CompilerInfo) -> GDObj {
     let mut params = HashMap::new();
     params.insert(57, ObjParam::GroupList(vec![context.start_group]));
-    params.insert(62, ObjParam::Bool(context.spawn_triggered));
+
     GDObj {
         params: HashMap::new(),
         func_id: info.func_id,

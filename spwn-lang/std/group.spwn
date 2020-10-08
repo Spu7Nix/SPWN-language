@@ -16,7 +16,7 @@ impl @group {
         easing: @number = NONE, 
         easing_rate: @number = 2
     ) {
-        /*$.add( trigger{
+        $.add( trigger{
             OBJ_ID: 901,
             TARGET: self,
             MOVE_X: x * 3,
@@ -24,7 +24,7 @@ impl @group {
             DURATION: duration,
             EASING: easing,
             EASING_RATE: easing_rate,
-        })*/
+        })
         
         wait(duration)
     },

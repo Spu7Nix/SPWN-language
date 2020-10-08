@@ -332,8 +332,9 @@ pub fn compile_scope(
                                     let storage =
                                         symbol.define(&mut new_context, globals, &info)?;
                                     //clone the value so as to not share the reference
+                                    let cloned = clone_value(e, 1, globals, &new_context, true);
                                     globals.stored_values[storage] =
-                                        globals.stored_values[e].clone();
+                                        globals.stored_values[cloned].clone();
                                     new_contexts.push(new_context);
                                 }
                             }
@@ -471,33 +472,43 @@ pub fn compile_scope(
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
-
+                contexts = Vec::new();
                 for (val, context) in all_values {
                     match &globals.stored_values[val] {
                         Value::Bool(b) => {
                             //internal if statement
                             if *b {
-                                contexts = Vec::new();
                                 let new_info = info.next("if body", globals, true);
                                 let compiled = compile_scope(
                                     &if_stmt.if_body,
-                                    vec![context],
+                                    vec![context.clone()],
                                     globals,
                                     new_info,
                                 )?;
                                 returns.extend(compiled.1);
-                                contexts.extend(compiled.0);
+                                contexts.extend(compiled.0.iter().map(|c| Context {
+                                    variables: context.variables.clone(),
+                                    implementations: context.implementations.clone(),
+                                    ..c.clone()
+                                }));
                             } else {
                                 match &if_stmt.else_body {
                                     Some(body) => {
-                                        contexts = Vec::new();
                                         let new_info = info.next("else body", globals, true);
-                                        let compiled =
-                                            compile_scope(body, vec![context], globals, new_info)?;
+                                        let compiled = compile_scope(
+                                            body,
+                                            vec![context.clone()],
+                                            globals,
+                                            new_info,
+                                        )?;
                                         returns.extend(compiled.1);
-                                        contexts.extend(compiled.0);
+                                        contexts.extend(compiled.0.iter().map(|c| Context {
+                                            variables: context.variables.clone(),
+                                            implementations: context.implementations.clone(),
+                                            ..c.clone()
+                                        }));
                                     }
-                                    None => {}
+                                    None => contexts.push(context),
                                 };
                             }
                         }
@@ -632,18 +643,25 @@ pub fn compile_scope(
                             let mut new_contexts = vec![context.clone()];
 
                             for element in arr {
-                                for mut c in new_contexts.clone() {
-                                    c.variables = context.variables.clone();
-
-                                    c.variables.insert(f.symbol.clone(), element);
-                                    let new_info = info.next("for loop", globals, false);
-                                    let (end_contexts, inner_returns) =
-                                        compile_scope(&f.body, vec![c], globals, new_info)?;
-                                    returns.extend(inner_returns);
-                                    new_contexts = end_contexts;
+                                //println!("{}", new_contexts.len());
+                                for c in &mut new_contexts {
+                                    (*c).variables = context.variables.clone();
+                                    (*c).variables.insert(f.symbol.clone(), element);
                                 }
+
+                                let new_info = info.next("for loop", globals, false);
+
+                                let (end_contexts, inner_returns) =
+                                    compile_scope(&f.body, new_contexts, globals, new_info)?;
+
+                                returns.extend(inner_returns);
+                                new_contexts = end_contexts;
                             }
-                            contexts.extend(new_contexts);
+                            contexts.extend(new_contexts.iter().map(|c| Context {
+                                variables: context.variables.clone(),
+                                implementations: context.implementations.clone(),
+                                ..c.clone()
+                            }));
                         }
 
                         a => {
@@ -820,7 +838,7 @@ pub fn import_module(
             .iter()
             .map(|x| {
                 let mut new_context = context.clone();
-                new_context.spawn_triggered = x.spawn_triggered;
+
                 new_context.start_group = x.start_group;
                 merge_impl(&mut new_context.implementations, &x.implementations);
                 (NULL_STORAGE, new_context)
@@ -831,7 +849,7 @@ pub fn import_module(
             .iter()
             .map(|(val, x)| {
                 let mut new_context = context.clone();
-                new_context.spawn_triggered = x.spawn_triggered;
+
                 new_context.start_group = x.start_group;
                 merge_impl(&mut new_context.implementations, &x.implementations);
                 (*val, new_context)

@@ -60,8 +60,7 @@ impl GDObj {
     pub fn context_parameters(&mut self, context: Context) -> GDObj {
         self.params
             .insert(57, ObjParam::GroupList(vec![context.start_group]));
-        self.params
-            .insert(62, ObjParam::Bool(context.spawn_triggered));
+
         (*self).clone()
     }
 
@@ -298,23 +297,28 @@ pub fn append_objects(
                 obj_string + ";"
             }
             ObjectMode::Trigger => {
-                let spawned = match trigger.params.get(&62) {
-                    Some(ObjParam::Bool(b)) => *b,
-                    _ => false,
-                };
-
-                if spawned {
-                    obj_string += "87,1,";
-                }
-
-                match trigger.params.get_mut(&57) {
-                    Some(ObjParam::GroupList(l)) => (*l).push(SPWN_SIGNATURE_GROUP),
+                let groups = match trigger.params.get_mut(&57) {
+                    Some(ObjParam::GroupList(l)) => {
+                        let list = l.clone();
+                        (*l).push(SPWN_SIGNATURE_GROUP);
+                        list
+                    }
                     _ => {
                         trigger
                             .params
                             .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP));
+                        Vec::new()
                     }
                 };
+
+                /*let spawned = match trigger.params.get(&62) {
+                    Some(ObjParam::Bool(b)) => *b,
+                    _ => groups.iter().any(|x| x.id != ID::Specific(0)),
+                };
+
+                if spawned {
+                    obj_string += "87,1,";
+                }*/
 
                 let mut param_list = trigger.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
 
@@ -380,10 +384,27 @@ pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
                     let y_pos = (i as u16) % possible_height + START_HEIGHT + y_offset;
                     let x_pos = (i as f64 / possible_height as f64).floor() as u32 + x_offset;
 
+                    let spawned = match obj.params.get(&62) {
+                        Some(ObjParam::Bool(b)) => *b,
+                        _ => match obj.params.get(&57) {
+                            None => false,
+                            Some(ObjParam::GroupList(l)) => {
+                                l.iter().any(|x| x.id != ID::Specific(0))
+                            }
+                            _ => unreachable!(),
+                        },
+                    };
+
                     let mut new_obj = obj.clone();
+
+                    if spawned {
+                        new_obj.params.insert(62, ObjParam::Bool(true));
+                        new_obj.params.insert(87, ObjParam::Bool(true));
+                    }
+
                     new_obj.params.insert(
                         2,
-                        if new_obj.params.get(&62) == Some(&ObjParam::Bool(true)) {
+                        if spawned {
                             ObjParam::Number((x_pos * 30 + 15) as f64)
                         } else {
                             ObjParam::Number(0.0)

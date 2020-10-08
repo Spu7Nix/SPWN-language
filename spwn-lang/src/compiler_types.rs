@@ -198,7 +198,7 @@ pub type Returns = Vec<(StoredValue, Context)>;
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Context {
     pub start_group: Group,
-    pub spawn_triggered: bool,
+    //pub spawn_triggered: bool,
     pub variables: HashMap<String, StoredValue>,
     //pub self_val: Option<StoredValue>,
     pub implementations: Implementations,
@@ -258,7 +258,7 @@ impl Context {
     pub fn new() -> Context {
         Context {
             start_group: Group::new(0),
-            spawn_triggered: false,
+            //spawn_triggered: false,
             variables: HashMap::new(),
             //return_val: Box::new(Value::Null),
             implementations: HashMap::new(),
@@ -1289,7 +1289,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
             for (val, count, c) in return_vals {
                 if count > 1 {
                     let mut new_context = context.clone();
-                    new_context.spawn_triggered = true;
+                    //new_context.spawn_triggered = true;
                     //pick a start group
                     let start_group = Group::next_free(&mut globals.closed_groups);
 
@@ -1326,8 +1326,10 @@ Should be used like this: value.macro(arguments)".to_string(), info
         returns
             .iter()
             .map(|x| {
+                //set mutable to false
+                (*globals.stored_values.map.get_mut(&x.0).unwrap()).2 = false;
                 (
-                    x.0.clone(),
+                    x.0,
                     Context {
                         variables: context.variables.clone(),
                         ..x.1.clone()
@@ -1452,7 +1454,7 @@ pub fn eval_dict(
 impl ast::Variable {
     pub fn to_value(
         &self,
-        context: Context,
+        mut context: Context,
         globals: &mut Globals,
         mut info: CompilerInfo,
         //mut define_new: bool,
@@ -1463,6 +1465,10 @@ impl ast::Variable {
         let mut inner_returns = Returns::new();
 
         //let mut defined = true;
+        if let Some(UnaryOperator::Let) = self.operator {
+            let val = self.define(&mut context, globals, &info)?;
+            start_val = vec![(val, context.clone())];
+        }
 
         use ast::IDClass;
 
@@ -1481,7 +1487,7 @@ impl ast::Variable {
                 }
             }
             ast::ValueBody::ID(id) => start_val.push((
-                store_value(
+                store_const_value(
                     match id.class_name {
                         IDClass::Group => {
                             if id.unspecified {
@@ -1519,7 +1525,7 @@ impl ast::Variable {
                 context.clone(),
             )),
             ast::ValueBody::Number(num) => start_val.push((
-                store_value(Value::Number(*num), 1, globals, &context),
+                store_const_value(Value::Number(*num), 1, globals, &context),
                 context.clone(),
             )),
             ast::ValueBody::Dictionary(dict) => {
@@ -1533,7 +1539,7 @@ impl ast::Variable {
                 let (evaled, returns) = cmp_stmt.to_scope(&context, globals, info.clone())?;
                 inner_returns.extend(returns);
                 start_val.push((
-                    store_value(Value::Func(evaled), 1, globals, &context),
+                    store_const_value(Value::Func(evaled), 1, globals, &context),
                     context.clone(),
                 ));
             }
@@ -1546,7 +1552,7 @@ impl ast::Variable {
             }
 
             ast::ValueBody::Bool(b) => start_val.push((
-                store_value(Value::Bool(*b), 1, globals, &context),
+                store_const_value(Value::Bool(*b), 1, globals, &context),
                 context.clone(),
             )),
             ast::ValueBody::Symbol(string) => {
@@ -1566,7 +1572,7 @@ impl ast::Variable {
                 }
             }
             ast::ValueBody::Str(s) => start_val.push((
-                store_value(Value::Str(s.clone()), 1, globals, &context),
+                store_const_value(Value::Str(s.clone()), 1, globals, &context),
                 context.clone(),
             )),
             ast::ValueBody::Array(a) => {
@@ -1592,7 +1598,9 @@ impl ast::Variable {
             ast::ValueBody::TypeIndicator(name) => {
                 start_val.push((
                     match globals.type_ids.get(name) {
-                        Some(id) => store_value(Value::TypeIndicator(*id), 1, globals, &context),
+                        Some(id) => {
+                            store_const_value(Value::TypeIndicator(*id), 1, globals, &context)
+                        }
                         None => {
                             return Err(RuntimeError::UndefinedErr {
                                 undefined: name.clone(),
@@ -1659,7 +1667,7 @@ impl ast::Variable {
                         ))
                     }
                     start_val.push((
-                        store_value(Value::Obj(obj, o.mode), 1, globals, &context),
+                        store_const_value(Value::Obj(obj, o.mode), 1, globals, &context),
                         context,
                     ));
                 }
@@ -1714,7 +1722,7 @@ impl ast::Variable {
                     }
 
                     start_val.push((
-                        store_value(
+                        store_const_value(
                             Value::Macro(Macro {
                                 args,
                                 body: m.body.statements.clone(),
@@ -2267,8 +2275,6 @@ impl ast::CompoundStatement {
     ) -> Result<(Function, Returns), RuntimeError> {
         //create the function context
         let mut new_context = context.clone();
-
-        new_context.spawn_triggered = true;
 
         //pick a start group
         let start_group = Group::next_free(&mut globals.closed_groups);
