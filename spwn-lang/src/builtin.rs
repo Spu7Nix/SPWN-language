@@ -8,13 +8,13 @@ use std::collections::HashMap;
 
 pub type ArbitraryID = u16;
 pub type SpecificID = u16;
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ID {
     Specific(SpecificID),
     Arbitrary(ArbitraryID), // will be given specific ids at the end of compilation
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Group {
     pub id: ID,
 }
@@ -101,13 +101,13 @@ impl Item {
     }
 }
 
-pub fn context_trigger(context: Context, info: CompilerInfo) -> GDObj {
+pub fn context_trigger(context: Context) -> GDObj {
     let mut params = HashMap::new();
     params.insert(57, ObjParam::GroupList(vec![context.start_group]));
 
     GDObj {
         params: HashMap::new(),
-        func_id: info.func_id,
+        func_id: context.func_id,
         mode: ObjectMode::Trigger,
     }
 }
@@ -313,26 +313,28 @@ pub fn built_in_function(
 
             match &globals.stored_values[arguments[0]] {
                 Value::Obj(obj, mode) => {
-                    let c_t = context_trigger(context.clone(), info.clone());
+                    let c_t = context_trigger(context.clone());
                     let mut obj_map = HashMap::<u16, ObjParam>::new();
 
                     for p in obj {
                         obj_map.insert(p.0, p.1.clone());
                     }
 
-                    (*globals).func_ids[info.func_id].obj_list.push(match mode {
-                        ObjectMode::Object => GDObj {
-                            params: obj_map.clone(),
-                            func_id: info.func_id,
-                            mode: ObjectMode::Object,
-                        },
-                        ObjectMode::Trigger => GDObj {
-                            params: obj_map.clone(),
-                            mode: ObjectMode::Trigger,
-                            ..c_t
-                        }
-                        .context_parameters(context.clone()),
-                    });
+                    (*globals).func_ids[context.func_id]
+                        .obj_list
+                        .push(match mode {
+                            ObjectMode::Object => GDObj {
+                                params: obj_map.clone(),
+                                func_id: context.func_id,
+                                mode: ObjectMode::Object,
+                            },
+                            ObjectMode::Trigger => GDObj {
+                                params: obj_map.clone(),
+                                mode: ObjectMode::Trigger,
+                                ..c_t
+                            }
+                            .context_parameters(context.clone()),
+                        });
                 }
 
                 a => {
@@ -533,10 +535,11 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                 },
                 "_plus_" => match (val_a, val_b) {
                     (Value::Number(a), Value::Number(b)) => Value::Number(*a + b),
+                    (Value::Str(a), Value::Str(b)) => Value::Str(a.clone() + &b),
 
                     _ => {
                         return Err(RuntimeError::TypeError {
-                            expected: "number and number".to_string(),
+                            expected: "number and number or string and string".to_string(),
                             found: format!("{} and {}", a_type, b_type),
                             info: info.clone(),
                         })
@@ -601,10 +604,11 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
 
                     match (val_a, val_b) {
                         (Value::Number(a), Value::Number(b)) => (*a) += b,
+                        (Value::Str(a), Value::Str(b)) => (*a) += &b,
 
                         _ => {
                             return Err(RuntimeError::TypeError {
-                                expected: "number and number".to_string(),
+                                expected: "number and number or string and string".to_string(),
                                 found: format!("{} and {}", a_type, b_type),
                                 info: info.clone(),
                             })

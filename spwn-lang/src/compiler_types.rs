@@ -193,6 +193,8 @@ pub fn store_const_value(
     index
 }
 
+pub type FnIDPtr = usize;
+
 pub type Returns = Vec<(StoredValue, Context)>;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -202,6 +204,8 @@ pub struct Context {
     pub variables: HashMap<String, StoredValue>,
     //pub self_val: Option<StoredValue>,
     pub implementations: Implementations,
+
+    pub func_id: FnIDPtr,
 }
 #[derive(Debug, Clone)]
 pub struct CompilerInfo {
@@ -209,7 +213,6 @@ pub struct CompilerInfo {
     pub path: Vec<String>,
     pub current_file: PathBuf,
     pub pos: FileRange,
-    pub func_id: usize,
 }
 
 impl CompilerInfo {
@@ -219,37 +222,6 @@ impl CompilerInfo {
             path: vec!["main scope".to_string()],
             current_file: PathBuf::new(),
             pos: ((0, 0), (0, 0)),
-            func_id: 0,
-        }
-    }
-    pub fn next(
-        &self,
-        name: &str,
-        globals: &mut Globals,
-        use_in_organization: bool,
-    ) -> CompilerInfo {
-        let mut new_path = self.path.clone();
-        new_path.push(name.to_string());
-
-        if use_in_organization {
-            (*globals).func_ids.push(FunctionID {
-                name: name.to_string(),
-                parent: Some(self.func_id),
-                obj_list: Vec::new(),
-                width: None,
-            });
-        }
-
-        CompilerInfo {
-            depth: self.depth + 1,
-            path: new_path,
-            pos: self.pos,
-            current_file: self.current_file.clone(),
-            func_id: if use_in_organization {
-                (*globals).func_ids.len() - 1
-            } else {
-                self.func_id
-            },
         }
     }
 }
@@ -263,7 +235,20 @@ impl Context {
             //return_val: Box::new(Value::Null),
             implementations: HashMap::new(),
             //self_val: None,
+            func_id: 0,
         }
+    }
+
+    pub fn next_fn_id(&self, globals: &mut Globals) -> Context {
+        (*globals).func_ids.push(FunctionID {
+            parent: Some(self.func_id),
+            obj_list: Vec::new(),
+            width: None,
+        });
+
+        let mut out = self.clone();
+        out.func_id = globals.func_ids.len() - 1;
+        out
     }
 }
 
@@ -537,12 +522,12 @@ impl Value {
             }
             Value::Number(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::Func(f) => format!("<function {}g>", {
-                (if let ID::Specific(id) = f.start_group.id {
+            Value::Func(f) => format!("{{ /*function {}g*/ }}", {
+                if let ID::Specific(id) = f.start_group.id {
                     id.to_string()
                 } else {
                     "?".to_string()
-                }) + "g"
+                }
             }),
             Value::Dict(d) => {
                 let mut out = String::from("{\n");
@@ -638,8 +623,8 @@ impl Value {
 pub struct FunctionID {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id
     pub width: Option<u32>,    //width of this id, is none when its not calculated yet
-    pub name: String,          //name of this id, used for the label
-    pub obj_list: Vec<GDObj>,  //list of objects in this function id
+    //pub name: String,          //name of this id, used for the label
+    pub obj_list: Vec<GDObj>, //list of objects in this function id
 }
 
 pub struct Globals {
@@ -719,7 +704,6 @@ impl Globals {
             val_id: storage.map.len(),
             stored_values: storage,
             func_ids: vec![FunctionID {
-                name: "main scope".to_string(),
                 parent: None,
                 width: None,
                 obj_list: Vec::new(),
@@ -765,7 +749,7 @@ fn handle_operator(
                 .member(macro_name.to_string(), &context, globals)
         {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
-                let new_info = info.next("operator", globals, false);
+                let new_info = info.clone();
                 if m.args.is_empty() {
                     return Err(RuntimeError::RuntimeError {
                         message: String::from("Expected at least one argument in operator macro"),
@@ -1260,7 +1244,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
         new_contexts.push(new_context);
     }
-    let mut new_info = info.next("macro body", globals, false);
+    let mut new_info = info.clone();
     new_info.current_file = m.def_file;
     let compiled = compile_scope(&m.body, new_contexts, globals, new_info)?;
 
@@ -1300,10 +1284,10 @@ Should be used like this: value.macro(arguments)".to_string(), info
                         let obj = GDObj {
                             params,
 
-                            ..context_trigger(cont.clone(), info.clone())
+                            ..context_trigger(cont.clone())
                         }
                         .context_parameters(cont.clone());
-                        (*globals).func_ids[info.func_id].obj_list.push(obj);
+                        (*globals).func_ids[context.func_id].obj_list.push(obj);
                     }
 
                     new_context.start_group = start_group;
@@ -1529,7 +1513,7 @@ impl ast::Variable {
                 context.clone(),
             )),
             ast::ValueBody::Dictionary(dict) => {
-                let new_info = info.next("dictionary", globals, false);
+                let new_info = info.clone();
                 let (new_out, new_inner_returns) =
                     eval_dict(dict.clone(), context.clone(), globals, new_info, constant)?;
                 start_val = new_out;
@@ -1576,7 +1560,7 @@ impl ast::Variable {
                 context.clone(),
             )),
             ast::ValueBody::Array(a) => {
-                let new_info = info.next("array", globals, false);
+                let new_info = info.clone();
                 let (evaled, returns) =
                     all_combinations(a.clone(), context.clone(), globals, new_info, constant)?;
                 inner_returns.extend(returns);
@@ -1618,7 +1602,7 @@ impl ast::Variable {
                     all_expr.push(prop.0.clone());
                     all_expr.push(prop.1.clone());
                 }
-                let new_info = info.next("object", globals, false);
+                let new_info = info.clone();
                 let (evaled, returns) =
                     all_combinations(all_expr, context.clone(), globals, new_info, constant)?;
                 inner_returns.extend(returns);
@@ -1684,7 +1668,7 @@ impl ast::Variable {
                         all_expr.push(e.clone());
                     }
                 }
-                let new_info = info.next("macro argument", globals, false);
+                let new_info = info.clone();
                 let (argument_possibilities, returns) =
                     all_combinations(all_expr, context.clone(), globals, new_info, constant)?;
                 inner_returns.extend(returns);
@@ -1839,7 +1823,7 @@ impl ast::Variable {
                     for (prev_v, prev_c, _) in with_parent.clone() {
                         match globals.stored_values[prev_v].clone() {
                             Value::Array(arr) => {
-                                let new_info = info.next("index", globals, false);
+                                let new_info = info.clone();
                                 let (evaled, returns) =
                                     i.eval(prev_c, globals, new_info, constant)?;
                                 inner_returns.extend(returns);
@@ -2274,13 +2258,13 @@ impl ast::CompoundStatement {
         info: CompilerInfo,
     ) -> Result<(Function, Returns), RuntimeError> {
         //create the function context
-        let mut new_context = context.clone();
+        let mut new_context = context.next_fn_id(globals);
 
         //pick a start group
         let start_group = Group::next_free(&mut globals.closed_groups);
 
         new_context.start_group = start_group;
-        let new_info = info.next("function body", globals, true);
+        let new_info = info.clone();
         let (_, inner_returns) =
             compile_scope(&self.statements, vec![new_context], globals, new_info)?;
 

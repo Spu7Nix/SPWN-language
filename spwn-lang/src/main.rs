@@ -1,5 +1,5 @@
 //#![feature(arbitrary_enum_discriminant)]
-
+#![feature(move_ref_pattern)]
 mod ast;
 mod builtin;
 mod compiler;
@@ -9,9 +9,9 @@ mod fmt;
 mod levelstring;
 mod parser;
 
-//mod optimize;
+mod optimize;
 
-//use optimize::optimize;
+use optimize::optimize;
 
 use parser::*;
 
@@ -25,6 +25,8 @@ use std::fs;
 pub const STD_PATH: &str = "../std";
 
 const ERROR_EXIT_CODE: i32 = 1;
+
+use ansi_term::Colour;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -48,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
 
-                    println!("Parsing...");
+                    println!("{}...", Colour::Green.bold().paint("Parsing"));
                     let unparsed = fs::read_to_string(script_path.clone())?;
 
                     let (statements, notes) = match parse_spwn(unparsed, script_path.clone()) {
@@ -90,8 +92,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p) => p,
                     };
 
+                    println!("{}", Colour::Cyan.bold().paint("Optimizing triggers..."));
+                    println!(
+                        "pre-opt-obj: {}",
+                        compiled
+                            .func_ids
+                            .iter()
+                            .fold(0, |a, e| a + e.obj_list.len())
+                    );
+                    let optimized = optimize(compiled.func_ids);
+
                     let level_string = if let Some(gd_path) = &gd_path {
-                        println!("Reading savefile...");
+                        println!("{}", Colour::Cyan.bold().paint("Reading savefile..."));
 
                         let file_content = fs::read_to_string(gd_path)?;
                         let mut level_string = levelstring::get_level_string(file_content);
@@ -101,20 +113,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         String::new()
                     };
 
+                    // println!(
+                    //     "post-opt-obj: {}",
+                    //     optimized
+                    //         .iter()
+                    //         .map(|e| format!("{}: {}", e.name, e.obj_list.len()))
+                    //         .collect::<Vec<String>>()
+                    //         .join("\n")
+                    // );
+
                     //println!("func ids: {:?}", compiled.func_ids);
-                    let objects = levelstring::apply_fn_ids(compiled.func_ids);
+                    let objects = levelstring::apply_fn_ids(optimized);
 
                     println!("{} objects added", objects.len());
-
-                    //objects = optimize(objects);
-
-                    //println!("optimized to {} objects", objects.len());
 
                     let (new_ls, used_ids) = levelstring::append_objects(objects, &level_string)?;
 
                     //let level_string = levelstring::serialize_triggers_old(compiled.func_ids);
 
-                    println!("\nScript:");
+                    /*println!("{}", Colour::White.bold().paint("\nScript:"));
                     for (i, len) in [
                         compiled.closed_groups,
                         compiled.closed_colors,
@@ -131,9 +148,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 ["groups", "colors", "block IDs", "item IDs"][i]
                             );
                         }
-                    }
+                    }*/
 
-                    println!("\nLevel:");
+                    println!("{}", Colour::White.bold().paint("\nLevel:"));
                     for (i, len) in used_ids.iter().enumerate() {
                         if *len > 0 {
                             println!(
@@ -147,9 +164,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     //println!("level_string: {}", level_string);
                     match gd_path {
                         Some(gd_path) => {
-                            println!("\nWriting back to savefile...");
+                            println!(
+                                "\n{}",
+                                Colour::Cyan.bold().paint("Writing back to savefile...")
+                            );
                             levelstring::encrypt_level_string(new_ls, level_string, gd_path);
-                            println!("Written to save. You can now open Geometry Dash again!");
+                            println!(
+                                "{}",
+                                Colour::Green.bold().paint(
+                                    "Written to save. You can now open Geometry Dash again!"
+                                )
+                            );
                         }
 
                         None => println!("Output: {}", level_string),

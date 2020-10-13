@@ -3,7 +3,6 @@
 use crate::builtin::TYPE_MEMBER_NAME;
 use crate::compiler::{import_module, RuntimeError};
 use crate::compiler_types::{find_key_for_value, CompilerInfo, Context, Globals, Macro, Value};
-use crate::parser::ParseNotes;
 use std::collections::HashMap;
 use std::path::PathBuf;
 

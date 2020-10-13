@@ -297,17 +297,16 @@ pub fn append_objects(
                 obj_string + ";"
             }
             ObjectMode::Trigger => {
-                let groups = match trigger.params.get_mut(&57) {
+                match trigger.params.get_mut(&57) {
                     Some(ObjParam::GroupList(l)) => {
-                        let list = l.clone();
                         (*l).push(SPWN_SIGNATURE_GROUP);
-                        list
+                        //list
                     }
                     _ => {
                         trigger
                             .params
                             .insert(57, ObjParam::Group(SPWN_SIGNATURE_GROUP));
-                        Vec::new()
+                        //Vec::new()
                     }
                 };
 
@@ -424,8 +423,7 @@ pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
         //add all children
         for (i, func_id) in func_ids.iter().enumerate() {
             if func_id.parent == Some(id_index) {
-                let (obj, new_length) =
-                    apply_fn_id(i, func_ids, current_x + x_offset, y_offset + 1);
+                let (obj, new_length) = apply_fn_id(i, func_ids, current_x + x_offset, y_offset);
                 objects.extend(obj);
 
                 if new_length > 0 {

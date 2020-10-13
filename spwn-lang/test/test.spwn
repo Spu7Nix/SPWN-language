@@ -1,17 +1,5 @@
-extract $
-
-c = counter(1)
-
-
-
-c.item.if_is(EQUAL_TO, 1, {
-	10g.move(10, 0, 0.6)
-})
-
-ret_false = {
-	10g.move(-10, 0, 0.6)
+func = {
+	wait(1)
+	func!
 }
-
-c.item.if_is(LARGER_THAN, 1, ret_false)
-c.item.if_is(SMALLER_THAN, 1, ret_false)
-
+func!
