@@ -1,3 +1,4 @@
+use crate::ast::ObjectMode;
 use crate::builtin::{Group, ID};
 use crate::compiler_types::FunctionID;
 use crate::levelstring::{GDObj, ObjParam};
@@ -136,7 +137,46 @@ pub fn optimize(mut obj_in: Vec<FunctionID>) -> Vec<FunctionID> {
                 continue;
             }
 
-            optimize_from(&mut network, &objects, (g, i));
+            let targets = optimize_from(&mut network, &objects, (g, i), 0.0);
+            let start_trigger = network.get(&g).unwrap()[i];
+            let obj = objects[trigger.obj].clone();
+            if let Some(targets) = targets {
+                for (g, _, delay) in targets {
+                    // add spawn trigger to obj.fn_id with target group: g and delay: delay
+                    let mut obj_map = HashMap::new();
+
+                    obj_map.extend(obj.params.clone());
+                    obj_map.insert(1, ObjParam::Number(1268.0));
+                    obj_map.insert(51, ObjParam::Group(g));
+                    obj_map.insert(63, ObjParam::Number(delay as f64));
+
+                    let obj = GDObj {
+                        params: obj_map.clone(),
+                        mode: ObjectMode::Trigger,
+                        func_id: obj.func_id,
+                    };
+                    let fn_id = obj.func_id;
+                    (*objects.list)[fn_id].obj_list.push(obj);
+                    let obj_index = (fn_id, objects.list[fn_id].obj_list.len() - 1);
+                    let trigger = Trigger {
+                        obj: obj_index,
+                        optimized: true,
+                        deleted: false,
+                        ..start_trigger
+                    };
+                    if let Some(ObjParam::GroupList(list)) = &obj_map.get(&57) {
+                        for group in list {
+                            match network.get_mut(group) {
+                                Some(list) => (*list).push(trigger),
+                                None => unreachable!(),
+                            }
+                        }
+                    }
+                }
+            }
+
+            //create spawn triggers
+            //TODO: keep track of delay
         }
     }
 
@@ -150,8 +190,9 @@ pub fn optimize(mut obj_in: Vec<FunctionID>) -> Vec<FunctionID> {
 fn optimize_from<'a>(
     network: &'a mut TriggerNetwork,
     objects: &Triggerlist,
-    start: (Group, usize), //&HashMap<u16, ObjParam>,
-) -> Option<Vec<(Group, usize)>> {
+    start: (Group, usize),
+    delay: f32,
+) -> Option<Vec<(Group, usize, f32)>> {
     // optimize from that trigger
 
     //(*start).optimized = true;
@@ -186,6 +227,12 @@ fn optimize_from<'a>(
                 return Some(Vec::new());
             }
 
+            let added_delay = if let Some(ObjParam::Number(n)) = start_obj.get(&63) {
+                *n as f32
+            } else {
+                0.0
+            };
+
             let mut out = Vec::new();
 
             for trigger_ptr in list {
@@ -194,22 +241,28 @@ fn optimize_from<'a>(
                     continue;
                 }
 
+                let full_trigger_ptr = (trigger_ptr.0, trigger_ptr.1, delay + added_delay);
+
                 if trigger.connections_in > 1 || trigger.optimized {
-                    out.push(trigger_ptr)
+                    out.push(full_trigger_ptr)
                 } else {
                     match trigger.role {
-                        TriggerRole::Output | TriggerRole::Func => out.push(trigger_ptr),
-                        TriggerRole::Spawn => match optimize_from(network, objects, trigger_ptr) {
-                            Some(children) => out.extend(children),
-                            None => (),
-                        },
+                        TriggerRole::Output | TriggerRole::Func => out.push(full_trigger_ptr),
+                        TriggerRole::Spawn => {
+                            match optimize_from(network, objects, trigger_ptr, delay + added_delay)
+                            {
+                                Some(children) => out.extend(children),
+                                None => (),
+                            }
+                        }
                     }
                 }
             }
 
-            if out.is_empty() {
-                (*network.get_mut(&start.0).unwrap())[start.1].deleted = true;
-            }
+            //if out.is_empty() {
+            (*network.get_mut(&start.0).unwrap())[start.1].deleted = true;
+            //}
+
             Some(out)
         }
         TriggerRole::Output => unreachable!(),

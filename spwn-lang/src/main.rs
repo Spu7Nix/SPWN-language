@@ -177,7 +177,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             );
                         }
 
-                        None => println!("Output: {}", level_string),
+                        None => println!("Output: {}", new_ls),
                     };
 
                     Ok(())
