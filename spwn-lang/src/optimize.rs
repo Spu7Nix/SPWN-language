@@ -133,11 +133,13 @@ pub fn optimize(mut obj_in: Vec<FunctionID>) -> Vec<FunctionID> {
     for (g, len) in group_sizes {
         for i in 0..len {
             let trigger = network.get(&g).unwrap()[i];
-            if trigger.role == TriggerRole::Output || trigger.optimized || trigger.deleted {
+            if trigger.role == TriggerRole::Output || trigger.optimized || trigger.deleted
+            //|| (trigger.role == TriggerRole::Spawn && g != no_group)
+            {
                 continue;
             }
 
-            let targets = optimize_from(&mut network, &objects, (g, i), 0.0);
+            let targets = optimize_from(&mut network, &objects, (g, i), 0.0, false);
             let start_trigger = network.get(&g).unwrap()[i];
             let obj = objects[trigger.obj].clone();
             if let Some(targets) = targets {
@@ -192,6 +194,7 @@ fn optimize_from<'a>(
     objects: &Triggerlist,
     start: (Group, usize),
     delay: f32,
+    ignore_otimized: bool,
 ) -> Option<Vec<(Group, usize, f32)>> {
     // optimize from that trigger
 
@@ -243,14 +246,27 @@ fn optimize_from<'a>(
 
                 let full_trigger_ptr = (trigger_ptr.0, trigger_ptr.1, delay + added_delay);
 
-                if trigger.connections_in > 1 || trigger.optimized {
+                if trigger.connections_in > 1
+                    || (trigger.optimized && !ignore_otimized && trigger.role != TriggerRole::Spawn)
+                {
                     out.push(full_trigger_ptr)
+                } else if trigger.role == TriggerRole::Spawn && trigger.optimized {
+                    // if its already optimized, redo
+                    match optimize_from(network, objects, trigger_ptr, delay + added_delay, true) {
+                        Some(children) => out.extend(children),
+                        None => (),
+                    }
                 } else {
                     match trigger.role {
                         TriggerRole::Output | TriggerRole::Func => out.push(full_trigger_ptr),
                         TriggerRole::Spawn => {
-                            match optimize_from(network, objects, trigger_ptr, delay + added_delay)
-                            {
+                            match optimize_from(
+                                network,
+                                objects,
+                                trigger_ptr,
+                                delay + added_delay,
+                                ignore_otimized,
+                            ) {
                                 Some(children) => out.extend(children),
                                 None => (),
                             }
