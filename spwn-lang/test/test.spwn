@@ -1,14 +1,12 @@
+a = counter(100)
 
-selected_button = counter(0)
+if a == 100 {
+	-> 10g.move(10, 0, 0.5)
+	11g.move(10, 0, 0.5)
+}
 
-button_anchors = [75g, 63g, 64g, 65g, 66g, 67g, 69g, 72g, 73g, 74g, 76g, 90g, 77g, 78g, 79g, 80g]
-select_box = 68g
 
-on(touch(true), {
-	
-	selected_button.item.add(1)
-	selected_button.item.if_is(EQUAL_TO, 16, {selected_button.item.add(-16)})
-	-> select_box.move_to(button_anchors[selected_button.to_const(0..16)])
-	
-})
+		
+
+
 

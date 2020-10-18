@@ -1,4 +1,5 @@
 // rewrite of the calculator with a more modern version of spwn
+// a bit buggy, and a bit slow, but it works
 
 
 death_group = 92g
@@ -79,6 +80,7 @@ for d in ..5 {
 }
 
 set_display = {
+	wait(0.05)
 	referance = main.clone(10)
 	for digit in 5..0 {
 		for i in 0..10 {
@@ -130,11 +132,12 @@ check_valid = {
 solve = {
 	start_loading!
 	move_from_secondary = {
-		secondary.add_to([main.item], speed = 3)
+		secondary.add_to([main.item], speed = 6)
 	}
+	
 	if current_operator == 0 {
 		//plus
-		main.add_to([secondary.item], speed = 3)
+		main.add_to([secondary.item], speed = 6)
 		-> if last_pressed_operator == 4 {
 			move_from_secondary!
 		}
@@ -143,7 +146,7 @@ solve = {
 		end_loading!
 	} else if current_operator == 1 {
 		//minus
-		main.subtract_from([secondary.item], speed = 3)
+		main.subtract_from([secondary.item], speed = 6)
 		
 		-> if last_pressed_operator == 4 {
 			move_from_secondary!
@@ -155,7 +158,7 @@ solve = {
 		end_loading!
 	} else if current_operator == 2 {
 		//mult
-		secondary.multiply(main, 3)
+		secondary.multiply(main, 7)
 
 		-> if last_pressed_operator == 4 {
 			move_from_secondary!
@@ -164,13 +167,13 @@ solve = {
 		current_operator.add(-2)
 		check_valid!
 		end_loading!
-	}/* else if current_operator == 3 {
+	} else if current_operator == 3 {
 		//divide
 		-> if main == 0 {
 			death_group.toggle_on()
 			no_text.toggle_on()
 		}
-		secondary.divide(main, remainder_display, 3)
+		secondary.divide(main, remainder_display, 4)
 		show_remainder!
 		
 
@@ -181,7 +184,9 @@ solve = {
 		current_operator.add(-3)
 		check_valid!
 		end_loading!
-	}*/ else {
+	}
+	//preserve context split becuase we need the time to match
+	if last_pressed_operator == 4 {
 		-> second_display.alpha(0, 0.5)
 	}
 	

@@ -43,10 +43,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
 
                     let mut gd_enabled = true;
+                    let mut opti_enambled = true;
 
                     for arg in args_iter {
                         if arg == "--no-gd" {
                             gd_enabled = false;
+                        } else if arg == "--no-optimize" {
+                            opti_enambled = false;
                         }
                     }
 
@@ -79,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         None
                     };
 
-                    let compiled = match compiler::compile_spwn(
+                    let mut compiled = match compiler::compile_spwn(
                         statements,
                         script_path,
                         //gd_path.clone(),
@@ -92,16 +95,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p) => p,
                     };
 
-                    println!("{}", Colour::Cyan.bold().paint("Optimizing triggers..."));
-                    println!(
-                        "pre-opt-obj: {}",
-                        compiled
-                            .func_ids
-                            .iter()
-                            .fold(0, |a, e| a + e.obj_list.len())
-                    );
-                    let optimized = optimize(compiled.func_ids);
-
                     let level_string = if let Some(gd_path) = &gd_path {
                         println!("{}", Colour::Cyan.bold().paint("Reading savefile..."));
 
@@ -113,42 +106,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         String::new()
                     };
 
-                    // println!(
-                    //     "post-opt-obj: {}",
-                    //     optimized
-                    //         .iter()
-                    //         .map(|e| format!("{}: {}", e.name, e.obj_list.len()))
-                    //         .collect::<Vec<String>>()
-                    //         .join("\n")
-                    // );
+                    if opti_enambled {
+                        println!("{}", Colour::Cyan.bold().paint("Optimizing triggers..."));
+
+                        compiled.func_ids = optimize(compiled.func_ids, compiled.closed_groups);
+                    }
 
                     //println!("func ids: {:?}", compiled.func_ids);
-                    let objects = levelstring::apply_fn_ids(optimized);
+                    let objects = levelstring::apply_fn_ids(compiled.func_ids);
 
                     println!("{} objects added", objects.len());
 
                     let (new_ls, used_ids) = levelstring::append_objects(objects, &level_string)?;
-
-                    //let level_string = levelstring::serialize_triggers_old(compiled.func_ids);
-
-                    /*println!("{}", Colour::White.bold().paint("\nScript:"));
-                    for (i, len) in [
-                        compiled.closed_groups,
-                        compiled.closed_colors,
-                        compiled.closed_blocks,
-                        compiled.closed_items,
-                    ]
-                    .iter()
-                    .enumerate()
-                    {
-                        if *len > 0 {
-                            println!(
-                                "{} {}",
-                                len,
-                                ["groups", "colors", "block IDs", "item IDs"][i]
-                            );
-                        }
-                    }*/
 
                     println!("{}", Colour::White.bold().paint("\nLevel:"));
                     for (i, len) in used_ids.iter().enumerate() {

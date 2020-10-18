@@ -91,6 +91,7 @@ for d in digits {
 
 
 set_display = {
+	wait(0.05)
 	referance = main.clone(10)
 	for digit in 5..0 {
 		for i in 0..10 {
@@ -199,7 +200,7 @@ solve = {
 
 on(collision(1b, 2b), {
 	loading.item.if_is(EQUAL_TO, 0, {
-		select_box.pulse(0, 0.7, 2, fade_out = 0.5, hsv = true)
+		
 		last_pressed_operator.reset()
 	
 		selected_button.item.if_is(SMALLER_THAN, 10, {

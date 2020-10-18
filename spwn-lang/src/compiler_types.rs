@@ -738,7 +738,7 @@ fn handle_operator(
     value1: StoredValue,
     value2: StoredValue,
     macro_name: &str,
-    context: Context,
+    context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
 ) -> Result<Returns, RuntimeError> {
@@ -782,7 +782,7 @@ fn handle_operator(
                                 globals,
                                 &context,
                             ),
-                            context,
+                            context.clone(),
                         )]);
                     }
                 }
@@ -814,7 +814,7 @@ fn handle_operator(
                         globals,
                         &context,
                     ),
-                    context,
+                    context.clone(),
                 )]
             }
         } else {
@@ -825,7 +825,7 @@ fn handle_operator(
                     globals,
                     &context,
                 ),
-                context,
+                context.clone(),
             )]
         },
     )
@@ -834,7 +834,7 @@ fn handle_operator(
 impl ast::Expression {
     pub fn eval(
         &self,
-        context: Context,
+        context: &Context,
         globals: &mut Globals,
         info: CompilerInfo,
         constant: bool,
@@ -863,118 +863,74 @@ impl ast::Expression {
 
                 use ast::Operator::*;
 
-                for (val, c2) in evaled.0 {
+                for (val, c2) in &evaled.0 {
                     //let val_fn_context = globals.get_val_fn_context(val, info.clone());
                     let vals: Returns = match self.operators[i] {
-                        Or => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_or_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
-                        And => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_and_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
+                        Or => handle_operator(acum_val, *val, "_or_", c2, globals, info.clone())?,
+                        And => handle_operator(acum_val, *val, "_and_", c2, globals, info.clone())?,
                         More => handle_operator(
-                            acum_val.clone(),
-                            val,
+                            acum_val,
+                            *val,
                             "_more_than_",
                             c2,
                             globals,
                             info.clone(),
                         )?,
                         Less => handle_operator(
-                            acum_val.clone(),
-                            val,
+                            acum_val,
+                            *val,
                             "_less_than_",
                             c2,
                             globals,
                             info.clone(),
                         )?,
                         MoreOrEqual => handle_operator(
-                            acum_val.clone(),
-                            val,
+                            acum_val,
+                            *val,
                             "_more_or_equal_",
                             c2,
                             globals,
                             info.clone(),
                         )?,
                         LessOrEqual => handle_operator(
-                            acum_val.clone(),
-                            val,
+                            acum_val,
+                            *val,
                             "_less_or_equal_",
                             c2,
                             globals,
                             info.clone(),
                         )?,
                         Slash => handle_operator(
-                            acum_val.clone(),
-                            val,
+                            acum_val,
+                            *val,
                             "_divided_by_",
                             c2,
                             globals,
                             info.clone(),
                         )?,
-                        Star => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_times_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
+                        Star => {
+                            handle_operator(acum_val, *val, "_times_", c2, globals, info.clone())?
+                        }
 
-                        Modulo => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_mod_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
+                        Modulo => {
+                            handle_operator(acum_val, *val, "_mod_", c2, globals, info.clone())?
+                        }
 
-                        Power => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_pow_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
-                        Plus => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_plus_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
-                        Minus => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_minus_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
-                        Equal => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_equal_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
+                        Power => {
+                            handle_operator(acum_val, *val, "_pow_", c2, globals, info.clone())?
+                        }
+                        Plus => {
+                            handle_operator(acum_val, *val, "_plus_", c2, globals, info.clone())?
+                        }
+                        Minus => {
+                            handle_operator(acum_val, *val, "_minus_", c2, globals, info.clone())?
+                        }
+                        Equal => {
+                            handle_operator(acum_val, *val, "_equal_", c2, globals, info.clone())?
+                        }
                         NotEqual => handle_operator(
-                            acum_val.clone(),
-                            val,
+                            acum_val,
+                            *val,
                             "_not_equal_",
                             c2,
                             globals,
@@ -993,7 +949,7 @@ impl ast::Expression {
                                             })
                                         }
                                     };
-                                    let end = match globals.stored_values[val] {
+                                    let end = match globals.stored_values[*val] {
                                         Value::Number(n) => n as i32,
                                         _ => {
                                             return Err(RuntimeError::RuntimeError {
@@ -1016,40 +972,21 @@ impl ast::Expression {
                                 globals,
                                 &c2,
                             ),
-                            c2,
+                            c2.clone(),
                         )],
                         //MUTABLE ONLY
                         //ADD CHECk
-                        Assign => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_assign_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
+                        Assign => {
+                            handle_operator(acum_val, *val, "_assign_", c2, globals, info.clone())?
+                        }
 
-                        As => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_as_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
+                        As => handle_operator(acum_val, *val, "_as_", c2, globals, info.clone())?,
 
-                        Add => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_add_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
+                        Add => handle_operator(acum_val, *val, "_add_", c2, globals, info.clone())?,
 
                         Subtract => handle_operator(
-                            acum_val.clone(),
-                            val,
+                            acum_val,
+                            *val,
                             "_subtract_",
                             c2,
                             globals,
@@ -1057,22 +994,17 @@ impl ast::Expression {
                         )?,
 
                         Multiply => handle_operator(
-                            acum_val.clone(),
-                            val,
+                            acum_val,
+                            *val,
                             "_multiply_",
                             c2,
                             globals,
                             info.clone(),
                         )?,
 
-                        Divide => handle_operator(
-                            acum_val.clone(),
-                            val,
-                            "_divide_",
-                            c2,
-                            globals,
-                            info.clone(),
-                        )?,
+                        Divide => {
+                            handle_operator(acum_val, *val, "_divide_", c2, globals, info.clone())?
+                        }
                     };
                     new_acum.extend(vals);
                 }
@@ -1085,7 +1017,7 @@ impl ast::Expression {
 
 pub fn execute_macro(
     (m, args): (Macro, Vec<ast::Argument>),
-    context: Context,
+    context: &Context,
     globals: &mut Globals,
     parent: StoredValue,
     info: CompilerInfo,
@@ -1096,7 +1028,7 @@ pub fn execute_macro(
         // second returns is for any compound statements in the args
         let (evaled_args, inner_returns) = all_combinations(
             args.iter().map(|x| x.value.clone()).collect(),
-            context.clone(),
+            context,
             globals,
             info.clone(),
             true,
@@ -1327,7 +1259,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
 fn all_combinations(
     a: Vec<ast::Expression>,
-    context: Context,
+    context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
     constant: bool,
@@ -1336,7 +1268,7 @@ fn all_combinations(
     let mut inner_returns = Returns::new();
     if a.is_empty() {
         //if there are so value, there is only one combination
-        out.push((Vec::new(), context));
+        out.push((Vec::new(), context.clone()));
     } else {
         let mut a_iter = a.iter();
         //starts with all the combinations of the first expr
@@ -1358,7 +1290,7 @@ fn all_combinations(
             //run through all the lists in out
             for (inner_arr, c) in out.iter() {
                 //for each one, run through all the returns in that context
-                let (values, returns) = expr.eval(c.clone(), globals, info.clone(), constant)?;
+                let (values, returns) = expr.eval(c, globals, info.clone(), constant)?;
                 inner_returns.extend(returns);
                 for (v, c2) in values.iter() {
                     //push a new list with each return pushed to it
@@ -1380,7 +1312,7 @@ fn all_combinations(
 }
 pub fn eval_dict(
     dict: Vec<ast::DictDef>,
-    context: Context,
+    context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
     constant: bool,
@@ -1393,7 +1325,7 @@ pub fn eval_dict(
                 ast::DictDef::Extract(e) => e.clone(),
             })
             .collect(),
-        context.clone(),
+        context,
         globals,
         info.clone(),
         constant,
@@ -1515,7 +1447,7 @@ impl ast::Variable {
             ast::ValueBody::Dictionary(dict) => {
                 let new_info = info.clone();
                 let (new_out, new_inner_returns) =
-                    eval_dict(dict.clone(), context.clone(), globals, new_info, constant)?;
+                    eval_dict(dict.clone(), &context, globals, new_info, constant)?;
                 start_val = new_out;
                 inner_returns = new_inner_returns;
             }
@@ -1529,8 +1461,7 @@ impl ast::Variable {
             }
 
             ast::ValueBody::Expression(expr) => {
-                let (evaled, returns) =
-                    expr.eval(context.clone(), globals, info.clone(), constant)?;
+                let (evaled, returns) = expr.eval(&context, globals, info.clone(), constant)?;
                 inner_returns.extend(returns);
                 start_val.extend(evaled.iter().cloned());
             }
@@ -1562,7 +1493,7 @@ impl ast::Variable {
             ast::ValueBody::Array(a) => {
                 let new_info = info.clone();
                 let (evaled, returns) =
-                    all_combinations(a.clone(), context.clone(), globals, new_info, constant)?;
+                    all_combinations(a.clone(), &context, globals, new_info, constant)?;
                 inner_returns.extend(returns);
                 start_val = evaled
                     .iter()
@@ -1604,7 +1535,7 @@ impl ast::Variable {
                 }
                 let new_info = info.clone();
                 let (evaled, returns) =
-                    all_combinations(all_expr, context.clone(), globals, new_info, constant)?;
+                    all_combinations(all_expr, &context, globals, new_info, constant)?;
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, ObjParam)> = Vec::new();
@@ -1614,7 +1545,18 @@ impl ast::Variable {
 
                         obj.push((
                             match &globals.stored_values[v] {
-                                Value::Number(n) => *n as u16,
+                                Value::Number(n) => {
+                                    let out = *n as u16;
+
+                                    if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use @object instead".to_string(),
+                                            info: info.clone(),
+                                        })
+                                    }
+
+                                    out
+                                },
                                 a => {
                                     return Err(RuntimeError::RuntimeError {
                                         message: format!(
@@ -1637,7 +1579,19 @@ impl ast::Variable {
 
                                 Value::Bool(b) => ObjParam::Bool(*b),
 
-                                //Value::Array(a) => {} TODO: Add this
+                                Value::Array(a) => ObjParam::GroupList({
+                                    let mut out = Vec::new();
+                                    for s in a {
+                                        out.push(match globals.stored_values[*s] {
+                                            Value::Group(g) => g,
+                                            _ => return Err(RuntimeError::RuntimeError {
+                                                message: "Arrays in object parameters can only contain groups".to_string(),
+                                                info: info.clone(),
+                                            })
+                                        })
+                                    }
+                                    out
+                                }),
                                 x => {
                                     return Err(RuntimeError::RuntimeError {
                                         message: format!(
@@ -1670,7 +1624,7 @@ impl ast::Variable {
                 }
                 let new_info = info.clone();
                 let (argument_possibilities, returns) =
-                    all_combinations(all_expr, context.clone(), globals, new_info, constant)?;
+                    all_combinations(all_expr, &context, globals, new_info, constant)?;
                 inner_returns.extend(returns);
                 for defaults in argument_possibilities {
                     let mut args: Vec<(String, Option<StoredValue>, ast::Tag, Option<TypeID>)> =
@@ -1825,7 +1779,7 @@ impl ast::Variable {
                             Value::Array(arr) => {
                                 let new_info = info.clone();
                                 let (evaled, returns) =
-                                    i.eval(prev_c, globals, new_info, constant)?;
+                                    i.eval(&prev_c, globals, new_info, constant)?;
                                 inner_returns.extend(returns);
                                 for index in evaled {
                                     match &globals.stored_values[index.0] {
@@ -1919,7 +1873,7 @@ impl ast::Variable {
                             Value::Macro(m) => {
                                 let (evaled, returns) = execute_macro(
                                     (m.clone(), args.clone()),
-                                    cont.clone(),
+                                    cont,
                                     globals,
                                     *parent,
                                     info.clone(),
@@ -1934,7 +1888,7 @@ impl ast::Variable {
                             Value::BuiltinFunction(name) => {
                                 let (evaled_args, returns) = all_combinations(
                                     args.iter().map(|x| x.value.clone()).collect(),
-                                    cont.clone(),
+                                    cont,
                                     globals,
                                     info.clone(),
                                     constant,

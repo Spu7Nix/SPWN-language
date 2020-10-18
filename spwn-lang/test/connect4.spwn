@@ -1,12 +1,12 @@
 
 
 board = [
-	[mut(1i ), mut(2i ), mut(3i ), mut(4i ), mut(5i ), mut(6i ), mut(7i )],
-	[mut(8i ), mut(9i ), mut(10i), mut(11i), mut(12i), mut(13i), mut(14i)],
-	[mut(15i), mut(16i), mut(17i), mut(18i), mut(19i), mut(20i), mut(21i)],
-	[mut(22i), mut(23i), mut(24i), mut(25i), mut(26i), mut(27i), mut(28i)],
-	[mut(29i), mut(30i), mut(31i), mut(32i), mut(33i), mut(34i), mut(35i)],
-	[mut(36i), mut(37i), mut(38i), mut(39i), mut(40i), mut(41i), mut(42i)],
+	[counter(1i ), counter(2i ), counter(3i ), counter(4i ), counter(5i ), counter(6i ), counter(7i )],
+	[counter(8i ), counter(9i ), counter(10i), counter(11i), counter(12i), counter(13i), counter(14i)],
+	[counter(15i), counter(16i), counter(17i), counter(18i), counter(19i), counter(20i), counter(21i)],
+	[counter(22i), counter(23i), counter(24i), counter(25i), counter(26i), counter(27i), counter(28i)],
+	[counter(29i), counter(30i), counter(31i), counter(32i), counter(33i), counter(34i), counter(35i)],
+	[counter(36i), counter(37i), counter(38i), counter(39i), counter(40i), counter(41i), counter(42i)],
 ]
 
 // when this item turns to 1, it means the process can move forward
@@ -19,7 +19,7 @@ wait_for_ready = () {
 		on(ready_sign.count(1), {
 			ready_sign.add(-1)
 			wait(0.05)
-			closure.stop()
+			closure.start_group.stop()
 			return
 		})
 	}
@@ -30,9 +30,9 @@ wait_for_ready = () {
 
 
 gfb_vars = {
-	x: mut(51i),
-	y: mut(52i),
-	result: mut(50i),
+	x: counter(51i),
+	y: counter(52i),
+	result: counter(50i),
 }
 
 move_x = (amount) {
@@ -98,9 +98,9 @@ write_to_board = () {
 }
 
 //player move
-allow_player_input = mut(1)
+allow_player_input = counter(1)
 
-selected_col = mut(3); //middle
+selected_col = counter(3); //middle
 $.print("selected col: ", selected_col.item)
 selector_arrow = 1g
 
@@ -118,7 +118,7 @@ on(touch(dual_side = true), {
 	})
 })
 
-player_turn = mut(100i)
+player_turn = counter(100i)
 player_turn.add(1)
 
 reset_selector_x = {
@@ -162,8 +162,8 @@ gfb_move_to_air = {
 	ready_sign.add(1)
 }
 
-longest_player_thread = mut(?i)
-longest_ai_thread = mut(?i)
+longest_player_thread = counter(?i)
+longest_ai_thread = counter(?i)
 
 reset_lpt = {
 	longest_player_thread.add(-longest_player_thread.to_const(1..4))
@@ -184,7 +184,7 @@ find_threads = {
 		closure = {
 			ret = {
 				//wait(0.05)
-				closure.stop()
+				closure.start_group.stop()
 				return
 			}
 			on(go_to_next_sign.count(1), {
@@ -200,9 +200,9 @@ find_threads = {
 		closure!
 	}
 
-	look_x = mut(1)
-	look_y = mut(0)
-	thread_type = mut(0)
+	look_x = counter(1)
+	look_y = counter(0)
+	thread_type = counter(0)
 	$.print("longest player thread:", longest_player_thread.item, "longest ai thread:", longest_ai_thread.item)
 
 	reset_thread_type = {
@@ -526,8 +526,8 @@ on(player_turn.item.count(-1), {
 	allow_player_input.add(1)
 
 	
-	/*highest_score = mut(0)
-	highest_index = mut(0)
+	/*highest_score = counter(0)
+	highest_index = counter(0)
 
 	reset_hindex = {
 		-> highest_index.add(-highest_index.to_const(1..7))

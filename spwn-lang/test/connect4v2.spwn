@@ -24,7 +24,7 @@ for y in 0..6 {
 	}
 }
 
-toggle_piece = (x, y, piece_type) {
+toggle_piece = (x: @number, y: @number, piece_type) {
 	if piece_type == 1 {
 		//player
 		player_pieces[5 - y][x].toggle_on()
@@ -112,7 +112,7 @@ wait_for_ready = () {
 		on(ready_sign.count(1), {
 			ready_sign.add(-1)
 			wait(0.05)
-			closure.stop()
+			closure.start_group.stop()
 			return
 		})
 	}
@@ -248,7 +248,7 @@ move_reader_back = {
 
 turn = counter(1)
 
-type @hello
+
 
 y_pos = counter(0)
 
@@ -296,8 +296,8 @@ on(collision(3b, 4b), {
 
 				-> (){
 					x_pos = selected_col.to_const(0..7)
-					y_pos = y_pos.to_const(0..6)
-					toggle_piece(x_pos, y_pos, 1)
+					ny_pos = y_pos.to_const(0..6)
+					toggle_piece(x_pos, ny_pos, 1)
 				}()
 
 				-> y_pos.add(-y_pos.to_const(1..7))
@@ -368,8 +368,8 @@ on(turn.item.count(-1), {
 
 	-> (){
 		x_pos = ai_selected.to_const(0..7)
-		y_pos = y_pos.to_const(0..6)
-		toggle_piece(x_pos, y_pos, -1)
+		ny_pos = y_pos.to_const(0..6)
+		toggle_piece(x_pos, ny_pos, -1)
 		ai_selected.add(-x_pos)
 	}()
 

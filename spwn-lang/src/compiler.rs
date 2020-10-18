@@ -274,7 +274,7 @@ pub fn compile_scope(
         match &statement.body {
             Expr(expr) => {
                 let mut new_contexts: Vec<Context> = Vec::new();
-                for context in contexts {
+                for context in &contexts {
                     let is_assign = !expr.operators.is_empty()
                         && expr.operators[0] == ast::Operator::Assign
                         && !expr.values[0].is_defined(&context, globals);
@@ -408,7 +408,7 @@ pub fn compile_scope(
             }*/
             Extract(val) => {
                 let mut all_values: Returns = Vec::new();
-                for context in contexts {
+                for context in &contexts {
                     let (evaled, inner_returns) = val.eval(context, globals, info.clone(), true)?;
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
@@ -464,7 +464,7 @@ pub fn compile_scope(
 
             If(if_stmt) => {
                 let mut all_values: Returns = Vec::new();
-                for context in contexts.clone() {
+                for context in &contexts {
                     let new_info = info.clone();
                     let (evaled, inner_returns) =
                         if_stmt.condition.eval(context, globals, new_info, true)?;
@@ -526,7 +526,7 @@ pub fn compile_scope(
 
             Impl(imp) => {
                 let mut new_contexts: Vec<Context> = Vec::new();
-                for context in contexts.clone() {
+                for context in &contexts {
                     let new_info = info.clone();
                     let (evaled, inner_returns) =
                         imp.symbol
@@ -537,7 +537,7 @@ pub fn compile_scope(
                             Value::TypeIndicator(s) => {
                                 let new_info = info.clone();
                                 let (evaled, inner_returns) =
-                                    eval_dict(imp.members.clone(), c, globals, new_info, true)?;
+                                    eval_dict(imp.members.clone(), &c, globals, new_info, true)?;
 
                                 //Returns inside impl values dont really make sense do they
                                 returns.extend(inner_returns);
@@ -619,14 +619,14 @@ pub fn compile_scope(
 
                             ..context_trigger(context.clone())
                         }
-                        .context_parameters(context.clone()),
+                        .context_parameters(context),
                     )
                 }
             }
 
             For(f) => {
                 let mut all_arrays: Returns = Vec::new();
-                for context in contexts {
+                for context in &contexts {
                     let (evaled, inner_returns) =
                         f.array.eval(context, globals, info.clone(), true)?;
                     returns.extend(inner_returns);
@@ -675,7 +675,7 @@ pub fn compile_scope(
             Return(return_val) => match return_val {
                 Some(val) => {
                     let mut all_values: Returns = Vec::new();
-                    for context in contexts.clone() {
+                    for context in &contexts {
                         let new_info = info.clone();
                         let (evaled, inner_returns) = val.eval(context, globals, new_info, true)?;
                         returns.extend(inner_returns);
@@ -687,15 +687,18 @@ pub fn compile_scope(
 
                 None => {
                     let mut all_values: Returns = Vec::new();
-                    for context in contexts.clone() {
-                        all_values.push((store_value(Value::Null, 1, globals, &context), context));
+                    for context in &contexts {
+                        all_values.push((
+                            store_value(Value::Null, 1, globals, context),
+                            context.clone(),
+                        ));
                     }
                     returns.extend(all_values);
                 }
             },
 
             Error(e) => {
-                for context in contexts.clone() {
+                for context in &contexts {
                     let new_info = info.clone();
                     let (evaled, _) = e.message.eval(context, globals, new_info, true)?;
                     for (msg, _) in evaled {
@@ -717,9 +720,9 @@ pub fn compile_scope(
                 });
             }
         }
-        if let Some(c) = stored_context {
+        if let Some(c) = &stored_context {
             //resetting the context if async
-            contexts = c;
+            contexts = (*c).clone();
         }
 
         /*println!(

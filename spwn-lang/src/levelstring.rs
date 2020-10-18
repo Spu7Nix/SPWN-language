@@ -28,7 +28,13 @@ impl fmt::Display for ObjParam {
                 ID::Specific(id) => write!(f, "{}", id),
                 _ => write!(f, "0"),
             },
-            ObjParam::Number(n) => write!(f, "{}", n),
+            ObjParam::Number(n) => {
+                if (n.round() - n).abs() < 0.001 {
+                    write!(f, "{}", *n as i32)
+                } else {
+                    write!(f, "{:.1$}", n, 3)
+                }
+            }
             ObjParam::Bool(b) => write!(f, "{}", if *b { "1" } else { "0" }),
             ObjParam::Text(t) => write!(f, "{}", t),
             ObjParam::GroupList(list) => {
@@ -58,8 +64,7 @@ pub struct GDObj {
 
 impl GDObj {
     pub fn context_parameters(&mut self, context: Context) -> GDObj {
-        self.params
-            .insert(57, ObjParam::GroupList(vec![context.start_group]));
+        self.params.insert(57, ObjParam::Group(context.start_group));
 
         (*self).clone()
     }
@@ -68,6 +73,7 @@ impl GDObj {
         match self.params.get(&57) {
             Some(group_string) => match group_string {
                 ObjParam::GroupList(l) => l.clone(),
+                ObjParam::Group(g) => vec![*g],
                 _ => unreachable!(),
             },
 
@@ -248,7 +254,7 @@ pub fn append_objects(
                             Some(a) => *a,
                             None => {
                                 let mut out = None;
-                                for i in 1..ID_MAX {
+                                for i in 1..10000 {
                                     if !closed_ids[class_index].contains(&i) {
                                         out = Some(i);
                                         closed_ids[class_index].insert(i);
@@ -272,6 +278,18 @@ pub fn append_objects(
             }
         }
     }
+    for class_index in 0..4 {
+        if closed_ids[class_index].len() > ID_MAX as usize {
+            return Err(format!(
+                "This level exeeds the {} limit! ({}/{})",
+                ["group", "color", "block ID", "item ID"][class_index],
+                closed_ids[class_index].len(),
+                ID_MAX
+            ));
+        }
+    }
+
+    //println!("group_map: {:?}", id_maps[0]);
 
     fn serialize_obj(mut trigger: GDObj) -> String {
         let mut obj_string = String::new();
@@ -279,6 +297,12 @@ pub fn append_objects(
             ObjectMode::Object => {
                 match trigger.params.get_mut(&57) {
                     Some(ObjParam::GroupList(l)) => (*l).push(SPWN_SIGNATURE_GROUP),
+                    Some(ObjParam::Group(g)) => {
+                        let group = *g;
+                        trigger
+                            .params
+                            .insert(57, ObjParam::GroupList(vec![group, SPWN_SIGNATURE_GROUP]));
+                    }
                     _ => {
                         trigger
                             .params
@@ -301,6 +325,12 @@ pub fn append_objects(
                     Some(ObjParam::GroupList(l)) => {
                         (*l).push(SPWN_SIGNATURE_GROUP);
                         //list
+                    }
+                    Some(ObjParam::Group(g)) => {
+                        let group = *g;
+                        trigger
+                            .params
+                            .insert(57, ObjParam::GroupList(vec![group, SPWN_SIGNATURE_GROUP]));
                     }
                     _ => {
                         trigger
@@ -387,9 +417,10 @@ pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
                         Some(ObjParam::Bool(b)) => *b,
                         _ => match obj.params.get(&57) {
                             None => false,
-                            Some(ObjParam::GroupList(l)) => {
-                                l.iter().any(|x| x.id != ID::Specific(0))
-                            }
+                            // Some(ObjParam::GroupList(l)) => {
+                            //     l.iter().any(|x| x.id != ID::Specific(0))
+                            // }
+                            Some(ObjParam::Group(g)) => g.id != ID::Specific(0),
                             _ => unreachable!(),
                         },
                     };
