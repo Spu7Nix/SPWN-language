@@ -1,11 +1,14 @@
-a = counter(100)
 
-if a == 100 {
-	-> 10g.move(10, 0, 0.5)
-	11g.move(10, 0, 0.5)
+
+fn = (a) {
+	if a == 2 {
+		return true
+		break
+	}
+	return false
 }
 
-
+$.print(fn(3))
 		
 
 

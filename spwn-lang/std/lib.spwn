@@ -13,7 +13,9 @@ import "block.spwn"
 
 import "counter.spwn"
 
-extract import "control_flow.spwn"
+ctrl_flow = import "control_flow.spwn";
+
+extract ctrl_flow
 
 impl @array {
     max: (self, minval = 0) {
@@ -34,6 +36,16 @@ impl @array {
         }
         return lowest
     },
+    contains: (self, el) {
+		let ret = false
+		for e in self {
+			if e == el {
+				ret = true
+				break
+			}
+		}
+		return ret
+	},
     push: (self, value) {
         $.append(self, value)
     }
@@ -59,8 +71,7 @@ return {
 
     ..import "events.spwn",
     
-    wait: wait,
-    supress_signal: supress_signal,
+    ..ctrl_flow,
 
     counter: @counter::new,
     call_with_delay: call_with_delay,

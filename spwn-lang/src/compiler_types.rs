@@ -206,8 +206,13 @@ pub struct Context {
     pub implementations: Implementations,
 
     pub func_id: FnIDPtr,
+
+    // info stores the info for the break statement if the context is "broken"
+    // broken doesn't mean something is wrong with it, it just means
+    // a break statement has been used :)
+    pub broken: Option<CompilerInfo>,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerInfo {
     pub depth: u8,
     pub path: Vec<String>,
@@ -236,6 +241,7 @@ impl Context {
             implementations: HashMap::new(),
             //self_val: None,
             func_id: 0,
+            broken: None,
         }
     }
 
@@ -1040,13 +1046,13 @@ pub fn execute_macro(
             let mut new_variables: HashMap<String, StoredValue> = HashMap::new();
 
             //parse each argument given into a local macro variable
+            //index of arg if no arg is specified
+            let mut def_index = if m.args[0].0 == "self" { 1 } else { 0 };
             for (i, arg) in args.iter().enumerate() {
-                let abs_index = if m.args[0].0 == "self" { i + 1 } else { i };
-
                 match &arg.symbol {
                     Some(name) => {
-                        let arg_def = m.args.iter().find(|e| e.0 == *name);
-                        if let Some(arg_def) = arg_def {
+                        let arg_def = m.args.iter().enumerate().find(|e| e.1 .0 == *name);
+                        if let Some((arg_i, arg_def)) = arg_def {
                             //type check!!
                             //maybe make type check function
                             match arg_def.3 {
@@ -1084,7 +1090,7 @@ pub fn execute_macro(
                         }
                     }
                     None => {
-                        if (abs_index) > m.args.len() - 1 {
+                        if (def_index) > m.args.len() - 1 {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Too many arguments!".to_string(),
                                 info: info.clone(),
@@ -1092,7 +1098,7 @@ pub fn execute_macro(
                         }
 
                         //type check!!
-                        match m.args[abs_index].3 {
+                        match m.args[def_index].3 {
                             Some(t) => {
                                 let val = globals.stored_values[arg_values[i]].clone();
                                 let type_of_val_index = val
@@ -1116,9 +1122,10 @@ pub fn execute_macro(
                         };
 
                         new_variables.insert(
-                            m.args[abs_index].0.clone(),
+                            m.args[def_index].0.clone(),
                             clone_value(arg_values[i], 1, globals, &context, true),
                         );
+                        def_index += 1;
                     }
                 }
             }
@@ -1178,7 +1185,12 @@ Should be used like this: value.macro(arguments)".to_string(), info
     }
     let mut new_info = info.clone();
     new_info.current_file = m.def_file;
-    let compiled = compile_scope(&m.body, new_contexts, globals, new_info)?;
+    let mut compiled = compile_scope(&m.body, new_contexts, globals, new_info)?;
+
+    // stop break chain
+    for c in &mut compiled.0 {
+        (*c).broken = None;
+    }
 
     let returns = if compiled.1.is_empty() {
         compiled.0.iter().map(|x| (1, x.clone())).collect()
@@ -1917,7 +1929,7 @@ impl ast::Variable {
                             a => {
                                 return Err(RuntimeError::RuntimeError {
                                     message: format!(
-                                        "Cannot call this type with arguments: {}",
+                                        "Cannot call ( ... ) on '{}'",
                                         a.to_str(globals)
                                     ),
                                     info: info.clone(),
@@ -2219,8 +2231,18 @@ impl ast::CompoundStatement {
 
         new_context.start_group = start_group;
         let new_info = info.clone();
-        let (_, inner_returns) =
+        let (contexts, inner_returns) =
             compile_scope(&self.statements, vec![new_context], globals, new_info)?;
+
+        for c in contexts {
+            if let Some(i) = c.broken {
+                return Err(RuntimeError::RuntimeError {
+                    message: "break statement is never used because it's inside a function"
+                        .to_string(),
+                    info: i,
+                });
+            }
+        }
 
         Ok((Function { start_group }, inner_returns))
     }

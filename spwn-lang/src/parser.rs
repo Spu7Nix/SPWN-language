@@ -224,6 +224,12 @@ pub enum Token {
     #[token("else")]
     Else,
 
+    #[token("break")]
+    Break,
+
+    #[token("continue")]
+    Continue,
+
     #[token("obj")]
     Object,
 
@@ -279,7 +285,7 @@ impl Token {
             | Period | DotDot | At | Hash => "terminator",
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal => "keyword",
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue => "keyword",
             Comment => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -634,6 +640,8 @@ pub fn parse_statement(
                 }
             }
         }
+
+        Some(Token::Break) => ast::StatementBody::Break,
 
         Some(Token::If) => {
             //parse if statement

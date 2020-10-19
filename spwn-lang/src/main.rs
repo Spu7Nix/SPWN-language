@@ -105,8 +105,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         String::new()
                     };
-
-                    if opti_enambled {
+                    let has_stuff = compiled.func_ids.iter().any(|x| !x.obj_list.is_empty());
+                    if opti_enambled && has_stuff {
                         println!("{}", Colour::Cyan.bold().paint("Optimizing triggers..."));
 
                         compiled.func_ids = optimize(compiled.func_ids, compiled.closed_groups);

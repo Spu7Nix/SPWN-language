@@ -220,7 +220,16 @@ pub fn compile_spwn(
         }
     }
 
-    compile_scope(&statements, vec![start_context], &mut globals, start_info)?;
+    let (contexts, _) = compile_scope(&statements, vec![start_context], &mut globals, start_info)?;
+
+    for c in contexts {
+        if let Some(i) = c.broken {
+            return Err(RuntimeError::RuntimeError {
+                message: "break statement is never used".to_string(),
+                info: i,
+            });
+        }
+    }
 
     println!(
         "\n{}\n{}\n",
@@ -244,6 +253,20 @@ pub fn compile_scope(
 
     let mut returns: Returns = Vec::new();
 
+    //take out broken contexts
+    let mut new_contexts = Vec::new();
+    let mut broken_contexts = Vec::new();
+    for c in contexts {
+        if c.broken == None {
+            new_contexts.push(c)
+        } else {
+            broken_contexts.push(c)
+        }
+    }
+    if new_contexts.is_empty() {
+        return Ok((broken_contexts, returns));
+    }
+    contexts = new_contexts;
     globals.stored_values.increment_lifetimes();
 
     while let Some(statement) = statements_iter.next() {
@@ -270,8 +293,15 @@ pub fn compile_scope(
         };
 
         info.pos = statement.pos;
-        use crate::fmt::SpwnFmt;
+        //use crate::fmt::SpwnFmt;
         match &statement.body {
+            Break => {
+                //set all contexts to broken
+                for c in &mut contexts {
+                    (*c).broken = Some(info.clone());
+                }
+                break;
+            }
             Expr(expr) => {
                 let mut new_contexts: Vec<Context> = Vec::new();
                 for context in &contexts {
@@ -352,60 +382,6 @@ pub fn compile_scope(
                 contexts = new_contexts;
             }
 
-            /*Definition(def) => {
-                let mut all_values: Returns = Vec::new();
-
-                for context in contexts {
-                    if let ast::ValueBody::CmpStmt(f) = &def.value.values[0].value.body {
-                        if def.value.values.len() == 1 {
-                            //create the function context
-                            let mut new_context = context.clone();
-                            new_context.spawn_triggered = true;
-                            //pick a start group
-                            let start_group = Group {
-                                id: next_free(
-                                    &mut globals.closed_groups,
-                                    ast::IDClass::Group,
-                                    info.clone(),
-                                )?,
-                            };
-                            let stored = store_const_value(
-                                Value::Func(Function { start_group }),
-                                1,
-                                globals,
-                                &context,
-                            );
-                            new_context.variables.insert(def.symbol.clone(), stored);
-                            all_values.push((stored, context));
-                            new_context.start_group = start_group;
-                            let new_info = info.next(&def.symbol, globals, true);
-                            let (_, inner_returns) =
-                                compile_scope(&f.statements, vec![new_context], globals, new_info)?;
-                            returns.extend(inner_returns);
-                        } else {
-                            let (evaled, inner_returns) =
-                                def.value.eval(context, globals, info.clone())?;
-                            returns.extend(inner_returns);
-                            all_values.extend(evaled);
-                        }
-                    } else {
-                        let (evaled, inner_returns) =
-                            def.value.eval(context, globals, info.clone())?;
-                        returns.extend(inner_returns);
-                        all_values.extend(evaled);
-                    }
-                    //copied because im lazy
-                }
-                contexts = Vec::new();
-                for (val, mut context) in all_values {
-                    /*if !def.mutable {
-                        (*globals.stored_values.map.get_mut(&val).unwrap()).2 = false;
-                    }*/
-                    context.variables.insert(String::from(&def.symbol), val);
-
-                    contexts.push(context);
-                }
-            }*/
             Extract(val) => {
                 let mut all_values: Returns = Vec::new();
                 for context in &contexts {
@@ -640,6 +616,7 @@ pub fn compile_scope(
                             //let scope_vars = context.variables.clone();
 
                             let mut new_contexts = vec![context.clone()];
+                            let mut out_contexts = Vec::new();
 
                             for element in arr {
                                 //println!("{}", new_contexts.len());
@@ -653,10 +630,20 @@ pub fn compile_scope(
                                 let (end_contexts, inner_returns) =
                                     compile_scope(&f.body, new_contexts, globals, new_info)?;
 
+                                new_contexts = Vec::new();
+                                for mut c in end_contexts {
+                                    if c.broken == None {
+                                        new_contexts.push(c)
+                                    } else {
+                                        c.broken = None;
+                                        out_contexts.push(c)
+                                    }
+                                }
+
                                 returns.extend(inner_returns);
-                                new_contexts = end_contexts;
                             }
-                            contexts.extend(new_contexts.iter().map(|c| Context {
+                            out_contexts.extend(new_contexts);
+                            contexts.extend(out_contexts.iter().map(|c| Context {
                                 variables: context.variables.clone(),
                                 implementations: context.implementations.clone(),
                                 ..c.clone()
@@ -720,8 +707,32 @@ pub fn compile_scope(
                 });
             }
         }
+
+        let mut new_contexts = Vec::new();
+
+        for c in contexts.clone() {
+            if c.broken == None {
+                new_contexts.push(c)
+            } else {
+                broken_contexts.push(c)
+            }
+        }
+        if new_contexts.is_empty() {
+            break;
+        }
+        contexts = new_contexts;
         if let Some(c) = &stored_context {
             //resetting the context if async
+            for c in contexts {
+                if let Some(i) = c.broken {
+                    return Err(RuntimeError::RuntimeError {
+                        message:
+                            "break statement is never used because it's inside an arrow statement"
+                                .to_string(),
+                        info: i,
+                    });
+                }
+            }
             contexts = (*c).clone();
         }
 
@@ -741,6 +752,9 @@ pub fn compile_scope(
     globals.stored_values.decrement_lifetimes();
     //collect garbage
     globals.stored_values.clean_up();
+
+    // put broken contexts back
+    contexts.extend(broken_contexts);
 
     //(*globals).highest_x = context.x;
     Ok((contexts, returns))

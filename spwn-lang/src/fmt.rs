@@ -229,6 +229,7 @@ impl SpwnFmt for StatementBody {
             StatementBody::For(x) => format!("{}", x.fmt(ind)),
             StatementBody::Error(x) => format!("{}", x.fmt(ind)),
             StatementBody::Extract(x) => format!("extract {}", x.fmt(ind)),
+            StatementBody::Break => String::from("break"),
         };
         /*let last = main.chars().last().unwrap();
         if last == '}' || last == '!' {

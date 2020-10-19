@@ -35,6 +35,7 @@ pub enum StatementBody {
     For(For),
     Error(Error),
     Extract(Expression),
+    Break,
     //EOI,
 }
 #[derive(Clone, PartialEq, Debug)]

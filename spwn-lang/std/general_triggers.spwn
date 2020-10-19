@@ -60,35 +60,6 @@ return {
         }
     },
 
-    loop: #[desc("Implementation of a spawn loop")] 
-    (
-        #[desc("Start value for the iterator")] start_val: @number,
-        #[desc("End value for the iterator")] end_val: @number, 
-        #[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument")] code: @macro, 
-        #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number = 0.05, 
-        #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true, 
-        #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1,
-        #[desc("Incrementation of the iterator")] increment: @number = 1
-    ) {
-        i = @counter::new(start_val)
-
-        func = {
-            code(i)
-            i.add(increment)
-            i.item.if_is(SMALLER_THAN, end_val, {
-                call_with_delay(delay, func)
-            })
-
-            i.item.if_is(LARGER_THAN, end_val - 1, {
-                if reset {
-                    i.reset(reset_speed)
-                }
-                return
-            })
-        }
-
-        func!
-        
-    }
+    
         
 }
