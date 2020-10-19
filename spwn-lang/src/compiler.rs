@@ -593,9 +593,9 @@ pub fn compile_scope(
                         GDObj {
                             params,
 
-                            ..context_trigger(context.clone())
+                            ..context_trigger(&context)
                         }
-                        .context_parameters(context),
+                        .context_parameters(&context),
                     )
                 }
             }

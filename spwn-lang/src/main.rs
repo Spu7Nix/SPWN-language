@@ -113,7 +113,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     //println!("func ids: {:?}", compiled.func_ids);
-                    let objects = levelstring::apply_fn_ids(compiled.func_ids);
+                    let mut objects = levelstring::apply_fn_ids(compiled.func_ids);
+                    objects.extend(compiled.objects);
 
                     println!("{} objects added", objects.len());
 

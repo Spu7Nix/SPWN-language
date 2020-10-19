@@ -63,7 +63,7 @@ pub struct GDObj {
 }
 
 impl GDObj {
-    pub fn context_parameters(&mut self, context: Context) -> GDObj {
+    pub fn context_parameters(&mut self, context: &Context) -> GDObj {
         self.params.insert(57, ObjParam::Group(context.start_group));
 
         (*self).clone()

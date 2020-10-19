@@ -101,7 +101,7 @@ impl Item {
     }
 }
 
-pub fn context_trigger(context: Context) -> GDObj {
+pub fn context_trigger(context: &Context) -> GDObj {
     let mut params = HashMap::new();
     params.insert(57, ObjParam::Group(context.start_group));
 
@@ -313,28 +313,32 @@ pub fn built_in_function(
 
             match &globals.stored_values[arguments[0]] {
                 Value::Obj(obj, mode) => {
-                    let c_t = context_trigger(context.clone());
+                    let c_t = context_trigger(context);
                     let mut obj_map = HashMap::<u16, ObjParam>::new();
 
                     for p in obj {
                         obj_map.insert(p.0, p.1.clone());
                     }
-
-                    (*globals).func_ids[context.func_id]
-                        .obj_list
-                        .push(match mode {
-                            ObjectMode::Object => GDObj {
+                    match mode {
+                        ObjectMode::Object => {
+                            let obj = GDObj {
                                 params: obj_map.clone(),
                                 func_id: context.func_id,
                                 mode: ObjectMode::Object,
-                            },
-                            ObjectMode::Trigger => GDObj {
+                            }
+                            .context_parameters(context);
+                            (*globals).objects.push(obj)
+                        }
+                        ObjectMode::Trigger => {
+                            let obj = GDObj {
                                 params: obj_map.clone(),
                                 mode: ObjectMode::Trigger,
                                 ..c_t
                             }
-                            .context_parameters(context.clone()),
-                        });
+                            .context_parameters(context);
+                            (*globals).func_ids[context.func_id].obj_list.push(obj)
+                        }
+                    };
                 }
 
                 a => {

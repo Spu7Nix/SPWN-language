@@ -650,6 +650,7 @@ pub struct Globals {
     pub type_id_count: u16,
 
     pub func_ids: Vec<FunctionID>,
+    pub objects: Vec<GDObj>,
 }
 
 impl Globals {
@@ -714,6 +715,7 @@ impl Globals {
                 width: None,
                 obj_list: Vec::new(),
             }],
+            objects: Vec::new(),
         };
 
         globals.type_ids.insert(String::from("group"), 0);
@@ -1228,9 +1230,9 @@ Should be used like this: value.macro(arguments)".to_string(), info
                         let obj = GDObj {
                             params,
 
-                            ..context_trigger(cont.clone())
+                            ..context_trigger(&cont)
                         }
-                        .context_parameters(cont.clone());
+                        .context_parameters(&cont);
                         (*globals).func_ids[context.func_id].obj_list.push(obj);
                     }
 
