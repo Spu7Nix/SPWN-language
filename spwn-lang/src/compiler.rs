@@ -204,7 +204,7 @@ pub fn compile_spwn(
         if standard_lib.len() != 1 {
             return Err(RuntimeError::RuntimeError {
                 message: "The standard library can not split the context".to_string(),
-                info: start_info.clone(),
+                info: start_info,
             });
         }
 
@@ -215,7 +215,7 @@ pub fn compile_spwn(
         } else {
             return Err(RuntimeError::RuntimeError {
                 message: "The standard library must return a dictionary".to_string(),
-                info: start_info.clone(),
+                info: start_info,
             });
         }
     }
@@ -244,7 +244,7 @@ pub fn compile_spwn(
 }
 
 pub fn compile_scope(
-    statements: &Vec<ast::Statement>,
+    statements: &[ast::Statement],
     mut contexts: Vec<Context>,
     globals: &mut Globals,
     mut info: CompilerInfo,

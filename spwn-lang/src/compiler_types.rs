@@ -1057,29 +1057,24 @@ pub fn execute_macro(
                         if let Some((arg_i, arg_def)) = arg_def {
                             //type check!!
                             //maybe make type check function
-                            match arg_def.3 {
-                                Some(t) => {
-                                    let val = globals.stored_values[arg_values[i]].clone();
-                                    let type_of_val_index = val
-                                        .member(TYPE_MEMBER_NAME.to_string(), &context, globals)
-                                        .unwrap();
+                            if let Some(t) = arg_def.3 {
+                                let val = globals.stored_values[arg_values[i]].clone();
+                                let type_of_val_index = val
+                                    .member(TYPE_MEMBER_NAME.to_string(), &context, globals)
+                                    .unwrap();
 
-                                    let type_of_val = match globals.stored_values[type_of_val_index]
-                                    {
-                                        Value::TypeIndicator(t) => t,
-                                        _ => unreachable!(),
-                                    };
+                                let type_of_val = match globals.stored_values[type_of_val_index] {
+                                    Value::TypeIndicator(t) => t,
+                                    _ => unreachable!(),
+                                };
 
-                                    if type_of_val != t {
-                                        return Err(RuntimeError::TypeError {
-                                            expected: Value::TypeIndicator(t).to_str(globals),
-                                            found: Value::TypeIndicator(type_of_val)
-                                                .to_str(globals),
-                                            info,
-                                        });
-                                    }
+                                if type_of_val != t {
+                                    return Err(RuntimeError::TypeError {
+                                        expected: Value::TypeIndicator(t).to_str(globals),
+                                        found: Value::TypeIndicator(type_of_val).to_str(globals),
+                                        info,
+                                    });
                                 }
-                                None => (),
                             };
 
                             new_variables.insert(name.clone(), arg_values[i]);
@@ -1196,60 +1191,58 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
     let returns = if compiled.1.is_empty() {
         compiled.0.iter().map(|x| (1, x.clone())).collect()
-    } else {
-        if compiled.1.len() > 1 {
-            let mut return_vals = Vec::<(Value, u8, Vec<Context>)>::new();
-            for (val, c) in compiled.1 {
-                let mut found = false;
-                for val2 in &mut return_vals {
-                    if globals.stored_values[val] == val2.0 {
-                        (*val2).1 += 1;
-                        (*val2).2.push(c.clone());
-                        found = true;
-                        break;
-                    }
-                }
-                if !found {
-                    return_vals.push((globals.stored_values[val].clone(), 1, vec![c]));
+    } else if compiled.1.len() > 1 {
+        let mut return_vals = Vec::<(Value, u8, Vec<Context>)>::new();
+        for (val, c) in compiled.1 {
+            let mut found = false;
+            for val2 in &mut return_vals {
+                if globals.stored_values[val] == val2.0 {
+                    (*val2).1 += 1;
+                    (*val2).2.push(c.clone());
+                    found = true;
+                    break;
                 }
             }
-
-            let mut rets = Returns::new();
-
-            for (val, count, c) in return_vals {
-                if count > 1 {
-                    let mut new_context = context.clone();
-                    //new_context.spawn_triggered = true;
-                    //pick a start group
-                    let start_group = Group::next_free(&mut globals.closed_groups);
-
-                    for cont in c {
-                        let mut params = HashMap::new();
-                        params.insert(1, ObjParam::Number(1268.0));
-                        params.insert(51, ObjParam::Group(start_group));
-                        let obj = GDObj {
-                            params,
-
-                            ..context_trigger(&cont)
-                        }
-                        .context_parameters(&cont);
-                        (*globals).func_ids[context.func_id].obj_list.push(obj);
-                    }
-
-                    new_context.start_group = start_group;
-
-                    rets.push((store_value(val, 1, globals, &context), new_context))
-                } else {
-                    rets.push((store_value(val, 1, globals, &context), c[0].clone()))
-                }
-                //compact the returns down to one function with a return
-
-                //create the function context
+            if !found {
+                return_vals.push((globals.stored_values[val].clone(), 1, vec![c]));
             }
-            rets
-        } else {
-            compiled.1
         }
+
+        let mut rets = Returns::new();
+
+        for (val, count, c) in return_vals {
+            if count > 1 {
+                let mut new_context = context.clone();
+                //new_context.spawn_triggered = true;
+                //pick a start group
+                let start_group = Group::next_free(&mut globals.closed_groups);
+
+                for cont in c {
+                    let mut params = HashMap::new();
+                    params.insert(1, ObjParam::Number(1268.0));
+                    params.insert(51, ObjParam::Group(start_group));
+                    let obj = GDObj {
+                        params,
+
+                        ..context_trigger(&cont)
+                    }
+                    .context_parameters(&cont);
+                    (*globals).func_ids[context.func_id].obj_list.push(obj);
+                }
+
+                new_context.start_group = start_group;
+
+                rets.push((store_value(val, 1, globals, &context), new_context))
+            } else {
+                rets.push((store_value(val, 1, globals, &context), c[0].clone()))
+            }
+            //compact the returns down to one function with a return
+
+            //create the function context
+        }
+        rets
+    } else {
+        compiled.1
     };
 
     Ok((

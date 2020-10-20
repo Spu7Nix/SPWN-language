@@ -40,9 +40,8 @@ impl fmt::Display for ObjParam {
             ObjParam::GroupList(list) => {
                 let mut out = String::new();
                 for g in list {
-                    match g.id {
-                        ID::Specific(id) => out += &(id.to_string() + "."),
-                        _ => (),
+                    if let ID::Specific(id) = g.id {
+                        out += &(id.to_string() + ".")
                     };
                 }
                 out.pop();
@@ -68,69 +67,31 @@ impl GDObj {
 
         (*self).clone()
     }
-
-    pub fn get_groups(&self) -> Vec<Group> {
-        match self.params.get(&57) {
-            Some(group_string) => match group_string {
-                ObjParam::GroupList(l) => l.clone(),
-                ObjParam::Group(g) => vec![*g],
-                _ => unreachable!(),
-            },
-
-            None => Vec::new(),
-        }
-    }
-
-    pub fn obj_id(&self) -> u16 {
-        match self.params.get(&1) {
-            Some(num) => match num {
-                ObjParam::Number(n) => *n as u16,
-                _ => unreachable!(),
-            },
-            None => 0,
-        }
-    }
-
-    pub fn get_pos(&self) -> (f64, f64) {
-        (
-            match self.params.get(&2) {
-                Some(ObjParam::Number(n)) => *n,
-                _ => 0.0,
-            },
-            match self.params.get(&3) {
-                Some(ObjParam::Number(n)) => *n,
-                _ => 0.0,
-            },
-        )
-    }
 }
 
-pub fn get_used_ids(ls: &String) -> [HashSet<u16>; 4] {
+pub fn get_used_ids(ls: &str) -> [HashSet<u16>; 4] {
     let mut out = [
         HashSet::<u16>::new(),
         HashSet::<u16>::new(),
         HashSet::<u16>::new(),
         HashSet::<u16>::new(),
     ];
-    let objects = ls.split(";");
+    let objects = ls.split(';');
     for obj in objects {
-        let props: Vec<&str> = obj.split(",").collect();
+        let props: Vec<&str> = obj.split(',').collect();
         for i in (0..props.len() - 1).step_by(2) {
             let key = props[i];
             let value = props[i + 1];
 
-            match key {
-                "57" => {
-                    //GROUPS
-                    let groups = value.split(".");
-                    for g in groups {
-                        let group = g.parse().unwrap();
-                        if !out[0].contains(&group) {
-                            out[0].insert(group);
-                        }
+            if key == "57" {
+                //GROUPS
+                let groups = value.split('.');
+                for g in groups {
+                    let group = g.parse().unwrap();
+                    if !out[0].contains(&group) {
+                        out[0].insert(group);
                     }
                 }
-                _ => {}
             }
         }
     }
@@ -152,13 +113,13 @@ pub fn remove_spwn_objects(file_content: &mut String) {
     };
     (*file_content) = file_content
         //remove previous spwn objects
-        .split(";")
+        .split(';')
         .map(|obj| {
-            let key_val: Vec<&str> = obj.split(",").collect();
+            let key_val: Vec<&str> = obj.split(',').collect();
             let mut ret = obj;
             for i in (0..key_val.len()).step_by(2) {
                 if key_val[i] == "57" {
-                    let mut groups = key_val[i + 1].split(".");
+                    let mut groups = key_val[i + 1].split('.');
                     if groups.any(|x| x == spwn_group) {
                         ret = "";
                     }
@@ -173,13 +134,13 @@ pub fn remove_spwn_objects(file_content: &mut String) {
 //returns the string to be appended to the old string
 pub fn append_objects(
     mut objects: Vec<GDObj>,
-    old_ls: &String,
+    old_ls: &str,
 ) -> Result<(String, [usize; 4]), String> {
     let mut closed_ids = get_used_ids(&old_ls);
 
     //collect all specific ids mentioned into closed_[id] lists
     for obj in &objects {
-        for (_, prop) in &obj.params {
+        for prop in obj.params.values() {
             let class_index;
             let id;
             match prop {

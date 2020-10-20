@@ -1,5 +1,5 @@
 //#![feature(arbitrary_enum_discriminant)]
-#![feature(move_ref_pattern)]
+
 mod ast;
 mod builtin;
 mod compiler;

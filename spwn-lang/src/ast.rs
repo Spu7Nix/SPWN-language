@@ -154,7 +154,7 @@ impl Tag {
                 return Some(args.clone());
             }
         }
-        return None;
+        None
     }
 
     pub fn get_desc(&self) -> Option<String> {
@@ -165,7 +165,7 @@ impl Tag {
                 } else {
                     match &args[0].value.values[0].value.body {
                         ValueBody::Str(s) => Some(s.clone()),
-                        a => Some(format!("{}", a.fmt(0))),
+                        a => Some(a.fmt(0)),
                     }
                 }
             }
@@ -262,19 +262,19 @@ pub struct Variable {
     pub comment: Comment,
 }
 
-impl Variable {
-    pub fn to_expression(&self) -> Expression {
-        if let ValueBody::Expression(e) = &self.value.body {
-            if self.path.is_empty() {
-                return e.to_owned();
-            }
-        }
-        Expression {
-            values: vec![self.clone()],
-            operators: Vec::new(),
-        }
-    }
-}
+// impl Variable {
+//     pub fn to_expression(&self) -> Expression {
+//         if let ValueBody::Expression(e) = &self.value.body {
+//             if self.path.is_empty() {
+//                 return e.to_owned();
+//             }
+//         }
+//         Expression {
+//             values: vec![self.clone()],
+//             operators: Vec::new(),
+//         }
+//     }
+// }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Expression {
@@ -320,7 +320,7 @@ pub struct ID {
 }
 
 pub fn str_content(inp: String) -> String {
-    inp.clone().replace("\"", "")
+    inp.replace("\"", "")
     /*.replace("'", "")
     .replace("\r", "")
     .replace("\n", "")*/

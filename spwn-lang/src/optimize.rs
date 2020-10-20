@@ -246,22 +246,7 @@ fn get_targets<'a>(
             if optimize_from(network, objects, trigger_ptr, closed_group) {
                 out.insert(full_trigger_ptr);
             }
-        }
-        /* else if trigger.role == TriggerRole::Spawn && trigger.optimized {
-            // if its already optimized, redo
-            match get_targets(
-                network,
-                objects,
-                trigger_ptr,
-                delay + added_delay,
-                true,
-                closed_group,
-            ) {
-                Some(children) => out.extend(children),
-                None => out.push(full_trigger_ptr),
-            }
-        }*/
-        else {
+        } else {
             match trigger.role {
                 TriggerRole::Output => {
                     (*network.get_mut(&trigger_ptr.0).unwrap())[trigger_ptr.1].deleted = false;
@@ -487,7 +472,7 @@ fn rebuild(network: &TriggerNetwork, orig_structure: &Vec<FunctionID>) -> Vec<Fu
         (*el).obj_list.clear();
     }
 
-    for (_, list) in network {
+    for list in network.values() {
         for trigger in list {
             //assert!(trigger.optimized);
             if trigger.deleted {

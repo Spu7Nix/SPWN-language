@@ -420,7 +420,7 @@ impl<'a> Tokens<'a> {
     }
 
     fn position(&self) -> ((usize, usize), (usize, usize)) {
-        if self.stack.len() - self.index <= 0 {
+        if self.stack.len() - self.index == 0 {
             return ((1, 0), (1, 0));
         }
         let file_pos1 = self.stack[self.stack.len() - self.index - 1].2.start;
@@ -538,7 +538,7 @@ pub fn parse_spwn(
                     expected: STATEMENT_SEPARATOR_DESC.to_string(),
                     found: format!("{}: \"{}\"", a.typ(), tokens.slice()),
                     pos: tokens.position(),
-                    file: notes.file.clone(),
+                    file: notes.file,
                 })
             }
             None => break,
@@ -779,10 +779,10 @@ pub fn parse_statement(
             let mut body = parse_cmp_stmt(tokens, notes)?;
 
             //fix confusing gd behavior
-            if body.iter().all(|x| match x.body {
-                ast::StatementBody::Call(_) => true,
-                _ => false,
-            }) {
+            if body
+                .iter()
+                .all(|x| matches!(x.body, ast::StatementBody::Call(_)))
+            {
                 //maybe not the fastest way, but the syntax tree is just too large to just paste in
                 let new_statement = parse_spwn(
                     String::from(
@@ -955,7 +955,7 @@ fn check_for_comment(tokens: &mut Tokens) -> Option<String> {
                 tokens.slice()
             }
             Some(Token::StatementSeparator) => {
-                if !result.ends_with("\n") {
+                if !result.ends_with('\n') {
                     String::from("\r\n")
                 } else {
                     String::new()
@@ -1012,7 +1012,7 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
 
 fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     if expr.operators.len() <= 1 {
-        return expr;
+        expr
     } else {
         let mut lowest = 10;
 
@@ -1059,7 +1059,7 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
 
         new_expr.values.push(expr.to_variable());
 
-        return new_expr;
+        new_expr
     }
 }
 
