@@ -580,7 +580,7 @@ impl @counter {
 
     to_const: #[desc("Converts the counter into a normal number (very context-splitting, be careful)")] (
         self, 
-        #[desc("Array of possible output values")] range: @array
+        #[desc("Array or range of possible output values")] range
     ) {
         for val in range {
             -> self.item.if_is(EQUAL_TO, val, {

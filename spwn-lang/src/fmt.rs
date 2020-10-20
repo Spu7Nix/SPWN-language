@@ -25,12 +25,12 @@ fn tabs(mut num: Indent) -> String {
 pub fn format(input: Vec<Statement>) -> String {
     let mut out = String::new();
     for s in input {
-        out += &format!("{}", s.fmt(0));
+        out += &s.fmt(0).to_string();
     }
     out
 }
 
-fn element_list(elements: &Vec<impl SpwnFmt>, open: char, closing: char, ind: Indent) -> String {
+fn element_list(elements: &[impl SpwnFmt], open: char, closing: char, ind: Indent) -> String {
     if elements.is_empty() {
         return format!("{}{}", open, closing);
     }
@@ -40,7 +40,7 @@ fn element_list(elements: &Vec<impl SpwnFmt>, open: char, closing: char, ind: In
 
     let last = elements.len() - 1;
 
-    for (i, el) in elements.iter().enumerate() {
+    for (_i, el) in elements.iter().enumerate() {
         let text = el.fmt(0);
 
         sum += text.lines().next().unwrap().len();
@@ -53,7 +53,7 @@ fn element_list(elements: &Vec<impl SpwnFmt>, open: char, closing: char, ind: In
     } else {
         elem_text.iter().enumerate().any(|(i, x)| {
             if i != last {
-                x.len() > 50 || x.contains("\n")
+                x.len() > 50 || x.contains('\n')
             } else {
                 sum > 100
             }
@@ -107,7 +107,7 @@ impl SpwnFmt for DictDef {
     }
 }
 
-fn trim_start_tabs<'a>(string: &'a str) -> (&'a str, Indent) {
+fn trim_start_tabs(string: &str) -> (&str, Indent) {
     //https://doc.rust-lang.org/src/core/str/mod.rs.html#4082-4090
     let mut ind = 0;
     for (i, c) in string.chars().enumerate() {
@@ -117,10 +117,10 @@ fn trim_start_tabs<'a>(string: &'a str) -> (&'a str, Indent) {
             _ => return (unsafe { string.get_unchecked(i..string.len()) }, ind),
         }
     }
-    return ("", ind);
+    ("", ind)
 }
 
-fn indent_comment(comment: &String, ind: Indent) -> String {
+fn indent_comment(comment: &str, ind: Indent) -> String {
     let mut in_comment = false;
     let mut current_off = 0;
     let mut out = String::new();
@@ -190,7 +190,7 @@ impl SpwnFmt for Statement {
             out += "\n";
             out += &indent_comment(comment, ind);
             //
-            if !comment.ends_with("\n") {
+            if !comment.ends_with('\n') {
                 out += "\n";
             }
             out += &tabs(ind);
@@ -201,7 +201,7 @@ impl SpwnFmt for Statement {
             format!("{}\n", self.body.fmt(ind))
         };
         if let Some(comment) = &self.comment.1 {
-            if !comment.starts_with("\n") {
+            if !comment.starts_with('\n') {
                 out += "\n";
             }
 
@@ -215,29 +215,22 @@ impl SpwnFmt for Statement {
 
 impl SpwnFmt for StatementBody {
     fn fmt(&self, ind: Indent) -> String {
-        let main = match self {
+        match self {
             //StatementBody::Definition(def) => format!("{}", def.fmt(ind)),
-            StatementBody::Call(call) => format!("{}", call.fmt(ind)),
-            StatementBody::Expr(x) => format!("{}", x.fmt(ind)),
+            StatementBody::Call(call) => call.fmt(ind),
+            StatementBody::Expr(x) => x.fmt(ind),
             StatementBody::TypeDef(x) => format!("type {}", x),
             StatementBody::Return(x) => match x {
                 Some(expr) => format!("return {}", expr.fmt(ind)),
-                None => format!("return"),
+                None => "return".to_string(),
             },
-            StatementBody::Impl(x) => format!("{}", x.fmt(ind)),
-            StatementBody::If(x) => format!("{}", x.fmt(ind)),
-            StatementBody::For(x) => format!("{}", x.fmt(ind)),
-            StatementBody::Error(x) => format!("{}", x.fmt(ind)),
+            StatementBody::Impl(x) => x.fmt(ind),
+            StatementBody::If(x) => x.fmt(ind),
+            StatementBody::For(x) => x.fmt(ind),
+            StatementBody::Error(x) => x.fmt(ind),
             StatementBody::Extract(x) => format!("extract {}", x.fmt(ind)),
             StatementBody::Break => String::from("break"),
-        };
-        /*let last = main.chars().last().unwrap();
-        if last == '}' || last == '!' {
-            main
-        } else {
-            main + ";"
-        }*/
-        main
+        }
     }
 }
 
@@ -252,12 +245,12 @@ impl SpwnFmt for ValueBody {
     fn fmt(&self, ind: Indent) -> String {
         use ValueBody::*;
         match self {
-            ID(x) => format!("{}", x.fmt(ind)),
+            ID(x) => x.fmt(ind),
             Number(x) => format!("{}", x),
             CmpStmt(x) => format!("{{\n{}\n{}}}", x.fmt(ind + 4), tabs(ind)),
             Dictionary(x) => element_list(x, '{', '}', ind),
             Array(x) => element_list(x, '[', ']', ind),
-            Symbol(x) => format!("{}", x),
+            Symbol(x) => x.to_string(),
             Bool(x) => format!("{}", x),
             Expression(x) => format!("({})", x.fmt(ind)),
             Str(x) => format!("\"{}\"", x),
@@ -268,11 +261,11 @@ impl SpwnFmt for ValueBody {
                     ObjectMode::Trigger => "trigger".to_string(),
                 }) + &element_list(&x.props, '{', '}', ind)
             }
-            Macro(x) => format!("{}", x.fmt(ind)),
-            Resolved(_) => format!("<val>"),
+            Macro(x) => x.fmt(ind),
+            Resolved(_) => "<val>".to_string(),
             TypeIndicator(x) => format!("@{}", x),
-            Null => format!("null"),
-            SelfVal => format!("self"),
+            Null => "null".to_string(),
+            SelfVal => "self".to_string(),
         }
     }
 }
@@ -284,16 +277,14 @@ impl SpwnFmt for ValueLiteral {
 }
 
 impl SpwnFmt for IDClass {
-    fn fmt(&self, ind: Indent) -> String {
-        format!(
-            "{}",
-            match self {
-                IDClass::Group => "g",
-                IDClass::Color => "c",
-                IDClass::Item => "i",
-                IDClass::Block => "b",
-            },
-        )
+    fn fmt(&self, _ind: Indent) -> String {
+        match self {
+            IDClass::Group => "g",
+            IDClass::Color => "c",
+            IDClass::Item => "i",
+            IDClass::Block => "b",
+        }
+        .to_string()
     }
 }
 
@@ -314,7 +305,7 @@ impl SpwnFmt for Argument {
         if let Some(symbol) = &self.symbol {
             format!("{} = {}", symbol, self.value.fmt(ind))
         } else {
-            format!("{}", self.value.fmt(ind))
+            self.value.fmt(ind)
         }
     }
 }
@@ -348,19 +339,19 @@ impl SpwnFmt for Variable {
             //out += "[var pre]";
             out += &indent_comment(comment, ind);
 
-            if comment.ends_with("\n") {
+            if comment.ends_with('\n') {
                 out += &tabs(ind);
             }
         }
 
         if let Some(op) = &self.operator {
-            out += &format!("{}", op.fmt(ind));
+            out += &op.fmt(ind);
         }
 
-        out += &format!("{}", self.value.fmt(ind));
+        out += &self.value.fmt(ind);
 
         for p in &self.path {
-            out += &format!("{}", p.fmt(ind));
+            out += &p.fmt(ind).to_string();
         }
 
         if let Some(comment) = &self.comment.1 {
@@ -372,7 +363,7 @@ impl SpwnFmt for Variable {
             }*/
         }
 
-        format!("{}", out)
+        out
     }
 }
 
@@ -387,9 +378,9 @@ impl SpwnFmt for Expression {
             }
         }
 
-        out += &format!("{}", self.values.last().unwrap().fmt(ind));
+        out += &self.values.last().unwrap().fmt(ind);
 
-        format!("{}", out)
+        out
     }
 }
 
@@ -404,47 +395,43 @@ impl SpwnFmt for ID {
 }
 
 impl SpwnFmt for Operator {
-    fn fmt(&self, ind: Indent) -> String {
-        format!(
-            "{}",
-            match self {
-                Operator::Or => "||",
-                Operator::And => "&&",
-                Operator::Equal => "==",
-                Operator::NotEqual => "!=",
-                Operator::Range => "..",
-                Operator::MoreOrEqual => ">=",
-                Operator::LessOrEqual => "<=",
-                Operator::More => ">",
-                Operator::Less => "<",
-                Operator::Slash => "/",
-                Operator::Star => "*",
-                Operator::Power => "^",
-                Operator::Plus => "+",
-                Operator::Minus => "-",
-                Operator::Modulo => "%",
-                Operator::Assign => "=",
-                Operator::Add => "+=",
-                Operator::Subtract => "-=",
-                Operator::Multiply => "*=",
-                Operator::Divide => "/=",
-                Operator::As => "as",
-            },
-        )
+    fn fmt(&self, _ind: Indent) -> String {
+        match self {
+            Operator::Or => "||",
+            Operator::And => "&&",
+            Operator::Equal => "==",
+            Operator::NotEqual => "!=",
+            Operator::Range => "..",
+            Operator::MoreOrEqual => ">=",
+            Operator::LessOrEqual => "<=",
+            Operator::More => ">",
+            Operator::Less => "<",
+            Operator::Slash => "/",
+            Operator::Star => "*",
+            Operator::Power => "^",
+            Operator::Plus => "+",
+            Operator::Minus => "-",
+            Operator::Modulo => "%",
+            Operator::Assign => "=",
+            Operator::Add => "+=",
+            Operator::Subtract => "-=",
+            Operator::Multiply => "*=",
+            Operator::Divide => "/=",
+            Operator::As => "as",
+        }
+        .to_string()
     }
 }
 
 impl SpwnFmt for UnaryOperator {
-    fn fmt(&self, ind: Indent) -> String {
-        format!(
-            "{}",
-            match self {
-                UnaryOperator::Not => "!",
-                UnaryOperator::Minus => "-",
-                UnaryOperator::Range => "..",
-                UnaryOperator::Let => "let ",
-            },
-        )
+    fn fmt(&self, _ind: Indent) -> String {
+        match self {
+            UnaryOperator::Not => "!",
+            UnaryOperator::Minus => "-",
+            UnaryOperator::Range => "..",
+            UnaryOperator::Let => "let ",
+        }
+        .to_string()
     }
 }
 

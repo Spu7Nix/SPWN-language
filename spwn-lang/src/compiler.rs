@@ -249,7 +249,7 @@ pub fn compile_scope(
     globals: &mut Globals,
     mut info: CompilerInfo,
 ) -> Result<(Vec<Context>, Returns), RuntimeError> {
-    let mut statements_iter = statements.iter();
+    let statements_iter = statements.iter();
 
     let mut returns: Returns = Vec::new();
 
@@ -269,7 +269,7 @@ pub fn compile_scope(
     contexts = new_contexts;
     globals.stored_values.increment_lifetimes();
 
-    while let Some(statement) = statements_iter.next() {
+    for statement in statements_iter {
         //find out what kind of statement this is
         //let start_time = Instant::now();
 
@@ -523,14 +523,12 @@ pub fn compile_scope(
                                     if let Value::Dict(d) = &globals.stored_values[val] {
                                         match new_context.implementations.get_mut(&s) {
                                             Some(implementation) => {
-                                                for (key, val) in d.into_iter() {
+                                                for (key, val) in d.iter() {
                                                     (*implementation).insert(key.clone(), *val);
                                                 }
                                             }
                                             None => {
-                                                new_context
-                                                    .implementations
-                                                    .insert(s.clone(), d.clone());
+                                                new_context.implementations.insert(s, d.clone());
                                             }
                                         }
                                     } else {
@@ -620,6 +618,49 @@ pub fn compile_scope(
 
                             for element in arr {
                                 //println!("{}", new_contexts.len());
+                                for c in &mut new_contexts {
+                                    (*c).variables = context.variables.clone();
+                                    (*c).variables.insert(f.symbol.clone(), element);
+                                }
+
+                                let new_info = info.clone();
+
+                                let (end_contexts, inner_returns) =
+                                    compile_scope(&f.body, new_contexts, globals, new_info)?;
+
+                                new_contexts = Vec::new();
+                                for mut c in end_contexts {
+                                    if c.broken == None {
+                                        new_contexts.push(c)
+                                    } else {
+                                        c.broken = None;
+                                        out_contexts.push(c)
+                                    }
+                                }
+
+                                returns.extend(inner_returns);
+                            }
+                            out_contexts.extend(new_contexts);
+                            contexts.extend(out_contexts.iter().map(|c| Context {
+                                variables: context.variables.clone(),
+                                implementations: context.implementations.clone(),
+                                ..c.clone()
+                            }));
+                        }
+
+                        Value::Range(start, end, step) => {
+                            let mut normal = (start..end).step_by(step);
+                            let mut rev = (end..start).step_by(step).rev();
+                            let range: &mut dyn Iterator<Item = i32> =
+                                if start < end { &mut normal } else { &mut rev };
+
+                            let mut new_contexts = vec![context.clone()];
+                            let mut out_contexts = Vec::new();
+
+                            for num in range {
+                                //println!("{}", new_contexts.len());
+                                let element =
+                                    store_value(Value::Number(num as f64), 0, globals, &context);
                                 for c in &mut new_contexts {
                                     (*c).variables = context.variables.clone();
                                     (*c).variables.insert(f.symbol.clone(), element);
@@ -763,9 +804,7 @@ pub fn compile_scope(
 fn merge_impl(target: &mut Implementations, source: &Implementations) {
     for (key, imp) in source.iter() {
         match target.get_mut(key) {
-            Some(target_imp) => {
-                (*target_imp).extend(imp.iter().map(|x| (x.0.clone(), x.1.clone())))
-            }
+            Some(target_imp) => (*target_imp).extend(imp.iter().map(|x| (x.0.clone(), *x.1))),
             None => {
                 (*target).insert(*key, imp.clone());
             }
@@ -823,7 +862,7 @@ pub fn import_module(
         if standard_lib.len() != 1 {
             return Err(RuntimeError::RuntimeError {
                 message: "The standard library can not split the context".to_string(),
-                info: info.clone(),
+                info,
             });
         }
 
@@ -834,7 +873,7 @@ pub fn import_module(
         } else {
             return Err(RuntimeError::RuntimeError {
                 message: "The standard library must return a dictionary".to_string(),
-                info: info.clone(),
+                info,
             });
         }
     }
@@ -842,7 +881,7 @@ pub fn import_module(
     let stored_path = globals.path.clone();
     (*globals).path = module_path.clone();
 
-    let mut new_info = info.clone();
+    let mut new_info = info;
 
     new_info.current_file = module_path;
 

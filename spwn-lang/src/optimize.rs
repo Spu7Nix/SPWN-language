@@ -466,8 +466,8 @@ fn optimize_from<'a>(
     }
 }
 
-fn rebuild(network: &TriggerNetwork, orig_structure: &Vec<FunctionID>) -> Vec<FunctionID> {
-    let mut out = orig_structure.clone();
+fn rebuild(network: &TriggerNetwork, orig_structure: &[FunctionID]) -> Vec<FunctionID> {
+    let mut out = orig_structure.to_vec();
     for el in &mut out {
         (*el).obj_list.clear();
     }

@@ -2,10 +2,3 @@
 extract $
 extract obj_props
 
-for x in ..100 {
-	add(obj {
-		OBJ_ID: 1764,
-		X: x,
-		Y: sin(x / 10) * 90 + 150
-	})
-}

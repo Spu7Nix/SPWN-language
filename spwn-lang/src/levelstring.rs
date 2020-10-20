@@ -182,7 +182,7 @@ pub fn append_objects(
     const ID_MAX: u16 = 999;
 
     for obj in &mut objects {
-        for (_, prop) in &mut obj.params {
+        for prop in obj.params.values_mut() {
             let class_index;
             let ids: Vec<&mut ID>;
             match prop {
@@ -338,12 +338,12 @@ pub fn append_objects(
     ))
 }
 
-pub fn apply_fn_ids(func_ids: Vec<FunctionID>) -> Vec<GDObj> {
+pub fn apply_fn_ids(func_ids: &[FunctionID]) -> Vec<GDObj> {
     //println!("{:?}", trigger);
 
     fn apply_fn_id(
         id_index: usize,
-        func_ids: &Vec<FunctionID>,
+        func_ids: &[FunctionID],
         x_offset: u32,
         y_offset: u16,
     ) -> (Vec<GDObj>, u32) {
@@ -591,7 +591,7 @@ pub fn serialize_triggers_old(func_ids: Vec<FunctionID>) -> String {
 }
 */
 //</OLD>
-use base64;
+
 use libflate::{gzip, zlib};
 use std::io::Read;
 

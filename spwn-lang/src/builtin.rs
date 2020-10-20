@@ -193,7 +193,7 @@ impl Value {
                 )),
                 Value::Dict(dict) => match dict.get(&member) {
                     Some(value) => Some(*value),
-                    None => get_impl(my_type, member).clone(),
+                    None => get_impl(my_type, member),
                 },
                 Value::Func(f) => {
                     if &member == "start_group" {
@@ -204,10 +204,10 @@ impl Value {
                             context,
                         ))
                     } else {
-                        get_impl(my_type, member).clone()
+                        get_impl(my_type, member)
                     }
                 }
-                _ => get_impl(my_type, member).clone(),
+                _ => get_impl(my_type, member),
             }
         }
     }
@@ -322,7 +322,7 @@ pub fn built_in_function(
                     match mode {
                         ObjectMode::Object => {
                             let obj = GDObj {
-                                params: obj_map.clone(),
+                                params: obj_map,
                                 func_id: context.func_id,
                                 mode: ObjectMode::Object,
                             }
@@ -331,7 +331,7 @@ pub fn built_in_function(
                         }
                         ObjectMode::Trigger => {
                             let obj = GDObj {
-                                params: obj_map.clone(),
+                                params: obj_map,
                                 mode: ObjectMode::Trigger,
                                 ..c_t
                             }
@@ -435,7 +435,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "bool and bool".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -445,7 +445,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "bool and bool".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -456,7 +456,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -467,7 +467,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -478,7 +478,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -489,7 +489,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -500,7 +500,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -511,7 +511,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -522,7 +522,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -533,7 +533,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -545,7 +545,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number or string and string".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -556,7 +556,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         return Err(RuntimeError::TypeError {
                             expected: "number and number".to_string(),
                             found: format!("{} and {}", a_type, b_type),
-                            info: info.clone(),
+                            info,
                         })
                     }
                 },
@@ -573,7 +573,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     if acum_val_fn_context != c2.start_group {
                         return Err(RuntimeError::RuntimeError {
                             message: CANNOT_CHANGE_ERROR.to_string(),
-                            info: info.clone(),
+                            info,
                         });
                     }
 
@@ -584,14 +584,15 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     Value::TypeIndicator(t) => convert_type(
                         globals.stored_values[acum_val].clone(),
                         t,
-                        info.clone(),
+                        info,
                         globals,
+                        &context,
                     )?,
 
                     _ => {
                         return Err(RuntimeError::RuntimeError {
                             message: "Expected a type-indicator to convert to!".to_string(),
-                            info: info.clone(),
+                            info,
                         });
                     }
                 },
@@ -602,7 +603,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     if acum_val_fn_context != c2.start_group {
                         return Err(RuntimeError::RuntimeError {
                             message: CANNOT_CHANGE_ERROR.to_string(),
-                            info: info.clone(),
+                            info,
                         });
                     }
 
@@ -614,7 +615,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             return Err(RuntimeError::TypeError {
                                 expected: "number and number or string and string".to_string(),
                                 found: format!("{} and {}", a_type, b_type),
-                                info: info.clone(),
+                                info,
                             })
                         }
                     };
@@ -627,7 +628,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     if acum_val_fn_context != c2.start_group {
                         return Err(RuntimeError::RuntimeError {
                             message: CANNOT_CHANGE_ERROR.to_string(),
-                            info: info.clone(),
+                            info,
                         });
                     }
 
@@ -638,7 +639,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             return Err(RuntimeError::TypeError {
                                 expected: "number and number".to_string(),
                                 found: format!("{} and {}", a_type, b_type),
-                                info: info.clone(),
+                                info,
                             })
                         }
                     };
@@ -651,7 +652,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     if acum_val_fn_context != c2.start_group {
                         return Err(RuntimeError::RuntimeError {
                             message: CANNOT_CHANGE_ERROR.to_string(),
-                            info: info.clone(),
+                            info,
                         });
                     }
 
@@ -662,7 +663,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             return Err(RuntimeError::TypeError {
                                 expected: "number and number".to_string(),
                                 found: format!("{} and {}", a_type, b_type),
-                                info: info.clone(),
+                                info,
                             })
                         }
                     };
@@ -675,7 +676,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     if acum_val_fn_context != c2.start_group {
                         return Err(RuntimeError::RuntimeError {
                             message: CANNOT_CHANGE_ERROR.to_string(),
-                            info: info.clone(),
+                            info,
                         });
                     }
 
@@ -686,7 +687,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             return Err(RuntimeError::TypeError {
                                 expected: "number and number".to_string(),
                                 found: format!("{} and {}", a_type, b_type),
-                                info: info.clone(),
+                                info,
                             })
                         }
                     };

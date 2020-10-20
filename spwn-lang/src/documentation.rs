@@ -30,7 +30,7 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     );
 
     let exports = globals.stored_values[module[0].0].clone();
-    let implementations = &module[0].1.implementations;
+    let implementations = module[0].1.implementations.clone();
 
     doc += "_This file was generated using `spwn doc [file name]`_\n";
 
@@ -87,19 +87,13 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
 
     let mut macro_list: Vec<(&String, &usize)> = dict
         .iter()
-        .filter(|x| match globals.stored_values[*x.1] {
-            Value::Macro(_) => true,
-            _ => false,
-        })
+        .filter(|x| matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
     macro_list.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut val_list: Vec<(&String, &usize)> = dict
         .iter()
-        .filter(|x| match globals.stored_values[*x.1] {
-            Value::Macro(_) => false,
-            _ => true,
-        })
+        .filter(|x| !matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
     val_list.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -154,9 +148,8 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
 fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
     //description
     let mut doc = String::new();
-    match mac.tag.get_desc() {
-        Some(s) => doc += &format!("## Description: \n _{}_\n", s),
-        None => (),
+    if let Some(s) = mac.tag.get_desc() {
+        doc += &format!("## Description: \n _{}_\n", s)
     };
 
     if !(mac.args.is_empty() || (mac.args.len() == 1 && mac.args[0].0 == "self")) {
@@ -179,7 +172,7 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
                 arg_string += &format!(": _{}_", desc);
             }
 
-            if let Some(def_val) = arg.1.clone() {
+            if let Some(def_val) = arg.1 {
                 let val = &globals.stored_values[def_val].clone();
                 arg_string +=
                     &format!("\n\n_Default value:_\n\n{}\n\n", document_val(val, globals));
