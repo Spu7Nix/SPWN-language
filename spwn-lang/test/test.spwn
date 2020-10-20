@@ -2,3 +2,12 @@
 extract $
 extract obj_props
 
+func = {
+	10g.move(10, 10, 0.5)
+}
+
+extend func {
+	11g.move(10, 10, 0.5)
+}
+
+func!

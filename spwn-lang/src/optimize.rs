@@ -157,7 +157,11 @@ pub fn optimize(mut obj_in: Vec<FunctionID>, mut closed_group: u16) -> Vec<Funct
     //optimize_network(&mut network);
 
     let mut objects = Triggerlist { list: &mut obj_in };
-    let len = network[&NO_GROUP].len();
+    let len = if let Some(list) = network.get(&NO_GROUP) {
+        list.len()
+    } else {
+        0
+    };
     for i in 0..len {
         let trigger = network[&NO_GROUP][i];
 

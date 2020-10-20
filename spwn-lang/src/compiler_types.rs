@@ -1509,7 +1509,7 @@ impl ast::Variable {
                 inner_returns = new_inner_returns;
             }
             ast::ValueBody::CmpStmt(cmp_stmt) => {
-                let (evaled, returns) = cmp_stmt.to_scope(&context, globals, info.clone())?;
+                let (evaled, returns) = cmp_stmt.to_scope(&context, globals, info.clone(), None)?;
                 inner_returns.extend(returns);
                 start_val.push((
                     store_const_value(Value::Func(evaled), 1, globals, &context),
@@ -2234,17 +2234,22 @@ impl ast::Variable {
 }
 
 impl ast::CompoundStatement {
-    fn to_scope(
+    pub fn to_scope(
         &self,
         context: &Context,
         globals: &mut Globals,
         info: CompilerInfo,
+        start_group: Option<Group>,
     ) -> Result<(Function, Returns), RuntimeError> {
         //create the function context
         let mut new_context = context.next_fn_id(globals);
 
         //pick a start group
-        let start_group = Group::next_free(&mut globals.closed_groups);
+        let start_group = if let Some(g) = start_group {
+            g
+        } else {
+            Group::next_free(&mut globals.closed_groups)
+        };
 
         new_context.start_group = start_group;
         let new_info = info;

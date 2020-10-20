@@ -302,6 +302,35 @@ pub fn compile_scope(
                 }
                 break;
             }
+            Extend(expr, statements) => {
+                let mut new_contexts: Vec<Context> = Vec::new();
+                for context in &contexts {
+                    let (evaled, inner_returns) =
+                        expr.eval(context, globals, info.clone(), false)?;
+                    returns.extend(inner_returns);
+
+                    for (val, context) in evaled {
+                        let group = match &globals.stored_values[val] {
+                            Value::Group(g) => *g,
+                            Value::Func(f) => f.start_group,
+                            _ => {
+                                return Err(RuntimeError::TypeError {
+                                    expected: "function or group in extend statement".to_string(),
+                                    found: globals.get_type_str(val),
+                                    info,
+                                })
+                            }
+                        };
+
+                        let (_, inner_returns) =
+                            statements.to_scope(&context, globals, info.clone(), Some(group))?;
+
+                        returns.extend(inner_returns);
+
+                        new_contexts.push(context);
+                    }
+                }
+            }
             Expr(expr) => {
                 let mut new_contexts: Vec<Context> = Vec::new();
                 for context in &contexts {
