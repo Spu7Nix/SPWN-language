@@ -35,7 +35,7 @@ pub enum StatementBody {
     For(For),
     Error(Error),
     Extract(Expression),
-    Extend(Expression, CompoundStatement),
+
     Break,
     //EOI,
 }

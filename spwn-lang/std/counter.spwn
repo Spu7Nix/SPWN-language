@@ -90,7 +90,8 @@ impl @counter {
     (
         self, 
         #[desc("Item IDs to add to")] items: @array, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
+        #[desc("Multiplyer for the value subtracted")] factor: @number = 1
     ) {
         sub = {
             
@@ -99,7 +100,7 @@ impl @counter {
                     self.item.if_is(LARGER_THAN, num - 1, {
                         self.item.add(-num)
                         for item in items {
-                            item.add(-num)
+                            item.add(-num * factor)
                         }
                         call_with_delay(0.05, sub)
                     })
@@ -121,7 +122,7 @@ impl @counter {
     },
 
     multiply:
-    #[desc("Multiplies the value of the counter by some factor")]
+    #[desc("Multiplies the value of the counter by some factor (does not consume the factor)")]
     (
         self,
         #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor,
@@ -132,36 +133,38 @@ impl @counter {
             self.add_to([temp.item], speed, factor)
             temp.add_to([self.item], speed)
         } else if factor.type == @counter {
-            
+            delay = 0.05
             temp = @counter::new(0, false)
             mini_mult = (num){
                 mult = {
+
+                    self.item.if_is(SMALLER_THAN, num, {
+                        supress_signal(delay + 0.01)
+                        wait(0.05)
+                        return mult.start_group
+                    })
+                    wait(0.05)
                     
                     self.item.if_is(LARGER_THAN, num - 1, {
                         self.item.add(-num)
-                        factor.copy_to(temp.item, speed, num)
+                        factor.copy_to([temp.item], speed, num)
                         
                         
-                        call_with_delay(0.1, mult)
-                    })
-                        
-                    self.item.if_is(SMALLER_THAN, num, {
-                        wait(0.1)
-                        supress_signal(0.11)
-                        return
+                        call_with_delay(delay, mult)
                     })
                 }
+                mult.start_group.toggle_on()
+                wait(0.05)
                 mult!
             }
             
 
             for i in speed..0 {
-                mini_mult(2^i)
+                mini_mult(2^i).toggle_off()
             }
             
-            
-            -> factor.reset(speed)
-            temp.add_to([self.item], speed * 2)
+            wait(delay)
+            temp.add_to([self.item], speed)
             
         }
     },
@@ -171,7 +174,7 @@ impl @counter {
     (
         self, 
         #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor,
-        #[desc("Counter to set to the remainder value")] remainder: @counter = {id: ?i, type: @counter},
+        #[desc("Counter to set to the remainder value")] remainder: @counter = {item: ?i, type: @counter},
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         
     ) {
@@ -208,9 +211,10 @@ impl @counter {
             }
             div!
         } else if divisor.type == @counter {
+            error "Dividing a counter by another counter is currently not supported"
             result = @counter::new(0, false)
             remainder.reset(speed)
-
+            delay = 0.1
             // IDEA:
             // every time it goes under, undo the previous operation to simulate comparison
             
@@ -220,51 +224,31 @@ impl @counter {
                     
                     self.item.if_is(LARGER_THAN, 0, {
                         //this basically subtracts divisor * num from self
-                        (){
-                            temp_storage = ?i
-                            cas = {
-                                mini_cas = (num2){
-                                    divisor.item.if_is(LARGER_THAN, num2 - 1, {
-                                        divisor.item.add(-num2)
-                                        temp_storage.add(num2)
-                                        self.item.add(-(num2 * num))
+                        // this is the slow version
+                        //temp = divisor.clone(speed)
+                        //temp.subtract_from([self], speed, factor = num)
 
+                        //this basically does that but in one loop
+                        //divisor.copy_to([self], speed, factor = -num)
+                        
+                        temp = divisor.clone(speed)
+                        temp.subtract_from([self], speed, factor = num)
 
-                                        
-                                        call_with_delay(0.05, cas)
-                                    })
-                                }
-                    
-                                for i in 0..speed {
-                                    mini_cas(3^i)
-                                }
-                                    
-                                divisor.item.if_is(EQUAL_TO, 0, {
-                                    wait(0.1)
-                                    supress_signal(0.11)
-                                    @counter::new(temp_storage, false).add_to([divisor.item], speed*2)
-                                    return
-                                })
-                            }
-                            cas!
-                        }()
                         result.item.add(num)
-                        call_with_delay(0.1, div)
+                        call_with_delay(delay, div)
                     })
 
                     self.item.if_is(SMALLER_THAN, 1, {
 
                         ret = {
-                            supress_signal(0.11)
-                            wait(0.1)
+                            supress_signal(delay + 0.01)
                             return
                         }
+                        supress_signal(delay + 0.01)
                         
-                        supress_signal(0.06)
                         self.item.if_is(SMALLER_THAN, 0, {
                             result.item.add(-num)
-                            wait(0.1)
-                            divisor.copy_to(self.item, speed*2, factor = num)
+                            divisor.copy_to([self], speed, factor = num)
                             ret!
                         })
                         self.item.if_is(EQUAL_TO, 0, ret)
@@ -279,13 +263,13 @@ impl @counter {
 
             
             for i in speed..0 {
-                mini_div(8^i)
+                mini_div(5^i)
                 wait(0.1)
             }
             -> divisor.reset(speed)
-            self.add_to([remainder.item], speed*2)
+            self.add_to([remainder.item], speed)
             
-            result.add_to([self.item], speed*2)
+            result.add_to([self.item], speed)
             wait(0.2)
             return remainder
             
@@ -341,7 +325,7 @@ impl @counter {
     copy_to: #[desc("Copies the value of the counter to another item ID, without consuming the original")] 
     (
         self, 
-        #[desc("Item ID to copy to")]  item: @item, 
+        #[desc("Items to copy to")] items: @array, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         #[desc("Factor of to multiply the copy by")] factor: @number = 1
     ) {
@@ -354,8 +338,9 @@ impl @counter {
                     
                     self.item.if_is(LARGER_THAN, num - 1, {
                         self.item.add(-num)
-                        
-                        item.add(num * factor)
+                        for item in items {
+                            item.add(num * factor)
+                        }
                         temp_storage.add(num)
                         
                         call_with_delay(0.05, add)
@@ -383,7 +368,7 @@ impl @counter {
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
         new_counter = ?i
-        self.copy_to(new_counter, speed)
+        self.copy_to([new_counter], speed)
         return @counter::new(new_counter, false)
     },
 
@@ -549,7 +534,7 @@ impl @counter {
         if num.type == @number {
             self.multiply(num)
         } else if num.type == @counter {
-            self.multiply(num.clone())
+            self.multiply(num)
         } else {
             error "Cannot multiply counter by this type"
         }
@@ -559,7 +544,7 @@ impl @counter {
         if num.type == @number {
             self.divide(num)
         } else if num.type == @counter {
-            self.divide(num.clone())
+            self.divide(num)
         } else {
             error "Cannot divide counter by this type"
         }

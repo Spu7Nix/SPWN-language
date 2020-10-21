@@ -242,9 +242,6 @@ pub enum Token {
     #[token("extract")]
     Extract,
 
-    #[token("extend")]
-    Extend,
-
     #[token("null")]
     Null,
 
@@ -288,9 +285,7 @@ impl Token {
             | Period | DotDot | At | Hash => "terminator",
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Extend => {
-                "keyword"
-            }
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue => "keyword",
             Comment => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -628,25 +623,6 @@ pub fn parse_statement(
 
             arrow = true;
             rest_of_statement.body
-        }
-
-        Some(Token::Extend) => {
-            let expr = parse_expr(tokens, notes, true, true)?;
-            let next = tokens.next(false, false);
-            if next != Some(Token::OpenCurlyBracket) {
-                return Err(SyntaxError::ExpectedErr {
-                    expected: "'{'".to_string(),
-                    found: if let Some(t) = next {
-                        t.typ().to_string()
-                    } else {
-                        String::from("end of file")
-                    },
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                });
-            }
-            let cmp = parse_cmp_stmt(tokens, notes)?;
-            ast::StatementBody::Extend(expr, ast::CompoundStatement { statements: cmp })
         }
 
         Some(Token::Return) => {

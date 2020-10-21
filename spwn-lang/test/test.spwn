@@ -1,13 +1,7 @@
 
-extract $
-extract obj_props
 
-func = {
-	10g.move(10, 10, 0.5)
-}
+a = counter(100)
+b = counter(3)
+wait(1)
 
-extend func {
-	11g.move(10, 10, 0.5)
-}
-
-func!
+a.multiply(b, speed = 10)

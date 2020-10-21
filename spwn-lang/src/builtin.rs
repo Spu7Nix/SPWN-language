@@ -171,7 +171,7 @@ impl Value {
                 }
                 Value::Array(a) => {
                     if member == "length" {
-                        return Some(store_value(
+                        return Some(store_const_value(
                             Value::Number(a.len() as f64),
                             1,
                             globals,
@@ -179,6 +179,33 @@ impl Value {
                         ));
                     }
                 }
+                Value::Range(start, end, step) => match member.as_ref() {
+                    "start" => {
+                        return Some(store_const_value(
+                            Value::Number(*start as f64),
+                            1,
+                            globals,
+                            context,
+                        ))
+                    }
+                    "end" => {
+                        return Some(store_const_value(
+                            Value::Number(*end as f64),
+                            1,
+                            globals,
+                            context,
+                        ))
+                    }
+                    "step_size" => {
+                        return Some(store_const_value(
+                            Value::Number(*step as f64),
+                            1,
+                            globals,
+                            context,
+                        ))
+                    }
+                    _ => (),
+                },
                 _ => (),
             };
 
