@@ -275,6 +275,12 @@ pub struct Function {
     pub start_group: Group,
     //pub all_groups: Vec<Group>,
 }
+#[derive(Clone, Debug, PartialEq)]
+pub enum Pattern {
+    Type(TypeID),
+    Array(Vec<Pattern>),
+    Either(Box<Pattern>, Box<Pattern>),
+}
 
 #[derive(Clone, Debug, PartialEq)]
 
@@ -295,6 +301,7 @@ pub enum Value {
     BuiltinFunction(String),
     TypeIndicator(TypeID),
     Range(i32, i32, usize), //start, end, step
+    Pattern(Pattern),
     Null,
 }
 
@@ -329,6 +336,7 @@ impl Value {
             Value::TypeIndicator(_) => 14,
             Value::Null => 15,
             Value::Range(_, _, _) => 17,
+            Value::Pattern(_) => 18,
         }
     }
 }
@@ -338,6 +346,8 @@ pub fn find_key_for_value(map: &HashMap<String, u16>, value: u16) -> Option<&Str
     map.iter()
         .find_map(|(key, &val)| if val == value { Some(key) } else { None })
 }
+
+
 
 pub fn convert_type(
     val: Value,
@@ -642,6 +652,24 @@ impl Value {
                     None => "[TYPE NOT FOUND]",
                 }
             ),
+
+            Value::Pattern(p) => match p {
+                Pattern::Type(t) => Value::TypeIndicator(*t).to_str(globals),
+                Pattern::Either(p1, p2) => format!("{} | {}", Value::Pattern(*p1.clone()).to_str(globals), Value::Pattern(*p2.clone()).to_str(globals)),
+                Pattern::Array(a) => if a.is_empty() {
+                    "[]".to_string()
+                } else {
+                    let mut out = String::from("[");
+                    for p in a {
+                        out += &Value::Pattern(p.clone()).to_str(globals);
+                        out += ",";
+                    }
+                    out.pop();
+                    out += "]";
+
+                    out
+                },
+            },
         }
     }
 }
@@ -757,6 +785,7 @@ impl Globals {
         globals.type_ids.insert(String::from("null"), 15);
         globals.type_ids.insert(String::from("trigger"), 16);
         globals.type_ids.insert(String::from("range"), 17);
+        globals.type_ids.insert(String::from("pattern"), 18);
 
         globals.type_id_count = globals.type_ids.len() as u16;
 

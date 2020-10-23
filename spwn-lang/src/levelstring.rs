@@ -79,19 +79,62 @@ pub fn get_used_ids(ls: &str) -> [HashSet<u16>; 4] {
     let objects = ls.split(';');
     for obj in objects {
         let props: Vec<&str> = obj.split(',').collect();
-        for i in (0..props.len() - 1).step_by(2) {
-            let key = props[i];
-            let value = props[i + 1];
+        let mut map = HashMap::new();
 
-            if key == "57" {
-                //GROUPS
-                let groups = value.split('.');
-                for g in groups {
-                    let group = g.parse().unwrap();
-                    if !out[0].contains(&group) {
+        for i in (0..props.len() - 1).step_by(2) {
+            map.insert(props[i], props[i + 1]);
+        }
+
+        for (key, value) in &map {
+            match *key {
+                "57" => {
+                    //GROUPS
+                    let groups = value.split('.');
+                    for g in groups {
+                        let group = g.parse().unwrap();
+
                         out[0].insert(group);
                     }
                 }
+                "51" => {
+                    match (map.get("1"), map.get("52")) {
+                        (Some(&"1006"), Some(&"1")) => out[0].insert(value.parse().unwrap()),
+                        (Some(&"1006"), _) => out[1].insert(value.parse().unwrap()),
+                        _ => out[0].insert(value.parse().unwrap()),
+                    };
+                }
+                "71" => {
+                    out[0].insert(value.parse().unwrap());
+                }
+                //colors
+                "21" => {
+                    out[1].insert(value.parse().unwrap());
+                }
+                "22" => {
+                    out[1].insert(value.parse().unwrap());
+                }
+                "23" => {
+                    out[1].insert(value.parse().unwrap());
+                }
+
+                "80" => {
+                    match map.get("1") {
+                        //if collision trigger, add block id
+                        Some(&"1815") => out[2].insert(value.parse().unwrap()),
+                        //counter display => do nothing
+                        Some(&"1615") => false,
+                        // else add item id
+                        _ => out[3].insert(value.parse().unwrap()),
+                    };
+                }
+
+                "95" => {
+                    out[2].insert(value.parse().unwrap());
+                }
+                //some of these depends on what object it is
+                //pulse target depends on group mode/color mode
+                //figure this out, future me
+                _ => (),
             }
         }
     }
@@ -137,6 +180,7 @@ pub fn append_objects(
     old_ls: &str,
 ) -> Result<(String, [usize; 4]), String> {
     let mut closed_ids = get_used_ids(&old_ls);
+    println!("{:?}", closed_ids);
 
     //collect all specific ids mentioned into closed_[id] lists
     for obj in &objects {

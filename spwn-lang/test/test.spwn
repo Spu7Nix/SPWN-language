@@ -1,7 +1,5 @@
 
 
-a = counter(100)
-b = counter(3)
-wait(1)
+let a
 
-a.multiply(b, speed = 10)
+$.print("hi")

@@ -57,7 +57,7 @@ return {
 	for_loop: #[desc("Implementation of a spawn loop")] 
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
-        #[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument")] code: @macro, 
+		#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: @macro, 
         #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number = 0.05, 
         #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true, 
         #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1,
@@ -81,5 +81,7 @@ return {
 
         func!
         
-    }
+	}
+	
+
 }

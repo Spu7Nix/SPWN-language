@@ -3,7 +3,7 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
-//use crate::builtin::TYPE_MEMBER_NAME;
+use crate::builtin::BUILTIN_LIST;
 
 //use std::collections::HashMap;
 use std::path::PathBuf;
@@ -36,6 +36,22 @@ pub enum SyntaxError {
         pos: FileRange,
         file: PathBuf,
     },
+}
+
+pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Result<(), SyntaxError> {
+    if name.starts_with('_') && name.ends_with('_') {
+        if BUILTIN_LIST.contains(&name) {
+            Ok(())
+        } else {
+            Err(SyntaxError::SyntaxError {
+                message: format!("{} is an invalid variable/property/argument name", name),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            })
+        }
+    } else {
+        Ok(())
+    }
 }
 
 impl fmt::Display for SyntaxError {
@@ -1142,6 +1158,8 @@ fn parse_dict(
             Some(Token::Symbol) | Some(Token::Type) => {
                 let symbol = tokens.slice();
 
+                is_valid_symbol(&symbol, tokens, notes)?;
+
                 match tokens.next(false, false) {
                     Some(Token::Colon) => {
                         let expr = parse_expr(tokens, notes, true, true)?;
@@ -1652,7 +1670,11 @@ fn parse_variable(
         Some(Token::False) => ast::ValueBody::Bool(false),
         Some(Token::Null) => ast::ValueBody::Null,
         Some(Token::SelfVal) => ast::ValueBody::SelfVal,
-        Some(Token::Symbol) => ast::ValueBody::Symbol(tokens.slice()),
+        Some(Token::Symbol) => {
+            let symbol = tokens.slice();
+            is_valid_symbol(&symbol, tokens, notes)?;
+            ast::ValueBody::Symbol(symbol)
+        }
 
         Some(Token::OpenSquareBracket) => {
             //Array
