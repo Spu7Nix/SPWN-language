@@ -116,6 +116,8 @@ pub enum Operator {
     Minus,
     Modulo,
 
+    Either,
+
     Assign,
     Add,
     Subtract,

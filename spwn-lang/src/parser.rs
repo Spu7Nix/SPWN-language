@@ -97,6 +97,9 @@ pub enum Token {
     #[token("->")]
     Arrow,
 
+    #[token("|")]
+    Either,
+
     #[token("||")]
     Or,
 
@@ -289,7 +292,7 @@ impl Token {
         match self {
             Arrow | Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan
             | LessThan | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign
-            | Add | Subtract | Multiply | Divide | As => "operator",
+            | Add | Subtract | Multiply | Divide | As | Either => "operator",
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -534,8 +537,13 @@ pub fn parse_spwn(
                 tokens.previous_no_ignore(false, true);
 
                 //tokens.previous();
+                let mut parsed = parse_statement(&mut tokens, &mut notes)?;
+                if parsed.comment.0 == None && !statements.is_empty() {
+                    parsed.comment.0 = statements.last().unwrap().comment.1.clone();
+                    (*statements.last_mut().unwrap()).comment.1 = None;
+                }
 
-                statements.push(parse_statement(&mut tokens, &mut notes)?)
+                statements.push(parsed)
             }
             None => break,
         }
@@ -574,7 +582,14 @@ fn parse_cmp_stmt(
             Some(Token::ClosingCurlyBracket) => break,
             Some(_) => {
                 tokens.previous_no_ignore(false, true);
-                statements.push(parse_statement(tokens, notes)?);
+
+                let mut parsed = parse_statement(tokens, notes)?;
+                if parsed.comment.0 == None && !statements.is_empty() {
+                    parsed.comment.0 = statements.last().unwrap().comment.1.clone();
+                    (*statements.last_mut().unwrap()).comment.1 = None;
+                }
+
+                statements.push(parsed)
                 //println!("statement done");
             }
             None => {
@@ -878,33 +893,6 @@ pub fn parse_statement(
 
         Some(Token::Extract) => ast::StatementBody::Extract(parse_expr(tokens, notes, true, true)?),
 
-        /*Some(Token::Let) => {
-            tokens.next(false, false);
-            let symbol = tokens.slice();
-
-            match tokens.next(false, false) {
-                Some(Token::Assign) => (),
-                _ => {
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "'='".to_string(),
-                        found: tokens.slice(),
-                        pos: tokens.position(),
-                    })
-                }
-            };
-
-            /*(*notes)
-            .defined_vars
-            .insert(symbol.clone(), tokens.abs_position());*/
-
-            let value = parse_expr(tokens, notes, true, true)?;
-
-            ast::StatementBody::Definition(ast::Definition {
-                symbol,
-                value,
-                //mutable: true,
-            })
-        }*/
         Some(_) => {
             //either expression, call or definition, FIGURE OUT
             //parse it
@@ -912,7 +900,7 @@ pub fn parse_statement(
             //expression or call
             //tokens.previous();
             tokens.previous_no_ignore(false, true);
-            let expr = parse_expr(tokens, notes, true, true)?;
+            let mut expr = parse_expr(tokens, notes, true, true)?;
             if tokens.next(false, false) == Some(Token::Exclamation) {
                 //call
                 // println!("found call");
@@ -923,7 +911,26 @@ pub fn parse_statement(
                 //expression statement
                 // println!("found expr");
                 tokens.previous_no_ignore(false, true);
-                ast::StatementBody::Expr(expr)
+                let (_, end_pos) = tokens.position();
+
+                let comment_after =
+                    if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
+                        (*expr.values.last_mut().unwrap()).comment.1 = None;
+                        Some(comment)
+                    } else {
+                        check_for_comment(tokens)
+                    };
+                /*println!(
+                    "current token after stmt post comment: {}: ",
+                    tokens.slice()
+                );*/
+
+                return Ok(ast::Statement {
+                    body: ast::StatementBody::Expr(expr),
+                    arrow,
+                    pos: (start_pos, end_pos),
+                    comment: (preceding_comment, comment_after),
+                });
             }
         }
 
@@ -953,6 +960,7 @@ fn check_for_comment(tokens: &mut Tokens) -> Option<String> {
     //let mut line_break_start = false;
 
     let mut result = String::new();
+
     /*match tokens.next(false, true) {
         Some(Token::Comment) => tokens.slice(),
         //Some(Token::StatementSeparator) => String::from("\r\n"),
@@ -970,13 +978,7 @@ fn check_for_comment(tokens: &mut Tokens) -> Option<String> {
                 comment_found = true;
                 tokens.slice()
             }
-            Some(Token::StatementSeparator) => {
-                if !result.ends_with('\n') {
-                    String::from("\r\n")
-                } else {
-                    String::new()
-                }
-            }
+            Some(Token::StatementSeparator) => tokens.slice(),
             _ => {
                 tokens.previous_no_ignore(false, true);
 
@@ -995,8 +997,10 @@ fn check_for_comment(tokens: &mut Tokens) -> Option<String> {
 fn operator_precedence(op: &ast::Operator) -> u8 {
     use ast::Operator::*;
     match op {
-        As => 9,
-        Power => 8,
+        As => 10,
+        Power => 9,
+
+        Either => 8,
 
         Modulo => 7,
         Star => 7,
@@ -1136,6 +1140,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Minus => Some(ast::Operator::Minus),
         Token::Slash => Some(ast::Operator::Slash),
         Token::Modulo => Some(ast::Operator::Modulo),
+        Token::Either => Some(ast::Operator::Either),
 
         Token::Assign => Some(ast::Operator::Assign),
         Token::Add => Some(ast::Operator::Add),

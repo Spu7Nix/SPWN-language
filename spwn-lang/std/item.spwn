@@ -18,7 +18,7 @@ impl @item {
     #[desc("Implementation of the instant count trigger")]
     (
         self, 
-        #[desc("Comparison mode")] comparison: @number, 
+        #[desc("Comparison mode")] comparison: @comparison, 
         #[desc("Number to compare with")] other: @number, 
         #[desc("Target function if comparison is 'true'")] function: @function
     ) {
@@ -26,8 +26,8 @@ impl @item {
             OBJ_ID: 1811,
             TARGET: function,
             COUNT: other,
-            ACTIVATE_GROUP: 1, 
-            COMPARISON: comparison, 
+            ACTIVATE_GROUP: true, 
+            COMPARISON: comparison.id, 
             ITEM: self,
         })
     },
@@ -43,7 +43,7 @@ impl @item {
                 OBJ_ID: 1611,
                 TARGET: function,
                 COUNT: number,
-                ACTIVATE_GROUP: 1, 
+                ACTIVATE_GROUP: true, 
                 ITEM: self,
                 COUNT_MULTI_ACTIVATE: true,
                 

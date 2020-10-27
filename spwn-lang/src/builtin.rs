@@ -240,7 +240,7 @@ impl Value {
     }
 }
 
-pub const BUILTIN_LIST: [&str; 32] = [
+pub const BUILTIN_LIST: [&str; 34] = [
     "print",
     "sin",
     "cos",
@@ -253,6 +253,7 @@ pub const BUILTIN_LIST: [&str; 32] = [
     "add",
     "current_context",
     "append",
+    "matches",
     //operators
     "_or_",
     "_and_",
@@ -274,6 +275,7 @@ pub const BUILTIN_LIST: [&str; 32] = [
     "_subtract_",
     "_multiply_",
     "_divide_",
+    "_either_",
 ];
 
 const CANNOT_CHANGE_ERROR: &str = "
@@ -299,10 +301,23 @@ pub fn built_in_function(
             Value::Null
         }
 
+        "matches" => {
+            if arguments.len() != 2 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "expected two arguments: the type to be checked and the pattern"
+                        .to_string(),
+                    info,
+                });
+            }
+            let val = globals.stored_values[arguments[0]].clone();
+            let pattern = globals.stored_values[arguments[1]].clone();
+            Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
+        }
+
         "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "floor" | "ceil" => {
             if arguments.len() != 1 {
                 return Err(RuntimeError::BuiltinError {
-                    message: "Expected one error".to_string(),
+                    message: "expected one argument".to_string(),
                     info,
                 });
             }
@@ -423,7 +438,7 @@ pub fn built_in_function(
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
         | "_less_or_equal_" | "_divided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
         | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_as_" | "_add_" | "_subtract_"
-        | "_multiply_" | "_divide_" => {
+        | "_multiply_" | "_divide_" | "_either_" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
                     message: "Expected two arguments".to_string(),
@@ -609,9 +624,9 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                 }
                 "_as_" => match globals.stored_values[val] {
                     Value::TypeIndicator(t) => convert_type(
-                        globals.stored_values[acum_val].clone(),
+                        &globals.stored_values[acum_val].clone(),
                         t,
-                        info,
+                        &info,
                         globals,
                         &context,
                     )?,
@@ -623,6 +638,30 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         });
                     }
                 },
+                "_either_" => Value::Pattern(Pattern::Either(
+                    if let Value::Pattern(p) = convert_type(
+                        &globals.stored_values[acum_val].clone(),
+                        18,
+                        &info,
+                        globals,
+                        &context,
+                    )? {
+                        Box::new(p)
+                    } else {
+                        unreachable!()
+                    },
+                    if let Value::Pattern(p) = convert_type(
+                        &globals.stored_values[val].clone(),
+                        18,
+                        &info,
+                        globals,
+                        &context,
+                    )? {
+                        Box::new(p)
+                    } else {
+                        unreachable!()
+                    },
+                )),
                 "_add_" => {
                     if !mutable {
                         return Err(mutable_err(info, "_add_"));

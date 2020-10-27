@@ -187,7 +187,7 @@ impl SpwnFmt for Statement {
         let mut out = String::new();
         if let Some(comment) = &self.comment.0 {
             //out += "[stmt pre]";
-            out += "\n";
+
             out += &indent_comment(comment, ind);
             //
             if !comment.ends_with('\n') {
@@ -356,6 +356,7 @@ impl SpwnFmt for Variable {
 
         if let Some(comment) = &self.comment.1 {
             //out += "[var post]";
+
             out += &indent_comment(comment, ind);
 
             /*if comment.ends_with("\n") {
@@ -418,6 +419,7 @@ impl SpwnFmt for Operator {
             Operator::Multiply => "*=",
             Operator::Divide => "/=",
             Operator::As => "as",
+            Operator::Either => "|",
         }
         .to_string()
     }

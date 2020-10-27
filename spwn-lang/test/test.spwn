@@ -1,5 +1,1 @@
-
-
-let a
-
-$.print("hi")
+10g.rotate(5g, 90, 0.5)

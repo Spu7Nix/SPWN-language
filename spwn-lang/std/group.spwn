@@ -13,7 +13,7 @@ impl @group {
         #[desc("Units to move on the X axis")] x: @number, 
         #[desc("Units to move on the Y axis")] y: @number, 
         #[desc("Duration of movement")] duration: @number = 0, 
-        easing: @number = NONE, 
+        easing: @easing_type = NONE, 
         easing_rate: @number = 2
     ) {
         $.add( trigger{
@@ -22,7 +22,7 @@ impl @group {
             MOVE_X: x * 3,
             MOVE_Y: y * 3,
             DURATION: duration,
-            EASING: easing,
+            EASING: easing.id,
             EASING_RATE: easing_rate,
         })
         
@@ -73,7 +73,7 @@ impl @group {
         #[desc("Group of object to rotate around")] center: @group, 
         #[desc("Rotation in degrees")] degrees: @number, 
         #[desc("Duration of rotation")] duration: @number = 0, 
-        #[desc("Easing type")] easing: @number = 0, 
+        #[desc("Easing type")] easing: @easing_type = NONE, 
         #[desc("Easing rate")] easing_rate: @number = 2, 
         #[desc("Only rotate positions of the objects, not the textures")] lock_object_rotation: @bool = false
     ){
@@ -83,7 +83,7 @@ impl @group {
             CENTER: center,
             ROTATE_DEGREES: degrees,
             DURATION: duration,
-            EASING: easing,
+            EASING: easing.id,
             EASING_RATE: easing_rate,
             LOCK_OBJECT_ROTATION: lock_object_rotation
         })
@@ -139,7 +139,7 @@ impl @group {
         #[desc("Duration of movement")] duration: @number = 0,
         #[desc("Will move to the object only on the X-axis")] x_only: @bool = false, 
         #[desc("Will move to the object only on the y-axis")] y_only: @bool = false, 
-        #[desc("Easing type")] easing: @number = NONE, 
+        #[desc("Easing type")] easing: @easing_type = NONE, 
         #[desc("Easing rate")] easing_rate: @number = 2
     ) {
         $.add( trigger{
@@ -161,7 +161,7 @@ impl @group {
             TARGET_POS: target,
             
             DURATION: duration,
-            EASING: easing,
+            EASING: easing.id,
             EASING_RATE: easing_rate,
         })
         wait(duration)

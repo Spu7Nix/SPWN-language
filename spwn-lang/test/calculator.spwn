@@ -174,7 +174,7 @@ solve = {
 		check_valid!
 		end_loading!
 	})
-	current_operator.item.if_is(EQUAL_TO, 3, {
+	/*current_operator.item.if_is(EQUAL_TO, 3, {
 		//divide
 		main.item.if_is(EQUAL_TO, 0, {
 			deathgroup.toggle_on()
@@ -189,7 +189,7 @@ solve = {
 		current_operator.item.add(-3)
 		check_valid!
 		end_loading!
-	})
+	})*/
 	last_pressed_operator.item.if_is(EQUAL_TO, 4, {
 		-> second_display.alpha(0, 0.5)
 	})

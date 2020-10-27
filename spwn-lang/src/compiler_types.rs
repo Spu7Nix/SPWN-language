@@ -96,8 +96,11 @@ impl ValStorage {
                 }
             }
             Value::Macro(m) => {
-                for (_, e, _, _) in m.args {
+                for (_, e, _, e2) in m.args {
                     if let Some(val) = e {
+                        self.increment_single_lifetime(val, amount)
+                    }
+                    if let Some(val) = e2 {
                         self.increment_single_lifetime(val, amount)
                     }
                 }
@@ -160,6 +163,10 @@ pub fn clone_value(
         Value::Macro(m) => {
             for arg in &mut m.args {
                 if let Some(def_val) = &mut arg.1 {
+                    (*def_val) = clone_value(*def_val, lifetime, globals, context, constant);
+                }
+
+                if let Some(def_val) = &mut arg.3 {
                     (*def_val) = clone_value(*def_val, lifetime, globals, context, constant);
                 }
             }
@@ -264,7 +271,8 @@ impl Context {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
-    pub args: Vec<(String, Option<StoredValue>, ast::Tag, Option<TypeID>)>,
+    //             name         default val      tag          pattern
+    pub args: Vec<(String, Option<StoredValue>, ast::Tag, Option<StoredValue>)>,
     pub def_context: Context,
     pub def_file: PathBuf,
     pub body: Vec<ast::Statement>,
@@ -339,28 +347,69 @@ impl Value {
             Value::Pattern(_) => 18,
         }
     }
+
+    pub fn matches_pat(&self, pat_val: &Value, info: &CompilerInfo, globals: &mut Globals, context: &Context) -> Result<bool, RuntimeError> {
+        let pat = if let Value::Pattern(p) = convert_type(pat_val, 18, info, globals, context)? {p} else {unreachable!()};
+        match pat {
+            Pattern::Either(p1, p2) => Ok(self.matches_pat(&Value::Pattern(*p1), info, globals, context)? || self.matches_pat(&Value::Pattern(*p2), info,globals, context)?),
+            Pattern::Type(t) => Ok(self.to_num(globals) == t),
+            Pattern::Array(a_pat) => {
+                if let Value::Array(a_val) = self {
+                    match a_pat.len() {
+                        0 => Ok(true),
+    
+                        1 => {
+                            for el in a_val {
+                                let val = globals.stored_values[*el].clone();
+                                if !val.matches_pat(&Value::Pattern(a_pat[0].clone()), info, globals, context)? {
+                                    return Ok(false)
+                                }
+                            }
+                            Ok(true)
+                        }
+
+                        _ => Err(RuntimeError::RuntimeError {
+                            message: String::from("arrays with multiple elements cannot be used as patterns (yet)"),
+                            info: info.clone(),
+                        })
+                    }
+                } else {
+                    Ok(false)
+                }
+                
+            }
+        }
+    }
 }
 
 //copied from https://stackoverflow.com/questions/59401720/how-do-i-find-the-key-for-a-value-in-a-hashmap
-pub fn find_key_for_value(map: &HashMap<String, u16>, value: u16) -> Option<&String> {
+pub fn find_key_for_value(map: &HashMap<String, (u16, PathBuf, (usize, usize))>, value: u16) -> Option<&String> {
     map.iter()
-        .find_map(|(key, &val)| if val == value { Some(key) } else { None })
+        .find_map(|(key, val)| if val.0 == value { Some(key) } else { None })
 }
+
+
+
 
 
 
 pub fn convert_type(
-    val: Value,
+    val: &Value,
     typ: TypeID,
-    info: CompilerInfo,
+    info: &CompilerInfo,
     globals: &mut Globals,
     context: &Context,
 ) -> Result<Value, RuntimeError> {
+
+    if val.to_num(globals) == typ {
+        return Ok(val.clone())
+    }
+
     if typ == 9 {
         return Ok(Value::Str(val.to_str(globals)));
     }
 
-    Ok(match &val {
+    Ok(match val {
         Value::Number(n) => match typ {
             0 => Value::Group(Group::new(*n as u16)),
             1 => Value::Color(Color::new(*n as u16)),
@@ -375,18 +424,18 @@ pub fn convert_type(
                         "Number can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
-                    info,
+                    info: info.clone(),
                 })
             }
         },
 
         Value::Group(g) => match typ {
-            0 => val,
+            
             4 => Value::Number(match g.id {
                 ID::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
                     message: "This group isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
-                    info,
+                    info: info.clone(),
                 })
             }),
             _ => {
@@ -395,18 +444,18 @@ pub fn convert_type(
                         "Group can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
-                    info,
+                    info: info.clone(),
                 })
             }
         },
 
         Value::Color(c) => match typ {
-            1 => val,
+            
             4 => Value::Number(match c.id {
                 ID::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
                     message: "This color isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
-                    info,
+                    info: info.clone(),
                 })
             }),
             _ => {
@@ -415,18 +464,18 @@ pub fn convert_type(
                         "Color can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
-                    info,
+                    info: info.clone(),
                 })
             }
         },
 
         Value::Block(b) => match typ {
-            2 => val,
+            
             4 => Value::Number(match b.id {
                 ID::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
                     message: "This block ID isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
-                    info,
+                    info: info.clone(),
                 })
             }),
             _ => {
@@ -435,18 +484,18 @@ pub fn convert_type(
                         "Block ID can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
-                    info,
+                    info: info.clone(),
                 })
             }
         },
 
         Value::Item(i) => match typ {
-            3 => val,
+            
             4 => Value::Number(match i.id {
                 ID::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
                     message: "This item ID isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
-                    info,
+                    info: info.clone(),
                 })
             }),
             _ => {
@@ -455,13 +504,13 @@ pub fn convert_type(
                         "Item ID can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
-                    info,
+                    info: info.clone(),
                 })
             }
         },
 
         Value::Bool(b) => match typ {
-            5 => val,
+            
             4 => Value::Number(if *b { 1.0 } else { 0.0 }),
             _ => {
                 return Err(RuntimeError::RuntimeError {
@@ -469,13 +518,13 @@ pub fn convert_type(
                         "Boolean can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
-                    info,
+                    info: info.clone(),
                 })
             }
         },
 
         Value::Func(f) => match typ {
-            6 => val,
+            
             0 => Value::Group(f.start_group),
             _ => {
                 return Err(RuntimeError::RuntimeError {
@@ -483,7 +532,7 @@ pub fn convert_type(
                         "Function can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
-                    info,
+                    info: info.clone(),
                 })
             }
         },
@@ -504,18 +553,63 @@ pub fn convert_type(
                         "Range can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
-                    info,
+                    info: info.clone(),
                 })
             }
         },
 
+        Value::Array(arr) => match typ {
+            18 => {
+                // pattern
+                let mut new_vec = Vec::new();
+                for el in arr {
+                    new_vec.push(match globals.stored_values[*el].clone() {
+                        Value::Pattern(p) => p,
+                        a => if let Value::Pattern(p) = convert_type(&a, 18, info, globals, context)? {
+                            p
+                        } else {
+                            unreachable!()
+                        },
+                    })
+                }
+                Value::Pattern(Pattern::Array(new_vec))
+            }
+
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "Array can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info: info.clone(),
+                })
+            }
+
+        }
+        Value::TypeIndicator(t) =>  match typ {
+            18 => {
+                
+                Value::Pattern(Pattern::Type(*t))
+            }
+
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "Type-Indicator can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info: info.clone(),
+                })
+            }
+        }
+
         _ => {
             return Err(RuntimeError::RuntimeError {
                 message: format!(
-                    "This value can't be converted to '{}'!",
-                    find_key_for_value(&globals.type_ids, typ).unwrap()
+                    "'{}' can't be converted to '{}'!",
+                    find_key_for_value(&globals.type_ids, typ).unwrap(), find_key_for_value(&globals.type_ids, val.to_num(globals)).unwrap()
                 ),
-                info,
+                info: info.clone(),
             })
         }
     })
@@ -600,11 +694,8 @@ impl Value {
                         out += &arg.0;
                         if let Some(val) = arg.3 {
                             out += &format!(
-                                ": @{}",
-                                match find_key_for_value(&globals.type_ids, val) {
-                                    Some(s) => s,
-                                    None => "undefined",
-                                }
+                                ": {}",
+                                globals.stored_values[val].to_str(globals),
                             )
                         };
                         if let Some(val) = arg.1 {
@@ -695,7 +786,7 @@ pub struct Globals {
     pub stored_values: ValStorage,
     pub val_id: usize,
 
-    pub type_ids: HashMap<String, u16>,
+    pub type_ids: HashMap<String, (u16, PathBuf, (usize, usize))>,
     pub type_id_count: u16,
 
     pub func_ids: Vec<FunctionID>,
@@ -767,25 +858,32 @@ impl Globals {
             objects: Vec::new(),
         };
 
-        globals.type_ids.insert(String::from("group"), 0);
-        globals.type_ids.insert(String::from("color"), 1);
-        globals.type_ids.insert(String::from("block"), 2);
-        globals.type_ids.insert(String::from("item"), 3);
-        globals.type_ids.insert(String::from("number"), 4);
-        globals.type_ids.insert(String::from("bool"), 5);
-        globals.type_ids.insert(String::from("function"), 6);
-        globals.type_ids.insert(String::from("dictionary"), 7);
-        globals.type_ids.insert(String::from("macro"), 8);
-        globals.type_ids.insert(String::from("string"), 9);
-        globals.type_ids.insert(String::from("array"), 10);
-        globals.type_ids.insert(String::from("object"), 11);
-        globals.type_ids.insert(String::from("spwn"), 13);
-        globals.type_ids.insert(String::from("builtin"), 13);
-        globals.type_ids.insert(String::from("type_indicator"), 14);
-        globals.type_ids.insert(String::from("null"), 15);
-        globals.type_ids.insert(String::from("trigger"), 16);
-        globals.type_ids.insert(String::from("range"), 17);
-        globals.type_ids.insert(String::from("pattern"), 18);
+        
+
+        let mut add_type = |name: &str, id: u16| {
+            globals.type_ids.insert(String::from(name), (id, PathBuf::new(), (0,0)))
+        };
+
+        add_type("group", 0);
+        add_type("color", 1);
+        add_type("block", 2);
+        add_type("item", 3);
+        add_type("number", 4);
+        add_type("bool", 5);
+        add_type("function", 6);
+        add_type("dictionary", 7);
+        add_type("macro", 8);
+        add_type("string", 9);
+        add_type("array", 10);
+        add_type("object", 11);
+        add_type("spwn", 12);
+        add_type("builtin", 13);
+        add_type("type_indicator", 14);
+        add_type("null", 15);
+        add_type("trigger", 16);
+        add_type("range", 17);
+        add_type("pattern", 18);
+        add_type("object_key", 19);
 
         globals.type_id_count = globals.type_ids.len() as u16;
 
@@ -818,15 +916,9 @@ fn handle_operator(
                 let val2 = globals.stored_values[value2].clone();
 
                 if let Some(target_typ) = m.args[0].3 {
-                    let val2storedtyp = val2
-                        .member(TYPE_MEMBER_NAME.to_string(), &context, globals)
-                        .unwrap();
-                    let val2typ = match &globals.stored_values[val2storedtyp] {
-                        Value::TypeIndicator(t) => t,
-                        _ => unreachable!(),
-                    };
+                    let pat = &globals.stored_values[target_typ].clone();
 
-                    if *val2typ != target_typ {
+                    if  !val2.matches_pat(pat, &info, globals, context)? {
                         //if types dont match, act as if there is no macro at all
                         return Ok(vec![(
                             store_value(
@@ -1006,6 +1098,14 @@ impl ast::Expression {
                             globals,
                             info.clone(),
                         )?,
+                        
+                        Either => handle_operator(acum_val,
+                            *val,
+                            "_either_",
+                            c2,
+                            globals,
+                            info.clone()
+                        )?,
                         Range => vec![(
                             store_value(
                                 {
@@ -1147,19 +1247,12 @@ pub fn execute_macro(
                             //maybe make type check function
                             if let Some(t) = arg_def.3 {
                                 let val = globals.stored_values[arg_values[i]].clone();
-                                let type_of_val_index = val
-                                    .member(TYPE_MEMBER_NAME.to_string(), &context, globals)
-                                    .unwrap();
+                                let pat = globals.stored_values[t].clone();
 
-                                let type_of_val = match globals.stored_values[type_of_val_index] {
-                                    Value::TypeIndicator(t) => t,
-                                    _ => unreachable!(),
-                                };
-
-                                if type_of_val != t {
+                                if !val.matches_pat(&pat, &info, globals, context)? {
                                     return Err(RuntimeError::TypeError {
-                                        expected: Value::TypeIndicator(t).to_str(globals),
-                                        found: Value::TypeIndicator(type_of_val).to_str(globals),
+                                        expected: pat.to_str(globals),
+                                        found: val.to_str(globals),
                                         info,
                                     });
                                 }
@@ -1185,19 +1278,12 @@ pub fn execute_macro(
                         //type check!!
                         if let Some(t) = m.args[def_index].3 {
                             let val = globals.stored_values[arg_values[i]].clone();
-                            let type_of_val_index = val
-                                .member(TYPE_MEMBER_NAME.to_string(), &context, globals)
-                                .unwrap();
+                            let pat = globals.stored_values[t].clone();
 
-                            let type_of_val = match globals.stored_values[type_of_val_index] {
-                                Value::TypeIndicator(t) => t,
-                                _ => unreachable!(),
-                            };
-
-                            if type_of_val != t {
+                            if !val.matches_pat(&pat, &info, globals, context)? {
                                 return Err(RuntimeError::TypeError {
-                                    expected: Value::TypeIndicator(t).to_str(globals),
-                                    found: Value::TypeIndicator(type_of_val).to_str(globals),
+                                    expected: pat.to_str(globals),
+                                    found: val.to_str(globals),
                                     info,
                                 });
                             }
@@ -1600,7 +1686,7 @@ impl ast::Variable {
                 start_val.push((
                     match globals.type_ids.get(name) {
                         Some(id) => {
-                            store_const_value(Value::TypeIndicator(*id), 1, globals, &context)
+                            store_const_value(Value::TypeIndicator(id.0), 1, globals, &context)
                         }
                         None => {
                             return Err(RuntimeError::UndefinedErr {
@@ -1629,64 +1715,126 @@ impl ast::Variable {
                         let v = expressions[i * 2];
                         let v2 = expressions[i * 2 + 1];
 
-                        obj.push((
-                            match &globals.stored_values[v] {
-                                Value::Number(n) => {
-                                    let out = *n as u16;
 
-                                    if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
+                        let (key, pattern) = match &globals.stored_values[v] {
+                            Value::Number(n) => {
+                                let out = *n as u16;
+
+                                if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
+                                        info,
+                                    })
+                                }
+
+                                (out, None)
+                            },
+                            Value::Dict(d) => {
+                                let gotten_type = d.get(TYPE_MEMBER_NAME);
+                                if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "expected either @number or @object_key as object key".to_string(),
+                                        info,
+                                    })
+                                }
+                                let id = d.get("id");
+                                if id == None {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "object key has no 'id' member".to_string(),
+                                        info,
+                                    })
+                                }
+                                let pattern = d.get("pattern");
+                                if pattern == None {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "object key has no 'pattern' member".to_string(),
+                                        info,
+                                    })
+                                }
+
+                                (match &globals.stored_values[*id.unwrap()] {
+                                    Value::Number(n) => {
+                                        let out = *n as u16;
+
+                                        if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
+                                                info,
+                                            })
+                                        }
+                                        out
+                                    }
+                                    _ => return Err(RuntimeError::RuntimeError {
+                                        message: format!("object key's id has to be @number, found {}", globals.get_type_str(*id.unwrap())),
+                                        info,
+                                    })
+                                }, Some(globals.stored_values[*pattern.unwrap()].clone()))
+                                
+                            }
+                            a => {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: format!(
+                                        "expected either @number or @object_key as object key, found: {}",
+                                        a.to_str(globals)
+                                    ),
+                                    info,
+                                })
+                            }
+                        };
+
+                        obj.push((
+                            key,
+                            {   
+                                let val = globals.stored_values[v2].clone();
+
+                                if let Some(pat) = pattern {
+                                    if !val.matches_pat(&pat, &info, globals, &context)? {
                                         return Err(RuntimeError::RuntimeError {
-                                            message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use @object instead".to_string(),
+                                            message: format!(
+                                                "key required value to match {}, found {}",
+                                                pat.to_str(globals), val.to_str(globals)
+                                            ),
                                             info,
                                         })
                                     }
-
-                                    out
-                                },
-                                a => {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: format!(
-                                            "Expected number type as object key, found: {}",
-                                            a.to_str(globals)
-                                        ),
-                                        info,
-                                    })
                                 }
-                            },
-                            match &globals.stored_values[v2] {
-                                Value::Number(n) => ObjParam::Number(*n),
-                                Value::Str(s) => ObjParam::Text(s.clone()),
-                                Value::Func(g) => ObjParam::Group(g.start_group),
+                                
+                                match &val {
+                                    Value::Number(n) => ObjParam::Number(*n),
+                                    Value::Str(s) => ObjParam::Text(s.clone()),
+                                    Value::Func(g) => ObjParam::Group(g.start_group),
 
-                                Value::Group(g) => ObjParam::Group(*g),
-                                Value::Color(c) => ObjParam::Color(*c),
-                                Value::Block(b) => ObjParam::Block(*b),
-                                Value::Item(i) => ObjParam::Item(*i),
+                                    Value::Group(g) => ObjParam::Group(*g),
+                                    Value::Color(c) => ObjParam::Color(*c),
+                                    Value::Block(b) => ObjParam::Block(*b),
+                                    Value::Item(i) => ObjParam::Item(*i),
 
-                                Value::Bool(b) => ObjParam::Bool(*b),
+                                    Value::Bool(b) => ObjParam::Bool(*b),
 
-                                Value::Array(a) => ObjParam::GroupList({
-                                    let mut out = Vec::new();
-                                    for s in a {
-                                        out.push(match globals.stored_values[*s] {
-                                            Value::Group(g) => g,
-                                            _ => return Err(RuntimeError::RuntimeError {
-                                                message: "Arrays in object parameters can only contain groups".to_string(),
-                                                info,
+                                    Value::Array(a) => ObjParam::GroupList({
+                                        let mut out = Vec::new();
+                                        for s in a {
+                                            out.push(match globals.stored_values[*s] {
+                                                Value::Group(g) => g,
+                                                _ => return Err(RuntimeError::RuntimeError {
+                                                    message: "Arrays in object parameters can only contain groups".to_string(),
+                                                    info,
+                                                })
                                             })
+                                        }
+                                        out
+                                    }),
+                                    x => {
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: format!(
+                                                "{} is not a valid object value",
+                                                x.to_str(globals)
+                                            ),
+                                            info,
                                         })
                                     }
-                                    out
-                                }),
-                                x => {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: format!(
-                                            "{} is not a valid object value",
-                                            x.to_str(globals)
-                                        ),
-                                        info,
-                                    })
                                 }
+                        
                             },
                         ))
                     }
@@ -1713,7 +1861,7 @@ impl ast::Variable {
                     all_combinations(all_expr, &context, globals, new_info, constant)?;
                 inner_returns.extend(returns);
                 for defaults in argument_possibilities {
-                    let mut args: Vec<(String, Option<StoredValue>, ast::Tag, Option<TypeID>)> =
+                    let mut args: Vec<(String, Option<StoredValue>, ast::Tag, Option<StoredValue>)> =
                         Vec::new();
                     let mut expr_index = 0;
                     for arg in m.args.iter() {
@@ -1732,13 +1880,7 @@ impl ast::Variable {
                             match &arg.3 {
                                 Some(_) => {
                                     expr_index += 1;
-                                    Some(match &globals.stored_values[defaults.0[expr_index - 1]] {
-                                        Value::TypeIndicator(t) => *t,
-                                        a => return Err(RuntimeError::RuntimeError {
-                                            message: format!("Expected TypeIndicator on argument definition, found: {}", a.to_str(globals)),
-                                            info,
-                                        })
-                                    })
+                                    Some(defaults.0[expr_index - 1])
                                 }
                                 None => None,
                             },
@@ -2082,7 +2224,7 @@ impl ast::Variable {
 
             ast::ValueBody::TypeIndicator(t) => {
                 if let Some(typ) = globals.type_ids.get(t) {
-                    store_const_value(Value::TypeIndicator(*typ), 1, globals, context)
+                    store_const_value(Value::TypeIndicator(typ.0), 1, globals, context)
                 } else {
                     return false;
                 }
@@ -2160,7 +2302,7 @@ impl ast::Variable {
 
             ast::ValueBody::TypeIndicator(t) => {
                 if let Some(typ) = globals.type_ids.get(t) {
-                    store_const_value(Value::TypeIndicator(*typ), 1, globals, context)
+                    store_const_value(Value::TypeIndicator(typ.0), 1, globals, context)
                 } else {
                     return Err(RuntimeError::RuntimeError {
                         message: format!("Use a type statement to define a new type: type {}", t),

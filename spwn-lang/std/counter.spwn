@@ -8,8 +8,8 @@ type counter
 impl @counter {
 
     new: #[desc("Creates a new counter")] (
-        #[desc("Source (can be a number, item ID or boolean)")] source = 0,
-        #[desc("Adds a delay if a value gets added to the new item (to avoid confusing behavior)")] delay = true
+        #[desc("Source (can be a number, item ID or boolean)")] source: @number | @item | @bool = 0,
+        #[desc("Adds a delay if a value gets added to the new item (to avoid confusing behavior)")] delay: @bool = true
     ){
         if source.type == @number {
             id = ?i
@@ -125,7 +125,7 @@ impl @counter {
     #[desc("Multiplies the value of the counter by some factor (does not consume the factor)")]
     (
         self,
-        #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor,
+        #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor: @counter | @number,
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
         if factor.type == @number {
@@ -175,8 +175,8 @@ impl @counter {
     divide: #[desc("Devides the value of the counter by some divisor")]
     (
         self, 
-        #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor,
-        #[desc("Counter to set to the remainder value")] remainder: @counter = {item: ?i, type: @counter},
+        #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor: @counter | @number,
+        #[desc("Counter or item to set to the remainder value")] remainder: @counter | @item = {item: ?i, type: @counter},
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         
     ) {
@@ -285,7 +285,7 @@ impl @counter {
     },
 
     //will consume both numbers
-    compare: (self, other, speed = DEFAULT_SPEED) {
+    compare: (self, other: @counter, speed: @number = DEFAULT_SPEED) {
         other.subtract_from([self.item], speed)
         if self == 0 {
             return 0
@@ -329,7 +329,7 @@ impl @counter {
     copy_to: #[desc("Copies the value of the counter to another item ID, without consuming the original")] 
     (
         self, 
-        #[desc("Items to copy to")] items: @array, 
+        #[desc("Items to copy to")] items: [@item | @counter], 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         #[desc("Factor of to multiply the copy by")] factor: @number = 1
     ) {
@@ -376,7 +376,7 @@ impl @counter {
         return @counter::new(new_counter, false)
     },
 
-    _plus_: (self, other) {
+    _plus_: (self, other: @number | @counter) {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.item.add(other)
@@ -390,7 +390,7 @@ impl @counter {
         }
     },
 
-    _minus_: (self, other) {
+    _minus_: (self, other: @number | @counter) {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.item.add(-other)
@@ -400,20 +400,20 @@ impl @counter {
         }
     },
 
-    _times_: (self, num) {
+    _times_: (self, num: @number | @counter) {
         clone = self.clone()
         clone.multiply(num)
         return clone
         
     },
 
-    _divided_by_: (self, num) {
+    _divided_by_: (self, num: @number | @counter) {
         clone = self.clone()
         clone.divide(num)
         return clone
     },
 
-    _more_than_: (self, other) {
+    _more_than_: (self, other: @number | @counter) {
         //TODO: add case for another counter
         if other.type == @number {
             self.item.if_is(LARGER_THAN, other, {
@@ -433,7 +433,7 @@ impl @counter {
         }
     },
 
-    _less_than_: (self, other) {
+    _less_than_: (self, other: @number | @counter) {
         //TODO: add case for another counter
         if other.type == @number {
             self.item.if_is(SMALLER_THAN, other, {
@@ -453,8 +453,8 @@ impl @counter {
         }
     },
 
-    _more_or_equal_: (self, other) {
-        //TODO: add case for another counter
+    _more_or_equal_: (self, other: @number | @counter) {
+        
         if other.type == @number {
             self.item.if_is(LARGER_THAN, other - 1, {
                 return true
@@ -473,8 +473,8 @@ impl @counter {
         }
     },
 
-    _less_or_equal_: (self, other) {
-        //TODO: add case for another counter
+    _less_or_equal_: (self, other: @number | @counter) {
+        
         if other.type == @number {
             self.item.if_is(SMALLER_THAN, other + 1, {
                 return true
@@ -493,7 +493,7 @@ impl @counter {
         }
     },
 
-    _equal_: (self, other) {
+    _equal_: (self, other: @number | @counter) {
         if other.type == @number {
             self.item.if_is(EQUAL_TO, other, {
                 return true
@@ -515,7 +515,7 @@ impl @counter {
         }
     },
 
-    _not_equal_: (self, other) {
+    _not_equal_: (self, other: @number | @counter) {
         return !(self == other)
     },
 
@@ -524,7 +524,7 @@ impl @counter {
         self.item.add(num)
     },
 
-    _add_: (self, num) {
+    _add_: (self, num: @number | @counter) {
         if num.type == @number {
             self.add(num)
             wait(0.05)
@@ -535,7 +535,7 @@ impl @counter {
         }
     },
 
-    _subtract_: (self, num) {
+    _subtract_: (self, num: @number | @counter) {
         if num.type == @number {
             self.add(-num)
             wait(0.05)
@@ -546,7 +546,7 @@ impl @counter {
         }
     },
 
-    _multiply_: (self, num) {
+    _multiply_: (self, num: @number | @counter) {
         
         if num.type == @number {
             self.multiply(num)
@@ -557,7 +557,7 @@ impl @counter {
         }
     },
 
-    _divide_: (self, num) {
+    _divide_: (self, num: @number | @counter) {
         if num.type == @number {
             self.divide(num)
         } else if num.type == @counter {
@@ -567,7 +567,7 @@ impl @counter {
         }
     },
 
-    _assign_: (self, num) {
+    _assign_: (self, num: @number | @counter) {
         self.reset()
         if num.type == @number {
             self.item.add(num)
@@ -582,7 +582,7 @@ impl @counter {
 
     to_const: #[desc("Converts the counter into a normal number (very context-splitting, be careful)")] (
         self, 
-        #[desc("Array or range of possible output values")] range
+        #[desc("Array or range of possible output values")] range: [@number] | @range
     ) {
         for val in range {
             -> self.item.if_is(EQUAL_TO, val, {

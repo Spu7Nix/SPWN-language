@@ -171,6 +171,17 @@ pub fn compile_spwn(
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
     let mut globals = Globals::new(path.clone());
+    if statements.is_empty() {
+        return Err(RuntimeError::RuntimeError {
+            message: "this script is empty".to_string(),
+            info: CompilerInfo {
+                depth: 0,
+                path: vec!["main scope".to_string()],
+                pos: ((0, 0), (0, 0)),
+                current_file: path,
+            },
+        });
+    }
     let mut start_context = Context::new();
     //store at pos 0
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
@@ -432,10 +443,21 @@ pub fn compile_scope(
 
             TypeDef(name) => {
                 //initialize type
-                (*globals).type_id_count += 1;
-                (*globals)
-                    .type_ids
-                    .insert(name.clone(), globals.type_id_count);
+                let already = globals.type_ids.get(name);
+                if let Some(t) = already {
+                    if !(t.1 == info.current_file && t.2 == info.pos.0) {
+                        return Err(RuntimeError::RuntimeError {
+                            message: format!("the type '{}' is already defined", name),
+                            info,
+                        });
+                    }
+                } else {
+                    (*globals).type_id_count += 1;
+                    (*globals).type_ids.insert(
+                        name.clone(),
+                        (globals.type_id_count, info.current_file.clone(), info.pos.0),
+                    );
+                }
                 //Value::TypeIndicator(globals.type_id_count)
             }
 
