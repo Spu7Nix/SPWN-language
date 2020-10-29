@@ -7,9 +7,8 @@ options = [1g, 2g, 3g, 4g, 5g, 6g, 7g]
 selected = counter(0)
 
 on(touch(), {
-    
-    selector.move_to(options[selected.to_const(0..options.length)], 0.1)
     selected += 1
+    selector.move_to(options[selected.to_const(0..options.length)], 0.1)
     
     if selected == options.length {
         selected -= options.length

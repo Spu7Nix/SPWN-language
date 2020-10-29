@@ -54,7 +54,7 @@ return {
 	
 	},
 
-	for_loop: #[desc("Implementation of a spawn loop")] 
+	for_loop: #[desc("Implementation of a spawn loop with a counter")] 
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
 		#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: @macro, 
@@ -81,6 +81,24 @@ return {
 
         func!
         
+	},
+
+	while_loop: #[desc("Implementation of a conditional spawn loop")] 
+	(
+		#[desc("While loop condition, should return a boolean")] expr: @macro, 
+		#[desc("Macro of the code that gets looped")] code: @macro,
+		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number = 0.05,
+	) {
+		func = {
+			code()
+			if expr() {
+				call_with_delay(delay, func)
+			} else {
+				return
+			}
+        }
+
+        func!
 	}
 	
 

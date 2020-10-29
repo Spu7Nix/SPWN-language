@@ -16,32 +16,87 @@ _This file was generated using `spwn doc [file name]`_
  ```
 
 {
-show_player: () { /* code omitted */ },
-BOUNCE_IN_OUT: {
-id: 7,
+BACK_IN: {
+id: 17,
 type: @easing_type
 },
-hide_player: () { /* code omitted */ },
-toggle_bg_effect: (on: @bool = false) { /* code omitted */ },
-NONE: {
+EASE_IN: {
 type: @easing_type,
+id: 2
+},
+EQUAL_TO: {
+type: @comparison,
 id: 0
 },
+disable_trail: () { /* code omitted */ },
 EXPONENTIAL_OUT: {
 type: @easing_type,
 id: 12
 },
-wait: (time: @number) { /* code omitted */ },
+death: () { /* code omitted */ },
+obj_props: {
+COPY_OPACTITY: {
+pattern: @bool,
+type: @object_key,
+id: 60
+},
+Y_OFFSET: {
+id: 92,
+type: @object_key,
+pattern: @number
+},
+BLOCK_B: {
+pattern: @block,
+type: @object_key,
+id: 95
+},
+SPAWN_DURATION: {
+pattern: @number,
+id: 63,
+type: @object_key
+},
+MULTI_TRIGGER: {
+pattern: @bool,
+type: @object_key,
+id: 87
+},
+SPAWN_TRIGGERED: {
+pattern: @bool,
+type: @object_key,
+id: 62
+},
+LOCK_TO_PLAYER_X: {
+type: @object_key,
+id: 58,
+pattern: @bool
+},
+FADE_OUT: {
+type: @object_key,
+id: 47,
+pattern: @number
+},
+HOLD_MODE: {
+type: @object_key,
+pattern: @bool,
+id: 81
+},
+SCALING: {
+type: @object_key,
+id: 32,
+pattern: @number
+},
+... (83 more)
+},
 call_with_delay: (time: @number, function: @function) { /* code omitted */ },
-SMALLER_THAN: {
-id: 2,
-type: @comparison
+ELASTIC_OUT: {
+id: 6,
+type: @easing_type
 },
-BOUNCE_IN: {
-type: @easing_type,
-id: 8
+BOUNCE_IN_OUT: {
+id: 7,
+type: @easing_type
 },
-... (31 more)
+... (32 more)
 }
 
 ``` 
@@ -201,7 +256,7 @@ id: 8
 >**Literal:** ```(range: @range, code: @macro, delay: @number = 0.05, reset: @bool = true, reset_speed: @number = 1) { /* code omitted */ }``` 
 >
 >## Description: 
-> _Implementation of a spawn loop_
+> _Implementation of a spawn loop with a counter_
 >## Arguments:
 >> **`range`** _(obligatory)_: _Range of values (for example 0..10)_
 >
@@ -491,6 +546,43 @@ id: 8
 >
 >
 >
+
+**`while_loop`**:
+
+>**Type:** `macro` 
+>
+>**Literal:** ```(expr: @macro, code: @macro, delay: @number = 0.05) { /* code omitted */ }``` 
+>
+>## Description: 
+> _Implementation of a conditional spawn loop_
+>## Arguments:
+>> **`expr`** _(obligatory)_: _While loop condition, should return a boolean_
+>
+>
+>
+>
+>> **`code`** _(obligatory)_: _Macro of the code that gets looped_
+>
+>
+>
+>
+>> _`delay` (optional)_ : _Delay between loops (less than 0.05 may be unstable)_
+>>
+>>_Default value:_
+>>
+>>**Type:** `number` 
+>>
+>>**Literal:** ```0.05``` 
+>>
+>>
+>>
+>>
+>
+>
+>
+>
+>
+>
 ## Other values:
 
 <details>
@@ -505,8 +597,8 @@ id: 8
 > ```
 >
 >{
->type: @easing_type,
->id: 17
+>id: 17,
+>type: @easing_type
 >}
 >
 >``` 
@@ -543,8 +635,8 @@ id: 8
 > ```
 >
 >{
->type: @easing_type,
->id: 16
+>id: 16,
+>type: @easing_type
 >}
 >
 >``` 
@@ -970,8 +1062,8 @@ id: 8
 > ```
 >
 >{
->id: 0,
->type: @comparison
+>type: @comparison,
+>id: 0
 >}
 >
 >``` 
@@ -1160,8 +1252,8 @@ id: 8
 > ```
 >
 >{
->type: @easing_type,
->id: 0
+>id: 0,
+>type: @easing_type
 >}
 >
 >``` 
@@ -1198,8 +1290,8 @@ id: 8
 > ```
 >
 >{
->id: 14,
->type: @easing_type
+>type: @easing_type,
+>id: 14
 >}
 >
 >``` 
@@ -1236,8 +1328,8 @@ id: 8
 > ```
 >
 >{
->type: @easing_type,
->id: 13
+>id: 13,
+>type: @easing_type
 >}
 >
 >``` 
@@ -1350,55 +1442,55 @@ id: 8
 > ```
 >
 >{
->GLOW_DISABLED: {
->id: 96,
->type: @object_key,
->pattern: @bool
->},
->COUNT_MULTI_ACTIVATE: {
->id: 104,
->pattern: @bool,
->type: @object_key
->},
->LOCK_TO_PLAYER_Y: {
->pattern: @bool,
->id: 59,
->type: @object_key
->},
->MOVE_X: {
->pattern: @number,
->type: @object_key,
->id: 28
->},
->ANIMATION_ID: {
->pattern: @number,
->id: 76,
->type: @object_key
->},
->TOUCH_TRIGGERED: {
+>COPY_OPACTITY: {
 >pattern: @bool,
 >type: @object_key,
->id: 11
->},
->VERTICAL_FLIP: {
->type: @object_key,
->pattern: @bool,
->id: 5
+>id: 60
 >},
 >Y_OFFSET: {
 >id: 92,
 >type: @object_key,
 >pattern: @number
 >},
->MAX_SPEED: {
->id: 105,
+>BLOCK_B: {
+>pattern: @block,
 >type: @object_key,
+>id: 95
+>},
+>SPAWN_DURATION: {
+>pattern: @number,
+>id: 63,
+>type: @object_key
+>},
+>MULTI_TRIGGER: {
+>pattern: @bool,
+>type: @object_key,
+>id: 87
+>},
+>SPAWN_TRIGGERED: {
+>pattern: @bool,
+>type: @object_key,
+>id: 62
+>},
+>LOCK_TO_PLAYER_X: {
+>type: @object_key,
+>id: 58,
+>pattern: @bool
+>},
+>FADE_OUT: {
+>type: @object_key,
+>id: 47,
 >pattern: @number
 >},
->EXCLUSIVE: {
->id: 86,
+>HOLD_MODE: {
 >type: @object_key,
->pattern: @bool
+>pattern: @bool,
+>id: 81
+>},
+>SCALING: {
+>type: @object_key,
+>id: 32,
+>pattern: @number
 >},
 >... (83 more)
 >}
@@ -1418,8 +1510,8 @@ id: 8
 >>
 >>{
 >>pattern: @bool,
->>type: @object_key,
->>id: 56
+>>id: 56,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -1513,9 +1605,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
+>>type: @object_key,
 >>id: 76,
->>type: @object_key
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -1609,9 +1701,9 @@ id: 8
 >> ```
 >>
 >>{
+>>pattern: @bool,
 >>type: @object_key,
->>id: 17,
->>pattern: @bool
+>>id: 17
 >>}
 >>
 >>``` 
@@ -1657,9 +1749,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @block,
+>>type: @object_key,
 >>id: 80,
->>type: @object_key
+>>pattern: @block
 >>}
 >>
 >>``` 
@@ -1705,9 +1797,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 95,
+>>pattern: @block,
 >>type: @object_key,
->>pattern: @block
+>>id: 95
 >>}
 >>
 >>``` 
@@ -1753,8 +1845,8 @@ id: 8
 >> ```
 >>
 >>{
->>id: 71,
 >>pattern: @group,
+>>id: 71,
 >>type: @object_key
 >>}
 >>
@@ -1801,9 +1893,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 21,
+>>pattern: @color,
 >>type: @object_key,
->>pattern: @color
+>>id: 21
 >>}
 >>
 >>``` 
@@ -1849,8 +1941,8 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @color,
 >>type: @object_key,
+>>pattern: @color,
 >>id: 22
 >>}
 >>
@@ -1897,8 +1989,8 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @string,
 >>type: @object_key,
+>>pattern: @string,
 >>id: 44
 >>}
 >>
@@ -1945,9 +2037,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @bool,
+>>type: @object_key,
 >>id: 42,
->>type: @object_key
+>>pattern: @bool
 >>}
 >>
 >>``` 
@@ -2041,8 +2133,8 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @string,
 >>id: 49,
+>>pattern: @string,
 >>type: @object_key
 >>}
 >>
@@ -2090,8 +2182,8 @@ id: 8
 >>
 >>{
 >>type: @object_key,
->>pattern: @color,
->>id: 50
+>>id: 50,
+>>pattern: @color
 >>}
 >>
 >>``` 
@@ -2137,9 +2229,9 @@ id: 8
 >> ```
 >>
 >>{
+>>pattern: @bool,
 >>type: @object_key,
->>id: 60,
->>pattern: @bool
+>>id: 60
 >>}
 >>
 >>``` 
@@ -2185,8 +2277,8 @@ id: 8
 >> ```
 >>
 >>{
->>id: 77,
 >>type: @object_key,
+>>id: 77,
 >>pattern: @number
 >>}
 >>
@@ -2233,9 +2325,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 104,
+>>type: @object_key,
 >>pattern: @bool,
->>type: @object_key
+>>id: 104
 >>}
 >>
 >>``` 
@@ -2281,9 +2373,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 91,
 >>type: @object_key,
->>pattern: @number
+>>pattern: @number,
+>>id: 91
 >>}
 >>
 >>``` 
@@ -2329,9 +2421,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @bool,
+>>id: 66,
 >>type: @object_key,
->>id: 66
+>>pattern: @bool
 >>}
 >>
 >>``` 
@@ -2377,9 +2469,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @bool,
+>>type: @object_key,
 >>id: 98,
->>type: @object_key
+>>pattern: @bool
 >>}
 >>
 >>``` 
@@ -2425,8 +2517,8 @@ id: 8
 >> ```
 >>
 >>{
->>type: @object_key,
 >>pattern: @bool,
+>>type: @object_key,
 >>id: 67
 >>}
 >>
@@ -2521,9 +2613,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @bool,
 >>id: 89,
->>type: @object_key
+>>type: @object_key,
+>>pattern: @bool
 >>}
 >>
 >>``` 
@@ -2570,8 +2662,8 @@ id: 8
 >>
 >>{
 >>type: @object_key,
->>pattern: @number,
->>id: 10
+>>id: 10,
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -2617,9 +2709,9 @@ id: 8
 >> ```
 >>
 >>{
->>type: @object_key,
+>>id: 94,
 >>pattern: @bool,
->>id: 94
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -2666,8 +2758,8 @@ id: 8
 >>
 >>{
 >>pattern: @number,
->>type: @object_key,
->>id: 30
+>>id: 30,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -2714,8 +2806,8 @@ id: 8
 >>
 >>{
 >>id: 85,
->>type: @object_key,
->>pattern: @number
+>>pattern: @number,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -2761,9 +2853,9 @@ id: 8
 >> ```
 >>
 >>{
+>>type: @object_key,
 >>pattern: @bool,
->>id: 102,
->>type: @object_key
+>>id: 102
 >>}
 >>
 >>``` 
@@ -2809,9 +2901,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
 >>id: 20,
->>type: @object_key
+>>type: @object_key,
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -2857,9 +2949,9 @@ id: 8
 >> ```
 >>
 >>{
+>>id: 61,
 >>pattern: @number,
->>type: @object_key,
->>id: 61
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -2905,9 +2997,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 86,
+>>pattern: @bool,
 >>type: @object_key,
->>pattern: @bool
+>>id: 86
 >>}
 >>
 >>``` 
@@ -2954,8 +3046,8 @@ id: 8
 >>
 >>{
 >>type: @object_key,
->>id: 45,
->>pattern: @number
+>>pattern: @number,
+>>id: 45
 >>}
 >>
 >>``` 
@@ -3001,9 +3093,9 @@ id: 8
 >> ```
 >>
 >>{
+>>type: @object_key,
 >>id: 47,
->>pattern: @number,
->>type: @object_key
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -3049,8 +3141,8 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @group,
 >>type: @object_key,
+>>pattern: @group,
 >>id: 71
 >>}
 >>
@@ -3098,8 +3190,8 @@ id: 8
 >>
 >>{
 >>id: 96,
->>type: @object_key,
->>pattern: @bool
+>>pattern: @bool,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -3145,9 +3237,9 @@ id: 8
 >> ```
 >>
 >>{
+>>id: 57,
 >>type: @object_key,
->>pattern: [@group] | @group,
->>id: 57
+>>pattern: [@group] | @group
 >>}
 >>
 >>``` 
@@ -3193,9 +3285,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @bool,
 >>type: @object_key,
->>id: 34
+>>id: 34,
+>>pattern: @bool
 >>}
 >>
 >>``` 
@@ -3289,9 +3381,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
 >>id: 46,
->>type: @object_key
+>>type: @object_key,
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -3337,9 +3429,9 @@ id: 8
 >> ```
 >>
 >>{
+>>type: @object_key,
 >>pattern: @bool,
->>id: 81,
->>type: @object_key
+>>id: 81
 >>}
 >>
 >>``` 
@@ -3385,8 +3477,8 @@ id: 8
 >> ```
 >>
 >>{
->>type: @object_key,
 >>id: 43,
+>>type: @object_key,
 >>pattern: @string
 >>}
 >>
@@ -3481,9 +3573,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
 >>type: @object_key,
->>id: 84
+>>id: 84,
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -3529,9 +3621,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 80,
 >>type: @object_key,
->>pattern: @item
+>>pattern: @item,
+>>id: 80
 >>}
 >>
 >>``` 
@@ -3578,8 +3670,8 @@ id: 8
 >>
 >>{
 >>id: 108,
->>type: @object_key,
->>pattern: @number
+>>pattern: @number,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -3721,8 +3813,8 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @bool,
 >>id: 59,
+>>pattern: @bool,
 >>type: @object_key
 >>}
 >>
@@ -3770,8 +3862,8 @@ id: 8
 >>
 >>{
 >>id: 65,
->>type: @object_key,
->>pattern: @bool
+>>pattern: @bool,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -3817,9 +3909,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 105,
+>>pattern: @number,
 >>type: @object_key,
->>pattern: @number
+>>id: 105
 >>}
 >>
 >>``` 
@@ -3865,9 +3957,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
 >>type: @object_key,
->>id: 28
+>>id: 28,
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -3913,8 +4005,8 @@ id: 8
 >> ```
 >>
 >>{
->>id: 29,
 >>type: @object_key,
+>>id: 29,
 >>pattern: @number
 >>}
 >>
@@ -3961,9 +4053,9 @@ id: 8
 >> ```
 >>
 >>{
+>>pattern: @bool,
 >>type: @object_key,
->>id: 87,
->>pattern: @bool
+>>id: 87
 >>}
 >>
 >>``` 
@@ -4009,9 +4101,9 @@ id: 8
 >> ```
 >>
 >>{
->>type: @object_key,
 >>id: 1,
->>pattern: @number
+>>pattern: @number,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -4058,8 +4150,8 @@ id: 8
 >>
 >>{
 >>pattern: @number,
->>id: 35,
->>type: @object_key
+>>type: @object_key,
+>>id: 35
 >>}
 >>
 >>``` 
@@ -4105,8 +4197,8 @@ id: 8
 >> ```
 >>
 >>{
->>type: @object_key,
 >>id: 79,
+>>type: @object_key,
 >>pattern: @number
 >>}
 >>
@@ -4201,8 +4293,8 @@ id: 8
 >> ```
 >>
 >>{
->>id: 16,
 >>type: @object_key,
+>>id: 16,
 >>pattern: @bool
 >>}
 >>
@@ -4249,9 +4341,9 @@ id: 8
 >> ```
 >>
 >>{
+>>id: 13,
 >>pattern: @bool,
->>type: @object_key,
->>id: 13
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -4345,9 +4437,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 106,
 >>pattern: @bool,
->>type: @object_key
+>>type: @object_key,
+>>id: 106
 >>}
 >>
 >>``` 
@@ -4393,8 +4485,8 @@ id: 8
 >> ```
 >>
 >>{
->>type: @object_key,
 >>id: 68,
+>>type: @object_key,
 >>pattern: @number
 >>}
 >>
@@ -4441,8 +4533,8 @@ id: 8
 >> ```
 >>
 >>{
->>id: 6,
 >>pattern: @number,
+>>id: 6,
 >>type: @object_key
 >>}
 >>
@@ -4489,9 +4581,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 97,
+>>pattern: @number,
 >>type: @object_key,
->>pattern: @number
+>>id: 97
 >>}
 >>
 >>``` 
@@ -4537,9 +4629,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
 >>type: @object_key,
->>id: 32
+>>id: 32,
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -4586,8 +4678,8 @@ id: 8
 >>
 >>{
 >>pattern: @number,
->>type: @object_key,
->>id: 63
+>>id: 63,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -4634,8 +4726,8 @@ id: 8
 >>
 >>{
 >>pattern: @bool,
->>id: 62,
->>type: @object_key
+>>type: @object_key,
+>>id: 62
 >>}
 >>
 >>``` 
@@ -4681,9 +4773,9 @@ id: 8
 >> ```
 >>
 >>{
+>>id: 90,
 >>pattern: @number,
->>type: @object_key,
->>id: 90
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -4729,8 +4821,8 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
 >>type: @object_key,
+>>pattern: @number,
 >>id: 75
 >>}
 >>
@@ -4778,8 +4870,8 @@ id: 8
 >>
 >>{
 >>id: 78,
->>type: @object_key,
->>pattern: @number
+>>pattern: @number,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -4825,8 +4917,8 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @color | @group | @function,
 >>type: @object_key,
+>>pattern: @color | @group | @function,
 >>id: 51
 >>}
 >>
@@ -4873,8 +4965,8 @@ id: 8
 >> ```
 >>
 >>{
->>id: 23,
 >>pattern: @color,
+>>id: 23,
 >>type: @object_key
 >>}
 >>
@@ -4921,9 +5013,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @group,
 >>type: @object_key,
->>id: 71
+>>id: 71,
+>>pattern: @group
 >>}
 >>
 >>``` 
@@ -4969,9 +5061,9 @@ id: 8
 >> ```
 >>
 >>{
+>>id: 101,
 >>pattern: @number,
->>type: @object_key,
->>id: 101
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -5017,9 +5109,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
+>>type: @object_key,
 >>id: 52,
->>type: @object_key
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -5065,8 +5157,8 @@ id: 8
 >> ```
 >>
 >>{
->>type: @object_key,
 >>pattern: @string,
+>>type: @object_key,
 >>id: 31
 >>}
 >>
@@ -5113,9 +5205,9 @@ id: 8
 >> ```
 >>
 >>{
->>type: @object_key,
+>>pattern: @number,
 >>id: 69,
->>pattern: @number
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -5209,9 +5301,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @bool,
+>>id: 11,
 >>type: @object_key,
->>id: 11
+>>pattern: @bool
 >>}
 >>
 >>``` 
@@ -5257,9 +5349,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
+>>type: @object_key,
 >>id: 9,
->>type: @object_key
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -5305,9 +5397,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 8,
+>>pattern: @number,
 >>type: @object_key,
->>pattern: @number
+>>id: 8
 >>}
 >>
 >>``` 
@@ -5354,8 +5446,8 @@ id: 8
 >>
 >>{
 >>pattern: @number,
->>id: 7,
->>type: @object_key
+>>type: @object_key,
+>>id: 7
 >>}
 >>
 >>``` 
@@ -5401,9 +5493,9 @@ id: 8
 >> ```
 >>
 >>{
+>>id: 100,
 >>pattern: @bool,
->>type: @object_key,
->>id: 100
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -5497,9 +5589,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @bool,
 >>id: 4,
->>type: @object_key
+>>type: @object_key,
+>>pattern: @bool
 >>}
 >>
 >>``` 
@@ -5546,8 +5638,8 @@ id: 8
 >>
 >>{
 >>pattern: @number,
->>id: 2,
->>type: @object_key
+>>type: @object_key,
+>>id: 2
 >>}
 >>
 >>``` 
@@ -5593,9 +5685,9 @@ id: 8
 >> ```
 >>
 >>{
+>>id: 72,
 >>pattern: @number,
->>type: @object_key,
->>id: 72
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -5641,9 +5733,9 @@ id: 8
 >> ```
 >>
 >>{
->>pattern: @number,
+>>id: 3,
 >>type: @object_key,
->>id: 3
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -5689,9 +5781,9 @@ id: 8
 >> ```
 >>
 >>{
->>id: 54,
+>>type: @object_key,
 >>pattern: @number,
->>type: @object_key
+>>id: 54
 >>}
 >>
 >>``` 
@@ -5833,9 +5925,9 @@ id: 8
 >> ```
 >>
 >>{
+>>type: @object_key,
 >>id: 24,
->>pattern: @number,
->>type: @object_key
+>>pattern: @number
 >>}
 >>
 >>``` 
@@ -5881,9 +5973,9 @@ id: 8
 >> ```
 >>
 >>{
->>type: @object_key,
 >>id: 25,
->>pattern: @number
+>>pattern: @number,
+>>type: @object_key
 >>}
 >>
 >>``` 
@@ -6133,8 +6225,8 @@ id: 8
 > ```
 >
 >(self, x: @number, y: @number, duration: @number = 0, easing: @easing_type = {
->id: 0,
->type: @easing_type
+>type: @easing_type,
+>id: 0
 >}, easing_rate: @number = 2) { /* code omitted */ }
 >
 >``` 
@@ -6178,8 +6270,8 @@ id: 8
 >> ```
 >>
 >>{
->>id: 0,
->>type: @easing_type
+>>type: @easing_type,
+>>id: 0
 >>}
 >>
 >>``` 
@@ -6470,8 +6562,8 @@ id: 8
 > ```
 >
 >(self, center: @group, degrees: @number, duration: @number = 0, easing: @easing_type = {
->id: 0,
->type: @easing_type
+>type: @easing_type,
+>id: 0
 >}, easing_rate: @number = 2, lock_object_rotation: @bool = false) { /* code omitted */ }
 >
 >``` 
@@ -6515,8 +6607,8 @@ id: 8
 >> ```
 >>
 >>{
->>id: 0,
->>type: @easing_type
+>>type: @easing_type,
+>>id: 0
 >>}
 >>
 >>``` 

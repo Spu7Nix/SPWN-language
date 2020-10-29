@@ -97,6 +97,9 @@ pub enum Token {
     #[token("->")]
     Arrow,
 
+    #[token("=>")]
+    ThickArrow,
+
     #[token("|")]
     Either,
 
@@ -290,9 +293,9 @@ impl Token {
     fn typ(&self) -> &'static str {
         use Token::*;
         match self {
-            Arrow | Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan
-            | LessThan | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign
-            | Add | Subtract | Multiply | Divide | As | Either => "operator",
+            Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
+            | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
+            | Subtract | Multiply | Divide | As | Either => "operator",
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -301,7 +304,7 @@ impl Token {
 
             Comma | OpenCurlyBracket | ClosingCurlyBracket | OpenSquareBracket
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
-            | Period | DotDot | At | Hash => "terminator",
+            | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
             | Import | Extract | Null | Type | Let | SelfVal | Break | Continue => "keyword",
@@ -1812,6 +1815,17 @@ fn parse_variable(
 
                 let body = match tokens.next(false, false) {
                     Some(Token::OpenCurlyBracket) => parse_cmp_stmt(tokens, notes)?,
+                    Some(Token::ThickArrow) => {
+                        let start = tokens.position().0;
+                        let expr = parse_expr(tokens, notes, true, true)?;
+                        let end = tokens.position().1;
+                        vec![ast::Statement {
+                            body: ast::StatementBody::Return(Some(expr)),
+                            arrow: false,
+                            comment: (None, None),
+                            pos: (start, end),
+                        }]
+                    }
                     a => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "'{'".to_string(),
@@ -1844,6 +1858,7 @@ fn parse_variable(
                     match test_tokens.next(false, false) {
                         Some(Token::ClosingBracket) => match test_tokens.next(false, false) {
                             Some(Token::OpenCurlyBracket) => parse_macro_def(tokens, notes)?,
+                            Some(Token::ThickArrow) => parse_macro_def(tokens, notes)?,
                             _ => {
                                 test_tokens.previous();
                                 (*tokens) = test_tokens;
@@ -1868,105 +1883,6 @@ fn parse_variable(
                     Err(e) => return Err(e),
                 },
             }
-
-            /*
-            //Either enclosed expression or macro definition
-            let parse_closed_expr = |tokens: &mut Tokens,
-                                     notes: &mut ParseNotes|
-             -> Result<ast::ValueBody, SyntaxError> {
-                //expr
-                let expr = ast::ValueBody::Expression(parse_expr(tokens, notes)?);
-                //consume closing bracket
-                match tokens.next(false, false) {
-                    Some(Token::ClosingBracket) => Ok(expr),
-                    a => {
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "')'".to_string(),
-                            found: format!("{}: \"{}\"", match a {Some(t) => t.typ(), None => "EOF"}, tokens.slice()),
-                            pos: tokens.position(),
-                        })
-                    }
-                }
-            };
-
-            let parse_macro_def = |tokens: &mut Tokens,
-                                   notes: &mut ParseNotes|
-             -> Result<ast::ValueBody, SyntaxError> {
-                let args = parse_arg_def(tokens, notes)?;
-
-                let body = match tokens.next(false, false) {
-                    Some(Token::OpenCurlyBracket) => parse_cmp_stmt(tokens, notes)?,
-                    a => {
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "'{'".to_string(),
-                            found: format!("{}: \"{}\"", match a {Some(t) => t.typ(), None => "EOF"}, tokens.slice()),
-                            pos: tokens.position(),
-                        })
-                    }
-                };
-
-                Ok(ast::ValueBody::Macro(ast::Macro {
-                    args,
-                    body: ast::CompoundStatement { statements: body },
-                    properties,
-                }))
-            };
-            //tokens.next(false, false);
-            match tokens.next(false, false) {
-                Some(Token::ClosingBracket) => {
-                    tokens.previous();
-                    //tokens.previous();
-
-                    parse_macro_def(tokens, notes)?
-                }
-
-                Some(Token::Symbol) => match tokens.next(false, false) {
-                    Some(Token::Comma) | Some(Token::Colon) => {
-                        tokens.previous();
-                        tokens.previous();
-
-                        parse_macro_def(tokens, notes)?
-                    }
-
-                    Some(Token::ClosingBracket) => match tokens.next(false, false) {
-                        Some(Token::OpenCurlyBracket) => {
-                            tokens.previous();
-                            tokens.previous();
-                            tokens.previous();
-
-                            parse_macro_def(tokens, notes)?
-                        }
-                        _ => {
-                            tokens.previous();
-                            tokens.previous();
-                            tokens.previous();
-
-                            parse_closed_expr(tokens, notes)?
-                        }
-                    },
-
-                    _ => {
-                        tokens.previous();
-                        tokens.previous();
-
-                        parse_closed_expr(tokens, notes)?
-                    }
-                },
-
-                Some(Token::Hash) => {
-                    //CHANGE THIS
-                    tokens.previous();
-                    //tokens.previous();
-
-                    parse_macro_def(tokens, notes)?
-                }
-                _ => {
-                    tokens.previous();
-
-                    parse_closed_expr(tokens, notes)?
-                }
-            }
-            */
         }
         Some(Token::OpenCurlyBracket) => {
             //either dictionary or function

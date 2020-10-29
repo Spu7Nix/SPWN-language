@@ -1,0 +1,6 @@
+
+num = counter(256)
+
+while_loop(() => num > 50, (){
+    num /= 2
+})
