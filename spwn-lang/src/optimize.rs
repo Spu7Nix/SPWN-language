@@ -178,7 +178,6 @@ pub fn optimize(mut obj_in: Vec<FunctionID>, mut closed_group: u16) -> Vec<Funct
             (*network.get_mut(&NO_GROUP).unwrap())[i].deleted = false;
         }
         //create spawn triggers
-        //TODO: keep track of delay
     }
 
     //for (g, len) in group_sizes {}

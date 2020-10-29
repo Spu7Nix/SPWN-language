@@ -36,6 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match &args_iter.next() {
         Some(a) => {
             match a as &str {
+                "help" => {
+                    println!("{}", include_str!("../help.txt"));
+                    Ok(())
+                }
                 "build" => {
                     let script_path = match args_iter.next() {
                         Some(a) => PathBuf::from(a),
@@ -94,7 +98,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         Ok(p) => p,
                     };
+                    let mut statement_counters: Vec<(&(PathBuf, (usize, usize)), &u128)> =
+                        compiled.statement_counter.iter().collect();
 
+                    statement_counters.sort_by(|a, b| b.1.cmp(a.1));
+                    for i in 0..30 {
+                        let ((file, (line, pos)), counter) = statement_counters[i];
+                        if statement_counters.len() > i {
+                            println!("{}:{}:{} : {}", file.to_string_lossy(), line, pos, counter);
+                        }
+                    }
                     let level_string = if let Some(gd_path) = &gd_path {
                         println!("{}", Colour::Cyan.bold().paint("Reading savefile..."));
 
@@ -183,7 +196,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("written to {:?}", output_path);
                     Ok(())
                 }
-                "format" => {
+                /*"format" => {
                     use std::fs::File;
                     use std::io::Write;
                     let script_path = match args_iter.next() {
@@ -191,7 +204,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         None => return Err(std::boxed::Box::from("Expected script file argument")),
                     };
 
-                    println!("Parsing...");
+                    println!("Formatting is not good yet, i will finish it before the final version is released.");
+
                     let unparsed = fs::read_to_string(script_path.clone())?;
 
                     let (parsed, _) = match parse_spwn(unparsed, script_path) {
@@ -208,8 +222,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     output_file.write_all(formatted.as_bytes())?;
 
                     Ok(())
-                }
-
+                }*/
                 a => {
                     eprintln!("Unknown command: {}", a);
                     std::process::exit(ERROR_EXIT_CODE);

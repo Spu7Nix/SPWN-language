@@ -260,27 +260,30 @@ pub fn compile_scope(
     globals: &mut Globals,
     mut info: CompilerInfo,
 ) -> Result<(Vec<Context>, Returns), RuntimeError> {
-    let statements_iter = statements.iter();
-
     let mut returns: Returns = Vec::new();
 
     //take out broken contexts
-    let mut new_contexts = Vec::new();
+
     let mut broken_contexts = Vec::new();
-    for c in contexts {
-        if c.broken == None {
-            new_contexts.push(c)
-        } else {
-            broken_contexts.push(c)
+    let mut to_be_removed = Vec::new();
+
+    for (i, c) in contexts.iter().enumerate() {
+        if c.broken != None {
+            broken_contexts.push(c.clone());
+            to_be_removed.push(i)
         }
     }
-    if new_contexts.is_empty() {
+
+    for i in to_be_removed.iter().rev() {
+        contexts.swap_remove(*i);
+    }
+    if contexts.is_empty() {
         return Ok((broken_contexts, returns));
     }
-    contexts = new_contexts;
+
     globals.stored_values.increment_lifetimes();
 
-    for statement in statements_iter {
+    for (statement_index, statement) in statements.iter().enumerate() {
         //find out what kind of statement this is
         //let start_time = Instant::now();
 
@@ -302,7 +305,8 @@ pub fn compile_scope(
         } else {
             None
         };
-
+        use std::time::Instant;
+        let start_time = Instant::now();
         info.pos = statement.pos;
         //use crate::fmt::SpwnFmt;
         match &statement.body {
@@ -772,20 +776,20 @@ pub fn compile_scope(
             }
         }
 
-        let mut new_contexts = Vec::new();
+        let mut to_be_removed = Vec::new();
 
-        for c in contexts.clone() {
-            if c.broken == None {
-                new_contexts.push(c)
-            } else {
-                broken_contexts.push(c)
+        for (i, c) in contexts.iter().enumerate() {
+            if c.broken != None {
+                broken_contexts.push(c.clone());
+                to_be_removed.push(i)
             }
         }
-        if new_contexts.is_empty() {
-            break;
+
+        for i in to_be_removed.iter().rev() {
+            contexts.swap_remove(*i);
         }
-        contexts = new_contexts;
-        if let Some(c) = &stored_context {
+
+        if let Some(c) = stored_context {
             //resetting the context if async
             for c in contexts {
                 if let Some(i) = c.broken {
@@ -797,8 +801,28 @@ pub fn compile_scope(
                     });
                 }
             }
-            contexts = (*c).clone();
+            contexts = c;
         }
+
+        if let Some(counter) = (*globals)
+            .statement_counter
+            .get_mut(&(info.current_file.clone(), statement.pos.0))
+        {
+            *counter += start_time.elapsed().as_millis();
+        } else {
+            (*globals).statement_counter.insert(
+                (info.current_file.clone(), statement.pos.0),
+                start_time.elapsed().as_millis(),
+            );
+        };
+        //try to merge contexts
+        //if statement_index < statements.len() - 1 {
+        loop {
+            if !merge_contexts(&mut contexts, globals) {
+                break;
+            }
+        }
+        //}
 
         /*println!(
             "{} -> Compiled '{}' in {} milliseconds!",

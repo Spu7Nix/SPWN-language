@@ -267,6 +267,95 @@ impl Context {
         out.func_id = globals.func_ids.len() - 1;
         out
     }
+
+}
+
+//will merge one set of context, returning false if no mergable contexts were found
+pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> bool {
+    
+    let mut mergable_ind = Vec::<usize>::new();
+    let mut ref_c = 0;
+    loop {
+        if ref_c >= contexts.len() {
+            return false;
+        }
+        for (i, c) in contexts.iter().enumerate() {
+            if i == ref_c {
+                continue;
+            }
+            let ref_c = &contexts[ref_c];
+
+            if (ref_c.broken == None) != (c.broken == None) {
+                continue;
+            }
+            let mut not_eq = false;
+
+            //check variables are equal
+            for (key, val) in &c.variables {
+                if globals.stored_values[ref_c.variables[key]] != globals.stored_values[*val] {
+                    not_eq = true;
+                    break;
+                }
+            }
+            if not_eq {
+                continue;
+            }
+            //check implementations are equal
+            for (key, val) in &c.implementations {
+                for (key2, val) in val {
+                    if globals.stored_values[ref_c.implementations[key][key2]] != globals.stored_values[*val] {
+                        not_eq = true;
+                        break;
+                    }
+                }
+            }
+            if not_eq {
+                continue;
+            }
+
+            //everything is equal, add to list
+            mergable_ind.push(i);
+        }
+        if mergable_ind.is_empty() {
+            ref_c += 1;
+        } else {
+            break
+        }
+    }
+
+    let new_group = Group::next_free(&mut globals.closed_groups);
+    //add spawn triggers
+    let mut add_spawn_trigger = |context: &Context| {
+        let mut params = HashMap::new();
+        params.insert(
+            51,
+            ObjParam::Group(new_group),
+        );
+        params.insert(1, ObjParam::Number(1268.0));
+
+        (*globals).func_ids[context.func_id].obj_list.push(
+            GDObj {
+                params,
+
+                ..context_trigger(&context)
+            }
+            .context_parameters(&context),
+        )
+    };
+    add_spawn_trigger(&contexts[ref_c]);
+    for i in mergable_ind.iter() {
+        add_spawn_trigger(&contexts[*i])
+    }
+    
+    (*contexts)[ref_c].start_group = new_group;
+    (*contexts)[ref_c].next_fn_id(globals);
+    
+    for i in mergable_ind.iter().rev() {
+        (*contexts).swap_remove(*i);
+    }
+
+    true
+    
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -791,6 +880,8 @@ pub struct Globals {
 
     pub func_ids: Vec<FunctionID>,
     pub objects: Vec<GDObj>,
+
+    pub statement_counter: HashMap<(PathBuf, (usize, usize)), u128>,
 }
 
 impl Globals {
@@ -856,6 +947,7 @@ impl Globals {
                 obj_list: Vec::new(),
             }],
             objects: Vec::new(),
+            statement_counter: HashMap::new(),
         };
 
         
@@ -1434,15 +1526,15 @@ Should be used like this: value.macro(arguments)".to_string(), info
         inner_inner_returns,
     ))
 }
-
+type ReturnsList = Vec<(Vec<StoredValue>, Context)>;
 fn all_combinations(
     a: Vec<ast::Expression>,
     context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
     constant: bool,
-) -> Result<(Vec<(Vec<StoredValue>, Context)>, Returns), RuntimeError> {
-    let mut out: Vec<(Vec<StoredValue>, Context)> = Vec::new();
+) -> Result<(ReturnsList, Returns), RuntimeError> {
+    let mut out = ReturnsList::new();
     let mut inner_returns = Returns::new();
     if a.is_empty() {
         //if there are so value, there is only one combination
@@ -1548,14 +1640,15 @@ impl ast::Variable {
         //mut define_new: bool,
         constant: bool,
     ) -> Result<(Returns, Returns), RuntimeError> {
-        // TODO: Check if this variable has native functions called on it, and if not set this to false
+        
         let mut start_val = Returns::new();
         let mut inner_returns = Returns::new();
 
         //let mut defined = true;
         if let Some(UnaryOperator::Let) = self.operator {
             let val = self.define(&mut context, globals, &info)?;
-            start_val = vec![(val, context.clone())];
+            start_val = vec![(val, context)];
+            return Ok((start_val, inner_returns));
         }
 
         use ast::IDClass;
@@ -1864,26 +1957,29 @@ impl ast::Variable {
                     let mut args: Vec<(String, Option<StoredValue>, ast::Tag, Option<StoredValue>)> =
                         Vec::new();
                     let mut expr_index = 0;
+                    
                     for arg in m.args.iter() {
+                        let def_val = match &arg.1 {
+                            Some(_) => {
+                                expr_index += 1;
+                                Some(
+                                    clone_value(defaults.0[expr_index - 1], 1, globals, &defaults.1, true)
+                                )
+                            }
+                            None => None,
+                        };
+                        let pat = match &arg.3 {
+                            Some(_) => {
+                                expr_index += 1;
+                                Some(defaults.0[expr_index - 1])
+                            }
+                            None => None,
+                        };
                         args.push((
                             arg.0.clone(),
-                            match &arg.1 {
-                                Some(_) => {
-                                    expr_index += 1;
-                                    Some(
-                                        clone_value(defaults.0[expr_index - 1], 1, globals, &defaults.1, true)
-                                    )
-                                }
-                                None => None,
-                            },
+                            def_val,
                             arg.2.clone(),
-                            match &arg.3 {
-                                Some(_) => {
-                                    expr_index += 1;
-                                    Some(defaults.0[expr_index - 1])
-                                }
-                                None => None,
-                            },
+                            pat,
                         ));
                     }
 

@@ -414,7 +414,7 @@ impl @counter {
     },
 
     _more_than_: (self, other: @number | @counter) {
-        //TODO: add case for another counter
+        
         if other.type == @number {
             self.item.if_is(LARGER_THAN, other, {
                 return true
@@ -434,7 +434,7 @@ impl @counter {
     },
 
     _less_than_: (self, other: @number | @counter) {
-        //TODO: add case for another counter
+        
         if other.type == @number {
             self.item.if_is(SMALLER_THAN, other, {
                 return true

@@ -167,6 +167,7 @@ solve = {
 	current_operator.item.if_is(EQUAL_TO, 2, {
 		//mult
 		secondary.multiply(main, 5)
+		main.reset(5)
 
 		last_pressed_operator.item.if_is(EQUAL_TO, 4, move_from_secondary)
 		set_display!

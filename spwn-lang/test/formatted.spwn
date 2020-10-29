@@ -1,65 +1,189 @@
-let constants = import "constants.spwn"
-extract constants.obj_props
-extract constants.comparisons
-extract constants.easing_types//type implementations
+main = counter(1i)
+secondary = counter(2i)
+second_display = 81g
+deathgroup = 92g
+limit_text = 93g
+no_text = 94g
+deathgroup.toggle_off()
+limit_text.toggle_off()
+no_text.toggle_off()
+remainder_display = counter(3i)
+show_remainder = {
+    91g.move(0, -30, 0.5, EASE_OUT)
+    wait(0.5)
+    91g.move(0, 30, 0.5, EASE_IN)
+}
+second_display.alpha(0)
+loading_anim = 86g
+loading_anim.alpha(0)
+loading = counter(0)
+start_loading = {
+    -> loading_anim.alpha(1, 1)
+    loading.item.if_is(EQUAL_TO, 0, {
+        loading.item.add(1)
+    })
+}
+end_loading = {
+    -> loading_anim.alpha(0, 0.2)
+    loading.item.if_is(EQUAL_TO, 1, {
+        loading.item.add(-1)
+    })
+}
+show_secondary = (operator) {
+    operators = [82g, 83g, 84g, 85g]
+    -> second_display.alpha(0.5, 0.5)
+    for i in 0..4 {
+	    if i == operator {
+		    operators[i].toggle_on()
+	    } else {
+		    operators[i].toggle_off()
+	    }
+    }
+}
+//set num display
+digits = [
+    {roll: 2g, target: 7g, anchors: [12g, 17g, 22g, 27g, 32g, 37g, 42g, 47g, 52g, 57g]},
+    {roll: 3g, target: 8g, anchors: [13g, 18g, 23g, 28g, 33g, 38g, 43g, 48g, 53g, 58g]},
+    {roll: 4g, target: 9g, anchors: [14g, 19g, 24g, 29g, 34g, 39g, 44g, 49g, 54g, 59g]},
+    {roll: 5g, target: 10g, anchors: [15g, 20g, 25g, 30g, 35g, 40g, 45g, 50g, 55g, 60g]},
+    {roll: 6g, target: 11g, anchors: [16g, 21g, 26g, 31g, 36g, 41g, 46g, 51g, 56g, 61g]},
+]
+for d in digits {
+    d.roll.follow(d.target)
+}
+set_display = {
+    wait(0.05)
+    referance = main.clone(10)
+    for digit in 5..0 {
+	    for i in 0..10 {
+		    lower_end = (i * (10 ^ digit))
+		    higher_end = ((i + 1) * (10 ^ digit))
+		    referance.item.if_is(LARGER_THAN, lower_end - 1, {
+		        referance.item.if_is(SMALLER_THAN, higher_end, {
+		            -> digits[digit].target.move_to(digits[digit].anchors[i], 0.5, easing = EASE_IN_OUT)
+		            referance.item.add(-lower_end)
+		        })
+		    })
+	    }
+    }
+}
+last_pressed_operator = counter(0)
+wait(1)
+set_display!
+selected_button = counter(0)
+button_anchors = [75g, 63g, 64g, 65g, 66g, 67g, 69g, 72g, 73g, 74g, 76g, 90g, 77g, 78g, 79g, 80g]
+select_box = 68g
+on(touch(true), {
+    loading.item.if_is(EQUAL_TO, 0, {
+        selected_button.item.add(1)
+        selected_button.item.if_is(EQUAL_TO, 16, {
+            selected_button.item.add(-16)
+        })
+        -> select_box.move_to(button_anchors[selected_button.to_const(0..16)])
+    })
+})
+current_operator = counter(0)
+check_valid = {
+    secondary.item.if_is(SMALLER_THAN, 0, {
+        deathgroup.toggle_on()
+        limit_text.toggle_on()
+    })
+    secondary.item.if_is(LARGER_THAN, 99998, {
+        deathgroup.toggle_on()
+        limit_text.toggle_on()
+    })
+}
+solve = {
+    start_loading!
+    move_from_secondary = {
+	    secondary.add_to([main.item], speed = 10)
+    }
+    current_operator.item.if_is(EQUAL_TO, 0, {
+            //plus
+    
+        main.add_to([secondary.item], speed = 10)
+        last_pressed_operator.item.if_is(EQUAL_TO, 4, move_from_secondary)
+        set_display!
+        check_valid!
+        end_loading!
+    })
+    current_operator.item.if_is(EQUAL_TO, 1, {
+            //minus
+    
+        main.subtract_from([secondary.item], speed = 10)
+        last_pressed_operator.item.if_is(EQUAL_TO, 4, move_from_secondary)
+        set_display!
+        current_operator.item.add(-1)
+        check_valid!
+        end_loading!
+    })
+    current_operator.item.if_is(EQUAL_TO, 2, {
+            //mult
+    
+        secondary.multiply(main, 5)
+        last_pressed_operator.item.if_is(EQUAL_TO, 4, move_from_secondary)
+        set_display!
+        current_operator.item.add(-2)
+        check_valid!
+        end_loading!
+    })
+        /*current_operator.item.if_is(EQUAL_TO, 3, {
+    //divide
+    main.item.if_is(EQUAL_TO, 0, {
+	    deathgroup.toggle_on()
+	    no_text.toggle_on()
+    })
+    secondary.divide(main, remainder_display, 4)
+    show_remainder!
+    
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																														    
+    last_pressed_operator.item.if_is(EQUAL_TO, 4, move_from_secondary)
+    set_display!
+    current_operator.item.add(-3)
+    check_valid!
+    end_loading!
+})*/
 
-import "group.spwn"
-import "color.spwn"
-import "item.spwn"
-import "block.spwn"
-import "counter.spwn"
-ctrl_flow = import "control_flow.spwn"
-extract ctrl_flow
-impl @array {
-    max: (self, minval = 0) {
-        let highest = minval
-        for el in self {
-    	    if el > highest {
-    		    highest = el
-    	    }
-        }
-        return highest
-    },
-    min: (self, max_val = 999999999999) {
-        let lowest = max_val
-        for el in self {
-    	    if el < lowest {
-    		    lowest = el
-    	    }
-        }
-        return lowest
-    },
-    contains: (self, el) {
-        let ret = false
-        for e in self {
-    	    if e == el {
-    		    ret = true
-    		    break
-    	    }
-        }
-        return ret
-    },
-    push: (self, value) {
-        $.append(self, value)
-    },
+    last_pressed_operator.item.if_is(EQUAL_TO, 4, {
+        -> second_display.alpha(0, 0.5)
+    })
 }
-// An event in spwn is a macro that returns a macro with one argument
-// which is the function that gets triggered on the event
-on = #[desc("Triggers a function every time an event fires")] (#[desc("Event to trigger on")] event: @macro, #[desc("Function to trigger")] function: @function) {
-    event(function)
-}
-return {
-    obj_props: constants.obj_props,
-    ..constants.easing_types,
-    ..constants.comparisons,
-    ..constants.colors,
-    ..import "general_triggers.spwn",
-    ..import "events.spwn",
-    ..ctrl_flow,
-    counter: @counter::new,
-    call_with_delay: call_with_delay,
-    on: on,
-    operation_scale: (new: @number) {
-        DEFAULT_SPEED = new
-    },
-}
+on(collision(1b, 2b), {
+    loading.item.if_is(EQUAL_TO, 0, {
+        last_pressed_operator.reset()
+        selected_button.item.if_is(SMALLER_THAN, 10, {
+                //number panel
+        
+            start_loading!
+            main.multiply(10, speed = 15)
+            -> main.item.add(selected_button.to_const(1..10))
+            set_display!
+            end_loading!
+        })
+        selected_button.item.if_is(LARGER_THAN, 11, {
+                //operator panel
+        
+            wait(0.2)
+            secondary.item.if_is(LARGER_THAN, 0, solve)
+            wait(0.2)
+            secondary.item.if_is(EQUAL_TO, 0, {
+                main.add_to([secondary.item], speed = 10)
+                set_display!
+            })
+            operator = (selected_button.to_const(12..16) - 12)
+            last_pressed_operator.item.add(operator)
+            show_secondary(operator)
+            current_operator.item.add(operator)
+        })
+        selected_button.item.if_is(EQUAL_TO, 10, {
+            last_pressed_operator.item.add(4)
+            solve!
+        })
+        selected_button.item.if_is(EQUAL_TO, 11, {
+            start_loading!
+            main.reset(speed = 10)
+            set_display!
+            end_loading!
+        })
+    })
+})

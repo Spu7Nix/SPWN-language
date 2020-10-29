@@ -132,12 +132,12 @@ check_valid = {
 solve = {
 	start_loading!
 	move_from_secondary = {
-		secondary.add_to([main.item], speed = 6)
+		secondary.add_to([main.item], speed = 10)
 	}
 	
 	if current_operator == 0 {
 		//plus
-		main.add_to([secondary.item], speed = 6)
+		main.add_to([secondary.item], speed = 10)
 		-> if last_pressed_operator == 4 {
 			move_from_secondary!
 		}
@@ -146,7 +146,7 @@ solve = {
 		end_loading!
 	} else if current_operator == 1 {
 		//minus
-		main.subtract_from([secondary.item], speed = 6)
+		main.subtract_from([secondary.item], speed = 10)
 		
 		-> if last_pressed_operator == 4 {
 			move_from_secondary!
@@ -159,6 +159,7 @@ solve = {
 	} else if current_operator == 2 {
 		//mult
 		secondary.multiply(main, 7)
+		main.reset(5)
 
 		-> if last_pressed_operator == 4 {
 			move_from_secondary!
@@ -167,7 +168,7 @@ solve = {
 		current_operator.add(-2)
 		check_valid!
 		end_loading!
-	} else if current_operator == 3 {
+	}/* else if current_operator == 3 {
 		//divide
 		-> if main == 0 {
 			death_group.toggle_on()
@@ -184,7 +185,7 @@ solve = {
 		current_operator.add(-3)
 		check_valid!
 		end_loading!
-	}
+	}*/
 	//preserve context split becuase we need the time to match
 	if last_pressed_operator == 4 {
 		-> second_display.alpha(0, 0.5)

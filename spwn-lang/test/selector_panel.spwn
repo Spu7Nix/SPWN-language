@@ -1,20 +1,16 @@
-//hello
-
-
-
 //groups defined in level
-//tst
 
-selector = 1g
-options = [2g, 3g, 4g, 5g, 6g, 7g]
+selector = 8g
+options = [1g, 2g, 3g, 4g, 5g, 6g, 7g]
 
 //keeps track of what option is selected
 selected = counter(0)
 
 on(touch(), {
-    -> selector.move_to(options[selected.to_const(0..options.length)])
-    wait(0.05)
+    
+    selector.move_to(options[selected.to_const(0..options.length)], 0.1)
     selected += 1
+    
     if selected == options.length {
         selected -= options.length
     }

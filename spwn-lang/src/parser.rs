@@ -17,7 +17,7 @@ use std::fmt;
 use crate::compiler::error_intro;
 
 pub type FileRange = ((usize, usize), (usize, usize));
-//TODO: add type defining statement
+
 #[derive(Debug)]
 pub enum SyntaxError {
     ExpectedErr {
@@ -631,6 +631,8 @@ pub fn parse_statement(
 ) -> Result<ast::Statement, SyntaxError> {
     let preceding_comment = check_for_comment(tokens);
 
+    let mut comment_after = None;
+
     let first = tokens.next(false, false);
 
     let (start_pos, _) = tokens.position();
@@ -667,7 +669,15 @@ pub fn parse_statement(
 
                 _ => {
                     tokens.previous();
-                    ast::StatementBody::Return(Some(parse_expr(tokens, notes, true, true)?))
+                    let mut expr = parse_expr(tokens, notes, true, true)?;
+                    comment_after =
+                        if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
+                            (*expr.values.last_mut().unwrap()).comment.1 = None;
+                            Some(comment)
+                        } else {
+                            None
+                        };
+                    ast::StatementBody::Return(Some(expr))
                 }
             }
         }
@@ -842,9 +852,16 @@ pub fn parse_statement(
             })
         }
 
-        Some(Token::ErrorStatement) => ast::StatementBody::Error(ast::Error {
-            message: parse_expr(tokens, notes, true, true)?,
-        }),
+        Some(Token::ErrorStatement) => {
+            let mut expr = parse_expr(tokens, notes, true, true)?;
+            comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
+                (*expr.values.last_mut().unwrap()).comment.1 = None;
+                Some(comment)
+            } else {
+                None
+            };
+            ast::StatementBody::Error(ast::Error { message: expr })
+        }
 
         Some(Token::Type) => match tokens.next(false, false) {
             Some(Token::Symbol) => ast::StatementBody::TypeDef(tokens.slice()),
@@ -891,7 +908,17 @@ pub fn parse_statement(
             }
         }
 
-        Some(Token::Extract) => ast::StatementBody::Extract(parse_expr(tokens, notes, true, true)?),
+        Some(Token::Extract) => {
+            let mut expr = parse_expr(tokens, notes, true, true)?;
+            comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
+                (*expr.values.last_mut().unwrap()).comment.1 = None;
+                Some(comment)
+            } else {
+                None
+            };
+
+            ast::StatementBody::Extract(expr)
+        }
 
         Some(_) => {
             //either expression, call or definition, FIGURE OUT
@@ -911,26 +938,20 @@ pub fn parse_statement(
                 //expression statement
                 // println!("found expr");
                 tokens.previous_no_ignore(false, true);
-                let (_, end_pos) = tokens.position();
 
-                let comment_after =
-                    if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
-                        (*expr.values.last_mut().unwrap()).comment.1 = None;
-                        Some(comment)
-                    } else {
-                        check_for_comment(tokens)
-                    };
+                comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone()
+                {
+                    (*expr.values.last_mut().unwrap()).comment.1 = None;
+                    Some(comment)
+                } else {
+                    None
+                };
                 /*println!(
                     "current token after stmt post comment: {}: ",
                     tokens.slice()
                 );*/
 
-                return Ok(ast::Statement {
-                    body: ast::StatementBody::Expr(expr),
-                    arrow,
-                    pos: (start_pos, end_pos),
-                    comment: (preceding_comment, comment_after),
-                });
+                ast::StatementBody::Expr(expr)
             }
         }
 
@@ -940,8 +961,9 @@ pub fn parse_statement(
         }
     };
     let (_, end_pos) = tokens.position();
-
-    let comment_after = check_for_comment(tokens);
+    if comment_after == None {
+        comment_after = check_for_comment(tokens);
+    }
     /*println!(
         "current token after stmt post comment: {}: ",
         tokens.slice()
@@ -1093,31 +1115,50 @@ fn parse_expr(
     let mut operators = Vec::<ast::Operator>::new();
 
     values.push(parse_variable(tokens, notes, check_for_comments)?);
-    loop {
-        let op = match tokens.next(false, false) {
-            Some(t) => match parse_operator(&t) {
-                Some(o) => {
-                    if allow_mut_op {
-                        o
-                    } else {
-                        match o {
-                            ast::Operator::Assign
-                            | ast::Operator::Add
-                            | ast::Operator::Subtract
-                            | ast::Operator::Multiply
-                            | ast::Operator::Divide => break,
-                            _ => o,
-                        }
-                    }
-                }
-                None => break,
-            },
-            None => break,
-        };
 
-        operators.push(op);
-        values.push(parse_variable(tokens, notes, check_for_comments)?);
+    while let Some(t) = tokens.next(false, false) {
+        if let Some(o) = parse_operator(&t) {
+            let op = if allow_mut_op {
+                o
+            } else {
+                match o {
+                    ast::Operator::Assign
+                    | ast::Operator::Add
+                    | ast::Operator::Subtract
+                    | ast::Operator::Multiply
+                    | ast::Operator::Divide => break,
+                    _ => o,
+                }
+            };
+
+            operators.push(op);
+            values.push(parse_variable(tokens, notes, check_for_comments)?);
+        } else {
+            break;
+        }
     }
+    // loop {
+    //     let op = match tokens.next(false, false) {
+    //         Some(t) => match parse_operator(&t) {
+    //             Some(o) => {
+    //                 if allow_mut_op {
+    //                     o
+    //                 } else {
+    //                     match o {
+    //                         ast::Operator::Assign
+    //                         | ast::Operator::Add
+    //                         | ast::Operator::Subtract
+    //                         | ast::Operator::Multiply
+    //                         | ast::Operator::Divide => break,
+    //                         _ => o,
+    //                     }
+    //                 }
+    //             }
+    //             None => break,
+    //         },
+    //         None => break,
+    //     };
+    // }
     tokens.previous_no_ignore(false, true);
 
     Ok(fix_precedence(ast::Expression { values, operators }))

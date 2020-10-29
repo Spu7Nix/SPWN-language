@@ -22,13 +22,13 @@ fn tabs(mut num: Indent) -> String {
     out
 }
 
-pub fn format(input: Vec<Statement>) -> String {
-    let mut out = String::new();
-    for s in input {
-        out += &s.fmt(0).to_string();
-    }
-    out
-}
+// pub fn format(input: Vec<Statement>) -> String {
+//     let mut out = String::new();
+//     for s in input {
+//         out += &s.fmt(0).to_string();
+//     }
+//     out
+// }
 
 fn element_list(elements: &[impl SpwnFmt], open: char, closing: char, ind: Indent) -> String {
     if elements.is_empty() {
