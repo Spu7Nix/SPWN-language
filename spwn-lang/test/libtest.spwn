@@ -1,5 +1,10 @@
 //for testing spwn libraries
+#[no_std]
 
-extract import "sublibtest.spwn"
+impl @number {
+    add: (a, b) => a + b
+}
 
-return a
+return {
+	msg: "hi"
+}

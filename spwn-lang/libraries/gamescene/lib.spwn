@@ -1,0 +1,103 @@
+hidden_group = ?g
+hidden_group.alpha(0)
+hide_player()
+
+extract $
+extract obj_props
+
+//dual portal
+add(obj {
+	OBJ_ID: 286,
+	X: 0,
+	Y: 0,
+	GROUPS: hidden_group,
+})
+
+//ship portal
+add(obj {
+	OBJ_ID: 13,
+	X: 0,
+	Y: 0,
+	GROUPS: hidden_group,
+})
+
+follow_x_group = ?g
+follow_y_group = ?g
+
+
+
+//move trigger
+//this is obj type because it needs a specific position
+add(obj {
+	OBJ_ID: 901,
+	X: 75,
+	Y: 90,
+	LOCK_TO_PLAYER_X: true,
+	TARGET: follow_x_group,
+	DURATION: 999
+})
+
+//follop p y
+add(obj {
+	OBJ_ID: 1814,
+	X: 75,
+	Y: 120,
+	TARGET: follow_y_group,
+	DURATION: 999,
+	SPEED: 1
+})
+
+ramp_offset = 6
+
+//ramp
+add(obj {
+	OBJ_ID: 1744,
+	HORIZONTAL_FLIP: true,
+	ROTATION: -90,
+	X: 75,
+	Y: 60 + ramp_offset,
+
+	GROUPS: [hidden_group, follow_x_group],
+})
+
+player_block = ?b
+collide_block = ?b
+
+//collision blocks
+add(obj {
+	OBJ_ID: 1816,
+	DYNAMIC_BLOCK: true,
+	BLOCK_A: player_block,
+	X: 75,
+	Y: 15,
+	GROUPS: [hidden_group, follow_x_group, follow_y_group]
+})
+
+add(obj {
+	OBJ_ID: 1816,
+	DYNAMIC_BLOCK: false,
+	BLOCK_A: collide_block,
+	X: 75,
+	Y: 45 + ramp_offset / 2,
+	GROUPS: [hidden_group, follow_x_group],
+	
+})
+
+
+return {
+	button_a: #[desc("Returns an event for when button A is pressed (the right side by default)")] () {
+		return collision(player_block, collide_block)
+	},
+	button_b: #[desc("Returns an event for when button B is pressed (the left side by default)")] () {
+		return touch(dual_side = true)
+	},
+
+	button_a_end: #[desc("Returns an event for when button A is released (the right side by default)")] () {
+		return collision_exit(player_block, collide_block)
+	},
+	button_b_end: #[desc("Returns an event for when button B is released (the left side by default)")] () {
+		return touch_end(dual_side = true)
+	},
+	hidden_group: #[desc("A group that is hidden (alpha = 0)")] hidden_group,
+}
+

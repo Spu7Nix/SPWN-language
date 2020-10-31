@@ -210,6 +210,7 @@ pub fn compile_spwn(
             &start_context,
             &mut globals,
             start_info.clone(),
+            false,
         )?;
 
         if standard_lib.len() != 1 {
@@ -283,7 +284,7 @@ pub fn compile_scope(
 
     globals.stored_values.increment_lifetimes();
 
-    for (statement_index, statement) in statements.iter().enumerate() {
+    for statement in statements.iter() {
         //find out what kind of statement this is
         //let start_time = Instant::now();
 
@@ -308,6 +309,8 @@ pub fn compile_scope(
         use std::time::Instant;
         let start_time = Instant::now();
         info.pos = statement.pos;
+
+        //println!("{}:{}:{}", info.current_file.to_string_lossy(), info.pos.0.0, info.pos.0.1);
         //use crate::fmt::SpwnFmt;
         match &statement.body {
             Break => {
@@ -490,7 +493,7 @@ pub fn compile_scope(
                                 returns.extend(compiled.1);
                                 contexts.extend(compiled.0.iter().map(|c| Context {
                                     variables: context.variables.clone(),
-                                    implementations: context.implementations.clone(),
+
                                     ..c.clone()
                                 }));
                             } else {
@@ -506,7 +509,7 @@ pub fn compile_scope(
                                         returns.extend(compiled.1);
                                         contexts.extend(compiled.0.iter().map(|c| Context {
                                             variables: context.variables.clone(),
-                                            implementations: context.implementations.clone(),
+
                                             ..c.clone()
                                         }));
                                     }
@@ -528,56 +531,81 @@ pub fn compile_scope(
             }
 
             Impl(imp) => {
-                let mut new_contexts: Vec<Context> = Vec::new();
-                for context in &contexts {
-                    let new_info = info.clone();
-                    let (evaled, inner_returns) =
-                        imp.symbol
-                            .to_value(context.clone(), globals, new_info, true)?;
-                    returns.extend(inner_returns);
-                    for (typ, c) in evaled {
-                        match globals.stored_values[typ].clone() {
-                            Value::TypeIndicator(s) => {
-                                let new_info = info.clone();
-                                let (evaled, inner_returns) =
-                                    eval_dict(imp.members.clone(), &c, globals, new_info, true)?;
+                let message = "cannot run impl statement in a function/group context, consider moving it to the start of your script.".to_string();
+                if contexts.len() > 1 || contexts[0].start_group.id != ID::Specific(0) {
+                    return Err(RuntimeError::RuntimeError { message, info });
+                }
 
-                                //Returns inside impl values dont really make sense do they
-                                returns.extend(inner_returns);
-                                for (val, c2) in evaled {
-                                    globals.stored_values.increment_single_lifetime(val, 1000);
-                                    let mut new_context = c2.clone();
-                                    if let Value::Dict(d) = &globals.stored_values[val] {
-                                        match new_context.implementations.get_mut(&s) {
-                                            Some(implementation) => {
-                                                for (key, val) in d.iter() {
-                                                    (*implementation).insert(key.clone(), *val);
-                                                }
-                                            }
-                                            None => {
-                                                new_context.implementations.insert(s, d.clone());
-                                            }
-                                        }
-                                    } else {
-                                        unreachable!();
+                let new_info = info.clone();
+                let (evaled, inner_returns) =
+                    imp.symbol
+                        .to_value(contexts[0].clone(), globals, new_info, true)?;
+
+                if evaled.len() > 1 {
+                    return Err(RuntimeError::RuntimeError {
+                        message: "impl statements with context-splitting values are not allowed"
+                            .to_string(),
+                        info,
+                    });
+                }
+                returns.extend(inner_returns);
+                let (typ, c) = evaled[0].clone();
+
+                if c.start_group.id != ID::Specific(0) {
+                    return Err(RuntimeError::RuntimeError { message, info });
+                }
+                match globals.stored_values[typ].clone() {
+                    Value::TypeIndicator(s) => {
+                        let new_info = info.clone();
+                        let (evaled, inner_returns) =
+                            eval_dict(imp.members.clone(), &c, globals, new_info, true)?;
+                        if evaled.len() > 1 {
+                            return Err(RuntimeError::RuntimeError {
+                                message:
+                                    "impl statements with context-splitting values are not allowed"
+                                        .to_string(),
+                                info,
+                            });
+                        }
+                        //Returns inside impl values dont really make sense do they
+                        if !inner_returns.is_empty() {
+                            return Err(RuntimeError::RuntimeError {
+                                message: "you can't use return from inside an impl statement"
+                                    .to_string(),
+                                info,
+                            });
+                        }
+                        let (val, _) = evaled[0];
+                        // make this not ugly, future me
+                        globals.stored_values.increment_single_lifetime(val, 1000);
+
+                        if let Value::Dict(d) = &globals.stored_values[val] {
+                            match globals.implementations.get_mut(&s) {
+                                Some(implementation) => {
+                                    for (key, val) in d.iter() {
+                                        (*implementation).insert(key.clone(), *val);
                                     }
-                                    new_contexts.push(new_context);
+                                }
+                                None => {
+                                    globals.implementations.insert(s, d.clone());
                                 }
                             }
-                            a => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: format!(
-                                        "Expected type-indicator, found {}",
-                                        a.to_str(globals)
-                                    ),
-                                    info,
-                                })
-                            }
+                        } else {
+                            unreachable!();
                         }
                     }
+                    a => {
+                        return Err(RuntimeError::RuntimeError {
+                            message: format!(
+                                "Expected type-indicator, found {}",
+                                a.to_str(globals)
+                            ),
+                            info,
+                        })
+                    }
                 }
+
                 //println!("{:?}", new_contexts[0].implementations);
-                contexts = new_contexts;
             }
             Call(call) => {
                 /*for context in &mut contexts {
@@ -670,7 +698,6 @@ pub fn compile_scope(
                             out_contexts.extend(new_contexts);
                             contexts.extend(out_contexts.iter().map(|c| Context {
                                 variables: context.variables.clone(),
-                                implementations: context.implementations.clone(),
                                 ..c.clone()
                             }));
                         }
@@ -713,7 +740,6 @@ pub fn compile_scope(
                             out_contexts.extend(new_contexts);
                             contexts.extend(out_contexts.iter().map(|c| Context {
                                 variables: context.variables.clone(),
-                                implementations: context.implementations.clone(),
                                 ..c.clone()
                             }));
                         }
@@ -848,34 +874,66 @@ pub fn compile_scope(
     Ok((contexts, returns))
 }
 
-fn merge_impl(target: &mut Implementations, source: &Implementations) {
-    for (key, imp) in source.iter() {
-        match target.get_mut(key) {
-            Some(target_imp) => (*target_imp).extend(imp.iter().map(|x| (x.0.clone(), *x.1))),
-            None => {
-                (*target).insert(*key, imp.clone());
-            }
-        }
-    }
-}
+// fn merge_impl(target: &mut Implementations, source: &Implementations) {
+//     for (key, imp) in source.iter() {
+//         match target.get_mut(key) {
+//             Some(target_imp) => (*target_imp).extend(imp.iter().map(|x| (x.0.clone(), *x.1))),
+//             None => {
+//                 (*target).insert(*key, imp.clone());
+//             }
+//         }
+//     }
+// }
 
 pub fn import_module(
     path: &PathBuf,
     context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
+    combine_paths: bool,
 ) -> Result<Returns, RuntimeError> {
-    let mut module_path = globals
-        .path
-        .clone()
-        .parent()
-        .expect("Your file must be in a folder to import modules!")
+    let mut module_path = if combine_paths {
+        globals
+            .path
+            .clone()
+            .parent()
+            .expect("Your file must be in a folder to import modules!")
+            .join(&path)
+    } else {
+        path.clone()
+    };
+
+    if !module_path.exists() {
+        //check lib folder
+        let new_path = match std::env::current_dir() {
+            // CHANGE THIS TO CURRENT_EXE BEFORE RELEASE
+            Ok(p) => p,
+            Err(e) => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!("Something went wrong when opening library folder: {}", e),
+                    info,
+                })
+            }
+        }
+        //.parent() ADD THIS BACK BEFORE RELEASE
+        //.unwrap()
+        .join("libraries")
         .join(&path);
+        module_path = new_path;
+    }
 
     if module_path.is_dir() {
         module_path = module_path.join("lib.spwn");
-    } else if module_path.extension().is_none() {
+    } else if module_path.is_file() && module_path.extension().is_none() {
         module_path.set_extension("spwn");
+    } else if !module_path.is_file() {
+        return Err(RuntimeError::RuntimeError {
+            message: format!(
+                "Couln't find library file (couldn't find it near the script path either) ({})",
+                module_path.to_string_lossy()
+            ),
+            info,
+        });
     }
 
     let unparsed = match fs::read_to_string(&module_path) {
@@ -904,6 +962,7 @@ pub fn import_module(
             &start_context,
             globals,
             info.clone(),
+            false,
         )?;
 
         if standard_lib.len() != 1 {
@@ -932,31 +991,24 @@ pub fn import_module(
 
     new_info.current_file = module_path;
 
-    let (contexts, returns) = compile_scope(&parsed, vec![start_context], globals, new_info)?;
+    let (contexts, mut returns) = compile_scope(&parsed, vec![start_context], globals, new_info)?;
     (*globals).path = stored_path;
 
     Ok(if returns.is_empty() {
         contexts
             .iter()
             .map(|x| {
-                let mut new_context = context.clone();
-
-                new_context.start_group = x.start_group;
-                merge_impl(&mut new_context.implementations, &x.implementations);
+                let mut new_context = x.clone();
+                new_context.variables = context.variables.clone();
                 (NULL_STORAGE, new_context)
             })
             .collect()
     } else {
-        returns
-            .iter()
-            .map(|(val, x)| {
-                let mut new_context = context.clone();
+        for (_, c) in &mut returns {
+            (*c).variables = context.variables.clone();
+        }
 
-                new_context.start_group = x.start_group;
-                merge_impl(&mut new_context.implementations, &x.implementations);
-                (*val, new_context)
-            })
-            .collect()
+        returns
     })
 }
 

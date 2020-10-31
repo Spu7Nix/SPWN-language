@@ -29,6 +29,22 @@ impl @group {
         wait(duration)
     },
 
+    lock_to_player: #[desc("Lock group to player position")] 
+    (
+        self,
+        #[desc("Lock to player X")] lock_x: @bool = true,
+        #[desc("Lock to player Y")] lock_y: @bool = true,
+        #[desc("Duration of lock")] duration: @number = 999, 
+    ) {
+        $.add( trigger{
+            OBJ_ID: 901,
+            TARGET: self,
+            DURATION: duration,
+            LOCK_TO_PLAYER_X: lock_x,
+            LOCK_TO_PLAYER_Y: lock_y,
+        })
+    },
+
     stop: #[desc("Implementation of the stop trigger")]
     (self){
         $.add( trigger{

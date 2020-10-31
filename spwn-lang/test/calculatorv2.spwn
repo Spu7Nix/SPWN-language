@@ -138,7 +138,7 @@ solve = {
 	if current_operator == 0 {
 		//plus
 		main.add_to([secondary.item], speed = 10)
-		-> if last_pressed_operator == 4 {
+		if last_pressed_operator == 4 {
 			move_from_secondary!
 		}
 		set_display!
@@ -148,7 +148,7 @@ solve = {
 		//minus
 		main.subtract_from([secondary.item], speed = 10)
 		
-		-> if last_pressed_operator == 4 {
+		if last_pressed_operator == 4 {
 			move_from_secondary!
 		}
 		set_display!

@@ -120,7 +120,7 @@ impl Value {
         context: &Context,
         globals: &mut Globals,
     ) -> Option<StoredValue> {
-        let get_impl = |t: u16, m: String| match context.implementations.get(&t) {
+        let get_impl = |t: u16, m: String| match globals.implementations.get(&t) {
             Some(imp) => match imp.get(&m) {
                 Some(mem) => Some(*mem),
                 None => None,
@@ -363,12 +363,17 @@ pub fn built_in_function(
                     }
                     match mode {
                         ObjectMode::Object => {
+                            if context.start_group.id != ID::Specific(0) {
+                                return Err(RuntimeError::BuiltinError {
+                                    message: String::from("you cannot add an obj type object in a function context. Consider moving this add function call to another context, or changing it to a trigger type"), 
+                                    info
+                                });
+                            }
                             let obj = GDObj {
                                 params: obj_map,
                                 func_id: context.func_id,
                                 mode: ObjectMode::Object,
-                            }
-                            .context_parameters(context);
+                            };
                             (*globals).objects.push(obj)
                         }
                         ObjectMode::Trigger => {

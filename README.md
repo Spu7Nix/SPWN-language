@@ -13,13 +13,12 @@ coming soon ish
 # Todo before release:
 
 - [x] Finish mutable variables
-- [ ] Type annotations for function arguments, variable definitions etc.
+- [x] Type annotations for function arguments, variable definitions etc.
 - [x] `as` operator for automatically changing type
-- [ ] suffix operators, make ! an operator instead of a statement
 - [ ] finish documentation
-- [ ] stop interpreting on return
-- [ ] break statement, continue statement
+- [x] break statement
 - [x] operation order
+- [ ] get and edit obj and trigger properties
 
 # Todo at some point
 

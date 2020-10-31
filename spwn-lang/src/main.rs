@@ -22,7 +22,7 @@ use std::path::PathBuf;
 
 use std::fs;
 
-pub const STD_PATH: &str = "../std";
+pub const STD_PATH: &str = "std";
 
 const ERROR_EXIT_CODE: i32 = 1;
 
@@ -103,9 +103,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     statement_counters.sort_by(|a, b| b.1.cmp(a.1));
                     for i in 0..30 {
-                        let ((file, (line, pos)), counter) = statement_counters[i];
-                        if statement_counters.len() > i {
-                            println!("{}:{}:{} : {}", file.to_string_lossy(), line, pos, counter);
+                        if i < statement_counters.len() {
+                            let ((file, (line, pos)), counter) = statement_counters[i];
+                            if statement_counters.len() > i {
+                                println!(
+                                    "{}:{}:{} : {}",
+                                    file.to_string_lossy(),
+                                    line,
+                                    pos,
+                                    counter
+                                );
+                            }
                         }
                     }
                     let level_string = if let Some(gd_path) = &gd_path {
@@ -125,8 +133,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         compiled.func_ids = optimize(compiled.func_ids, compiled.closed_groups);
                     }
 
-                    //println!("func ids: {:?}", compiled.func_ids);
                     let mut objects = levelstring::apply_fn_ids(&compiled.func_ids);
+
                     objects.extend(compiled.objects);
 
                     println!("{} objects added", objects.len());

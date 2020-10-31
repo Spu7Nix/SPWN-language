@@ -7,14 +7,20 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
-    let mut globals = Globals::new(path.clone());
+    let mut globals = Globals::new(PathBuf::new());
     //println!("{:?}", globals);
     let start_context = Context::new();
 
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
 
-    let module = import_module(path, &start_context, &mut globals, CompilerInfo::new())?;
+    let module = import_module(
+        path,
+        &start_context,
+        &mut globals,
+        CompilerInfo::new(),
+        false,
+    )?;
 
     if module.len() > 1 {
         return Err(RuntimeError::RuntimeError {
@@ -30,7 +36,7 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     );
 
     let exports = globals.stored_values[module[0].0].clone();
-    let implementations = module[0].1.implementations.clone();
+    let implementations = globals.implementations.clone();
 
     doc += "_This file was generated using `spwn doc [file name]`_\n";
 

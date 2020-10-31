@@ -61,7 +61,6 @@ on = #[desc("Triggers a function every time an event fires")] (
     event(function)
 }
 
-
 return {
     obj_props: constants.obj_props,
     ..constants.easing_types,

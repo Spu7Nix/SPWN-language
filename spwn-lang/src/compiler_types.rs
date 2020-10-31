@@ -83,7 +83,7 @@ impl ValStorage {
     }
 
     pub fn increment_single_lifetime(&mut self, index: usize, amount: u16) {
-        (*self.map.get_mut(&index).unwrap()).3 += amount;
+        (*self.map.get_mut(&index).expect(&(index.to_string() + " index not found"))).3 += amount;
         match self[index].clone() {
             Value::Array(a) => {
                 for e in a {
@@ -121,6 +121,7 @@ pub fn store_value(
     context: &Context,
 ) -> StoredValue {
     let index = globals.val_id;
+    
     (*globals)
         .stored_values
         .map
@@ -171,9 +172,9 @@ pub fn clone_value(
                 }
             }
 
-            for (_, v) in m.def_context.variables.iter_mut() {
-                (*v) = clone_value(*v, lifetime, globals, context, constant)
-            }
+            // for (_, v) in m.def_context.variables.iter_mut() {
+            //     (*v) = clone_value(*v, lifetime, globals, context, constant)
+            // }
         }
         _ => (),
     };
@@ -195,7 +196,9 @@ pub fn store_const_value(
     globals: &mut Globals,
     context: &Context,
 ) -> StoredValue {
+    
     let index = globals.val_id;
+    
     (*globals)
         .stored_values
         .map
@@ -214,7 +217,6 @@ pub struct Context {
     //pub spawn_triggered: bool,
     pub variables: HashMap<String, StoredValue>,
     //pub self_val: Option<StoredValue>,
-    pub implementations: Implementations,
 
     pub func_id: FnIDPtr,
 
@@ -249,7 +251,7 @@ impl Context {
             //spawn_triggered: false,
             variables: HashMap::new(),
             //return_val: Box::new(Value::Null),
-            implementations: HashMap::new(),
+            
             //self_val: None,
             func_id: 0,
             broken: None,
@@ -301,17 +303,17 @@ pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> boo
                 continue;
             }
             //check implementations are equal
-            for (key, val) in &c.implementations {
-                for (key2, val) in val {
-                    if globals.stored_values[ref_c.implementations[key][key2]] != globals.stored_values[*val] {
-                        not_eq = true;
-                        break;
-                    }
-                }
-            }
-            if not_eq {
-                continue;
-            }
+            // for (key, val) in &c.implementations {
+            //     for (key2, val) in val {
+            //         if globals.stored_values[ref_c.implementations[key][key2]] != globals.stored_values[*val] {
+            //             not_eq = true;
+            //             break;
+            //         }
+            //     }
+            // }
+            // if not_eq {
+            //     continue;
+            // }
 
             //everything is equal, add to list
             mergable_ind.push(i);
@@ -815,8 +817,8 @@ impl Value {
             }
             Value::Obj(o, _) => {
                 let mut out = String::new();
-                for (key, _val) in o {
-                    out += &format!("{},{},", key, "val");
+                for (key, val) in o {
+                    out += &format!("{},{},", key, val);
                 }
                 out.pop();
                 out += ";";
@@ -882,6 +884,8 @@ pub struct Globals {
     pub objects: Vec<GDObj>,
 
     pub statement_counter: HashMap<(PathBuf, (usize, usize)), u128>,
+
+    pub implementations: Implementations,
 }
 
 impl Globals {
@@ -948,6 +952,7 @@ impl Globals {
             }],
             objects: Vec::new(),
             statement_counter: HashMap::new(),
+            implementations: HashMap::new()
         };
 
         
@@ -1772,7 +1777,7 @@ impl ast::Variable {
             }
             ast::ValueBody::Import(i) => {
                 //let mut new_contexts = context.clone();
-                start_val = import_module(i, &context, globals, info.clone())?;
+                start_val = import_module(i, &context, globals, info.clone(), true)?;
             }
 
             ast::ValueBody::TypeIndicator(name) => {
@@ -1915,6 +1920,7 @@ impl ast::Variable {
                                                 })
                                             })
                                         }
+                                        
                                         out
                                     }),
                                     x => {
@@ -1931,6 +1937,7 @@ impl ast::Variable {
                             },
                         ))
                     }
+                    
                     start_val.push((
                         store_const_value(Value::Obj(obj, o.mode), 1, globals, &context),
                         context,
@@ -2040,7 +2047,7 @@ impl ast::Variable {
                     for x in &mut with_parent {
                         *x = (
                             match &globals.stored_values[x.0] {
-                                Value::TypeIndicator(t) => match x.1.implementations.get(&t) {
+                                Value::TypeIndicator(t) => match globals.implementations.get(&t) {
                                     Some(imp) => match imp.get(a) {
                                         Some(val) => {
                                             if let Value::Macro(m) = &globals.stored_values[*val] {
@@ -2342,7 +2349,7 @@ impl ast::Variable {
                     }
                 }
                 ast::Path::Associated(m) => match &globals.stored_values[current_ptr] {
-                    Value::TypeIndicator(t) => match context.implementations.get(t) {
+                    Value::TypeIndicator(t) => match globals.implementations.get(t) {
                         Some(imp) => {
                             if let Some(val) = imp.get(m) {
                                 current_ptr = *val;
@@ -2452,7 +2459,7 @@ impl ast::Variable {
                 }
                 ast::Path::Associated(m) => {
                     match &globals.stored_values[current_ptr] {
-                        Value::TypeIndicator(t) => match context.implementations.get_mut(t) {
+                        Value::TypeIndicator(t) => match (*globals).implementations.get_mut(t) {
                             Some(imp) => {
                                 if let Some(val) = imp.get(m) {
                                     current_ptr = *val;
@@ -2465,7 +2472,7 @@ impl ast::Variable {
                             None => {
                                 let mut new_imp = HashMap::new();
                                 new_imp.insert(m.clone(), value);
-                                context.implementations.insert(*t, new_imp);
+                                (*globals).implementations.insert(*t, new_imp);
                                 defined = false;
                                 current_ptr = value;
                             }

@@ -39,9 +39,12 @@ impl fmt::Display for ObjParam {
             ObjParam::Text(t) => write!(f, "{}", t),
             ObjParam::GroupList(list) => {
                 let mut out = String::new();
+
                 for g in list {
                     if let ID::Specific(id) = g.id {
                         out += &(id.to_string() + ".")
+                    } else {
+                        out += "?."
                     };
                 }
                 out.pop();
@@ -180,7 +183,6 @@ pub fn append_objects(
     old_ls: &str,
 ) -> Result<(String, [usize; 4]), String> {
     let mut closed_ids = get_used_ids(&old_ls);
-    println!("{:?}", closed_ids);
 
     //collect all specific ids mentioned into closed_[id] lists
     for obj in &objects {
@@ -190,27 +192,35 @@ pub fn append_objects(
             match prop {
                 ObjParam::Group(g) => {
                     class_index = 0;
-                    id = g.id;
+                    id = vec![g.id];
+                }
+
+                ObjParam::GroupList(l) => {
+                    class_index = 0;
+
+                    id = l.iter().map(|g| g.id).collect();
                 }
                 ObjParam::Color(g) => {
                     class_index = 1;
-                    id = g.id;
+                    id = vec![g.id];
                 }
                 ObjParam::Block(g) => {
                     class_index = 2;
-                    id = g.id;
+                    id = vec![g.id];
                 }
                 ObjParam::Item(g) => {
                     class_index = 3;
-                    id = g.id;
+                    id = vec![g.id];
                 }
                 _ => continue,
             }
-            match id {
-                ID::Specific(i) => {
-                    closed_ids[class_index].insert(i);
+            for id in id {
+                match id {
+                    ID::Specific(i) => {
+                        closed_ids[class_index].insert(i);
+                    }
+                    _ => continue,
                 }
-                _ => continue,
             }
         }
     }

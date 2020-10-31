@@ -1,7 +1,7 @@
 #[no_std]
 
-type comparison
-type easing_type
+type @comparison
+type @easing_type
 
 //comparison
 cmp = (id: @number) {
@@ -17,6 +17,8 @@ et = (id: @number) {
 ok = (id: @number, pat: @pattern | @type_indicator) {
     return @object_key::{id: id, pattern: pat}
 }
+
+
 
 return {
     easing_types : {
@@ -55,7 +57,7 @@ return {
         OBJ_ID : ok(1, @number),            
         X : ok(2, @number),
         Y : ok(3, @number),
-        VORIZONTAL_FLIP : ok(4, @bool),
+        HORIZONTAL_FLIP : ok(4, @bool),
         VERTICAL_FLIP : ok(5, @bool),
         ROTATION : ok(6, @number),
         TRIGGER_RED : ok(7, @number),

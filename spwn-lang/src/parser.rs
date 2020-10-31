@@ -866,24 +866,45 @@ pub fn parse_statement(
             ast::StatementBody::Error(ast::Error { message: expr })
         }
 
-        Some(Token::Type) => match tokens.next(false, false) {
-            Some(Token::Symbol) => ast::StatementBody::TypeDef(tokens.slice()),
-            a => {
-                return Err(SyntaxError::ExpectedErr {
-                    expected: "type name".to_string(),
-                    found: format!(
-                        "{}: \"{}\"",
-                        match a {
-                            Some(t) => t.typ(),
-                            None => "EOF",
-                        },
-                        tokens.slice()
-                    ),
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                })
+        Some(Token::Type) => {
+            match tokens.next(false, false) {
+                Some(Token::At) => (),
+                a => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "@".to_string(),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
+            };
+
+            match tokens.next(false, false) {
+                Some(Token::Symbol) => ast::StatementBody::TypeDef(tokens.slice()),
+                a => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "type name".to_string(),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
             }
-        },
+        }
 
         Some(Token::Implement) => {
             //parse impl statement

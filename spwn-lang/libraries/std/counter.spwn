@@ -3,7 +3,7 @@
 extract import "control_flow.spwn"
 extract import "constants.spwn".comparisons
 let DEFAULT_SPEED = 3
-type counter
+type @counter
 
 impl @counter {
 

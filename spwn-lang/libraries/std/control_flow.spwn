@@ -8,14 +8,15 @@ extract constants.comparisons
 wait = #[desc("Adds a delay before the next triggers")] (
 	#[desc("Delay time in seconds")] time: @number
 ){
-	
-	$.add( trigger{
-		OBJ_ID: 1268,
-		SPAWN_DURATION: time,
-		TARGET: {
-			return
-		},
-	})
+	if time > 0 {
+		$.add( trigger{
+			OBJ_ID: 1268,
+			SPAWN_DURATION: time,
+			TARGET: {
+				return
+			},
+		})
+	}
 	
 }
 call_with_delay = #[desc("Call a function after a delay")] (
