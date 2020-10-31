@@ -98,24 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         Ok(p) => p,
                     };
-                    let mut statement_counters: Vec<(&(PathBuf, (usize, usize)), &u128)> =
-                        compiled.statement_counter.iter().collect();
 
-                    statement_counters.sort_by(|a, b| b.1.cmp(a.1));
-                    for i in 0..30 {
-                        if i < statement_counters.len() {
-                            let ((file, (line, pos)), counter) = statement_counters[i];
-                            if statement_counters.len() > i {
-                                println!(
-                                    "{}:{}:{} : {}",
-                                    file.to_string_lossy(),
-                                    line,
-                                    pos,
-                                    counter
-                                );
-                            }
-                        }
-                    }
                     let level_string = if let Some(gd_path) = &gd_path {
                         println!("{}", Colour::Cyan.bold().paint("Reading savefile..."));
 
@@ -178,11 +161,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     use std::fs::File;
                     use std::io::Write;
                     let lib_path = match args_iter.next() {
-                        Some(a) => PathBuf::from(a),
-                        None => return Err(std::boxed::Box::from("Expected script file argument")),
+                        Some(a) => a,
+                        None => {
+                            return Err(std::boxed::Box::from("Expected library name argument"))
+                        }
                     };
 
-                    let documentation = match documentation::document_lib(&lib_path) {
+                    let documentation = match documentation::document_lib(lib_path) {
                         Ok(doc) => doc,
                         Err(e) => {
                             eprintln!("{}\n", e);
@@ -192,12 +177,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     //println!("doc {:?}", documentation);
 
-                    let mut output_path = lib_path.clone();
+                    let mut output_path = PathBuf::from(lib_path.clone());
                     output_path.pop();
-                    output_path.push(PathBuf::from(format!(
-                        "{}-docs.md",
-                        lib_path.file_stem().unwrap().to_str().unwrap()
-                    )));
+                    output_path.push(PathBuf::from(format!("{}-docs.md", lib_path)));
 
                     let mut output_file = File::create(&output_path)?;
                     output_file.write_all(documentation.as_bytes())?;

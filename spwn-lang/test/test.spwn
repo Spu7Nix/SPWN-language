@@ -1,5 +1,5 @@
 
-gamescene = import "../libraries/gamescene"
+gamescene = import gamescene
 my_counter = counter(1i)
 
 a = counter(0)

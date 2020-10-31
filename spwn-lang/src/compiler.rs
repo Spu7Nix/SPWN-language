@@ -179,6 +179,7 @@ pub fn compile_spwn(
                 path: vec!["main scope".to_string()],
                 pos: ((0, 0), (0, 0)),
                 current_file: path,
+                current_module: String::new(),
             },
         });
     }
@@ -192,6 +193,7 @@ pub fn compile_spwn(
         path: vec!["main scope".to_string()],
         pos: statements[0].pos,
         current_file: path,
+        current_module: String::new(),
     };
     use std::time::Instant;
 
@@ -206,11 +208,10 @@ pub fn compile_spwn(
 
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
         let standard_lib = import_module(
-            &PathBuf::from(STD_PATH),
+            &ImportType::Lib(STD_PATH.to_string()),
             &start_context,
             &mut globals,
             start_info.clone(),
-            false,
         )?;
 
         if standard_lib.len() != 1 {
@@ -583,11 +584,16 @@ pub fn compile_scope(
                             match globals.implementations.get_mut(&s) {
                                 Some(implementation) => {
                                     for (key, val) in d.iter() {
-                                        (*implementation).insert(key.clone(), *val);
+                                        (*implementation).insert(key.clone(), (*val, true));
                                     }
                                 }
                                 None => {
-                                    globals.implementations.insert(s, d.clone());
+                                    globals.implementations.insert(
+                                        s,
+                                        d.iter()
+                                            .map(|(key, value)| (key.clone(), (*value, true)))
+                                            .collect(),
+                                    );
                                 }
                             }
                         } else {
@@ -830,17 +836,6 @@ pub fn compile_scope(
             contexts = c;
         }
 
-        if let Some(counter) = (*globals)
-            .statement_counter
-            .get_mut(&(info.current_file.clone(), statement.pos.0))
-        {
-            *counter += start_time.elapsed().as_millis();
-        } else {
-            (*globals).statement_counter.insert(
-                (info.current_file.clone(), statement.pos.0),
-                start_time.elapsed().as_millis(),
-            );
-        };
         //try to merge contexts
         //if statement_index < statements.len() - 1 {
         loop {
@@ -874,53 +869,48 @@ pub fn compile_scope(
     Ok((contexts, returns))
 }
 
-// fn merge_impl(target: &mut Implementations, source: &Implementations) {
-//     for (key, imp) in source.iter() {
-//         match target.get_mut(key) {
-//             Some(target_imp) => (*target_imp).extend(imp.iter().map(|x| (x.0.clone(), *x.1))),
-//             None => {
-//                 (*target).insert(*key, imp.clone());
-//             }
-//         }
-//     }
-// }
+fn merge_impl(target: &mut Implementations, source: &Implementations) {
+    for (key, imp) in source.iter() {
+        match target.get_mut(key) {
+            Some(target_imp) => (*target_imp).extend(imp.iter().map(|x| (x.0.clone(), *x.1))),
+            None => {
+                (*target).insert(*key, imp.clone());
+            }
+        }
+    }
+}
 
 pub fn import_module(
-    path: &PathBuf,
+    path: &ImportType,
     context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
-    combine_paths: bool,
 ) -> Result<Returns, RuntimeError> {
-    let mut module_path = if combine_paths {
-        globals
+    let mut module_path = match path {
+        ImportType::Script(p) => globals
             .path
             .clone()
             .parent()
             .expect("Your file must be in a folder to import modules!")
-            .join(&path)
-    } else {
-        path.clone()
-    };
+            .join(&p),
 
-    if !module_path.exists() {
-        //check lib folder
-        let new_path = match std::env::current_dir() {
-            // CHANGE THIS TO CURRENT_EXE BEFORE RELEASE
-            Ok(p) => p,
-            Err(e) => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!("Something went wrong when opening library folder: {}", e),
-                    info,
-                })
+        ImportType::Lib(name) => {
+            match std::env::current_dir() {
+                // CHANGE THIS TO CURRENT_EXE BEFORE RELEASE
+                Ok(p) => p,
+                Err(e) => {
+                    return Err(RuntimeError::RuntimeError {
+                        message: format!("Something went wrong when opening library folder: {}", e),
+                        info,
+                    })
+                }
             }
+            //.parent() ADD THIS BACK BEFORE RELEASE
+            //.unwrap()
+            .join("libraries")
+            .join(name)
         }
-        //.parent() ADD THIS BACK BEFORE RELEASE
-        //.unwrap()
-        .join("libraries")
-        .join(&path);
-        module_path = new_path;
-    }
+    };
 
     if module_path.is_dir() {
         module_path = module_path.join("lib.spwn");
@@ -929,7 +919,7 @@ pub fn import_module(
     } else if !module_path.is_file() {
         return Err(RuntimeError::RuntimeError {
             message: format!(
-                "Couln't find library file (couldn't find it near the script path either) ({})",
+                "Couln't find library file ({})",
                 module_path.to_string_lossy()
             ),
             info,
@@ -956,13 +946,18 @@ pub fn import_module(
 
     let mut start_context = Context::new();
 
+    let mut stored_impl = None;
+    if let ImportType::Lib(_) = path {
+        stored_impl = Some(globals.implementations.clone());
+        globals.implementations = HashMap::new();
+    }
+
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
         let standard_lib = import_module(
-            &PathBuf::from(STD_PATH),
+            &ImportType::Lib(STD_PATH.to_string()),
             &start_context,
             globals,
             info.clone(),
-            false,
         )?;
 
         if standard_lib.len() != 1 {
@@ -991,8 +986,32 @@ pub fn import_module(
 
     new_info.current_file = module_path;
 
+    if let ImportType::Lib(l) = path {
+        new_info.current_module = l.clone();
+    }
+
     let (contexts, mut returns) = compile_scope(&parsed, vec![start_context], globals, new_info)?;
     (*globals).path = stored_path;
+
+    if let Some(stored_impl) = stored_impl {
+        //change and delete from impls
+        let mut to_be_deleted = Vec::new();
+        for (k1, imp) in &mut globals.implementations {
+            for (k2, (_, in_scope)) in imp {
+                if *in_scope {
+                    (*in_scope) = false;
+                } else {
+                    to_be_deleted.push((*k1, k2.clone()));
+                }
+            }
+        }
+        for (k1, k2) in to_be_deleted {
+            (*globals).implementations.get_mut(&k1).unwrap().remove(&k2);
+        }
+
+        //merge impls
+        merge_impl(&mut globals.implementations, &stored_impl);
+    }
 
     Ok(if returns.is_empty() {
         contexts

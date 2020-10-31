@@ -11,8 +11,9 @@ use std::path::PathBuf;
 use crate::compiler::{compile_scope, import_module, RuntimeError, BUILTIN_STORAGE, NULL_STORAGE};
 
 pub type TypeID = u16;
-
-pub type Implementations = HashMap<TypeID, HashMap<String, StoredValue>>;
+//                                                               This bool is for if this value
+//                                                               was implemented in the current module
+pub type Implementations = HashMap<TypeID, HashMap<String, (StoredValue, bool)>>;
 pub type StoredValue = usize; //index to stored value in globals.stored_values
 
 pub struct ValStorage {
@@ -212,6 +213,12 @@ pub type FnIDPtr = usize;
 pub type Returns = Vec<(StoredValue, Context)>;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
+pub enum ImportType {
+    Script(PathBuf),
+    Lib(String)
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Context {
     pub start_group: Group,
     //pub spawn_triggered: bool,
@@ -230,6 +237,7 @@ pub struct CompilerInfo {
     pub depth: u8,
     pub path: Vec<String>,
     pub current_file: PathBuf,
+    pub current_module: String, // empty string means script
     pub pos: FileRange,
 }
 
@@ -239,6 +247,7 @@ impl CompilerInfo {
             depth: 0,
             path: vec!["main scope".to_string()],
             current_file: PathBuf::new(),
+            current_module: String::new(),
             pos: ((0, 0), (0, 0)),
         }
     }
@@ -864,6 +873,8 @@ pub struct FunctionID {
     pub obj_list: Vec<GDObj>, //list of objects in this function id
 }
 
+
+
 pub struct Globals {
     //counters for arbitrary groups
     pub closed_groups: u16,
@@ -883,7 +894,6 @@ pub struct Globals {
     pub func_ids: Vec<FunctionID>,
     pub objects: Vec<GDObj>,
 
-    pub statement_counter: HashMap<(PathBuf, (usize, usize)), u128>,
 
     pub implementations: Implementations,
 }
@@ -951,7 +961,6 @@ impl Globals {
                 obj_list: Vec::new(),
             }],
             objects: Vec::new(),
-            statement_counter: HashMap::new(),
             implementations: HashMap::new()
         };
 
@@ -1777,7 +1786,7 @@ impl ast::Variable {
             }
             ast::ValueBody::Import(i) => {
                 //let mut new_contexts = context.clone();
-                start_val = import_module(i, &context, globals, info.clone(), true)?;
+                start_val = import_module(i, &context, globals, info.clone())?;
             }
 
             ast::ValueBody::TypeIndicator(name) => {
@@ -2049,7 +2058,7 @@ impl ast::Variable {
                             match &globals.stored_values[x.0] {
                                 Value::TypeIndicator(t) => match globals.implementations.get(&t) {
                                     Some(imp) => match imp.get(a) {
-                                        Some(val) => {
+                                        Some((val, _)) => {
                                             if let Value::Macro(m) = &globals.stored_values[*val] {
                                                 if !m.args.is_empty() && m.args[0].0 == "self" {
                                                     return Err(RuntimeError::RuntimeError {
@@ -2352,7 +2361,7 @@ impl ast::Variable {
                     Value::TypeIndicator(t) => match globals.implementations.get(t) {
                         Some(imp) => {
                             if let Some(val) = imp.get(m) {
-                                current_ptr = *val;
+                                current_ptr = val.0;
                             } else {
                                 return false;
                             }
@@ -2461,17 +2470,17 @@ impl ast::Variable {
                     match &globals.stored_values[current_ptr] {
                         Value::TypeIndicator(t) => match (*globals).implementations.get_mut(t) {
                             Some(imp) => {
-                                if let Some(val) = imp.get(m) {
+                                if let Some((val,_)) = imp.get(m) {
                                     current_ptr = *val;
                                 } else {
-                                    (*imp).insert(m.clone(), value);
+                                    (*imp).insert(m.clone(), (value, true));
                                     defined = false;
                                     current_ptr = value;
                                 }
                             }
                             None => {
                                 let mut new_imp = HashMap::new();
-                                new_imp.insert(m.clone(), value);
+                                new_imp.insert(m.clone(), (value, true));
                                 (*globals).implementations.insert(*t, new_imp);
                                 defined = false;
                                 current_ptr = value;

@@ -122,7 +122,7 @@ impl Value {
     ) -> Option<StoredValue> {
         let get_impl = |t: u16, m: String| match globals.implementations.get(&t) {
             Some(imp) => match imp.get(&m) {
-                Some(mem) => Some(*mem),
+                Some(mem) => Some(mem.0),
                 None => None,
             },
             None => None,

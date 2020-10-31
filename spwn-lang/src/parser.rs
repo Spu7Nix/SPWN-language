@@ -15,6 +15,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::compiler::error_intro;
+use crate::compiler_types::ImportType;
 
 pub type FileRange = ((usize, usize), (usize, usize));
 
@@ -1787,7 +1788,10 @@ fn parse_variable(
         }
 
         Some(Token::Import) => ast::ValueBody::Import(match tokens.next(false, false) {
-            Some(Token::StringLiteral) => PathBuf::from(ast::str_content(tokens.slice())),
+            Some(Token::StringLiteral) => {
+                ImportType::Script(PathBuf::from(ast::str_content(tokens.slice())))
+            }
+            Some(Token::Symbol) => ImportType::Lib(tokens.slice()),
             a => {
                 return Err(SyntaxError::ExpectedErr {
                     expected: "literal string".to_string(),

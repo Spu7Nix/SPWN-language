@@ -3,7 +3,7 @@
 use crate::fmt::SpwnFmt;
 use std::path::PathBuf;
 
-use crate::compiler_types::StoredValue;
+use crate::compiler_types::{ImportType, StoredValue};
 use crate::parser::FileRange;
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
@@ -64,7 +64,7 @@ pub enum ValueBody {
     Bool(bool),
     Expression(Expression),
     Str(String),
-    Import(PathBuf),
+    Import(ImportType),
     Array(Vec<Expression>),
     Obj(ObjectLiteral),
     Macro(Macro),

@@ -2,24 +2,25 @@
 //use crate::ast::*;
 use crate::builtin::TYPE_MEMBER_NAME;
 use crate::compiler::{import_module, RuntimeError};
-use crate::compiler_types::{find_key_for_value, CompilerInfo, Context, Globals, Macro, Value};
+use crate::compiler_types::{
+    find_key_for_value, CompilerInfo, Context, Globals, ImportType, Macro, Value,
+};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
+pub fn document_lib(path: &str) -> Result<String, RuntimeError> {
     let mut globals = Globals::new(PathBuf::new());
-    //println!("{:?}", globals);
+
     let start_context = Context::new();
 
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
 
     let module = import_module(
-        path,
+        &ImportType::Lib(path.to_string()),
         &start_context,
         &mut globals,
         CompilerInfo::new(),
-        false,
     )?;
 
     if module.len() > 1 {
@@ -30,10 +31,7 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
         });
     }
 
-    let mut doc = format!(
-        "# Documentation for `{}` \n",
-        path.file_stem().unwrap().to_str().unwrap()
-    );
+    let mut doc = format!("# Documentation for `{}` \n", path);
 
     let exports = globals.stored_values[module[0].0].clone();
     let implementations = globals.implementations.clone();
@@ -48,7 +46,7 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
     let total_objects = globals.func_ids.iter().fold(0, |mut sum, val| {
         sum += val.obj_list.len();
         sum
-    });
+    }) + globals.objects.len();
 
     //if used_groups > 0 || used_colors > 0 || used_blocks > 0 || used_used > 0 {
     doc += "## Info:\n";
@@ -70,7 +68,17 @@ pub fn document_lib(path: &PathBuf) -> Result<String, RuntimeError> {
 
     doc += "## Type Implementations:\n";
 
-    let mut list: Vec<(&u16, &HashMap<String, usize>)> = implementations.iter().collect();
+    let mut list: Vec<(&u16, HashMap<String, usize>)> = implementations
+        .iter()
+        .map(|(key, val)| {
+            (
+                key,
+                val.iter()
+                    .map(|(key, val)| (key.clone(), val.0))
+                    .collect::<HashMap<String, usize>>(),
+            )
+        })
+        .collect();
     list.sort_by(|a, b| a.0.cmp(b.0));
 
     for (typ, dict) in list.iter() {
