@@ -89,7 +89,7 @@ return {
         FADE_IN : ok(45, @number),
         HOLD : ok(46, @number),
         FADE_OUT : ok(47, @number),
-        PULSE_MODE : ok(48, @number),
+        PULSE_HSV : ok(48, @bool),
         COPIED_COLOR_HVS : ok(49, @string),
         COPIED_COLOR_ID : ok(50, @color),
         TARGET : ok(51, @color | @group | @function),

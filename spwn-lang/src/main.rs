@@ -28,6 +28,8 @@ const ERROR_EXIT_CODE: i32 = 1;
 
 use ansi_term::Colour;
 
+const HELP: &str = include_str!("../help.txt");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let mut args_iter = args.iter();
@@ -37,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(a) => {
             match a as &str {
                 "help" => {
-                    println!("{}", include_str!("../help.txt"));
+                    println!("{}", HELP);
                     Ok(())
                 }
                 "build" => {
@@ -214,11 +216,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(())
                 }*/
                 a => {
-                    eprintln!("Unknown command: {}", a);
+                    eprintln!("Unknown subcommand: {}", a);
                     std::process::exit(ERROR_EXIT_CODE);
                 }
             }
         }
-        None => Ok(()),
+        None => {
+            println!("{}", HELP);
+            Ok(())
+        }
     }
 }

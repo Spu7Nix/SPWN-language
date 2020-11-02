@@ -8,7 +8,9 @@ use crate::parser::FileRange;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::compiler::{compile_scope, import_module, RuntimeError, BUILTIN_STORAGE, NULL_STORAGE};
+use smallvec::{SmallVec, smallvec};
+
+use crate::compiler::{compile_scope, import_module, RuntimeError, BUILTIN_STORAGE, NULL_STORAGE, CONTEXT_MAX};
 
 pub type TypeID = u16;
 //                                                               This bool is for if this value
@@ -19,6 +21,8 @@ pub type StoredValue = usize; //index to stored value in globals.stored_values
 pub struct ValStorage {
     pub map: HashMap<usize, (Value, Group, bool, u16)>, //val, fn context, mutable, lifetime
 }
+
+
 
 /*
 LIFETIME:
@@ -210,7 +214,7 @@ pub fn store_const_value(
 
 pub type FnIDPtr = usize;
 
-pub type Returns = Vec<(StoredValue, Context)>;
+pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum ImportType {
@@ -282,7 +286,7 @@ impl Context {
 }
 
 //will merge one set of context, returning false if no mergable contexts were found
-pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> bool {
+pub fn merge_contexts(contexts: &mut SmallVec<[Context; CONTEXT_MAX]>, globals: &mut Globals) -> bool {
     
     let mut mergable_ind = Vec::<usize>::new();
     let mut ref_c = 0;
@@ -1026,7 +1030,7 @@ fn handle_operator(
 
                     if  !val2.matches_pat(pat, &info, globals, context)? {
                         //if types dont match, act as if there is no macro at all
-                        return Ok(vec![(
+                        return Ok(smallvec![(
                             store_value(
                                 built_in_function(
                                     macro_name,
@@ -1058,7 +1062,7 @@ fn handle_operator(
                 )?;
                 values
             } else {
-                vec![(
+                smallvec![(
                     store_value(
                         built_in_function(
                             macro_name,
@@ -1075,7 +1079,7 @@ fn handle_operator(
                 )]
             }
         } else {
-            vec![(
+            smallvec![(
                 store_value(
                     built_in_function(macro_name, vec![value1, value2], info, globals, &context)?,
                     1,
@@ -1122,7 +1126,7 @@ impl ast::Expression {
         }
 
         for (i, var) in vals.enumerate() {
-            let mut new_acum: Returns = Vec::new();
+            let mut new_acum: Returns = SmallVec::new();
             //every value in acum will be operated with the value of var in the corresponding context
             for (acum_val, c) in acum {
                 //what the value in acum becomes
@@ -1212,7 +1216,7 @@ impl ast::Expression {
                             globals,
                             info.clone()
                         )?,
-                        Range => vec![(
+                        Range => smallvec![(
                             store_value(
                                 {
                                     let end = match globals.stored_values[*val] {
@@ -1324,8 +1328,8 @@ pub fn execute_macro(
     parent: StoredValue,
     info: CompilerInfo,
 ) -> Result<(Returns, Returns), RuntimeError> {
-    let mut inner_inner_returns = Vec::new();
-    let mut new_contexts: Vec<Context> = Vec::new();
+    let mut inner_inner_returns = SmallVec::new();
+    let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> = SmallVec::new();
     if !m.args.is_empty() {
         // second returns is for any compound statements in the args
         let (evaled_args, inner_returns) = all_combinations(
@@ -1468,56 +1472,6 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
     let returns = if compiled.1.is_empty() {
         compiled.0.iter().map(|x| (1, x.clone())).collect()
-    } else if compiled.1.len() > 1 {
-        let mut return_vals = Vec::<(Value, u8, Vec<Context>)>::new();
-        for (val, c) in compiled.1 {
-            let mut found = false;
-            for val2 in &mut return_vals {
-                if globals.stored_values[val] == val2.0 {
-                    (*val2).1 += 1;
-                    (*val2).2.push(c.clone());
-                    found = true;
-                    break;
-                }
-            }
-            if !found {
-                return_vals.push((globals.stored_values[val].clone(), 1, vec![c]));
-            }
-        }
-
-        let mut rets = Returns::new();
-
-        for (val, count, c) in return_vals {
-            if count > 1 {
-                let mut new_context = context.clone();
-                //new_context.spawn_triggered = true;
-                //pick a start group
-                let start_group = Group::next_free(&mut globals.closed_groups);
-
-                for cont in c {
-                    let mut params = HashMap::new();
-                    params.insert(1, ObjParam::Number(1268.0));
-                    params.insert(51, ObjParam::Group(start_group));
-                    let obj = GDObj {
-                        params,
-
-                        ..context_trigger(&cont)
-                    }
-                    .context_parameters(&cont);
-                    (*globals).func_ids[context.func_id].obj_list.push(obj);
-                }
-
-                new_context.start_group = start_group;
-
-                rets.push((store_value(val, 1, globals, &context), new_context))
-            } else {
-                rets.push((store_value(val, 1, globals, &context), c[0].clone()))
-            }
-            //compact the returns down to one function with a return
-
-            //create the function context
-        }
-        rets
     } else {
         compiled.1
     };
@@ -1661,7 +1615,7 @@ impl ast::Variable {
         //let mut defined = true;
         if let Some(UnaryOperator::Let) = self.operator {
             let val = self.define(&mut context, globals, &info)?;
-            start_val = vec![(val, context)];
+            start_val = smallvec![(val, context)];
             return Ok((start_val, inner_returns));
         }
 
@@ -2537,7 +2491,7 @@ impl ast::CompoundStatement {
         new_context.start_group = start_group;
         let new_info = info;
         let (contexts, inner_returns) =
-            compile_scope(&self.statements, vec![new_context], globals, new_info)?;
+            compile_scope(&self.statements, smallvec![new_context], globals, new_info)?;
 
         for c in contexts {
             if let Some(i) = c.broken {

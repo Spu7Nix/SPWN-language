@@ -104,9 +104,6 @@ $.print(longest_player_thread.item, ",", longest_ai_thread.item)
 ready_sign = ?i
 
 
-
-$.print("ready_sign: ", ready_sign)
-
 wait_for_ready = () {
 	closure = {
 		on(ready_sign.count(1), {

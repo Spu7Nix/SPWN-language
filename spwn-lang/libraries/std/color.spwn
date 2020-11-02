@@ -52,7 +52,7 @@ impl @color {
             HOLD: hold,
             FADE_OUT: fade_out,
             TARGET: self,
-            PULSE_MODE: hsv,
+            PULSE_HSV: hsv,
             //TARGET_TYPE: 0 //color
         })
         wait(fade_in + hold + fade_out)

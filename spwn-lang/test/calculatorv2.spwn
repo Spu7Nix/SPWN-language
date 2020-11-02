@@ -1,7 +1,6 @@
 // rewrite of the calculator with a more modern version of spwn
 // a bit buggy, and a bit slow, but it works
 
-
 death_group = 92g
 
 limit_text = 93g

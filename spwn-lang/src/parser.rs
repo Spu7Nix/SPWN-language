@@ -253,6 +253,9 @@ pub enum Token {
     #[token("continue")]
     Continue,
 
+    #[token("while")]
+    While,
+
     #[token("obj")]
     Object,
 
@@ -307,8 +310,12 @@ impl Token {
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
             | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
+            While | Continue => {
+                "reserved keyword (not currently in use, but may be used in future updates)"
+            }
+
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue => "keyword",
+            | Import | Extract | Null | Type | Let | SelfVal | Break => "keyword",
             Comment => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -821,33 +828,33 @@ pub fn parse_statement(
                     })
                 }
             };
-            let mut body = parse_cmp_stmt(tokens, notes)?;
+            let body = parse_cmp_stmt(tokens, notes)?;
 
             //fix confusing gd behavior
-            if body
-                .iter()
-                .all(|x| matches!(x.body, ast::StatementBody::Call(_)))
-            {
-                //maybe not the fastest way, but the syntax tree is just too large to just paste in
-                let new_statement = parse_spwn(
-                    String::from(
-                        "
-(){
-    $.add(obj {
-        1: 1268,
-        63: 0.05,
-        51: {
-            return
-        },
-    })
-}()
-                ",
-                    ),
-                    PathBuf::new(),
-                )?;
+            //             if body
+            //                 .iter()
+            //                 .all(|x| matches!(x.body, ast::StatementBody::Call(_)))
+            //             {
+            //                 //maybe not the fastest way, but the syntax tree is just too large to just paste in
+            //                 let new_statement = parse_spwn(
+            //                     String::from(
+            //                         "
+            // (){
+            //     $.add(obj {
+            //         1: 1268,
+            //         63: 0.05,
+            //         51: {
+            //             return
+            //         },
+            //     })
+            // }()
+            //                 ",
+            //                     ),
+            //                     PathBuf::new(),
+            //                 )?;
 
-                body.push(new_statement.0[0].clone());
-            }
+            //                 body.push(new_statement.0[0].clone());
+            //             }
 
             ast::StatementBody::For(ast::For {
                 symbol,

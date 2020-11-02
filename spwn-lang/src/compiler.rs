@@ -13,6 +13,8 @@ use crate::compiler_types::*;
 
 use ansi_term::Colour;
 
+pub const CONTEXT_MAX: usize = 2;
+
 #[derive(Debug)]
 pub enum RuntimeError {
     UndefinedErr {
@@ -233,7 +235,12 @@ pub fn compile_spwn(
         }
     }
 
-    let (contexts, _) = compile_scope(&statements, vec![start_context], &mut globals, start_info)?;
+    let (contexts, _) = compile_scope(
+        &statements,
+        smallvec![start_context],
+        &mut globals,
+        start_info,
+    )?;
 
     for c in contexts {
         if let Some(i) = c.broken {
@@ -256,18 +263,20 @@ pub fn compile_spwn(
     Ok(globals)
 }
 
+use smallvec::{smallvec, SmallVec};
+
 pub fn compile_scope(
     statements: &[ast::Statement],
-    mut contexts: Vec<Context>,
+    mut contexts: SmallVec<[Context; CONTEXT_MAX]>,
     globals: &mut Globals,
     mut info: CompilerInfo,
-) -> Result<(Vec<Context>, Returns), RuntimeError> {
-    let mut returns: Returns = Vec::new();
+) -> Result<(SmallVec<[Context; CONTEXT_MAX]>, Returns), RuntimeError> {
+    let mut returns: Returns = SmallVec::new();
 
     //take out broken contexts
 
-    let mut broken_contexts = Vec::new();
-    let mut to_be_removed = Vec::new();
+    let mut broken_contexts = SmallVec::new();
+    let mut to_be_removed = SmallVec::<[usize; CONTEXT_MAX]>::new();
 
     for (i, c) in contexts.iter().enumerate() {
         if c.broken != None {
@@ -307,8 +316,7 @@ pub fn compile_scope(
         } else {
             None
         };
-        use std::time::Instant;
-        let start_time = Instant::now();
+
         info.pos = statement.pos;
 
         //println!("{}:{}:{}", info.current_file.to_string_lossy(), info.pos.0.0, info.pos.0.1);
@@ -323,7 +331,7 @@ pub fn compile_scope(
             }
 
             Expr(expr) => {
-                let mut new_contexts: Vec<Context> = Vec::new();
+                let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> = SmallVec::new();
                 for context in &contexts {
                     let is_assign = !expr.operators.is_empty()
                         && expr.operators[0] == ast::Operator::Assign
@@ -356,7 +364,7 @@ pub fn compile_scope(
                                 let new_info = info.clone();
                                 let (_, inner_returns) = compile_scope(
                                     &f.statements,
-                                    vec![new_context],
+                                    smallvec![new_context],
                                     globals,
                                     new_info,
                                 )?;
@@ -403,14 +411,14 @@ pub fn compile_scope(
             }
 
             Extract(val) => {
-                let mut all_values: Returns = Vec::new();
+                let mut all_values: Returns = SmallVec::new();
                 for context in &contexts {
                     let (evaled, inner_returns) = val.eval(context, globals, info.clone(), true)?;
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
 
-                contexts = Vec::new();
+                contexts = SmallVec::new();
                 for (val, mut context) in all_values {
                     match globals.stored_values[val].clone() {
                         Value::Dict(d) => {
@@ -470,7 +478,7 @@ pub fn compile_scope(
             }
 
             If(if_stmt) => {
-                let mut all_values: Returns = Vec::new();
+                let mut all_values: Returns = SmallVec::new();
                 for context in &contexts {
                     let new_info = info.clone();
                     let (evaled, inner_returns) =
@@ -478,7 +486,7 @@ pub fn compile_scope(
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
-                contexts = Vec::new();
+                contexts = SmallVec::new();
                 for (val, context) in all_values {
                     match &globals.stored_values[val] {
                         Value::Bool(b) => {
@@ -487,7 +495,7 @@ pub fn compile_scope(
                                 let new_info = info.clone();
                                 let compiled = compile_scope(
                                     &if_stmt.if_body,
-                                    vec![context.clone()],
+                                    smallvec![context.clone()],
                                     globals,
                                     new_info,
                                 )?;
@@ -503,7 +511,7 @@ pub fn compile_scope(
                                         let new_info = info.clone();
                                         let compiled = compile_scope(
                                             body,
-                                            vec![context.clone()],
+                                            smallvec![context.clone()],
                                             globals,
                                             new_info,
                                         )?;
@@ -617,7 +625,7 @@ pub fn compile_scope(
                 /*for context in &mut contexts {
                     context.x += 1;
                 }*/
-                let mut all_values: Returns = Vec::new();
+                let mut all_values: Returns = SmallVec::new();
                 for context in contexts {
                     let (evaled, inner_returns) =
                         call.function
@@ -625,7 +633,7 @@ pub fn compile_scope(
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
-                contexts = Vec::new();
+                contexts = SmallVec::new();
                 //let mut obj_list = Vec::<GDObj>::new();
                 for (func, context) in all_values {
                     contexts.push(context.clone());
@@ -660,22 +668,24 @@ pub fn compile_scope(
             }
 
             For(f) => {
-                let mut all_arrays: Returns = Vec::new();
+                let mut all_arrays: Returns = SmallVec::new();
                 for context in &contexts {
                     let (evaled, inner_returns) =
                         f.array.eval(context, globals, info.clone(), true)?;
                     returns.extend(inner_returns);
                     all_arrays.extend(evaled);
                 }
-                contexts = Vec::new();
+                contexts = SmallVec::new();
                 for (val, context) in all_arrays {
                     match globals.stored_values[val].clone() {
                         Value::Array(arr) => {
                             //let iterator_val = store_value(Value::Null, globals);
                             //let scope_vars = context.variables.clone();
 
-                            let mut new_contexts = vec![context.clone()];
-                            let mut out_contexts = Vec::new();
+                            let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> =
+                                smallvec![context.clone()];
+                            let mut out_contexts: SmallVec<[Context; CONTEXT_MAX]> =
+                                SmallVec::new();
 
                             for element in arr {
                                 //println!("{}", new_contexts.len());
@@ -689,7 +699,7 @@ pub fn compile_scope(
                                 let (end_contexts, inner_returns) =
                                     compile_scope(&f.body, new_contexts, globals, new_info)?;
 
-                                new_contexts = Vec::new();
+                                new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
                                     if c.broken == None {
                                         new_contexts.push(c)
@@ -714,8 +724,10 @@ pub fn compile_scope(
                             let range: &mut dyn Iterator<Item = i32> =
                                 if start < end { &mut normal } else { &mut rev };
 
-                            let mut new_contexts = vec![context.clone()];
-                            let mut out_contexts = Vec::new();
+                            let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> =
+                                smallvec![context.clone()];
+                            let mut out_contexts: SmallVec<[Context; CONTEXT_MAX]> =
+                                SmallVec::new();
 
                             for num in range {
                                 //println!("{}", new_contexts.len());
@@ -731,7 +743,7 @@ pub fn compile_scope(
                                 let (end_contexts, inner_returns) =
                                     compile_scope(&f.body, new_contexts, globals, new_info)?;
 
-                                new_contexts = Vec::new();
+                                new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
                                     if c.broken == None {
                                         new_contexts.push(c)
@@ -761,7 +773,7 @@ pub fn compile_scope(
             }
             Return(return_val) => match return_val {
                 Some(val) => {
-                    let mut all_values: Returns = Vec::new();
+                    let mut all_values: Returns = SmallVec::new();
                     for context in &contexts {
                         let new_info = info.clone();
                         let (evaled, inner_returns) = val.eval(context, globals, new_info, true)?;
@@ -773,7 +785,7 @@ pub fn compile_scope(
                 }
 
                 None => {
-                    let mut all_values: Returns = Vec::new();
+                    let mut all_values: Returns = SmallVec::new();
                     for context in &contexts {
                         all_values.push((
                             store_value(Value::Null, 1, globals, context),
@@ -894,22 +906,20 @@ pub fn import_module(
             .expect("Your file must be in a folder to import modules!")
             .join(&p),
 
-        ImportType::Lib(name) => {
-            match std::env::current_dir() {
-                // CHANGE THIS TO CURRENT_EXE BEFORE RELEASE
-                Ok(p) => p,
-                Err(e) => {
-                    return Err(RuntimeError::RuntimeError {
-                        message: format!("Something went wrong when opening library folder: {}", e),
-                        info,
-                    })
-                }
+        ImportType::Lib(name) => match std::env::current_dir() {
+            //change to current_exe before release
+            Ok(p) => p,
+            Err(e) => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!("Something went wrong when opening library folder: {}", e),
+                    info,
+                })
             }
-            //.parent() ADD THIS BACK BEFORE RELEASE
-            //.unwrap()
-            .join("libraries")
-            .join(name)
         }
+        //.parent() ADD BACK BEFORE RELEASE
+        //.unwrap()
+        .join("libraries")
+        .join(name),
     };
 
     if module_path.is_dir() {
@@ -985,12 +995,14 @@ pub fn import_module(
     let mut new_info = info;
 
     new_info.current_file = module_path;
+    new_info.pos = ((0, 0), (0, 0));
 
     if let ImportType::Lib(l) = path {
         new_info.current_module = l.clone();
     }
 
-    let (contexts, mut returns) = compile_scope(&parsed, vec![start_context], globals, new_info)?;
+    let (contexts, mut returns) =
+        compile_scope(&parsed, smallvec![start_context], globals, new_info)?;
     (*globals).path = stored_path;
 
     if let Some(stored_impl) = stored_impl {

@@ -205,8 +205,8 @@ impl @group {
             FADE_IN: fade_in,
             HOLD: hold,
             FADE_OUT: fade_out,
-            TARGET_COLOR: self,
-            PULSE_MODE: hsv,
+            TARGET_COLOR: self as @number as @color,
+            PULSE_HSV: hsv,
             TARGET_TYPE: 1 //group
         })
         wait(fade_in + hold + fade_out)

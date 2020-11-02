@@ -293,12 +293,12 @@ pub fn append_objects(
             }
         }
     }
-    for class_index in 0..4 {
-        if closed_ids[class_index].len() > ID_MAX as usize {
+    for (i, list) in closed_ids.iter().enumerate() {
+        if list.len() > ID_MAX as usize {
             return Err(format!(
                 "This level exeeds the {} limit! ({}/{})",
-                ["group", "color", "block ID", "item ID"][class_index],
-                closed_ids[class_index].len(),
+                ["group", "color", "block ID", "item ID"][i],
+                list.len(),
                 ID_MAX
             ));
         }

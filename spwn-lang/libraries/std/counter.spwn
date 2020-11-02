@@ -526,6 +526,7 @@ impl @counter {
 
     _add_: (self, num: @number | @counter) {
         if num.type == @number {
+            wait(0.05)
             self.add(num)
             wait(0.05)
         } else if num.type == @counter {
@@ -537,6 +538,7 @@ impl @counter {
 
     _subtract_: (self, num: @number | @counter) {
         if num.type == @number {
+            wait(0.05)
             self.add(-num)
             wait(0.05)
         } else if num.type == @counter {
