@@ -480,9 +480,10 @@ pub fn compile_scope(
             If(if_stmt) => {
                 let mut all_values: Returns = SmallVec::new();
                 for context in &contexts {
-                    let new_info = info.clone();
                     let (evaled, inner_returns) =
-                        if_stmt.condition.eval(context, globals, new_info, true)?;
+                        if_stmt
+                            .condition
+                            .eval(context, globals, info.clone(), true)?;
                     returns.extend(inner_returns);
                     all_values.extend(evaled);
                 }
@@ -775,8 +776,8 @@ pub fn compile_scope(
                 Some(val) => {
                     let mut all_values: Returns = SmallVec::new();
                     for context in &contexts {
-                        let new_info = info.clone();
-                        let (evaled, inner_returns) = val.eval(context, globals, new_info, true)?;
+                        let (evaled, inner_returns) =
+                            val.eval(context, globals, info.clone(), true)?;
                         returns.extend(inner_returns);
                         all_values.extend(evaled);
                     }
@@ -798,8 +799,7 @@ pub fn compile_scope(
 
             Error(e) => {
                 for context in &contexts {
-                    let new_info = info.clone();
-                    let (evaled, _) = e.message.eval(context, globals, new_info, true)?;
+                    let (evaled, _) = e.message.eval(context, globals, info.clone(), true)?;
                     for (msg, _) in evaled {
                         let exclam = Colour::Red.bold().paint("!");
                         eprintln!(

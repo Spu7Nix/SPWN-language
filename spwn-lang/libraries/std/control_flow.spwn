@@ -6,9 +6,9 @@ extract constants.obj_props
 extract constants.comparisons
 
 wait = #[desc("Adds a delay before the next triggers")] (
-	#[desc("Delay time in seconds")] time: @number
+	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{}
 ){
-	if time > 0 {
+	if time.type == @epsilon || time > 0 {
 		$.add( trigger{
 			OBJ_ID: 1268,
 			SPAWN_DURATION: time,
@@ -20,7 +20,7 @@ wait = #[desc("Adds a delay before the next triggers")] (
 	
 }
 call_with_delay = #[desc("Call a function after a delay")] (
-	#[desc("Delay time in seconds")] time: @number, 
+	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{}, 
 	#[desc("Function to call after the delay")] function: @function
 ) {
 	$.add(trigger{

@@ -240,7 +240,7 @@ impl Value {
     }
 }
 
-pub const BUILTIN_LIST: [&str; 34] = [
+pub const BUILTIN_LIST: [&str; 35] = [
     "print",
     "sin",
     "cos",
@@ -254,6 +254,7 @@ pub const BUILTIN_LIST: [&str; 34] = [
     "current_context",
     "append",
     "matches",
+    "is_in_use",
     //operators
     "_or_",
     "_and_",
@@ -312,6 +313,37 @@ pub fn built_in_function(
             let val = globals.stored_values[arguments[0]].clone();
             let pattern = globals.stored_values[arguments[1]].clone();
             Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
+        }
+
+        "is_in_use" => {
+            if arguments.len() != 1 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "expected one argument: The ID to check for".to_string(),
+                    info,
+                });
+            }
+            let obj_prop = match globals.stored_values[arguments[0]] {
+                Value::Group(g) => ObjParam::Group(g),
+                Value::Color(c) => ObjParam::Color(c),
+                Value::Block(b) => ObjParam::Block(b),
+                Value::Item(i) => ObjParam::Item(i),
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: "value given was not an ID (group, color, block or item ID)"
+                            .to_string(),
+                        info,
+                    })
+                }
+            };
+            let mut out = Value::Bool(false);
+            for obj in &globals.func_ids[context.func_id].obj_list {
+                for val in obj.params.values() {
+                    if val == &obj_prop {
+                        out = Value::Bool(true);
+                    }
+                }
+            }
+            out
         }
 
         "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "floor" | "ceil" => {
@@ -454,8 +486,8 @@ pub fn built_in_function(
             let val = arguments[1];
             let c2 = &context;
 
-            let a_type = globals.get_type_str(val);
-            let b_type = globals.get_type_str(acum_val);
+            let a_type = globals.get_type_str(acum_val);
+            let b_type = globals.get_type_str(val);
 
             let acum_val_fn_context = globals.get_val_fn_context(acum_val, info.clone())?;
             let mutable = globals.is_mutable(acum_val);

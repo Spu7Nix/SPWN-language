@@ -11,12 +11,9 @@ quick-xml = "0.17.2"
 base64 = "0.2.1"
 libflate = "0.1.27"
 lazy_static = "1.4.0"
-
 crc32fast = "1.2.0"
-
 logos = "0.11.4"
-
 ansi_term = "0.12.1"
-
 smallvec = "1.4.2"
+
 

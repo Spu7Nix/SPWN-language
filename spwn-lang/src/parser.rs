@@ -171,7 +171,7 @@ pub enum Token {
     #[regex(r"[0-9]+(\.[0-9]+)?")]
     Number,
 
-    #[regex("\"[^\n\r\"]*\"")] //FIX: make it not match \"
+    #[regex("\"(\\\\\"|[^\"])*\"|\'(\\\\\'|[^\'])*\'")]
     StringLiteral,
 
     #[token("true")]
@@ -1655,6 +1655,41 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
     }
 }
 
+pub fn str_content(
+    mut inp: String,
+    tokens: &Tokens,
+    notes: &ParseNotes,
+) -> Result<String, SyntaxError> {
+    inp.remove(0);
+    inp.remove(inp.len() - 1);
+    let mut out = String::new();
+    let mut chars = inp.chars();
+
+    while let Some(c) = chars.next() {
+        out.push(if c == '\\' {
+            match chars.next() {
+                Some('n') => '\n',
+                Some('r') => '\r',
+                Some('t') => '\t',
+                Some('"') => '\"',
+                Some('\'') => '\'',
+                Some(a) => {
+                    return Err(SyntaxError::SyntaxError {
+                        message: format!("Invalid escape: \\{}", a),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
+                None => unreachable!(),
+            }
+        } else {
+            c
+        });
+    }
+
+    Ok(out)
+}
+
 fn parse_variable(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
@@ -1709,7 +1744,9 @@ fn parse_variable(
                 });
             }
         }),
-        Some(Token::StringLiteral) => ast::ValueBody::Str(ast::str_content(tokens.slice())),
+        Some(Token::StringLiteral) => {
+            ast::ValueBody::Str(str_content(tokens.slice(), tokens, notes)?)
+        }
         Some(Token::ID) => {
             let mut text = tokens.slice();
             let class_name = match text.pop().unwrap() {
@@ -1796,7 +1833,7 @@ fn parse_variable(
 
         Some(Token::Import) => ast::ValueBody::Import(match tokens.next(false, false) {
             Some(Token::StringLiteral) => {
-                ImportType::Script(PathBuf::from(ast::str_content(tokens.slice())))
+                ImportType::Script(PathBuf::from(str_content(tokens.slice(), tokens, notes)?))
             }
             Some(Token::Symbol) => ImportType::Lib(tokens.slice()),
             a => {

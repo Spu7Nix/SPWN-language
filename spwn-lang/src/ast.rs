@@ -320,10 +320,3 @@ pub struct ID {
     pub unspecified: bool,
     pub class_name: IDClass,
 }
-
-pub fn str_content(inp: String) -> String {
-    inp.replace("\"", "")
-    /*.replace("'", "")
-    .replace("\r", "")
-    .replace("\n", "")*/
-}

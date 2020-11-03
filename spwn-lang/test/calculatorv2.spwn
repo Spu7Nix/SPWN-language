@@ -79,16 +79,18 @@ for d in ..5 {
 }
 
 set_display = {
-	wait(0.05)
+	wait()
 	referance = main.clone(10)
 	for digit in 5..0 {
 		for i in 0..10 {
 			lower_end = i * (10^digit)
 			higher_end = (i + 1) * (10^digit)
-			-> if referance >= lower_end && referance < higher_end {
-				-> digits[digit].target.move_to(digits[digit].anchors[i], 0.5, easing = EASE_IN_OUT)
-				referance -= lower_end
-			}
+			referance.item.if_is(LARGER_THAN, lower_end - 1, {
+				referance.item.if_is(SMALLER_THAN, higher_end, {
+					-> digits[digit].target.move_to(digits[digit].anchors[i], 0.5, easing = EASE_IN_OUT)
+					referance.item.add(-lower_end)
+				})
+			})
 		}
 	}
 }
@@ -108,12 +110,10 @@ button_anchors = [75g, 63g, 64g, 65g, 66g, 67g, 69g, 72g, 73g, 74g, 76g, 90g, 77
 on(touch(true), {
 	if loading == 0 {
 		selected_button += 1
-		wait(0.05)
-		-> if selected_button == button_anchors.length {
+		if selected_button == button_anchors.length {
 			selected_button -= button_anchors.length
 		}
-		wait(0.05)
-		-> select_box.move_to(
+		select_box.move_to(
 			button_anchors[
 				selected_button.to_const(0..button_anchors.length)
 			]
@@ -132,6 +132,8 @@ solve = {
 	start_loading!
 	move_from_secondary = {
 		secondary.add_to([main.item], speed = 10)
+		wait()
+		set_display!
 	}
 	
 	if current_operator == 0 {
@@ -140,7 +142,7 @@ solve = {
 		if last_pressed_operator == 4 {
 			move_from_secondary!
 		}
-		set_display!
+		
 		check_valid!
 		end_loading!
 	} else if current_operator == 1 {
@@ -150,20 +152,21 @@ solve = {
 		if last_pressed_operator == 4 {
 			move_from_secondary!
 		}
-		set_display!
+		
 		
 		current_operator.add(-1)
 		check_valid!
 		end_loading!
 	} else if current_operator == 2 {
 		//mult
-		secondary.multiply(main, 7)
+		secondary.multiply(main, 10)
 		main.reset(5)
+		wait()
 
 		-> if last_pressed_operator == 4 {
 			move_from_secondary!
 		}
-		set_display!
+		
 		current_operator.add(-2)
 		check_valid!
 		end_loading!
@@ -229,7 +232,7 @@ on(collision(1b, 2b), {
 		} else {
 			//reset
 			start_loading!
-			main = 0
+			main.reset(7)
 			set_display!
 			end_loading!
 		}

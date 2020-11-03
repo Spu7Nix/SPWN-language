@@ -994,6 +994,7 @@ impl Globals {
         add_type("range", 17);
         add_type("pattern", 18);
         add_type("object_key", 19);
+        add_type("epsilon", 20);
 
         globals.type_id_count = globals.type_ids.len() as u16;
 
@@ -1007,7 +1008,7 @@ fn handle_operator(
     macro_name: &str,
     context: &Context,
     globals: &mut Globals,
-    info: CompilerInfo,
+    info: &CompilerInfo,
 ) -> Result<Returns, RuntimeError> {
     Ok(
         if let Some(val) =
@@ -1016,11 +1017,11 @@ fn handle_operator(
                 .member(macro_name.to_string(), &context, globals)
         {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
-                let new_info = info.clone();
+                
                 if m.args.is_empty() {
                     return Err(RuntimeError::RuntimeError {
                         message: String::from("Expected at least one argument in operator macro"),
-                        info: new_info,
+                        info: info.clone(),
                     });
                 }
                 let val2 = globals.stored_values[value2].clone();
@@ -1035,7 +1036,7 @@ fn handle_operator(
                                 built_in_function(
                                     macro_name,
                                     vec![value1, value2],
-                                    info,
+                                    info.clone(),
                                     globals,
                                     &context,
                                 )?,
@@ -1058,7 +1059,7 @@ fn handle_operator(
                     context,
                     globals,
                     value1,
-                    new_info,
+                    info.clone(),
                 )?;
                 values
             } else {
@@ -1067,7 +1068,7 @@ fn handle_operator(
                         built_in_function(
                             macro_name,
                             vec![value1, value2],
-                            info,
+                            info.clone(),
                             globals,
                             &context,
                         )?,
@@ -1081,7 +1082,7 @@ fn handle_operator(
         } else {
             smallvec![(
                 store_value(
-                    built_in_function(macro_name, vec![value1, value2], info, globals, &context)?,
+                    built_in_function(macro_name, vec![value1, value2], info.clone(), globals, &context)?,
                     1,
                     globals,
                     &context,
@@ -1108,17 +1109,17 @@ impl ast::Expression {
         &self,
         context: &Context,
         globals: &mut Globals,
-        info: CompilerInfo,
+        mut info: CompilerInfo,
         constant: bool,
     ) -> Result<(Returns, Returns), RuntimeError> {
         //second returns is in case there are any values in the expression that includes a return statement
         let mut vals = self.values.iter();
-        let first_value =
-            vals.next()
-                .unwrap()
-                .to_value(context.clone(), globals, info.clone(), constant)?;
+        let first = vals.next().unwrap();
+        let first_value = first.to_value(context.clone(), globals, info.clone(), constant)?;
         let mut acum = first_value.0;
         let mut inner_returns = first_value.1;
+
+        let mut start_pos = first.pos.0;
 
         if self.operators.is_empty() {
             //if only variable
@@ -1127,26 +1128,47 @@ impl ast::Expression {
 
         for (i, var) in vals.enumerate() {
             let mut new_acum: Returns = SmallVec::new();
+            let end_pos = var.pos.1;
+            info.pos = (start_pos, end_pos);
             //every value in acum will be operated with the value of var in the corresponding context
             for (acum_val, c) in acum {
+                use ast::Operator::*;
+
+                //only eval the first one on Or and And
+                let (or_overwritten, and_overwritten) = 
+                    if let Some(imp) = globals.implementations.get(&5) {
+                        (imp.get("_or_") != None, imp.get("_and_") != None)
+                    } else {
+                        (false, false)
+                    };
+                if self.operators[i] == Or && !or_overwritten && globals.stored_values[acum_val] == Value::Bool(true) {
+                    let stored = store_const_value(Value::Bool(true), 1, globals, &c);
+                    new_acum.push((stored, c));
+                    continue;
+                } else if self.operators[i] == And && !and_overwritten && globals.stored_values[acum_val] == Value::Bool(false) {
+                    let stored = store_const_value(Value::Bool(false), 1, globals, &c);
+                    new_acum.push((stored, c));
+                    continue;
+                }
+
                 //what the value in acum becomes
                 let evaled = var.to_value(c, globals, info.clone(), constant)?;
                 inner_returns.extend(evaled.1);
 
-                use ast::Operator::*;
+                
 
                 for (val, c2) in &evaled.0 {
                     //let val_fn_context = globals.get_val_fn_context(val, info.clone());
                     let vals: Returns = match self.operators[i] {
-                        Or => handle_operator(acum_val, *val, "_or_", c2, globals, info.clone())?,
-                        And => handle_operator(acum_val, *val, "_and_", c2, globals, info.clone())?,
+                        Or => handle_operator(acum_val, *val, "_or_", c2, globals, &info)?,
+                        And => handle_operator(acum_val, *val, "_and_", c2, globals, &info)?,
                         More => handle_operator(
                             acum_val,
                             *val,
                             "_more_than_",
                             c2,
                             globals,
-                            info.clone(),
+                            &info,
                         )?,
                         Less => handle_operator(
                             acum_val,
@@ -1154,7 +1176,7 @@ impl ast::Expression {
                             "_less_than_",
                             c2,
                             globals,
-                            info.clone(),
+                            &info,
                         )?,
                         MoreOrEqual => handle_operator(
                             acum_val,
@@ -1162,7 +1184,7 @@ impl ast::Expression {
                             "_more_or_equal_",
                             c2,
                             globals,
-                            info.clone(),
+                            &info,
                         )?,
                         LessOrEqual => handle_operator(
                             acum_val,
@@ -1170,7 +1192,7 @@ impl ast::Expression {
                             "_less_or_equal_",
                             c2,
                             globals,
-                            info.clone(),
+                            &info,
                         )?,
                         Slash => handle_operator(
                             acum_val,
@@ -1178,27 +1200,27 @@ impl ast::Expression {
                             "_divided_by_",
                             c2,
                             globals,
-                            info.clone(),
+                            &info,
                         )?,
                         Star => {
-                            handle_operator(acum_val, *val, "_times_", c2, globals, info.clone())?
+                            handle_operator(acum_val, *val, "_times_", c2, globals, &info)?
                         }
 
                         Modulo => {
-                            handle_operator(acum_val, *val, "_mod_", c2, globals, info.clone())?
+                            handle_operator(acum_val, *val, "_mod_", c2, globals, &info)?
                         }
 
                         Power => {
-                            handle_operator(acum_val, *val, "_pow_", c2, globals, info.clone())?
+                            handle_operator(acum_val, *val, "_pow_", c2, globals, &info)?
                         }
                         Plus => {
-                            handle_operator(acum_val, *val, "_plus_", c2, globals, info.clone())?
+                            handle_operator(acum_val, *val, "_plus_", c2, globals, &info)?
                         }
                         Minus => {
-                            handle_operator(acum_val, *val, "_minus_", c2, globals, info.clone())?
+                            handle_operator(acum_val, *val, "_minus_", c2, globals, &info)?
                         }
                         Equal => {
-                            handle_operator(acum_val, *val, "_equal_", c2, globals, info.clone())?
+                            handle_operator(acum_val, *val, "_equal_", c2, globals, &info)?
                         }
                         NotEqual => handle_operator(
                             acum_val,
@@ -1206,7 +1228,7 @@ impl ast::Expression {
                             "_not_equal_",
                             c2,
                             globals,
-                            info.clone(),
+                            &info,
                         )?,
                         
                         Either => handle_operator(acum_val,
@@ -1214,7 +1236,7 @@ impl ast::Expression {
                             "_either_",
                             c2,
                             globals,
-                            info.clone()
+                            &info
                         )?,
                         Range => smallvec![(
                             store_value(
@@ -1283,12 +1305,12 @@ impl ast::Expression {
                         //MUTABLE ONLY
                         //ADD CHECk
                         Assign => {
-                            handle_operator(acum_val, *val, "_assign_", c2, globals, info.clone())?
+                            handle_operator(acum_val, *val, "_assign_", c2, globals, &info)?
                         }
 
-                        As => handle_operator(acum_val, *val, "_as_", c2, globals, info.clone())?,
+                        As => handle_operator(acum_val, *val, "_as_", c2, globals, &info)?,
 
-                        Add => handle_operator(acum_val, *val, "_add_", c2, globals, info.clone())?,
+                        Add => handle_operator(acum_val, *val, "_add_", c2, globals, &info)?,
 
                         Subtract => handle_operator(
                             acum_val,
@@ -1296,7 +1318,7 @@ impl ast::Expression {
                             "_subtract_",
                             c2,
                             globals,
-                            info.clone(),
+                            &info,
                         )?,
 
                         Multiply => handle_operator(
@@ -1305,17 +1327,18 @@ impl ast::Expression {
                             "_multiply_",
                             c2,
                             globals,
-                            info.clone(),
+                            &info,
                         )?,
 
                         Divide => {
-                            handle_operator(acum_val, *val, "_divide_", c2, globals, info.clone())?
+                            handle_operator(acum_val, *val, "_divide_", c2, globals, &info)?
                         }
                     };
                     new_acum.extend(vals);
                 }
             }
             acum = new_acum;
+            start_pos = var.pos.0;
         }
         Ok((acum, inner_returns))
     }
@@ -1608,6 +1631,7 @@ impl ast::Variable {
         //mut define_new: bool,
         constant: bool,
     ) -> Result<(Returns, Returns), RuntimeError> {
+        info.pos = self.pos;
         
         let mut start_val = Returns::new();
         let mut inner_returns = Returns::new();
@@ -1621,7 +1645,7 @@ impl ast::Variable {
 
         use ast::IDClass;
 
-        info.pos = self.pos;
+        
 
         match &self.value.body {
             ast::ValueBody::Resolved(r) => start_val.push((*r, context.clone())),
@@ -1859,6 +1883,13 @@ impl ast::Variable {
                                         })
                                     }
                                 }
+                                let err = Err(RuntimeError::RuntimeError {
+                                    message: format!(
+                                        "{} is not a valid object value",
+                                        val.to_str(globals)
+                                    ),
+                                    info: info.clone(),
+                                });
                                 
                                 match &val {
                                     Value::Number(n) => ObjParam::Number(*n),
@@ -1886,14 +1917,23 @@ impl ast::Variable {
                                         
                                         out
                                     }),
-                                    x => {
-                                        return Err(RuntimeError::RuntimeError {
-                                            message: format!(
-                                                "{} is not a valid object value",
-                                                x.to_str(globals)
-                                            ),
-                                            info,
-                                        })
+                                    Value::Dict(d) => {
+                                        if let Some(t) = d.get(TYPE_MEMBER_NAME) {
+                                            if let Value::TypeIndicator(t) = globals.stored_values[*t] {
+                                                if t == 20 {
+                                                    ObjParam::Epsilon
+                                                } else {
+                                                    return err;
+                                                }
+                                            } else {
+                                                return err;
+                                            }
+                                        } else {
+                                            return err;
+                                        }
+                                    }
+                                    _ => {
+                                        return err;
                                     }
                                 }
                         
@@ -2069,9 +2109,9 @@ impl ast::Variable {
                     for (prev_v, prev_c, _) in with_parent.clone() {
                         match globals.stored_values[prev_v].clone() {
                             Value::Array(arr) => {
-                                let new_info = info.clone();
+                                
                                 let (evaled, returns) =
-                                    i.eval(&prev_c, globals, new_info, constant)?;
+                                    i.eval(&prev_c, globals, info.clone(), constant)?;
                                 inner_returns.extend(returns);
                                 for index in evaled {
                                     match &globals.stored_values[index.0] {

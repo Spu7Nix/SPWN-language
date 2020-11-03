@@ -1,7 +1,1 @@
-let a = 10
-
-b = counter(0).to_const(0..2)
-
-a += b
-
-$.print(a)
+$.print('hello \'friend\'')

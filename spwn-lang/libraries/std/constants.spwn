@@ -102,7 +102,7 @@ return {
         COPY_OPACTITY : ok(60, @bool),
         EDITOR_LAYER_2 : ok(61, @number),
         SPAWN_TRIGGERED : ok(62, @bool),
-        SPAWN_DURATION : ok(63, @number),
+        SPAWN_DURATION : ok(63, @number | @epsilon),
         DONT_FADE : ok(64, @bool),
         MAIN_ONLY : ok(65, @bool),
         DETAIL_ONLY : ok(66, @bool),

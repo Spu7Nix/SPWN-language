@@ -14,6 +14,7 @@ pub enum ObjParam {
     Bool(bool),
     Text(String),
     GroupList(Vec<Group>),
+    Epsilon,
 }
 
 use std::fmt;
@@ -50,6 +51,7 @@ impl fmt::Display for ObjParam {
                 out.pop();
                 write!(f, "{}", out)
             }
+            ObjParam::Epsilon => write!(f, "{{epsilon}}"),
         }
     }
 }

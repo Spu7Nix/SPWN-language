@@ -20,9 +20,7 @@ result = counter(50i)
 mode = counter(0) // 0 => read, 1 => write
 
 reset_result = {
-	val = result.to_const([-1, 1])
-	wait(0.05)
-	result -= val
+	result -= result.to_const([-1, 1])
 }
 
 w = board[0].length
@@ -30,19 +28,14 @@ h = board.length
 
 
 reset_sx = {
-	val = sx.to_const(1..w)
-	wait(0.05)
-	sx -= val
+	sx -= sx.to_const(1..w)
 }
 
 reset_sy = {
-	val = sx.to_const(1..w)
-	wait(0.05)
-	sy -= val
+	sy -= sx.to_const(1..w)
 }
 
 interact = {
-	wait(0.05)
 	x = sx.to_const(0..w)
 	y = sy.to_const(0..h)
 	c = board[y][x]
@@ -63,11 +56,10 @@ read_board = (x, y) {
 	reset_sx!
 	reset_sy!
 	reset_result!
-	wait(0.05)
+	wait()
 	sx += x
 	sy += y
 	interact!
-	wait(0.05)
 	return result
 }
 
@@ -78,23 +70,19 @@ write_board = (x, y, d) {
 	reset_sx!
 	reset_sy!
 	reset_result!
-	wait(0.05)
+	wait()
 	result += d
 	sx += x
 	sy += y
 	interact!
-	wait(0.05)
-	$.print("hello")
 }
 
 
 on(gamescene.button_a(), {
 	if selected == 6 {
-		wait(0.05)
 		selected -= 6
 		selector_obj.move(-120, 0)
 	} else {
-		wait(0.05)
 		selected += 1
 		selector_obj.move(20, 0)
 	}

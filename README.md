@@ -18,12 +18,12 @@ coming soon ish
 - [ ] finish documentation
 - [x] break statement
 - [x] operation order
-- [ ] get and edit obj and trigger properties
+- [x] escaped characters in string
+- [x] fix post-compile optimizations
 
 # Todo at some point
 
 - [ ] implement live editor features
 - [ ] make it work on mac (and linux?)
-- [ ] fix post-compile optimizations
-- [ ] escaped characters in string
 - [ ] nested comments
+- [ ] get and edit obj and trigger properties

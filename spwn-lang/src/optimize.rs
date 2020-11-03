@@ -230,10 +230,16 @@ fn get_targets<'a>(
         return Some(Vec::new());
     }
 
-    let added_delay = if let Some(ObjParam::Number(n)) = start_obj.get(&63) {
-        (*n * 1000.0) as u32
-    } else {
-        0
+    let added_delay = match start_obj.get(&63) {
+        Some(ObjParam::Number(n)) => (*n * 1000.0) as u32,
+        Some(ObjParam::Epsilon) => {
+            if delay == 0 {
+                50
+            } else {
+                0
+            }
+        }
+        _ => 0,
     };
 
     let mut out = HashSet::new();
