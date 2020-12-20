@@ -91,6 +91,7 @@ set_display = {
 					referance.item.add(-lower_end)
 				})
 			})
+			wait(0.05)
 		}
 	}
 }

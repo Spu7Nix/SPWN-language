@@ -1,3 +1,6 @@
+let a = 10
+
+
 return {
-	a: 100
+	a: a
 }

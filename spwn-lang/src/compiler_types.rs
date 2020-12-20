@@ -347,14 +347,15 @@ pub fn merge_contexts(contexts: &mut SmallVec<[Context; CONTEXT_MAX]>, globals: 
             ObjParam::Group(new_group),
         );
         params.insert(1, ObjParam::Number(1268.0));
+        (*globals).trigger_order += 1;
 
         (*globals).func_ids[context.func_id].obj_list.push(
-            GDObj {
+            (GDObj {
                 params,
 
-                ..context_trigger(&context)
+                ..context_trigger(&context,&mut globals.uid_counter)
             }
-            .context_parameters(&context),
+            .context_parameters(&context),globals.trigger_order)
         )
     };
     add_spawn_trigger(&contexts[ref_c]);
@@ -874,7 +875,7 @@ pub struct FunctionID {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id
     pub width: Option<u32>,    //width of this id, is none when its not calculated yet
     //pub name: String,          //name of this id, used for the label
-    pub obj_list: Vec<GDObj>, //list of objects in this function id
+    pub obj_list: Vec<(GDObj, usize)>, //list of objects in this function id, + their order id
 }
 
 
@@ -898,7 +899,9 @@ pub struct Globals {
     pub func_ids: Vec<FunctionID>,
     pub objects: Vec<GDObj>,
 
+    pub trigger_order: usize,
 
+    pub uid_counter: usize,
     pub implementations: Implementations,
 }
 
@@ -956,6 +959,8 @@ impl Globals {
 
             type_ids: HashMap::new(),
             type_id_count: 0,
+            trigger_order: 0,
+            uid_counter: 0,
 
             val_id: storage.map.len(),
             stored_values: storage,
@@ -2132,11 +2137,11 @@ impl ast::Variable {
 
                                             new_out.push((arr[*n as usize], index.1, prev_v));
                                         }
-                                        a => {
+                                        _ => {
                                             return Err(RuntimeError::RuntimeError {
                                                 message: format!(
-                                                    "expected number in index, found {}",
-                                                    a.to_str(globals)
+                                                    "expected @number in index, found @{}",
+                                                    globals.get_type_str(index.0)
                                                 ),
                                                 info,
                                             })

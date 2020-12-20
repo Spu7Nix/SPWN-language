@@ -6,6 +6,7 @@ extract constants.comparisons
 extract constants.easing_types
 
 //type implementations
+events = import "events.spwn"
 import "group.spwn"
 import "color.spwn"
 import "item.spwn"
@@ -51,15 +52,6 @@ impl @array {
     }
 }
 
-// An event in spwn is a macro that returns a macro with one argument
-// which is the function that gets triggered on the event
-
-on = #[desc("Triggers a function every time an event fires")] (
-    #[desc("Event to trigger on")] event: @macro, 
-    #[desc("Function to trigger")] function: @function
-){
-    event(function)
-}
 
 return {
     obj_props: constants.obj_props,
@@ -68,17 +60,13 @@ return {
     ..constants.colors,
     ..import "general_triggers.spwn",
 
-    ..import "events.spwn",
+    ..events,
     
     ..ctrl_flow,
 
     counter: @counter::new,
     call_with_delay: call_with_delay,
-    on: on,
-
-    operation_scale: (new: @number) {
-        DEFAULT_SPEED = new
-    }
+    on: @event::on,
 }
 
 

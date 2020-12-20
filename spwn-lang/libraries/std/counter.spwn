@@ -23,9 +23,7 @@ impl @counter {
                 item: id
             }
         } else if source.type == @item {
-            if $.is_in_use(source) {
-                wait()
-            }
+            
             return {
                 type: @counter,
                 item: source
@@ -54,9 +52,7 @@ impl @counter {
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         #[desc("Multiplyer for the value added")] factor: @number = 1
     ) {
-        if $.is_in_use(self.item) {
-            wait()
-        }
+        
         add = {
             
             
@@ -78,7 +74,7 @@ impl @counter {
             
             self.item.if_is(EQUAL_TO, 0, {
                 wait()
-                supress_signal(0.06)
+                supress_signal(0.1)
                 return
             })
         }
@@ -93,9 +89,7 @@ impl @counter {
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
         #[desc("Multiplyer for the value subtracted")] factor: @number = 1
     ) {
-        if $.is_in_use(self.item) {
-            wait()
-        }
+        
         sub = {
             
             self.item.if_is(LARGER_THAN, 0, {
@@ -117,7 +111,7 @@ impl @counter {
             })
             self.item.if_is(EQUAL_TO, 0, {
                 wait()
-                supress_signal(0.06)
+                supress_signal(0.1)
                 return
             })
         }
@@ -131,9 +125,7 @@ impl @counter {
         #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor: @counter | @number,
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
-        if $.is_in_use(self.item) {
-            wait()
-        }
+        
         if factor.type == @number {
             temp = @counter::new(0, false)
             self.add_to([temp.item], speed, factor)
@@ -144,7 +136,7 @@ impl @counter {
                 mult = {
 
                     self.item.if_is(SMALLER_THAN, num, {
-                        supress_signal(0.06)
+                        supress_signal(0.1)
                         wait()
                         return mult.start_group
                     })
@@ -189,9 +181,7 @@ impl @counter {
 
         if divisor.type == @number {
             result = @counter::new(0, false)
-            if $.is_in_use(self.item) {
-                wait()
-            }
+            
             div = {
                 mini_div = (num) {
                     self.item.if_is(LARGER_THAN, (divisor * num) - 1, {
@@ -214,13 +204,13 @@ impl @counter {
                     wait()
                     self.add_to([remainder.item], speed)
                     result.add_to([self.item], speed)
-                    supress_signal(0.06)
+                    supress_signal(0.1)
                     return remainder
                 })
             }
             div!
         } else if divisor.type == @counter {
-            error "Dividing a counter by another counter is currently not supported"
+            //error "Dividing a counter by another counter is currently not supported"
             result = @counter::new(0, false)
             remainder.reset(speed)
             delay = 0.1
@@ -238,11 +228,8 @@ impl @counter {
                         //temp.subtract_from([self], speed, factor = num)
 
                         //this basically does that but in one loop
-                        //divisor.copy_to([self], speed, factor = -num)
-                        
-                        temp = divisor.clone(speed)
-                        temp.subtract_from([self], speed, factor = num)
-
+                        divisor.copy_to([self], speed, factor = -num)
+                            
                         result.item.add(num)
                         call_with_delay(delay, div)
                     })
@@ -250,10 +237,10 @@ impl @counter {
                     self.item.if_is(SMALLER_THAN, 1, {
 
                         ret = {
-                            supress_signal(delay + 0.01)
+                            supress_signal(0.1)
                             return
                         }
-                        supress_signal(delay + 0.01)
+                        supress_signal(0.1)
                         
                         self.item.if_is(SMALLER_THAN, 0, {
                             result.item.add(-num)
@@ -308,25 +295,26 @@ impl @counter {
         self, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ){
+        
         //almost the same
         add = {
-            self.item.if_is(LARGER_THAN, 0, {
-                mini_add = (num){
-                    self.item.if_is(LARGER_THAN, num - 1, {
-                        self.item.add(-num)
-                        call_with_delay(@epsilon::{}, add)
-                    })
-                }
+            
+            mini_add = (num){
+                self.item.if_is(LARGER_THAN, num - 1, {
+                    self.item.add(-num)
+                    call_with_delay(@epsilon::{}, add)
+                })
+            }
 
-                for i in 0..speed {
-                    mini_add(3^i)
-                }
+            for i in 0..speed {
+                mini_add(3^i)
+            }
                 
                 
-            })
+            
             self.item.if_is(EQUAL_TO, 0, {
                 wait()
-                supress_signal(0.05)
+                supress_signal(0.1)
                 return
             })
         }
@@ -340,6 +328,7 @@ impl @counter {
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         #[desc("Factor of to multiply the copy by")] factor: @number = 1
     ) {
+        
         temp_storage = ?i
         
         add = {
@@ -366,7 +355,7 @@ impl @counter {
             })
             self.item.if_is(EQUAL_TO, 0, {
                 wait()
-                supress_signal(0.06)
+                supress_signal(0.1)
                 @counter::new(temp_storage, false).add_to([self.item], speed)
                 return
             })
@@ -423,9 +412,7 @@ impl @counter {
     _more_than_: (self, other: @number | @counter) {
         
         if other.type == @number {
-            if $.is_in_use(self.item) {
-                wait()
-            }
+            
             self.item.if_is(LARGER_THAN, other, {
                 return true
             })
@@ -446,9 +433,7 @@ impl @counter {
     _less_than_: (self, other: @number | @counter) {
         
         if other.type == @number {
-            if $.is_in_use(self.item) {
-                wait()
-            }
+            
             self.item.if_is(SMALLER_THAN, other, {
                 return true
             })
@@ -469,9 +454,7 @@ impl @counter {
     _more_or_equal_: (self, other: @number | @counter) {
         
         if other.type == @number {
-            if $.is_in_use(self.item) {
-                wait()
-            }
+            
             self.item.if_is(LARGER_THAN, other - 1, {
                 return true
             })
@@ -492,9 +475,7 @@ impl @counter {
     _less_or_equal_: (self, other: @number | @counter) {
         
         if other.type == @number {
-            if $.is_in_use(self.item) {
-                wait()
-            }
+            
             self.item.if_is(SMALLER_THAN, other + 1, {
                 return true
             })
@@ -514,9 +495,7 @@ impl @counter {
 
     _equal_: (self, other: @number | @counter) {
         if other.type == @number {
-            if $.is_in_use(self.item) {
-                wait()
-            }
+            
             self.item.if_is(EQUAL_TO, other, {
                 return true
             })
@@ -548,9 +527,7 @@ impl @counter {
 
     _add_: (self, num: @number | @counter) {
         if num.type == @number {
-            if $.is_in_use(self.item) {
-                wait()
-            }
+            
             self.add(num)
         } else if num.type == @counter {
             num.clone().add_to([self])
@@ -561,9 +538,7 @@ impl @counter {
 
     _subtract_: (self, num: @number | @counter) {
         if num.type == @number {
-            if $.is_in_use(self.item) {
-                wait()
-            }
+            
             self.add(-num)
             
         } else if num.type == @counter {
@@ -597,23 +572,21 @@ impl @counter {
     _assign_: (self, num: @number | @counter) {
         self.reset()
         if num.type == @number {
-            self.item.add(num)
+            if num > 0 {
+                self.item.add(num)
+            }
         } else if num.type == @counter {
-            num.clone().add_to([self])
+            num.copy_to([self])
         } else {
-            error "Cannot " + num.type as @string + " this type to counter"
+            error "Cannot assign" + num.type as @string + " to counter"
         }
     },
-
-    
 
     to_const: #[desc("Converts the counter into a normal number (very context-splitting, be careful)")] (
         self, 
         #[desc("Array or range of possible output values")] range: [@number] | @range
     ) {
-        if $.is_in_use(self.item) {
-            wait()
-        }
+        
         for val in range {
             -> self.item.if_is(EQUAL_TO, val, {
                 return val
@@ -621,7 +594,6 @@ impl @counter {
         }
     },
     
-
     _as_: (self, _type: @type_indicator) {
         if _type == @bool {
             return self.to_const([0, 1]) == 1

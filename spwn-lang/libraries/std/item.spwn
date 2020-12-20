@@ -38,8 +38,8 @@ impl @item {
         self, 
         #[desc("Number to check against")] number: @number = 0
     ) {
-        return (function) {
-            $.add( trigger{
+        return @event::{
+            on: (function) => $.add( trigger{
                 OBJ_ID: 1611,
                 TARGET: function,
                 COUNT: number,
@@ -49,5 +49,6 @@ impl @item {
                 
             })
         }
+        
     },
 }

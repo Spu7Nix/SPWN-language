@@ -58,7 +58,7 @@ impl Color {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Block {
     pub id: ID,
 }
@@ -79,7 +79,7 @@ impl Block {
         }
     }
 }
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Item {
     pub id: ID,
 }
@@ -101,14 +101,15 @@ impl Item {
     }
 }
 
-pub fn context_trigger(context: &Context) -> GDObj {
+pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GDObj {
     let mut params = HashMap::new();
     params.insert(57, ObjParam::Group(context.start_group));
-
+    (*uid_counter) += 1;
     GDObj {
         params: HashMap::new(),
         func_id: context.func_id,
         mode: ObjectMode::Trigger,
+        unique_id: *uid_counter,
     }
 }
 
@@ -240,7 +241,7 @@ impl Value {
     }
 }
 
-pub const BUILTIN_LIST: [&str; 35] = [
+pub const BUILTIN_LIST: [&str; 34] = [
     "print",
     "sin",
     "cos",
@@ -254,7 +255,6 @@ pub const BUILTIN_LIST: [&str; 35] = [
     "current_context",
     "append",
     "matches",
-    "is_in_use",
     //operators
     "_or_",
     "_and_",
@@ -315,37 +315,36 @@ pub fn built_in_function(
             Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
         }
 
-        "is_in_use" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "expected one argument: The ID to check for".to_string(),
-                    info,
-                });
-            }
-            let obj_prop = match globals.stored_values[arguments[0]] {
-                Value::Group(g) => ObjParam::Group(g),
-                Value::Color(c) => ObjParam::Color(c),
-                Value::Block(b) => ObjParam::Block(b),
-                Value::Item(i) => ObjParam::Item(i),
-                _ => {
-                    return Err(RuntimeError::BuiltinError {
-                        message: "value given was not an ID (group, color, block or item ID)"
-                            .to_string(),
-                        info,
-                    })
-                }
-            };
-            let mut out = Value::Bool(false);
-            for obj in &globals.func_ids[context.func_id].obj_list {
-                for val in obj.params.values() {
-                    if val == &obj_prop {
-                        out = Value::Bool(true);
-                    }
-                }
-            }
-            out
-        }
-
+        // "is_in_use" => {
+        //     if arguments.len() != 1 {
+        //         return Err(RuntimeError::BuiltinError {
+        //             message: "expected one argument: The ID to check for".to_string(),
+        //             info,
+        //         });
+        //     }
+        //     let obj_prop = match globals.stored_values[arguments[0]] {
+        //         Value::Group(g) => ObjParam::Group(g),
+        //         Value::Color(c) => ObjParam::Color(c),
+        //         Value::Block(b) => ObjParam::Block(b),
+        //         Value::Item(i) => ObjParam::Item(i),
+        //         _ => {
+        //             return Err(RuntimeError::BuiltinError {
+        //                 message: "value given was not an ID (group, color, block or item ID)"
+        //                     .to_string(),
+        //                 info,
+        //             })
+        //         }
+        //     };
+        //     let mut out = Value::Bool(false);
+        //     for (obj, _) in &globals.func_ids[context.func_id].obj_list {
+        //         for val in obj.params.values() {
+        //             if val == &obj_prop {
+        //                 out = Value::Bool(true);
+        //             }
+        //         }
+        //     }
+        //     out
+        // }
         "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "floor" | "ceil" => {
             if arguments.len() != 1 {
                 return Err(RuntimeError::BuiltinError {
@@ -387,7 +386,7 @@ pub fn built_in_function(
 
             match &globals.stored_values[arguments[0]] {
                 Value::Obj(obj, mode) => {
-                    let c_t = context_trigger(context);
+                    let c_t = context_trigger(context, &mut globals.uid_counter);
                     let mut obj_map = HashMap::<u16, ObjParam>::new();
 
                     for p in obj {
@@ -401,10 +400,12 @@ pub fn built_in_function(
                                     info
                                 });
                             }
+                            (*globals).uid_counter += 1;
                             let obj = GDObj {
                                 params: obj_map,
                                 func_id: context.func_id,
                                 mode: ObjectMode::Object,
+                                unique_id: globals.uid_counter,
                             };
                             (*globals).objects.push(obj)
                         }
@@ -415,7 +416,10 @@ pub fn built_in_function(
                                 ..c_t
                             }
                             .context_parameters(context);
-                            (*globals).func_ids[context.func_id].obj_list.push(obj)
+                            (*globals).trigger_order += 1;
+                            (*globals).func_ids[context.func_id]
+                                .obj_list
+                                .push((obj, globals.trigger_order))
                         }
                     };
                 }

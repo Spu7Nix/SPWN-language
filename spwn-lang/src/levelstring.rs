@@ -64,6 +64,7 @@ pub struct GDObj {
     pub func_id: usize,
     pub params: HashMap<u16, ObjParam>,
     pub mode: ObjectMode,
+    pub unique_id: usize,
 }
 
 impl GDObj {
@@ -306,7 +307,7 @@ pub fn append_objects(
         }
     }
 
-    //println!("group_map: {:?}", id_maps[0]);
+    println!("group_map: {:?}", id_maps[0]);
 
     fn serialize_obj(mut trigger: GDObj) -> String {
         let mut obj_string = String::new();
@@ -421,7 +422,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionID]) -> Vec<GDObj> {
         //add top layer
         let possible_height = MAX_HEIGHT - (START_HEIGHT + y_offset); //30 is max (TODO: case for if y_offset is more than 30)
 
-        for (i, obj) in id.obj_list.iter().enumerate() {
+        for (i, (obj, _)) in id.obj_list.iter().enumerate() {
             match obj.mode {
                 ObjectMode::Object => {
                     objects.push(obj.clone());

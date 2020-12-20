@@ -40,18 +40,18 @@ return {
 	){
 		//if checker is 0, a signal can come through
 		//if checker is 1, it will be supressed
-		checker = @counter::new(0)
-		-> (){
-			wait(delay * 2)
-			checker.item.if_is(EQUAL_TO, 1, {
-				checker.item.add(-1)
-			})
-		}()
-		checker.item.if_is(EQUAL_TO, 0, {
-			checker.item.add(1)
-			return
-		})
-		
+		// checker = @counter::new(0)
+		// -> (){
+		// 	wait(delay)
+		// 	checker.item.if_is(EQUAL_TO, 1, {
+		// 		checker.item.add(-1)
+		// 	})
+		// }()
+		// checker.item.if_is(EQUAL_TO, 0, {
+		// 	checker.item.add(1)
+		// 	return
+		// })
+		return null
 	
 	},
 
@@ -59,7 +59,7 @@ return {
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
 		#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: @macro, 
-        #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number = 0.05, 
+        #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{}, 
         #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true, 
         #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1,
     ) {
@@ -67,7 +67,8 @@ return {
 
         func = {
             code(i)
-            i.add(range.step_size)
+			i.add(range.step_size)
+			wait()
             i.item.if_is(SMALLER_THAN, range.end, {
                 call_with_delay(delay, func)
             })
@@ -88,7 +89,7 @@ return {
 	(
 		#[desc("While loop condition, should return a boolean")] expr: @macro, 
 		#[desc("Macro of the code that gets looped")] code: @macro,
-		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number = 0.05,
+		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
 	) {
 		func = {
 			code()

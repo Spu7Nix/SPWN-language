@@ -656,15 +656,17 @@ pub fn compile_scope(
                         },
                     );
                     params.insert(1, ObjParam::Number(1268.0));
+                    (*globals).trigger_order += 1;
 
-                    (*globals).func_ids[context.func_id].obj_list.push(
+                    (*globals).func_ids[context.func_id].obj_list.push((
                         GDObj {
                             params,
 
-                            ..context_trigger(&context)
+                            ..context_trigger(&context, &mut globals.uid_counter)
                         }
                         .context_parameters(&context),
-                    )
+                        globals.trigger_order,
+                    ))
                 }
             }
 
