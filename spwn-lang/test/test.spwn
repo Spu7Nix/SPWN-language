@@ -1,3 +1,6 @@
-a = 10i
-
+a = counter(1i)
+a += 444
+b = counter(2i)
+b += 11
+a /= b
 

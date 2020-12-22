@@ -52,6 +52,7 @@ impl @counter {
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         #[desc("Multiplyer for the value added")] factor: @number = 1
     ) {
+        wait()
         
         add = {
             
@@ -140,7 +141,7 @@ impl @counter {
                         wait()
                         return mult.start_group
                     })
-                    wait()
+                    
                     
                     self.item.if_is(LARGER_THAN, num - 1, {
                         self.item.add(-num)
@@ -328,7 +329,7 @@ impl @counter {
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         #[desc("Factor of to multiply the copy by")] factor: @number = 1
     ) {
-        
+        wait()
         temp_storage = ?i
         
         add = {

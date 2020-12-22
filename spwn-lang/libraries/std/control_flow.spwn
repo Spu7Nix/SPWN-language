@@ -40,18 +40,18 @@ return {
 	){
 		//if checker is 0, a signal can come through
 		//if checker is 1, it will be supressed
-		// checker = @counter::new(0)
-		// -> (){
-		// 	wait(delay)
-		// 	checker.item.if_is(EQUAL_TO, 1, {
-		// 		checker.item.add(-1)
-		// 	})
-		// }()
-		// checker.item.if_is(EQUAL_TO, 0, {
-		// 	checker.item.add(1)
-		// 	return
-		// })
-		return null
+		checker = @counter::new(0)
+		-> (){
+			wait(delay)
+			checker.item.if_is(EQUAL_TO, 1, {
+				checker.item.add(-1)
+			})
+		}()
+		checker.item.if_is(EQUAL_TO, 0, {
+			checker.item.add(1)
+			return
+		})
+		
 	
 	},
 

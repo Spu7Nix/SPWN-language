@@ -173,7 +173,7 @@ pub fn optimize(mut obj_in: Vec<FunctionID>, mut closed_group: u16) -> Vec<Funct
     // not an optimization, more like a consistancy fix
     // also, like nothing works without this, so i should probably move
     // this somewhere else if i want to add an option to not have optimization
-    //network = fix_read_write_order(&mut objects, &network, &mut closed_group);
+    network = fix_read_write_order(&mut objects, &network, &mut closed_group);
 
     //println!("{:?}", network);
 
@@ -435,41 +435,42 @@ fn optimize_from<'a>(
     let targets = get_targets(network, objects, start, 0, false, closed_group);
     let trigger = network[&start.0].triggers[start.1];
 
-    {
-        let object = &objects[trigger.obj];
-        println!("\nsource");
-        println!("Deleted: {}", trigger.deleted);
-        println!("Optimized: {}", trigger.optimized);
-        let mut paramlist = object.0.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
-        paramlist.sort_by(|a, b| (a.0).cmp(b.0));
-        for (k, v) in &paramlist {
-            println!("{}: {:?}", k, v);
-        }
-    }
+    // {
+    //     let object = &objects[trigger.obj];
+    //     println!("\nsource");
+    //     println!("Deleted: {}", trigger.deleted);
+    //     println!("Optimized: {}", trigger.optimized);
+    //     let mut paramlist = object.0.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
+    //     paramlist.sort_by(|a, b| (a.0).cmp(b.0));
+    //     for (k, v) in &paramlist {
+    //         println!("{}: {:?}", k, v);
+    //     }
+    // }
 
     if let Some(targets) = targets {
         if targets.is_empty() {
             println!("NO TARGET (deleted)");
             return false;
-        } else {
-            for (g, _) in &targets {
-                {
-                    println!("\nTarget group: {:?}", g);
-                    for t in &network[&g].triggers {
-                        let object = &objects[t.obj];
-                        println!("\ntarget");
-                        println!("Deleted: {}", t.deleted);
-                        println!("Optimized: {}", t.optimized);
-                        let mut paramlist =
-                            object.0.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
-                        paramlist.sort_by(|a, b| (a.0).cmp(b.0));
-                        for (k, v) in &paramlist {
-                            println!("{}: {:?}", k, v);
-                        }
-                    }
-                }
-            }
         }
+        // else {
+        //     for (g, _) in &targets {
+        //         {
+        //             println!("\nTarget group: {:?}", g);
+        //             for t in &network[&g].triggers {
+        //                 let object = &objects[t.obj];
+        //                 println!("\ntarget");
+        //                 println!("Deleted: {}", t.deleted);
+        //                 println!("Optimized: {}", t.optimized);
+        //                 let mut paramlist =
+        //                     object.0.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
+        //                 paramlist.sort_by(|a, b| (a.0).cmp(b.0));
+        //                 for (k, v) in &paramlist {
+        //                     println!("{}: {:?}", k, v);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         if trigger.role == TriggerRole::Func && targets.len() == 1 && targets[0].1 == 0
         //&& network[&start.0].connections_in > 1
