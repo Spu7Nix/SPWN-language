@@ -307,7 +307,7 @@ pub fn append_objects(
         }
     }
 
-    println!("group_map: {:?}", id_maps[0]);
+    //println!("group_map: {:?}", id_maps[0]);
 
     fn serialize_obj(mut trigger: GDObj) -> String {
         let mut obj_string = String::new();

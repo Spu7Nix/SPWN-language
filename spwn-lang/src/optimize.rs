@@ -449,7 +449,7 @@ fn optimize_from<'a>(
 
     if let Some(targets) = targets {
         if targets.is_empty() {
-            println!("NO TARGET (deleted)");
+            
             return false;
         }
         // else {

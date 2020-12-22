@@ -1,6 +1,8 @@
-a = counter(1i)
-a += 444
-b = counter(2i)
-b += 11
-a /= b
+main = counter(1i)
+sec = counter(2i)
+
+main += 222
+sec += 2
+
+main.divide(sec, speed = 5)
 
