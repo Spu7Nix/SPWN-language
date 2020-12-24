@@ -59,7 +59,7 @@ impl @counter {
             
             mini_add = (num){
                 self.item.if_is(LARGER_THAN, num - 1, {
-                    self.item.add(-num)
+                    self.add(-num)
                     for item in items {
                         item.add(num * factor)
                     }
@@ -96,7 +96,7 @@ impl @counter {
             self.item.if_is(LARGER_THAN, 0, {
                 mini_sub = (num){
                     self.item.if_is(LARGER_THAN, num - 1, {
-                        self.item.add(-num)
+                        self.add(-num)
                         for item in items {
                             item.add(-num * factor)
                         }
@@ -144,7 +144,7 @@ impl @counter {
                     
                     
                     self.item.if_is(LARGER_THAN, num - 1, {
-                        self.item.add(-num)
+                        self.add(-num)
                         factor.copy_to([temp.item], speed, num)
                         
                         
@@ -188,8 +188,8 @@ impl @counter {
                     self.item.if_is(LARGER_THAN, (divisor * num) - 1, {
                         
                         
-                        self.item.add(-(divisor * num))
-                        result.item.add(num)
+                        self.add(-(divisor * num))
+                        result.add(num)
                         
                         call_with_delay(@epsilon::{}, div)
                         
@@ -203,8 +203,8 @@ impl @counter {
                 self.item.if_is(SMALLER_THAN, divisor, {
                     
                     wait()
-                    self.add_to([remainder.item], speed)
-                    result.add_to([self.item], speed)
+                    self.add_to([remainder], speed)
+                    result.add_to([self], speed)
                     supress_signal(0.1)
                     return remainder
                 })
@@ -231,7 +231,7 @@ impl @counter {
                         //this basically does that but in one loop
                         divisor.copy_to([self], speed, factor = -num)
                             
-                        result.item.add(num)
+                        result.add(num)
                         call_with_delay(delay, div)
                     })
 
@@ -244,7 +244,7 @@ impl @counter {
                         supress_signal(0.1)
                         
                         self.item.if_is(SMALLER_THAN, 0, {
-                            result.item.add(-num)
+                            result.add(-num)
                             divisor.copy_to([self], speed, factor = num)
                             ret!
                         })
@@ -302,7 +302,7 @@ impl @counter {
             
             mini_add = (num){
                 self.item.if_is(LARGER_THAN, num - 1, {
-                    self.item.add(-num)
+                    self.add(-num)
                     call_with_delay(@epsilon::{}, add)
                 })
             }
@@ -338,7 +338,7 @@ impl @counter {
                 mini_add = (num){
                     
                     self.item.if_is(LARGER_THAN, num - 1, {
-                        self.item.add(-num)
+                        self.add(-num)
                         for item in items {
                             item.add(num * factor)
                         }
@@ -376,7 +376,7 @@ impl @counter {
     _plus_: (self, other: @number | @counter) {
         if other.type == @number {
             new_counter = self.clone()
-            new_counter.item.add(other)
+            new_counter.add(other)
             return new_counter
         } else if other.type == @counter {
             new_counter = self.clone()
@@ -390,7 +390,7 @@ impl @counter {
     _minus_: (self, other: @number | @counter) {
         if other.type == @number {
             new_counter = self.clone()
-            new_counter.item.add(-other)
+            new_counter.add(-other)
             return new_counter
         } else {
             error "Cannot subtract counter with " + num.type as @string
@@ -523,7 +523,7 @@ impl @counter {
 
     add: #[desc("Implementation of the pickup trigger")]
     (self, #[desc("Amount to add")] num: @number) {
-        self.item.add(num)
+        self.add(num)
     },
 
     _add_: (self, num: @number | @counter) {
@@ -574,7 +574,7 @@ impl @counter {
         self.reset()
         if num.type == @number {
             if num > 0 {
-                self.item.add(num)
+                self.add(num)
             }
         } else if num.type == @counter {
             num.copy_to([self])

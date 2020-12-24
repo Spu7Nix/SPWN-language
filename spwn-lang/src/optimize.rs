@@ -257,6 +257,8 @@ fn get_targets<'a>(
     let trigger = network.get(&start.0).unwrap().triggers[start.1];
     let start_obj = &objects[trigger.obj].0.params;
 
+    println!("{}", network[&start.0].connections_in);
+
     let list: Vec<(usize, Group)>;
 
     if let Some(ObjParam::Group(g)) = start_obj.get(&51) {
@@ -310,8 +312,11 @@ fn get_targets<'a>(
                 out.insert(target_out);
             }
         } else if network[&trigger_ptr.0].connections_in > 1 {
+            (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
             if optimize_from(network, objects, trigger_ptr, closed_group) {
                 out.insert(target_out);
+            } else {
+                (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = true;
             }
         } else {
             match trigger.role {
@@ -449,7 +454,6 @@ fn optimize_from<'a>(
 
     if let Some(targets) = targets {
         if targets.is_empty() {
-            
             return false;
         }
         // else {

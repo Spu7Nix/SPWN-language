@@ -1,8 +1,3 @@
-main = counter(1i)
-sec = counter(2i)
+c = counter()
 
-main += 222
-sec += 2
-
-main.divide(sec, speed = 5)
-
+c += 5

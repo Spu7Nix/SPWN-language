@@ -26,9 +26,18 @@ pub const STD_PATH: &str = "std";
 
 const ERROR_EXIT_CODE: i32 = 1;
 
-use ansi_term::Colour;
+use std::io::Write;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 const HELP: &str = include_str!("../help.txt");
+
+fn print_with_color(text: &str, color: Color) {
+    let mut stdout = StandardStream::stdout(ColorChoice::Always);
+    stdout
+        .set_color(ColorSpec::new().set_fg(Some(color)))
+        .unwrap();
+    writeln!(&mut stdout, "{}", text).unwrap();
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -59,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
 
-                    println!("{}...", Colour::Green.bold().paint("Parsing"));
+                    print_with_color("Parsing ...", Color::Green);
                     let unparsed = fs::read_to_string(script_path.clone())?;
 
                     let (statements, notes) = match parse_spwn(unparsed, script_path.clone()) {
@@ -102,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
 
                     let level_string = if let Some(gd_path) = &gd_path {
-                        println!("{}", Colour::Cyan.bold().paint("Reading savefile..."));
+                        print_with_color("Reading savefile...", Color::Cyan);
 
                         let file_content = fs::read_to_string(gd_path)?;
                         let mut level_string = levelstring::get_level_string(file_content);
@@ -113,8 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     let has_stuff = compiled.func_ids.iter().any(|x| !x.obj_list.is_empty());
                     if opti_enambled && has_stuff {
-                        println!("{}", Colour::Cyan.bold().paint("Optimizing triggers..."));
-
+                        print_with_color("Optimizing triggers...", Color::Cyan);
                         compiled.func_ids = optimize(compiled.func_ids, compiled.closed_groups);
                     }
 
@@ -122,17 +130,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     objects.extend(compiled.objects);
 
-                    println!("{} objects added", objects.len());
+                    print_with_color(&format!("{} objects added", objects.len()), Color::White);
 
                     let (new_ls, used_ids) = levelstring::append_objects(objects, &level_string)?;
 
-                    println!("{}", Colour::White.bold().paint("\nLevel:"));
+                    print_with_color("\nLevel:", Color::Magenta);
                     for (i, len) in used_ids.iter().enumerate() {
                         if *len > 0 {
-                            println!(
-                                "{} {}",
-                                len,
-                                ["groups", "colors", "block IDs", "item IDs"][i]
+                            print_with_color(
+                                &format!(
+                                    "{} {}",
+                                    len,
+                                    ["groups", "colors", "block IDs", "item IDs"][i]
+                                ),
+                                Color::White,
                             );
                         }
                     }
@@ -140,28 +151,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     //println!("level_string: {}", level_string);
                     match gd_path {
                         Some(gd_path) => {
-                            println!(
-                                "\n{}",
-                                Colour::Cyan.bold().paint("Writing back to savefile...")
-                            );
+                            print_with_color("\nWriting back to savefile...", Color::Cyan);
                             levelstring::encrypt_level_string(new_ls, level_string, gd_path);
-                            println!(
-                                "{}",
-                                Colour::Green.bold().paint(
-                                    "Written to save. You can now open Geometry Dash again!"
-                                )
+
+                            print_with_color(
+                                "Written to save. You can now open Geometry Dash again!",
+                                Color::Green,
                             );
                         }
 
                         None => println!("Output: {}", new_ls),
                     };
+                    let mut stdout = StandardStream::stdout(ColorChoice::Always);
+                    stdout
+                        .set_color(ColorSpec::new().set_fg(Some(Color::White)))
+                        .unwrap();
 
                     Ok(())
                 }
 
                 "doc" => {
                     use std::fs::File;
-                    use std::io::Write;
+
                     let lib_path = match args_iter.next() {
                         Some(a) => a,
                         None => {

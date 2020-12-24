@@ -10,10 +10,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::compiler_types::*;
-
-use ansi_term::Colour;
-
+use crate::print_with_color;
 pub const CONTEXT_MAX: usize = 2;
+
+use termcolor::Color as TColor;
 
 #[derive(Debug)]
 pub enum RuntimeError {
@@ -44,7 +44,19 @@ pub enum RuntimeError {
         info: CompilerInfo,
     },
 }
-pub fn error_intro(pos: crate::parser::FileRange, file: &PathBuf) -> String {
+pub fn print_error_intro(pos: crate::parser::FileRange, file: &PathBuf) {
+    use std::io::Write;
+    use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+
+    let mut stdout = StandardStream::stderr(ColorChoice::Always);
+
+    let mut write_with_color = |text: &str, color: Color| {
+        stdout
+            .set_color(ColorSpec::new().set_fg(Some(color)))
+            .unwrap();
+        write!(&mut stdout, "{}", text).unwrap();
+    };
+
     let path_str = format!(
         "{}:{}:{}",
         file.to_string_lossy().to_string(),
@@ -52,54 +64,46 @@ pub fn error_intro(pos: crate::parser::FileRange, file: &PathBuf) -> String {
         pos.0 .1 + 1
     );
 
-    let line = if pos.0 .0 == pos.1 .0 {
+    write_with_color("Error", TColor::Red);
+    write_with_color(&format!(" at {}\n", path_str), TColor::White);
+
+    if pos.0 .0 == pos.1 .0 {
         use std::io::BufRead;
-        match fs::File::open(&file) {
-            Ok(file) => match std::io::BufReader::new(file).lines().nth(pos.0 .0 - 1) {
-                Some(line) => match line {
-                    Ok(line) => {
-                        let line_num = pos.1 .0.to_string();
-                        let start = Colour::Blue.bold().paint(line_num.clone() + " | ");
+        if let Ok(file) = fs::File::open(&file) {
+            if let Some(line) = std::io::BufReader::new(file).lines().nth(pos.0 .0 - 1) {
+                if let Ok(line) = line {
+                    let line_num = pos.1 .0.to_string();
 
-                        let mut spacing = String::new();
+                    let mut spacing = String::new();
 
-                        for _ in 0..line_num.len() {
-                            spacing += " ";
-                        }
-
-                        let start_empty = Colour::Blue.bold().paint(spacing + " | ");
-
-                        let squiggly_line = Colour::Red.bold().paint("^");
-
-                        let mut out = format!(
-                            "{}\n{}{}\n{}",
-                            start_empty,
-                            start,
-                            line.replace("\t", " "),
-                            start_empty
-                        );
-
-                        for _ in 0..(pos.0 .1) {
-                            out += " ";
-                        }
-                        for _ in 0..(pos.1 .1 - pos.0 .1) {
-                            out += &format!("{}", squiggly_line);
-                        }
-                        out + "\n"
+                    for _ in 0..line_num.len() {
+                        spacing += " ";
                     }
-                    Err(_) => String::new(),
-                },
-                None => String::new(),
-            },
-            Err(_) => String::new(),
+
+                    let squiggly_line = "^";
+
+                    write_with_color(
+                        (spacing.clone() + " |\n" + &line_num + " |").as_str(),
+                        TColor::Cyan,
+                    );
+                    write_with_color((line.replace("\t", " ") + "\n").as_str(), TColor::White);
+                    write_with_color((spacing + " |").as_str(), TColor::Cyan);
+                    let mut out = String::new();
+                    for _ in 0..(pos.0 .1) {
+                        out += " ";
+                    }
+                    for _ in 0..(pos.1 .1 - pos.0 .1) {
+                        out += squiggly_line;
+                    }
+                    out += "\n";
+                    write_with_color(&out, TColor::Red);
+                    stdout
+                        .set_color(ColorSpec::new().set_fg(Some(TColor::White)))
+                        .unwrap();
+                }
+            }
         }
-    } else {
-        String::new()
     };
-
-    let err_msg = Colour::Red.bold().paint("Error");
-
-    format!("{} at {}\n{}", err_msg, path_str, line)
 }
 
 impl std::fmt::Display for RuntimeError {
@@ -123,35 +127,29 @@ impl std::fmt::Display for RuntimeError {
             RuntimeError::BuiltinError { message: _, info } => info,
         };
 
-        let start = error_intro(info.pos, &info.current_file);
+        print_error_intro(info.pos, &info.current_file);
 
         match self {
             RuntimeError::UndefinedErr {
                 undefined,
                 desc,
                 info: _,
-            } => write!(f, "{}{} '{}' is not defined", start, desc, undefined,),
+            } => write!(f, "{} '{}' is not defined", desc, undefined,),
             RuntimeError::PackageSyntaxError { err, info: _ } => {
-                write!(f, "{}Error when parsing library: {}", start, err)
+                write!(f, "Error when parsing library: {}", err)
             }
 
             RuntimeError::TypeError {
                 expected,
                 found,
                 info: _,
-            } => write!(
-                f,
-                "{}Type mismatch: expected {}, found {}",
-                start, expected, found,
-            ),
+            } => write!(f, "Type mismatch: expected {}, found {}", expected, found,),
 
-            RuntimeError::RuntimeError { message, info: _ } => write!(f, "{}{}", start, message,),
+            RuntimeError::RuntimeError { message, info: _ } => write!(f, "{}", message,),
 
-            RuntimeError::BuiltinError { message, info: _ } => write!(
-                f,
-                "{}Error when calling built-in-function: {}",
-                start, message,
-            ),
+            RuntimeError::BuiltinError { message, info: _ } => {
+                write!(f, "Error when calling built-in-function: {}", message,)
+            }
         }
     }
 }
@@ -200,12 +198,8 @@ pub fn compile_spwn(
     use std::time::Instant;
 
     //println!("Importing standard library...");
-
-    println!(
-        "\n{}...\n{}\n",
-        Colour::Cyan.bold().paint("Building script"),
-        Colour::White.bold().paint("———————————————————————————")
-    );
+    print_with_color("Building script ...", TColor::Cyan);
+    print_with_color("———————————————————————————\n", TColor::White);
     let start_time = Instant::now();
 
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
@@ -251,13 +245,13 @@ pub fn compile_spwn(
         }
     }
 
-    println!(
-        "\n{}\n{}\n",
-        Colour::White.bold().paint("———————————————————————————"),
-        Colour::Green.bold().paint(&format!(
+    print_with_color("———————————————————————————\n", TColor::White);
+    print_with_color(
+        &format!(
             "Built in {} milliseconds!",
             start_time.elapsed().as_millis()
-        ))
+        ),
+        TColor::Green,
     );
 
     Ok(globals)
@@ -803,15 +797,12 @@ pub fn compile_scope(
                 for context in &contexts {
                     let (evaled, _) = e.message.eval(context, globals, info.clone(), true)?;
                     for (msg, _) in evaled {
-                        let exclam = Colour::Red.bold().paint("!");
                         eprintln!(
-                            "{} {} {}",
-                            exclam,
+                            "{}",
                             match &globals.stored_values[msg] {
                                 Value::Str(s) => s,
                                 _ => "no message",
                             },
-                            exclam
                         );
                     }
                 }
@@ -918,7 +909,7 @@ pub fn import_module(
                 })
             }
         }
-        //.parent() ADD BACK BEFORE RELEASE
+        //.parent() //ADD BACK BEFORE RELEASE
         //.unwrap()
         .join("libraries")
         .join(name),
@@ -931,7 +922,7 @@ pub fn import_module(
     } else if !module_path.is_file() {
         return Err(RuntimeError::RuntimeError {
             message: format!(
-                "Couln't find library file ({})",
+                "Couldn't find library file ({})",
                 module_path.to_string_lossy()
             ),
             info,

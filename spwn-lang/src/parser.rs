@@ -14,7 +14,7 @@ use logos::Logos;
 use std::error::Error;
 use std::fmt;
 
-use crate::compiler::error_intro;
+use crate::compiler::print_error_intro;
 use crate::compiler_types::ImportType;
 
 pub type FileRange = ((usize, usize), (usize, usize));
@@ -64,23 +64,19 @@ impl fmt::Display for SyntaxError {
                 found,
                 pos,
                 file,
-            } => write!(
-                f,
-                "{}SyntaxError: Expected {}, found {}",
-                error_intro(*pos, file),
-                expected,
-                found
-            ),
+            } => {
+                print_error_intro(*pos, file);
+                write!(f, "SyntaxError: Expected {}, found {}", expected, found)
+            }
 
-            SyntaxError::UnexpectedErr { found, pos, file } => write!(
-                f,
-                "{}SyntaxError: Unexpected {}",
-                error_intro(*pos, file),
-                found
-            ),
+            SyntaxError::UnexpectedErr { found, pos, file } => {
+                print_error_intro(*pos, file);
+                write!(f, "SyntaxError: Unexpected {}", found)
+            }
 
             SyntaxError::SyntaxError { message, pos, file } => {
-                write!(f, "{}SyntaxError: {}", error_intro(*pos, file), message)
+                print_error_intro(*pos, file);
+                write!(f, "SyntaxError: {}", message)
             }
         }
     }

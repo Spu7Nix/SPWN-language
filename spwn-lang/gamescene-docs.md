@@ -16,11 +16,11 @@ _This file was generated using `spwn doc [file name]`_
  ```
 
 {
-hidden_group: ?g,
-button_b: () { /* code omitted */ },
 button_a_end: () { /* code omitted */ },
+button_a: () { /* code omitted */ },
+button_b: () { /* code omitted */ },
 button_b_end: () { /* code omitted */ },
-button_a: () { /* code omitted */ }
+hidden_group: ?g
 }
 
 ``` 
@@ -109,6 +109,9 @@ button_a: () { /* code omitted */ }
  <details>
 <summary> View members </summary>
 ### **@array**: 
+ <details>
+<summary> View members </summary>
+### **@event**: 
  <details>
 <summary> View members </summary>
 ### **@counter**: 
