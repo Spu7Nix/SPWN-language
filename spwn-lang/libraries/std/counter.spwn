@@ -523,7 +523,7 @@ impl @counter {
 
     add: #[desc("Implementation of the pickup trigger")]
     (self, #[desc("Amount to add")] num: @number) {
-        self.add(num)
+        self.item.add(num)
     },
 
     _add_: (self, num: @number | @counter) {

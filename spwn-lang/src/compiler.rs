@@ -292,11 +292,13 @@ pub fn compile_scope(
         //find out what kind of statement this is
         //let start_time = Instant::now();
 
-        /*println!(
-            "{} -> Compiling a statement in {} contexts",
-            info.path.join(">"),
-            contexts.len()
-        );*/
+        //print_error_intro(info.pos, &info.current_file);
+
+        // println!(
+        //     "{} -> Compiling a statement in {} contexts",
+        //     info.path.join(">"),
+        //     contexts.len()
+        // );
         if contexts.is_empty() {
             return Err(RuntimeError::RuntimeError {
                 message: "No context! This is probably a bug, please contact sputnix".to_string(),
