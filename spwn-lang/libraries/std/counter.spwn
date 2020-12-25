@@ -410,6 +410,13 @@ impl @counter {
         return clone
     },
 
+    _mod_: (self, num: @number | @counter) {
+        clone = self.clone()
+        out = @counter::new()
+        clone.divide(num, remainder = out)
+        return out
+    },
+
     _more_than_: (self, other: @number | @counter) {
         
         if other.type == @number {

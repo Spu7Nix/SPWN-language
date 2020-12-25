@@ -254,7 +254,7 @@ impl SpwnFmt for ValueBody {
             Bool(x) => format!("{}", x),
             Expression(x) => format!("({})", x.fmt(ind)),
             Str(x) => format!("\"{}\"", x),
-            Import(x) => format!("import {:?}", x),
+            Import(x, f) => format!("import{} {:?}", if *f { "!" } else { "" }, x),
             Obj(x) => {
                 (match x.mode {
                     ObjectMode::Object => "obj".to_string(),

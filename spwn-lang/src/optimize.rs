@@ -257,7 +257,7 @@ fn get_targets<'a>(
     let trigger = network.get(&start.0).unwrap().triggers[start.1];
     let start_obj = &objects[trigger.obj].0.params;
 
-    println!("{}", network[&start.0].connections_in);
+    //println!("{}", network[&start.0].connections_in);
 
     let list: Vec<(usize, Group)>;
 

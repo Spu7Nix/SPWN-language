@@ -63,7 +63,7 @@ pub enum ValueBody {
     Bool(bool),
     Expression(Expression),
     Str(String),
-    Import(ImportType),
+    Import(ImportType, bool),
     Array(Vec<Expression>),
     Obj(ObjectLiteral),
     Macro(Macro),

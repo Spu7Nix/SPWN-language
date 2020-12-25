@@ -37,6 +37,20 @@ fn print_with_color(text: &str, color: Color) {
         .set_color(ColorSpec::new().set_fg(Some(color)))
         .unwrap();
     writeln!(&mut stdout, "{}", text).unwrap();
+    stdout
+        .set_color(ColorSpec::new().set_fg(Some(Color::White)))
+        .unwrap();
+}
+
+fn eprint_with_color(text: &str, color: Color) {
+    let mut stdout = StandardStream::stderr(ColorChoice::Always);
+    stdout
+        .set_color(ColorSpec::new().set_fg(Some(color)))
+        .unwrap();
+    writeln!(&mut stdout, "{}", text).unwrap();
+    stdout
+        .set_color(ColorSpec::new().set_fg(Some(Color::White)))
+        .unwrap();
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -59,13 +73,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     let mut gd_enabled = true;
                     let mut opti_enambled = true;
+                    let mut level_name = None;
 
-                    for arg in args_iter {
-                        if arg == "--no-gd" {
-                            gd_enabled = false;
-                        } else if arg == "--no-optimize" {
-                            opti_enambled = false;
-                        }
+                    while let Some(arg) = args_iter.next() {
+                        match arg.as_ref() {
+                            "--no-gd" => gd_enabled = false,
+                            "--no-optimize" => opti_enambled = false,
+                            "--level-name" => level_name = args_iter.next().cloned(),
+                            _ => (),
+                        };
                     }
 
                     print_with_color("Parsing ...", Color::Green);
@@ -73,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     let (statements, notes) = match parse_spwn(unparsed, script_path.clone()) {
                         Err(err) => {
-                            eprintln!("{}\n", err);
+                            eprint_with_color(&format!("{}\n", err), Color::Red);
                             std::process::exit(ERROR_EXIT_CODE);
                         }
                         Ok(p) => p,
@@ -104,7 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         notes,
                     ) {
                         Err(err) => {
-                            eprintln!("{}\n", err);
+                            eprint_with_color(&format!("{}\n", err), Color::White);
                             std::process::exit(ERROR_EXIT_CODE);
                         }
                         Ok(p) => p,
@@ -112,9 +128,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     let level_string = if let Some(gd_path) = &gd_path {
                         print_with_color("Reading savefile...", Color::Cyan);
+                        let mut file = fs::File::open(gd_path)?;
+                        let mut file_content = Vec::new();
+                        use std::io::Read;
+                        file.read_to_end(&mut file_content)
+                            .expect("Problem reading savefile");
+                        let mut level_string =
+                            match levelstring::get_level_string(file_content, level_name.clone()) {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    eprint_with_color(
+                                        &format!("Error reading level:\n{}", e),
+                                        Color::Red,
+                                    );
 
-                        let file_content = fs::read_to_string(gd_path)?;
-                        let mut level_string = levelstring::get_level_string(file_content);
+                                    std::process::exit(ERROR_EXIT_CODE);
+                                }
+                            };
+                        if level_string.is_empty() {}
                         levelstring::remove_spwn_objects(&mut level_string);
                         level_string
                     } else {
@@ -152,7 +183,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     match gd_path {
                         Some(gd_path) => {
                             print_with_color("\nWriting back to savefile...", Color::Cyan);
-                            levelstring::encrypt_level_string(new_ls, level_string, gd_path);
+                            levelstring::encrypt_level_string(
+                                new_ls,
+                                level_string,
+                                gd_path,
+                                level_name,
+                            );
 
                             print_with_color(
                                 "Written to save. You can now open Geometry Dash again!",
@@ -183,7 +219,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let documentation = match documentation::document_lib(lib_path) {
                         Ok(doc) => doc,
                         Err(e) => {
-                            eprintln!("{}\n", e);
+                            eprint_with_color(&format!("{}\n", e), Color::Red);
                             std::process::exit(ERROR_EXIT_CODE);
                         }
                     };
@@ -227,7 +263,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(())
                 }*/
                 a => {
-                    eprintln!("Unknown subcommand: {}", a);
+                    eprint_with_color(&format!("Unknown subcommand: {}", a), Color::Red);
+
                     std::process::exit(ERROR_EXIT_CODE);
                 }
             }

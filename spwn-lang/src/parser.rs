@@ -1827,27 +1827,38 @@ fn parse_variable(
             ast::ValueBody::Array(arr)
         }
 
-        Some(Token::Import) => ast::ValueBody::Import(match tokens.next(false, false) {
-            Some(Token::StringLiteral) => {
-                ImportType::Script(PathBuf::from(str_content(tokens.slice(), tokens, notes)?))
+        Some(Token::Import) => {
+            let mut first = tokens.next(false, false);
+            let mut forced = false;
+            if first == Some(Token::Exclamation) {
+                forced = true;
+                first = tokens.next(false, false);
             }
-            Some(Token::Symbol) => ImportType::Lib(tokens.slice()),
-            a => {
-                return Err(SyntaxError::ExpectedErr {
-                    expected: "literal string".to_string(),
-                    found: format!(
-                        "{}: \"{}\"",
-                        match a {
-                            Some(t) => t.typ(),
-                            None => "EOF",
-                        },
-                        tokens.slice()
-                    ),
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                })
+            match first {
+                Some(Token::StringLiteral) => ast::ValueBody::Import(
+                    ImportType::Script(PathBuf::from(str_content(tokens.slice(), tokens, notes)?)),
+                    forced,
+                ),
+                Some(Token::Symbol) => {
+                    ast::ValueBody::Import(ImportType::Lib(tokens.slice()), forced)
+                }
+                a => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "literal string".to_string(),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
             }
-        }),
+        }
 
         Some(Token::At) => {
             let type_name = match tokens.next(false, false) {

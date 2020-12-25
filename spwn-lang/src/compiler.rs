@@ -208,6 +208,7 @@ pub fn compile_spwn(
             &start_context,
             &mut globals,
             start_info.clone(),
+            false,
         )?;
 
         if standard_lib.len() != 1 {
@@ -892,7 +893,18 @@ pub fn import_module(
     context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
+    forced: bool,
 ) -> Result<Returns, RuntimeError> {
+    if !forced {
+        if let Some(ret) = globals.prev_imports.get(path) {
+            merge_impl(&mut globals.implementations, &ret.1);
+            return Ok(smallvec![(
+                store_value(ret.0.clone(), 1, globals, context),
+                context.clone()
+            )]);
+        }
+    }
+
     let mut module_path = match path {
         ImportType::Script(p) => globals
             .path
@@ -963,6 +975,7 @@ pub fn import_module(
             &start_context,
             globals,
             info.clone(),
+            false,
         )?;
 
         if standard_lib.len() != 1 {
@@ -1020,7 +1033,7 @@ pub fn import_module(
         merge_impl(&mut globals.implementations, &stored_impl);
     }
 
-    Ok(if returns.is_empty() {
+    let out = if returns.is_empty() {
         contexts
             .iter()
             .map(|x| {
@@ -1035,7 +1048,16 @@ pub fn import_module(
         }
 
         returns
-    })
+    };
+
+    if out.len() == 1 && &out[0].1 == context {
+        let cloned = clone_and_get_value(out[0].0, 9999, globals, context, true);
+        let s_impl = globals.implementations.clone();
+
+        globals.prev_imports.insert(path.clone(), (cloned, s_impl));
+    }
+
+    Ok(out)
 }
 
 // const ID_MAX: u16 = 999;

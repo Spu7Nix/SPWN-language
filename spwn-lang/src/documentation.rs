@@ -21,6 +21,7 @@ pub fn document_lib(path: &str) -> Result<String, RuntimeError> {
         &start_context,
         &mut globals,
         CompilerInfo::new(),
+        false,
     )?;
 
     if module.len() > 1 {

@@ -135,13 +135,13 @@ pub fn store_value(
     index
 }
 
-pub fn clone_value(
+pub fn clone_and_get_value(
     index: usize,
     lifetime: u16,
     globals: &mut Globals,
     context: &Context,
     constant: bool,
-) -> StoredValue {
+) -> Value {
     let mut old_val = globals.stored_values[index].clone();
 
     match &mut old_val {
@@ -184,6 +184,19 @@ pub fn clone_value(
         _ => (),
     };
 
+    old_val
+}
+
+
+pub fn clone_value(
+    index: usize,
+    lifetime: u16,
+    globals: &mut Globals,
+    context: &Context,
+    constant: bool,
+) -> StoredValue {
+    let old_val = clone_and_get_value(index, lifetime, globals, context, constant);
+
     //clone all inner values
     //do the thing
     //bing bang
@@ -216,7 +229,7 @@ pub type FnIDPtr = usize;
 
 pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub enum ImportType {
     Script(PathBuf),
     Lib(String)
@@ -284,6 +297,10 @@ impl Context {
     }
 
 }
+// pub fn compare_contexts(context1: Context, context2: Context, globals: &mut Globals) -> bool {
+//     // returns true if the contexts are equal/mergable
+
+// }
 
 //will merge one set of context, returning false if no mergable contexts were found
 pub fn merge_contexts(contexts: &mut SmallVec<[Context; CONTEXT_MAX]>, globals: &mut Globals) -> bool {
@@ -899,6 +916,8 @@ pub struct Globals {
     pub func_ids: Vec<FunctionID>,
     pub objects: Vec<GDObj>,
 
+    pub prev_imports: HashMap<ImportType, (Value, Implementations)>,
+
     pub trigger_order: usize,
 
     pub uid_counter: usize,
@@ -958,6 +977,8 @@ impl Globals {
             lowest_y: HashMap::new(),
 
             type_ids: HashMap::new(),
+
+            prev_imports: HashMap::new(),
             type_id_count: 0,
             trigger_order: 0,
             uid_counter: 0,
@@ -1769,9 +1790,9 @@ impl ast::Variable {
                     })
                     .collect();
             }
-            ast::ValueBody::Import(i) => {
+            ast::ValueBody::Import(i, f) => {
                 //let mut new_contexts = context.clone();
-                start_val = import_module(i, &context, globals, info.clone())?;
+                start_val = import_module(i, &context, globals, info.clone(), *f)?;
             }
 
             ast::ValueBody::TypeIndicator(name) => {
