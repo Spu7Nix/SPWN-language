@@ -264,19 +264,19 @@ pub struct Variable {
     pub comment: Comment,
 }
 
-// impl Variable {
-//     pub fn to_expression(&self) -> Expression {
-//         if let ValueBody::Expression(e) = &self.value.body {
-//             if self.path.is_empty() {
-//                 return e.to_owned();
-//             }
-//         }
-//         Expression {
-//             values: vec![self.clone()],
-//             operators: Vec::new(),
-//         }
-//     }
-// }
+impl Variable {
+    pub fn to_expression(&self) -> Expression {
+        if let ValueBody::Expression(e) = &self.value.body {
+            if self.path.is_empty() {
+                return e.to_owned();
+            }
+        }
+        Expression {
+            values: vec![self.clone()],
+            operators: Vec::new(),
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Expression {

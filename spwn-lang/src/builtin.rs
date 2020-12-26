@@ -241,7 +241,7 @@ impl Value {
     }
 }
 
-pub const BUILTIN_LIST: [&str; 34] = [
+pub const BUILTIN_LIST: [&str; 36] = [
     "print",
     "sin",
     "cos",
@@ -255,6 +255,8 @@ pub const BUILTIN_LIST: [&str; 34] = [
     "current_context",
     "append",
     "matches",
+    "b64encrypt",
+    "b64decrypt",
     //operators
     "_or_",
     "_and_",
@@ -313,6 +315,59 @@ pub fn built_in_function(
             let val = globals.stored_values[arguments[0]].clone();
             let pattern = globals.stored_values[arguments[1]].clone();
             Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
+        }
+
+        "b64encrypt" => {
+            if arguments.len() != 1 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "expected one argument: string to be encrypted".to_string(),
+                    info,
+                });
+            }
+
+            let val = globals.stored_values[arguments[0]].clone();
+            match val {
+                Value::Str(s) => {
+                    let encrypted = base64::encode(&s.as_bytes());
+                    Value::Str(encrypted)
+                }
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: "expected one argument: string to be encrypted".to_string(),
+                        info,
+                    })
+                }
+            }
+        }
+        "b64decrypt" => {
+            if arguments.len() != 1 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "expected one argument: string to be encrypted".to_string(),
+                    info,
+                });
+            }
+
+            let val = globals.stored_values[arguments[0]].clone();
+            match val {
+                Value::Str(s) => {
+                    let decrypted = match base64::decode(&s) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            return Err(RuntimeError::BuiltinError {
+                                message: format!("Base 64 error: {}", e),
+                                info,
+                            })
+                        }
+                    };
+                    Value::Str(String::from_utf8_lossy(&decrypted).to_string())
+                }
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: "expected one argument: string to be encrypted".to_string(),
+                        info,
+                    })
+                }
+            }
         }
 
         // "is_in_use" => {

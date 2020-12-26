@@ -913,7 +913,7 @@ pub fn import_module(
             .expect("Your file must be in a folder to import modules!")
             .join(&p),
 
-        ImportType::Lib(name) => match std::env::current_dir() {
+        ImportType::Lib(name) => match std::env::current_exe() {
             //change to current_exe before release
             Ok(p) => p,
             Err(e) => {
@@ -923,8 +923,8 @@ pub fn import_module(
                 })
             }
         }
-        //.parent() //ADD BACK BEFORE RELEASE
-        //.unwrap()
+        .parent() //ADD BACK BEFORE RELEASE
+        .unwrap()
         .join("libraries")
         .join(name),
     };

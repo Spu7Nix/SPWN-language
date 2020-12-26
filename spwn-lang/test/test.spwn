@@ -63,12 +63,9 @@ impl @binaryCalculator {
 
 
 
-//extract obj_props;
-//import "binaryCalculator.spwn";
-
 decimal = ?i;
 decimalCounter = counter(decimal);
-calculator = @binaryCalculator::new(8, 300, 300);
+calculator = @binaryCalculator::new(16, 300, 300);
 
 $.add(obj {
     OBJ_ID: 1615,
@@ -78,6 +75,6 @@ $.add(obj {
     GROUPS: 999g
 });
 
-decimalCounter = 3576;
+decimalCounter = 64576;
 wait(1);
-calculator.decimalToBinary(decimalCounter, calcSpeed = 8);
+calculator.prettyDecimalToBinary(decimalCounter);

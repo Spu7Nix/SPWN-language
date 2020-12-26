@@ -8,6 +8,7 @@ use crate::builtin::BUILTIN_LIST;
 //use std::collections::HashMap;
 use std::path::PathBuf;
 
+//use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
 
@@ -1239,7 +1240,37 @@ fn parse_dict(
                         let expr = parse_expr(tokens, notes, true, true)?;
                         defs.push(ast::DictDef::Def((symbol, expr)));
                     }
+                    Some(Token::Comma) => {
+                        if symbol == "type" {
+                            return Err(SyntaxError::ExpectedErr {
+                                expected: "':'".to_string(),
+                                found: String::from("comma (',')"),
+                                pos: tokens.position(),
+                                file: notes.file.clone(),
+                            });
+                        }
+                        defs.push(ast::DictDef::Def((
+                            symbol.clone(),
+                            ast::ValueBody::Symbol(symbol).to_variable().to_expression(),
+                        )));
+                    }
 
+                    Some(Token::ClosingCurlyBracket) => {
+                        if symbol == "type" {
+                            return Err(SyntaxError::ExpectedErr {
+                                expected: "':'".to_string(),
+                                found: String::from("}"),
+                                pos: tokens.position(),
+                                file: notes.file.clone(),
+                            });
+                        }
+                        defs.push(ast::DictDef::Def((
+                            symbol.clone(),
+                            ast::ValueBody::Symbol(symbol).to_variable().to_expression(),
+                        )));
+                        //tokens.previous();
+                        break;
+                    }
                     a => {
                         return Err(SyntaxError::ExpectedErr {
                             expected: "':'".to_string(),
@@ -1967,6 +1998,21 @@ fn parse_variable(
                     tokens.previous();
                     ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
                 }
+                Some(Token::Symbol) => match tokens.next(false, false) {
+                    Some(Token::ClosingCurlyBracket) | Some(Token::Comma) | Some(Token::Colon) => {
+                        tokens.previous();
+                        tokens.previous();
+                        ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
+                    }
+                    _ => {
+                        tokens.previous();
+                        tokens.previous();
+
+                        ast::ValueBody::CmpStmt(ast::CompoundStatement {
+                            statements: parse_cmp_stmt(tokens, notes)?,
+                        })
+                    }
+                },
                 _ => match tokens.next(false, false) {
                     Some(Token::Colon) => {
                         tokens.previous();

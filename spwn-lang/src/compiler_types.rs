@@ -88,7 +88,11 @@ impl ValStorage {
     }
 
     pub fn increment_single_lifetime(&mut self, index: usize, amount: u16) {
-        (*self.map.get_mut(&index).expect(&(index.to_string() + " index not found"))).3 += amount;
+        let val = &mut (*self.map.get_mut(&index).expect(&(index.to_string() + " index not found"))).3;
+        if *val < 10000 - amount {
+            *val += amount;
+        }
+        
         match self[index].clone() {
             Value::Array(a) => {
                 for e in a {

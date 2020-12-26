@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     let (statements, notes) = match parse_spwn(unparsed, script_path.clone()) {
                         Err(err) => {
-                            eprint_with_color(&format!("{}\n", err), Color::Red);
+                            eprint_with_color(&format!("{}\n", err), Color::White);
                             std::process::exit(ERROR_EXIT_CODE);
                         }
                         Ok(p) => p,
