@@ -337,6 +337,7 @@ pub fn compile_scope(
                     if is_assign {
                         let mut new_expr = expr.clone();
                         let symbol = new_expr.values.remove(0);
+                        //use crate::fmt::SpwnFmt;
                         new_expr.operators.remove(0); //assign operator
                         let constant = symbol.operator != Some(ast::UnaryOperator::Let);
 
@@ -380,6 +381,12 @@ pub fn compile_scope(
                             _ => {
                                 let (evaled, inner_returns) =
                                     new_expr.eval(context, globals, info.clone(), constant)?;
+                                if !constant {
+                                    for (val, _) in &evaled {
+                                        globals.stored_values.set_mutability(*val, !constant);
+                                    }
+                                }
+
                                 returns.extend(inner_returns);
                                 for (e, c2) in evaled {
                                     let mut new_context = c2.clone();
@@ -913,8 +920,8 @@ pub fn import_module(
             .expect("Your file must be in a folder to import modules!")
             .join(&p),
 
-        ImportType::Lib(name) => match std::env::current_exe() {
-            //change to current_exe before release
+        ImportType::Lib(name) => match std::env::current_dir() {
+            //change to current_exe before release (from current_dir)
             Ok(p) => p,
             Err(e) => {
                 return Err(RuntimeError::RuntimeError {
@@ -923,8 +930,8 @@ pub fn import_module(
                 })
             }
         }
-        .parent() //ADD BACK BEFORE RELEASE
-        .unwrap()
+        //.parent() //ADD BACK BEFORE RELEASE
+        //.unwrap()
         .join("libraries")
         .join(name),
     };

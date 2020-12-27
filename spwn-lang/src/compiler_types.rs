@@ -63,6 +63,42 @@ impl ValStorage {
         }
     }
 
+    pub fn set_mutability(
+        &mut self, index: usize, constant: bool,
+    ) {
+
+        (*self.map.get_mut(&index).unwrap()).2 = constant;
+        
+        match self[index].clone() {
+            Value::Array(a) => {
+                for e in a {
+                    self.set_mutability(e, constant);
+                }
+            }
+            Value::Dict(a) => {
+                for (_, e) in a {
+                    self.set_mutability(e, constant);
+                }
+            }
+            Value::Macro(m) => {
+                for (_, e, _, e2) in m.args {
+                    if let Some(val) = e {
+                        self.set_mutability(val, constant);
+                    }
+                    if let Some(val) = e2 {
+                        self.set_mutability(val, constant);
+                    }
+                }
+
+                for (_, v) in m.def_context.variables.iter() {
+                    self.set_mutability(*v, constant);
+                }
+            }
+            _ => (),
+        };    
+    }
+
+
     pub fn increment_lifetimes(&mut self) {
         for (_, val) in self.map.iter_mut() {
             (*val).3 += 1;
@@ -228,6 +264,24 @@ pub fn store_const_value(
     (*globals).val_id += 1;
     index
 }
+
+// pub fn store_val_m(
+//     val: Value,
+//     lifetime: u16,
+//     globals: &mut Globals,
+//     context: &Context,
+//     constant: bool,
+// ) -> StoredValue {
+    
+//     let index = globals.val_id;
+    
+//     (*globals)
+//         .stored_values
+//         .map
+//         .insert(index, (val, context.start_group, constant, lifetime));
+//     (*globals).val_id += 1;
+//     index
+// }
 
 pub type FnIDPtr = usize;
 
@@ -746,6 +800,7 @@ pub fn convert_type(
 const MAX_DICT_EL_DISPLAY: u16 = 10;
 
 impl Value {
+    
     pub fn to_str(&self, globals: &Globals) -> String {
         match self {
             Value::Group(g) => {
@@ -792,9 +847,17 @@ impl Value {
                     format!("{}..{}", start, end)
                 }
             }
-            Value::Dict(d) => {
-                let mut out = String::from("{\n");
+            Value::Dict(dict_in) => {
+                let mut out = String::new();
                 let mut count = 0;
+                let mut d = dict_in.clone();
+                if let Some(n) = d.get(TYPE_MEMBER_NAME) {
+                    let val = &globals.stored_values[*n];
+                    out += &val.to_str(globals);
+                    d.remove(TYPE_MEMBER_NAME);
+                    out += "::";
+                }
+                out += "{\n";
                 let mut d_iter = d.iter();
                 for (key, val) in &mut d_iter {
                     count += 1;
@@ -806,7 +869,9 @@ impl Value {
                     let stored_val = (*globals).stored_values[*val as usize].to_str(globals);
                     out += &format!("{}: {},\n", key, stored_val);
                 }
-                out.pop();
+                if !d.is_empty() {
+                    out.pop();
+                }
                 out.pop();
 
                 out += "\n}"; //why do i have to do this twice? idk
@@ -1374,6 +1439,8 @@ impl ast::Expression {
         }
         Ok((acum, inner_returns))
     }
+
+
 }
 
 pub fn execute_macro(
@@ -2349,7 +2416,11 @@ impl ast::Variable {
 
     //more like is_undefinable
     pub fn is_defined(&self, context: &Context, globals: &mut Globals) -> bool {
-        // use crate::fmt::SpwnFmt;
+        //use crate::fmt::SpwnFmt;
+        if self.operator == Some(ast::UnaryOperator::Let) {
+            return true
+        }
+        
         // println!("hello? {}", self.fmt(0));
         let mut current_ptr = match &self.value.body {
             ast::ValueBody::Symbol(a) => {
@@ -2374,12 +2445,15 @@ impl ast::Variable {
         for p in &self.path {
             match p {
                 ast::Path::Member(m) => {
+                    
                     if let Value::Dict(d) = &globals.stored_values[current_ptr] {
                         match d.get(m) {
                             Some(s) => current_ptr = *s,
                             None => return false,
                         }
+                        
                     } else {
+                        
                         return true;
                     }
                 }
@@ -2404,7 +2478,7 @@ impl ast::Variable {
 
         true
     }
-
+    
     pub fn define(
         &self,
         //value: StoredValue,
@@ -2415,9 +2489,13 @@ impl ast::Variable {
         // when None, the value is already defined
         use crate::fmt::SpwnFmt;
         let mut defined = true;
+        
 
         let value = match &self.operator {
-            Some(ast::UnaryOperator::Let) => store_value(Value::Null, 1, globals, context),
+            Some(ast::UnaryOperator::Let) => {
+                
+                store_value(Value::Null, 1, globals, context)
+            },
             None => store_const_value(Value::Null, 1, globals, context),
             a => {
                 return Err(RuntimeError::RuntimeError {

@@ -214,7 +214,7 @@ impl @counter {
             //error "Dividing a counter by another counter is currently not supported"
             result = @counter::new(0, false)
             remainder.reset(speed)
-            delay = 0.1
+            delay = @epsilon::{}
             // IDEA:
             // every time it goes under, undo the previous operation to simulate comparison
             
@@ -261,13 +261,12 @@ impl @counter {
             
             for i in speed..0 {
                 mini_div(5^i)
-                wait(0.1)
+                wait(delay)
             }
             -> divisor.reset(speed)
             self.add_to([remainder.item], speed)
             
-            result.add_to([self.item], speed)
-            wait(0.2)
+            result.add_to([self.item], speed * 2)
             return remainder
             
             

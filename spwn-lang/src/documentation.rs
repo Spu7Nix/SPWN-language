@@ -126,7 +126,7 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
 
         member_doc += &format!(
             r#"
-**`{}`**:
+## **{}**:
 
 {}
 >
@@ -169,8 +169,11 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
 
     if !(mac.args.is_empty() || (mac.args.len() == 1 && mac.args[0].0 == "self")) {
         doc += "## Arguments:\n";
-
-        for arg in &mac.args {
+        doc += "
+| # | name | type | default value | description |
+| - | ---- | ---- | ------------- | ----------- |
+";
+        for (i, arg) in mac.args.iter().enumerate() {
             let mut arg_string = String::new();
 
             if arg.0 == "self" {
@@ -178,25 +181,36 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
             }
 
             if arg.1 != None {
-                arg_string += &format!(" _`{}` (optional)_ ", arg.0);
+                arg_string += &format!("| {} | `{}` |", i + 1, arg.0);
             } else {
-                arg_string += &format!(" **`{}`** _(obligatory)_", arg.0);
+                arg_string += &format!("| {} | **`{}`** |", i + 1, arg.0);
             }
 
-            if let Some(desc) = arg.2.get_desc() {
-                arg_string += &format!(": _{}_", desc);
+            if let Some(typ) = arg.3 {
+                let val = &globals.stored_values[typ].clone();
+                arg_string += &format!(" {} |", val.to_str(globals).replace("|", "or"));
+            } else {
+                arg_string += "any |";
             }
 
             if let Some(def_val) = arg.1 {
                 let val = &globals.stored_values[def_val].clone();
-                arg_string +=
-                    &format!("\n\n_Default value:_\n\n{}\n\n", document_val(val, globals));
+                arg_string += &format!(" `{}` |", val.to_str(globals).replace("\n", ""));
+            } else {
+                arg_string += " |";
             }
 
-            add_arrows(&mut arg_string);
+            if let Some(desc) = arg.2.get_desc() {
+                arg_string += &format!("{} |", desc);
+            } else {
+                arg_string += " |";
+            }
+
+            //add_arrows(&mut arg_string);
+
             doc += &arg_string;
 
-            doc += "\n\n\n\n\n";
+            doc += "\n";
         }
     }
 
@@ -218,12 +232,11 @@ fn document_val(val: &Value, globals: &mut Globals) -> String {
     let type_name =
         find_key_for_value(&globals.type_ids, type_id).expect("Implemented type was not found!");
 
-    doc += &format!("**Type:** `{}` \n\n", type_name);
     let literal = val.to_str(globals);
-    if literal.lines().count() > 1 {
-        doc += &format!("**Literal:** \n\n ```\n\n{}\n\n``` \n\n", literal);
+    if literal.len() < 100 {
+        doc += &format!(" **Value:** `{}` (`@{}`) \n\n", literal, type_name);
     } else {
-        doc += &format!("**Literal:** ```{}``` \n\n", literal);
+        doc += &format!(" **Type:** `@{}` \n\n", type_name);
     }
 
     doc += &match &val {
@@ -238,13 +251,13 @@ fn document_val(val: &Value, globals: &mut Globals) -> String {
     doc
 }
 
-fn add_arrows(string: &mut String) {
-    let mut formatted = String::new();
+// fn add_arrows(string: &mut String) {
+//     let mut formatted = String::new();
 
-    for line in string.lines() {
-        formatted += &format!(">{}\n", line);
-    }
+//     for line in string.lines() {
+//         formatted += &format!(">{}\n", line);
+//     }
 
-    formatted.pop();
-    (*string) = formatted
-}
+//     formatted.pop();
+//     (*string) = formatted
+// }

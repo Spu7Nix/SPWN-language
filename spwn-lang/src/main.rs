@@ -235,9 +235,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("written to {:?}", output_path);
                     Ok(())
                 }
-                /*"format" => {
+                "format" => {
                     use std::fs::File;
-                    use std::io::Write;
+                    //use std::io::Write;
                     let script_path = match args_iter.next() {
                         Some(a) => PathBuf::from(a),
                         None => return Err(std::boxed::Box::from("Expected script file argument")),
@@ -261,7 +261,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     output_file.write_all(formatted.as_bytes())?;
 
                     Ok(())
-                }*/
+                }
                 a => {
                     eprint_with_color(&format!("Unknown subcommand: {}", a), Color::Red);
 

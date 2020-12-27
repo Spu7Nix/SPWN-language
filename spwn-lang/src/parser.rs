@@ -134,6 +134,9 @@ pub enum Token {
     #[token("^")]
     Power,
 
+    #[token("**")]
+    DoubleStar,
+
     #[token("+")]
     Plus,
 
@@ -296,7 +299,7 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | As | Either => "operator",
+            | Subtract | Multiply | Divide | As | Either | DoubleStar => "operator",
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -1082,6 +1085,13 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
 }
 
 fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
+    for val in &mut expr.values {
+        let body = &mut val.value.body;
+        if let ast::ValueBody::Expression(e) = body {
+            *e = fix_precedence(e.clone());
+        }
+    }
+
     if expr.operators.len() <= 1 {
         expr
     } else {
@@ -1099,36 +1109,34 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
             values: Vec::new(),
         };
 
-        loop {
-            let mut didnt_break = true;
-            for (i, op) in expr.operators.iter().enumerate() {
-                if operator_precedence(op) == lowest {
-                    new_expr.operators.push(*op);
-                    new_expr.values.push(if i == 0 {
-                        expr.values[0].clone()
-                    } else {
-                        fix_precedence(ast::Expression {
-                            operators: expr.operators[..i].to_vec(),
-                            values: expr.values[..(i + 1)].to_vec(),
-                        })
-                        .to_variable()
-                    });
+        for (i, op) in expr.operators.iter().enumerate() {
+            if operator_precedence(op) == lowest {
+                new_expr.operators.push(*op);
+                new_expr.values.push(if i == 0 {
+                    expr.values[0].clone()
+                } else {
+                    fix_precedence(ast::Expression {
+                        operators: expr.operators[..i].to_vec(),
+                        values: expr.values[..(i + 1)].to_vec(),
+                    })
+                    .to_variable()
+                });
 
-                    expr = ast::Expression {
+                new_expr.values.push(if i == expr.operators.len() - 1 {
+                    expr.values.last().unwrap().clone()
+                } else {
+                    // expr.operators[(i + 1)..].to_vec(),
+                    //     values: expr.values[(i + 1)..]
+                    fix_precedence(ast::Expression {
                         operators: expr.operators[(i + 1)..].to_vec(),
                         values: expr.values[(i + 1)..].to_vec(),
-                    };
-                    didnt_break = false;
-                    break;
-                }
-            }
-            //println!("{:?}", expr);
-            if didnt_break || expr.operators.is_empty() {
+                    })
+                    .to_variable()
+                });
+
                 break;
             }
         }
-
-        new_expr.values.push(expr.to_variable());
 
         new_expr
     }
@@ -1205,7 +1213,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::LessThan => Some(ast::Operator::Less),
         Token::MoreThan => Some(ast::Operator::More),
         Token::Star => Some(ast::Operator::Star),
-        Token::Power => Some(ast::Operator::Power),
+        Token::Power | Token::DoubleStar => Some(ast::Operator::Power),
         Token::Plus => Some(ast::Operator::Plus),
         Token::Minus => Some(ast::Operator::Minus),
         Token::Slash => Some(ast::Operator::Slash),
@@ -2013,6 +2021,7 @@ fn parse_variable(
                         })
                     }
                 },
+                Some(Token::ClosingCurlyBracket) => ast::ValueBody::Dictionary(Vec::new()),
                 _ => match tokens.next(false, false) {
                     Some(Token::Colon) => {
                         tokens.previous();
