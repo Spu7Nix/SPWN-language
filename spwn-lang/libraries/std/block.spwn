@@ -2,10 +2,10 @@
 events = import "events.spwn"
 
 on = (
-     event: @macro, 
+     event: @event, 
      function: @function
 ){
-    event(function)
+    event.on_triggered(function)
 }
 
 impl @block {
