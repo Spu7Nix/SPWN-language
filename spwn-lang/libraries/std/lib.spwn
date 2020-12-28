@@ -8,6 +8,7 @@ import "item.spwn"
 import "block.spwn"
 import "array.spwn"
 import "counter.spwn"
+import "fileio.spwn"
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"

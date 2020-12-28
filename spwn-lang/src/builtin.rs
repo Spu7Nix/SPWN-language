@@ -5,6 +5,8 @@ use crate::compiler::RuntimeError;
 use crate::compiler_types::*;
 use crate::levelstring::*;
 use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 
 pub type ArbitraryID = u16;
 pub type SpecificID = u16;
@@ -256,6 +258,8 @@ pub const BUILTIN_LIST: &[&str] = &[
     "append",
     "pop",
     "remove_index",
+    "readfile",
+    "substr",
     "matches",
     "b64encrypt",
     "b64decrypt",
@@ -534,6 +538,44 @@ pub fn built_in_function(
             Value::Null
         }
 
+        "readfile" => {
+            if arguments.len() != 1 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected file name".to_string(),
+                    info,
+                });
+            }
+            let val = globals.stored_values[arguments[0]].clone();
+            match val {
+                Value::Str(s) => {
+                    let path = Path::new(&s);
+                    if !path.exists() {
+                        return Err(RuntimeError::BuiltinError {
+                            message: "Path doesn't exist".to_string(),
+                            info,
+                        });
+                    }
+                    let ret = fs::read_to_string(s);
+                    let rval = match ret {
+                        Ok(file) => file,
+                        Err(_) => {
+                            return Err(RuntimeError::BuiltinError {
+                                message: "File cannot be opened".to_string(),
+                                info,
+                            });
+                        },
+                    };
+                    Value::Str(rval)
+                }
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: "Expected one argument: string as path".to_string(),
+                        info,
+                    });
+                }
+            }
+        }
+
         "pop" => {
             if arguments.len() != 1 {
                 return Err(RuntimeError::BuiltinError {
@@ -566,6 +608,63 @@ pub fn built_in_function(
                     })
                 }
             }
+        }
+
+        "substr" => {
+            if arguments.len() != 3 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected three arguments: string to be sliced, a start index, and an end index".to_string(),
+                    info,
+                });
+            }
+
+            let val = match globals.stored_values[arguments[0]].clone() {
+                Value::Str(s) => s,
+                _ => {
+                    let typ = globals.get_type_str(arguments[0]);
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected string, found @{}",typ),
+                        info,
+                    })
+                }
+            };
+
+            let start_index = match globals.stored_values[arguments[1]] {
+                Value::Number(n) => n as usize,
+                _ => {
+                    let typ = globals.get_type_str(arguments[1]);
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected number as start index, found @{}", typ),
+                        info,
+                    });
+                }
+            };
+
+            let end_index = match globals.stored_values[arguments[2]] {
+                Value::Number(n) => n as usize,
+                _ => {
+                    let typ = globals.get_type_str(arguments[2]);
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected number as start index, found @{}", typ),
+                        info,
+                    });
+                }
+            };
+
+            if start_index >= end_index {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Start index is larger than end index".to_string(),
+                    info
+                });
+            }
+            if end_index > val.len()  {
+                return Err(RuntimeError::BuiltinError {
+                    message: "End index is larger than string".to_string(),
+                    info
+                });
+            }
+            Value::Str(val.as_str()[start_index..end_index].to_string())
+
         }
 
         "remove_index" => {
