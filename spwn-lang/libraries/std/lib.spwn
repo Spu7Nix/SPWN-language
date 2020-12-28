@@ -55,6 +55,13 @@ impl @array {
     },
     remove: (self, index: @number) {
         return $.remove_index(self, index)
+    },
+    _plus_: (self, list: @array) {
+        let ret = self
+        for item in list {
+            ret.push(item)
+        }
+        return ret
     }
 }
 
