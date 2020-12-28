@@ -1,5 +1,8 @@
 #[no_std]
 // brought to you by camden314
+
+type @file;
+
 impl @file {
 	new: (path: @string) {
 		let ret = {type: @file};
@@ -8,21 +11,24 @@ impl @file {
 		ret.size = ret.filedata.length;
 		let ret.fseek = 0;
 		return ret;
-	}
-	seek: (s: @number) {
+	},
+	seek: (self, s: @number) {
 		if s < 0 {
 			error "Negative seek position " + s as @string;
 		}
 		self.fseek = s;
-	}
-	read: (self, s=-1) {
+	},
+	read: (self, size=-1) {
 		let s = size;
 		if size == -1 {
 			s = self.size;
 		}
 		if self.fseek >= self.size {
 			return "";
+		} else {
+			oldseek = self.fseek;
+			self.fseek += s;
+			return $.substr(self.filedata, oldseek, [self.fseek, self.size].min());
 		}
-		return $.substr(self.filedata)
 	}
 }

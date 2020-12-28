@@ -26,6 +26,7 @@ return {
     counter: @counter::new,
     on: @event::on,
     obj_props: constants.obj_props,
+    open: @file::new,
 }
 
 
