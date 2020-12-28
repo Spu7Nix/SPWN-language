@@ -1,0 +1,28 @@
+#[no_std]
+// brought to you by camden314
+impl @file {
+	new: (path: @string) {
+		let ret = {type: @file};
+
+		ret.filedata = $.readfile(path);
+		ret.size = ret.filedata.length;
+		let ret.fseek = 0;
+		return ret;
+	}
+	seek: (s: @number) {
+		if s < 0 {
+			error "Negative seek position " + s as @string;
+		}
+		self.fseek = s;
+	}
+	read: (self, s=-1) {
+		let s = size;
+		if size == -1 {
+			s = self.size;
+		}
+		if self.fseek >= self.size {
+			return "";
+		}
+		return $.substr(self.filedata)
+	}
+}
