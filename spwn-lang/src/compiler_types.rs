@@ -264,23 +264,23 @@ pub fn store_const_value(
     index
 }
 
-// pub fn store_val_m(
-//     val: Value,
-//     lifetime: u16,
-//     globals: &mut Globals,
-//     context: &Context,
-//     constant: bool,
-// ) -> StoredValue {
+pub fn store_val_m(
+    val: Value,
+    lifetime: u16,
+    globals: &mut Globals,
+    context: &Context,
+    constant: bool,
+) -> StoredValue {
     
-//     let index = globals.val_id;
+    let index = globals.val_id;
     
-//     (*globals)
-//         .stored_values
-//         .map
-//         .insert(index, (val, context.start_group, constant, lifetime));
-//     (*globals).val_id += 1;
-//     index
-// }
+    (*globals)
+        .stored_values
+        .map
+        .insert(index, (val, context.start_group, constant, lifetime));
+    (*globals).val_id += 1;
+    index
+}
 
 pub type FnIDPtr = usize;
 
@@ -1189,7 +1189,7 @@ fn handle_operator(
     )
 }
 
-fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError> {
+pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError> {
     let rounded = num.round();
     if (num - rounded).abs() > 0.000000001 {
         return Err(RuntimeError::RuntimeError {
@@ -1334,70 +1334,13 @@ impl ast::Expression {
                             globals,
                             &info
                         )?,
-                        Range => smallvec![(
-                            store_value(
-                                {
-                                    let end = match globals.stored_values[*val] {
-                                        Value::Number(n) => convert_to_int(n, &info)?,
-                                        _ => {
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: "Both sides of range must be Numbers"
-                                                    .to_string(),
-                                                info,
-                                            })
-                                        }
-                                    };
-                                    match globals.stored_values[acum_val] {
-                                        Value::Number(start) => {
-                                            Value::Range(convert_to_int(start, &info)?, end, 1)
-                                        }
-                                        Value::Range(start, step, old_step) => {
-                                            if old_step != 1 {
-                                                return Err(RuntimeError::RuntimeError {
-                                                    message: "Range operator cannot be used on a range that already has a non-default stepsize"
-                                                        .to_string(),
-                                                    info,
-                                                });
-                                            }
-                                            Value::Range(
-                                                start,
-                                                end,
-                                                if step < 0 {
-                                                    return Err(RuntimeError::RuntimeError {
-                                                        message:
-                                                            "cannot have a stepsize less than 0"
-                                                                .to_string(),
-                                                        info,
-                                                    });
-                                                } else {
-                                                    step as usize
-                                                },
-                                            )
-                                        }
-                                        _ => {
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: "Both sides of range must be Numbers"
-                                                    .to_string(),
-                                                info,
-                                            })
-                                        }
-                                    }
-
-                                    // if start < end {
-                                    //     (start..end).collect::<Vec<i32>>()
-                                    // } else {
-                                    //     (end..start).rev().collect::<Vec<i32>>()
-                                    // }
-                                    // .into_iter()
-                                    // .map(|x| store_value(Value::Number(x as f64), 1, globals, &c2))
-                                    // .collect()
-                                },
-                                1,
-                                globals,
-                                &c2,
-                            ),
-                            c2.clone(),
-                        )],
+                        Range => handle_operator(acum_val,
+                            *val,
+                            "_range_",
+                            c2,
+                            globals,
+                            &info
+                        )?,
                         //MUTABLE ONLY
                         //ADD CHECk
                         Assign => {
@@ -2282,6 +2225,42 @@ impl ast::Variable {
                     with_parent = new_out
                 }
 
+                ast::Path::Increment => {
+                    for (prev_v,prev_c, _) in &mut with_parent {
+                        let is_mutable = globals.stored_values.map[&prev_v].2;
+                        match &mut globals.stored_values[*prev_v] {
+                            Value::Number(n) => {
+                                *n += 1.0;
+                                *prev_v = store_val_m(Value::Number(*n - 1.0),1, globals, prev_c, is_mutable);
+                            }
+                            _ => {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: "Cannot increment this type".to_string(),
+                                    info,
+                                })
+                            }
+                        }
+                    } 
+                }
+
+                ast::Path::Decrement => {
+                    for (prev_v,prev_c, _) in &mut with_parent {
+                        let is_mutable = globals.stored_values.map[&prev_v].2;
+                        match &mut globals.stored_values[*prev_v] {
+                            Value::Number(n) => {
+                                *n -= 1.0;                          
+                                *prev_v = store_val_m(Value::Number(*n + 1.0),1, globals, prev_c, is_mutable);
+                            }
+                            _ => {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: "Cannot decrement this type".to_string(),
+                                    info,
+                                })
+                            }
+                        }
+                    } 
+                }
+
                 ast::Path::Constructor(defs) => {
                     let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
 
@@ -2391,6 +2370,28 @@ impl ast::Variable {
                         } else {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Cannot make non-number type negative".to_string(),
+                                info,
+                            });
+                        }
+                    }
+
+                    UnaryOperator::Increment => {
+                        if let Value::Number(n) = &mut globals.stored_values[final_value.0] {
+                            *n += 1.0;
+                        } else {
+                            return Err(RuntimeError::RuntimeError {
+                                message: "Cannot increment non-number type".to_string(),
+                                info,
+                            });
+                        }
+                    }
+
+                    UnaryOperator::Decrement => {
+                        if let Value::Number(n) = &mut globals.stored_values[final_value.0] {
+                            *n -= 1.0;
+                        } else {
+                            return Err(RuntimeError::RuntimeError {
+                                message: "Cannot decrement non-number type".to_string(),
                                 info,
                             });
                         }

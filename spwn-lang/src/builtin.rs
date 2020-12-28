@@ -283,6 +283,7 @@ pub const BUILTIN_LIST: &[&str] = &[
     "_multiply_",
     "_divide_",
     "_either_",
+    "_range_",
 ];
 
 const CANNOT_CHANGE_ERROR: &str = "
@@ -615,7 +616,7 @@ pub fn built_in_function(
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
         | "_less_or_equal_" | "_divided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
         | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_as_" | "_add_" | "_subtract_"
-        | "_multiply_" | "_divide_" | "_either_" | "_exponate_" | "_modulate_" => {
+        | "_multiply_" | "_divide_" | "_either_" | "_exponate_" | "_modulate_" | "_range_" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
                     message: "Expected two arguments".to_string(),
@@ -647,6 +648,50 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
             }
 
             match name {
+                "_range_" => {
+                    let end = match val_b {
+                        Value::Number(n) => convert_to_int(n, &info)?,
+                        _ => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!("expected @number, found @{}", b_type),
+                                info,
+                            })
+                        }
+                    };
+                    match val_a {
+                        Value::Number(start) => {
+                            Value::Range(convert_to_int(*start, &info)?, end, 1)
+                        }
+                        Value::Range(start, step, old_step) => {
+                            if *old_step != 1 {
+                                return Err(RuntimeError::RuntimeError {
+                                message: "Range operator cannot be used on a range that already has a non-default stepsize"
+                                    .to_string(),
+                                info,
+                            });
+                            }
+                            Value::Range(
+                                *start,
+                                end,
+                                if *step < 0 {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: "cannot have a stepsize less than 0".to_string(),
+                                        info,
+                                    });
+                                } else {
+                                    *step as usize
+                                },
+                            )
+                        }
+                        _ => {
+                            println!("{:?}", val_a);
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!("expected @number, found @{}", a_type),
+                                info,
+                            });
+                        }
+                    }
+                }
                 "_or_" => match (val_a, val_b) {
                     (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a || b),
 

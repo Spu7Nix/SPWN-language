@@ -134,6 +134,8 @@ pub enum UnaryOperator {
     Minus,
     Range,
     Let,
+    Increment,
+    Decrement,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -187,6 +189,8 @@ pub enum Path {
     Index(Expression),
     Call(Vec<Argument>),
     Constructor(Vec<DictDef>),
+    Increment,
+    Decrement,
 }
 
 #[derive(Clone, PartialEq, Debug)]

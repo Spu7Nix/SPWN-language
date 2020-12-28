@@ -296,6 +296,8 @@ impl SpwnFmt for Path {
             Path::Constructor(dict) => format!("::{}", element_list(dict, '{', '}', ind)),
             Path::Index(call) => format!("[{}]", call.fmt(ind)),
             Path::Call(x) => element_list(x, '(', ')', ind),
+            Path::Increment => "++".to_string(),
+            Path::Decrement => "--".to_string(),
         }
     }
 }
@@ -434,6 +436,8 @@ impl SpwnFmt for UnaryOperator {
             UnaryOperator::Minus => "-",
             UnaryOperator::Range => "..",
             UnaryOperator::Let => "let ",
+            UnaryOperator::Decrement => "--",
+            UnaryOperator::Increment => "++",
         }
         .to_string()
     }

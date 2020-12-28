@@ -167,6 +167,11 @@ pub enum Token {
     #[token("%=")]
     Modulate,
 
+    #[token("++")]
+    Increment,
+    #[token("--")]
+    Decrement,
+
     #[token("as")]
     As,
 
@@ -305,9 +310,8 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | As | Either | DoubleStar | Exponate | Modulate => {
-                "operator"
-            }
+            | Subtract | Multiply | Divide | As | Either | DoubleStar | Exponate | Modulate
+            | Increment | Decrement => "operator",
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -1775,6 +1779,14 @@ fn parse_variable(
             first_token = tokens.next(false, false);
             Some(ast::UnaryOperator::Let)
         }
+        Some(Token::Increment) => {
+            first_token = tokens.next(false, false);
+            Some(ast::UnaryOperator::Increment)
+        }
+        Some(Token::Decrement) => {
+            first_token = tokens.next(false, false);
+            Some(ast::UnaryOperator::Decrement)
+        }
         _ => None,
     };
 
@@ -2149,6 +2161,9 @@ fn parse_variable(
                     })
                 }
             },
+
+            Some(Token::Increment) => path.push(ast::Path::Increment),
+            Some(Token::Decrement) => path.push(ast::Path::Decrement),
 
             _ => break,
         }
