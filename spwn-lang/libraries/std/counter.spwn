@@ -55,7 +55,7 @@ impl @counter {
             OBJ_ID: 1615,
             X: x,
             Y: y,
-            ITEM: selfitem,
+            ITEM: self.item,
             GROUPS: 999g
         });
     },
