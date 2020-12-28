@@ -432,6 +432,13 @@ impl @counter {
         return out
     },
 
+    _modulate_: (self, num: @number | @counter) {
+        out = @counter::new()
+        self.divide(num, remainder = out)
+        self.reset()
+        out.add_to([self])
+    },
+
     _more_than_: (self, other: @number | @counter) {
         
         if other.type == @number {
