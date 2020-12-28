@@ -123,6 +123,9 @@ pub enum Operator {
     Multiply,
     Divide,
     As,
+
+    Exponate,
+    Modulate,
 }
 
 #[derive(Clone, PartialEq, Debug)]

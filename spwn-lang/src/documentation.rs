@@ -65,9 +65,9 @@ pub fn document_lib(path: &str) -> Result<String, RuntimeError> {
         used_groups, used_colors, used_blocks, used_items, total_objects
     );
 
-    doc += &format!("## Exports:\n{}", document_val(&exports, &mut globals));
+    doc += &format!("# Exports:\n{}", document_val(&exports, &mut globals));
 
-    doc += "## Type Implementations:\n";
+    doc += "# Type Implementations:\n";
 
     let mut list: Vec<(&u16, HashMap<String, usize>)> = implementations
         .iter()
@@ -88,7 +88,7 @@ pub fn document_lib(path: &str) -> Result<String, RuntimeError> {
             .clone();
 
         doc += &format!(
-            "### **@{}**: \n {}",
+            "  \n\n# **@{}**: \n {}",
             type_name,
             document_dict(dict, &mut globals)
         );
@@ -98,7 +98,7 @@ pub fn document_lib(path: &str) -> Result<String, RuntimeError> {
 }
 
 fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String {
-    let mut doc = String::from("<details>\n<summary> View members </summary>\n");
+    let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
 
     let mut macro_list: Vec<(&String, &usize)> = dict
         .iter()
@@ -150,13 +150,14 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
         for (key, val) in val_list.iter() {
             doc += &document_member(*key, *val)
         }
+
         if !macro_list.is_empty() {
-            doc += "\n\n</details>\n\n";
+            doc += "</details>\n\n";
         }
     }
-    if !macro_list.is_empty() {
-        doc += "</details>\n\n";
-    }
+    // if !macro_list.is_empty() {
+    //     doc += "</details>\n\n";
+    // }
     doc
 }
 
@@ -210,7 +211,7 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
 
             doc += &arg_string;
 
-            doc += "\n";
+            doc += "\n  ";
         }
     }
 
@@ -247,7 +248,7 @@ fn document_val(val: &Value, globals: &mut Globals) -> String {
 
     //add_arrows(&mut doc);
 
-    doc += "\n";
+    doc += "\n  ";
     doc
 }
 

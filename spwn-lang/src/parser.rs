@@ -161,6 +161,12 @@ pub enum Token {
     #[token("/=")]
     Divide,
 
+    #[token("^=")]
+    Exponate,
+
+    #[token("%=")]
+    Modulate,
+
     #[token("as")]
     As,
 
@@ -299,7 +305,9 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | As | Either | DoubleStar => "operator",
+            | Subtract | Multiply | Divide | As | Either | DoubleStar | Exponate | Modulate => {
+                "operator"
+            }
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -1081,6 +1089,8 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
         Subtract => 0,
         Multiply => 0,
         Divide => 0,
+        Exponate => 0,
+        Modulate => 0,
     }
 }
 
@@ -1225,6 +1235,8 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Subtract => Some(ast::Operator::Subtract),
         Token::Multiply => Some(ast::Operator::Multiply),
         Token::Divide => Some(ast::Operator::Divide),
+        Token::Exponate => Some(ast::Operator::Exponate),
+        Token::Modulate => Some(ast::Operator::Modulate),
         Token::As => Some(ast::Operator::As),
         _ => None,
     }

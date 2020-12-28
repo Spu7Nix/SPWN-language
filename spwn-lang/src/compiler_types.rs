@@ -1426,6 +1426,24 @@ impl ast::Expression {
                             &info,
                         )?,
 
+                        Exponate => handle_operator(
+                            acum_val,
+                            *val,
+                            "_exponate_",
+                            c2,
+                            globals,
+                            &info,
+                        )?,
+
+                        Modulate => handle_operator(
+                            acum_val,
+                            *val,
+                            "_modulate_",
+                            c2,
+                            globals,
+                            &info,
+                        )?,
+
                         Divide => {
                             handle_operator(acum_val, *val, "_divide_", c2, globals, &info)?
                         }

@@ -1,0 +1,43 @@
+#[no_std]
+impl @array {
+    max: (self, minval = 0) {
+        let highest = minval
+        for el in self {
+            if el > highest {
+                highest = el
+            }
+        }
+        return highest
+    },
+    min: (self, max_val = 999999999999) {
+        let lowest = max_val
+        for el in self {
+            if el < lowest {
+                lowest = el
+            }
+        }
+        return lowest
+    },
+    contains: (self, el) {
+		let ret = false
+		for e in self {
+			if e == el {
+				ret = true
+				break
+			}
+		}
+		return ret
+	},
+    push: (self, value) {
+        $.append(self, value)
+    },
+    pop: (self) {
+        return $.pop(self)
+    },
+    remove: (self, index: @number) {
+        return $.remove_index(self, index)
+    },
+
+    
+
+}

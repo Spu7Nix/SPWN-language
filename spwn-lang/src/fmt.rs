@@ -420,6 +420,8 @@ impl SpwnFmt for Operator {
             Operator::Divide => "/=",
             Operator::As => "as",
             Operator::Either => "|",
+            Operator::Exponate => "^=",
+            Operator::Modulate => "%=",
         }
         .to_string()
     }

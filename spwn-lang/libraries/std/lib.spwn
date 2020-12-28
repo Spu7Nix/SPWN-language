@@ -1,85 +1,30 @@
 #[no_std]
 let constants = import "constants.spwn"
 
-extract constants.obj_props
-extract constants.comparisons
-extract constants.easing_types
-
 //type implementations
-events = import "events.spwn"
 import "group.spwn"
 import "color.spwn"
 import "item.spwn"
 import "block.spwn"
-
+import "array.spwn"
 import "counter.spwn"
 
-ctrl_flow = import "control_flow.spwn";
-
-extract ctrl_flow
-
-impl @array {
-    max: (self, minval = 0) {
-        let highest = minval
-        for el in self {
-            if el > highest {
-                highest = el
-            }
-        }
-        return highest
-    },
-    min: (self, max_val = 999999999999) {
-        let lowest = max_val
-        for el in self {
-            if el < lowest {
-                lowest = el
-            }
-        }
-        return lowest
-    },
-    contains: (self, el) {
-		let ret = false
-		for e in self {
-			if e == el {
-				ret = true
-				break
-			}
-		}
-		return ret
-	},
-    push: (self, value) {
-        $.append(self, value)
-    },
-    pop: (self) {
-        return $.pop(self)
-    },
-    remove: (self, index: @number) {
-        return $.remove_index(self, index)
-    },
-    _plus_: (self, list: @array) {
-        let ret = self
-        for item in list {
-            ret.push(item)
-        }
-        return ret
-    }
-}
+general = import "general_triggers.spwn"
+events = import "events.spwn"
+ctrl_flow = import "control_flow.spwn"
 
 
 return {
-    obj_props: constants.obj_props,
     ..constants.easing_types,
     ..constants.comparisons,
     ..constants.colors,
-    ..import "general_triggers.spwn",
-
+    ..general,
     ..events,
-    
     ..ctrl_flow,
 
     counter: @counter::new,
-    call_with_delay: call_with_delay,
     on: @event::on,
+    obj_props: constants.obj_props,
 }
 
 

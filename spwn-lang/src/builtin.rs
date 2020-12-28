@@ -278,6 +278,8 @@ pub const BUILTIN_LIST: &[&str] = &[
     "_as_",
     "_add_",
     "_subtract_",
+    "_exponate_",
+    "_modulate_",
     "_multiply_",
     "_divide_",
     "_either_",
@@ -613,7 +615,7 @@ pub fn built_in_function(
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
         | "_less_or_equal_" | "_divided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
         | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_as_" | "_add_" | "_subtract_"
-        | "_multiply_" | "_divide_" | "_either_" => {
+        | "_multiply_" | "_divide_" | "_either_" | "_exponate_" | "_modulate_" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
                     message: "Expected two arguments".to_string(),
@@ -757,10 +759,14 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                 "_plus_" => match (val_a, val_b) {
                     (Value::Number(a), Value::Number(b)) => Value::Number(*a + b),
                     (Value::Str(a), Value::Str(b)) => Value::Str(a.clone() + &b),
+                    (Value::Array(a), Value::Array(b)) => {
+                        Value::Array([a.as_slice(), b.as_slice()].concat())
+                    }
 
                     _ => {
                         return Err(RuntimeError::TypeError {
-                            expected: "number and number or string and string".to_string(),
+                            expected: "number and number, array and array or string and string"
+                                .to_string(),
                             found: format!("{} and {}", a_type, b_type),
                             info,
                         })
@@ -862,10 +868,12 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     match (val_a, val_b) {
                         (Value::Number(a), Value::Number(b)) => (*a) += b,
                         (Value::Str(a), Value::Str(b)) => (*a) += &b,
+                        (Value::Array(a), Value::Array(b)) => (*a).extend(&b),
 
                         _ => {
                             return Err(RuntimeError::TypeError {
-                                expected: "number and number or string and string".to_string(),
+                                expected: "number and number, array and array or string and string"
+                                    .to_string(),
                                 found: format!("{} and {}", a_type, b_type),
                                 info,
                             })
@@ -910,6 +918,54 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
 
                     match (val_a, val_b) {
                         (Value::Number(a), Value::Number(b)) => (*a) *= b,
+
+                        _ => {
+                            return Err(RuntimeError::TypeError {
+                                expected: "number and number".to_string(),
+                                found: format!("{} and {}", a_type, b_type),
+                                info,
+                            })
+                        }
+                    };
+                    Value::Null
+                }
+                "_exponate_" => {
+                    if !mutable {
+                        return Err(mutable_err(info, "_exponate_"));
+                    }
+                    if acum_val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info,
+                        });
+                    }
+
+                    match (val_a, val_b) {
+                        (Value::Number(a), Value::Number(b)) => (*a) = a.powf(b),
+
+                        _ => {
+                            return Err(RuntimeError::TypeError {
+                                expected: "number and number".to_string(),
+                                found: format!("{} and {}", a_type, b_type),
+                                info,
+                            })
+                        }
+                    };
+                    Value::Null
+                }
+                "_modulate_" => {
+                    if !mutable {
+                        return Err(mutable_err(info, "_modulate_"));
+                    }
+                    if acum_val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info,
+                        });
+                    }
+
+                    match (val_a, val_b) {
+                        (Value::Number(a), Value::Number(b)) => (*a) %= b,
 
                         _ => {
                             return Err(RuntimeError::TypeError {
