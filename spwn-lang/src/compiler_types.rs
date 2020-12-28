@@ -49,7 +49,7 @@ impl std::ops::IndexMut<usize> for ValStorage {
         &mut self.map.get_mut(&i).unwrap().0
     }
 }
-
+use std::collections::HashSet;
 impl ValStorage {
     pub fn new() -> Self {
         ValStorage {
@@ -64,36 +64,25 @@ impl ValStorage {
     }
 
     pub fn set_mutability(
-        &mut self, index: usize, constant: bool,
+        &mut self, index: usize, mutable: bool,
     ) {
-
-        (*self.map.get_mut(&index).unwrap()).2 = constant;
+        if !mutable || !matches!(self[index], Value::Macro(_)) {
+            (*self.map.get_mut(&index).unwrap()).2 = mutable;
+        }
+       
         
         match self[index].clone() {
             Value::Array(a) => {
                 for e in a {
-                    self.set_mutability(e, constant);
+                    self.set_mutability(e, mutable);
                 }
             }
             Value::Dict(a) => {
                 for (_, e) in a {
-                    self.set_mutability(e, constant);
+                    self.set_mutability(e, mutable);
                 }
             }
-            Value::Macro(m) => {
-                for (_, e, _, e2) in m.args {
-                    if let Some(val) = e {
-                        self.set_mutability(val, constant);
-                    }
-                    if let Some(val) = e2 {
-                        self.set_mutability(val, constant);
-                    }
-                }
-
-                for (_, v) in m.def_context.variables.iter() {
-                    self.set_mutability(*v, constant);
-                }
-            }
+            Value::Macro(_) => (),
             _ => (),
         };    
     }
@@ -122,9 +111,17 @@ impl ValStorage {
             self.map.remove(&index);
         }
     }
+    
 
-    pub fn increment_single_lifetime(&mut self, index: usize, amount: u16) {
+    pub fn increment_single_lifetime(&mut self, index: usize, amount: u16, already_done: &mut HashSet<usize>) {
+
+        if already_done.get(&index) == None {
+            (*already_done).insert(index);
+        } else {
+            return
+        }
         let val = &mut (*self.map.get_mut(&index).expect(&(index.to_string() + " index not found"))).3;
+        
         if *val < 10000 - amount {
             *val += amount;
         }
@@ -132,26 +129,26 @@ impl ValStorage {
         match self[index].clone() {
             Value::Array(a) => {
                 for e in a {
-                    self.increment_single_lifetime(e, amount)
+                    self.increment_single_lifetime(e, amount, already_done)
                 }
             }
             Value::Dict(a) => {
                 for (_, e) in a {
-                    self.increment_single_lifetime(e, amount)
+                    self.increment_single_lifetime(e, amount, already_done)
                 }
             }
             Value::Macro(m) => {
                 for (_, e, _, e2) in m.args {
                     if let Some(val) = e {
-                        self.increment_single_lifetime(val, amount)
+                        self.increment_single_lifetime(val, amount, already_done)
                     }
                     if let Some(val) = e2 {
-                        self.increment_single_lifetime(val, amount)
+                        self.increment_single_lifetime(val, amount, already_done)
                     }
                 }
 
                 for (_, v) in m.def_context.variables.iter() {
-                    self.increment_single_lifetime(*v, amount)
+                    self.increment_single_lifetime(*v, amount, already_done)
                 }
             }
             _ => (),
@@ -166,11 +163,13 @@ pub fn store_value(
     context: &Context,
 ) -> StoredValue {
     let index = globals.val_id;
+    let mutable = !matches!(val, Value::Macro(_)); 
+    
     
     (*globals)
         .stored_values
         .map
-        .insert(index, (val, context.start_group, true, lifetime));
+        .insert(index, (val, context.start_group, mutable, lifetime));
     (*globals).val_id += 1;
     index
 }
@@ -857,7 +856,7 @@ impl Value {
                     d.remove(TYPE_MEMBER_NAME);
                     out += "::";
                 }
-                out += "{\n";
+                out += "{";
                 let mut d_iter = d.iter();
                 for (key, val) in &mut d_iter {
                     count += 1;
@@ -867,14 +866,14 @@ impl Value {
                         break;
                     }
                     let stored_val = (*globals).stored_values[*val as usize].to_str(globals);
-                    out += &format!("{}: {},\n", key, stored_val);
+                    out += &format!("{}: {},", key, stored_val);
                 }
                 if !d.is_empty() {
                     out.pop();
                 }
-                out.pop();
+                
 
-                out += "\n}"; //why do i have to do this twice? idk
+                out += "}"; //why do i have to do this twice? idk
 
                 out
             }

@@ -672,7 +672,7 @@ fn base_64_decrypt(encoded: Vec<u8>) -> Vec<u8> {
 use quick_xml::events::{BytesText, Event};
 use quick_xml::Reader;
 //use std::io::BufReader;
-fn decrypt_savefile(mut sf: Vec<u8>) -> Vec<u8> {
+fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, String> {
     if cfg!(target_os = "macos") {
         use aes::Aes256;
 
@@ -690,24 +690,30 @@ fn decrypt_savefile(mut sf: Vec<u8>) -> Vec<u8> {
         // re-create cipher mode instance
         let cipher = AesEcb::new_var(&IOS_KEY, &[]).unwrap();
 
-        cipher.decrypt(&mut sf).unwrap().to_vec()
+        Ok(match cipher.decrypt(&mut sf) {
+            Ok(v) => v,
+            Err(e) => return Err(format!("{}", e)),
+        }
+        .to_vec())
     } else {
         let xor = xor(sf.to_vec(), 11);
-        let replaced = String::from_utf8(xor)
-            .unwrap()
+        let replaced = String::from_utf8_lossy(&xor)
             .replace("-", "+")
             .replace("_", "/")
             .replace("\0", "");
-        let b64 = base64::decode(replaced.as_str()).unwrap();
+        let b64 = match base64::decode(replaced.as_str()) {
+            Ok(b) => b,
+            Err(e) => return Err(format!("{}", e)),
+        };
         let mut decoder = gzip::Decoder::new(&b64[..]).unwrap();
         let mut data = Vec::new();
         decoder.read_to_end(&mut data).unwrap();
-        data
+        Ok(data)
     }
 }
 pub fn get_level_string(ls: Vec<u8>, level_name: Option<String>) -> Result<String, String> {
     //decrypting the savefile
-    let content = decrypt_savefile(ls);
+    let content = decrypt_savefile(ls)?;
     let string_content = String::from_utf8_lossy(&content);
 
     let mut reader = Reader::from_str(&string_content);
@@ -813,13 +819,18 @@ use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-pub fn encrypt_level_string(ls: String, old_ls: String, path: PathBuf, level_name: Option<String>) {
+pub fn encrypt_level_string(
+    ls: String,
+    old_ls: String,
+    path: PathBuf,
+    level_name: Option<String>,
+) -> Result<(), String> {
     let mut file = fs::File::open(path.clone()).unwrap();
     let mut file_content = Vec::new();
     file.read_to_end(&mut file_content).unwrap();
 
     //decrypting the savefile
-    let content = decrypt_savefile(file_content);
+    let content = decrypt_savefile(file_content)?;
     let string_content = String::from_utf8_lossy(&content);
 
     let mut reader = Reader::from_str(&string_content);
@@ -894,7 +905,7 @@ pub fn encrypt_level_string(ls: String, old_ls: String, path: PathBuf, level_nam
         // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory usage low
         buf.clear();
     }
-    let mut bytes = writer.into_inner().into_inner();
+    let bytes = writer.into_inner().into_inner();
     //encrypt level save
     use std::io::Write;
 
@@ -915,7 +926,7 @@ pub fn encrypt_level_string(ls: String, old_ls: String, path: PathBuf, level_nam
         // re-create cipher mode instance
         let cipher = AesEcb::new_var(&IOS_KEY, &[]).unwrap();
 
-        let fin = cipher.encrypt_vec(&mut bytes);
+        let fin = cipher.encrypt_vec(&bytes);
         assert!(fs::write(path, fin).is_ok());
     } else {
         let mut encoder = zlib::Encoder::new(Vec::new()).unwrap();
@@ -943,4 +954,5 @@ pub fn encrypt_level_string(ls: String, old_ls: String, path: PathBuf, level_nam
         let fin = xor(encoded, 11);
         assert!(fs::write(path, fin).is_ok());
     }
+    Ok(())
 }

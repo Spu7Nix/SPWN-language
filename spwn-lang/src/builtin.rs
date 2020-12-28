@@ -705,7 +705,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     Value::Bool(globals.stored_values[acum_val] != globals.stored_values[val])
                 }
                 "_assign_" => {
-                    println!("hi1");
+                    //println!("hi1");
                     if !mutable {
                         return Err(mutable_err(info, "_assign_"));
                     }
@@ -719,12 +719,12 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     if globals.stored_values[acum_val] == Value::Null
                         && globals.stored_values.map.get(&acum_val).unwrap().2
                     {
-                        println!("hi");
+                        //println!("hi");
                         globals.stored_values[acum_val] = globals.stored_values[val].clone();
                         globals.stored_values.set_mutability(acum_val, true);
                         globals.stored_values[acum_val].clone()
                     } else {
-                        println!("{:?}", globals.stored_values[acum_val]);
+                        //println!("{:?}", globals.stored_values[acum_val]);
                         globals.stored_values[acum_val] = globals.stored_values[val].clone();
                         globals.stored_values[acum_val].clone()
                     }

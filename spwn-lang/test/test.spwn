@@ -1,19 +1,15 @@
-type @person
-
-impl @person {
-    new: (age: @number) {
-        return @person::{
-            age
-        }
-    },
-
-    birthday: (self) {
-        self.age += 1
+newCell = (item, group) {
+    let Cell = {item: counter(item), group: group};
+    Cell.decrement = (self, by) {
+        self.item-=by;
     }
+    return Cell;
 }
 
-let p = @person::new(20)
-p.birthday()
+newBFSystem = (num) {
+    let BFSystem = {cs: 0};
+    newCell(4 as @item, 4 as @group);
+    return BFSystem;
+}
 
-$.print(p)
-
+let system = newBFSystem(4);

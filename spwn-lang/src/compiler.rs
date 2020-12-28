@@ -3,7 +3,7 @@ use crate::ast;
 use crate::builtin::*;
 use crate::levelstring::*;
 use crate::STD_PATH;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::parser::{ParseNotes, SyntaxError};
 use std::fs;
@@ -591,7 +591,11 @@ pub fn compile_scope(
                         }
                         let (val, _) = evaled[0];
                         // make this not ugly, future me
-                        globals.stored_values.increment_single_lifetime(val, 1000);
+                        globals.stored_values.increment_single_lifetime(
+                            val,
+                            1000,
+                            &mut HashSet::new(),
+                        );
 
                         if let Value::Dict(d) = &globals.stored_values[val] {
                             match globals.implementations.get_mut(&s) {
@@ -870,7 +874,9 @@ pub fn compile_scope(
 
     //return values need longer lifetimes
     for (val, _) in &returns {
-        globals.stored_values.increment_single_lifetime(*val, 1);
+        globals
+            .stored_values
+            .increment_single_lifetime(*val, 1, &mut HashSet::new());
     }
 
     globals.stored_values.decrement_lifetimes();

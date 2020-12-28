@@ -188,7 +188,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 level_string,
                                 gd_path,
                                 level_name,
-                            );
+                            )?;
 
                             print_with_color(
                                 "Written to save. You can now open Geometry Dash again!",
