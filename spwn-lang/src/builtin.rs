@@ -241,7 +241,7 @@ impl Value {
     }
 }
 
-pub const BUILTIN_LIST: [&str; 36] = [
+pub const BUILTIN_LIST: &[&str] = &[
     "print",
     "sin",
     "cos",
@@ -254,6 +254,8 @@ pub const BUILTIN_LIST: [&str; 36] = [
     "add",
     "current_context",
     "append",
+    "pop",
+    "remove_index",
     "matches",
     "b64encrypt",
     "b64decrypt",
@@ -527,6 +529,83 @@ pub fn built_in_function(
             }
 
             Value::Null
+        }
+
+        "pop" => {
+            if arguments.len() != 1 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected one arguments, the array or string to pop from".to_string(),
+                    info,
+                });
+            }
+            if !globals.is_mutable(arguments[0]) {
+                return Err(RuntimeError::BuiltinError {
+                    message: String::from("This value is not mutable"),
+                    info,
+                });
+            }
+
+            let typ = globals.get_type_str(arguments[0]);
+
+            match &mut globals.stored_values[arguments[0]] {
+                Value::Array(arr) => match (*arr).pop() {
+                    Some(val) => globals.stored_values[val].clone(),
+                    None => Value::Null,
+                },
+                Value::Str(s) => match (*s).pop() {
+                    Some(val) => Value::Str(val.to_string()),
+                    None => Value::Null,
+                },
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected array or string, found @{}", typ),
+                        info,
+                    })
+                }
+            }
+        }
+
+        "remove_index" => {
+            if arguments.len() != 2 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected two arguments, the array or string to remove from and the index of the element to be removed".to_string(),
+                    info,
+                });
+            }
+            if !globals.is_mutable(arguments[0]) {
+                return Err(RuntimeError::BuiltinError {
+                    message: String::from("This value is not mutable"),
+                    info,
+                });
+            }
+
+            let typ = globals.get_type_str(arguments[0]);
+
+            let index = match globals.stored_values[arguments[1]] {
+                Value::Number(n) => n as usize,
+                _ => {
+                    let typ = globals.get_type_str(arguments[1]);
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected number as index, found @{}", typ),
+                        info,
+                    });
+                }
+            };
+
+            match &mut globals.stored_values[arguments[0]] {
+                Value::Array(arr) => {
+                    let out = (*arr).remove(index);
+                    globals.stored_values[out].clone()
+                }
+
+                Value::Str(s) => Value::Str((*s).remove(index).to_string()),
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected array or string, found @{}", typ),
+                        info,
+                    })
+                }
+            }
         }
 
         "current_context" => Value::Str(format!("{:?}", context)),

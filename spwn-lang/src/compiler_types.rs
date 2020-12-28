@@ -2215,12 +2215,13 @@ impl ast::Variable {
                                     match &globals.stored_values[index.0] {
                                         Value::Number(n) => {
                                             let len = arr.len();
-                                            if (*n) < 0.0 {
+                                            if (*n) < 0.0 && (-*n) as usize >= len {
                                                 return Err(RuntimeError::RuntimeError {
                                                     message: format!("Index too low! Index is {}, but length is {}.", n, len),
                                                     info,
                                                 });
                                             }
+                                            
                                             if *n as usize >= len {
                                                 return Err(RuntimeError::RuntimeError {
                                                     message: format!("Index too high! Index is {}, but length is {}.", n, len),
@@ -2228,7 +2229,13 @@ impl ast::Variable {
                                                 });
                                             }
 
-                                            new_out.push((arr[*n as usize], index.1, prev_v));
+                                            if *n < 0.0 {
+                                                new_out.push((arr[len - (-n as usize)], index.1, prev_v));
+                                            } else {
+                                                new_out.push((arr[*n as usize], index.1, prev_v));
+                                            }
+
+                                            
                                         }
                                         _ => {
                                             return Err(RuntimeError::RuntimeError {

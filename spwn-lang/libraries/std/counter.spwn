@@ -43,6 +43,22 @@ impl @counter {
         }
         
     },
+    display: 
+    #[desc("Creates a item display object that displays the value of the counter")]
+    (
+        self, 
+        #[desc("X pos of display in units (1 grid square = 30 units)")] x, 
+        #[desc("Y pos of display in units")] y
+    ) {
+        extract import "constants.spwn".obj_props
+        $.add(obj {
+            OBJ_ID: 1615,
+            X: x,
+            Y: y,
+            ITEM: selfitem,
+            GROUPS: 999g
+        });
+    },
 
     add_to: 
     #[desc("Adds the counter's value to all item IDs in a list, and resets the counter to 0 in the process")]

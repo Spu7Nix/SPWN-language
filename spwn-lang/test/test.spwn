@@ -1,15 +1,8 @@
-newCell = (item, group) {
-    let Cell = {item: counter(item), group: group};
-    Cell.decrement = (self, by) {
-        self.item-=by;
-    }
-    return Cell;
-}
+let arr = [1, 2, 3, 4, 5]
 
-newBFSystem = (num) {
-    let BFSystem = {cs: 0};
-    newCell(4 as @item, 4 as @group);
-    return BFSystem;
-}
 
-let system = newBFSystem(4);
+$.print(arr.remove(1))
+$.print(arr)
+$.print(arr.pop())
+
+$.print(arr)

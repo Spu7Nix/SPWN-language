@@ -49,6 +49,12 @@ impl @array {
 	},
     push: (self, value) {
         $.append(self, value)
+    },
+    pop: (self) {
+        return $.pop(self)
+    },
+    remove: (self, index: @number) {
+        return $.remove_index(self, index)
     }
 }
 
