@@ -4,8 +4,10 @@ constants = import "constants.spwn"
 
 extract constants.obj_props
 extract import "control_flow.spwn"
-
+extract import "util.spwn"
 impl @color {
+    
+    _range_: create_range_macro(@color),
     set: 
     #[desc("Implementation of the color trigger")]
     (

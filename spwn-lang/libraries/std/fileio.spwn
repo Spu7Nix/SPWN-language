@@ -1,5 +1,7 @@
 #[no_std]
 // brought to you by camden314
+type @file
+
 impl @file {
 	new: (path: @string) {
 		let ret = {type: @file};
@@ -8,13 +10,13 @@ impl @file {
 		ret.size = ret.filedata.length;
 		let ret.fseek = 0;
 		return ret;
-	}
+	},
 	seek: (s: @number) {
 		if s < 0 {
 			error "Negative seek position " + s as @string;
 		}
 		self.fseek = s;
-	}
+	},
 	read: (self, s=-1) {
 		let s = size;
 		if size == -1 {

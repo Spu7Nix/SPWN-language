@@ -37,7 +37,4 @@ impl @array {
     remove: (self, index: @number) {
         return $.remove_index(self, index)
     },
-
-    
-
 }
