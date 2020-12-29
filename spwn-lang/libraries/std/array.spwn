@@ -1,6 +1,6 @@
 #[no_std]
 impl @array {
-    max: (self, minval = 0) {
+    max: (self, minval = -999999999999) {
         let highest = minval
         for el in self {
             if el > highest {

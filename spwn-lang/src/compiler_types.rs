@@ -2166,8 +2166,9 @@ impl ast::Variable {
                     let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
 
                     for (prev_v, prev_c, _) in with_parent.clone() {
+                        
                         match globals.stored_values[prev_v].clone() {
-                            Value::Array(arr) => {
+                            Value::Array(arr)  => {
                                 
                                 let (evaled, returns) =
                                     i.eval(&prev_c, globals, info.clone(), constant)?;
@@ -2196,6 +2197,53 @@ impl ast::Variable {
                                                 new_out.push((arr[*n as usize], index.1, prev_v));
                                             }
 
+                                            
+                                        }
+                                        _ => {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: format!(
+                                                    "expected @number in index, found @{}",
+                                                    globals.get_type_str(index.0)
+                                                ),
+                                                info,
+                                            })
+                                        }
+                                    }
+                                }
+                            }
+                            Value::Str(s)  => {
+                                let arr: Vec<char> = s.chars().collect();
+                                
+                                let (evaled, returns) =
+                                    i.eval(&prev_c, globals, info.clone(), constant)?;
+                                inner_returns.extend(returns);
+                                for index in evaled {
+                                    match &globals.stored_values[index.0] {
+                                        Value::Number(n) => {
+                                            let len = arr.len();
+                                            if (*n) < 0.0 && (-*n) as usize >= len {
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: format!("Index too low! Index is {}, but length is {}.", n, len),
+                                                    info,
+                                                });
+                                            }
+                                            
+                                            if *n as usize >= len {
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: format!("Index too high! Index is {}, but length is {}.", n, len),
+                                                    info,
+                                                });
+                                            }
+
+                                            let val = if *n < 0.0 {
+                                                Value::Str(arr[len - (-n as usize)].to_string())
+                                               
+                                            } else {
+                                                Value::Str(arr[*n as usize].to_string())
+                                            };
+                                            let stored = store_const_value(val, 1, globals, &index.1);
+
+                                            new_out.push((stored, index.1, prev_v));
                                             
                                         }
                                         _ => {
