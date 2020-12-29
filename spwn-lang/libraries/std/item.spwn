@@ -2,6 +2,8 @@
 constants = import "constants.spwn"
 extract constants.obj_props
 
+extract import "util.spwn"
+
 impl @item {
     
     add:
@@ -51,4 +53,5 @@ impl @item {
         }
         
     },
+    _range_: create_range_macro(@item)
 }

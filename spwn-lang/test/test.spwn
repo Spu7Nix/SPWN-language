@@ -1,8 +1,4 @@
-let a = counter(4)
-let b = counter()
-a.display(300, 300)
-b.display(330, 300)
-wait(1)
-
-b = a % 3
-a %= 3
+$.print(1i..10i)
+$.print(1g..10g)
+$.print(1c..10c)
+$.print(1b..10b)

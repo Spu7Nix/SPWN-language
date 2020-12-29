@@ -5,8 +5,11 @@ extract constants.obj_props
 extract constants.comparisons
 extract constants.easing_types
 extract import "control_flow.spwn"
+extract import "util.spwn"
 
 impl @group {
+    
+    _range_: create_range_macro(@group),
     move: #[desc("Implementation of the move trigger")] 
     (
         self, 

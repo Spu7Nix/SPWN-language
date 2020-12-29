@@ -1,7 +1,7 @@
 #[no_std]
 // brought to you by camden314
 
-type @file;
+type @file
 
 impl @file {
 	new: (path: @string) {
@@ -18,7 +18,7 @@ impl @file {
 		}
 		self.fseek = s;
 	},
-	read: (self, size=-1) {
+	read: (self, s=-1) {
 		let s = size;
 		if size == -1 {
 			s = self.size;
