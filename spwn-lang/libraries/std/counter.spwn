@@ -628,7 +628,7 @@ impl @counter {
         if _type == @bool {
             return self != 0
         } else {
-            error "Cannot convert counter to " + num.type as @string + " (counter can convert to a number using the counter.to_const macro)"
+            error "Cannot convert counter to " + _type as @string + " (counter can convert to a number using the counter.to_const macro)"
         }
     }
 }

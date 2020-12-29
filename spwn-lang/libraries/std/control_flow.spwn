@@ -16,6 +16,8 @@ wait = #[desc("Adds a delay before the next triggers")] (
 				return
 			},
 		})
+	} else {
+		return
 	}
 	
 }
