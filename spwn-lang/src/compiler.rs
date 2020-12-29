@@ -728,6 +728,51 @@ pub fn compile_scope(
                                 ..c.clone()
                             }));
                         }
+                        Value::Str(s) => {
+                            //let iterator_val = store_value(Value::Null, globals);
+                            //let scope_vars = context.variables.clone();
+
+                            let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> =
+                                smallvec![context.clone()];
+                            let mut out_contexts: SmallVec<[Context; CONTEXT_MAX]> =
+                                SmallVec::new();
+
+                            for ch in s.chars() {
+                                //println!("{}", new_contexts.len());
+                                for c in &mut new_contexts {
+                                    (*c).variables = context.variables.clone();
+                                    let stored = store_const_value(
+                                        Value::Str(ch.to_string()),
+                                        1,
+                                        globals,
+                                        c,
+                                    );
+                                    (*c).variables.insert(f.symbol.clone(), stored);
+                                }
+
+                                let new_info = info.clone();
+
+                                let (end_contexts, inner_returns) =
+                                    compile_scope(&f.body, new_contexts, globals, new_info)?;
+
+                                new_contexts = SmallVec::new();
+                                for mut c in end_contexts {
+                                    if c.broken == None {
+                                        new_contexts.push(c)
+                                    } else {
+                                        c.broken = None;
+                                        out_contexts.push(c)
+                                    }
+                                }
+
+                                returns.extend(inner_returns);
+                            }
+                            out_contexts.extend(new_contexts);
+                            contexts.extend(out_contexts.iter().map(|c| Context {
+                                variables: context.variables.clone(),
+                                ..c.clone()
+                            }));
+                        }
 
                         Value::Range(start, end, step) => {
                             let mut normal = (start..end).step_by(step);
