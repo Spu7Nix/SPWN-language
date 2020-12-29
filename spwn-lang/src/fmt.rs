@@ -22,7 +22,7 @@ fn tabs(mut num: Indent) -> String {
     out
 }
 
-pub fn format(input: Vec<Statement>) -> String {
+pub fn _format(input: Vec<Statement>) -> String {
     let mut out = String::new();
     for s in input {
         out += &s.fmt(0).to_string();

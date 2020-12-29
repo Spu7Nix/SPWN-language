@@ -5,16 +5,30 @@ use crate::compiler::{import_module, RuntimeError};
 use crate::compiler_types::{
     find_key_for_value, CompilerInfo, Context, Globals, ImportType, Macro, Value,
 };
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::fs::File;
 
-pub fn document_lib(path: &str) -> Result<String, RuntimeError> {
+use std::path::PathBuf;
+use std::{collections::HashMap, env::current_dir};
+fn create_doc_file(mut dir: PathBuf, name: String, content: &str) {
+    use std::io::Write;
+    dir.push(format!("{}.md", name));
+    let mut output_file = File::create(&dir).unwrap();
+    output_file.write_all(content.as_bytes()).unwrap();
+    println!("written to {:?}", dir);
+}
+pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     let mut globals = Globals::new(PathBuf::new());
 
     let start_context = Context::new();
 
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
+
+    let mut output_path = current_dir().unwrap();
+    output_path.push(PathBuf::from(format!("{}-docs", path)));
+    if !output_path.exists() {
+        std::fs::create_dir(output_path.clone()).unwrap();
+    }
 
     let module = import_module(
         &ImportType::Lib(path.to_string()),
@@ -37,7 +51,7 @@ pub fn document_lib(path: &str) -> Result<String, RuntimeError> {
     let exports = globals.stored_values[module[0].0].clone();
     let implementations = globals.implementations.clone();
 
-    doc += "_This file was generated using `spwn doc [file name]`_\n";
+    doc += "_Generated using `spwn doc [file name]`_\n";
 
     let used_groups = globals.closed_groups;
     let used_colors = globals.closed_colors;
@@ -64,9 +78,6 @@ pub fn document_lib(path: &str) -> Result<String, RuntimeError> {
 ",
         used_groups, used_colors, used_blocks, used_items, total_objects
     );
-
-    doc += &format!("# Exports:\n{}", document_val(&exports, &mut globals));
-
     doc += "# Type Implementations:\n";
 
     let mut list: Vec<(&u16, HashMap<String, usize>)> = implementations
@@ -87,14 +98,21 @@ pub fn document_lib(path: &str) -> Result<String, RuntimeError> {
             .expect("Implemented type was not found!")
             .clone();
 
-        doc += &format!(
+        doc += &format!("- [**@{1}**]({}-docs/{1}.md)\n", path, type_name);
+
+        let content = &format!(
             "  \n\n# **@{}**: \n {}",
             type_name,
             document_dict(dict, &mut globals)
         );
+
+        create_doc_file(output_path.clone(), type_name, content);
     }
 
-    Ok(doc)
+    doc += &format!("# Exports:\n{}", document_val(&exports, &mut globals));
+
+    create_doc_file(output_path, format!("{}-docs", path), &doc);
+    Ok(())
 }
 
 fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String {
@@ -131,7 +149,8 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
 {}
 >
 "#,
-            key, formatted
+            key.replace("_", "\\_"),
+            formatted
         );
         member_doc
     };
@@ -145,19 +164,12 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
     }
     if !val_list.is_empty() {
         if !macro_list.is_empty() {
-            doc += "## Other values:\n\n<details>\n<summary> View </summary>\n";
+            doc += "## Other values:\n\n";
         }
         for (key, val) in val_list.iter() {
             doc += &document_member(*key, *val)
         }
-
-        if !macro_list.is_empty() {
-            doc += "</details>\n\n";
-        }
     }
-    // if !macro_list.is_empty() {
-    //     doc += "</details>\n\n";
-    // }
     doc
 }
 

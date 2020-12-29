@@ -1,5 +1,5 @@
 # Documentation for `std` 
-_This file was generated using `spwn doc [file name]`_
+_Generated using `spwn doc [file name]`_
 ## Info:
 
 - Uses 0 groups
@@ -8,6 +8,15 @@ _This file was generated using `spwn doc [file name]`_
 - Uses 1 item IDs
 
 - Adds 0 objects
+# Type Implementations:
+- [**@group**](std-docs/group.md)
+- [**@color**](std-docs/color.md)
+- [**@block**](std-docs/block.md)
+- [**@item**](std-docs/item.md)
+- [**@array**](std-docs/array.md)
+- [**@event**](std-docs/event.md)
+- [**@counter**](std-docs/counter.md)
+- [**@file**](std-docs/file.md)
 # Exports:
  **Type:** `@dictionary` 
 
@@ -16,7 +25,7 @@ _This file was generated using `spwn doc [file name]`_
 ## Macros:
 
 
-## **call_with_delay**:
+## **call\_with\_delay**:
 
 > **Value:** `(time: @number | @epsilon = @epsilon::{}, function: @function) { /* code omitted */ }` (`@macro`) 
 >
@@ -48,7 +57,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **collision_exit**:
+## **collision\_exit**:
 
 > **Value:** `(a: @block, b: @block) { /* code omitted */ }` (`@macro`) 
 >
@@ -90,7 +99,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **disable_trail**:
+## **disable\_trail**:
 
 > **Value:** `() { /* code omitted */ }` (`@macro`) 
 >
@@ -100,7 +109,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **enable_trail**:
+## **enable\_trail**:
 
 > **Value:** `() { /* code omitted */ }` (`@macro`) 
 >
@@ -110,7 +119,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **for_loop**:
+## **for\_loop**:
 
 > **Type:** `@macro` 
 >
@@ -129,7 +138,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **hide_player**:
+## **hide\_player**:
 
 > **Value:** `() { /* code omitted */ }` (`@macro`) 
 >
@@ -172,7 +181,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **show_player**:
+## **show\_player**:
 
 > **Value:** `() { /* code omitted */ }` (`@macro`) 
 >
@@ -182,7 +191,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **supress_signal**:
+## **supress\_signal**:
 
 > **Value:** `(delay: @number) { /* code omitted */ }` (`@macro`) 
 >
@@ -197,7 +206,20 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **toggle_bg_effect**:
+## **sync\_function**:
+
+> **Value:** `(code: @macro) { /* code omitted */ }` (`@macro`) 
+>
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 1 | **`code`** | @macro | | |
+>  
+>  
+>
+
+## **toggle\_bg\_effect**:
 
 > **Value:** `(on: @bool = false) { /* code omitted */ }` (`@macro`) 
 >
@@ -227,7 +249,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **touch_end**:
+## **touch\_end**:
 
 > **Value:** `(dual_side: @bool = false) { /* code omitted */ }` (`@macro`) 
 >
@@ -257,7 +279,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **while_loop**:
+## **while\_loop**:
 
 > **Value:** `(expr: @macro, code: @macro, delay: @number | @epsilon = @epsilon::{}) { /* code omitted */ }` (`@macro`) 
 >
@@ -275,10 +297,8 @@ _This file was generated using `spwn doc [file name]`_
 >
 ## Other values:
 
-<details>
-<summary> View </summary>
 
-## **BACK_IN**:
+## **BACK\_IN**:
 
 > **Value:** `@easing_type::{id: 17}` (`@easing_type`) 
 >
@@ -302,7 +322,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **BACK_IN_OUT**:
+## **BACK\_IN\_OUT**:
 
 > **Value:** `@easing_type::{id: 16}` (`@easing_type`) 
 >
@@ -326,7 +346,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **BACK_OUT**:
+## **BACK\_OUT**:
 
 > **Value:** `@easing_type::{id: 18}` (`@easing_type`) 
 >
@@ -358,7 +378,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **BOUNCE_IN**:
+## **BOUNCE\_IN**:
 
 > **Value:** `@easing_type::{id: 8}` (`@easing_type`) 
 >
@@ -382,7 +402,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **BOUNCE_IN_OUT**:
+## **BOUNCE\_IN\_OUT**:
 
 > **Value:** `@easing_type::{id: 7}` (`@easing_type`) 
 >
@@ -406,7 +426,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **BOUNCE_OUT**:
+## **BOUNCE\_OUT**:
 
 > **Value:** `@easing_type::{id: 9}` (`@easing_type`) 
 >
@@ -430,7 +450,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **EASE_IN**:
+## **EASE\_IN**:
 
 > **Value:** `@easing_type::{id: 2}` (`@easing_type`) 
 >
@@ -454,7 +474,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **EASE_IN_OUT**:
+## **EASE\_IN\_OUT**:
 
 > **Value:** `@easing_type::{id: 1}` (`@easing_type`) 
 >
@@ -478,7 +498,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **EASE_OUT**:
+## **EASE\_OUT**:
 
 > **Value:** `@easing_type::{id: 3}` (`@easing_type`) 
 >
@@ -502,7 +522,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **ELASTIC_IN**:
+## **ELASTIC\_IN**:
 
 > **Value:** `@easing_type::{id: 5}` (`@easing_type`) 
 >
@@ -526,7 +546,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **ELASTIC_IN_OUT**:
+## **ELASTIC\_IN\_OUT**:
 
 > **Value:** `@easing_type::{id: 4}` (`@easing_type`) 
 >
@@ -550,7 +570,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **ELASTIC_OUT**:
+## **ELASTIC\_OUT**:
 
 > **Value:** `@easing_type::{id: 6}` (`@easing_type`) 
 >
@@ -574,7 +594,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **EQUAL_TO**:
+## **EQUAL\_TO**:
 
 > **Value:** `@comparison::{id: 0}` (`@comparison`) 
 >
@@ -598,7 +618,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **EXPONENTIAL_IN**:
+## **EXPONENTIAL\_IN**:
 
 > **Value:** `@easing_type::{id: 11}` (`@easing_type`) 
 >
@@ -622,7 +642,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **EXPONENTIAL_IN_OUT**:
+## **EXPONENTIAL\_IN\_OUT**:
 
 > **Value:** `@easing_type::{id: 10}` (`@easing_type`) 
 >
@@ -646,7 +666,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **EXPONENTIAL_OUT**:
+## **EXPONENTIAL\_OUT**:
 
 > **Value:** `@easing_type::{id: 12}` (`@easing_type`) 
 >
@@ -670,7 +690,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **LARGER_THAN**:
+## **LARGER\_THAN**:
 
 > **Value:** `@comparison::{id: 1}` (`@comparison`) 
 >
@@ -718,7 +738,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **SINE_IN**:
+## **SINE\_IN**:
 
 > **Value:** `@easing_type::{id: 14}` (`@easing_type`) 
 >
@@ -742,7 +762,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **SINE_IN_OUT**:
+## **SINE\_IN\_OUT**:
 
 > **Value:** `@easing_type::{id: 13}` (`@easing_type`) 
 >
@@ -766,7 +786,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **SINE_OUT**:
+## **SINE\_OUT**:
 
 > **Value:** `@easing_type::{id: 15}` (`@easing_type`) 
 >
@@ -790,7 +810,7 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **SMALLER_THAN**:
+## **SMALLER\_THAN**:
 
 > **Value:** `@comparison::{id: 2}` (`@comparison`) 
 >
@@ -814,14 +834,14 @@ _This file was generated using `spwn doc [file name]`_
 >  
 >
 
-## **obj_props**:
+## **obj\_props**:
 
 > **Type:** `@dictionary` 
 >
 >
->## **ACTIVATE_GROUP**:
+>## **ACTIVATE\_GROUP**:
 >
->> **Value:** `@object_key::{id: 56,pattern: @bool}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @bool,id: 56}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -851,7 +871,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **ACTIVATE_ON_EXIT**:
+>## **ACTIVATE\_ON\_EXIT**:
 >
 >> **Value:** `@object_key::{pattern: @bool,id: 93}` (`@object_key`) 
 >>
@@ -883,9 +903,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **ANIMATION_ID**:
+>## **ANIMATION\_ID**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 76}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 76,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -915,7 +935,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **ANIMATION_SPEED**:
+>## **ANIMATION\_SPEED**:
 >
 >> **Value:** `@object_key::{pattern: @number,id: 107}` (`@object_key`) 
 >>
@@ -979,7 +999,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **BLOCK_A**:
+>## **BLOCK\_A**:
 >
 >> **Value:** `@object_key::{id: 80,pattern: @block}` (`@object_key`) 
 >>
@@ -1011,7 +1031,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **BLOCK_B**:
+>## **BLOCK\_B**:
 >
 >> **Value:** `@object_key::{id: 95,pattern: @block}` (`@object_key`) 
 >>
@@ -1077,7 +1097,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **COLOR**:
 >
->> **Value:** `@object_key::{pattern: @color,id: 21}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 21,pattern: @color}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1107,7 +1127,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **COLOR_2**:
+>## **COLOR\_2**:
 >
 >> **Value:** `@object_key::{id: 22,pattern: @color}` (`@object_key`) 
 >>
@@ -1139,7 +1159,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **COLOR_2_HVS**:
+>## **COLOR\_2\_HVS**:
 >
 >> **Value:** `@object_key::{id: 44,pattern: @string}` (`@object_key`) 
 >>
@@ -1171,7 +1191,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **COLOR_2_HVS_ENABLED**:
+>## **COLOR\_2\_HVS\_ENABLED**:
 >
 >> **Value:** `@object_key::{id: 42,pattern: @bool}` (`@object_key`) 
 >>
@@ -1205,7 +1225,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **COMPARISON**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 88}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 88,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1235,7 +1255,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **COPIED_COLOR_HVS**:
+>## **COPIED\_COLOR\_HVS**:
 >
 >> **Value:** `@object_key::{id: 49,pattern: @string}` (`@object_key`) 
 >>
@@ -1267,7 +1287,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **COPIED_COLOR_ID**:
+>## **COPIED\_COLOR\_ID**:
 >
 >> **Value:** `@object_key::{id: 50,pattern: @color}` (`@object_key`) 
 >>
@@ -1299,7 +1319,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **COPY_OPACTITY**:
+>## **COPY\_OPACTITY**:
 >
 >> **Value:** `@object_key::{id: 60,pattern: @bool}` (`@object_key`) 
 >>
@@ -1363,9 +1383,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **COUNT_MULTI_ACTIVATE**:
+>## **COUNT\_MULTI\_ACTIVATE**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 104}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 104,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1427,9 +1447,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **DETAIL_ONLY**:
+>## **DETAIL\_ONLY**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 66}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 66,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1459,9 +1479,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **DISABLE_ROTATION**:
+>## **DISABLE\_ROTATION**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 98}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 98,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1491,7 +1511,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **DONT_ENTER**:
+>## **DONT\_ENTER**:
 >
 >> **Value:** `@object_key::{id: 67,pattern: @bool}` (`@object_key`) 
 >>
@@ -1523,9 +1543,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **DONT_FADE**:
+>## **DONT\_FADE**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 64}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 64,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1555,9 +1575,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **DUAL_MODE**:
+>## **DUAL\_MODE**:
 >
->> **Value:** `@object_key::{id: 89,pattern: @bool}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @bool,id: 89}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1589,7 +1609,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **DURATION**:
 >
->> **Value:** `@object_key::{id: 10,pattern: @number}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @number,id: 10}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1619,7 +1639,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **DYNAMIC_BLOCK**:
+>## **DYNAMIC\_BLOCK**:
 >
 >> **Value:** `@object_key::{pattern: @bool,id: 94}` (`@object_key`) 
 >>
@@ -1653,7 +1673,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **EASING**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 30}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 30,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1683,7 +1703,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **EASING_RATE**:
+>## **EASING\_RATE**:
 >
 >> **Value:** `@object_key::{id: 85,pattern: @number}` (`@object_key`) 
 >>
@@ -1715,7 +1735,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **EDITOR_DISABLE**:
+>## **EDITOR\_DISABLE**:
 >
 >> **Value:** `@object_key::{pattern: @bool,id: 102}` (`@object_key`) 
 >>
@@ -1747,7 +1767,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **EDITOR_LAYER_1**:
+>## **EDITOR\_LAYER\_1**:
 >
 >> **Value:** `@object_key::{id: 20,pattern: @number}` (`@object_key`) 
 >>
@@ -1779,7 +1799,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **EDITOR_LAYER_2**:
+>## **EDITOR\_LAYER\_2**:
 >
 >> **Value:** `@object_key::{id: 61,pattern: @number}` (`@object_key`) 
 >>
@@ -1813,7 +1833,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **EXCLUSIVE**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 86}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 86,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1843,9 +1863,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **FADE_IN**:
+>## **FADE\_IN**:
 >
->> **Value:** `@object_key::{id: 45,pattern: @number}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @number,id: 45}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1875,9 +1895,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **FADE_OUT**:
+>## **FADE\_OUT**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 47}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 47,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1909,7 +1929,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **FOLLOW**:
 >
->> **Value:** `@object_key::{pattern: @group,id: 71}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 71,pattern: @group}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -1939,9 +1959,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **GLOW_DISABLED**:
+>## **GLOW\_DISABLED**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 96}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 96,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2003,7 +2023,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **GROUP_PARENT**:
+>## **GROUP\_PARENT**:
 >
 >> **Value:** `@object_key::{id: 34,pattern: @bool}` (`@object_key`) 
 >>
@@ -2035,9 +2055,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **HIGH_DETAIL**:
+>## **HIGH\_DETAIL**:
 >
->> **Value:** `@object_key::{id: 103,pattern: @bool}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @bool,id: 103}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2099,9 +2119,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **HOLD_MODE**:
+>## **HOLD\_MODE**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 81}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 81,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2131,7 +2151,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **HORIZONTAL_FLIP**:
+>## **HORIZONTAL\_FLIP**:
 >
 >> **Value:** `@object_key::{pattern: @bool,id: 4}` (`@object_key`) 
 >>
@@ -2195,9 +2215,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **HVS_ENABLED**:
+>## **HVS\_ENABLED**:
 >
->> **Value:** `@object_key::{id: 41,pattern: @bool}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @bool,id: 41}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2229,7 +2249,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **INTERVAL**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 84}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 84,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2261,7 +2281,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **ITEM**:
 >
->> **Value:** `@object_key::{id: 80,pattern: @item}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @item,id: 80}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2291,9 +2311,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **LINKED_GROUP**:
+>## **LINKED\_GROUP**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 108}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 108,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2323,7 +2343,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **LOCK_OBJECT_ROTATION**:
+>## **LOCK\_OBJECT\_ROTATION**:
 >
 >> **Value:** `@object_key::{id: 70,pattern: @bool}` (`@object_key`) 
 >>
@@ -2355,7 +2375,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **LOCK_TO_PLAYER_X**:
+>## **LOCK\_TO\_PLAYER\_X**:
 >
 >> **Value:** `@object_key::{pattern: @bool,id: 58}` (`@object_key`) 
 >>
@@ -2387,7 +2407,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **LOCK_TO_PLAYER_Y**:
+>## **LOCK\_TO\_PLAYER\_Y**:
 >
 >> **Value:** `@object_key::{pattern: @bool,id: 59}` (`@object_key`) 
 >>
@@ -2419,9 +2439,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **MAIN_ONLY**:
+>## **MAIN\_ONLY**:
 >
->> **Value:** `@object_key::{id: 65,pattern: @bool}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @bool,id: 65}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2451,7 +2471,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **MAX_SPEED**:
+>## **MAX\_SPEED**:
 >
 >> **Value:** `@object_key::{id: 105,pattern: @number}` (`@object_key`) 
 >>
@@ -2483,9 +2503,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **MOVE_X**:
+>## **MOVE\_X**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 28}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 28,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2515,7 +2535,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **MOVE_Y**:
+>## **MOVE\_Y**:
 >
 >> **Value:** `@object_key::{id: 29,pattern: @number}` (`@object_key`) 
 >>
@@ -2547,9 +2567,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **MULTI_TRIGGER**:
+>## **MULTI\_TRIGGER**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 87}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 87,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2579,7 +2599,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **OBJ_ID**:
+>## **OBJ\_ID**:
 >
 >> **Value:** `@object_key::{id: 1,pattern: @number}` (`@object_key`) 
 >>
@@ -2613,7 +2633,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **OPACITY**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 35}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 35,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2643,9 +2663,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **PICKUP_MODE**:
+>## **PICKUP\_MODE**:
 >
->> **Value:** `@object_key::{id: 79,pattern: @number}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @number,id: 79}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2675,7 +2695,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **PLAYER_COLOR_1**:
+>## **PLAYER\_COLOR\_1**:
 >
 >> **Value:** `@object_key::{pattern: @bool,id: 15}` (`@object_key`) 
 >>
@@ -2707,7 +2727,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **PLAYER_COLOR_2**:
+>## **PLAYER\_COLOR\_2**:
 >
 >> **Value:** `@object_key::{id: 16,pattern: @bool}` (`@object_key`) 
 >>
@@ -2739,9 +2759,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **PORTAL_CHECKED**:
+>## **PORTAL\_CHECKED**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 13}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 13,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2771,7 +2791,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **PULSE_HSV**:
+>## **PULSE\_HSV**:
 >
 >> **Value:** `@object_key::{id: 48,pattern: @bool}` (`@object_key`) 
 >>
@@ -2803,9 +2823,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **RANDOMIZE_START**:
+>## **RANDOMIZE\_START**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 106}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 106,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2835,7 +2855,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **ROTATE_DEGREES**:
+>## **ROTATE\_DEGREES**:
 >
 >> **Value:** `@object_key::{pattern: @number,id: 68}` (`@object_key`) 
 >>
@@ -2869,7 +2889,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **ROTATION**:
 >
->> **Value:** `@object_key::{id: 6,pattern: @number}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @number,id: 6}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2899,7 +2919,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **ROTATION_SPEED**:
+>## **ROTATION\_SPEED**:
 >
 >> **Value:** `@object_key::{id: 97,pattern: @number}` (`@object_key`) 
 >>
@@ -2963,9 +2983,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **SPAWN_DURATION**:
+>## **SPAWN\_DURATION**:
 >
->> **Value:** `@object_key::{pattern: @number | @epsilon,id: 63}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 63,pattern: @number | @epsilon}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -2995,9 +3015,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **SPAWN_TRIGGERED**:
+>## **SPAWN\_TRIGGERED**:
 >
->> **Value:** `@object_key::{id: 62,pattern: @bool}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @bool,id: 62}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3061,7 +3081,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **STRENGTH**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 75}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 75,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3091,7 +3111,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **SUBTRACT_COUNT**:
+>## **SUBTRACT\_COUNT**:
 >
 >> **Value:** `@object_key::{id: 78,pattern: @number}` (`@object_key`) 
 >>
@@ -3125,7 +3145,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **TARGET**:
 >
->> **Value:** `@object_key::{id: 51,pattern: @color | @group | @function}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @color | @group | @function,id: 51}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3155,9 +3175,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TARGET_COLOR**:
+>## **TARGET\_COLOR**:
 >
->> **Value:** `@object_key::{id: 23,pattern: @color}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @color,id: 23}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3187,9 +3207,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TARGET_POS**:
+>## **TARGET\_POS**:
 >
->> **Value:** `@object_key::{id: 71,pattern: @group}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @group,id: 71}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3219,7 +3239,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TARGET_POS_AXES**:
+>## **TARGET\_POS\_AXES**:
 >
 >> **Value:** `@object_key::{id: 101,pattern: @number}` (`@object_key`) 
 >>
@@ -3251,7 +3271,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TARGET_TYPE**:
+>## **TARGET\_TYPE**:
 >
 >> **Value:** `@object_key::{id: 52,pattern: @number}` (`@object_key`) 
 >>
@@ -3315,7 +3335,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TIMES_360**:
+>## **TIMES\_360**:
 >
 >> **Value:** `@object_key::{id: 69,pattern: @number}` (`@object_key`) 
 >>
@@ -3347,9 +3367,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TOGGLE_MODE**:
+>## **TOGGLE\_MODE**:
 >
->> **Value:** `@object_key::{id: 82,pattern: @number}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @number,id: 82}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3379,9 +3399,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TOUCH_TRIGGERED**:
+>## **TOUCH\_TRIGGERED**:
 >
->> **Value:** `@object_key::{id: 11,pattern: @bool}` (`@object_key`) 
+>> **Value:** `@object_key::{pattern: @bool,id: 11}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3411,9 +3431,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TRIGGER_BLUE**:
+>## **TRIGGER\_BLUE**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 9}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 9,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3443,7 +3463,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TRIGGER_GREEN**:
+>## **TRIGGER\_GREEN**:
 >
 >> **Value:** `@object_key::{pattern: @number,id: 8}` (`@object_key`) 
 >>
@@ -3475,7 +3495,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **TRIGGER_RED**:
+>## **TRIGGER\_RED**:
 >
 >> **Value:** `@object_key::{pattern: @number,id: 7}` (`@object_key`) 
 >>
@@ -3507,9 +3527,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **USE_TARGET**:
+>## **USE\_TARGET**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 100}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 100,pattern: @bool}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3539,7 +3559,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **VERTICAL_FLIP**:
+>## **VERTICAL\_FLIP**:
 >
 >> **Value:** `@object_key::{id: 5,pattern: @bool}` (`@object_key`) 
 >>
@@ -3573,7 +3593,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **X**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 2}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 2,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3603,7 +3623,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **X_MOD**:
+>## **X\_MOD**:
 >
 >> **Value:** `@object_key::{pattern: @number,id: 72}` (`@object_key`) 
 >>
@@ -3637,7 +3657,7 @@ _This file was generated using `spwn doc [file name]`_
 >
 >## **Y**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 3}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 3,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3667,7 +3687,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **YELLOW_TELEPORTATION_PORTAL_DISTANCE**:
+>## **YELLOW\_TELEPORTATION\_PORTAL\_DISTANCE**:
 >
 >> **Value:** `@object_key::{id: 54,pattern: @number}` (`@object_key`) 
 >>
@@ -3699,7 +3719,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **Y_MOD**:
+>## **Y\_MOD**:
 >
 >> **Value:** `@object_key::{pattern: @number,id: 73}` (`@object_key`) 
 >>
@@ -3731,7 +3751,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **Y_OFFSET**:
+>## **Y\_OFFSET**:
 >
 >> **Value:** `@object_key::{pattern: @number,id: 92}` (`@object_key`) 
 >>
@@ -3763,7 +3783,7 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **Z_LAYER**:
+>## **Z\_LAYER**:
 >
 >> **Value:** `@object_key::{pattern: @number,id: 24}` (`@object_key`) 
 >>
@@ -3795,9 +3815,9 @@ _This file was generated using `spwn doc [file name]`_
 >>  
 >>
 >
->## **Z_ORDER**:
+>## **Z\_ORDER**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 25}` (`@object_key`) 
+>> **Value:** `@object_key::{id: 25,pattern: @number}` (`@object_key`) 
 >>
 >>
 >>## **id**:
@@ -3829,813 +3849,5 @@ _This file was generated using `spwn doc [file name]`_
 >
 >  
 >
-</details>
 
-
-  # Type Implementations:
   
-
-# **@group**: 
- 
-## **alpha**:
-
-> **Value:** `(self, opacity: @number = 1, duration: @number = 0) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Implementation of the alpha trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | `opacity` | @number | `1` | |
->  | 3 | `duration` | @number | `0` | |
->  
->  
->
-
-## **follow**:
-
-> **Type:** `@macro` 
->
->## Description: 
-> _Implementation of the follow trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @group | |Group of object to follow |
->  | 3 | `x_mod` | @number | `1` |Multiplier for the movement on the X-axis |
->  | 4 | `y_mod` | @number | `1` |Multiplier for the movement on the Y-axis |
->  | 5 | `duration` | @number | `999` |Duration of following |
->  
->  
->
-
-## **follow_player_y**:
-
-> **Type:** `@macro` 
->
->## Description: 
-> _Implementation of the follow player Y trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | `speed` | @number | `1` |Interpolation factor (?) |
->  | 3 | `delay` | @number | `0` |Delay of movement |
->  | 4 | `offset` | @number | `0` |Offset on the Y-axis |
->  | 5 | `max_speed` | @number | `0` |Maximum speed |
->  | 6 | `duration` | @number | `999` |Duration of following |
->  
->  
->
-
-## **lock_to_player**:
-
-> **Value:** `(self, lock_x: @bool = true, lock_y: @bool = true, duration: @number = 999) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Lock group to player position_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | `lock_x` | @bool | `true` |Lock to player X |
->  | 3 | `lock_y` | @bool | `true` |Lock to player Y |
->  | 4 | `duration` | @number | `999` |Duration of lock |
->  
->  
->
-
-## **move**:
-
-> **Type:** `@macro` 
->
->## Description: 
-> _Implementation of the move trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`x`** | @number | |Units to move on the X axis |
->  | 3 | **`y`** | @number | |Units to move on the Y axis |
->  | 4 | `duration` | @number | `0` |Duration of movement |
->  | 5 | `easing` | @easing_type | `@easing_type::{id: 0}` | |
->  | 6 | `easing_rate` | @number | `2` | |
->  
->  
->
-
-## **move_to**:
-
-> **Type:** `@macro` 
->
->## Description: 
-> _Implementation of the 'Move target' feature of the move trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`target`** | @group | |Group of the object to move to |
->  | 3 | `duration` | @number | `0` |Duration of movement |
->  | 4 | `x_only` | @bool | `false` |Will move to the object only on the X-axis |
->  | 5 | `y_only` | @bool | `false` |Will move to the object only on the y-axis |
->  | 6 | `easing` | @easing_type | `@easing_type::{id: 0}` |Easing type |
->  | 7 | `easing_rate` | @number | `2` |Easing rate |
->  
->  
->
-
-## **pulse**:
-
-> **Type:** `@macro` 
->
->## Description: 
-> _Implementation of the pulse trigger for groups_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`r`** | @number | |Red value of pulse color (or hue if HSV is enabled) |
->  | 3 | **`g`** | @number | |Green value of pulse color (or saturation if HSV is enabled) |
->  | 4 | **`b`** | @number | |Blue value of pulse color (or brightness/value if HSV is enabled) |
->  | 5 | `fade_in` | @number | `0` |Fade-in duration |
->  | 6 | `hold` | @number | `0` |Duration to hold the color |
->  | 7 | `fade_out` | @number | `0` |Fade-out duration |
->  | 8 | `exclusive` | @bool | `false` |Weather to prioritize this pulse over simultaneous pulses |
->  | 9 | `hsv` | @bool | `false` |Toggle HSV mode |
->  
->  
->
-
-## **rotate**:
-
-> **Type:** `@macro` 
->
->## Description: 
-> _Implementation of the rotate trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`center`** | @group | |Group of object to rotate around |
->  | 3 | **`degrees`** | @number | |Rotation in degrees |
->  | 4 | `duration` | @number | `0` |Duration of rotation |
->  | 5 | `easing` | @easing_type | `@easing_type::{id: 0}` |Easing type |
->  | 6 | `easing_rate` | @number | `2` |Easing rate |
->  | 7 | `lock_object_rotation` | @bool | `false` |Only rotate positions of the objects, not the textures |
->  
->  
->
-
-## **stop**:
-
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Implementation of the stop trigger_
->
->  
->
-
-## **toggle_off**:
-
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Toggles the group off_
->
->  
->
-
-## **toggle_on**:
-
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Toggles the group on_
->
->  
->
-  
-
-# **@color**: 
- 
-## **pulse**:
-
-> **Type:** `@macro` 
->
->## Description: 
-> _Implementation of the pulse trigger for colors_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`r`** | @number | |Red value of pulse color (or hue if HSV is enabled) |
->  | 3 | **`g`** | @number | |Green value of pulse color (or saturation if HSV is enabled) |
->  | 4 | **`b`** | @number | |Blue value of pulse color (or brightness/value if HSV is enabled) |
->  | 5 | `fade_in` | @number | `0` |Fade-in duration |
->  | 6 | `hold` | @number | `0` |Duration to hold the color |
->  | 7 | `fade_out` | @number | `0` |Fade-out duration |
->  | 8 | `exclusive` | @bool | `false` |Weather to prioritize this pulse over simultaneous pulses |
->  | 9 | `hsv` | @bool | `false` |Toggle HSV mode |
->  
->  
->
-
-## **set**:
-
-> **Type:** `@macro` 
->
->## Description: 
-> _Implementation of the color trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`r`** | @number | |Red value of the target color |
->  | 3 | **`g`** | @number | |Green value of the target color |
->  | 4 | **`b`** | @number | |Blue value of the target color |
->  | 5 | `duration` | @number | `0` |Duration of color change |
->  | 6 | `opacity` | @number | `1` |Opacity of target color |
->  | 7 | `blending` | @bool | `false` |Toggle blending on target color |
->  
->  
->
-  
-
-# **@block**: 
- 
-## **create_tracker_item**:
-
-> **Value:** `(self, other: @block) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Returns an item ID that is 1 when the blocks are colliding and 0 when they are not_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @block | |Block ID to check against |
->  
->  
->
-  
-
-# **@item**: 
- 
-## **add**:
-
-> **Value:** `(self, amount: @number) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Implementation of the pickup trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`amount`** | @number | |Amount to add |
->  
->  
->
-
-## **count**:
-
-> **Value:** `(self, number: @number = 0) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Implementation of the count trigger (returns an event)_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | `number` | @number | `0` |Number to check against |
->  
->  
->
-
-## **if_is**:
-
-> **Value:** `(self, comparison: @comparison, other: @number, function: @function) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Implementation of the instant count trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`comparison`** | @comparison | |Comparison mode |
->  | 3 | **`other`** | @number | |Number to compare with |
->  | 4 | **`function`** | @function | |Target function if comparison is 'true' |
->  
->  
->
-  
-
-# **@array**: 
- 
-## **contains**:
-
-> **Value:** `(self, el) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`el`** |any | | |
->  
->  
->
-
-## **max**:
-
-> **Value:** `(self, minval = 0) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | `minval` |any | `0` | |
->  
->  
->
-
-## **min**:
-
-> **Value:** `(self, max_val = 999999999999) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | `max_val` |any | `999999999999` | |
->  
->  
->
-
-## **pop**:
-
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
->
->  
->
-
-## **push**:
-
-> **Value:** `(self, value) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`value`** |any | | |
->  
->  
->
-
-## **remove**:
-
-> **Value:** `(self, index: @number) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`index`** | @number | | |
->  
->  
->
-  
-
-# **@event**: 
- 
-## **on**:
-
-> **Value:** `(event: @event, function: @function) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Triggers a function every time an event fires_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 1 | **`event`** | @event | |Event to trigger on |
->  | 2 | **`function`** | @function | |Function to trigger |
->  
->  
->
-  
-
-# **@counter**: 
- 
-## **_add_**:
-
-> **Value:** `(self, num: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`num`** | @number or @counter | | |
->  
->  
->
-
-## **_as_**:
-
-> **Value:** `(self, _type: @type_indicator) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`_type`** | @type_indicator | | |
->  
->  
->
-
-## **_assign_**:
-
-> **Value:** `(self, num: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`num`** | @number or @counter | | |
->  
->  
->
-
-## **_divide_**:
-
-> **Value:** `(self, num: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`num`** | @number or @counter | | |
->  
->  
->
-
-## **_divided_by_**:
-
-> **Value:** `(self, num: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`num`** | @number or @counter | | |
->  
->  
->
-
-## **_equal_**:
-
-> **Value:** `(self, other: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @number or @counter | | |
->  
->  
->
-
-## **_less_or_equal_**:
-
-> **Value:** `(self, other: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @number or @counter | | |
->  
->  
->
-
-## **_less_than_**:
-
-> **Value:** `(self, other: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @number or @counter | | |
->  
->  
->
-
-## **_minus_**:
-
-> **Value:** `(self, other: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @number or @counter | | |
->  
->  
->
-
-## **_mod_**:
-
-> **Value:** `(self, num: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`num`** | @number or @counter | | |
->  
->  
->
-
-## **_more_or_equal_**:
-
-> **Value:** `(self, other: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @number or @counter | | |
->  
->  
->
-
-## **_more_than_**:
-
-> **Value:** `(self, other: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @number or @counter | | |
->  
->  
->
-
-## **_multiply_**:
-
-> **Value:** `(self, num: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`num`** | @number or @counter | | |
->  
->  
->
-
-## **_not_equal_**:
-
-> **Value:** `(self, other: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @number or @counter | | |
->  
->  
->
-
-## **_plus_**:
-
-> **Value:** `(self, other: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @number or @counter | | |
->  
->  
->
-
-## **_subtract_**:
-
-> **Value:** `(self, num: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`num`** | @number or @counter | | |
->  
->  
->
-
-## **_times_**:
-
-> **Value:** `(self, num: @number | @counter) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`num`** | @number or @counter | | |
->  
->  
->
-
-## **add**:
-
-> **Value:** `(self, num: @number) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Implementation of the pickup trigger_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`num`** | @number | |Amount to add |
->  
->  
->
-
-## **add_to**:
-
-> **Value:** `(self, items: @array, speed: @number = 3, factor: @number = 1) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Adds the counter's value to all item IDs in a list, and resets the counter to 0 in the process_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`items`** | @array | |Item IDs to add to |
->  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
->  | 4 | `factor` | @number | `1` |Multiplyer for the value added |
->  
->  
->
-
-## **clone**:
-
-> **Value:** `(self, speed: @number = 3) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Copies the counter and returns the copy_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
->  
->  
->
-
-## **compare**:
-
-> **Value:** `(self, other: @counter, speed: @number = 3) { /* code omitted */ }` (`@macro`) 
->
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`other`** | @counter | | |
->  | 3 | `speed` | @number | `3` | |
->  
->  
->
-
-## **copy_to**:
-
-> **Value:** `(self, items: [@item | @counter], speed: @number = 3, factor: @number = 1) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Copies the value of the counter to another item ID, without consuming the original_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`items`** | [@item or @counter] | |Items to copy to |
->  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
->  | 4 | `factor` | @number | `1` |Factor of to multiply the copy by |
->  
->  
->
-
-## **display**:
-
-> **Value:** `(self, x, y) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Creates a item display object that displays the value of the counter_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`x`** |any | |X pos of display in units (1 grid square = 30 units) |
->  | 3 | **`y`** |any | |Y pos of display in units |
->  
->  
->
-
-## **divide**:
-
-> **Type:** `@macro` 
->
->## Description: 
-> _Devides the value of the counter by some divisor_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`divisor`** | @counter or @number | |Divisor to divide by, either another counter (very expensive) or a normal number |
->  | 3 | `remainder` | @counter or @item | `@counter::{item: ?i}` |Counter or item to set to the remainder value |
->  | 4 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
->  
->  
->
-
-## **multiply**:
-
-> **Value:** `(self, factor: @counter | @number, speed: @number = 3) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Multiplies the value of the counter by some factor (does not consume the factor)_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`factor`** | @counter or @number | |Factor to multiply by, either another counter (very expensive) or a normal number |
->  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
->  
->  
->
-
-## **new**:
-
-> **Value:** `(source: @number | @item | @bool = 0, delay: @bool = true) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Creates a new counter_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 1 | `source` | @number or @item or @bool | `0` |Source (can be a number, item ID or boolean) |
->  | 2 | `delay` | @bool | `true` |Adds a delay if a value gets added to the new item (to avoid confusing behavior) |
->  
->  
->
-
-## **reset**:
-
-> **Value:** `(self, speed: @number = 3) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Resets counter to 0_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
->  
->  
->
-
-## **subtract_from**:
-
-> **Value:** `(self, items: @array, speed: @number = 3, factor: @number = 1) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Subtracts the counter's value from all item IDs in a list, and resets the counter to 0 in the process_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`items`** | @array | |Item IDs to add to |
->  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
->  | 4 | `factor` | @number | `1` |Multiplyer for the value subtracted |
->  
->  
->
-
-## **to_const**:
-
-> **Value:** `(self, range: [@number] | @range) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Converts the counter into a normal number (very context-splitting, be careful)_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`range`** | [@number] or @range | |Array or range of possible output values |
->  
->  
->
