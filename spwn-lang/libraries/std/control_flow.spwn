@@ -16,6 +16,8 @@ wait = #[desc("Adds a delay before the next triggers")] (
 				return
 			},
 		})
+	} else {
+		return
 	}
 	
 }
@@ -101,6 +103,37 @@ return {
         }
 
         func!
+	},
+
+	sync_function: 
+	(
+		code: @macro
+	) {
+		import "item.spwn"
+		ready_sign = ?i
+		func = {
+			code()
+			ready_sign.add(1)
+		}
+
+		wait_for_ready = () {
+			closure = {
+				ready_sign.count(1).on_triggered({
+					ready_sign.add(-1)
+					wait()
+					closure.start_group.stop()
+					return
+				})
+			}
+
+		
+			closure!
+		}
+
+		return () {
+			func!
+			wait_for_ready()
+		}
 	}
 	
 
