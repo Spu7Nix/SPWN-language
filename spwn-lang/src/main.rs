@@ -207,7 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 "doc" => {
-                    use std::fs::File;
+                    //use std::fs::File;
 
                     let lib_path = match args_iter.next() {
                         Some(a) => a,
@@ -216,8 +216,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     };
 
-                    let documentation = match documentation::document_lib(lib_path) {
-                        Ok(doc) => doc,
+                    match documentation::document_lib(lib_path) {
+                        Ok(_) => (),
                         Err(e) => {
                             eprint_with_color(&format!("{}\n", e), Color::Red);
                             std::process::exit(ERROR_EXIT_CODE);
@@ -226,42 +226,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     //println!("doc {:?}", documentation);
 
-                    let mut output_path = PathBuf::from(lib_path.clone());
-                    output_path.pop();
-                    output_path.push(PathBuf::from(format!("{}-docs.md", lib_path)));
-
-                    let mut output_file = File::create(&output_path)?;
-                    output_file.write_all(documentation.as_bytes())?;
-                    println!("written to {:?}", output_path);
                     Ok(())
                 }
-                "format" => {
-                    use std::fs::File;
-                    //use std::io::Write;
-                    let script_path = match args_iter.next() {
-                        Some(a) => PathBuf::from(a),
-                        None => return Err(std::boxed::Box::from("Expected script file argument")),
-                    };
+                // "format" => {
+                //     use std::fs::File;
+                //     //use std::io::Write;
+                //     let script_path = match args_iter.next() {
+                //         Some(a) => PathBuf::from(a),
+                //         None => return Err(std::boxed::Box::from("Expected script file argument")),
+                //     };
 
-                    println!("Formatting is not good yet, i will finish it before the final version is released.");
+                //     println!("Formatting is not good yet, i will finish it before the final version is released.");
 
-                    let unparsed = fs::read_to_string(script_path.clone())?;
+                //     let unparsed = fs::read_to_string(script_path.clone())?;
 
-                    let (parsed, _) = match parse_spwn(unparsed, script_path) {
-                        Err(err) => {
-                            eprintln!("{}\n", err);
-                            std::process::exit(ERROR_EXIT_CODE);
-                        }
-                        Ok(p) => p,
-                    };
+                //     let (parsed, _) = match parse_spwn(unparsed, script_path) {
+                //         Err(err) => {
+                //             eprintln!("{}\n", err);
+                //             std::process::exit(ERROR_EXIT_CODE);
+                //         }
+                //         Ok(p) => p,
+                //     };
 
-                    let formatted = fmt::format(parsed);
+                //     let formatted = fmt::format(parsed);
 
-                    let mut output_file = File::create("test/formatted.spwn")?;
-                    output_file.write_all(formatted.as_bytes())?;
+                //     let mut output_file = File::create("test/formatted.spwn")?;
+                //     output_file.write_all(formatted.as_bytes())?;
 
-                    Ok(())
-                }
+                //     Ok(())
+                // }
                 a => {
                     eprint_with_color(&format!("Unknown subcommand: {}", a), Color::Red);
 

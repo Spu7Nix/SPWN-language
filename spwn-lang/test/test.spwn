@@ -205,7 +205,7 @@ impl @BFSystem {
 69i.add(0);
 let mySystem = @BFSystem::new(4);
 
-let mycode = stringToArr('[>+>]');
+let mycode = stringToArr('[>+>>]');
 
 mySystem.update(mycode);
 mySystem.compile()
