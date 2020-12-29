@@ -1,6 +1,0 @@
-$.print("hello"[1])
-
-for i in "hello" {
-    $.print(i)
-}
-
