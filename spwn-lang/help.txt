@@ -1,19 +1,19 @@
 Usage: spwn [subcommand] [flags]
 
 Subcommands:
-    build [script file]
+    build [script file], b [script file]
     runs/builds a given file
     
     doc [library path]
     generates documentation for a SPWN library, in the form of a markdown file
 
 Flags:
-    --no-gd
+    --no-gd, -g
     Makes the script not apply to a Geometry Dash level
     
-    --no-optimize
+    --no-optimizem, -o
     Removes post-optimization of triggers, making the output more readable, 
     while also using a lot more objects and groups
 
-    --level-name [name]
+    --level-name [name], -n [name]
     Targets a specific level

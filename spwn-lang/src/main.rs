@@ -65,21 +65,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("{}", HELP);
                     Ok(())
                 }
-                "build" => {
+                "build" | "b" => {
                     let script_path = match args_iter.next() {
                         Some(a) => PathBuf::from(a),
                         None => return Err(std::boxed::Box::from("Expected script file argument")),
                     };
 
                     let mut gd_enabled = true;
-                    let mut opti_enambled = true;
+                    let mut opti_enabled = true;
                     let mut level_name = None;
 
                     while let Some(arg) = args_iter.next() {
                         match arg.as_ref() {
-                            "--no-gd" => gd_enabled = false,
-                            "--no-optimize" => opti_enambled = false,
-                            "--level-name" => level_name = args_iter.next().cloned(),
+                            "--no-gd" | "-g" => gd_enabled = false,
+                            "--no-optimize" | "-o" => opti_enabled = false,
+                            "--level-name" | "-n" => level_name = args_iter.next().cloned(),
                             _ => (),
                         };
                     }
@@ -152,7 +152,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         String::new()
                     };
                     let has_stuff = compiled.func_ids.iter().any(|x| !x.obj_list.is_empty());
-                    if opti_enambled && has_stuff {
+                    if opti_enabled && has_stuff {
                         print_with_color("Optimizing triggers...", Color::Cyan);
                         compiled.func_ids = optimize(compiled.func_ids, compiled.closed_groups);
                     }
@@ -257,7 +257,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // }
                 a => {
                     eprint_with_color(&format!("Unknown subcommand: {}", a), Color::Red);
-
+                    println!("{}", HELP);
                     std::process::exit(ERROR_EXIT_CODE);
                 }
             }

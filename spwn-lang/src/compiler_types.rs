@@ -1124,7 +1124,7 @@ impl Globals {
         add_type("spwn", 12);
         add_type("builtin", 13);
         add_type("type_indicator", 14);
-        add_type("null", 15);
+        add_type("NULL", 15);
         add_type("trigger", 16);
         add_type("range", 17);
         add_type("pattern", 18);
