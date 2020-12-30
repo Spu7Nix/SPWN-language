@@ -492,6 +492,45 @@ pub enum Value {
     Null,
 }
 
+pub fn value_equality(val1: StoredValue, val2: StoredValue, globals: &Globals) -> bool {
+    match (&globals.stored_values[val1], &globals.stored_values[val2]) {
+        (Value::Array(a1), Value::Array(a2)) => {
+            if a1.len() != a2.len() {
+                return false
+            }
+
+            for i in 0..a1.len() {
+                if !value_equality(a1[i], a2[i], globals) {
+                    return false
+                }
+            }
+            true
+        }
+        (Value::Dict(d1), Value::Dict(d2)) => {
+            if d1.len() != d2.len() {
+                return false
+            }
+
+            for key in d1.keys() {
+                if let Some(val1) = d2.get(key) {
+                    if let Some(val2) = d1.get(key) {
+                        if !value_equality(*val1, *val2, globals) {
+                            return false
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                
+                } else {
+                    return false
+                }
+            }
+            true
+        }
+        (a, b) => a == b,
+    }
+}
+ 
 impl Value {
     //numeric representation of value
     pub fn to_num(&self, globals: &Globals) -> TypeID {
@@ -526,6 +565,8 @@ impl Value {
             Value::Pattern(_) => 18,
         }
     }
+
+
 
     pub fn matches_pat(&self, pat_val: &Value, info: &CompilerInfo, globals: &mut Globals, context: &Context) -> Result<bool, RuntimeError> {
         let pat = if let Value::Pattern(p) = convert_type(pat_val, 18, info, globals, context)? {p} else {unreachable!()};

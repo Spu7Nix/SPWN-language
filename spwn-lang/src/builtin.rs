@@ -924,12 +924,8 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         })
                     }
                 },
-                "_equal_" => {
-                    Value::Bool(globals.stored_values[acum_val] == globals.stored_values[val])
-                }
-                "_not_equal_" => {
-                    Value::Bool(globals.stored_values[acum_val] != globals.stored_values[val])
-                }
+                "_equal_" => Value::Bool(value_equality(acum_val, val, globals)),
+                "_not_equal_" => Value::Bool(!value_equality(acum_val, val, globals)),
                 "_assign_" => {
                     //println!("hi1");
                     if !mutable {
