@@ -28,6 +28,42 @@ impl @array {
 		}
 		return ret
 	},
+    index: (self, el) {
+        let ret = null;
+        for i in 0..self.length {
+            if self[i] == el {
+                ret = i
+                break
+            }
+        }
+        return ret
+    },
+    clear: (self) {
+        for i in 0..self.length {
+            self.pop();
+        }
+    },
+    all_mutable: (self) {
+        let ret = [];
+        for el in self {
+            let mt = 2;
+            mt = el;
+            ret.push(mt);
+        }
+        return ret;
+    },
+    reverse: (self) {
+        if self.length == 0 {
+            return [];
+            break
+        }
+        let ret = [];
+        for i in 1..self.length {
+            ret.push(self[-i]);
+        }
+        ret.push(self[0]);
+        return ret;
+    },
     push: (self, value) {
         $.append(self, value)
     },
@@ -36,5 +72,5 @@ impl @array {
     },
     remove: (self, index: @number) {
         return $.remove_index(self, index)
-    },
+    }
 }
