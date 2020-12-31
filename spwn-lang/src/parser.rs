@@ -267,6 +267,12 @@ pub enum Token {
     #[token("else")]
     Else,
 
+    #[token("switch")]
+    Switch,
+
+    #[token("case")]
+    Case,
+
     #[token("break")]
     Break,
 
@@ -336,7 +342,7 @@ impl Token {
             }
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break => "keyword",
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Switch | Case => "keyword",
             Comment => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -1166,6 +1172,154 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     }
 }
 
+fn parse_cases(
+    tokens: &mut Tokens,
+    notes: &mut ParseNotes
+) -> Result<Vec<ast::Case>, SyntaxError> {
+    let mut values = Vec::<ast::Expression>::new();
+    let mut bodies = Vec::<ast::Expression>::new();
+    let mut check_types = Vec::<bool>::new();
+    let mut default_enabled = false;
+
+    println!("omg parsing the cases");
+
+    let mut do_we_have_next = true;
+    loop {
+        match tokens.next(false, false) {
+            Some(Token::ClosingCurlyBracket) => break,
+            None => {
+                return Err(SyntaxError::ExpectedErr {
+                    expected: "'}'".to_string(),
+                    found: "EOF".to_string(),
+                    pos: tokens.position(),
+                    file: notes.file.clone(),
+                });
+            }
+            Some(Token::Else) => { // the default
+                if default_enabled {
+                    return Err(SyntaxError::SyntaxError {
+                        message: "Cannot have 2 else cases".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+                default_enabled = true;
+
+                /* under normal circumstances we would add another value to check_types,
+                   but since an else case never type checks and is always at the end,
+                   there is no need to. */
+
+                match tokens.next(false, false) {
+                    Some(Token::Colon) => {
+                        bodies.push(parse_expr(tokens, notes, false, false)?); // parse whats after the :
+
+                        do_we_have_next = false; // else must be the last
+
+                        if tokens.next(false, false) != Some(Token::Comma) { // for error formatting
+                            tokens.previous_no_ignore(false, false);
+                        }
+
+                    }
+                    a => {
+                        return Err(SyntaxError::ExpectedErr {
+                            expected: "':'".to_string(),
+                            found: format!(
+                                "{}: \"{}\"",
+                                match a {
+                                    Some(t) => t.typ(),
+                                    None => "EOF",
+                                },
+                                tokens.slice()
+                            ),
+                            pos: tokens.position(),
+                            file: notes.file.clone(),
+                        });
+                    } 
+                }
+
+            }
+            exp => {
+                // since we are using the same function for both case and type checking
+                // there needs to be some vars for it
+                let is_case = exp == Some(Token::Case);
+
+                let found = if is_case {"case".to_string()} 
+                            else {format!("{}",tokens.slice())};
+
+                if default_enabled { // else is always the last case
+                    return Err(SyntaxError::SyntaxError {
+                        message: "Else must be the last case in a switch statement".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+
+                if !do_we_have_next { // check if there should be a new one
+                    return Err(SyntaxError::ExpectedErr { // there shouldnt be a new one, this is bad
+                        expected: "comma".to_string(),
+                        found: found,
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+
+
+                check_types.push(!is_case); 
+                // case means that we aren't checking for types but values
+
+                values.push(parse_expr(tokens, notes, false, false)?); // parse the first part before the :
+
+                match tokens.next(false, false) {
+                    Some(Token::Colon) => {
+                        bodies.push(parse_expr(tokens, notes, false, false)?); // parse whats after the :
+
+                        if tokens.next(false, false) != Some(Token::Comma) { // no comma = no more cases
+                            do_we_have_next = false;
+                            tokens.previous_no_ignore(false, false);
+                        }
+                    }
+                    a => {
+                        return Err(SyntaxError::ExpectedErr {
+                            expected: "':'".to_string(),
+                            found: format!(
+                                "{}: \"{}\"",
+                                match a {
+                                    Some(t) => t.typ(),
+                                    None => "EOF",
+                                },
+                                tokens.slice()
+                            ),
+                            pos: tokens.position(),
+                            file: notes.file.clone(),
+                        });
+                    } 
+                }
+            }
+        }
+    }
+    let mut cases = Vec::<ast::Case>::new();
+
+    for i in 0..check_types.len() {
+        println!("{}",i);
+        cases.push(ast::Case {
+            value: values[i].clone(),
+            body: bodies[i].clone(),
+            check_type: check_types[i],
+            default: false
+        });
+    }
+    if default_enabled {
+        cases.push(ast::Case {
+            value: ast::Expression{values:vec![], operators:vec![]},
+            body: bodies[bodies.len()-1].clone(),
+            check_type: false,
+            default: true
+        });
+    }
+
+    Ok(cases)
+}
+
 fn parse_expr(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
@@ -1173,6 +1327,7 @@ fn parse_expr(
     check_for_comments: bool,
 ) -> Result<ast::Expression, SyntaxError> {
     // Alright lets parse an expression
+    // NOTE: this parses whatever is *after* the current token
 
     let mut values = Vec::<ast::Variable>::new();
     let mut operators = Vec::<ast::Operator>::new();
@@ -1226,7 +1381,7 @@ fn parse_expr(
     // }
     tokens.previous_no_ignore(false, true);
 
-    Ok(fix_precedence(ast::Expression { values, operators }))
+    Ok(fix_precedence(ast::Expression { values, operators })) //pemdas and stuff
 }
 
 fn parse_operator(token: &Token) -> Option<ast::Operator> {
@@ -1763,7 +1918,7 @@ fn parse_variable(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
     check_for_comments: bool,
-) -> Result<ast::Variable, SyntaxError> {
+) -> Result<ast::Variable, SyntaxError> { // for the vars and stuff that isnt operators
     let preceding_comment = if check_for_comments {
         check_for_comment(tokens)
     } else {
@@ -1772,13 +1927,10 @@ fn parse_variable(
 
     let properties = check_for_tag(tokens, notes)?;
 
-    /*if tokens.stack.len() - tokens.index > 0 {
-        println!("current token after val pre comment: {}: ", tokens.slice());
-    }*/
     let mut first_token = tokens.next(false, false);
     let (start_pos, _) = tokens.position();
 
-    let operator = match first_token {
+    let operator = match first_token { // does it start with an op? (e.g -3, let i)
         Some(Token::Minus) => {
             first_token = tokens.next(false, false);
             Some(ast::UnaryOperator::Minus)
@@ -1808,11 +1960,10 @@ fn parse_variable(
         _ => None,
     };
 
-    let value = match first_token {
+    let value = match first_token { // what kind of variable is it?
         Some(Token::Number) => ast::ValueBody::Number(match tokens.slice().parse() {
-            Ok(n) => n,
+            Ok(n) => n, // its a valid number
             Err(err) => {
-                //println!("{}", tokens.slice());
                 return Err(SyntaxError::SyntaxError {
                     message: format!("Error when parsing number: {}", err),
 
@@ -1821,7 +1972,7 @@ fn parse_variable(
                 });
             }
         }),
-        Some(Token::StringLiteral) => {
+        Some(Token::StringLiteral) => { // is a string
             ast::ValueBody::Str(str_content(tokens.slice(), tokens, notes)?)
         }
         Some(Token::ID) => {
@@ -1962,6 +2113,31 @@ fn parse_variable(
             };
 
             ast::ValueBody::TypeIndicator(type_name)
+        }
+
+        Some(Token::Switch) => {
+            let value = parse_expr(tokens, notes, true, true)?; // what are we switching?
+
+            let cases = match tokens.next(false, false) {
+                Some(Token::OpenCurlyBracket) => parse_cases(tokens, notes)?, // check for {
+                a => {
+                    return Err(SyntaxError::ExpectedErr { // no { we should error
+                        expected: "{".to_string(),
+                        found: format!(
+                            "{}: \"{}\"",
+                            match a {
+                                Some(t) => t.typ(),
+                                None => "EOF",
+                            },
+                            tokens.slice()
+                        ),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
+            };
+            //ast::ValueBody::TypeIndicator("number".to_string())
+            ast::ValueBody::Switch(value,cases)
         }
 
         Some(Token::OpenBracket) => {
