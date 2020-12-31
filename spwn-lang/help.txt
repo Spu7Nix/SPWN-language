@@ -15,7 +15,7 @@ Flags:
     --no-level, -l
     Only compiles the script, no level creation at all
     
-    --no-optimizem, -o
+    --no-optimize, -o
     Removes post-optimization of triggers, making the output more readable, 
     while also using a lot more objects and groups
 
