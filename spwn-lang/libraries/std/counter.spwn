@@ -3,6 +3,7 @@
 extract import "control_flow.spwn"
 extract import "constants.spwn".comparisons
 let DEFAULT_SPEED = 3
+let SWAP_ID = ?i
 type @counter
 
 impl @counter {
@@ -609,6 +610,20 @@ impl @counter {
             num.copy_to([self])
         } else {
             error "Cannot assign" + num.type as @string + " to counter"
+        }
+    },
+
+    _swap_: (self, num: @counter) {
+        if num.type == @counter {
+            let swap_tmp = @counter::new(SWAP_ID);
+
+            num.copy_to([swap_tmp]);
+            wait()
+            self.copy_to([num]);
+            wait()
+            swap_tmp.copy_to([self]);
+        } else {
+            error "Cannot swap counter with " + num.type as @string
         }
     },
 

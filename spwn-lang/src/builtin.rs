@@ -10,7 +10,7 @@ use std::path::Path;
 
 macro_rules! arg_length {
     ($info:expr , $count:expr, $args:expr , $message:expr) => {
-        if $args.len() != 2 {
+        if $args.len() != $count {
             return Err(RuntimeError::BuiltinError {
                 message: $message,
                 info: $info,
