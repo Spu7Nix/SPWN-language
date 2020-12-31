@@ -200,7 +200,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     let mut stdout = StandardStream::stdout(ColorChoice::Always);
                     stdout
-                        .set_color(ColorSpec::new().set_fg(Some(Color::White)))
+                        .set_color(&ColorSpec::new())
                         .unwrap();
 
                     Ok(())

@@ -8,6 +8,17 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+macro_rules! arg_length {
+    ($info:expr , $count:expr, $args:expr , $message:expr) => {
+        if $args.len() != 2 {
+            return Err(RuntimeError::BuiltinError {
+                message: $message,
+                info: $info,
+            });
+        }
+    }
+}
+
 pub type ArbitraryID = u16;
 pub type SpecificID = u16;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -314,25 +325,25 @@ pub fn built_in_function(
         }
 
         "matches" => {
-            if arguments.len() != 2 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "expected two arguments: the type to be checked and the pattern"
-                        .to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                2,
+                arguments,
+                "Expected two arguments: the type to be checked and the pattern".to_string()
+            );
+
             let val = globals.stored_values[arguments[0]].clone();
             let pattern = globals.stored_values[arguments[1]].clone();
             Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
         }
 
         "b64encrypt" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "expected one argument: string to be encrypted".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one argument: string to be encrypted".to_string()
+            );
 
             let val = globals.stored_values[arguments[0]].clone();
             match val {
@@ -342,19 +353,19 @@ pub fn built_in_function(
                 }
                 _ => {
                     return Err(RuntimeError::BuiltinError {
-                        message: "expected one argument: string to be encrypted".to_string(),
+                        message: "Expected one argument: string to be encrypted".to_string(),
                         info,
                     })
                 }
             }
         }
         "b64decrypt" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "expected one argument: string to be encrypted".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one argument: string to be decrypted".to_string()
+            );
 
             let val = globals.stored_values[arguments[0]].clone();
             match val {
@@ -372,7 +383,7 @@ pub fn built_in_function(
                 }
                 _ => {
                     return Err(RuntimeError::BuiltinError {
-                        message: "expected one argument: string to be encrypted".to_string(),
+                        message: "Expected one argument: string to be decrypted".to_string(),
                         info,
                     })
                 }
@@ -410,12 +421,12 @@ pub fn built_in_function(
         //     out
         // }
         "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "floor" | "ceil" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "expected one argument".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one argument".to_string()
+            );
 
             match &globals.stored_values[arguments[0]] {
                 Value::Number(n) => Value::Number(match name {
@@ -441,12 +452,12 @@ pub fn built_in_function(
         }
 
         "add" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected one argument".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one argument".to_string()
+            );
 
             match &globals.stored_values[arguments[0]] {
                 Value::Obj(obj, mode) => {
@@ -500,12 +511,13 @@ pub fn built_in_function(
         }
 
         "append" => {
-            if arguments.len() != 2 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected two arguments, the first one being an array and the other being the value to append.".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                2,
+                arguments,
+                "Expected two arguments, the first one being an array and the other being the value to append.".to_string()
+            );
+
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This array is not mutable"),
@@ -539,12 +551,8 @@ pub fn built_in_function(
         }
 
         "readfile" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected file name".to_string(),
-                    info,
-                });
-            }
+            arg_length!(info, 1, arguments, "Expected file name".to_string());
+
             let val = globals.stored_values[arguments[0]].clone();
             match val {
                 Value::Str(s) => {
@@ -577,12 +585,8 @@ pub fn built_in_function(
         }
 
         "pop" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected one arguments, the array or string to pop from".to_string(),
-                    info,
-                });
-            }
+            arg_length!(info, 1, arguments, "Expected one arguments, the array or string to pop from".to_string());
+
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This value is not mutable"),
@@ -611,12 +615,12 @@ pub fn built_in_function(
         }
 
         "substr" => {
-            if arguments.len() != 3 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected three arguments: string to be sliced, a start index, and an end index".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                3,
+                arguments,
+                "Expected three arguments: string to be sliced, a start index, and an end index".to_string()
+            );
 
             let val = match globals.stored_values[arguments[0]].clone() {
                 Value::Str(s) => s,
@@ -667,12 +671,13 @@ pub fn built_in_function(
         }
 
         "remove_index" => {
-            if arguments.len() != 2 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected two arguments, the array or string to remove from and the index of the element to be removed".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                2,
+                arguments,
+                "Expected two arguments, the array or string to remove from and the index of the element to be removed".to_string()
+            );
+
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This value is not mutable"),
