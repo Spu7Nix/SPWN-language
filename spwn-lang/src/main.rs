@@ -38,7 +38,7 @@ fn print_with_color(text: &str, color: Color) {
         .unwrap();
     writeln!(&mut stdout, "{}", text).unwrap();
     stdout
-        .set_color(ColorSpec::new().set_fg(Some(Color::White)))
+        .set_color(&ColorSpec::new())
         .unwrap();
 }
 
@@ -49,7 +49,7 @@ fn eprint_with_color(text: &str, color: Color) {
         .unwrap();
     writeln!(&mut stdout, "{}", text).unwrap();
     stdout
-        .set_color(ColorSpec::new().set_fg(Some(Color::White)))
+        .set_color(&ColorSpec::new())
         .unwrap();
 }
 
