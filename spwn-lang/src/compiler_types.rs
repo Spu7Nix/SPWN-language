@@ -1391,7 +1391,11 @@ impl ast::Expression {
                         //ADD CHECk
                         Assign => {
                             handle_operator(acum_val, *val, "_assign_", c2, globals, &info)?
-                        }
+                        },
+
+                        Swap => {
+                            handle_operator(acum_val, *val, "_swap_", c2, globals, &info)?
+                        },
 
                         As => handle_operator(acum_val, *val, "_as_", c2, globals, &info)?,
 

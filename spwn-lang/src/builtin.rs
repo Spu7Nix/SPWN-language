@@ -290,6 +290,7 @@ pub const BUILTIN_LIST: &[&str] = &[
     "_equal_",
     "_not_equal_",
     "_assign_",
+    "_swap_",
     "_as_",
     "_add_",
     "_subtract_",
@@ -718,7 +719,7 @@ pub fn built_in_function(
 
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
         | "_less_or_equal_" | "_divided_by_" | "_intdivided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
-        | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_as_" | "_add_" | "_subtract_"
+        | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_swap_" | "_as_" | "_add_" | "_subtract_"
         | "_multiply_" | "_divide_" | "_intdivide_" |"_either_" | "_exponate_" | "_modulate_" | "_range_" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
@@ -734,7 +735,11 @@ pub fn built_in_function(
             let b_type = globals.get_type_str(val);
 
             let acum_val_fn_context = globals.get_val_fn_context(acum_val, info.clone())?;
+            let val_fn_context = globals.get_val_fn_context(val, info.clone())?;
+
             let mutable = globals.is_mutable(acum_val);
+            let val_mutable = globals.is_mutable(val);
+
             let val_b = globals.stored_values[val].clone();
             let val_a = &mut globals.stored_values[acum_val];
 
@@ -967,6 +972,25 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         globals.stored_values[acum_val].clone()
                     }
                 }
+
+                "_swap_" => {
+                    //println!("hi1");
+                    if !mutable || !val_mutable {
+                        return Err(mutable_err(info, "_swap_"));
+                    }
+                    if acum_val_fn_context != c2.start_group ||  val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info,
+                        });
+                    }
+
+                    let swap_temp = globals.stored_values[val].clone();
+                    globals.stored_values[val] = globals.stored_values[acum_val].clone();
+                    globals.stored_values[acum_val] = swap_temp;
+                    Value::Null
+                }
+
                 "_as_" => match globals.stored_values[val] {
                     Value::TypeIndicator(t) => convert_type(
                         &globals.stored_values[acum_val].clone(),

@@ -98,6 +98,9 @@ pub enum Token {
     #[token("=>")]
     ThickArrow,
 
+    #[token("<=>")]
+    Swap,
+
     #[token("|")]
     Either,
 
@@ -317,7 +320,7 @@ impl Token {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
             | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Either | DoubleStar | Exponate | Modulate
-            | Increment | Decrement => "operator",
+            | Increment | Decrement | Swap => "operator",
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -1101,6 +1104,7 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
         IntDivide => 0,
         Exponate => 0,
         Modulate => 0,
+        Swap => 0,
     }
 }
 
@@ -1254,6 +1258,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::IntDivide => Some(ast::Operator::IntDivide),
         Token::Exponate => Some(ast::Operator::Exponate),
         Token::Modulate => Some(ast::Operator::Modulate),
+        Token::Swap => Some(ast::Operator::Swap),
         Token::As => Some(ast::Operator::As),
         _ => None,
     }

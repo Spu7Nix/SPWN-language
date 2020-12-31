@@ -426,6 +426,7 @@ impl SpwnFmt for Operator {
             Operator::Either => "|",
             Operator::Exponate => "^=",
             Operator::Modulate => "%=",
+            Operator::Swap => "<=>",
         }
         .to_string()
     }

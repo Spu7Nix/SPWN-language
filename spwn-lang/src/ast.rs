@@ -128,6 +128,7 @@ pub enum Operator {
 
     Exponate,
     Modulate,
+    Swap,
 }
 
 #[derive(Clone, PartialEq, Debug)]

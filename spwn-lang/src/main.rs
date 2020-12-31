@@ -94,7 +94,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         Ok(p) => p,
                     };
-                    //println!("parsed: {:?}", statements);
+
+                    if notes.tag.tags.iter().any(|x| x.0 == "no_gd") {
+                        gd_enabled = false;
+                    }
 
                     let gd_path = if gd_enabled {
                         Some(if cfg!(target_os = "windows") {
