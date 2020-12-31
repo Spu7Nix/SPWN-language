@@ -73,11 +73,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     let mut gd_enabled = true;
                     let mut opti_enabled = true;
+                    let mut compile_only = false;
                     let mut level_name = None;
 
                     while let Some(arg) = args_iter.next() {
                         match arg.as_ref() {
-                            "--no-gd" | "-g" => gd_enabled = false,
+                            "--console-output" | "-c" => gd_enabled = false,
+                            "--no-level" | "-l" => {gd_enabled = false; compile_only = true;}
                             "--no-optimize" | "-o" => opti_enabled = false,
                             "--level-name" | "-n" => level_name = args_iter.next().cloned(),
                             _ => (),
@@ -94,10 +96,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         Ok(p) => p,
                     };
-
-                    if notes.tag.tags.iter().any(|x| x.0 == "no_gd") {
-                        gd_enabled = false;
+                    
+                    let mut tags = notes.tag.tags.iter();
+                    while let Some(tag) = tags.next() {
+                        match tag.0.as_str() {
+                            "console_output" => gd_enabled = false,
+                            "no_level" => {gd_enabled = false; compile_only = true;},
+                            _ => (),
+                        }
                     }
+
 
                     let gd_path = if gd_enabled {
                         Some(if cfg!(target_os = "windows") {
@@ -129,78 +137,80 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p) => p,
                     };
 
-                    let level_string = if let Some(gd_path) = &gd_path {
-                        print_with_color("Reading savefile...", Color::Cyan);
-                        let mut file = fs::File::open(gd_path)?;
-                        let mut file_content = Vec::new();
-                        use std::io::Read;
-                        file.read_to_end(&mut file_content)
-                            .expect("Problem reading savefile");
-                        let mut level_string =
-                            match levelstring::get_level_string(file_content, level_name.clone()) {
-                                Ok(s) => s,
-                                Err(e) => {
-                                    eprint_with_color(
-                                        &format!("Error reading level:\n{}", e),
-                                        Color::Red,
-                                    );
+                    if !compile_only {
+                        let level_string = if let Some(gd_path) = &gd_path {
+                            print_with_color("Reading savefile...", Color::Cyan);
+                            let mut file = fs::File::open(gd_path)?;
+                            let mut file_content = Vec::new();
+                            use std::io::Read;
+                            file.read_to_end(&mut file_content)
+                                .expect("Problem reading savefile");
+                            let mut level_string =
+                                match levelstring::get_level_string(file_content, level_name.clone()) {
+                                    Ok(s) => s,
+                                    Err(e) => {
+                                        eprint_with_color(
+                                            &format!("Error reading level:\n{}", e),
+                                            Color::Red,
+                                        );
 
-                                    std::process::exit(ERROR_EXIT_CODE);
-                                }
-                            };
-                        if level_string.is_empty() {}
-                        levelstring::remove_spwn_objects(&mut level_string);
-                        level_string
-                    } else {
-                        String::new()
-                    };
-                    let has_stuff = compiled.func_ids.iter().any(|x| !x.obj_list.is_empty());
-                    if opti_enabled && has_stuff {
-                        print_with_color("Optimizing triggers...", Color::Cyan);
-                        compiled.func_ids = optimize(compiled.func_ids, compiled.closed_groups);
-                    }
-
-                    let mut objects = levelstring::apply_fn_ids(&compiled.func_ids);
-
-                    objects.extend(compiled.objects);
-
-                    print_with_color(&format!("{} objects added", objects.len()), Color::White);
-
-                    let (new_ls, used_ids) = levelstring::append_objects(objects, &level_string)?;
-
-                    print_with_color("\nLevel:", Color::Magenta);
-                    for (i, len) in used_ids.iter().enumerate() {
-                        if *len > 0 {
-                            print_with_color(
-                                &format!(
-                                    "{} {}",
-                                    len,
-                                    ["groups", "colors", "block IDs", "item IDs"][i]
-                                ),
-                                Color::White,
-                            );
-                        }
-                    }
-
-                    //println!("level_string: {}", level_string);
-                    match gd_path {
-                        Some(gd_path) => {
-                            print_with_color("\nWriting back to savefile...", Color::Cyan);
-                            levelstring::encrypt_level_string(
-                                new_ls,
-                                level_string,
-                                gd_path,
-                                level_name,
-                            )?;
-
-                            print_with_color(
-                                "Written to save. You can now open Geometry Dash again!",
-                                Color::Green,
-                            );
+                                        std::process::exit(ERROR_EXIT_CODE);
+                                    }
+                                };
+                            if level_string.is_empty() {}
+                            levelstring::remove_spwn_objects(&mut level_string);
+                            level_string
+                        } else {
+                            String::new()
+                        };
+                        let has_stuff = compiled.func_ids.iter().any(|x| !x.obj_list.is_empty());
+                        if opti_enabled && has_stuff {
+                            print_with_color("Optimizing triggers...", Color::Cyan);
+                            compiled.func_ids = optimize(compiled.func_ids, compiled.closed_groups);
                         }
 
-                        None => println!("Output: {}", new_ls),
+                        let mut objects = levelstring::apply_fn_ids(&compiled.func_ids);
+
+                        objects.extend(compiled.objects);
+
+                        print_with_color(&format!("{} objects added", objects.len()), Color::White);
+
+                        let (new_ls, used_ids) = levelstring::append_objects(objects, &level_string)?;
+
+                        print_with_color("\nLevel:", Color::Magenta);
+                        for (i, len) in used_ids.iter().enumerate() {
+                            if *len > 0 {
+                                print_with_color(
+                                    &format!(
+                                        "{} {}",
+                                        len,
+                                        ["groups", "colors", "block IDs", "item IDs"][i]
+                                    ),
+                                    Color::White,
+                                );
+                            }
+                        }
+                        //println!("level_string: {}", level_string);
+                        match gd_path {
+                            Some(gd_path) => {
+                                print_with_color("\nWriting back to savefile...", Color::Cyan);
+                                levelstring::encrypt_level_string(
+                                    new_ls,
+                                    level_string,
+                                    gd_path,
+                                    level_name,
+                                )?;
+
+                                print_with_color(
+                                    "Written to save. You can now open Geometry Dash again!",
+                                    Color::Green,
+                                );
+                            }
+
+                            None => println!("Output: {}", new_ls),
+                        };
                     };
+
                     let mut stdout = StandardStream::stdout(ColorChoice::Always);
                     stdout
                         .set_color(&ColorSpec::new())
