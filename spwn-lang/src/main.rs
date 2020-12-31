@@ -37,9 +37,7 @@ fn print_with_color(text: &str, color: Color) {
         .set_color(ColorSpec::new().set_fg(Some(color)))
         .unwrap();
     writeln!(&mut stdout, "{}", text).unwrap();
-    stdout
-        .set_color(&ColorSpec::new())
-        .unwrap();
+    stdout.set_color(&ColorSpec::new()).unwrap();
 }
 
 fn eprint_with_color(text: &str, color: Color) {
@@ -48,9 +46,7 @@ fn eprint_with_color(text: &str, color: Color) {
         .set_color(ColorSpec::new().set_fg(Some(color)))
         .unwrap();
     writeln!(&mut stdout, "{}", text).unwrap();
-    stdout
-        .set_color(&ColorSpec::new())
-        .unwrap();
+    stdout.set_color(&ColorSpec::new()).unwrap();
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -79,7 +75,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     while let Some(arg) = args_iter.next() {
                         match arg.as_ref() {
                             "--console-output" | "-c" => gd_enabled = false,
-                            "--no-level" | "-l" => {gd_enabled = false; compile_only = true;}
+                            "--no-level" | "-l" => {
+                                gd_enabled = false;
+                                compile_only = true;
+                            }
                             "--no-optimize" | "-o" => opti_enabled = false,
                             "--level-name" | "-n" => level_name = args_iter.next().cloned(),
                             _ => (),
@@ -96,16 +95,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         Ok(p) => p,
                     };
-                    
-                    let mut tags = notes.tag.tags.iter();
-                    while let Some(tag) = tags.next() {
+
+                    let tags = notes.tag.tags.iter();
+                    for tag in tags {
                         match tag.0.as_str() {
                             "console_output" => gd_enabled = false,
-                            "no_level" => {gd_enabled = false; compile_only = true;},
+                            "no_level" => {
+                                gd_enabled = false;
+                                compile_only = true;
+                            }
                             _ => (),
                         }
                     }
-
 
                     let gd_path = if gd_enabled {
                         Some(if cfg!(target_os = "windows") {
@@ -145,18 +146,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             use std::io::Read;
                             file.read_to_end(&mut file_content)
                                 .expect("Problem reading savefile");
-                            let mut level_string =
-                                match levelstring::get_level_string(file_content, level_name.clone()) {
-                                    Ok(s) => s,
-                                    Err(e) => {
-                                        eprint_with_color(
-                                            &format!("Error reading level:\n{}", e),
-                                            Color::Red,
-                                        );
+                            let mut level_string = match levelstring::get_level_string(
+                                file_content,
+                                level_name.clone(),
+                            ) {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    eprint_with_color(
+                                        &format!("Error reading level:\n{}", e),
+                                        Color::Red,
+                                    );
 
-                                        std::process::exit(ERROR_EXIT_CODE);
-                                    }
-                                };
+                                    std::process::exit(ERROR_EXIT_CODE);
+                                }
+                            };
                             if level_string.is_empty() {}
                             levelstring::remove_spwn_objects(&mut level_string);
                             level_string
@@ -175,7 +178,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                         print_with_color(&format!("{} objects added", objects.len()), Color::White);
 
-                        let (new_ls, used_ids) = levelstring::append_objects(objects, &level_string)?;
+                        let (new_ls, used_ids) =
+                            levelstring::append_objects(objects, &level_string)?;
 
                         print_with_color("\nLevel:", Color::Magenta);
                         for (i, len) in used_ids.iter().enumerate() {
@@ -212,9 +216,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
 
                     let mut stdout = StandardStream::stdout(ColorChoice::Always);
-                    stdout
-                        .set_color(&ColorSpec::new())
-                        .unwrap();
+                    stdout.set_color(&ColorSpec::new()).unwrap();
 
                     Ok(())
                 }
