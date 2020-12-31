@@ -109,7 +109,7 @@ pub enum Operator {
     More,
     Less,
     Slash,
-    IntDivide,
+    IntDividedBy,
     Star,
     Power,
     Plus,
@@ -123,6 +123,7 @@ pub enum Operator {
     Subtract,
     Multiply,
     Divide,
+    IntDivide,
     As,
 
     Exponate,

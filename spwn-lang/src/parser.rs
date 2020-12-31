@@ -147,7 +147,7 @@ pub enum Token {
     Slash,
 
     #[token("/%")]
-    IntDivide,
+    IntDividedBy,
 
     #[token("!")]
     Exclamation,
@@ -163,6 +163,9 @@ pub enum Token {
     Multiply,
     #[token("/=")]
     Divide,
+
+    #[token("/%=")]
+    IntDivide,
 
     #[token("^=")]
     Exponate,
@@ -313,7 +316,7 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | IntDivide | As | Either | DoubleStar | Exponate | Modulate
+            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Either | DoubleStar | Exponate | Modulate
             | Increment | Decrement => "operator",
             Symbol => "identifier",
             Number => "number literal",
@@ -1072,7 +1075,7 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
         Modulo => 7,
         Star => 7,
         Slash => 7,
-        IntDivide => 7,
+        IntDividedBy => 7,
 
         Plus => 6,
         Minus => 6,
@@ -1095,6 +1098,7 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
         Subtract => 0,
         Multiply => 0,
         Divide => 0,
+        IntDivide => 0,
         Exponate => 0,
         Modulate => 0,
     }
@@ -1238,7 +1242,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Plus => Some(ast::Operator::Plus),
         Token::Minus => Some(ast::Operator::Minus),
         Token::Slash => Some(ast::Operator::Slash),
-        Token::IntDivide => Some(ast::Operator::IntDivide),
+        Token::IntDividedBy => Some(ast::Operator::IntDividedBy),
         Token::Modulo => Some(ast::Operator::Modulo),
         Token::Either => Some(ast::Operator::Either),
 
@@ -1247,6 +1251,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Subtract => Some(ast::Operator::Subtract),
         Token::Multiply => Some(ast::Operator::Multiply),
         Token::Divide => Some(ast::Operator::Divide),
+        Token::IntDivide => Some(ast::Operator::IntDivide),
         Token::Exponate => Some(ast::Operator::Exponate),
         Token::Modulate => Some(ast::Operator::Modulate),
         Token::As => Some(ast::Operator::As),

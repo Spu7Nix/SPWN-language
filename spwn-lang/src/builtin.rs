@@ -712,7 +712,7 @@ pub fn built_in_function(
         "current_context" => Value::Str(format!("{:?}", context)),
 
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
-        | "_less_or_equal_" | "_divided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
+        | "_less_or_equal_" | "_divided_by_" | "_intdivided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
         | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_as_" | "_add_" | "_subtract_"
         | "_multiply_" | "_divide_" | "_intdivide_" |"_either_" | "_exponate_" | "_modulate_" | "_range_" => {
             if arguments.len() != 2 {
@@ -864,7 +864,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         })
                     }
                 },
-                "_intdivide_" => match (val_a, val_b) {
+                "_intdivided_by_" => match (val_a, val_b) {
                     (Value::Number(a), Value::Number(b)) => Value::Number(((*a as i32) / (b as i32)).into()),
 
                     _ => {
@@ -1138,6 +1138,30 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
 
                     match (val_a, val_b) {
                         (Value::Number(a), Value::Number(b)) => (*a) /= b,
+
+                        _ => {
+                            return Err(RuntimeError::TypeError {
+                                expected: "number and number".to_string(),
+                                found: format!("{} and {}", a_type, b_type),
+                                info,
+                            })
+                        }
+                    };
+                    Value::Null
+                }
+                "_intdivide_" => {
+                    if !mutable {
+                        return Err(mutable_err(info, "_intdivide_"));
+                    }
+                    if acum_val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info,
+                        });
+                    }
+
+                    match (val_a, val_b) {
+                        (Value::Number(a), Value::Number(b)) => (*a) = (((*a) as i32) / (b as i32)).into(),
 
                         _ => {
                             return Err(RuntimeError::TypeError {

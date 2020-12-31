@@ -1339,6 +1339,11 @@ impl ast::Expression {
                             globals,
                             &info,
                         )?,
+
+                        IntDividedBy => {
+                            handle_operator(acum_val, *val, "_intdivided_by_", c2, globals, &info)?
+                        },
+
                         Star => {
                             handle_operator(acum_val, *val, "_times_", c2, globals, &info)?
                         }
@@ -1434,7 +1439,8 @@ impl ast::Expression {
 
                         IntDivide => {
                             handle_operator(acum_val, *val, "_intdivide_", c2, globals, &info)?
-                        }
+                        },                 
+
                     };
                     new_acum.extend(vals);
                 }
