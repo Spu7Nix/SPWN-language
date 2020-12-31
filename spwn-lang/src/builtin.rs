@@ -714,7 +714,7 @@ pub fn built_in_function(
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
         | "_less_or_equal_" | "_divided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
         | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_as_" | "_add_" | "_subtract_"
-        | "_multiply_" | "_divide_" | "_either_" | "_exponate_" | "_modulate_" | "_range_" => {
+        | "_multiply_" | "_divide_" | "_intdivide_" |"_either_" | "_exponate_" | "_modulate_" | "_range_" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
                     message: "Expected two arguments".to_string(),
@@ -855,6 +855,17 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                 },
                 "_divided_by_" => match (val_a, val_b) {
                     (Value::Number(a), Value::Number(b)) => Value::Number(*a / b),
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info,
+                        })
+                    }
+                },
+                "_intdivide_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => Value::Number(((*a as i32) / (b as i32)).into()),
 
                     _ => {
                         return Err(RuntimeError::TypeError {

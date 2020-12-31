@@ -109,6 +109,7 @@ pub enum Operator {
     More,
     Less,
     Slash,
+    IntDivide,
     Star,
     Power,
     Plus,

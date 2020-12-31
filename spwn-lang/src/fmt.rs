@@ -420,6 +420,7 @@ impl SpwnFmt for Operator {
             Operator::Subtract => "-=",
             Operator::Multiply => "*=",
             Operator::Divide => "/=",
+            Operator::IntDivide => "/%",
             Operator::As => "as",
             Operator::Either => "|",
             Operator::Exponate => "^=",

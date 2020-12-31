@@ -1430,6 +1430,10 @@ impl ast::Expression {
 
                         Divide => {
                             handle_operator(acum_val, *val, "_divide_", c2, globals, &info)?
+                        },
+
+                        IntDivide => {
+                            handle_operator(acum_val, *val, "_intdivide_", c2, globals, &info)?
                         }
                     };
                     new_acum.extend(vals);
