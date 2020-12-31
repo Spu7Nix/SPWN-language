@@ -254,7 +254,6 @@ pub const BUILTIN_LIST: &[&str] = &[
     "floor",
     "ceil",
     "add",
-    "current_context",
     "append",
     "pop",
     "remove_index",
@@ -316,7 +315,7 @@ pub fn built_in_function(
         "matches" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
-                    message: "expected two arguments: the type to be checked and the pattern"
+                    message: "expected two arguments: the value to be checked and the pattern"
                         .to_string(),
                     info,
                 });
@@ -708,8 +707,6 @@ pub fn built_in_function(
                 }
             }
         }
-
-        "current_context" => Value::Str(format!("{:?}", context)),
 
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
         | "_less_or_equal_" | "_divided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"

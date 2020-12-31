@@ -118,16 +118,14 @@ return {
 
 		wait_for_ready = () {
 			closure = {
-				ready_sign.count(1).on_triggered({
-					ready_sign.add(-1)
-					wait()
-					closure.start_group.stop()
-					return
-				})
+				ready_sign.add(-1)
+				wait()
+				closure.start_group.toggle_off()
+				wait()
+				return
 			}
-
-		
-			closure!
+			closure.start_group.toggle_on()
+			ready_sign.count(1).on_triggered(closure)
 		}
 
 		return () {
