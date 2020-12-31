@@ -8,6 +8,17 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+macro_rules! arg_length {
+    ($info:expr , $count:expr, $args:expr , $message:expr) => {
+        if $args.len() != $count {
+            return Err(RuntimeError::BuiltinError {
+                message: $message,
+                info: $info,
+            });
+        }
+    };
+}
+
 pub type ArbitraryID = u16;
 pub type SpecificID = u16;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -278,6 +289,7 @@ pub const BUILTIN_LIST: &[&str] = &[
     "_equal_",
     "_not_equal_",
     "_assign_",
+    "_swap_",
     "_as_",
     "_add_",
     "_subtract_",
@@ -313,25 +325,25 @@ pub fn built_in_function(
         }
 
         "matches" => {
-            if arguments.len() != 2 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "expected two arguments: the value to be checked and the pattern"
-                        .to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                2,
+                arguments,
+                "Expected two arguments: the type to be checked and the pattern".to_string()
+            );
+
             let val = globals.stored_values[arguments[0]].clone();
             let pattern = globals.stored_values[arguments[1]].clone();
             Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
         }
 
         "b64encrypt" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "expected one argument: string to be encrypted".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one argument: string to be encrypted".to_string()
+            );
 
             let val = globals.stored_values[arguments[0]].clone();
             match val {
@@ -341,19 +353,19 @@ pub fn built_in_function(
                 }
                 _ => {
                     return Err(RuntimeError::BuiltinError {
-                        message: "expected one argument: string to be encrypted".to_string(),
+                        message: "Expected one argument: string to be encrypted".to_string(),
                         info,
                     })
                 }
             }
         }
         "b64decrypt" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "expected one argument: string to be encrypted".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one argument: string to be decrypted".to_string()
+            );
 
             let val = globals.stored_values[arguments[0]].clone();
             match val {
@@ -371,7 +383,7 @@ pub fn built_in_function(
                 }
                 _ => {
                     return Err(RuntimeError::BuiltinError {
-                        message: "expected one argument: string to be encrypted".to_string(),
+                        message: "Expected one argument: string to be decrypted".to_string(),
                         info,
                     })
                 }
@@ -409,12 +421,7 @@ pub fn built_in_function(
         //     out
         // }
         "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "floor" | "ceil" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "expected one argument".to_string(),
-                    info,
-                });
-            }
+            arg_length!(info, 1, arguments, "Expected one argument".to_string());
 
             match &globals.stored_values[arguments[0]] {
                 Value::Number(n) => Value::Number(match name {
@@ -440,12 +447,7 @@ pub fn built_in_function(
         }
 
         "add" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected one argument".to_string(),
-                    info,
-                });
-            }
+            arg_length!(info, 1, arguments, "Expected one argument".to_string());
 
             match &globals.stored_values[arguments[0]] {
                 Value::Obj(obj, mode) => {
@@ -499,12 +501,13 @@ pub fn built_in_function(
         }
 
         "append" => {
-            if arguments.len() != 2 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected two arguments, the first one being an array and the other being the value to append.".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                2,
+                arguments,
+                "Expected two arguments, the first one being an array and the other being the value to append.".to_string()
+            );
+
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This array is not mutable"),
@@ -538,12 +541,8 @@ pub fn built_in_function(
         }
 
         "readfile" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected file name".to_string(),
-                    info,
-                });
-            }
+            arg_length!(info, 1, arguments, "Expected file name".to_string());
+
             let val = globals.stored_values[arguments[0]].clone();
             match val {
                 Value::Str(s) => {
@@ -576,12 +575,13 @@ pub fn built_in_function(
         }
 
         "pop" => {
-            if arguments.len() != 1 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected one arguments, the array or string to pop from".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one arguments, the array or string to pop from".to_string()
+            );
+
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This value is not mutable"),
@@ -610,12 +610,13 @@ pub fn built_in_function(
         }
 
         "substr" => {
-            if arguments.len() != 3 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected three arguments: string to be sliced, a start index, and an end index".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                3,
+                arguments,
+                "Expected three arguments: string to be sliced, a start index, and an end index"
+                    .to_string()
+            );
 
             let val = match globals.stored_values[arguments[0]].clone() {
                 Value::Str(s) => s,
@@ -666,12 +667,13 @@ pub fn built_in_function(
         }
 
         "remove_index" => {
-            if arguments.len() != 2 {
-                return Err(RuntimeError::BuiltinError {
-                    message: "Expected two arguments, the array or string to remove from and the index of the element to be removed".to_string(),
-                    info,
-                });
-            }
+            arg_length!(
+                info,
+                2,
+                arguments,
+                "Expected two arguments, the array or string to remove from and the index of the element to be removed".to_string()
+            );
+
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This value is not mutable"),
@@ -709,9 +711,10 @@ pub fn built_in_function(
         }
 
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
-        | "_less_or_equal_" | "_divided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
-        | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_as_" | "_add_" | "_subtract_"
-        | "_multiply_" | "_divide_" | "_either_" | "_exponate_" | "_modulate_" | "_range_" => {
+        | "_less_or_equal_" | "_divided_by_" | "_intdivided_by_" | "_times_" | "_mod_"
+        | "_pow_" | "_plus_" | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_swap_"
+        | "_as_" | "_add_" | "_subtract_" | "_multiply_" | "_divide_" | "_intdivide_"
+        | "_either_" | "_exponate_" | "_modulate_" | "_range_" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
                     message: "Expected two arguments".to_string(),
@@ -726,7 +729,11 @@ pub fn built_in_function(
             let b_type = globals.get_type_str(val);
 
             let acum_val_fn_context = globals.get_val_fn_context(acum_val, info.clone())?;
+            let val_fn_context = globals.get_val_fn_context(val, info.clone())?;
+
             let mutable = globals.is_mutable(acum_val);
+            let val_mutable = globals.is_mutable(val);
+
             let val_b = globals.stored_values[val].clone();
             let val_a = &mut globals.stored_values[acum_val];
 
@@ -861,6 +868,19 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         })
                     }
                 },
+                "_intdivided_by_" => match (val_a, val_b) {
+                    (Value::Number(a), Value::Number(b)) => {
+                        Value::Number(((*a as i32) / (b as i32)).into())
+                    }
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "number and number".to_string(),
+                            found: format!("{} and {}", a_type, b_type),
+                            info,
+                        })
+                    }
+                },
                 "_times_" => match (val_a, val_b) {
                     (Value::Number(a), Value::Number(b)) => Value::Number(*a * b),
 
@@ -948,6 +968,25 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         globals.stored_values[acum_val].clone()
                     }
                 }
+
+                "_swap_" => {
+                    //println!("hi1");
+                    if !mutable || !val_mutable {
+                        return Err(mutable_err(info, "_swap_"));
+                    }
+                    if acum_val_fn_context != c2.start_group || val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info,
+                        });
+                    }
+
+                    let swap_temp = globals.stored_values[val].clone();
+                    globals.stored_values[val] = globals.stored_values[acum_val].clone();
+                    globals.stored_values[acum_val] = swap_temp;
+                    Value::Null
+                }
+
                 "_as_" => match globals.stored_values[val] {
                     Value::TypeIndicator(t) => convert_type(
                         &globals.stored_values[acum_val].clone(),
@@ -1124,6 +1163,32 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
 
                     match (val_a, val_b) {
                         (Value::Number(a), Value::Number(b)) => (*a) /= b,
+
+                        _ => {
+                            return Err(RuntimeError::TypeError {
+                                expected: "number and number".to_string(),
+                                found: format!("{} and {}", a_type, b_type),
+                                info,
+                            })
+                        }
+                    };
+                    Value::Null
+                }
+                "_intdivide_" => {
+                    if !mutable {
+                        return Err(mutable_err(info, "_intdivide_"));
+                    }
+                    if acum_val_fn_context != c2.start_group {
+                        return Err(RuntimeError::RuntimeError {
+                            message: CANNOT_CHANGE_ERROR.to_string(),
+                            info,
+                        });
+                    }
+
+                    match (val_a, val_b) {
+                        (Value::Number(a), Value::Number(b)) => {
+                            (*a) = (((*a) as i32) / (b as i32)).into()
+                        }
 
                         _ => {
                             return Err(RuntimeError::TypeError {

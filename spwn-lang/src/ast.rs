@@ -109,6 +109,7 @@ pub enum Operator {
     More,
     Less,
     Slash,
+    IntDividedBy,
     Star,
     Power,
     Plus,
@@ -122,10 +123,12 @@ pub enum Operator {
     Subtract,
     Multiply,
     Divide,
+    IntDivide,
     As,
 
     Exponate,
     Modulate,
+    Swap,
 }
 
 #[derive(Clone, PartialEq, Debug)]
