@@ -1339,6 +1339,11 @@ impl ast::Expression {
                             globals,
                             &info,
                         )?,
+
+                        IntDividedBy => {
+                            handle_operator(acum_val, *val, "_intdivided_by_", c2, globals, &info)?
+                        },
+
                         Star => {
                             handle_operator(acum_val, *val, "_times_", c2, globals, &info)?
                         }
@@ -1386,7 +1391,11 @@ impl ast::Expression {
                         //ADD CHECk
                         Assign => {
                             handle_operator(acum_val, *val, "_assign_", c2, globals, &info)?
-                        }
+                        },
+
+                        Swap => {
+                            handle_operator(acum_val, *val, "_swap_", c2, globals, &info)?
+                        },
 
                         As => handle_operator(acum_val, *val, "_as_", c2, globals, &info)?,
 
@@ -1430,7 +1439,12 @@ impl ast::Expression {
 
                         Divide => {
                             handle_operator(acum_val, *val, "_divide_", c2, globals, &info)?
-                        }
+                        },
+
+                        IntDivide => {
+                            handle_operator(acum_val, *val, "_intdivide_", c2, globals, &info)?
+                        },                 
+
                     };
                     new_acum.extend(vals);
                 }

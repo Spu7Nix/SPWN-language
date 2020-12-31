@@ -410,6 +410,7 @@ impl SpwnFmt for Operator {
             Operator::More => ">",
             Operator::Less => "<",
             Operator::Slash => "/",
+            Operator::IntDividedBy => "/%",
             Operator::Star => "*",
             Operator::Power => "^",
             Operator::Plus => "+",
@@ -420,10 +421,12 @@ impl SpwnFmt for Operator {
             Operator::Subtract => "-=",
             Operator::Multiply => "*=",
             Operator::Divide => "/=",
+            Operator::IntDivide => "/%=",
             Operator::As => "as",
             Operator::Either => "|",
             Operator::Exponate => "^=",
             Operator::Modulate => "%=",
+            Operator::Swap => "<=>",
         }
         .to_string()
     }

@@ -98,6 +98,9 @@ pub enum Token {
     #[token("=>")]
     ThickArrow,
 
+    #[token("<=>")]
+    Swap,
+
     #[token("|")]
     Either,
 
@@ -146,6 +149,9 @@ pub enum Token {
     #[token("/")]
     Slash,
 
+    #[token("/%")]
+    IntDividedBy,
+
     #[token("!")]
     Exclamation,
 
@@ -160,6 +166,9 @@ pub enum Token {
     Multiply,
     #[token("/=")]
     Divide,
+
+    #[token("/%=")]
+    IntDivide,
 
     #[token("^=")]
     Exponate,
@@ -310,8 +319,8 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | As | Either | DoubleStar | Exponate | Modulate
-            | Increment | Decrement => "operator",
+            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Either | DoubleStar | Exponate | Modulate
+            | Increment | Decrement | Swap => "operator",
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -370,22 +379,10 @@ impl<'a> Tokens<'a> {
     fn next(&mut self, ss: bool, comment: bool) -> Option<Token> {
         if self.index == 0 {
             let next_element = self.iter.next();
-            /* {
-                Some(e) => Some(e),
-                None => {
-                    if ss {
-                        Some(Token::StatementSeparator)
-                    } else {
-                        None
-                    }
-                }
-            };*/
 
             let slice = self.iter.slice().to_string();
             let range = self.iter.span();
-            /*if self.stack.len() > 4 {
-                self.stack.remove(0);
-            }*/
+
             self.stack.push((next_element, slice, range));
 
             if (!ss && next_element == Some(Token::StatementSeparator))
@@ -522,20 +519,6 @@ pub fn parse_spwn(
 
     let mut tokens = Tokens::new(tokens_iter);
 
-    /*{
-        let mut test = tokens.clone();
-
-        for _ in 0..100 {
-            println!("{:?}", test.next(true, true));
-        }
-
-        /*println!(
-            "{:?}",
-            test.iter
-                .spanned()
-                .collect::<Vec<(Token, std::ops::Range<usize>)>>()
-        );*/
-    }*/
     let mut statements = Vec::<ast::Statement>::new();
 
     let mut notes = ParseNotes::new(path);
@@ -554,13 +537,17 @@ pub fn parse_spwn(
     let start_tag = check_for_tag(&mut tokens, &mut notes)?;
     notes.tag = start_tag;
     loop {
-        //tokens.next(false, false);
-        match tokens.next(false, true) {
-            Some(_) => {
-                tokens.previous_no_ignore(false, true);
 
-                //tokens.previous();
-                let mut parsed = parse_statement(&mut tokens, &mut notes)?;
+
+        //+ do something if we have tokens. if no more tokens, leave loop
+        match tokens.next(false, true) {
+            //oops we just advanced the tokens in an attempt to check if we have any
+
+            Some(_) => {
+                tokens.previous_no_ignore(false, true); //bring tokens back to original
+
+                //+ we are goign to parse the tokens
+                let mut parsed = parse_statement(&mut tokens, &mut notes)?; 
                 if parsed.comment.0 == None && !statements.is_empty() {
                     parsed.comment.0 = statements.last().unwrap().comment.1.clone();
                     (*statements.last_mut().unwrap()).comment.1 = None;
@@ -568,16 +555,10 @@ pub fn parse_spwn(
 
                 statements.push(parsed)
             }
-            None => break,
+            None => break, //+ no more tokens, probably end of file
         }
 
-        /*println!(
-            "\n{:?}\ncurrent: {:?}, {:?}",
-            statements.last(),
-            tokens.current(),
-            tokens.slice()
-        );*/
-
+        //+ can't find any more tokens that are valid syntax, checking for line separator
         match tokens.next(true, false) {
             Some(Token::StatementSeparator) => {}
             Some(a) => {
@@ -612,7 +593,7 @@ fn parse_cmp_stmt(
                     (*statements.last_mut().unwrap()).comment.1 = None;
                 }
 
-                statements.push(parsed)
+                statements.push(parsed) // add to big statement list
                 //println!("statement done");
             }
             None => {
@@ -661,7 +642,7 @@ pub fn parse_statement(
     let (start_pos, _) = tokens.position();
 
     let mut arrow = false;
-    let body = match first {
+    let body = match first { // ooh what type of token is it
         Some(Token::Arrow) => {
             //parse async statement
             if tokens.next(false, false) == Some(Token::Arrow) {
@@ -675,24 +656,29 @@ pub fn parse_statement(
 
             tokens.previous();
 
-            let rest_of_statement = parse_statement(tokens, notes)?;
+            let rest_of_statement = parse_statement(tokens, notes)?; // recursion moment
 
             arrow = true;
             rest_of_statement.body
+
+            /* Summary: 
+            check for double arrows, if it is then throw error because you cant do that
+            enable the async flag and parse everything else
+            */
         }
 
         Some(Token::Return) => {
             //parse return statement
 
-            match tokens.next(true, false) {
-                Some(Token::StatementSeparator) | Some(Token::ClosingCurlyBracket) => {
+            match tokens.next(true, false) { //do we actually return something?
+                Some(Token::StatementSeparator) | Some(Token::ClosingCurlyBracket) => { // we dont return anything
                     tokens.previous();
                     ast::StatementBody::Return(None)
                 }
 
-                _ => {
+                _ => { // we are returning something, how fun
                     tokens.previous();
-                    let mut expr = parse_expr(tokens, notes, true, true)?;
+                    let mut expr = parse_expr(tokens, notes, true, true)?; //parse whatever we are returning
                     comment_after =
                         if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
                             (*expr.values.last_mut().unwrap()).comment.1 = None;
@@ -703,19 +689,27 @@ pub fn parse_statement(
                     ast::StatementBody::Return(Some(expr))
                 }
             }
+
+            /* Summary:
+                check if we are returning something
+                if not, just output an empty return syntax tree
+                if we are, parse the return expression and return a syntax tree with it
+            */
         }
 
-        Some(Token::Break) => ast::StatementBody::Break,
+        Some(Token::Break) => ast::StatementBody::Break, // its just break
 
         Some(Token::If) => {
             //parse if statement
 
             // println!("if statement");
 
-            let condition = parse_expr(tokens, notes, true, true)?;
-            match tokens.next(false, false) {
+            let condition = parse_expr(tokens, notes, true, true)?; // parse the condition part
+            match tokens.next(false, false) { 
+                // check for a { character
+
                 Some(Token::OpenCurlyBracket) => (),
-                a => {
+                a => { // no { this is very bad
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'{'".to_string(),
                         found: format!(
@@ -731,21 +725,22 @@ pub fn parse_statement(
                     })
                 }
             }
-            let if_body = parse_cmp_stmt(tokens, notes)?;
-            let else_body = match tokens.next(false, false) {
+            let if_body = parse_cmp_stmt(tokens, notes)?; // parse whatever is inside if statement
+
+            let else_body = match tokens.next(false, false) { // is there an else?
                 Some(Token::Else) => match tokens.next(false, false) {
-                    Some(Token::OpenCurlyBracket) => {
-                        // println!("else");
-                        Some(parse_cmp_stmt(tokens, notes)?)
+                    // there is an else, check for else if
+
+                    Some(Token::OpenCurlyBracket) => { // no else if, just else
+                        Some(parse_cmp_stmt(tokens, notes)?) // parse the else
                     }
-                    Some(Token::If) => {
+                    Some(Token::If) => { // there is an else if
                         tokens.previous();
-                        // println!("else if");
 
-                        Some(vec![parse_statement(tokens, notes)?])
+                        Some(vec![parse_statement(tokens, notes)?]) // parse the else if
                     }
 
-                    a => {
+                    a => { // found something other than { or if
                         return Err(SyntaxError::ExpectedErr {
                             expected: "'{' or 'if'".to_string(),
                             found: format!(
@@ -762,8 +757,7 @@ pub fn parse_statement(
                     }
                 },
 
-                _ => {
-                    // println!("token after if stmt: {:?}", a);
+                _ => { // no else at all
                     tokens.previous();
                     None
                 }
@@ -776,14 +770,21 @@ pub fn parse_statement(
             };
 
             ast::StatementBody::If(if_statement)
+
+            /* Summary:
+                parse the condition
+                check if the first "if" statement has a {
+                check for any "else" or "else if" statements
+                return a syntax tree for it
+            */
         }
 
         Some(Token::For) => {
             //parse for statement
 
-            let symbol = match tokens.next(false, false) {
+            let symbol = match tokens.next(false, false) { // check for variable
                 Some(Token::Symbol) => tokens.slice(),
-                Some(a) => {
+                Some(a) => { // invalid variable name
                     return Err(SyntaxError::ExpectedErr {
                         expected: "iterator variable name".to_string(),
                         found: format!("{}: \"{}\"", a.typ(), tokens.slice()),
@@ -792,7 +793,7 @@ pub fn parse_statement(
                     })
                 }
 
-                None => {
+                None => { // literally no variable, why
                     return Err(SyntaxError::ExpectedErr {
                         expected: "iterator variable name".to_string(),
                         found: "None".to_string(),
@@ -802,9 +803,9 @@ pub fn parse_statement(
                 }
             };
 
-            match tokens.next(false, false) {
+            match tokens.next(false, false) { // check for an in
                 Some(Token::In) => {}
-                a => {
+                a => { // didnt find an in
                     return Err(SyntaxError::ExpectedErr {
                         expected: "keyword 'in'".to_string(),
                         found: format!(
@@ -821,10 +822,11 @@ pub fn parse_statement(
                 }
             };
 
-            let array = parse_expr(tokens, notes, true, true)?;
-            match tokens.next(false, false) {
+            let array = parse_expr(tokens, notes, true, true)?; // parse the array (or range)
+            match tokens.next(false, false) { // check for brace
+
                 Some(Token::OpenCurlyBracket) => {}
-                a => {
+                a => { // no brace
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'{'".to_string(),
                         found: format!(
@@ -840,43 +842,23 @@ pub fn parse_statement(
                     })
                 }
             };
-            let body = parse_cmp_stmt(tokens, notes)?;
-
-            //fix confusing gd behavior
-            //             if body
-            //                 .iter()
-            //                 .all(|x| matches!(x.body, ast::StatementBody::Call(_)))
-            //             {
-            //                 //maybe not the fastest way, but the syntax tree is just too large to just paste in
-            //                 let new_statement = parse_spwn(
-            //                     String::from(
-            //                         "
-            // (){
-            //     $.add(obj {
-            //         1: 1268,
-            //         63: 0.05,
-            //         51: {
-            //             return
-            //         },
-            //     })
-            // }()
-            //                 ",
-            //                     ),
-            //                     PathBuf::new(),
-            //                 )?;
-
-            //                 body.push(new_statement.0[0].clone());
-            //             }
+            let body = parse_cmp_stmt(tokens, notes)?; // parse whats in the for loop
 
             ast::StatementBody::For(ast::For {
                 symbol,
                 array,
                 body,
             })
+            /* Summary:
+            check for an iterator variable
+            parse range/list
+            parse code block
+            return syntax tree
+            */
         }
 
         Some(Token::ErrorStatement) => {
-            let mut expr = parse_expr(tokens, notes, true, true)?;
+            let mut expr = parse_expr(tokens, notes, true, true)?; 
             comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
                 (*expr.values.last_mut().unwrap()).comment.1 = None;
                 Some(comment)
@@ -884,12 +866,15 @@ pub fn parse_statement(
                 None
             };
             ast::StatementBody::Error(ast::Error { message: expr })
+            //i dont think a summary is needed for this
         }
 
-        Some(Token::Type) => {
+        Some(Token::Type) => { // defining a new type
             match tokens.next(false, false) {
+                // all types start with @, throw error if it doesn't
+
                 Some(Token::At) => (),
-                a => {
+                a => { 
                     return Err(SyntaxError::ExpectedErr {
                         expected: "@".to_string(),
                         found: format!(
@@ -907,6 +892,8 @@ pub fn parse_statement(
             };
 
             match tokens.next(false, false) {
+                // check if type name is valid
+
                 Some(Token::Symbol) => ast::StatementBody::TypeDef(tokens.slice()),
                 a => {
                     return Err(SyntaxError::ExpectedErr {
@@ -924,17 +911,34 @@ pub fn parse_statement(
                     })
                 }
             }
+            /*Summary:
+            check for @ sybol at the start
+            check if type name is actually valid
+            return typedef syntax tree
+            */
         }
 
         Some(Token::Implement) => {
             //parse impl statement
             let symbol = parse_variable(tokens, notes, true)?;
+            /*
+                You might be asking yourself here,
+                "why are we parsing it as a variable and not a type?"
+
+                Well the answer to that is simply that the developer thought
+                that some people might not like the typing system and would
+                want to use a variable instead.
+            */
+
+
             match tokens.next(false, false) {
+                // check if it has the brace
                 Some(Token::OpenCurlyBracket) => ast::StatementBody::Impl(ast::Implementation {
                     symbol,
-                    members: parse_dict(tokens, notes)?,
+                    members: parse_dict(tokens, notes)?, // impl block is basically a dict
                 }),
-                a => {
+
+                a => { // no brace
                     return Err(SyntaxError::ExpectedErr {
                         expected: "'{'".to_string(),
                         found: format!(
@@ -950,10 +954,14 @@ pub fn parse_statement(
                     })
                 }
             }
+            // honestly this shouldn't deserve a summary its so basic
         }
 
         Some(Token::Extract) => {
             let mut expr = parse_expr(tokens, notes, true, true)?;
+            // its an expression because dicts can also be extracted alongside imported modules
+
+            //you can literally ignore this
             comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
                 (*expr.values.last_mut().unwrap()).comment.1 = None;
                 Some(comment)
@@ -962,6 +970,7 @@ pub fn parse_statement(
             };
 
             ast::StatementBody::Extract(expr)
+            // too basic to have a summary,
         }
 
         Some(_) => {
@@ -969,17 +978,15 @@ pub fn parse_statement(
             //parse it
 
             //expression or call
-            //tokens.previous();
             tokens.previous_no_ignore(false, true);
             let mut expr = parse_expr(tokens, notes, true, true)?;
             if tokens.next(false, false) == Some(Token::Exclamation) {
                 //call
-                // println!("found call");
                 ast::StatementBody::Call(ast::Call {
                     function: expr.values[0].clone(),
                 })
             } else {
-                //expression statement
+                // expression statement
                 // println!("found expr");
                 tokens.previous_no_ignore(false, true);
 
@@ -1013,7 +1020,7 @@ pub fn parse_statement(
         tokens.slice()
     );*/
 
-    Ok(ast::Statement {
+    Ok(ast::Statement { // we are returning a statement pog
         body,
         arrow,
         pos: (start_pos, end_pos),
@@ -1071,6 +1078,7 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
         Modulo => 7,
         Star => 7,
         Slash => 7,
+        IntDividedBy => 7,
 
         Plus => 6,
         Minus => 6,
@@ -1093,8 +1101,10 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
         Subtract => 0,
         Multiply => 0,
         Divide => 0,
+        IntDivide => 0,
         Exponate => 0,
         Modulate => 0,
+        Swap => 0,
     }
 }
 
@@ -1162,13 +1172,17 @@ fn parse_expr(
     allow_mut_op: bool,
     check_for_comments: bool,
 ) -> Result<ast::Expression, SyntaxError> {
+    // Alright lets parse an expression
+
     let mut values = Vec::<ast::Variable>::new();
     let mut operators = Vec::<ast::Operator>::new();
 
-    values.push(parse_variable(tokens, notes, check_for_comments)?);
+    values.push(parse_variable(tokens, notes, check_for_comments)?); 
+    // all expressions begin with a variable
 
-    while let Some(t) = tokens.next(false, false) {
-        if let Some(o) = parse_operator(&t) {
+    while let Some(t) = tokens.next(false, false) { // keep looking for operators and values
+
+        if let Some(o) = parse_operator(&t) { // check if new operator
             let op = if allow_mut_op {
                 o
             } else {
@@ -1216,6 +1230,7 @@ fn parse_expr(
 }
 
 fn parse_operator(token: &Token) -> Option<ast::Operator> {
+    // its just a giant match statement
     match token {
         Token::DotDot => Some(ast::Operator::Range),
         Token::Or => Some(ast::Operator::Or),
@@ -1231,6 +1246,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Plus => Some(ast::Operator::Plus),
         Token::Minus => Some(ast::Operator::Minus),
         Token::Slash => Some(ast::Operator::Slash),
+        Token::IntDividedBy => Some(ast::Operator::IntDividedBy),
         Token::Modulo => Some(ast::Operator::Modulo),
         Token::Either => Some(ast::Operator::Either),
 
@@ -1239,8 +1255,10 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Subtract => Some(ast::Operator::Subtract),
         Token::Multiply => Some(ast::Operator::Multiply),
         Token::Divide => Some(ast::Operator::Divide),
+        Token::IntDivide => Some(ast::Operator::IntDivide),
         Token::Exponate => Some(ast::Operator::Exponate),
         Token::Modulate => Some(ast::Operator::Modulate),
+        Token::Swap => Some(ast::Operator::Swap),
         Token::As => Some(ast::Operator::As),
         _ => None,
     }
