@@ -3,6 +3,8 @@ f = sync_function(() {
     wait(0.1)
 })
 
-
 f()
+
+
+
 10g.move(-10, 0, 0.5)

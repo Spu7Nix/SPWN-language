@@ -119,13 +119,15 @@ return {
 		wait_for_ready = () {
 			closure = {
 				ready_sign.add(-1)
-				wait()
 				closure.start_group.toggle_off()
-				wait()
+				wait(0)
 				return
 			}
 			closure.start_group.toggle_on()
-			ready_sign.count(1).on_triggered(closure)
+			ready_sign.count(1).on_triggered({
+				wait(0)
+				closure!
+			})
 		}
 
 		return () {
