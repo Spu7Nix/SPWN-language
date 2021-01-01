@@ -20,6 +20,24 @@ use crate::compiler_types::ImportType;
 
 pub type FileRange = ((usize, usize), (usize, usize));
 
+macro_rules! expected {
+    ($expected:expr, $tokens:expr, $notes:expr, $a:expr) => {
+        return Err(SyntaxError::ExpectedErr {
+            expected: $expected,
+            found: format!(
+                "{}: \"{}\"",
+                match $a {
+                    Some(t) => t.typ(),
+                    None => "EOF",
+                },
+                $tokens.slice()
+            ),
+            pos: $tokens.position(),
+            file: $notes.file.clone(),
+        });
+    };
+}
+
 #[derive(Debug)]
 pub enum SyntaxError {
     ExpectedErr {
@@ -325,8 +343,8 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Either | DoubleStar | Exponate | Modulate
-            | Increment | Decrement | Swap => "operator",
+            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Either
+            | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap => "operator",
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -543,17 +561,14 @@ pub fn parse_spwn(
     let start_tag = check_for_tag(&mut tokens, &mut notes)?;
     notes.tag = start_tag;
     loop {
-
-
         //+ do something if we have tokens. if no more tokens, leave loop
         match tokens.next(false, true) {
             //oops we just advanced the tokens in an attempt to check if we have any
-
             Some(_) => {
                 tokens.previous_no_ignore(false, true); //bring tokens back to original
 
                 //+ we are goign to parse the tokens
-                let mut parsed = parse_statement(&mut tokens, &mut notes)?; 
+                let mut parsed = parse_statement(&mut tokens, &mut notes)?;
                 if parsed.comment.0 == None && !statements.is_empty() {
                     parsed.comment.0 = statements.last().unwrap().comment.1.clone();
                     (*statements.last_mut().unwrap()).comment.1 = None;
@@ -600,7 +615,7 @@ fn parse_cmp_stmt(
                 }
 
                 statements.push(parsed) // add to big statement list
-                //println!("statement done");
+                                        //println!("statement done");
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
@@ -614,21 +629,7 @@ fn parse_cmp_stmt(
         match tokens.next(true, false) {
             Some(Token::StatementSeparator) => {}
             Some(Token::ClosingCurlyBracket) => break,
-            a => {
-                return Err(SyntaxError::ExpectedErr {
-                    expected: STATEMENT_SEPARATOR_DESC.to_string(),
-                    found: format!(
-                        "{}: \"{}\"",
-                        match a {
-                            Some(t) => t.typ(),
-                            None => "EOF",
-                        },
-                        tokens.slice()
-                    ),
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                });
-            }
+            a => expected!(STATEMENT_SEPARATOR_DESC.to_string(), tokens, notes, a),
         }
     }
     //tokens.next(false, false);
@@ -648,7 +649,8 @@ pub fn parse_statement(
     let (start_pos, _) = tokens.position();
 
     let mut arrow = false;
-    let body = match first { // ooh what type of token is it
+    let body = match first {
+        // ooh what type of token is it
         Some(Token::Arrow) => {
             //parse async statement
             if tokens.next(false, false) == Some(Token::Arrow) {
@@ -667,7 +669,7 @@ pub fn parse_statement(
             arrow = true;
             rest_of_statement.body
 
-            /* Summary: 
+            /* Summary:
             check for double arrows, if it is then throw error because you cant do that
             enable the async flag and parse everything else
             */
@@ -676,13 +678,16 @@ pub fn parse_statement(
         Some(Token::Return) => {
             //parse return statement
 
-            match tokens.next(true, false) { //do we actually return something?
-                Some(Token::StatementSeparator) | Some(Token::ClosingCurlyBracket) => { // we dont return anything
+            match tokens.next(true, false) {
+                //do we actually return something?
+                Some(Token::StatementSeparator) | Some(Token::ClosingCurlyBracket) => {
+                    // we dont return anything
                     tokens.previous();
                     ast::StatementBody::Return(None)
                 }
 
-                _ => { // we are returning something, how fun
+                _ => {
+                    // we are returning something, how fun
                     tokens.previous();
                     let mut expr = parse_expr(tokens, notes, true, true)?; //parse whatever we are returning
                     comment_after =
@@ -711,59 +716,39 @@ pub fn parse_statement(
             // println!("if statement");
 
             let condition = parse_expr(tokens, notes, true, true)?; // parse the condition part
-            match tokens.next(false, false) { 
+            match tokens.next(false, false) {
                 // check for a { character
-
                 Some(Token::OpenCurlyBracket) => (),
-                a => { // no { this is very bad
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "'{'".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
+                a => {
+                    // no { this is very bad
+                    expected!("'{'".to_string(), tokens, notes, a)
                 }
             }
             let if_body = parse_cmp_stmt(tokens, notes)?; // parse whatever is inside if statement
 
-            let else_body = match tokens.next(false, false) { // is there an else?
+            let else_body = match tokens.next(false, false) {
+                // is there an else?
                 Some(Token::Else) => match tokens.next(false, false) {
                     // there is an else, check for else if
-
-                    Some(Token::OpenCurlyBracket) => { // no else if, just else
+                    Some(Token::OpenCurlyBracket) => {
+                        // no else if, just else
                         Some(parse_cmp_stmt(tokens, notes)?) // parse the else
                     }
-                    Some(Token::If) => { // there is an else if
+                    Some(Token::If) => {
+                        // there is an else if
                         tokens.previous();
 
                         Some(vec![parse_statement(tokens, notes)?]) // parse the else if
                     }
 
-                    a => { // found something other than { or if
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "'{' or 'if'".to_string(),
-                            found: format!(
-                                "{}: \"{}\"",
-                                match a {
-                                    Some(t) => t.typ(),
-                                    None => "EOF",
-                                },
-                                tokens.slice()
-                            ),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        })
+                    a => {
+                        // found something other than { or if
+                        expected!("'{' or 'if'".to_string(), tokens, notes, a)
                     }
                 },
 
-                _ => { // no else at all
+                _ => {
+                    // no else at all
                     tokens.previous();
                     None
                 }
@@ -788,64 +773,46 @@ pub fn parse_statement(
         Some(Token::For) => {
             //parse for statement
 
-            let symbol = match tokens.next(false, false) { // check for variable
+            let symbol = match tokens.next(false, false) {
+                // check for variable
                 Some(Token::Symbol) => tokens.slice(),
-                Some(a) => { // invalid variable name
+                Some(a) => {
+                    // invalid variable name
                     return Err(SyntaxError::ExpectedErr {
                         expected: "iterator variable name".to_string(),
                         found: format!("{}: \"{}\"", a.typ(), tokens.slice()),
                         pos: tokens.position(),
                         file: notes.file.clone(),
-                    })
+                    });
                 }
 
-                None => { // literally no variable, why
+                None => {
+                    // literally no variable, why
                     return Err(SyntaxError::ExpectedErr {
                         expected: "iterator variable name".to_string(),
                         found: "None".to_string(),
                         pos: tokens.position(),
                         file: notes.file.clone(),
-                    })
+                    });
                 }
             };
 
-            match tokens.next(false, false) { // check for an in
+            match tokens.next(false, false) {
+                // check for an in
                 Some(Token::In) => {}
-                a => { // didnt find an in
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "keyword 'in'".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
+                a => {
+                    // didnt find an in
+                    expected!("keyword 'in'".to_string(), tokens, notes, a)
                 }
             };
 
             let array = parse_expr(tokens, notes, true, true)?; // parse the array (or range)
-            match tokens.next(false, false) { // check for brace
-
+            match tokens.next(false, false) {
+                // check for brace
                 Some(Token::OpenCurlyBracket) => {}
-                a => { // no brace
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "'{'".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
+                a => {
+                    // no brace
+                    expected!("'{'".to_string(), tokens, notes, a)
                 }
             };
             let body = parse_cmp_stmt(tokens, notes)?; // parse whats in the for loop
@@ -864,7 +831,7 @@ pub fn parse_statement(
         }
 
         Some(Token::ErrorStatement) => {
-            let mut expr = parse_expr(tokens, notes, true, true)?; 
+            let mut expr = parse_expr(tokens, notes, true, true)?;
             comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
                 (*expr.values.last_mut().unwrap()).comment.1 = None;
                 Some(comment)
@@ -875,47 +842,18 @@ pub fn parse_statement(
             //i dont think a summary is needed for this
         }
 
-        Some(Token::Type) => { // defining a new type
+        Some(Token::Type) => {
+            // defining a new type
             match tokens.next(false, false) {
                 // all types start with @, throw error if it doesn't
-
                 Some(Token::At) => (),
-                a => { 
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "@".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
-                }
+                a => expected!("'@'".to_string(), tokens, notes, a),
             };
 
             match tokens.next(false, false) {
                 // check if type name is valid
-
                 Some(Token::Symbol) => ast::StatementBody::TypeDef(tokens.slice()),
-                a => {
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "type name".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
-                }
+                a => expected!("type name".to_string(), tokens, notes, a),
             }
             /*Summary:
             check for @ sybol at the start
@@ -936,7 +874,6 @@ pub fn parse_statement(
                 want to use a variable instead.
             */
 
-
             match tokens.next(false, false) {
                 // check if it has the brace
                 Some(Token::OpenCurlyBracket) => ast::StatementBody::Impl(ast::Implementation {
@@ -944,20 +881,9 @@ pub fn parse_statement(
                     members: parse_dict(tokens, notes)?, // impl block is basically a dict
                 }),
 
-                a => { // no brace
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "'{'".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
+                a => {
+                    // no brace
+                    expected!("'{'".to_string(), tokens, notes, a)
                 }
             }
             // honestly this shouldn't deserve a summary its so basic
@@ -1026,7 +952,8 @@ pub fn parse_statement(
         tokens.slice()
     );*/
 
-    Ok(ast::Statement { // we are returning a statement pog
+    Ok(ast::Statement {
+        // we are returning a statement pog
         body,
         arrow,
         pos: (start_pos, end_pos),
@@ -1172,28 +1099,17 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     }
 }
 
-fn parse_cases(
-    tokens: &mut Tokens,
-    notes: &mut ParseNotes
-) -> Result<Vec<ast::Case>, SyntaxError> {
-    let mut values = Vec::<ast::Expression>::new();
-    let mut bodies = Vec::<ast::Expression>::new();
-    let mut check_types = Vec::<bool>::new();
+fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::Case>, SyntaxError> {
     let mut default_enabled = false;
 
-    let mut do_we_have_next = true;
+    //let mut do_we_have_next = true;
+
+    let mut cases = Vec::<ast::Case>::new();
     loop {
         match tokens.next(false, false) {
             Some(Token::ClosingCurlyBracket) => break,
-            None => {
-                return Err(SyntaxError::ExpectedErr {
-                    expected: "'}'".to_string(),
-                    found: "EOF".to_string(),
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                });
-            }
-            Some(Token::Else) => { // the default
+            Some(Token::Else) => {
+                // the default
                 if default_enabled {
                     return Err(SyntaxError::SyntaxError {
                         message: "Cannot have 2 else cases".to_string(),
@@ -1204,115 +1120,78 @@ fn parse_cases(
                 default_enabled = true;
 
                 /* under normal circumstances we would add another value to check_types,
-                   but since an else case never type checks and is always at the end,
-                   there is no need to. */
+                but since an else case never type checks and is always at the end,
+                there is no need to. */
 
                 match tokens.next(false, false) {
                     Some(Token::Colon) => {
-                        bodies.push(parse_expr(tokens, notes, false, false)?); // parse whats after the :
-
-                        do_we_have_next = false; // else must be the last
-
-                        if tokens.next(false, false) != Some(Token::Comma) { // for error formatting
-                            tokens.previous_no_ignore(false, false);
-                        }
-
-                    }
-                    a => {
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "':'".to_string(),
-                            found: format!(
-                                "{}: \"{}\"",
-                                match a {
-                                    Some(t) => t.typ(),
-                                    None => "EOF",
-                                },
-                                tokens.slice()
-                            ),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
+                        let expr = parse_expr(tokens, notes, false, false)?; // parse whats after the :
+                        cases.push(ast::Case {
+                            typ: ast::CaseType::Default,
+                            body: expr,
                         });
-                    } 
+                        if tokens.next(false, false) != Some(Token::Comma) {
+                            // for error formatting
+                            tokens.previous();
+                        }
+                    }
+                    a => expected!("':'".to_string(), tokens, notes, a),
                 }
-
             }
-            exp => {
-                // since we are using the same function for both case and type checking
-                // there needs to be some vars for it
-                let is_case = exp == Some(Token::Case);
-
-                let found = if is_case {"case".to_string()} 
-                            else {format!("{}",tokens.slice())};
-
-                if default_enabled { // else is always the last case
+            Some(Token::Case) => {
+                if default_enabled {
                     return Err(SyntaxError::SyntaxError {
-                        message: "Else must be the last case in a switch statement".to_string(),
+                        message: "cannot have more cases after 'else' field".to_string(),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     });
                 }
-
-                if !do_we_have_next { // check if there should be a new one
-                    return Err(SyntaxError::ExpectedErr { // there shouldnt be a new one, this is bad
-                        expected: "comma".to_string(),
-                        found: found,
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    });
-                }
-
-
-                check_types.push(!is_case); 
-                // case means that we aren't checking for types but values
-
-                values.push(parse_expr(tokens, notes, false, false)?); // parse the first part before the :
-
+                let val = parse_expr(tokens, notes, false, false)?;
                 match tokens.next(false, false) {
                     Some(Token::Colon) => {
-                        bodies.push(parse_expr(tokens, notes, false, false)?); // parse whats after the :
+                        let expr = parse_expr(tokens, notes, false, false)?; // parse whats after the :
+                        cases.push(ast::Case {
+                            typ: ast::CaseType::Value(val),
+                            body: expr,
+                        });
 
-                        if tokens.next(false, false) != Some(Token::Comma) { // no comma = no more cases
-                            do_we_have_next = false;
+                        if tokens.next(false, false) != Some(Token::Comma) {
+                            // for error formatting
                             tokens.previous_no_ignore(false, false);
                         }
                     }
-                    a => {
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "':'".to_string(),
-                            found: format!(
-                                "{}: \"{}\"",
-                                match a {
-                                    Some(t) => t.typ(),
-                                    None => "EOF",
-                                },
-                                tokens.slice()
-                            ),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
+                    a => expected!("':'".to_string(), tokens, notes, a),
+                }
+            }
+
+            _ => {
+                tokens.previous();
+
+                let pat = parse_expr(tokens, notes, false, false)?;
+                if default_enabled {
+                    return Err(SyntaxError::SyntaxError {
+                        message: "cannot have more cases after 'else' field".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+                match tokens.next(false, false) {
+                    Some(Token::Colon) => {
+                        let expr = parse_expr(tokens, notes, false, false)?; // parse whats after the :
+                        cases.push(ast::Case {
+                            typ: ast::CaseType::Pattern(pat),
+                            body: expr,
                         });
-                    } 
+
+                        if tokens.next(false, false) != Some(Token::Comma) {
+                            // for error formatting
+                            tokens.previous_no_ignore(false, false);
+                        }
+                    }
+                    a => expected!("':'".to_string(), tokens, notes, a),
                 }
             }
         }
-    }
-    let mut cases = Vec::<ast::Case>::new();
-
-    for i in 0..check_types.len() {
-        println!("{}",i);
-        cases.push(ast::Case {
-            value: values[i].clone(),
-            body: bodies[i].clone(),
-            check_type: check_types[i],
-            default: false
-        });
-    }
-    if default_enabled {
-        cases.push(ast::Case {
-            value: ast::Expression{values:vec![], operators:vec![]},
-            body: bodies[bodies.len()-1].clone(),
-            check_type: false,
-            default: true
-        });
     }
 
     Ok(cases)
@@ -1330,12 +1209,14 @@ fn parse_expr(
     let mut values = Vec::<ast::Variable>::new();
     let mut operators = Vec::<ast::Operator>::new();
 
-    values.push(parse_variable(tokens, notes, check_for_comments)?); 
+    values.push(parse_variable(tokens, notes, check_for_comments)?);
     // all expressions begin with a variable
 
-    while let Some(t) = tokens.next(false, false) { // keep looking for operators and values
+    while let Some(t) = tokens.next(false, false) {
+        // keep looking for operators and values
 
-        if let Some(o) = parse_operator(&t) { // check if new operator
+        if let Some(o) = parse_operator(&t) {
+            // check if new operator
             let op = if allow_mut_op {
                 o
             } else {
@@ -1466,21 +1347,7 @@ fn parse_dict(
                         //tokens.previous();
                         break;
                     }
-                    a => {
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "':'".to_string(),
-                            found: format!(
-                                "{}: \"{}\"",
-                                match a {
-                                    Some(t) => t.typ(),
-                                    None => "EOF",
-                                },
-                                tokens.slice()
-                            ),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        });
-                    }
+                    a => expected!("':'".to_string(), tokens, notes, a),
                 }
             }
 
@@ -1491,21 +1358,12 @@ fn parse_dict(
 
             Some(Token::ClosingCurlyBracket) => break,
 
-            a => {
-                return Err(SyntaxError::ExpectedErr {
-                    expected: "member definition, '..' or '}'".to_string(),
-                    found: format!(
-                        "{}: \"{}\"",
-                        match a {
-                            Some(t) => t.typ(),
-                            None => "EOF",
-                        },
-                        tokens.slice()
-                    ),
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                });
-            }
+            a => expected!(
+                "member definition, '..' or '}'".to_string(),
+                tokens,
+                notes,
+                a
+            ),
         };
         let next = tokens.next(false, false);
 
@@ -1533,21 +1391,7 @@ fn parse_object(
 
     match tokens.next(false, false) {
         Some(Token::OpenCurlyBracket) => (),
-        a => {
-            return Err(SyntaxError::ExpectedErr {
-                expected: "'{'".to_string(),
-                found: format!(
-                    "{}: \"{}\"",
-                    match a {
-                        Some(t) => t.typ(),
-                        None => "EOF",
-                    },
-                    tokens.slice()
-                ),
-                pos: tokens.position(),
-                file: notes.file.clone(),
-            })
-        }
+        a => expected!("'{'".to_string(), tokens, notes, a),
     }
 
     loop {
@@ -1559,21 +1403,7 @@ fn parse_object(
         let key = parse_expr(tokens, notes, true, true)?;
         match tokens.next(false, false) {
             Some(Token::Colon) => (),
-            a => {
-                return Err(SyntaxError::ExpectedErr {
-                    expected: "':'".to_string(),
-                    found: format!(
-                        "{}: \"{}\"",
-                        match a {
-                            Some(t) => t.typ(),
-                            None => "EOF",
-                        },
-                        tokens.slice()
-                    ),
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                })
-            }
+            a => expected!("':'".to_string(), tokens, notes, a),
         }
         let val = parse_expr(tokens, notes, true, true)?;
 
@@ -1801,21 +1631,7 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
             //parse tag
             match tokens.next(false, false) {
                 Some(Token::OpenSquareBracket) => (),
-                a => {
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "'['".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
-                }
+                a => expected!("'['".to_string(), tokens, notes, a),
             };
 
             let mut contents = ast::Tag::new();
@@ -1832,39 +1648,16 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
                                 contents.tags.push((name, Vec::new()));
                                 break;
                             }
-                            a => {
-                                return Err(SyntaxError::ExpectedErr {
-                                    expected: "either '(', ']' or comma (',')".to_string(),
-                                    found: format!(
-                                        "{}: \"{}\"",
-                                        match a {
-                                            Some(t) => t.typ(),
-                                            None => "EOF",
-                                        },
-                                        tokens.slice()
-                                    ),
-                                    pos: tokens.position(),
-                                    file: notes.file.clone(),
-                                })
-                            }
+                            a => expected!(
+                                "either '(', ']' or comma (',')".to_string(),
+                                tokens,
+                                notes,
+                                a
+                            ),
                         };
                         contents.tags.push((name, args));
                     }
-                    a => {
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "either Symbol or ']'".to_string(),
-                            found: format!(
-                                "{}: \"{}\"",
-                                match a {
-                                    Some(t) => t.typ(),
-                                    None => "EOF",
-                                },
-                                tokens.slice()
-                            ),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        })
-                    }
+                    a => expected!("either Symbol or ']'".to_string(), tokens, notes, a),
                 };
             }
 
@@ -1916,7 +1709,8 @@ fn parse_variable(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
     check_for_comments: bool,
-) -> Result<ast::Variable, SyntaxError> { // for the vars and stuff that isnt operators
+) -> Result<ast::Variable, SyntaxError> {
+    // for the vars and stuff that isnt operators
     let preceding_comment = if check_for_comments {
         check_for_comment(tokens)
     } else {
@@ -1928,7 +1722,8 @@ fn parse_variable(
     let mut first_token = tokens.next(false, false);
     let (start_pos, _) = tokens.position();
 
-    let operator = match first_token { // does it start with an op? (e.g -3, let i)
+    let operator = match first_token {
+        // does it start with an op? (e.g -3, let i)
         Some(Token::Minus) => {
             first_token = tokens.next(false, false);
             Some(ast::UnaryOperator::Minus)
@@ -1958,7 +1753,8 @@ fn parse_variable(
         _ => None,
     };
 
-    let value = match first_token { // what kind of variable is it?
+    let value = match first_token {
+        // what kind of variable is it?
         Some(Token::Number) => ast::ValueBody::Number(match tokens.slice().parse() {
             Ok(n) => n, // its a valid number
             Err(err) => {
@@ -1970,7 +1766,8 @@ fn parse_variable(
                 });
             }
         }),
-        Some(Token::StringLiteral) => { // is a string
+        Some(Token::StringLiteral) => {
+            // is a string
             ast::ValueBody::Str(str_content(tokens.slice(), tokens, notes)?)
         }
         Some(Token::ID) => {
@@ -2035,21 +1832,7 @@ fn parse_variable(
                             }
                         }
                         Some(Token::ClosingSquareBracket) => break,
-                        a => {
-                            return Err(SyntaxError::ExpectedErr {
-                                expected: "comma (',') or ']'".to_string(),
-                                found: format!(
-                                    "{}: \"{}\"",
-                                    match a {
-                                        Some(t) => t.typ(),
-                                        None => "EOF",
-                                    },
-                                    tokens.slice()
-                                ),
-                                pos: tokens.position(),
-                                file: notes.file.clone(),
-                            })
-                        }
+                        a => expected!("comma (',') or ']'".to_string(), tokens, notes, a),
                     }
                 }
             }
@@ -2072,42 +1855,14 @@ fn parse_variable(
                 Some(Token::Symbol) => {
                     ast::ValueBody::Import(ImportType::Lib(tokens.slice()), forced)
                 }
-                a => {
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "literal string".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
-                }
+                a => expected!("literal string".to_string(), tokens, notes, a),
             }
         }
 
         Some(Token::At) => {
             let type_name = match tokens.next(false, false) {
                 Some(Token::Symbol) => tokens.slice(),
-                a => {
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "type name".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
-                }
+                a => expected!("type name".to_string(), tokens, notes, a),
             };
 
             ast::ValueBody::TypeIndicator(type_name)
@@ -2118,24 +1873,10 @@ fn parse_variable(
 
             let cases = match tokens.next(false, false) {
                 Some(Token::OpenCurlyBracket) => parse_cases(tokens, notes)?, // check for {
-                a => {
-                    return Err(SyntaxError::ExpectedErr { // no { we should error
-                        expected: "{".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
-                }
+                a => expected!("'{'".to_string(), tokens, notes, a),
             };
             //ast::ValueBody::TypeIndicator("number".to_string())
-            ast::ValueBody::Switch(value,cases)
+            ast::ValueBody::Switch(value, cases)
         }
 
         Some(Token::OpenBracket) => {
@@ -2157,21 +1898,7 @@ fn parse_variable(
                             pos: (start, end),
                         }]
                     }
-                    a => {
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "'{'".to_string(),
-                            found: format!(
-                                "{}: \"{}\"",
-                                match a {
-                                    Some(t) => t.typ(),
-                                    None => "EOF",
-                                },
-                                tokens.slice()
-                            ),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        })
-                    }
+                    a => expected!("'{'".to_string(), tokens, notes, a),
                 };
 
                 Ok(ast::ValueBody::Macro(ast::Macro {
@@ -2266,21 +1993,7 @@ fn parse_variable(
             mode: ast::ObjectMode::Trigger,
         }),
 
-        a => {
-            return Err(SyntaxError::ExpectedErr {
-                expected: "a value".to_string(),
-                found: format!(
-                    "{}: \"{}\"",
-                    match a {
-                        Some(t) => t.typ(),
-                        None => "EOF",
-                    },
-                    tokens.slice()
-                ),
-                pos: tokens.position(),
-                file: notes.file.clone(),
-            })
-        }
+        a => expected!("a value".to_string(), tokens, notes, a),
     };
 
     let mut path = Vec::<ast::Path>::new();
@@ -2313,21 +2026,7 @@ fn parse_variable(
                 Some(Token::Symbol) | Some(Token::Type) => {
                     path.push(ast::Path::Member(tokens.slice()))
                 }
-                a => {
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "member name".to_string(),
-                        found: format!(
-                            "{}: \"{}\"",
-                            match a {
-                                Some(t) => t.typ(),
-                                None => "EOF",
-                            },
-                            tokens.slice()
-                        ),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
-                }
+                a => expected!("member name".to_string(), tokens, notes, a),
             },
 
             Some(Token::DoubleColon) => match tokens.next(false, false) {

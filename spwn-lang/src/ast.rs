@@ -260,13 +260,17 @@ pub struct For {
     pub array: Expression,
     pub body: Vec<Statement>,
 }
+#[derive(Clone, PartialEq, Debug)]
+pub enum CaseType {
+    Value(Expression),
+    Pattern(Expression),
+    Default,
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Case {
-    pub value: Expression,
+    pub typ: CaseType,
     pub body: Expression,
-    pub check_type: bool,
-    pub default: bool
 }
 
 #[derive(Clone, PartialEq, Debug)]

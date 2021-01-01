@@ -16,7 +16,7 @@ macro_rules! arg_length {
                 info: $info,
             });
         }
-    }
+    };
 }
 
 pub type ArbitraryID = u16;
@@ -265,7 +265,6 @@ pub const BUILTIN_LIST: &[&str] = &[
     "floor",
     "ceil",
     "add",
-    "current_context",
     "append",
     "pop",
     "remove_index",
@@ -422,12 +421,7 @@ pub fn built_in_function(
         //     out
         // }
         "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "floor" | "ceil" => {
-            arg_length!(
-                info,
-                1,
-                arguments,
-                "Expected one argument".to_string()
-            );
+            arg_length!(info, 1, arguments, "Expected one argument".to_string());
 
             match &globals.stored_values[arguments[0]] {
                 Value::Number(n) => Value::Number(match name {
@@ -453,12 +447,7 @@ pub fn built_in_function(
         }
 
         "add" => {
-            arg_length!(
-                info,
-                1,
-                arguments,
-                "Expected one argument".to_string()
-            );
+            arg_length!(info, 1, arguments, "Expected one argument".to_string());
 
             match &globals.stored_values[arguments[0]] {
                 Value::Obj(obj, mode) => {
@@ -586,7 +575,12 @@ pub fn built_in_function(
         }
 
         "pop" => {
-            arg_length!(info, 1, arguments, "Expected one arguments, the array or string to pop from".to_string());
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one arguments, the array or string to pop from".to_string()
+            );
 
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
@@ -620,7 +614,8 @@ pub fn built_in_function(
                 info,
                 3,
                 arguments,
-                "Expected three arguments: string to be sliced, a start index, and an end index".to_string()
+                "Expected three arguments: string to be sliced, a start index, and an end index"
+                    .to_string()
             );
 
             let val = match globals.stored_values[arguments[0]].clone() {
@@ -715,12 +710,11 @@ pub fn built_in_function(
             }
         }
 
-        "current_context" => Value::Str(format!("{:?}", context)),
-
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
-        | "_less_or_equal_" | "_divided_by_" | "_intdivided_by_" | "_times_" | "_mod_" | "_pow_" | "_plus_"
-        | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_swap_" | "_as_" | "_add_" | "_subtract_"
-        | "_multiply_" | "_divide_" | "_intdivide_" |"_either_" | "_exponate_" | "_modulate_" | "_range_" => {
+        | "_less_or_equal_" | "_divided_by_" | "_intdivided_by_" | "_times_" | "_mod_"
+        | "_pow_" | "_plus_" | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_swap_"
+        | "_as_" | "_add_" | "_subtract_" | "_multiply_" | "_divide_" | "_intdivide_"
+        | "_either_" | "_exponate_" | "_modulate_" | "_range_" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
                     message: "Expected two arguments".to_string(),
@@ -875,7 +869,9 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     }
                 },
                 "_intdivided_by_" => match (val_a, val_b) {
-                    (Value::Number(a), Value::Number(b)) => Value::Number(((*a as i32) / (b as i32)).into()),
+                    (Value::Number(a), Value::Number(b)) => {
+                        Value::Number(((*a as i32) / (b as i32)).into())
+                    }
 
                     _ => {
                         return Err(RuntimeError::TypeError {
@@ -978,7 +974,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     if !mutable || !val_mutable {
                         return Err(mutable_err(info, "_swap_"));
                     }
-                    if acum_val_fn_context != c2.start_group ||  val_fn_context != c2.start_group {
+                    if acum_val_fn_context != c2.start_group || val_fn_context != c2.start_group {
                         return Err(RuntimeError::RuntimeError {
                             message: CANNOT_CHANGE_ERROR.to_string(),
                             info,
@@ -1190,7 +1186,9 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     }
 
                     match (val_a, val_b) {
-                        (Value::Number(a), Value::Number(b)) => (*a) = (((*a) as i32) / (b as i32)).into(),
+                        (Value::Number(a), Value::Number(b)) => {
+                            (*a) = (((*a) as i32) / (b as i32)).into()
+                        }
 
                         _ => {
                             return Err(RuntimeError::TypeError {

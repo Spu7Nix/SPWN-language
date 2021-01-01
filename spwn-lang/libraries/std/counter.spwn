@@ -156,7 +156,7 @@ impl @counter {
                     self.item.if_is(SMALLER_THAN, num, {
                         supress_signal(0.1)
                         wait()
-                        return mult.start_group
+                        return //mult.start_group
                     })
                     
                     
@@ -168,14 +168,14 @@ impl @counter {
                         call_with_delay(@epsilon::{}, mult)
                     })
                 }
-                mult.start_group.toggle_on()
+                //mult.start_group.toggle_on()
                 wait()
                 mult!
             }
             
 
             for i in speed..0 {
-                mini_mult(4^i).toggle_off()
+                mini_mult(4^i)
             }
             
             wait()
