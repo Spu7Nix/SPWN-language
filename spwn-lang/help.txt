@@ -21,3 +21,7 @@ Flags:
 
     --level-name [name], -n [name]
     Targets a specific level
+
+    --live-editor
+    Instead of writing the level to the save file, the script will use a
+    live editor library if it's installed (Currently works only for MacOS)
