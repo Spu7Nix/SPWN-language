@@ -1181,8 +1181,6 @@ fn parse_cases(
     let mut check_types = Vec::<bool>::new();
     let mut default_enabled = false;
 
-    println!("omg parsing the cases");
-
     let mut do_we_have_next = true;
     loop {
         match tokens.next(false, false) {
