@@ -64,6 +64,7 @@ pub enum ValueBody {
     Expression(Expression),
     Str(String),
     Import(ImportType, bool),
+    Switch(Expression, Vec<Case>),
     Array(Vec<Expression>),
     Obj(ObjectLiteral),
     Macro(Macro),
@@ -258,6 +259,20 @@ pub struct For {
     pub symbol: String,
     pub array: Expression,
     pub body: Vec<Statement>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Case {
+    pub value: Expression,
+    pub body: Expression,
+    pub check_type: bool,
+    pub default: bool
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Switch {
+    pub value: Expression,
+    pub cases: Vec<Case>,
 }
 
 #[derive(Clone, PartialEq, Debug)]

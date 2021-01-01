@@ -1898,6 +1898,9 @@ impl ast::Variable {
                     context.clone(),
                 ));
             }
+            ast::ValueBody::Switch(value, cases) => {
+                // CODE HERE
+            }
             ast::ValueBody::Obj(o) => {
                 let mut all_expr: Vec<ast::Expression> = Vec::new();
                 for prop in &o.props {
