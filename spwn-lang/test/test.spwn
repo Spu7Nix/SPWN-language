@@ -1,10 +1,24 @@
-f = sync_function(() {
-    10g.move(10, 0, 0.5)
-    wait(0.1)
-})
+waittime = 1
+let n = counter(1i)
+let fact = counter(2i)
+let detect_end = counter(3i)
 
-f()
+n = 6;
+fact = 1;
 
+109g.move(0,0)
 
+wait(waittime);
 
-10g.move(-10, 0, 0.5)
+while_loop(()=>n>0, delay = 0.1, (){
+    
+    fact.multiply(n, speed = 10);
+    n -= 1;
+    
+    
+});
+2c.set(0,0,255);
+wait(0.5);
+n = fact;
+wait(0.5);
+fact = 0;

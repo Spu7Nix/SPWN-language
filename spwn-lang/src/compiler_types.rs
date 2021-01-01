@@ -1898,8 +1898,21 @@ impl ast::Variable {
                     context.clone(),
                 ));
             }
-            ast::ValueBody::Switch(value, cases) => {
-                // CODE HERE
+            ast::ValueBody::Switch(expr, cases) => {
+                let (evaled, returns) = expr.eval(&context, globals, info.clone(), constant)?;
+                inner_returns.extend(returns);
+
+                for (val, context) in evaled {
+                    let mut contexts = vec![context];
+
+                    for case in cases {
+                        
+                        
+                    }
+                }
+
+
+
             }
             ast::ValueBody::Obj(o) => {
                 let mut all_expr: Vec<ast::Expression> = Vec::new();
@@ -2009,7 +2022,10 @@ impl ast::Variable {
                                 });
                                 
                                 match &val {
-                                    Value::Number(n) => ObjParam::Number(*n),
+                                    Value::Number(n) => {
+                                        
+                                        ObjParam::Number(*n)
+                                    },
                                     Value::Str(s) => ObjParam::Text(s.clone()),
                                     Value::Func(g) => ObjParam::Group(g.start_group),
 

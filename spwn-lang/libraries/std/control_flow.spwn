@@ -102,7 +102,7 @@ return {
 			}
         }
 
-        func!
+        call_with_delay(delay, func)
 	},
 
 	sync_function: 

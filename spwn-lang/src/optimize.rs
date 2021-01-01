@@ -152,15 +152,15 @@ pub fn optimize(mut obj_in: Vec<FunctionID>, mut closed_group: u16) -> Vec<Funct
     // count connection in for all triggers
     for fnid in &obj_in {
         for (obj, _) in &fnid.obj_list {
-            if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
-                //if get_role(*id as u16) != TriggerRole::Output {
-                if let Some(ObjParam::Group(id)) = obj.params.get(&51) {
-                    if let Some(gang) = network.get_mut(id) {
-                        (*gang).connections_in += 1;
-                    }
+            //if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
+            //if get_role(*id as u16) != TriggerRole::Output {
+            if let Some(ObjParam::Group(id)) = obj.params.get(&51) {
+                if let Some(gang) = network.get_mut(id) {
+                    (*gang).connections_in += 1;
                 }
-                //}
             }
+            //}
+            //}
         }
     }
 
