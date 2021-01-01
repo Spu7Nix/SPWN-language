@@ -1,24 +1,12 @@
-waittime = 1
-let n = counter(1i)
-let fact = counter(2i)
-let detect_end = counter(3i)
+let b = 3
 
-n = 6;
-fact = 1;
+let a = switch b {
+    case 1: "one",
+    case 2: "two",
+    case 10: "ten",
+    [@string]: "an array of strings",
+    @number: "a number ig",
+    else: "idk",
+}
 
-109g.move(0,0)
-
-wait(waittime);
-
-while_loop(()=>n>0, delay = 0.1, (){
-    
-    fact.multiply(n, speed = 10);
-    n -= 1;
-    
-    
-});
-2c.set(0,0,255);
-wait(0.5);
-n = fact;
-wait(0.5);
-fact = 0;
+$.print(a)

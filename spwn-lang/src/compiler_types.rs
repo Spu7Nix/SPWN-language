@@ -1899,14 +1899,121 @@ impl ast::Variable {
                 ));
             }
             ast::ValueBody::Switch(expr, cases) => {
+                // ok so in spwn you have to always assume every expression will split the context, that is,
+                // output multiple values in multiple contexts. This is called context splitting. A list of 
+                // values and contexts (Vec<(Value, Context)>) is called bundled together in a type called Returns
                 let (evaled, returns) = expr.eval(&context, globals, info.clone(), constant)?;
+                //inner returns are return statements that are inside the expession, for example in a function/trigger context/ whatever we call it now
                 inner_returns.extend(returns);
 
-                for (val, context) in evaled {
-                    let mut contexts = vec![context];
+                // now we loop through every value the first expression outputted
+                for (val1, context) in evaled {
+                    //lets store the current contexts we are working with in a vector, starting with only the context
+                    // outputted from the first expression
+                    let mut contexts = vec![context.clone()];
+
 
                     for case in cases {
-                        
+                        // if there are no contexts left to deal with, we can leave the loop
+                        if contexts.is_empty() {
+                            break
+                        }
+
+                        match &case.typ {
+                            ast::CaseType::Value(v) => {
+                                // in this type of case we want to check if the original expression is
+                                // equal to some value. for this, we use the == operator
+
+                                // lets first evaluate the value we will compare to
+                                // remember, we have to evaluate it in all the contexts we are working with
+                                let mut all_values = Vec::new();
+                                for c in &contexts {
+                                    let (evaled, returns) = v.eval(c, globals, info.clone(), constant)?;
+                                    inner_returns.extend(returns);
+                                    all_values.extend(evaled);
+                                }
+
+                                // lets clear the contexts list for now, as we will refill it
+                                // with new contexts from the next few evaluations
+                                contexts.clear();
+                                
+                                // looping through all the values of the expression we just evaled
+                                for (val2, c) in all_values {
+
+                                    // lets compare the two values with the == operator
+                                    // since this is an expression in itself, we also have to assume
+                                    // this will output multiple values
+                                    let results = handle_operator(
+                                        val1, 
+                                        val2, 
+                                        "_equal_", 
+                                        &c, 
+                                        globals, 
+                                        &info
+                                    )?;
+
+                                    // lets loop through all those result values
+                                    for (r, c) in results {
+                                        if let Value::Bool(b) = globals.stored_values[r] {
+                                            if b {
+                                                // if the two values match, we output this value to the output "start val"
+                                                // we can't break here, because the two values might only match in this one context,
+                                                // and there may be more contexts left to check
+                                                let (evaled, returns) = case.body.eval(&c, globals, info.clone(), constant)?;
+                                                inner_returns.extend(returns);
+                                                start_val.extend(evaled);
+                                            } else {
+                                                // if they dont match, we keep going through the cases in this context
+                                                contexts.push(c)
+                                            }
+                                        } else {
+                                            // if the == operator for that type doesn't output a boolean, it can't be
+                                            // used in a switch statement
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: "== operator returned non-boolean value".to_string(),
+                                                info,
+                                                
+                                            });
+                                        }
+                                    }
+                                }
+
+                            }
+                            ast::CaseType::Pattern(p) => {
+                                // this is pretty much the same as the one before, except that we use .matches_pat
+                                // to check instead of ==
+                                let mut all_patterns = Vec::new();
+                                for c in &contexts {
+                                    let (evaled, returns) = p.eval(c, globals, info.clone(), constant)?;
+                                    inner_returns.extend(returns);
+                                    all_patterns.extend(evaled);
+                                }
+                                contexts.clear();
+                                
+                                for (pat, c) in all_patterns {
+                                    let pat_val = globals.stored_values[pat].clone();
+                                    let b = globals.stored_values[val1].clone().matches_pat(&pat_val, &info, globals, &context)?;
+
+                                    if b {
+                                        let (evaled, returns) = case.body.eval(&c, globals, info.clone(), constant)?;
+                                        inner_returns.extend(returns);
+                                        start_val.extend(evaled);
+                                    } else {
+                                        contexts.push(c)
+                                    }
+                                        
+                                }
+                            }
+
+                            ast::CaseType::Default => {
+                                //this should be the last case, so we just return the body
+                                for c in &contexts {
+                                    let (evaled, returns) = case.body.eval(&c, globals, info.clone(), constant)?;
+                                    inner_returns.extend(returns);
+                                    start_val.extend(evaled);
+                                }
+                            }
+                        }
                         
                     }
                 }
