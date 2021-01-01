@@ -22,8 +22,6 @@ use parser::*;
 use std::env;
 use std::path::PathBuf;
 
-//#[macro_use]
-
 use std::fs;
 
 use editorlive::editor_paste;
