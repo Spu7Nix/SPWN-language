@@ -77,6 +77,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut level_name = None;
                     let mut live_editor = false;
 
+                    let mut save_file = None;
+
+
                     while let Some(arg) = args_iter.next() {
                         match arg.as_ref() {
                             "--console-output" | "-c" => gd_enabled = false,
@@ -87,6 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "--no-optimize" | "-o" => opti_enabled = false,
                             "--level-name" | "-n" => level_name = args_iter.next().cloned(),
                             "--live-editor" | "-e" => live_editor = true,
+                            "--save-file" | "-s" => save_file = args_iter.next().cloned(),
                             _ => (),
                         };
                     }
@@ -115,7 +119,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     let gd_path = if gd_enabled {
-                        Some(if cfg!(target_os = "windows") {
+                        Some( if save_file != None{
+                            PathBuf::from(save_file.expect("what"))
+                        }else if cfg!(target_os = "windows") {
                             PathBuf::from(std::env::var("localappdata").expect("No local app data"))
                                 .join("GeometryDash/CCLocalLevels.dat")
                         } else if cfg!(target_os = "macos") {
