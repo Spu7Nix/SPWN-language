@@ -33,7 +33,10 @@ const ERROR_EXIT_CODE: i32 = 1;
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
+
 const HELP: &str = include_str!("../help.txt");
+
+
 
 fn print_with_color(text: &str, color: Color) {
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
