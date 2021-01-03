@@ -1,2 +1,2 @@
-$.print("hi")
-$.print($.dict_keys({a: 4, b: 5, c: 8}))
+let test = {a: 4, b: 10g};
+$.print(test[4])
