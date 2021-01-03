@@ -1,12 +1,10 @@
-let b = 3
+b = counter(1)
 
 let a = switch b {
-    case 1: "one",
-    case 2: "two",
-    case 10: "ten",
-    [@string]: "an array of strings",
-    @number: "a number ig",
-    else: "idk",
+    case 1: 10,
+    case 2: 100,
+    case 3: 50,
+    else: 30,
 }
 
-$.print(a)
+10g.move(a, 0, 0.6)
