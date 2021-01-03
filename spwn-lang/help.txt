@@ -28,3 +28,6 @@ Flags:
 
     --save-file [file], -s [file]
     Chooses a specific save file to write to
+
+    --include-path [folder], -i [folder]
+    Adds a search path to look for libraries

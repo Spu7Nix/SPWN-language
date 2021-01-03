@@ -166,7 +166,7 @@ pub const BUILTIN_STORAGE: usize = 0;
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
     path: PathBuf,
-    //gd_path: Option<PathBuf>,
+    included_paths: Vec<PathBuf>,
     notes: ParseNotes,
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
@@ -180,6 +180,7 @@ pub fn compile_spwn(
                 pos: ((0, 0), (0, 0)),
                 current_file: path,
                 current_module: String::new(),
+                includes: vec![]
             },
         });
     }
@@ -194,6 +195,7 @@ pub fn compile_spwn(
         pos: statements[0].pos,
         current_file: path,
         current_module: String::new(),
+        includes: included_paths
     };
     use std::time::Instant;
 
@@ -1040,14 +1042,23 @@ pub fn import_module(
             .expect("Your file must be in a folder to import modules!")
             .join(&p),
 
-        ImportType::Lib(name) => match std::env::current_dir() {
-            //change to current_exe before release (from current_dir)
-            Ok(p) => p,
-            Err(e) => {
+        ImportType::Lib(name) => {
+            let mut outpath = info.includes[0].clone();
+            let mut found = false;
+            for path in &info.includes {
+                if path.join("libraries").join(name).exists() {
+                    outpath = path.to_path_buf();
+                    found = true;
+                    break;
+                }
+            }
+            if found {
+                outpath
+            } else {
                 return Err(RuntimeError::RuntimeError {
-                    message: format!("Something went wrong when opening library folder: {}", e),
-                    info,
-                })
+                    message: "Unable to find library folder in given search paths".to_string(),
+                    info: info
+                });
             }
         }
         //.parent() //ADD BACK BEFORE RELEASE

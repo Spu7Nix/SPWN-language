@@ -78,6 +78,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut live_editor = false;
 
                     let mut save_file = None;
+                    let mut included_paths = vec![std::env::current_dir().expect("Cannot access current directory")];
+                    //change to current_exe before release (from current_dir)
 
 
                     while let Some(arg) = args_iter.next() {
@@ -86,11 +88,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "--no-level" | "-l" => {
                                 gd_enabled = false;
                                 compile_only = true;
-                            }
+                            },
                             "--no-optimize" | "-o" => opti_enabled = false,
                             "--level-name" | "-n" => level_name = args_iter.next().cloned(),
                             "--live-editor" | "-e" => live_editor = true,
                             "--save-file" | "-s" => save_file = args_iter.next().cloned(),
+                            "--included-path" | "-i" => included_paths.push({
+                                let path = PathBuf::from(args_iter.next().cloned().expect("No path provided"));
+                                if path.exists() {
+                                    path
+                                } else {
+                                    return Err(Box::from("Invalid path".to_string()));
+                                }
+                            }),
                             _ => (),
                         };
                     }
@@ -140,7 +150,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut compiled = match compiler::compile_spwn(
                         statements,
                         script_path,
-                        //gd_path.clone(),
+                        included_paths,
                         notes,
                     ) {
                         Err(err) => {

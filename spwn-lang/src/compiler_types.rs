@@ -313,6 +313,7 @@ pub struct CompilerInfo {
     pub current_file: PathBuf,
     pub current_module: String, // empty string means script
     pub pos: FileRange,
+    pub includes: Vec<PathBuf>,
 }
 
 impl CompilerInfo {
@@ -323,6 +324,7 @@ impl CompilerInfo {
             current_file: PathBuf::new(),
             current_module: String::new(),
             pos: ((0, 0), (0, 0)),
+            includes: vec![]
         }
     }
 }
