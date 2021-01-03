@@ -713,7 +713,6 @@ pub fn compile_scope(
 
                             for element in arr { // going through the array items
 
-                                println!("elem {}", element);
                                 for c in &mut new_contexts { // reset all variables per context
                                     (*c).variables = context.variables.clone();
                                     (*c).variables.insert(f.symbol.clone(), element);
