@@ -1,10 +1,2 @@
-b = counter(1)
-
-let a = switch b {
-    case 1: 10,
-    case 2: 100,
-    case 3: 50,
-    else: 30,
-}
-
-10g.move(a, 0, 0.6)
+$.print("hi")
+$.print($.dict_keys({a: 4, b: 5, c: 8}))
