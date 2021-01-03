@@ -11,6 +11,10 @@ mod parser;
 
 mod optimize;
 
+#[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
+#[cfg_attr(windows, path = "editorlive_win.rs")]
+mod editorlive;
+
 use optimize::optimize;
 
 use parser::*;
@@ -18,9 +22,9 @@ use parser::*;
 use std::env;
 use std::path::PathBuf;
 
-//#[macro_use]
-
 use std::fs;
+
+use editorlive::editor_paste;
 
 pub const STD_PATH: &str = "std";
 
@@ -29,7 +33,10 @@ const ERROR_EXIT_CODE: i32 = 1;
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
+
 const HELP: &str = include_str!("../help.txt");
+
+
 
 fn print_with_color(text: &str, color: Color) {
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
@@ -71,6 +78,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut opti_enabled = true;
                     let mut compile_only = false;
                     let mut level_name = None;
+                    let mut live_editor = false;
+
+                    let mut save_file = None;
+                    let mut included_paths = vec![std::env::current_dir().expect("Cannot access current directory")];
+                    //change to current_exe before release (from current_dir)
+
 
                     while let Some(arg) = args_iter.next() {
                         match arg.as_ref() {
@@ -78,9 +91,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "--no-level" | "-l" => {
                                 gd_enabled = false;
                                 compile_only = true;
-                            }
+                            },
                             "--no-optimize" | "-o" => opti_enabled = false,
                             "--level-name" | "-n" => level_name = args_iter.next().cloned(),
+                            "--live-editor" | "-e" => live_editor = true,
+                            "--save-file" | "-s" => save_file = args_iter.next().cloned(),
+                            "--included-path" | "-i" => included_paths.push({
+                                let path = PathBuf::from(args_iter.next().cloned().expect("No path provided"));
+                                if path.exists() {
+                                    path
+                                } else {
+                                    return Err(Box::from("Invalid path".to_string()));
+                                }
+                            }),
                             _ => (),
                         };
                     }
@@ -109,7 +132,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     let gd_path = if gd_enabled {
-                        Some(if cfg!(target_os = "windows") {
+                        Some( if save_file != None{
+                            PathBuf::from(save_file.expect("what"))
+                        }else if cfg!(target_os = "windows") {
                             PathBuf::from(std::env::var("localappdata").expect("No local app data"))
                                 .join("GeometryDash/CCLocalLevels.dat")
                         } else if cfg!(target_os = "macos") {
@@ -128,7 +153,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut compiled = match compiler::compile_spwn(
                         statements,
                         script_path,
-                        //gd_path.clone(),
+                        included_paths,
                         notes,
                     ) {
                         Err(err) => {
@@ -195,24 +220,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                         }
                         //println!("level_string: {}", level_string);
-                        match gd_path {
-                            Some(gd_path) => {
-                                print_with_color("\nWriting back to savefile...", Color::Cyan);
-                                levelstring::encrypt_level_string(
-                                    new_ls,
-                                    level_string,
-                                    gd_path,
-                                    level_name,
-                                )?;
+                        if live_editor {
+                            match editor_paste(&new_ls) {
+                                Err(e) => {
+                                    eprint_with_color(
+                                        &format!("Error pasting into editor:\n{}", e),
+                                        Color::Red,
+                                    );
 
-                                print_with_color(
-                                    "Written to save. You can now open Geometry Dash again!",
-                                    Color::Green,
-                                );
+                                    std::process::exit(ERROR_EXIT_CODE);
+                                }
+                                Ok(_) => {
+                                    print_with_color(
+                                        "Pasted into the editor!",
+                                        Color::Green,
+                                    );
+                                }
                             }
+                        } else {
+                            match gd_path {
+                                Some(gd_path) => {
+                                    print_with_color("\nWriting back to savefile...", Color::Cyan);
+                                    levelstring::encrypt_level_string(
+                                        new_ls,
+                                        level_string,
+                                        gd_path,
+                                        level_name,
+                                    )?;
 
-                            None => println!("Output: {}", new_ls),
-                        };
+                                    print_with_color(
+                                        "Written to save. You can now open Geometry Dash again!",
+                                        Color::Green,
+                                    );
+                                }
+
+                                None => println!("Output: {}", new_ls),
+                            };
+                        }
                     };
 
                     let mut stdout = StandardStream::stdout(ColorChoice::Always);

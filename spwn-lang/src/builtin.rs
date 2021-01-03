@@ -500,6 +500,37 @@ pub fn built_in_function(
             Value::Null
         }
 
+        "dict_keys" => {
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one argument.".to_string()
+            );
+            let typ = globals.get_type_str(arguments[0]);
+            let val = globals.stored_values[arguments[0]].clone();
+            match val {
+                Value::Dict(d) => {
+                    let mut stored = vec![];
+                    for key in d.keys() {
+                        let stored_key = store_const_value( // store the dict key
+                            Value::Str(key.clone()),
+                            1,
+                            globals,
+                            context
+                        );
+                        stored.push(stored_key);
+                    }
+                    Value::Array(stored)
+                }
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected dictionary, found @{}", typ),
+                        info,
+                    })
+                }
+            }
+        }
         "append" => {
             arg_length!(
                 info,

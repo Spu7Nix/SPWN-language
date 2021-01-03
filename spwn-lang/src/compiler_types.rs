@@ -8,9 +8,11 @@ use crate::parser::FileRange;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+
 use smallvec::{SmallVec, smallvec};
 
 use crate::compiler::{compile_scope, import_module, RuntimeError, BUILTIN_STORAGE, NULL_STORAGE, CONTEXT_MAX};
+
 
 pub type TypeID = u16;
 //                                                               This bool is for if this value
@@ -313,6 +315,7 @@ pub struct CompilerInfo {
     pub current_file: PathBuf,
     pub current_module: String, // empty string means script
     pub pos: FileRange,
+    pub includes: Vec<PathBuf>,
 }
 
 impl CompilerInfo {
@@ -323,6 +326,7 @@ impl CompilerInfo {
             current_file: PathBuf::new(),
             current_module: String::new(),
             pos: ((0, 0), (0, 0)),
+            includes: vec![],
         }
     }
 }
