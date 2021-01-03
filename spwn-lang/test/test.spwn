@@ -1,12 +1,3 @@
-let b = 3
-
-let a = switch b {
-    case 1: "one",
-    case 2: "two",
-    case 10: "ten",
-    [@string]: "an array of strings",
-    @number: "a number ig",
-    else: "idk",
+for i in {a: 4} {
+	$.print(i[0]);
 }
-
-$.print(a)
