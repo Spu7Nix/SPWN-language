@@ -180,7 +180,7 @@ pub fn compile_spwn(
                 pos: ((0, 0), (0, 0)),
                 current_file: path,
                 current_module: String::new(),
-                includes: vec![]
+                includes: vec![],
             },
         });
     }
@@ -195,7 +195,7 @@ pub fn compile_spwn(
         pos: statements[0].pos,
         current_file: path,
         current_module: String::new(),
-        includes: included_paths
+        includes: included_paths,
     };
     use std::time::Instant;
 
@@ -694,26 +694,28 @@ pub fn compile_scope(
                 A "context", in SPWN, is like a parallel universe. Each context is nearly
                 identical to a code block, except it expands a runtime value that is meant to be
                 converted into a compile time item. Every time you want to do something like
-                convert a counter to a number, SPWN will branch the current code block into a number 
+                convert a counter to a number, SPWN will branch the current code block into a number
                 of contexts, one for each possible value from the conversion. All of the branched contexts
                 will be evaluated in isolation to each other.
                 */
                 for (val, context) in all_arrays {
-                    match globals.stored_values[val].clone() { // what are we iterating
-
-                        Value::Array(arr) => { // its an array!
+                    match globals.stored_values[val].clone() {
+                        // what are we iterating
+                        Value::Array(arr) => {
+                            // its an array!
 
                             let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                smallvec![context.clone()]; 
+                                smallvec![context.clone()];
                             // new contexts: any contexts that are created in the loop. currently only has 1
-
 
                             let mut out_contexts: SmallVec<[Context; CONTEXT_MAX]> =
                                 SmallVec::new(); // out contexts: anything declared outside the loop
 
-                            for element in arr { // going through the array items
+                            for element in arr {
+                                // going through the array items
 
-                                for c in &mut new_contexts { // reset all variables per context
+                                for c in &mut new_contexts {
+                                    // reset all variables per context
                                     (*c).variables = context.variables.clone();
                                     (*c).variables.insert(f.symbol.clone(), element);
                                 }
@@ -722,10 +724,11 @@ pub fn compile_scope(
 
                                 let (end_contexts, inner_returns) =
                                     compile_scope(&f.body, new_contexts, globals, new_info)?; // eval the stuff
-                                // end_contexts has any new contexts made in the loop
+                                                                                              // end_contexts has any new contexts made in the loop
 
                                 new_contexts = SmallVec::new();
-                                for mut c in end_contexts { // add contexts made in the loop to the new_contexts, if theyre not broken
+                                for mut c in end_contexts {
+                                    // add contexts made in the loop to the new_contexts, if theyre not broken
                                     if c.broken == None {
                                         new_contexts.push(c)
                                     } else {
@@ -737,38 +740,41 @@ pub fn compile_scope(
                                 returns.extend(inner_returns); // return stuff
                             }
                             out_contexts.extend(new_contexts);
-                            contexts.extend(out_contexts.iter().map(|c| Context { 
+                            contexts.extend(out_contexts.iter().map(|c| Context {
                                 variables: context.variables.clone(),
                                 ..c.clone()
                             }));
                             // finally append all newly created ones to the global count
                         }
-                        Value::Dict(d) => { // its a dict!
+                        Value::Dict(d) => {
+                            // its a dict!
 
                             let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                smallvec![context.clone()]; 
+                                smallvec![context.clone()];
                             // new contexts: any contexts that are created in the loop. currently only has 1
-
 
                             let mut out_contexts: SmallVec<[Context; CONTEXT_MAX]> =
                                 SmallVec::new(); // out contexts: anything declared outside the loop
 
-                            for (k,v) in d { // going through the array items
+                            for (k, v) in d {
+                                // going through the array items
 
-
-                                for c in &mut new_contexts { // reset all variables per context
+                                for c in &mut new_contexts {
+                                    // reset all variables per context
                                     (*c).variables = context.variables.clone();
-                                    let key_stored = store_const_value( // store the dict key
+                                    let key_stored = store_const_value(
+                                        // store the dict key
                                         Value::Str(k.clone()),
                                         1,
                                         globals,
-                                        c
+                                        c,
                                     );
-                                    let stored = store_const_value( // store the val key
+                                    let stored = store_const_value(
+                                        // store the val key
                                         Value::Array(vec![key_stored, v]),
                                         1,
                                         globals,
-                                        c
+                                        c,
                                     );
                                     (*c).variables.insert(f.symbol.clone(), stored);
                                 }
@@ -777,10 +783,11 @@ pub fn compile_scope(
 
                                 let (end_contexts, inner_returns) =
                                     compile_scope(&f.body, new_contexts, globals, new_info)?; // eval the stuff
-                                // end_contexts has any new contexts made in the loop
+                                                                                              // end_contexts has any new contexts made in the loop
 
                                 new_contexts = SmallVec::new();
-                                for mut c in end_contexts { // add contexts made in the loop to the new_contexts, if theyre not broken
+                                for mut c in end_contexts {
+                                    // add contexts made in the loop to the new_contexts, if theyre not broken
                                     if c.broken == None {
                                         new_contexts.push(c)
                                     } else {
@@ -792,7 +799,7 @@ pub fn compile_scope(
                                 returns.extend(inner_returns); // return stuff
                             }
                             out_contexts.extend(new_contexts);
-                            contexts.extend(out_contexts.iter().map(|c| Context { 
+                            contexts.extend(out_contexts.iter().map(|c| Context {
                                 variables: context.variables.clone(),
                                 ..c.clone()
                             }));
@@ -1056,7 +1063,7 @@ pub fn import_module(
             } else {
                 return Err(RuntimeError::RuntimeError {
                     message: "Unable to find library folder in given search paths".to_string(),
-                    info: info
+                    info,
                 });
             }
         }

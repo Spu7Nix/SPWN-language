@@ -12,7 +12,7 @@ wait = #[desc("Adds a delay before the next triggers")] (
 		$.add( trigger{
 			OBJ_ID: 1268,
 			SPAWN_DURATION: time,
-			TARGET: {
+			TARGET: !{
 				return
 			},
 		})
@@ -45,11 +45,11 @@ return {
 		checker = @counter::new(0)
 		-> (){
 			wait(delay)
-			checker.item.if_is(EQUAL_TO, 1, {
+			checker.item.if_is(EQUAL_TO, 1, !{
 				checker.item.add(-1)
 			})
 		}()
-		checker.item.if_is(EQUAL_TO, 0, {
+		checker.item.if_is(EQUAL_TO, 0, !{
 			checker.item.add(1)
 			return
 		})
@@ -67,15 +67,15 @@ return {
     ) {
 		i = @counter::new(range.start)
 
-        func = {
+        func = !{
             code(i)
 			i.add(range.step_size)
 			wait()
-            i.item.if_is(SMALLER_THAN, range.end, {
+            i.item.if_is(SMALLER_THAN, range.end, !{
                 call_with_delay(delay, func)
             })
 
-            i.item.if_is(LARGER_THAN, range.end - 1, {
+            i.item.if_is(LARGER_THAN, range.end - 1, !{
                 if reset {
                     i.reset(reset_speed)
                 }
@@ -93,7 +93,7 @@ return {
 		#[desc("Macro of the code that gets looped")] code: @macro,
 		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
 	) {
-		func = {
+		func = !{
 			code()
 			if expr() {
 				call_with_delay(delay, func)
@@ -111,20 +111,20 @@ return {
 	) {
 		import "item.spwn"
 		ready_sign = ?i
-		func = {
+		func = !{
 			code()
 			ready_sign.add(1)
 		}
 
 		wait_for_ready = () {
-			closure = {
+			closure = !{
 				ready_sign.add(-1)
 				closure.start_group.toggle_off()
 				wait(0)
 				return
 			}
 			closure.start_group.toggle_on()
-			ready_sign.count(1).on_triggered({
+			ready_sign.count(1).on_triggered(!{
 				wait(0)
 				closure!
 			})

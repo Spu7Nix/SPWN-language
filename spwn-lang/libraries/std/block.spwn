@@ -17,11 +17,11 @@ impl @block {
         #[desc("Block ID to check against")] other: @block
     ) {
         item = ?i
-        on(events.collision(self, other), {
+        on(events.collision(self, other), !{
             item.add(1)
         })
 
-        on(events.collision_exit(self, other), {
+        on(events.collision_exit(self, other), !{
             item.add(-1)
         })
 

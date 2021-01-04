@@ -162,17 +162,16 @@ impl Value {
             })
         } else {
             match self {
-                Value::Func(f) => {
-                    if member == "group" {
-                        return Some(store_value(
-                            Value::Group(f.start_group),
-                            1,
-                            globals,
-                            context,
-                        ));
-                    }
-                }
-
+                // Value::Func(f) => {
+                //     if member == "group" {
+                //         return Some(store_value(
+                //             Value::Group(f.start_group),
+                //             1,
+                //             globals,
+                //             context,
+                //         ));
+                //     }
+                // }
                 Value::Str(a) => {
                     if member == "length" {
                         return Some(store_value(
@@ -501,23 +500,19 @@ pub fn built_in_function(
         }
 
         "dict_keys" => {
-            arg_length!(
-                info,
-                1,
-                arguments,
-                "Expected one argument.".to_string()
-            );
+            arg_length!(info, 1, arguments, "Expected one argument.".to_string());
             let typ = globals.get_type_str(arguments[0]);
             let val = globals.stored_values[arguments[0]].clone();
             match val {
                 Value::Dict(d) => {
                     let mut stored = vec![];
                     for key in d.keys() {
-                        let stored_key = store_const_value( // store the dict key
+                        let stored_key = store_const_value(
+                            // store the dict key
                             Value::Str(key.clone()),
                             1,
                             globals,
-                            context
+                            context,
                         );
                         stored.push(stored_key);
                     }

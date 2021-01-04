@@ -1729,8 +1729,14 @@ fn parse_variable(
             Some(ast::UnaryOperator::Minus)
         }
         Some(Token::Exclamation) => {
-            first_token = tokens.next(false, false);
-            Some(ast::UnaryOperator::Not)
+            if tokens.next(true, true) == Some(Token::OpenCurlyBracket) {
+                tokens.previous_no_ignore(true, true);
+                None
+            } else {
+                tokens.previous_no_ignore(true, true);
+                first_token = tokens.next(false, false);
+                Some(ast::UnaryOperator::Not)
+            }
         }
 
         Some(Token::DotDot) => {
@@ -1944,43 +1950,51 @@ fn parse_variable(
         }
         Some(Token::OpenCurlyBracket) => {
             //either dictionary or function
-            match tokens.next(false, false) {
-                Some(Token::DotDot) => {
-                    tokens.previous();
-                    ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
-                }
-                Some(Token::Symbol) => match tokens.next(false, false) {
-                    Some(Token::ClosingCurlyBracket) | Some(Token::Comma) | Some(Token::Colon) => {
-                        tokens.previous();
-                        tokens.previous();
-                        ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
-                    }
-                    _ => {
-                        tokens.previous();
-                        tokens.previous();
+            // match tokens.next(false, false) {
+            //     Some(Token::DotDot) => {
+            //         tokens.previous();
+            //         ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
+            //     }
+            //     Some(Token::Symbol) => match tokens.next(false, false) {
+            //         Some(Token::ClosingCurlyBracket) | Some(Token::Comma) | Some(Token::Colon) => {
+            //             tokens.previous();
+            //             tokens.previous();
+            //             ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
+            //         }
+            //         _ => {
+            //             tokens.previous();
+            //             tokens.previous();
 
-                        ast::ValueBody::CmpStmt(ast::CompoundStatement {
-                            statements: parse_cmp_stmt(tokens, notes)?,
-                        })
-                    }
-                },
-                Some(Token::ClosingCurlyBracket) => ast::ValueBody::Dictionary(Vec::new()),
-                _ => match tokens.next(false, false) {
-                    Some(Token::Colon) => {
-                        tokens.previous();
-                        tokens.previous();
-                        ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
-                    }
-                    _ => {
-                        tokens.previous();
-                        tokens.previous();
+            //             ast::ValueBody::CmpStmt(ast::CompoundStatement {
+            //                 statements: parse_cmp_stmt(tokens, notes)?,
+            //             })
+            //         }
+            //     },
+            //     Some(Token::ClosingCurlyBracket) => ast::ValueBody::Dictionary(Vec::new()),
+            //     _ => match tokens.next(false, false) {
+            //         Some(Token::Colon) => {
+            //             tokens.previous();
+            //             tokens.previous();
+            //             ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
+            //         }
+            //         _ => {
+            //             tokens.previous();
+            //             tokens.previous();
 
-                        ast::ValueBody::CmpStmt(ast::CompoundStatement {
-                            statements: parse_cmp_stmt(tokens, notes)?,
-                        })
-                    }
-                },
-            }
+            //             ast::ValueBody::CmpStmt(ast::CompoundStatement {
+            //                 statements: parse_cmp_stmt(tokens, notes)?,
+            //             })
+            //         }
+            //     },
+            // }
+            ast::ValueBody::Dictionary(parse_dict(tokens, notes)?)
+        }
+        Some(Token::Exclamation) => {
+            //next token is a curly bracket, checked earlier
+            tokens.next(false, false);
+            ast::ValueBody::CmpStmt(ast::CompoundStatement {
+                statements: parse_cmp_stmt(tokens, notes)?,
+            })
         }
 
         Some(Token::Object) => ast::ValueBody::Obj(ast::ObjectLiteral {

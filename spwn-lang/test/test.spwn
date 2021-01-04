@@ -1,2 +1,37 @@
-$.print("hi")
-$.print($.dict_keys({a: 4, b: 5, c: 8}))
+gs = import gamescene
+
+type @InputManager;
+let SharedInputManager = [];
+impl @InputManager {
+    new: () {
+        let slf = {type: @InputManager};
+        let slf.shortclick = counter(34i);
+        let slf.longclick = counter(35i);
+        let slf.click_indicator = counter(34b.create_tracker_item(35b));
+
+        let movegroup = !{
+            34g.move_to(35g, 0.5);
+        };
+
+        gs.button_a().on_triggered(!{
+            34g.move_to(33g,0);
+            wait(0.1)
+            movegroup!
+        });
+
+        gs.button_a_end().on_triggered(!{
+            movegroup.start_group.stop();
+            slf.shortclick += slf.click_indicator;
+        });
+
+        return slf;
+    },
+    shared: () {
+        if SharedInputManager.length == 0 {
+            SharedInputManager.push(@InputManager::new());
+        }
+        return SharedInputManager[0];
+    }
+}
+
+let test = @InputManager::shared();

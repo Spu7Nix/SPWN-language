@@ -71,11 +71,11 @@ impl @counter {
     ) {
         wait()
         
-        add = {
+        add = !{
             
             
             mini_add = (num){
-                self.item.if_is(LARGER_THAN, num - 1, {
+                self.item.if_is(LARGER_THAN, num - 1, !{
                     self.add(-num)
                     for item in items {
                         item.add(num * factor)
@@ -90,7 +90,7 @@ impl @counter {
                 
                 
             
-            self.item.if_is(EQUAL_TO, 0, {
+            self.item.if_is(EQUAL_TO, 0, !{
                 wait()
                 supress_signal(0.1)
                 return
@@ -108,11 +108,11 @@ impl @counter {
         #[desc("Multiplyer for the value subtracted")] factor: @number = 1
     ) {
         
-        sub = {
+        sub = !{
             
-            self.item.if_is(LARGER_THAN, 0, {
+            self.item.if_is(LARGER_THAN, 0, !{
                 mini_sub = (num){
-                    self.item.if_is(LARGER_THAN, num - 1, {
+                    self.item.if_is(LARGER_THAN, num - 1, !{
                         self.add(-num)
                         for item in items {
                             item.add(-num * factor)
@@ -127,7 +127,7 @@ impl @counter {
                 
                 
             })
-            self.item.if_is(EQUAL_TO, 0, {
+            self.item.if_is(EQUAL_TO, 0, !{
                 wait()
                 supress_signal(0.1)
                 return
@@ -151,16 +151,16 @@ impl @counter {
         } else if factor.type == @counter {
             temp = @counter::new(0, false)
             mini_mult = (num){
-                mult = {
+                mult = !{
 
-                    self.item.if_is(SMALLER_THAN, num, {
+                    self.item.if_is(SMALLER_THAN, num, !{
                         supress_signal(0.1)
                         wait()
                         return //mult.start_group
                     })
                     
                     
-                    self.item.if_is(LARGER_THAN, num - 1, {
+                    self.item.if_is(LARGER_THAN, num - 1, !{
                         self.add(-num)
                         factor.copy_to([temp.item], speed, num)
                         
@@ -200,9 +200,9 @@ impl @counter {
         if divisor.type == @number {
             result = @counter::new(0, false)
             
-            div = {
+            div = !{
                 mini_div = (num) {
-                    self.item.if_is(LARGER_THAN, (divisor * num) - 1, {
+                    self.item.if_is(LARGER_THAN, (divisor * num) - 1, !{
                         
                         
                         self.add(-(divisor * num))
@@ -217,7 +217,7 @@ impl @counter {
                     mini_div(i * 4 + 1)
                 }
 
-                self.item.if_is(SMALLER_THAN, divisor, {
+                self.item.if_is(SMALLER_THAN, divisor, !{
                     
                     wait()
                     self.add_to([remainder], speed)
@@ -236,10 +236,10 @@ impl @counter {
             // every time it goes under, undo the previous operation to simulate comparison
             
             mini_div = (num){
-                div = {
+                div = !{
                     
                     
-                    self.item.if_is(LARGER_THAN, 0, {
+                    self.item.if_is(LARGER_THAN, 0, !{
                         //this basically subtracts divisor * num from self
                         // this is the slow version
                         //temp = divisor.clone(speed)
@@ -252,15 +252,15 @@ impl @counter {
                         call_with_delay(delay, div)
                     })
 
-                    self.item.if_is(SMALLER_THAN, 1, {
+                    self.item.if_is(SMALLER_THAN, 1, !{
 
-                        ret = {
+                        ret = !{
                             supress_signal(0.1)
                             return
                         }
                         supress_signal(0.1)
                         
-                        self.item.if_is(SMALLER_THAN, 0, {
+                        self.item.if_is(SMALLER_THAN, 0, !{
                             result.add(-num)
                             divisor.copy_to([self], speed, factor = num)
                             ret!
@@ -314,10 +314,10 @@ impl @counter {
     ){
         
         //almost the same
-        add = {
+        add = !{
             
             mini_add = (num){
-                self.item.if_is(LARGER_THAN, num - 1, {
+                self.item.if_is(LARGER_THAN, num - 1, !{
                     self.add(-num)
                     call_with_delay(@epsilon::{}, add)
                 })
@@ -329,7 +329,7 @@ impl @counter {
                 
                 
             
-            self.item.if_is(EQUAL_TO, 0, {
+            self.item.if_is(EQUAL_TO, 0, !{
                 wait()
                 supress_signal(0.1)
                 return
@@ -348,12 +348,12 @@ impl @counter {
         wait()
         temp_storage = ?i
         
-        add = {
+        add = !{
             
-            self.item.if_is(LARGER_THAN, 0, {
+            self.item.if_is(LARGER_THAN, 0, !{
                 mini_add = (num){
                     
-                    self.item.if_is(LARGER_THAN, num - 1, {
+                    self.item.if_is(LARGER_THAN, num - 1, !{
                         self.add(-num)
                         for item in items {
                             item.add(num * factor)
@@ -370,7 +370,7 @@ impl @counter {
                 
                 
             })
-            self.item.if_is(EQUAL_TO, 0, {
+            self.item.if_is(EQUAL_TO, 0, !{
                 wait()
                 supress_signal(0.1)
                 @counter::new(temp_storage, false).add_to([self.item], speed)
@@ -444,11 +444,11 @@ impl @counter {
         
         if other.type == @number {
             
-            self.item.if_is(LARGER_THAN, other, {
+            self.item.if_is(LARGER_THAN, other, !{
                 return true
             })
 
-            self.item.if_is(SMALLER_THAN, other + 1, {
+            self.item.if_is(SMALLER_THAN, other + 1, !{
                 return false
             })
         } else if other.type == @counter {
@@ -465,11 +465,11 @@ impl @counter {
         
         if other.type == @number {
             
-            self.item.if_is(SMALLER_THAN, other, {
+            self.item.if_is(SMALLER_THAN, other, !{
                 return true
             })
 
-            self.item.if_is(LARGER_THAN, other - 1, {
+            self.item.if_is(LARGER_THAN, other - 1, !{
                 return false
             })
         } else if other.type == @counter {
@@ -486,11 +486,11 @@ impl @counter {
         
         if other.type == @number {
             
-            self.item.if_is(LARGER_THAN, other - 1, {
+            self.item.if_is(LARGER_THAN, other - 1, !{
                 return true
             })
 
-            self.item.if_is(SMALLER_THAN, other, {
+            self.item.if_is(SMALLER_THAN, other, !{
                 return false
             })
         } else if other.type == @counter {
@@ -507,11 +507,11 @@ impl @counter {
         
         if other.type == @number {
             
-            self.item.if_is(SMALLER_THAN, other + 1, {
+            self.item.if_is(SMALLER_THAN, other + 1, !{
                 return true
             })
 
-            self.item.if_is(LARGER_THAN, other, {
+            self.item.if_is(LARGER_THAN, other, !{
                 return false
             })
         } else if other.type == @counter {
@@ -527,11 +527,11 @@ impl @counter {
     _equal_: (self, other: @number | @counter) {
         if other.type == @number {
             
-            self.item.if_is(EQUAL_TO, other, {
+            self.item.if_is(EQUAL_TO, other, !{
                 return true
             })
 
-            ret_false = {
+            ret_false = !{
                 return false
             }
 
@@ -633,7 +633,7 @@ impl @counter {
     ) {
         
         for val in range {
-            -> self.item.if_is(EQUAL_TO, val, {
+            -> self.item.if_is(EQUAL_TO, val, !{
                 return val
             }) 
         }
@@ -646,7 +646,7 @@ impl @counter {
 
     ) {
         for val in range {
-            -> self.item.if_is(EQUAL_TO, val, {
+            -> self.item.if_is(EQUAL_TO, val, !{
                 closure(val)
             }) 
         }
