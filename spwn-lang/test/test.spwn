@@ -1,2 +1,4 @@
 let test = {a: 4, b: 10g};
-$.print(test[4])
+let test["hello"] = 10
+test["hello"]++
+$.print(test)

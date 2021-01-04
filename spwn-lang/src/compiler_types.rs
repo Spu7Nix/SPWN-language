@@ -462,7 +462,7 @@ pub struct Macro {
     pub tag: ast::Tag,
 }
 #[derive(Clone, Debug, PartialEq)]
-pub struct Function {
+pub struct TriggerFunction {
     pub start_group: Group,
     //pub all_groups: Vec<Group>,
 }
@@ -482,7 +482,7 @@ pub enum Value {
     Item(Item),
     Number(f64),
     Bool(bool),
-    Func(Function),
+    TriggerFunc(TriggerFunction),
     Dict(HashMap<String, StoredValue>),
     Macro(Box<Macro>),
     Str(String),
@@ -545,7 +545,7 @@ impl Value {
             Value::Item(_) => 3,
             Value::Number(_) => 4,
             Value::Bool(_) => 5,
-            Value::Func(_) => 6,
+            Value::TriggerFunc(_) => 6,
             Value::Dict(d) => match d.get(TYPE_MEMBER_NAME) {
                 Some(member) => match globals.stored_values[*member as usize] {
                     Value::TypeIndicator(t) => t,
@@ -747,13 +747,13 @@ pub fn convert_type(
             }
         },
 
-        Value::Func(f) => match typ {
+        Value::TriggerFunc(f) => match typ {
             
             0 => Value::Group(f.start_group),
             _ => {
                 return Err(RuntimeError::RuntimeError {
                     message: format!(
-                        "Function can't be converted to '{}'!",
+                        "Trigger function can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
                     info: info.clone(),
@@ -877,13 +877,7 @@ impl Value {
             }
             Value::Number(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::Func(f) => format!("{{ /*function {}g*/ }}", {
-                if let ID::Specific(id) = f.start_group.id {
-                    id.to_string()
-                } else {
-                    "?".to_string()
-                }
-            }),
+            Value::TriggerFunc(_) => "{ /*trigger function */ }".to_string(),
             Value::Range(start, end, stepsize) => {
                 if *stepsize != 1 {
                     format!("{}..{}..{}", start, stepsize, end)
@@ -1119,7 +1113,7 @@ impl Globals {
         add_type("item", 3);
         add_type("number", 4);
         add_type("bool", 5);
-        add_type("function", 6);
+        add_type("trigger_function", 6);
         add_type("dictionary", 7);
         add_type("macro", 8);
         add_type("string", 9);
@@ -1830,7 +1824,7 @@ impl ast::Variable {
                 let (evaled, returns) = cmp_stmt.to_scope(&context, globals, info.clone(), None)?;
                 inner_returns.extend(returns);
                 start_val.push((
-                    store_const_value(Value::Func(evaled), 1, globals, &context),
+                    store_const_value(Value::TriggerFunc(evaled), 1, globals, &context),
                     context.clone(),
                 ));
             }
@@ -2138,7 +2132,7 @@ impl ast::Variable {
                                         ObjParam::Number(*n)
                                     },
                                     Value::Str(s) => ObjParam::Text(s.clone()),
-                                    Value::Func(g) => ObjParam::Group(g.start_group),
+                                    Value::TriggerFunc(g) => ObjParam::Group(g.start_group),
 
                                     Value::Group(g) => ObjParam::Group(*g),
                                     Value::Color(c) => ObjParam::Color(*c),
@@ -2778,11 +2772,8 @@ impl ast::Variable {
         
 
         let value = match &self.operator {
-            Some(ast::UnaryOperator::Let) => {
-                
-                store_value(Value::Null, 1, globals, context)
-            },
-            None => store_const_value(Value::Null, 1, globals, context),
+            Some(ast::UnaryOperator::Let) => NULL_STORAGE,
+            None => NULL_STORAGE,
             a => {
                 return Err(RuntimeError::RuntimeError {
                     message: format!("Cannot use operator {:?} in definition", a),
@@ -2856,6 +2847,7 @@ impl ast::Variable {
                         }
                     };
                 }
+                
                 ast::Path::Associated(m) => {
                     match &globals.stored_values[current_ptr] {
                         Value::TypeIndicator(t) => match (*globals).implementations.get_mut(t) {
@@ -2913,7 +2905,7 @@ impl ast::CompoundStatement {
         globals: &mut Globals,
         info: CompilerInfo,
         start_group: Option<Group>,
-    ) -> Result<(Function, Returns), RuntimeError> {
+    ) -> Result<(TriggerFunction, Returns), RuntimeError> {
         //create the function context
         let mut new_context = context.next_fn_id(globals);
 
@@ -2932,13 +2924,13 @@ impl ast::CompoundStatement {
         for c in contexts {
             if let Some(i) = c.broken {
                 return Err(RuntimeError::RuntimeError {
-                    message: "break statement is never used because it's inside a function"
+                    message: "break statement is never used because it's inside a trigger function"
                         .to_string(),
                     info: i,
                 });
             }
         }
 
-        Ok((Function { start_group }, inner_returns))
+        Ok((TriggerFunction { start_group }, inner_returns))
     }
 }

@@ -235,7 +235,7 @@ impl Value {
                     Some(value) => Some(*value),
                     None => get_impl(my_type, member),
                 },
-                Value::Func(f) => {
+                Value::TriggerFunc(f) => {
                     if &member == "start_group" {
                         Some(store_value(
                             Value::Group(f.start_group),
@@ -301,7 +301,7 @@ pub const BUILTIN_LIST: &[&str] = &[
 ];
 
 const CANNOT_CHANGE_ERROR: &str = "
-Cannot change a variable that was defined in another group/function context
+Cannot change a variable that was defined in another trigger function context
 (consider using a counter)
 ";
 
@@ -460,7 +460,7 @@ pub fn built_in_function(
                         ObjectMode::Object => {
                             if context.start_group.id != ID::Specific(0) {
                                 return Err(RuntimeError::BuiltinError {
-                                    message: String::from("you cannot add an obj type object in a function context. Consider moving this add function call to another context, or changing it to a trigger type"), 
+                                    message: String::from("you cannot add an obj type object in a trigger function context. Consider moving this add function call to another context, or changing the object to a trigger type"), 
                                     info
                                 });
                             }

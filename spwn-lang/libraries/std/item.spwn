@@ -22,7 +22,7 @@ impl @item {
         self, 
         #[desc("Comparison mode")] comparison: @comparison, 
         #[desc("Number to compare with")] other: @number, 
-        #[desc("Target function if comparison is 'true'")] function: @function
+        #[desc("Target function if comparison is 'true'")] function: @trigger_function
     ) {
         $.add( trigger{
             OBJ_ID: 1811,

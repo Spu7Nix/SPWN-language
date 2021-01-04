@@ -3,7 +3,7 @@ events = import "events.spwn"
 
 on = (
      event: @event, 
-     function: @function
+     function: @trigger_function
 ){
     event.on_triggered(function)
 }

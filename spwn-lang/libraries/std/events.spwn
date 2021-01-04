@@ -8,7 +8,7 @@ type @event
 impl @event {
     on: #[desc("Triggers a function every time an event fires")] (
         #[desc("Event to trigger on")] event: @event, 
-        #[desc("Function to trigger")] function: @function
+        #[desc("Function to trigger")] function: @trigger_function
     ){
         event.on_triggered(function)
     }

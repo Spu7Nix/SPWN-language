@@ -357,7 +357,7 @@ pub fn compile_scope(
                                 let start_group = Group::next_free(&mut globals.closed_groups);
                                 //store value
                                 globals.stored_values[storage] =
-                                    Value::Func(Function { start_group });
+                                    Value::TriggerFunc(TriggerFunction { start_group });
 
                                 new_context.start_group = start_group;
 
@@ -376,7 +376,7 @@ pub fn compile_scope(
                                     symbol.define(&mut after_context, globals, &info)?;
 
                                 globals.stored_values[var_storage] =
-                                    Value::Func(Function { start_group });
+                                    Value::TriggerFunc(TriggerFunction { start_group });
 
                                 new_contexts.push(after_context);
                             }
@@ -547,7 +547,7 @@ pub fn compile_scope(
             }
 
             Impl(imp) => {
-                let message = "cannot run impl statement in a function/group context, consider moving it to the start of your script.".to_string();
+                let message = "cannot run impl statement in a trigger function context, consider moving it to the start of your script.".to_string();
                 if contexts.len() > 1 || contexts[0].start_group.id != ID::Specific(0) {
                     return Err(RuntimeError::RuntimeError { message, info });
                 }
@@ -652,12 +652,12 @@ pub fn compile_scope(
                     params.insert(
                         51,
                         match &globals.stored_values[func] {
-                            Value::Func(g) => ObjParam::Group(g.start_group),
+                            Value::TriggerFunc(g) => ObjParam::Group(g.start_group),
                             Value::Group(g) => ObjParam::Group(*g),
                             a => {
                                 return Err(RuntimeError::RuntimeError {
                                     message: format!(
-                                        "Expected function or group, found: {}",
+                                        "Expected trigger function or group, found: {}",
                                         a.to_str(globals)
                                     ),
                                     info,
