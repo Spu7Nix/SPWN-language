@@ -2266,8 +2266,8 @@ impl ast::Variable {
             match &p {
                 ast::Path::Member(m) => {
                     for x in &mut with_parent {
-                        let val = globals.stored_values[x.0].clone();
-                        *x = (
+                        let val = globals.stored_values[x.0].clone(); // this is the object we are getting member of
+                        *x = ( 
                             match val.member(m.clone(), &x.1, globals) {
                                 Some(m) => m,
                                 None => {
@@ -2847,7 +2847,12 @@ impl ast::Variable {
                         }
                     };
                 }
-                
+                ast::Path::Index(i) => {
+                    return Err(RuntimeError::RuntimeError {
+                        message: "No implementation yet, oopsies".to_string(),
+                        info: info.clone()
+                    });
+                }
                 ast::Path::Associated(m) => {
                     match &globals.stored_values[current_ptr] {
                         Value::TypeIndicator(t) => match (*globals).implementations.get_mut(t) {

@@ -1,4 +1,11 @@
-let test = {a: 4, b: 10g};
-let test["hello"] = 10
-test["hello"]++
-$.print(test)
+#[no_level]
+extract $
+
+let a = [];
+
+let b = {test: 4}
+
+//a.push(b)
+append(a, b)
+
+a[0].test = 10;

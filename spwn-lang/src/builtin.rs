@@ -265,6 +265,8 @@ pub const BUILTIN_LIST: &[&str] = &[
     "ceil",
     "add",
     "append",
+    "dict_add",
+    "dict_keys",
     "pop",
     "remove_index",
     "readfile",
@@ -272,6 +274,8 @@ pub const BUILTIN_LIST: &[&str] = &[
     "matches",
     "b64encrypt",
     "b64decrypt",
+
+    "mutability", // for testing purposes
     //operators
     "_or_",
     "_and_",
@@ -547,7 +551,7 @@ pub fn built_in_function(
                 globals.stored_values.map.get(&arguments[0]).unwrap().3,
                 globals,
                 context,
-                globals.is_mutable(arguments[1]),
+                !globals.is_mutable(arguments[1]),
             );
 
             let typ = globals.get_type_str(arguments[0]);
@@ -564,6 +568,59 @@ pub fn built_in_function(
             }
 
             Value::Null
+        }
+
+        "dict_add" => {
+            arg_length!(info, 3, arguments, "Expected 3 arguments, a dictionary, a key, and a value to be added to it".to_string());
+
+            if !globals.is_mutable(arguments[0]) {
+                return Err(RuntimeError::BuiltinError {
+                    message: String::from("This dictionary is not mutable"),
+                    info,
+                });
+            }
+
+            //set lifetime to the lifetime of the dictionary
+
+            let cloned = clone_value(
+                arguments[2],
+                globals.stored_values.map.get(&arguments[0]).unwrap().3,
+                globals,
+                context,
+                !globals.is_mutable(arguments[2]),
+            );
+
+            let key = globals.stored_values[arguments[1]].clone();
+            let key_type = globals.get_type_str(arguments[1]);
+
+            let typ = globals.get_type_str(arguments[0]);
+            match &mut globals.stored_values[arguments[0]] {
+                Value::Dict(d) => {
+                    match key {
+                        Value::Str(s) => (*d).insert(s,cloned),
+                        _ => {
+                            return Err(RuntimeError::BuiltinError {
+                                message: format!("Expected str, found @{}", key_type),
+                                info,
+                            })
+                        }
+                    };
+                },
+
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected dictionary, found @{}", typ),
+                        info,
+                    })
+                }
+            }
+
+            Value::Null
+        }
+
+        "mutability" => {
+            arg_length!(info, 1, arguments, "Expected one argument".to_string());
+            Value::Bool(globals.is_mutable(arguments[0]))
         }
 
         "readfile" => {
