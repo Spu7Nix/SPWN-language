@@ -2396,6 +2396,34 @@ impl ast::Variable {
                                     }
                                 }
                             }
+                            Value::Dict(d)  => {
+                                
+                                let (evaled, returns) =
+                                    i.eval(&prev_c, globals, info.clone(), constant)?;
+                                inner_returns.extend(returns);
+                                for index in evaled {
+                                    match &globals.stored_values[index.0] {
+                                        Value::Str(s) => {
+                                            if !d.contains_key(s) {
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: format!("Cannot find key '{}' in dictionary",s),
+                                                    info,
+                                                })
+                                            }
+                                            new_out.push((d[s], index.1, prev_v));  
+                                        }
+                                        _ => {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: format!(
+                                                    "expected @string in index, found @{}",
+                                                    globals.get_type_str(index.0)
+                                                ),
+                                                info,
+                                            })
+                                        }
+                                    }
+                                }
+                            }
                             Value::Str(s)  => {
                                 let arr: Vec<char> = s.chars().collect();
                                 
