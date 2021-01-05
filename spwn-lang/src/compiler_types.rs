@@ -295,6 +295,12 @@ pub enum ImportType {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
+pub enum BreakType {
+    Macro,
+    Loop,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Context {
     pub start_group: Group,
     //pub spawn_triggered: bool,
@@ -306,7 +312,7 @@ pub struct Context {
     // info stores the info for the break statement if the context is "broken"
     // broken doesn't mean something is wrong with it, it just means
     // a break statement has been used :)
-    pub broken: Option<CompilerInfo>,
+    pub broken: Option<(CompilerInfo, BreakType)>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerInfo {
@@ -1602,6 +1608,12 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
     // stop break chain
     for c in &mut compiled.0 {
+        if let Some((i, BreakType::Loop)) = &(*c).broken {
+            return Err(RuntimeError::RuntimeError {
+                message: "break statement is never used".to_string(),
+                info: i.clone(),
+            });
+        }
         (*c).broken = None;
     }
 
@@ -2847,7 +2859,7 @@ impl ast::Variable {
                         }
                     };
                 }
-                ast::Path::Index(i) => {
+                ast::Path::Index(_) => {
                     return Err(RuntimeError::RuntimeError {
                         message: "No implementation yet, oopsies".to_string(),
                         info: info.clone()
@@ -2927,12 +2939,25 @@ impl ast::CompoundStatement {
             compile_scope(&self.statements, smallvec![new_context], globals, new_info)?;
 
         for c in contexts {
-            if let Some(i) = c.broken {
-                return Err(RuntimeError::RuntimeError {
-                    message: "break statement is never used because it's inside a trigger function"
-                        .to_string(),
-                    info: i,
-                });
+            if let Some((i, t)) = c.broken {
+                match t {
+                    BreakType::Loop => {
+                        return Err(RuntimeError::RuntimeError {
+                            message: "break statement is never used because it's inside a trigger function"
+                                .to_string(),
+                            info: i,
+                        });
+                    }
+
+                    BreakType::Macro => {
+                        return Err(RuntimeError::RuntimeError {
+                            message: "return statement is never used because it's inside a trigger function (consider putting the return statement in an arrow statement)"
+                                .to_string(),
+                            info: i,
+                        });
+                    }
+                }
+                
             }
         }
 

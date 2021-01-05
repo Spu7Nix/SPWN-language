@@ -19,13 +19,13 @@ impl @counter {
                 id.add(source)
             }
             
-            return {
+            -> return {
                 type: @counter,
                 item: id
             }
         } else if source.type == @item {
             
-            return {
+            -> return {
                 type: @counter,
                 item: source
             }
@@ -35,7 +35,7 @@ impl @counter {
             if source {
                 id.add(1)
             }
-            return {
+            -> return {
                 type: @counter,
                 item: id
             }
@@ -93,7 +93,7 @@ impl @counter {
             self.item.if_is(EQUAL_TO, 0, !{
                 wait()
                 supress_signal(0.1)
-                return
+                -> return
             })
         }
         add!
@@ -130,7 +130,7 @@ impl @counter {
             self.item.if_is(EQUAL_TO, 0, !{
                 wait()
                 supress_signal(0.1)
-                return
+                -> return
             })
         }
         sub!
@@ -156,7 +156,7 @@ impl @counter {
                     self.item.if_is(SMALLER_THAN, num, !{
                         supress_signal(0.1)
                         wait()
-                        return //mult.start_group
+                        -> return //mult.start_group
                     })
                     
                     
@@ -223,7 +223,7 @@ impl @counter {
                     self.add_to([remainder], speed)
                     result.add_to([self], speed)
                     supress_signal(0.1)
-                    return remainder
+                    -> return remainder
                 })
             }
             div!
@@ -256,7 +256,7 @@ impl @counter {
 
                         ret = !{
                             supress_signal(0.1)
-                            return
+                            -> return
                         }
                         supress_signal(0.1)
                         
@@ -284,7 +284,7 @@ impl @counter {
             self.add_to([remainder.item], speed)
             
             result.add_to([self.item], speed * 2)
-            return remainder
+            -> return remainder
             
             
          
@@ -299,11 +299,11 @@ impl @counter {
     compare: (self, other: @counter, speed: @number = DEFAULT_SPEED) {
         other.subtract_from([self.item], speed)
         if self == 0 {
-            return 0
+            -> return 0
         } else if self > 0 {
-            return 1
+            -> return 1
         } else {
-            return -1
+            -> return -1
         }
     },
 
@@ -332,7 +332,7 @@ impl @counter {
             self.item.if_is(EQUAL_TO, 0, !{
                 wait()
                 supress_signal(0.1)
-                return
+                -> return
             })
         }
         add!
@@ -374,30 +374,30 @@ impl @counter {
                 wait()
                 supress_signal(0.1)
                 @counter::new(temp_storage, false).add_to([self.item], speed)
-                return
+                -> return
             })
         }
         add! 
     },
 
-    clone: #[desc("Copies the counter and returns the copy")] (
+    clone: #[desc("Copies the counter and -> returns the copy")] (
         self, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
         new_counter = ?i
         self.copy_to([new_counter], speed)
-        return @counter::new(new_counter, false)
+        -> return @counter::new(new_counter, false)
     },
 
     _plus_: (self, other: @number | @counter) {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.add(other)
-            return new_counter
+            -> return new_counter
         } else if other.type == @counter {
             new_counter = self.clone()
             other.clone().add_to([new_counter.item])
-            return new_counter
+            -> return new_counter
         } else {
             error "Cannot add counter with " + num.type as @string
         }
@@ -407,7 +407,7 @@ impl @counter {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.add(-other)
-            return new_counter
+            -> return new_counter
         } else {
             error "Cannot subtract counter with " + num.type as @string
         }
@@ -416,21 +416,21 @@ impl @counter {
     _times_: (self, num: @number | @counter) {
         clone = self.clone()
         clone.multiply(num)
-        return clone
+        -> return clone
         
     },
 
     _divided_by_: (self, num: @number | @counter) {
         clone = self.clone()
         clone.divide(num)
-        return clone
+        -> return clone
     },
 
     _mod_: (self, num: @number | @counter) {
         clone = self.clone()
         out = @counter::new()
         clone.divide(num, remainder = out)
-        return out
+        -> return out
     },
 
     _modulate_: (self, num: @number | @counter) {
@@ -445,17 +445,17 @@ impl @counter {
         if other.type == @number {
             
             self.item.if_is(LARGER_THAN, other, !{
-                return true
+                -> return true
             })
 
             self.item.if_is(SMALLER_THAN, other + 1, !{
-                return false
+                -> return false
             })
         } else if other.type == @counter {
             self_clone = self.clone()
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
-            return cmp == 1
+            -> return cmp == 1
         } else {
             error "Cannot compare counter with " + other.type as @string
         }
@@ -466,17 +466,17 @@ impl @counter {
         if other.type == @number {
             
             self.item.if_is(SMALLER_THAN, other, !{
-                return true
+                -> return true
             })
 
             self.item.if_is(LARGER_THAN, other - 1, !{
-                return false
+                -> return false
             })
         } else if other.type == @counter {
             self_clone = self.clone()
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
-            return cmp == -1
+            -> return cmp == -1
         } else {
             error "Cannot compare counter with " + other.type as @string
         }
@@ -487,17 +487,17 @@ impl @counter {
         if other.type == @number {
             
             self.item.if_is(LARGER_THAN, other - 1, !{
-                return true
+                -> return true
             })
 
             self.item.if_is(SMALLER_THAN, other, !{
-                return false
+                -> return false
             })
         } else if other.type == @counter {
             self_clone = self.clone()
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
-            return cmp == 1 || cmp == 0
+            -> return cmp == 1 || cmp == 0
         } else {
             error "Cannot compare counter with " + other.type as @string
         }
@@ -508,17 +508,17 @@ impl @counter {
         if other.type == @number {
             
             self.item.if_is(SMALLER_THAN, other + 1, !{
-                return true
+                -> return true
             })
 
             self.item.if_is(LARGER_THAN, other, !{
-                return false
+                -> return false
             })
         } else if other.type == @counter {
             self_clone = self.clone()
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
-            return cmp == -1 || cmp == 0
+            -> return cmp == -1 || cmp == 0
         } else {
             error "Cannot compare counter with " + other.type as @string
         }
@@ -528,11 +528,11 @@ impl @counter {
         if other.type == @number {
             
             self.item.if_is(EQUAL_TO, other, !{
-                return true
+                -> return true
             })
 
             ret_false = !{
-                return false
+                -> return false
             }
 
             self.item.if_is(LARGER_THAN, other, ret_false)
@@ -541,14 +541,14 @@ impl @counter {
             self_clone = self.clone()
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
-            return cmp == 0
+            -> return cmp == 0
         } else {
             error "Cannot compare counter with " + other.type as @string
         }
     },
 
     _not_equal_: (self, other: @number | @counter) {
-        return !(self == other)
+        -> return !(self == other)
     },
 
     add: #[desc("Implementation of the pickup trigger")]
@@ -634,7 +634,7 @@ impl @counter {
         
         for val in range {
             -> self.item.if_is(EQUAL_TO, val, !{
-                return val
+                -> return val
             }) 
         }
     },
@@ -654,7 +654,7 @@ impl @counter {
     
     _as_: (self, _type: @type_indicator) {
         if _type == @bool {
-            return self != 0
+            -> return self != 0
         } else {
             error "Cannot convert counter to " + _type as @string + " (counter can convert to a number using the counter.to_const macro)"
         }

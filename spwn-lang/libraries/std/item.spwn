@@ -35,12 +35,12 @@ impl @item {
     },
 
     count:
-    #[desc("Implementation of the count trigger (returns an event)")]
+    #[desc("Implementation of the count trigger (-> returns an event)")]
     (
         self, 
         #[desc("Number to check against")] number: @number = 0
     ) {
-        return @event::{
+        -> return @event::{
             on_triggered: (function) => $.add( trigger{
                 OBJ_ID: 1611,
                 TARGET: function,

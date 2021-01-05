@@ -29,12 +29,15 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     if !output_path.exists() {
         std::fs::create_dir(output_path.clone()).unwrap();
     }
+    let mut info = CompilerInfo::new();
+    info.includes
+        .push(std::env::current_dir().expect("Cannot access current directory"));
 
     let module = import_module(
         &ImportType::Lib(path.to_string()),
         &start_context,
         &mut globals,
-        CompilerInfo::new(),
+        info,
         false,
     )?;
 

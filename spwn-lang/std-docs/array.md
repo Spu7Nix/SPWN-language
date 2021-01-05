@@ -2,7 +2,36 @@
 
 # **@array**: 
  
+## **all\_mutable**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>
+>  
+>
+
+## **clear**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>
+>  
+>
+
 ## **contains**:
+
+> **Value:** `(self, el) { /* code omitted */ }` (`@macro`) 
+>
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`el`** |any | | |
+>  
+>  
+>
+
+## **index**:
 
 > **Value:** `(self, el) { /* code omitted */ }` (`@macro`) 
 >
@@ -72,5 +101,13 @@
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`index`** | @number | | |
 >  
+>  
+>
+
+## **reverse**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>
 >  
 >

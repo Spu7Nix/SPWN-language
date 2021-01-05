@@ -15,7 +15,7 @@ events = import "events.spwn"
 ctrl_flow = import "control_flow.spwn"
 
 
-return {
+-> return {
     ..constants.easing_types,
     ..constants.comparisons,
     ..constants.colors,

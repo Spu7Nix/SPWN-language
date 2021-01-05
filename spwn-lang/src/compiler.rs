@@ -240,7 +240,7 @@ pub fn compile_spwn(
     )?;
 
     for c in contexts {
-        if let Some(i) = c.broken {
+        if let Some((i, _)) = c.broken {
             return Err(RuntimeError::RuntimeError {
                 message: "break statement is never used".to_string(),
                 info: i,
@@ -321,14 +321,6 @@ pub fn compile_scope(
         //println!("{}:{}:{}", info.current_file.to_string_lossy(), info.pos.0.0, info.pos.0.1);
         //use crate::fmt::SpwnFmt;
         match &statement.body {
-            Break => {
-                //set all contexts to broken
-                for c in &mut contexts {
-                    (*c).broken = Some(info.clone());
-                }
-                break;
-            }
-
             Expr(expr) => {
                 let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> = SmallVec::new();
                 for context in &contexts {
@@ -729,11 +721,11 @@ pub fn compile_scope(
                                 new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
                                     // add contexts made in the loop to the new_contexts, if theyre not broken
-                                    if c.broken == None {
-                                        new_contexts.push(c)
-                                    } else {
+                                    if let Some((_, BreakType::Loop)) = c.broken {
                                         c.broken = None;
                                         out_contexts.push(c)
+                                    } else {
+                                        new_contexts.push(c)
                                     }
                                 }
 
@@ -788,11 +780,11 @@ pub fn compile_scope(
                                 new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
                                     // add contexts made in the loop to the new_contexts, if theyre not broken
-                                    if c.broken == None {
-                                        new_contexts.push(c)
-                                    } else {
+                                    if let Some((_, BreakType::Loop)) = c.broken {
                                         c.broken = None;
                                         out_contexts.push(c)
+                                    } else {
+                                        new_contexts.push(c)
                                     }
                                 }
 
@@ -834,11 +826,11 @@ pub fn compile_scope(
 
                                 new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
-                                    if c.broken == None {
-                                        new_contexts.push(c)
-                                    } else {
+                                    if let Some((_, BreakType::Loop)) = c.broken {
                                         c.broken = None;
                                         out_contexts.push(c)
+                                    } else {
+                                        new_contexts.push(c)
                                     }
                                 }
 
@@ -878,11 +870,11 @@ pub fn compile_scope(
 
                                 new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
-                                    if c.broken == None {
-                                        new_contexts.push(c)
-                                    } else {
+                                    if let Some((_, BreakType::Loop)) = c.broken {
                                         c.broken = None;
                                         out_contexts.push(c)
+                                    } else {
+                                        new_contexts.push(c)
                                     }
                                 }
 
@@ -904,30 +896,46 @@ pub fn compile_scope(
                     }
                 }
             }
-            Return(return_val) => match return_val {
-                Some(val) => {
-                    let mut all_values: Returns = SmallVec::new();
-                    for context in &contexts {
-                        let (evaled, inner_returns) =
-                            val.eval(context, globals, info.clone(), true)?;
-                        returns.extend(inner_returns);
-                        all_values.extend(evaled);
+            Break => {
+                //set all contexts to broken
+                for c in &mut contexts {
+                    (*c).broken = Some((info.clone(), BreakType::Loop));
+                }
+                break;
+            }
+            Return(return_val) => {
+                match return_val {
+                    Some(val) => {
+                        let mut all_values: Returns = SmallVec::new();
+                        for context in &contexts {
+                            let (evaled, inner_returns) =
+                                val.eval(context, globals, info.clone(), true)?;
+                            returns.extend(inner_returns);
+                            all_values.extend(evaled);
+                        }
+
+                        returns.extend(all_values);
                     }
 
-                    returns.extend(all_values);
-                }
-
-                None => {
-                    let mut all_values: Returns = SmallVec::new();
-                    for context in &contexts {
-                        all_values.push((
-                            store_value(Value::Null, 1, globals, context),
-                            context.clone(),
-                        ));
+                    None => {
+                        let mut all_values: Returns = SmallVec::new();
+                        for context in &contexts {
+                            all_values.push((
+                                store_value(Value::Null, 1, globals, context),
+                                context.clone(),
+                            ));
+                        }
+                        returns.extend(all_values);
                     }
-                    returns.extend(all_values);
+                };
+                if !statement.arrow {
+                    //set all contexts to broken
+                    for c in &mut contexts {
+                        (*c).broken = Some((info.clone(), BreakType::Macro));
+                    }
+                    break;
                 }
-            },
+            }
 
             Error(e) => {
                 for context in &contexts {
@@ -965,7 +973,7 @@ pub fn compile_scope(
         if let Some(c) = stored_context {
             //resetting the context if async
             for c in contexts {
-                if let Some(i) = c.broken {
+                if let Some((i, _)) = c.broken {
                     return Err(RuntimeError::RuntimeError {
                         message:
                             "break statement is never used because it's inside an arrow statement"
@@ -1155,6 +1163,15 @@ pub fn import_module(
 
     let (contexts, mut returns) =
         compile_scope(&parsed, smallvec![start_context], globals, new_info)?;
+
+    for c in &contexts {
+        if let Some((i, BreakType::Loop)) = &c.broken {
+            return Err(RuntimeError::RuntimeError {
+                message: "break statement is never used".to_string(),
+                info: i.clone(),
+            });
+        }
+    }
     (*globals).path = stored_path;
 
     if let Some(stored_impl) = stored_impl {

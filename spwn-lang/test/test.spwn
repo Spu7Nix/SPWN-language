@@ -1,11 +1,12 @@
-#[no_level]
-extract $
+mac = () {
+    for i in 0..10 {
+        if i > 5 {
+            !{ 
+                -> return i
+            }!
+        }
+    }
+}
 
-let a = [];
+$.print(mac())
 
-let b = {test: 4}
-
-//a.push(b)
-append(a, b)
-
-a[0].test = 10;

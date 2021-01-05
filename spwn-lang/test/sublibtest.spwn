@@ -1,6 +1,0 @@
-let a = 10
-
-
-return {
-	a: a
-}

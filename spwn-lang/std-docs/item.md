@@ -47,7 +47,7 @@
 
 ## **if\_is**:
 
-> **Value:** `(self, comparison: @comparison, other: @number, function: @function) { /* code omitted */ }` (`@macro`) 
+> **Value:** `(self, comparison: @comparison, other: @number, function: @trigger_function) { /* code omitted */ }` (`@macro`) 
 >
 >## Description: 
 > _Implementation of the instant count trigger_
@@ -57,7 +57,7 @@
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`comparison`** | @comparison | |Comparison mode |
 >  | 3 | **`other`** | @number | |Number to compare with |
->  | 4 | **`function`** | @function | |Target function if comparison is 'true' |
+>  | 4 | **`function`** | @trigger_function | |Target function if comparison is 'true' |
 >  
 >  
 >

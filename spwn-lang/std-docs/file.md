@@ -30,13 +30,13 @@
 
 ## **seek**:
 
-> **Value:** `(s: @number) { /* code omitted */ }` (`@macro`) 
+> **Value:** `(self, s: @number) { /* code omitted */ }` (`@macro`) 
 >
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 1 | **`s`** | @number | | |
+>| 2 | **`s`** | @number | | |
 >  
 >  
 >

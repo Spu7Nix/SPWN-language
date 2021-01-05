@@ -13,11 +13,11 @@ wait = #[desc("Adds a delay before the next triggers")] (
 			OBJ_ID: 1268,
 			SPAWN_DURATION: time,
 			TARGET: !{
-				return
+				-> return
 			},
 		})
 	} else {
-		return
+		-> return
 	}
 	
 }
@@ -31,7 +31,7 @@ call_with_delay = #[desc("Call a function after a delay")] (
 		TARGET: function,
 	})
 }
-return {
+-> return {
 	wait: wait,
 	call_with_delay: call_with_delay,
 	
@@ -51,7 +51,7 @@ return {
 		}()
 		checker.item.if_is(EQUAL_TO, 0, !{
 			checker.item.add(1)
-			return
+			-> return
 		})
 		
 	
@@ -79,7 +79,7 @@ return {
                 if reset {
                     i.reset(reset_speed)
                 }
-                return
+                -> return
             })
         }
 
@@ -89,7 +89,7 @@ return {
 
 	while_loop: #[desc("Implementation of a conditional spawn loop")] 
 	(
-		#[desc("While loop condition, should return a boolean")] expr: @macro, 
+		#[desc("While loop condition, should -> return a boolean")] expr: @macro, 
 		#[desc("Macro of the code that gets looped")] code: @macro,
 		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
 	) {
@@ -98,7 +98,7 @@ return {
 			if expr() {
 				call_with_delay(delay, func)
 			} else {
-				return
+				-> return
 			}
         }
 
@@ -121,7 +121,7 @@ return {
 				ready_sign.add(-1)
 				closure.start_group.toggle_off()
 				wait(0)
-				return
+				-> return
 			}
 			closure.start_group.toggle_on()
 			ready_sign.count(1).on_triggered(!{
@@ -130,7 +130,7 @@ return {
 			})
 		}
 
-		return () {
+		-> return () {
 			func!
 			wait_for_ready()
 		}

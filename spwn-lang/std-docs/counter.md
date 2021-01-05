@@ -223,6 +223,19 @@
 >  
 >
 
+## **\_swap\_**:
+
+> **Value:** `(self, num: @counter) { /* code omitted */ }` (`@macro`) 
+>
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`num`** | @counter | | |
+>  
+>  
+>
+
 ## **\_times\_**:
 
 > **Value:** `(self, num: @number | @counter) { /* code omitted */ }` (`@macro`) 
@@ -422,6 +435,22 @@
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`range`** | [@number] or @range | |Array or range of possible output values |
+>  
+>  
+>
+
+## **to\_const\_enclosed**:
+
+> **Value:** `(self, range: [@number] | @range, closure: @macro) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Converts the counter into a normal number that you can use within a macro_
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`range`** | [@number] or @range | |Array or range of possible output values |
+>  | 3 | **`closure`** | @macro | |Closure where you can use the const value, should take the value as the first argument |
 >  
 >  
 >
