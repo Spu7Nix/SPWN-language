@@ -276,7 +276,7 @@ pub enum Token {
     #[token("in")]
     In,
 
-    #[token("error")]
+    #[token("throw")]
     ErrorStatement,
 
     #[token("if")]
