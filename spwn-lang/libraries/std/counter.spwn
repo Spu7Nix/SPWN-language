@@ -40,7 +40,7 @@ impl @counter {
                 item: id
             }
         } else {
-            error "Can not make counter from this type"
+            throw "Can not make counter from this type"
         }
         
     },
@@ -182,7 +182,7 @@ impl @counter {
             temp.add_to([self.item], speed)
             
         } else {
-            error "Cannot multiply counter by " + factor.type as @string
+            throw "Cannot multiply counter by " + factor.type as @string
         }
     },
 
@@ -228,7 +228,7 @@ impl @counter {
             }
             div!
         } else if divisor.type == @counter {
-            //error "Dividing a counter by another counter is currently not supported"
+            //throw "Dividing a counter by another counter is currently not supported"
             result = @counter::new(0, false)
             remainder.reset(speed)
             delay = @epsilon::{}
@@ -289,7 +289,7 @@ impl @counter {
             
          
         } else {
-            error "Cannot divide counter by " + divisor.type as @string
+            throw "Cannot divide counter by " + divisor.type as @string
         }
 
         
@@ -399,7 +399,7 @@ impl @counter {
             other.clone().add_to([new_counter.item])
             -> return new_counter
         } else {
-            error "Cannot add counter with " + num.type as @string
+            throw "Cannot add counter with " + num.type as @string
         }
     },
 
@@ -409,7 +409,7 @@ impl @counter {
             new_counter.add(-other)
             -> return new_counter
         } else {
-            error "Cannot subtract counter with " + num.type as @string
+            throw "Cannot subtract counter with " + num.type as @string
         }
     },
 
@@ -457,7 +457,7 @@ impl @counter {
             cmp = self_clone.compare(other_clone)
             -> return cmp == 1
         } else {
-            error "Cannot compare counter with " + other.type as @string
+            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -478,7 +478,7 @@ impl @counter {
             cmp = self_clone.compare(other_clone)
             -> return cmp == -1
         } else {
-            error "Cannot compare counter with " + other.type as @string
+            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -499,7 +499,7 @@ impl @counter {
             cmp = self_clone.compare(other_clone)
             -> return cmp == 1 || cmp == 0
         } else {
-            error "Cannot compare counter with " + other.type as @string
+            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -520,7 +520,7 @@ impl @counter {
             cmp = self_clone.compare(other_clone)
             -> return cmp == -1 || cmp == 0
         } else {
-            error "Cannot compare counter with " + other.type as @string
+            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -543,7 +543,7 @@ impl @counter {
             cmp = self_clone.compare(other_clone)
             -> return cmp == 0
         } else {
-            error "Cannot compare counter with " + other.type as @string
+            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -563,7 +563,7 @@ impl @counter {
         } else if num.type == @counter {
             num.clone().add_to([self])
         } else {
-            error "Cannot add " + num.type as @string + " to counter"
+            throw "Cannot add " + num.type as @string + " to counter"
         }
     },
 
@@ -575,7 +575,7 @@ impl @counter {
         } else if num.type == @counter {
             num.clone().subtract_from([self])
         } else {
-            error "Cannot subtract " + num.type as @string + " from counter"
+            throw "Cannot subtract " + num.type as @string + " from counter"
         }
     },
 
@@ -586,7 +586,7 @@ impl @counter {
         } else if num.type == @counter {
             self.multiply(num)
         } else {
-            error "Cannot multiply counter by " + num.type as @string
+            throw "Cannot multiply counter by " + num.type as @string
         }
     },
 
@@ -596,7 +596,7 @@ impl @counter {
         } else if num.type == @counter {
             self.divide(num)
         } else {
-            error "Cannot divide counter by " + num.type as @string
+            throw "Cannot divide counter by " + num.type as @string
         }
     },
 
@@ -609,7 +609,7 @@ impl @counter {
         } else if num.type == @counter {
             num.copy_to([self])
         } else {
-            error "Cannot assign" + num.type as @string + " to counter"
+            throw "Cannot assign" + num.type as @string + " to counter"
         }
     },
 
@@ -623,7 +623,7 @@ impl @counter {
             wait()
             swap_tmp.copy_to([self]);
         } else {
-            error "Cannot swap counter with " + num.type as @string
+            throw "Cannot swap counter with " + num.type as @string
         }
     },
 
@@ -656,7 +656,7 @@ impl @counter {
         if _type == @bool {
             -> return self != 0
         } else {
-            error "Cannot convert counter to " + _type as @string + " (counter can convert to a number using the counter.to_const macro)"
+            throw "Cannot convert counter to " + _type as @string + " (counter can convert to a number using the counter.to_const macro)"
         }
     }
 }

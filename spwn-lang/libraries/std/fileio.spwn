@@ -14,7 +14,7 @@ impl @file {
 	},
 	seek: (self, s: @number) {
 		if s < 0 {
-			error "Negative seek position " + s as @string;
+			throw "Negative seek position " + s as @string;
 		}
 		self.fseek = s;
 	},
