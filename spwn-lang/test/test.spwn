@@ -1,12 +1,4 @@
-mac = () {
-    for i in 0..10 {
-        if i > 5 {
-            !{ 
-                -> return i
-            }!
-        }
-    }
-}
 
-$.print(mac())
+
+$.print(@string(1000))
 

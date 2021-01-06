@@ -2580,6 +2580,25 @@ impl ast::Variable {
                                     evaled.iter().map(|x| (x.0, x.1.clone(), *v)).collect();
                             }
 
+                            Value::TypeIndicator(_) => {
+                                if args.len() != 1 {
+                                    return Err(RuntimeError::RuntimeError {
+                                        message: format!("casting takes one argument, but {} were provided", args.len()),
+                                        info,
+                                    })
+                                }
+                                let mut all_values = Returns::new();
+                                let (evaled, returns) = args[0].value.eval(cont, globals, info.clone(), constant)?;
+                                inner_returns.extend(returns);
+                                for (val, c) in evaled {
+                                    let evaled = handle_operator(val, *v, "_as_", &c, globals, &info)?;
+                                    all_values.extend(evaled);
+                                }
+                                
+                                with_parent =
+                                all_values.iter().map(|x| (x.0, x.1.clone(), *v)).collect();
+                            }
+
                             Value::BuiltinFunction(name) => {
                                 let (evaled_args, returns) = all_combinations(
                                     args.iter().map(|x| x.value.clone()).collect(),
