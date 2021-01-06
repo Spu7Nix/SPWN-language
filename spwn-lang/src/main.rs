@@ -33,10 +33,7 @@ const ERROR_EXIT_CODE: i32 = 1;
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-
 const HELP: &str = include_str!("../help.txt");
-
-
 
 fn print_with_color(text: &str, color: Color) {
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
@@ -81,9 +78,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut live_editor = false;
 
                     let mut save_file = None;
-                    let mut included_paths = vec![std::env::current_dir().expect("Cannot access current directory")];
+                    let mut included_paths = vec![
+                        std::env::current_dir().expect("Cannot access current directory"),
+                        std::env::current_exe().expect("Cannot access directory of executable"),
+                    ];
                     //change to current_exe before release (from current_dir)
-
 
                     while let Some(arg) = args_iter.next() {
                         match arg.as_ref() {
@@ -91,13 +90,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "--no-level" | "-l" => {
                                 gd_enabled = false;
                                 compile_only = true;
-                            },
+                            }
                             "--no-optimize" | "-o" => opti_enabled = false,
                             "--level-name" | "-n" => level_name = args_iter.next().cloned(),
                             "--live-editor" | "-e" => live_editor = true,
                             "--save-file" | "-s" => save_file = args_iter.next().cloned(),
                             "--included-path" | "-i" => included_paths.push({
-                                let path = PathBuf::from(args_iter.next().cloned().expect("No path provided"));
+                                let path = PathBuf::from(
+                                    args_iter.next().cloned().expect("No path provided"),
+                                );
                                 if path.exists() {
                                     path
                                 } else {
@@ -132,9 +133,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     let gd_path = if gd_enabled {
-                        Some( if save_file != None{
+                        Some(if save_file != None {
                             PathBuf::from(save_file.expect("what"))
-                        }else if cfg!(target_os = "windows") {
+                        } else if cfg!(target_os = "windows") {
                             PathBuf::from(std::env::var("localappdata").expect("No local app data"))
                                 .join("GeometryDash/CCLocalLevels.dat")
                         } else if cfg!(target_os = "macos") {
@@ -231,10 +232,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     std::process::exit(ERROR_EXIT_CODE);
                                 }
                                 Ok(_) => {
-                                    print_with_color(
-                                        "Pasted into the editor!",
-                                        Color::Green,
-                                    );
+                                    print_with_color("Pasted into the editor!", Color::Green);
                                 }
                             }
                         } else {

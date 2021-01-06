@@ -77,6 +77,7 @@ call_with_delay = #[desc("Call a function after a delay")] (
 
             i.item.if_is(LARGER_THAN, range.end - 1, !{
                 if reset {
+					wait()
                     i.reset(reset_speed)
                 }
                 -> return

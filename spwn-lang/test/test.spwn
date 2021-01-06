@@ -1,4 +1,79 @@
+extract obj_props;
 
+type @binaryCalculator;
 
-$.print(@string(1000))
+impl @binaryCalculator {
 
+    new: (bits: @number, x: @number, y: @number) {
+        let bitCounters = [];
+
+        for i in ..bits {
+            item = ?i;
+
+            $.add(obj {
+                OBJ_ID: 1615,
+                X: x + i * 30,
+                Y: y,
+                ITEM: item,
+                GROUPS: 999g
+            });
+
+            bitCounters.push(counter(item));
+        }
+
+        return {
+            bitCounters: bitCounters,
+            type: @binaryCalculator
+        }
+    },
+    binaryToDecimal: (self, target: @counter) {
+        target = 0;
+        wait(1);
+
+        for i in ..self.bitCounters.length {
+            if self.bitCounters[self.bitCounters.length - 1 - i] as @bool {
+                target += 2 ^ i;
+            }
+        }
+    },
+    decimalToBinary: (self, source: @counter, calcSpeed: @number = 5) {
+        let tempcounters = [];
+
+        for i in ..self.bitCounters.length {
+            tempcounters.push(counter());
+        }
+
+        source.copy_to(tempcounters, speed = 10);
+
+        for i in ..self.bitCounters.length {
+            -> () {
+                tempcounters[i].divide(2 ^ i, speed = calcSpeed);
+                tempcounters[i].divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i], speed = calcSpeed);
+            }();
+        }
+    },
+    prettyDecimalToBinary: (self, source: @counter, calcSpeed: @number = 10) {
+        
+        for i in ..self.bitCounters.length {
+            source.divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i], speed = calcSpeed);
+        }
+
+        self.binaryToDecimal(source);
+    }
+}
+
+decimal = ?i;
+decimalCounter = counter(decimal);
+calculator = @binaryCalculator::new(12, 300, 300);
+
+$.add(obj {
+    OBJ_ID: 1615,
+    X: 300,
+    Y: 330,
+    ITEM: decimal,
+    GROUPS: 999g
+});
+
+decimalCounter += 1234;
+wait(1);
+calculator.decimalToBinary(decimalCounter);

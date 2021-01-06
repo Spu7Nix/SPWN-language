@@ -1066,19 +1066,9 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
             values: Vec::new(),
         };
 
-        for (i, op) in expr.operators.iter().enumerate() {
+        for (i, op) in expr.operators.iter().enumerate().rev() {
             if operator_precedence(op) == lowest {
                 new_expr.operators.push(*op);
-                new_expr.values.push(if i == 0 {
-                    expr.values[0].clone()
-                } else {
-                    fix_precedence(ast::Expression {
-                        operators: expr.operators[..i].to_vec(),
-                        values: expr.values[..(i + 1)].to_vec(),
-                    })
-                    .to_variable()
-                });
-
                 new_expr.values.push(if i == expr.operators.len() - 1 {
                     expr.values.last().unwrap().clone()
                 } else {
@@ -1090,10 +1080,21 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
                     })
                     .to_variable()
                 });
+                new_expr.values.push(if i == 0 {
+                    expr.values[0].clone()
+                } else {
+                    fix_precedence(ast::Expression {
+                        operators: expr.operators[..i].to_vec(),
+                        values: expr.values[..(i + 1)].to_vec(),
+                    })
+                    .to_variable()
+                });
 
                 break;
             }
         }
+        new_expr.operators.reverse();
+        new_expr.values.reverse();
 
         new_expr
     }

@@ -266,7 +266,7 @@ impl SpwnFmt for ValueBody {
             TypeIndicator(x) => format!("@{}", x),
             Null => "null".to_string(),
             SelfVal => "self".to_string(),
-            Switch(_, _) => "switch".to_string()
+            Switch(_, _) => "switch".to_string(),
         }
     }
 }
