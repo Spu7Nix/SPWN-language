@@ -1,5 +1,5 @@
 [package]
-name = "spwn-lang"
+name = "spwn"
 version = "0.1.0"
 authors = ["Spu7Nix <spu7nix@outlook.com>"]
 edition = "2018"
@@ -25,3 +25,5 @@ libc = "0.2.81"
 
 # [target.'cfg(target_os = "windows")'.dependencies]
 # named_pipe = "0.4.1"
+
+# heat dir libraries -o wix/libraries.wxs -scom -frag -srd -sreg -gg -cg libraries -dr LIB_DIR -suid
