@@ -1210,6 +1210,10 @@ fn parse_expr(
     let mut values = Vec::<ast::Variable>::new();
     let mut operators = Vec::<ast::Operator>::new();
 
+    tokens.next(false, false);
+    let (start_pos, _) = tokens.position();
+    tokens.previous_no_ignore(false, false);
+
     values.push(parse_variable(tokens, notes, check_for_comments)?);
     // all expressions begin with a variable
 
@@ -1237,31 +1241,94 @@ fn parse_expr(
             break;
         }
     }
-    // loop {
-    //     let op = match tokens.next(false, false) {
-    //         Some(t) => match parse_operator(&t) {
-    //             Some(o) => {
-    //                 if allow_mut_op {
-    //                     o
-    //                 } else {
-    //                     match o {
-    //                         ast::Operator::Assign
-    //                         | ast::Operator::Add
-    //                         | ast::Operator::Subtract
-    //                         | ast::Operator::Multiply
-    //                         | ast::Operator::Divide => break,
-    //                         _ => o,
-    //                     }
-    //                 }
-    //             }
-    //             None => break,
-    //         },
-    //         None => break,
-    //     };
-    // }
-    tokens.previous_no_ignore(false, true);
 
-    Ok(fix_precedence(ast::Expression { values, operators })) //pemdas and stuff
+    tokens.previous_no_ignore(false, true);
+    let express = fix_precedence(ast::Expression { values: values.clone(), operators: operators.clone() }); //pemdas and stuff
+
+    match tokens.next(true, false) {
+        Some(Token::If) => { // oooh ternaries
+
+
+            // remove any = from the ternary and place into a seperate stack
+            let mut old_values = express.values.clone();
+            let mut old_operators = express.operators.clone();
+
+            let mut tern_values = Vec::<ast::Variable>::new();
+            let mut tern_operators = Vec::<ast::Operator>::new();
+
+
+            // iterate though the operators until we get one like =
+            while old_operators.len()>0 {
+                let ol = old_operators.len();
+                if operator_precedence(&old_operators[ol-1]) == 0 { // any assign operators have a precedence of 0
+                    match old_values.pop() {
+                        Some(v) => tern_values.push(v),
+                        _ => unreachable!() // pop should never return nothing 
+                    }
+                    break
+                }
+
+                match (old_values.pop(), old_operators.pop()) { 
+                    // pop off of the original expressionand put onto ternary stack
+                    (Some(v), Some(o)) => {
+                        tern_values.push(v);
+                        tern_operators.push(o);
+                    }
+                    (_, _) => unreachable!()
+                }
+            }
+
+            let conditional = parse_expr(tokens, notes, false, false)?;
+
+            let do_else = match tokens.next(false, false) { // every ternary needs an else
+                Some(Token::Else) => {
+                    parse_expr(tokens, notes, false, false)
+                }
+                _ => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "else".to_string(),
+                        found: tokens.slice(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
+            }?;
+
+            let (end_pos, _) = tokens.position();
+
+            // SPWN syntax structures can get pretty messy with variables, valuebodies,
+            // valueliterals, expressions, etc.
+            let tern = ast::Ternary {
+                conditional,
+                do_if: ast::Expression {
+                    values: tern_values,
+                    operators: tern_operators
+                },
+                do_else,
+            };
+
+            let ternval_literal = ast::ValueLiteral { 
+                body: ast::ValueBody::Ternary(tern)
+            };
+
+            old_values.push(ast::Variable {
+                operator: None,
+                value: ternval_literal,
+                path: vec![],
+                pos: (start_pos,end_pos),
+                comment: (None, None),
+            });
+
+            Ok(ast::Expression {
+                values: old_values,
+                operators: old_operators
+            })
+        }
+        _ =>  {
+            tokens.previous_no_ignore(false, false);
+            Ok(express)
+        }
+    }
 }
 
 fn parse_operator(token: &Token) -> Option<ast::Operator> {

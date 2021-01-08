@@ -1908,6 +1908,34 @@ impl ast::Variable {
                     context.clone(),
                 ));
             }
+
+            ast::ValueBody::Ternary(t) => {
+                
+                let (evaled, returns) = t.conditional.eval(&context, globals, info.clone(), constant)?;
+                // contexts of the conditional
+
+                inner_returns.extend(returns);
+
+                for (condition, context) in evaled { // through every condictional context
+                    match &globals.stored_values[condition] {
+                        Value::Bool(b) => {
+                            let answer = if *b {&t.do_if} else {&t.do_else};
+
+                            let (evaled, returns) = answer.eval(&context, globals, info.clone(), constant)?;
+                            inner_returns.extend(returns);
+                            start_val.extend(evaled);
+                        }
+                        a => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!("Expected boolean condition in ternary statement, found {}", a.to_str(globals)),
+                                info,
+
+                            })
+                        }
+                    }
+                }
+            }
+
             ast::ValueBody::Switch(expr, cases) => {
                 // ok so in spwn you have to always assume every expression will split the context, that is,
                 // output multiple values in multiple contexts. This is called context splitting. A list of 
@@ -2581,22 +2609,30 @@ impl ast::Variable {
                             }
 
                             Value::TypeIndicator(_) => {
-                                if args.len() != 1 {
+                                if args.len() != 1 { // cast takes 1 argument only
                                     return Err(RuntimeError::RuntimeError {
                                         message: format!("casting takes one argument, but {} were provided", args.len()),
                                         info,
                                     })
                                 }
+
+                                // one value for each context
                                 let mut all_values = Returns::new();
-                                let (evaled, returns) = args[0].value.eval(cont, globals, info.clone(), constant)?;
+
+                                //find out whats in the thing we are casting first, its a tuple because contexts and stuff
+                                let (evaled, returns) = args[0].value.eval(cont, globals, info.clone(), constant)?; 
+
+                                //return statements are weird in spwn 
                                 inner_returns.extend(returns);
+
+                                // go through each context, c = context
                                 for (val, c) in evaled {
-                                    let evaled = handle_operator(val, *v, "_as_", &c, globals, &info)?;
+                                    let evaled = handle_operator(val, *v, "_as_", &c, globals, &info)?; // just use the "as" operator
                                     all_values.extend(evaled);
                                 }
                                 
                                 with_parent =
-                                all_values.iter().map(|x| (x.0, x.1.clone(), *v)).collect();
+                                all_values.iter().map(|x| (x.0, x.1.clone(), *v)).collect(); // not sure but it looks important
                             }
 
                             Value::BuiltinFunction(name) => {

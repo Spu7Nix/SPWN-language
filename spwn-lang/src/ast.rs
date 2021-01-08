@@ -71,6 +71,7 @@ pub enum ValueBody {
     Resolved(StoredValue),
     TypeIndicator(String),
     SelfVal,
+    Ternary(Ternary),
     Null,
 }
 
@@ -311,6 +312,13 @@ impl Variable {
 pub struct Expression {
     pub values: Vec<Variable>,
     pub operators: Vec<Operator>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Ternary {
+    pub conditional: Expression,
+    pub do_if: Expression,
+    pub do_else: Expression
 }
 
 impl Expression {
