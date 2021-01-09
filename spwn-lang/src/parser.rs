@@ -1326,6 +1326,7 @@ fn parse_dict(
                                 file: notes.file.clone(),
                             });
                         }
+                        tokens.previous();
                         defs.push(ast::DictDef::Def((
                             symbol.clone(),
                             ast::ValueBody::Symbol(symbol).to_variable().to_expression(),
@@ -1689,6 +1690,7 @@ pub fn str_content(
                 Some('t') => '\t',
                 Some('"') => '\"',
                 Some('\'') => '\'',
+                Some('\\') => '\\',
                 Some(a) => {
                     return Err(SyntaxError::SyntaxError {
                         message: format!("Invalid escape: \\{}", a),

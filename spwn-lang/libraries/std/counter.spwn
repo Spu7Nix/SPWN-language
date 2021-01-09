@@ -57,6 +57,7 @@ impl @counter {
             X: x,
             Y: y,
             ITEM: self.item,
+            COLOR: 1c,
             GROUPS: 999g
         });
     },
