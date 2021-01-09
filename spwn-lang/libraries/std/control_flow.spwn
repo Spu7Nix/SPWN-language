@@ -96,8 +96,9 @@ call_with_delay = #[desc("Call a function after a delay")] (
 	) {
 		func = !{
 			code()
+			wait(delay)
 			if expr() {
-				call_with_delay(delay, func)
+				func!
 			} else {
 				-> return
 			}
@@ -105,37 +106,6 @@ call_with_delay = #[desc("Call a function after a delay")] (
 
         call_with_delay(delay, func)
 	},
-
-	sync_function: 
-	(
-		code: @macro
-	) {
-		import "item.spwn"
-		ready_sign = ?i
-		func = !{
-			code()
-			ready_sign.add(1)
-		}
-
-		wait_for_ready = () {
-			closure = !{
-				ready_sign.add(-1)
-				closure.start_group.toggle_off()
-				wait(0)
-				-> return
-			}
-			closure.start_group.toggle_on()
-			ready_sign.count(1).on_triggered(!{
-				wait(0)
-				closure!
-			})
-		}
-
-		-> return () {
-			func!
-			wait_for_ready()
-		}
-	}
 	
 
 }
