@@ -266,6 +266,7 @@ impl SpwnFmt for ValueBody {
             TypeIndicator(x) => format!("@{}", x),
             Null => "null".to_string(),
             SelfVal => "self".to_string(),
+            Ternary(t) => format!("{} if {} else {}", t.do_if.fmt(ind), t.conditional.fmt(ind), t.do_else.fmt(ind)),
             Switch(_, _) => "switch".to_string(),
         }
     }
