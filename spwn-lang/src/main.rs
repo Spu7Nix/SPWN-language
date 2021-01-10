@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut save_file = None;
                     let mut included_paths = vec![
                         std::env::current_dir().expect("Cannot access current directory"),
-                        std::env::current_exe().expect("Cannot access directory of executable"),
+                        std::env::current_exe().expect("Cannot access directory of executable").parent().expect("Executable must be in some directory").to_path_buf(),
                     ];
                     //change to current_exe before release (from current_dir)
 

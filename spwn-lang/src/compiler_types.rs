@@ -24,8 +24,6 @@ pub struct ValStorage {
     pub map: HashMap<usize, (Value, Group, bool, u16)>, //val, fn context, mutable, lifetime
 }
 
-
-
 /*
 LIFETIME:
 
@@ -51,6 +49,7 @@ impl std::ops::IndexMut<usize> for ValStorage {
         &mut self.map.get_mut(&i).unwrap().0
     }
 }
+
 use std::collections::HashSet;
 impl ValStorage {
     pub fn new() -> Self {
@@ -175,7 +174,6 @@ pub fn store_value(
     (*globals).val_id += 1;
     index
 }
-
 pub fn clone_and_get_value(
     index: usize,
     lifetime: u16,
