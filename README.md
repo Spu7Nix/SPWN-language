@@ -8,7 +8,7 @@ coming soon
 
 # Documentation
 
-coming soon ish
+coming soon-ish
 
 # Todo before release:
 
