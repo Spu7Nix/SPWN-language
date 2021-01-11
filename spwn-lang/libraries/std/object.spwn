@@ -1,0 +1,9 @@
+#[no_std]
+impl @object {
+	set: (self, key: @object_key, value) {
+		$.edit_obj(self, key, value);
+	},
+	add: (self) {
+		$.add(self);
+	}
+}

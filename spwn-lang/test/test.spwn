@@ -1,7 +1,20 @@
-#[no_std]
-let t = 10;
+extract obj_props
 
-let a = t^2 if t+3==13 else 5;
-let b = t^2 if t > 100 else -30;
-$.print("first condition: ", a)
-$.print("second condition: ", b)
+let testobj = obj {
+	OBJ_ID: 1,
+	X: 100,
+	Y: 200,
+}
+
+$.print("Before edit: ", testobj)
+
+testobj.set(OBJ_ID, 20)
+
+$.print("After edit: ", testobj)
+
+$.print("This should fail:")
+let ctr = counter(1i)
+
+if ctr == 3 {
+	testobj.set(OBJ_ID, 30)
+}

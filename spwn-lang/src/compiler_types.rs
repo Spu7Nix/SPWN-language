@@ -2057,25 +2057,32 @@ impl ast::Variable {
 
 
             }
-            ast::ValueBody::Obj(o) => {
-                let mut all_expr: Vec<ast::Expression> = Vec::new();
-                for prop in &o.props {
-                    all_expr.push(prop.0.clone());
-                    all_expr.push(prop.1.clone());
+            ast::ValueBody::Obj(o) => { // parsing an obj
+
+                let mut all_expr: Vec<ast::Expression> = Vec::new(); // all expressions
+
+                for prop in &o.props { // iterate through obj properties
+
+                    all_expr.push(prop.0.clone()); // this is the object key expression
+                    all_expr.push(prop.1.clone()); // this is the object value expression
                 }
                 let new_info = info.clone();
+
                 let (evaled, returns) =
-                    all_combinations(all_expr, &context, globals, new_info, constant)?;
+                    all_combinations(all_expr, &context, globals, new_info, constant)?; // evaluate all expressions gathered
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, ObjParam)> = Vec::new();
                     for i in 0..(o.props.len()) {
-                        let v = expressions[i * 2];
-                        let v2 = expressions[i * 2 + 1];
 
+                        let o_key = expressions[i * 2]; 
+                        let o_val = expressions[i * 2 + 1];
+                        // hopefully self explanatory
 
-                        let (key, pattern) = match &globals.stored_values[v] {
-                            Value::Number(n) => {
+                        let (key, pattern) = match &globals.stored_values[o_key] {
+                        // key = int of the id, pattern = what type should be expected from the value
+
+                            Value::Number(n) => { // number, i have no clue why people would use this over an obj_key
                                 let out = *n as u16;
 
                                 if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
@@ -2087,9 +2094,9 @@ impl ast::Variable {
 
                                 (out, None)
                             },
-                            Value::Dict(d) => {
+                            Value::Dict(d) => { // this is specifically for object_key dicts
                                 let gotten_type = d.get(TYPE_MEMBER_NAME);
-                                if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) {
+                                if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
                                     return Err(RuntimeError::RuntimeError {
                                         message: "expected either @number or @object_key as object key".to_string(),
                                         info,
@@ -2097,24 +2104,24 @@ impl ast::Variable {
                                 }
                                 let id = d.get("id");
                                 if id == None {
-                                    return Err(RuntimeError::RuntimeError {
+                                    return Err(RuntimeError::RuntimeError { // object_key has an ID member for the key basically
                                         message: "object key has no 'id' member".to_string(),
                                         info,
                                     })
                                 }
                                 let pattern = d.get("pattern");
                                 if pattern == None {
-                                    return Err(RuntimeError::RuntimeError {
+                                    return Err(RuntimeError::RuntimeError { // same with pattern, for the expected type
                                         message: "object key has no 'pattern' member".to_string(),
                                         info,
                                     })
                                 }
 
-                                (match &globals.stored_values[*id.unwrap()] {
+                                (match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
                                     Value::Number(n) => {
                                         let out = *n as u16;
 
-                                        if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
+                                        if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) { // group ids and stuff on triggers
                                             return Err(RuntimeError::RuntimeError {
                                                 message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
                                                 info,
@@ -2142,10 +2149,10 @@ impl ast::Variable {
 
                         obj.push((
                             key,
-                            {   
-                                let val = globals.stored_values[v2].clone();
+                            {   // parse the value
+                                let val = globals.stored_values[o_val].clone();
 
-                                if let Some(pat) = pattern {
+                                if let Some(pat) = pattern { // check if pattern is actually enforced (not null)
                                     if !val.matches_pat(&pat, &info, globals, &context)? {
                                         return Err(RuntimeError::RuntimeError {
                                             message: format!(
@@ -2164,7 +2171,7 @@ impl ast::Variable {
                                     info: info.clone(),
                                 });
                                 
-                                match &val {
+                                match &val { // its just converting value to objparam basic level stuff
                                     Value::Number(n) => {
                                         
                                         ObjParam::Number(*n)
@@ -2196,7 +2203,7 @@ impl ast::Variable {
                                     Value::Dict(d) => {
                                         if let Some(t) = d.get(TYPE_MEMBER_NAME) {
                                             if let Value::TypeIndicator(t) = globals.stored_values[*t] {
-                                                if t == 20 {
+                                                if t == 20 { // type indicator number 20 is epsilon ig
                                                     ObjParam::Epsilon
                                                 } else {
                                                     return err;
@@ -2502,6 +2509,9 @@ impl ast::Variable {
                                         }
                                     }
                                 }
+                            }
+                            Value::Obj(_, _) => {
+                                // TODO: remove this
                             }
                             a => {
                                 return Err(RuntimeError::RuntimeError {
@@ -2911,12 +2921,6 @@ impl ast::Variable {
                             }
                         }
                     };
-                }
-                ast::Path::Index(_) => {
-                    return Err(RuntimeError::RuntimeError {
-                        message: "No implementation yet, oopsies".to_string(),
-                        info: info.clone()
-                    });
                 }
                 ast::Path::Associated(m) => {
                     match &globals.stored_values[current_ptr] {
