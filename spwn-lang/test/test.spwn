@@ -1,2 +1,4 @@
 let a = "epic moment"
-$.print(a has "epic")
+let b = ["a", "b", "c"]
+$.print("Should return true: ", a has "epic")
+$.print("Should return false: ",b has "epic")
