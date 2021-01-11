@@ -29,5 +29,25 @@ impl @string {
       }
     }
     return i;
-  }
+  },
+  
+  //piffle lines 34 - 48
+  copyString: (self, string) {
+    if self.length == 0 {
+      string = '';
+    } else {
+      string = self;
+    }
+  },
+  compString: (self, string) {
+    if self == string {
+      return true;
+    } else {
+      return false;
+    }
+  },
+  
+
+  
+  
 }
