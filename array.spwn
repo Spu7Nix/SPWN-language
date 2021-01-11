@@ -1,0 +1,87 @@
+#[no_std]
+impl @array {
+    max: (self, minval = -999999999999) {
+        let highest = minval
+        for el in self {
+            if el > highest {
+                highest = el
+            }
+        }
+        return highest
+    },
+    min: (self, max_val = 999999999999) {
+        let lowest = max_val
+        for el in self {
+            if el < lowest {
+                lowest = el
+            }
+        }
+        return lowest
+    },
+    contains: (self, el) {
+		let ret = false
+		for e in self {
+			if e == el {
+				ret = true
+				break
+			}
+		}
+		return ret
+	},
+    index: (self, el) {
+        let ret = null;
+        for i in 0..self.length {
+            if self[i] == el {
+                ret = i
+                break
+            }
+        }
+        return ret
+    },
+    clear: (self) {
+        for i in 0..self.length {
+            self.pop();
+        }
+    },
+    all_mutable: (self) {
+        let ret = [];
+        for el in self {
+            let mt = 2;
+            mt = el;
+            ret.push(mt);
+        }
+        return ret;
+    },
+    reverse: (self) {
+        if self.length == 0 {
+            return [];
+            break
+        }
+        let ret = [];
+        for i in 1..self.length {
+            ret.push(self[-i]);
+        }
+        ret.push(self[0]);
+        return ret;
+    },
+    join: (self, string) {
+        let s = '';
+        for i in 0..self.length {
+            if i != self.length - 1 {
+                s += self[i] + string;
+            } else {
+                s += self[i];
+            }
+        }
+        return s;
+    },
+    push: (self, value) {
+        $.append(self, value)
+    },
+    pop: (self) {
+        return $.pop(self)
+    },
+    remove: (self, index: @number) {
+        return $.remove_index(self, index)
+    }
+}
