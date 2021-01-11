@@ -425,6 +425,7 @@ impl SpwnFmt for Operator {
             Operator::Divide => "/=",
             Operator::IntDivide => "/%=",
             Operator::As => "as",
+            Operator::Has => "has",
             Operator::Either => "|",
             Operator::Exponate => "^=",
             Operator::Modulate => "%=",

@@ -1401,6 +1401,8 @@ impl ast::Expression {
 
                         As => handle_operator(acum_val, *val, "_as_", c2, globals, &info)?,
 
+                        Has => handle_operator(acum_val, *val, "_has_", c2, globals, &info)?,
+
                         Add => handle_operator(acum_val, *val, "_add_", c2, globals, &info)?,
 
                         Subtract => handle_operator(

@@ -170,6 +170,9 @@ pub enum Token {
     #[token("/%")]
     IntDividedBy,
 
+    #[token("has")]
+    Has,
+
     #[token("!")]
     Exclamation,
 
@@ -343,7 +346,7 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Either
+            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either
             | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap => "operator",
             Symbol => "identifier",
             Number => "number literal",
@@ -1024,6 +1027,7 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
         Less => 3,
 
         Equal => 2,
+        Has => 2,
         NotEqual => 2,
 
         Or => 1,
@@ -1361,6 +1365,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Exponate => Some(ast::Operator::Exponate),
         Token::Modulate => Some(ast::Operator::Modulate),
         Token::Swap => Some(ast::Operator::Swap),
+        Token::Has => Some(ast::Operator::Has),
         Token::As => Some(ast::Operator::As),
         _ => None,
     }

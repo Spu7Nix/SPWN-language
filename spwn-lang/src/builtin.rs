@@ -294,6 +294,7 @@ pub const BUILTIN_LIST: &[&str] = &[
     "_not_equal_",
     "_assign_",
     "_swap_",
+    "_has_",
     "_as_",
     "_add_",
     "_subtract_",
@@ -991,7 +992,7 @@ pub fn built_in_function(
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
         | "_less_or_equal_" | "_divided_by_" | "_intdivided_by_" | "_times_" | "_mod_"
         | "_pow_" | "_plus_" | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_swap_"
-        | "_as_" | "_add_" | "_subtract_" | "_multiply_" | "_divide_" | "_intdivide_"
+        | "_has_" | "_as_" | "_add_" | "_subtract_" | "_multiply_" | "_divide_" | "_intdivide_"
         | "_either_" | "_exponate_" | "_modulate_" | "_range_" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
@@ -1263,6 +1264,59 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     globals.stored_values[val] = globals.stored_values[acum_val].clone();
                     globals.stored_values[acum_val] = swap_temp;
                     Value::Null
+                }
+
+                "_has_" => match (val_a, val_b) {
+                    (Value::Array(ar), _) => {
+                        let mut out = false;
+                        for v in ar.clone() {
+                            //let cmp = &globals.stored_values[v];
+                            if value_equality(v, val, globals) {
+                                out = true;
+                                break;
+                            }
+                        }
+                        Value::Bool(out)
+                    },
+
+                    (Value::Dict(d), Value::Str(b)) => {
+                        let mut out = false;
+                        for k in d.keys() {
+                            if *k == b {
+                                out = true;
+                                break;
+                            }
+                        }
+                        Value::Bool(out)
+                    }
+
+                    (Value::Str(s), Value::Str(s2)) => {
+                        Value::Bool(s.contains(&s2))
+                    }
+
+                    (Value::Str(_), _) => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "string to compare".to_string(),
+                            found: format!("{}", b_type),
+                            info,
+                        })
+                    }
+
+                    (Value::Dict(_), _) => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "string as key".to_string(),
+                            found: format!("{}", b_type),
+                            info,
+                        })
+                    }
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "array, dictionary, or string".to_string(),
+                            found: format!("{}", a_type),
+                            info,
+                        })
+                    }
                 }
 
                 "_as_" => match globals.stored_values[val] {

@@ -127,6 +127,7 @@ pub enum Operator {
     Divide,
     IntDivide,
     As,
+    Has,
 
     Exponate,
     Modulate,

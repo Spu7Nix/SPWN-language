@@ -1,13 +1,2 @@
-extract obj_props
-
-let testobj = obj {
-	OBJ_ID: 14,
-	SPAWN_DURATION: @epsilon::{},
-	Y: 200,
-}
-
-$.print("value before edit: ", testobj[OBJ_ID])
-
-testobj.set(OBJ_ID, 123)
-
-$.print("value after edit: ", testobj[OBJ_ID])
+let a = "epic moment"
+$.print(a has "epic")
