@@ -1,4 +1,15 @@
-let a = "epic moment"
-let b = ["a", "b", "c"]
-$.print("Should return true: ", a has "epic")
-$.print("Should return false: ",b has "epic")
+extract obj_props
+let a = obj {
+	OBJ_ID: 1,
+	X: 10,
+	Y: 20,
+}
+if a has X {
+	$.print("it has x position")
+}
+
+if a has GROUPS {
+	$.print("it has groups")
+} else {
+	$.print("it does not have groups")
+}

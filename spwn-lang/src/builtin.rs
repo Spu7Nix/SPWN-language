@@ -1266,11 +1266,10 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     Value::Null
                 }
 
-                "_has_" => match (val_a, val_b) {
+                "_has_" => match (&globals.stored_values[acum_val], val_b) {
                     (Value::Array(ar), _) => {
                         let mut out = false;
                         for v in ar.clone() {
-                            //let cmp = &globals.stored_values[v];
                             if value_equality(v, val, globals) {
                                 out = true;
                                 break;
@@ -1294,6 +1293,53 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         Value::Bool(s.contains(&s2))
                     }
 
+                    (Value::Obj(o, _m), Value::Number(n)) => {
+                        let obj_has: bool = o.iter()
+                                             .any(|k| k.0==n as u16);
+                        Value::Bool(obj_has)
+                    }
+
+                    (Value::Obj(o, _m), Value::Dict(d)) => {
+                        let gotten_type = d.get(TYPE_MEMBER_NAME);
+
+                        if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
+                            return Err(RuntimeError::TypeError {
+                                expected: "either @number or @object_key".to_string(),
+                                found: format!("{}", b_type),
+                                info,
+                            })
+                        }
+
+                        let id = d.get("id");
+                        if id == None {
+                            return Err(RuntimeError::BuiltinError { // object_key has an ID member for the key basically
+                                message: "object key has no 'id' member".to_string(),
+                                info,
+                            })
+                        }
+                        let ob_key = match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
+                            Value::Number(n) => {
+                                *n as u16
+                            }
+                            _ => return Err(RuntimeError::TypeError {
+                                expected: "@number as object key".to_string(),
+                                found: format!("{}", globals.get_type_str(*id.unwrap())),
+                                info,
+                            })
+                        };
+                        let obj_has: bool = o.iter()
+                                             .any(|k| k.0==ob_key);
+                        Value::Bool(obj_has)
+                    }
+
+                    (Value::Obj(_, _), _) => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "@number or @object_key".to_string(),
+                            found: format!("{}", b_type),
+                            info,
+                        })
+                    }
+
                     (Value::Str(_), _) => {
                         return Err(RuntimeError::TypeError {
                             expected: "string to compare".to_string(),
@@ -1312,7 +1358,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
 
                     _ => {
                         return Err(RuntimeError::TypeError {
-                            expected: "array, dictionary, or string".to_string(),
+                            expected: "array, dictionary, object, or string".to_string(),
                             found: format!("{}", a_type),
                             info,
                         })
