@@ -1,20 +1,13 @@
 extract obj_props
 
 let testobj = obj {
-	OBJ_ID: 1,
-	X: 100,
+	OBJ_ID: 14,
+	SPAWN_DURATION: @epsilon::{},
 	Y: 200,
 }
 
-$.print("Before edit: ", testobj)
+$.print("value before edit: ", testobj[OBJ_ID])
 
-testobj.set(OBJ_ID, 20)
+testobj.set(OBJ_ID, 123)
 
-$.print("After edit: ", testobj)
-
-$.print("This should fail:")
-let ctr = counter(1i)
-
-if ctr == 3 {
-	testobj.set(OBJ_ID, 30)
-}
+$.print("value after edit: ", testobj[OBJ_ID])

@@ -2463,6 +2463,99 @@ impl ast::Variable {
                                     }
                                 }
                             }
+
+                            Value::Obj(o, _) => {
+
+                                let (evaled, returns) =
+                                    i.eval(&prev_c, globals, info.clone(), constant)?;
+                                inner_returns.extend(returns);
+                                for index in evaled {
+                                    match &globals.stored_values[index.0] {
+                                        Value::Dict(d) => {
+                                            let gotten_type = d.get(TYPE_MEMBER_NAME);
+                                            if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: "expected either @number or @object_key in index".to_string(),
+                                                    info,
+                                                })
+                                            }
+
+                                            let id = d.get("id");
+                                            if id == None {
+                                                return Err(RuntimeError::RuntimeError { // object_key has an ID member for the key basically
+                                                    message: "object key has no 'id' member".to_string(),
+                                                    info,
+                                                })
+                                            }
+                                            let okey = match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
+                                                Value::Number(n) => {
+                                                    *n as u16
+                                                }
+                                                _ => return Err(RuntimeError::RuntimeError {
+                                                    message: format!("object key's id has to be @number, found {}", globals.get_type_str(*id.unwrap())),
+                                                    info,
+                                                })
+                                            };
+
+                                            let mut contains = false;
+                                            for iter in o.iter() {
+                                                if iter.0 == okey {
+                                                    contains = true;
+
+                                                    let out_val = match &iter.1 { // its just converting value to objparam basic level stuff
+                                                        ObjParam::Number(n) => Value::Number(*n),
+                                                        ObjParam::Text(s) => Value::Str(s.clone()),
+
+                                                        ObjParam::Group(g) => Value::Group(*g),
+                                                        ObjParam::Color(c) => Value::Color(*c),
+                                                        ObjParam::Block(b) => Value::Block(*b),
+                                                        ObjParam::Item(i) => Value::Item(*i),
+
+                                                        ObjParam::Bool(b) => Value::Bool(*b),
+
+                                                        ObjParam::GroupList(g) => {
+                                                            let mut out = Vec::new();
+                                                            for s in g {
+                                                                let stored = store_const_value(Value::Group(*s), 1, globals, &index.1);
+                                                                out.push(stored);
+                                                            }
+                                                            Value::Array(out)
+                                                        },
+                                                        
+                                                        ObjParam::Epsilon => {
+                                                            let mut map = HashMap::<String, StoredValue>::new();
+                                                            let stored = store_const_value(Value::TypeIndicator(20), 1, globals, &index.1);
+                                                            map.insert(TYPE_MEMBER_NAME.to_string(), stored);
+                                                            Value::Dict(map)
+                                                        }
+                                                    };
+                                                    let stored = store_const_value(out_val, 1, globals, &index.1);
+                                                    new_out.push((stored, index.1, prev_v));
+                                                    break;
+                                                }
+                                            }
+
+                                            if !contains {
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: "Cannot find key in object".to_string(),
+                                                    info,
+                                                });
+                                            }
+
+                                        }
+                                        _ => {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: format!(
+                                                    "expected @object_key or @number in index, found @{}",
+                                                    globals.get_type_str(index.0)
+                                                ),
+                                                info,
+                                            })
+                                        }
+                                    }
+                                }
+
+                            }
                             Value::Str(s)  => {
                                 let arr: Vec<char> = s.chars().collect();
                                 
@@ -2509,9 +2602,6 @@ impl ast::Variable {
                                         }
                                     }
                                 }
-                            }
-                            Value::Obj(_, _) => {
-                                // TODO: remove this
                             }
                             a => {
                                 return Err(RuntimeError::RuntimeError {
