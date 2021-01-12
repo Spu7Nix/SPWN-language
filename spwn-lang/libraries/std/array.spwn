@@ -43,7 +43,7 @@ impl @array {
             self.pop();
         }
     },
-    join: (self, string) {
+    join: (self, string) { //sertdfyguhi 2021 Jan 11
         let s = '';
         for i in 0..self.length {
             if i != self.length - 1 {
