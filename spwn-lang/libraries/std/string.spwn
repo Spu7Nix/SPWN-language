@@ -29,25 +29,5 @@ impl @string {
       }
     }
     return i;
-  },
-  split_char: (self, char) {
-    let l = [];
-    let i = 0;
-    let first = true;
-    for c in self {
-      if c == char {
-        i++;
-        $.print('if')
-      } else {
-        $.print('else');
-        if first == true {
-          l[i] = c;
-          first = false;
-        } else {
-          l[i] += c;
-        }
-      }
-    }
-    return l;
   }
 }
