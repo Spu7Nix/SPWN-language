@@ -8,7 +8,7 @@ coming soon
 
 # Documentation
 
-coming soon-ish
+The documentation for the SPWN language is located at https://spu7nix.net/spwn/#/. There you can find more detailed information about SPWN, and how to use it. You can also visit the standard documentation at https://spu7nix.net/spwn/#/std-docs/std-docs.
 
 # Todo before release:
 
