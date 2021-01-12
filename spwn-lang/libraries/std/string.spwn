@@ -7,20 +7,6 @@ impl @string {
     }
     return s;
   },
-  startsWith: (self, value) {
-    if self[0] == value {
-      return true;
-    } else {
-      return false;
-    }
-  },
-  endsWith: (self, value) {
-    if self[self.length - 1] == value {
-      return true;
-    } else {
-      return false;
-    }
-  },
   count_char: (self, char) {
     let i = 0;
     for c in self {
@@ -30,25 +16,14 @@ impl @string {
     }
     return i;
   },
+  clear: (self) {
+    self = '';
+  },
   split_every_char: (self) {
     let l = [];
     for c in self {
       l.push(c)
     }
-    return l;
-  },
-  split_char: (self, char) {
-    let l = [];
-    let s = '';
-    for c in self {
-      if c == char {
-        l.push(s);
-        s.clear();
-      } else {
-        s += c;
-      }
-    }
-    l.push(s);
     return l;
   }
 }
