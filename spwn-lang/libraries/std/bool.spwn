@@ -1,0 +1,10 @@
+#[no_std] //sertdfyguhi 2021 Jan 12
+impl @bool {
+  as_integer: (self) {
+    if self == true {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+}

@@ -1,0 +1,23 @@
+#[no_std] // sertdfyguhi 12 Jan 2021
+impl @dictionary {
+  get: (self, key) {
+    return self[key];
+  },
+  clear: (self) {
+    self = {}
+  },
+  keys: (self) {
+    let i = [];
+    for k in self {
+      i.push(k[0])
+    }
+    return i;
+  },
+  values: (self) {
+    let i = [];
+    for k in self {
+      i.push(k[1])
+    }
+    return i;
+  }
+}
