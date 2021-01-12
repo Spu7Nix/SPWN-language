@@ -43,6 +43,17 @@ impl @array {
             self.pop();
         }
     },
+    join: (self, string) {
+        let s = '';
+        for i in 0..self.length {
+            if i != self.length - 1 {
+                s += self[i] + string;
+            } else {
+                s += self[i];
+            }
+        }
+        return s;
+    },
     all_mutable: (self) {
         let ret = [];
         for el in self {
