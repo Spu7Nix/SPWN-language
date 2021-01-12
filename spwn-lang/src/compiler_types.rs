@@ -2531,7 +2531,7 @@ impl ast::Variable {
                                                             Value::Dict(map)
                                                         }
                                                     };
-                                                    let stored = store_const_value(out_val, 1, globals, &index.1);
+                                                    let stored = store_const_value(out_val, globals.stored_values.map.get(&prev_v).unwrap().3, globals, &index.1);
                                                     new_out.push((stored, index.1, prev_v));
                                                     break;
                                                 }

@@ -4,12 +4,5 @@ let a = obj {
 	X: 10,
 	Y: 20,
 }
-if a has X {
-	$.print("it has x position")
-}
-
-if a has GROUPS {
-	$.print("it has groups")
-} else {
-	$.print("it does not have groups")
-}
+a.add_groups(3g)
+$.print("groups after: ", a[GROUPS])
