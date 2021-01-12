@@ -3014,6 +3014,50 @@ impl ast::Variable {
                         }
                     };
                 }
+                ast::Path::Index(i) => {
+                    let (evaled, _) = i.eval(&context, globals, info.clone(), true)?;
+                    let first_context_eval = evaled[0].0;
+                    match &globals.stored_values[current_ptr] {
+                        Value::Dict(d)  => {
+                            if evaled.len() > 1 {
+                                println!("Warning: context splitting inside of an index definition. Use $.dict_add for better results");
+                            }
+                            if let Value::Str(st) = globals.stored_values[first_context_eval].clone() {
+
+                                match d.get(&st) {
+                                    Some(_) => current_ptr = first_context_eval,
+                                    None => {
+                                        let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
+                                        if !stored.2 {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: "Cannot edit members of a constant value".to_string(),
+                                                info: info.clone(),
+                                            });
+                                        }
+                                        if let Value::Dict(d) = &mut stored.0 {
+                                            (*d).insert(st.to_string(), value);
+                                            defined = false;
+                                            current_ptr = value;
+                                        } else {
+                                            unreachable!();
+                                        }
+                                    }
+                                };
+                            } else {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: "Only string indexes are supported for dicts".to_string(),
+                                    info: info.clone(),
+                                });
+                            }
+                        }
+                        _ => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: "Other values are not supported yet".to_string(),
+                                info: info.clone()
+                            })
+                        },
+                    }
+                }
                 ast::Path::Associated(m) => {
                     match &globals.stored_values[current_ptr] {
                         Value::TypeIndicator(t) => match (*globals).implementations.get_mut(t) {

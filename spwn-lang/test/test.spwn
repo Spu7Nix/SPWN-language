@@ -1,8 +1,6 @@
-extract obj_props
-let a = obj {
-	OBJ_ID: 1,
-	X: 10,
-	Y: 20,
-}
-a.add_groups(3g)
-$.print("groups after: ", a[GROUPS])
+let a = {ok: 10}
+a["ok"] = 20
+
+let a["new"] = 30
+
+$.print(a)
