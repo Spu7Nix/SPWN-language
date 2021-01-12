@@ -29,5 +29,12 @@ impl @string {
       }
     }
     return i;
+  },
+  split_every_char: (self) {
+    let l = [];
+    for c in self {
+      l.push(c)
+    }
+    return l;
   }
 }
