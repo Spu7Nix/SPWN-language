@@ -11,6 +11,8 @@ import "object.spwn"
 import "counter.spwn"
 import "fileio.spwn"
 import "string.spwn" //sertdfyguhi 2021 Jan 11
+import "bool.spwn" // sertdfyguhi 12 Jan 2021
+import "dict.spwn"
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"
