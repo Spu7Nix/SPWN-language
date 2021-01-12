@@ -36,5 +36,19 @@ impl @string {
       l.push(c)
     }
     return l;
+  },
+  split_char: (self, char) {
+    let l = [];
+    let s = '';
+    for c in self {
+      if c == char {
+        l.push(s);
+        s.clear();
+      } else {
+        s += c;
+      }
+    }
+    l.push(s);
+    return l;
   }
 }
