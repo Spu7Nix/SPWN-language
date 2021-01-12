@@ -10,6 +10,7 @@ import "array.spwn"
 import "object.spwn"
 import "counter.spwn"
 import "fileio.spwn"
+import "string.spwn" //sertdfyguhi 2021 Jan 11
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"
