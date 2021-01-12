@@ -26,4 +26,4 @@ The documentation for the SPWN language is located at https://spu7nix.net/spwn/#
 - [ ] implement live editor features
 - [ ] make it work on mac (and linux?)
 - [ ] nested comments
-- [ ] get and edit obj and trigger properties
+- [x] get and edit obj and trigger properties
