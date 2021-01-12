@@ -1,0 +1,53 @@
+#[no_std] //sertdfyguhi 2021 Jan 11
+impl @string {
+  reverse: (self) {
+    let s = '';
+    for i in 0..self.length {
+      s += self[(self.length - 1) - i];
+    }
+    return s;
+  },
+  startsWith: (self, value) {
+    if self[0] == value {
+      return true;
+    } else {
+      return false;
+    }
+  },
+  endsWith: (self, value) {
+    if self[self.length - 1] == value {
+      return true;
+    } else {
+      return false;
+    }
+  },
+  count_char: (self, char) {
+    let i = 0;
+    for c in self {
+      if c == char {
+        i++;
+      }
+    }
+    return i;
+  },
+  split_char: (self, char) {
+    let l = [];
+    let i = 0;
+    let first = true;
+    for c in self {
+      if c == char {
+        i++;
+        $.print('if')
+      } else {
+        $.print('else');
+        if first == true {
+          l[i] = c;
+          first = false;
+        } else {
+          l[i] += c;
+        }
+      }
+    }
+    return l;
+  }
+}
