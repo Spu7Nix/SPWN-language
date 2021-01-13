@@ -232,6 +232,7 @@ dependencies = [
  "quick-xml",
  "smallvec",
  "termcolor",
+ "text_io",
 ]
 
 [[package]]
@@ -259,6 +260,12 @@ checksum = "2dfed899f0eb03f32ee8c6a0aabdb8a7949659e3466561fc0adf54e26d88c5f4"
 dependencies = [
  "winapi-util",
 ]
+
+[[package]]
+name = "text_io"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6cb170b4f47dc48835fbc56259c12d8963e542b05a24be2e3a1f5a6c320fd2d4"
 
 [[package]]
 name = "typenum"

@@ -8,6 +8,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use std::io::Write;
+use std::io::stdout;
+use text_io;
+
 macro_rules! arg_length {
     ($info:expr , $count:expr, $args:expr , $message:expr) => {
         if $args.len() != $count {
@@ -268,6 +272,7 @@ pub const BUILTIN_LIST: &[&str] = &[
     "dict_add",
     "dict_keys",
     "edit_obj",
+    "get_input",
     "pop",
     "remove_index",
     "split_str",
@@ -328,6 +333,16 @@ pub fn built_in_function(
             //out.pop();
             println!("{}", out);
             Value::Null
+        }
+
+        "get_input" => {
+            let mut out = String::new();
+            for val in arguments {
+                out += &globals.stored_values[val].to_str(globals);
+            }
+            print!("{}", out);
+            stdout().flush().expect("Unexpected error occurred when trying to get user input");
+            Value::Str(text_io::read!("{}\n"))
         }
 
         "matches" => {

@@ -91,5 +91,20 @@ impl @array {
             }
         }
         return output
-    }
+    },
+    reduce: (self, reduce_func: @macro) {
+        let acum = self[0];
+        for iter in 1..self.length {
+            acum = reduce_func(acum, self[iter]);
+        }
+        return acum;
+    },
+    any: (self) {
+        let numerical = self.reduce((t, v)=>@number(@bool(t))+@number(@bool(v)))
+        return numerical as @bool;
+    },
+    all: (self) {
+        let numerical = self.reduce((t, v)=>@number(@bool(t))*@number(@bool(v)))
+        return numerical as @bool;
+    },
 }

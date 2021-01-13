@@ -15,6 +15,7 @@ crc32fast = "1.2.0"
 logos = "0.11.4"
 termcolor = "1.1.2"
 smallvec = "1.4.2"
+text_io = "0.1.8"
 
 aes = "0.6.0"
 block-modes = "0.7.0"

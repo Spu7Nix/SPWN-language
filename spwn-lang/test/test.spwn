@@ -1,5 +1,2 @@
-let nums = @array(1..100)
-
-perfect_squares = nums.filter(n=>$.floor(n^0.5)==n^0.5);
-
-$.print(perfect_squares)
+let p = $.get_input("enter name: ")
+$.print("your name is ",p)
