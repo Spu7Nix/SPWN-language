@@ -43,15 +43,6 @@ impl @array {
             self.pop();
         }
     },
-    all_mutable: (self) {
-        let ret = [];
-        for el in self {
-            let mt = 2;
-            mt = el;
-            ret.push(mt);
-        }
-        return ret;
-    },
     reverse: (self) {
         if self.length == 0 {
             return [];

@@ -286,7 +286,7 @@
 > **Value:** `(self, speed: @number = 3) { /* code omitted */ }` (`@macro`) 
 >
 >## Description: 
-> _Copies the counter and returns the copy_
+> _Copies the counter and -> returns the copy_
 >## Arguments:
 >
 >| # | name | type | default value | description |
