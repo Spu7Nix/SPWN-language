@@ -7,6 +7,7 @@ import "color.spwn"
 import "item.spwn"
 import "block.spwn"
 import "array.spwn"
+import "object.spwn"
 import "counter.spwn"
 import "fileio.spwn"
 import "string.spwn" // sertdfyguhi 11 Jan 2021
