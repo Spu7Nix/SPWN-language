@@ -36,6 +36,7 @@ pub enum StatementBody {
     Extract(Expression),
 
     Break,
+    Continue,
     //EOI,
 }
 #[derive(Clone, PartialEq, Debug)]

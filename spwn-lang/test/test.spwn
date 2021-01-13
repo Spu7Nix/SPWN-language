@@ -1,2 +1,6 @@
-let p = $.get_input("enter name: ")
-$.print("your name is ",p)
+for i in [1,2,3,4,5] {
+$.print(i);
+continue;
+$.print("never used");
+}
+$.print("ok")

@@ -230,6 +230,7 @@ impl SpwnFmt for StatementBody {
             StatementBody::Error(x) => x.fmt(ind),
             StatementBody::Extract(x) => format!("extract {}", x.fmt(ind)),
             StatementBody::Break => String::from("break"),
+            StatementBody::Continue => String::from("continue"),
         }
     }
 }

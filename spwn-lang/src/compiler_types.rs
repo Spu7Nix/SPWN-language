@@ -296,6 +296,7 @@ pub enum ImportType {
 pub enum BreakType {
     Macro,
     Loop,
+    ContinueLoop,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -3164,6 +3165,14 @@ impl ast::CompoundStatement {
                     BreakType::Loop => {
                         return Err(RuntimeError::RuntimeError {
                             message: "break statement is never used because it's inside a trigger function"
+                                .to_string(),
+                            info: i,
+                        });
+                    }
+
+                    BreakType::ContinueLoop => {
+                        return Err(RuntimeError::RuntimeError {
+                            message: "continue statement is never used because it's inside a trigger function"
                                 .to_string(),
                             info: i,
                         });

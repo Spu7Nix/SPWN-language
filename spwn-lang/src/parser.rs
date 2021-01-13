@@ -358,12 +358,12 @@ impl Token {
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
             | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
-            While | Continue => {
+            While => {
                 "reserved keyword (not currently in use, but may be used in future updates)"
             }
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Switch | Case => "keyword",
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case => "keyword",
             Comment => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -712,6 +712,7 @@ pub fn parse_statement(
         }
 
         Some(Token::Break) => ast::StatementBody::Break, // its just break
+        Some(Token::Continue) => ast::StatementBody::Continue,
 
         Some(Token::If) => {
             //parse if statement
