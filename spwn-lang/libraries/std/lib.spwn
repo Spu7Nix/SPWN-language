@@ -8,6 +8,7 @@ import "item.spwn"
 import "block.spwn"
 import "array.spwn"
 import "object.spwn"
+import "string.spwn"
 import "counter.spwn"
 import "fileio.spwn"
 

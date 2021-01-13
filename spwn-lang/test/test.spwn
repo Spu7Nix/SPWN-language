@@ -1,6 +1,2 @@
-let a = {ok: 10}
-a["ok"] = 20
-
-let a["new"] = 30
-
-$.print(a)
+let stuff = @array(1..100).filter((v)=>$.floor(v^0.5)==v^0.5 )
+$.print(stuff)

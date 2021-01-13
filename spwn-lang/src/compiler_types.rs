@@ -786,6 +786,33 @@ pub fn convert_type(
             }
         },
 
+        Value::Str(s) => match typ {
+            4 => {
+                let out: std::result::Result<f64, _> = s.parse();
+                match out {
+                    Ok(n) => Value::Number(n),
+                    _ => {
+                        return Err(RuntimeError::RuntimeError {
+                            message: format!("Cannot convert '{}' to @number", s),
+                            info: info.clone()
+                        })
+                    }
+                }
+            },
+            10 => {
+                Value::Array(s.chars().map(|x| store_value(Value::Str(x.to_string()), 1, globals, &context)).collect::<Vec<StoredValue>>())
+            },
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "String can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info: info.clone(),
+                })
+            }
+        },
+
         Value::Array(arr) => match typ {
             18 => {
                 // pattern

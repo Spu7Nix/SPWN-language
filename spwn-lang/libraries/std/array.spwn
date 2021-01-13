@@ -72,5 +72,24 @@ impl @array {
     },
     remove: (self, index: @number) {
         return $.remove_index(self, index)
+    },
+    map: (self, map_func: @macro) {
+        let output = [];
+        for iter in self {
+            output.push(map_func(iter));
+        }
+        return output;
+    },
+    filter: (self, filter_func: @macro) {
+        let output = [];
+        for iter in self {
+            let r = filter_func(iter);
+            if r.type != @bool {
+                throw "Filter must return a boolean value";
+            } else if r {
+                output.push(iter)
+            }
+        }
+        return output
     }
 }

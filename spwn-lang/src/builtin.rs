@@ -270,6 +270,7 @@ pub const BUILTIN_LIST: &[&str] = &[
     "edit_obj",
     "pop",
     "remove_index",
+    "split_str",
     "readfile",
     "substr",
     "matches",
@@ -623,6 +624,32 @@ pub fn built_in_function(
             }
 
             Value::Null
+        }
+
+        "split_str" => {
+            arg_length!(info, 2, arguments, "Expected two strings as arguments".to_string());
+            let mut output = Vec::<StoredValue>::new();
+            let mut valid_args = true;
+            if let Value::Str(s) = globals.stored_values[arguments[0]].clone() {
+                if let Value::Str(substr) = globals.stored_values[arguments[1]].clone() {
+                    for split in s.split(&substr) {
+                        let entry = store_const_value(Value::Str(split.to_string()), 1, globals, context);
+                        output.push(entry);
+                    }
+                } else {
+                    valid_args = false;
+                }
+            } else {
+                valid_args = false;
+            }
+
+            if !valid_args {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected string".to_string(),
+                    info,
+                });
+            }
+            Value::Array(output)
         }
 
         "edit_obj" => {
