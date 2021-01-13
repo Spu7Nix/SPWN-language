@@ -2,7 +2,15 @@
 
 # **@array**: 
  
-## **all\_mutable**:
+## **all**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>
+>  
+>
+
+## **any**:
 
 > **Value:** `(self) { /* code omitted */ }` (`@macro`) 
 >
@@ -31,6 +39,19 @@
 >  
 >
 
+## **filter**:
+
+> **Value:** `(self, filter_func: @macro) { /* code omitted */ }` (`@macro`) 
+>
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`filter_func`** | @macro | | |
+>  
+>  
+>
+
 ## **index**:
 
 > **Value:** `(self, el) { /* code omitted */ }` (`@macro`) 
@@ -40,6 +61,19 @@
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`el`** |any | | |
+>  
+>  
+>
+
+## **map**:
+
+> **Value:** `(self, map_func: @macro) { /* code omitted */ }` (`@macro`) 
+>
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`map_func`** | @macro | | |
 >  
 >  
 >
@@ -87,6 +121,19 @@
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`value`** |any | | |
+>  
+>  
+>
+
+## **reduce**:
+
+> **Value:** `(self, reduce_func: @macro) { /* code omitted */ }` (`@macro`) 
+>
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`reduce_func`** | @macro | | |
 >  
 >  
 >
