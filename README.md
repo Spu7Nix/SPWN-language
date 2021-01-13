@@ -16,7 +16,7 @@ The documentation for the SPWN language is located at https://spu7nix.net/spwn/#
 - [x] Type annotations for function arguments, variable definitions etc.
 - [x] `as` operator for automatically changing type
 - [ ] finish documentation
-- [x] break statement
+- [x] break/continue statement
 - [x] operation order
 - [x] escaped characters in string
 - [x] fix post-compile optimizations
