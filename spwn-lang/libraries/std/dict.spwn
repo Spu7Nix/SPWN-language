@@ -2,19 +2,5 @@
 impl @dictionary {
   clear: (self) {
     self = {}
-  },
-  keys: (self) {
-    let i = [];
-    for k in self {
-      i.push(k[0])
-    }
-    return i;
-  },
-  values: (self) {
-    let i = [];
-    for k in self {
-      i.push(k[1])
-    }
-    return i;
   }
 }
