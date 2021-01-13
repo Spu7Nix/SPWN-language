@@ -1891,8 +1891,38 @@ fn parse_variable(
         Some(Token::SelfVal) => ast::ValueBody::SelfVal,
         Some(Token::Symbol) => {
             let symbol = tokens.slice();
-            is_valid_symbol(&symbol, tokens, notes)?;
-            ast::ValueBody::Symbol(symbol)
+
+            match tokens.next(false, false) {
+                Some(Token::ThickArrow) => { // Woo macro shorthand
+                    let arg = if symbol != "_" {
+                        is_valid_symbol(&symbol, tokens, notes)?;
+                        vec![(symbol, None, properties.clone(), None)]
+                    } else {
+                        Vec::new()
+                    };
+
+                    let start = tokens.position().0;
+                    let expr = parse_expr(tokens, notes, true, true)?;
+                    let end = tokens.position().1;
+                    let macro_body = vec![ast::Statement {
+                        body: ast::StatementBody::Return(Some(expr)),
+                        arrow: false,
+                        comment: (None, None),
+                        pos: (start, end),
+                    }];
+
+                    ast::ValueBody::Macro(ast::Macro {
+                        args: arg,
+                        body: ast::CompoundStatement { statements: macro_body },
+                        properties,
+                    })
+                },
+                _ => {
+                    is_valid_symbol(&symbol, tokens, notes)?;
+                    tokens.previous_no_ignore(false, false);
+                    ast::ValueBody::Symbol(symbol)
+                }
+            }
         }
 
         Some(Token::OpenSquareBracket) => {

@@ -1,2 +1,5 @@
-let stuff = @array(1..100).filter((v)=>$.floor(v^0.5)==v^0.5 )
-$.print(stuff)
+let nums = @array(1..100)
+
+perfect_squares = nums.filter(n=>$.floor(n^0.5)==n^0.5);
+
+$.print(perfect_squares)
