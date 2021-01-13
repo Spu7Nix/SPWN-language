@@ -1,0 +1,22 @@
+#[no_std] //sertdfyguhi 2021 Jan 11
+impl @string {
+  reverse: (self) {
+    let s = '';
+    for i in 0..self.length {
+      s += self[(self.length - 1) - i];
+    }
+    return s;
+  },
+  count_char: (self, char) {
+    let i = 0;
+    for c in self {
+      if c == char {
+        i++;
+      }
+    }
+    return i;
+  },
+  clear: (self) {
+    self = '';
+  }
+}

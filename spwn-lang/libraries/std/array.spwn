@@ -64,6 +64,17 @@ impl @array {
         ret.push(self[0]);
         return ret;
     },
+    join: (self, string) {
+        let s = '';
+        for i in 0..self.length {
+            if i != self.length - 1 {
+                s += self[i] + string;
+            } else {
+                s += self[i];
+            }
+        }
+        return s;
+    },
     push: (self, value) {
         $.append(self, value)
     },
