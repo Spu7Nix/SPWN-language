@@ -23,7 +23,7 @@ The documentation for the SPWN language is located at https://spu7nix.net/spwn/#
 
 # Todo at some point
 
-- [ ] implement live editor features
-- [ ] make it work on mac (and linux?)
+- [x] implement live editor features
+- [ ] make it work on linux
 - [ ] nested comments
 - [x] get and edit obj and trigger properties
