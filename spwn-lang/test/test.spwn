@@ -1,7 +1,18 @@
-#[no_std]
-let t = 10;
+split_char = (str, char) {
+    let l = [];
+    let i = 0;
+    let first = true;
+    for c in str {
+        $.print("c: ", c, ", char: ", char)
+        if char == c {
+            i++;
+            $.print('equal');
+        } else {
+            $.print('not equal');
+            
+        }
+    }
+    return l;
+}
 
-let a = t^2 if t+3==13 else 5;
-let b = t^2 if t > 100 else -30;
-$.print("first condition: ", a)
-$.print("second condition: ", b)
+split_char("hello", "e")

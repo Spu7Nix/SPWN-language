@@ -93,7 +93,7 @@ impl @counter {
             
             self.item.if_is(EQUAL_TO, 0, !{
                 wait()
-                supress_signal(0.1)
+                if speed > 1  { supress_signal(0.1) }
                 -> return
             })
         }
@@ -223,7 +223,7 @@ impl @counter {
                     wait()
                     self.add_to([remainder], speed)
                     result.add_to([self], speed)
-                    supress_signal(0.1)
+                    if speed > 1  { supress_signal(0.1) }
                     -> return remainder
                 })
             }
@@ -332,7 +332,7 @@ impl @counter {
             
             self.item.if_is(EQUAL_TO, 0, !{
                 wait()
-                supress_signal(0.1)
+                if speed > 1  { supress_signal(0.1) }
                 -> return
             })
         }
@@ -373,7 +373,7 @@ impl @counter {
             })
             self.item.if_is(EQUAL_TO, 0, !{
                 wait()
-                supress_signal(0.1)
+                if speed > 1  { supress_signal(0.1) }
                 @counter::new(temp_storage, false).add_to([self.item], speed)
                 -> return
             })
