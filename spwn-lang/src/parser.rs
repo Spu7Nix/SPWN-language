@@ -328,9 +328,14 @@ pub enum Token {
     SelfVal,
 
     //COMMENT
-    #[regex(r"/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*")]
+    #[regex(r"//[^\n]*")]
     Comment,
 
+    #[token("/*")]
+    MultiCommentStart,
+
+    #[token("*/")]
+    MultiCommentEnd,
     //STATEMENT SEPARATOR
     #[regex(r"[\n\r;][ \t\f\n\r]*")]
     StatementSeparator,
@@ -364,7 +369,7 @@ impl Token {
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
             | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case => "keyword",
-            Comment => "comment",
+            Comment | MultiCommentStart | MultiCommentEnd => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
         }
@@ -403,34 +408,59 @@ impl<'a> Tokens<'a> {
             index: 0,
         }
     }
-    fn next(&mut self, ss: bool, comment: bool) -> Option<Token> {
+
+    fn inner_next(&mut self) -> Option<Token> {
         if self.index == 0 {
-            let next_element = self.iter.next();
+            let next_elem = self.iter.next();
 
             let slice = self.iter.slice().to_string();
             let range = self.iter.span();
 
-            self.stack.push((next_element, slice, range));
-
-            if (!ss && next_element == Some(Token::StatementSeparator))
-                || (!comment && next_element == Some(Token::Comment))
-            {
-                self.next(ss, comment)
-            } else {
-                next_element
-            }
+            self.stack.push((next_elem, slice, range));
+            next_elem
         } else {
             self.index -= 1;
-            if (!ss
-                && self.stack[self.stack.len() - self.index - 1].0
-                    == Some(Token::StatementSeparator))
-                || (!comment
-                    && self.stack[self.stack.len() - self.index - 1].0 == Some(Token::Comment))
-            {
-                self.next(ss, comment)
-            } else {
-                self.stack[self.stack.len() - self.index - 1].0
+            self.stack[self.stack.len() - self.index - 1].0
+        }
+    }
+
+    fn next(&mut self, ss: bool, comment: bool) -> Option<Token> {
+        //println!("what ok {}", self.index);
+
+        if self.index > 0 {
+            let curr_element =self.stack[self.stack.len() - self.index].0;
+
+            if curr_element == Some(Token::MultiCommentStart) {
+                //println!("comment time");
+                let mut nest = 0;
+                loop {
+                    let next_elem = self.inner_next();
+
+                    if next_elem == Some(Token::MultiCommentStart) {
+                        nest+=1;
+                    } else if next_elem == Some(Token::MultiCommentEnd) {
+                        nest-=1;
+                    }
+
+                    if nest == 0 {
+                        break;
+                    }
+                }
+                if !comment {
+                    self.inner_next();
+                }
             }
+        }
+
+        let next_element = self.inner_next();
+
+        if (!ss && next_element == Some(Token::StatementSeparator))
+            || (!comment && (next_element == Some(Token::Comment) 
+                || next_element == Some(Token::MultiCommentStart)))
+        {
+            self.next(ss, comment)
+        } else {
+            next_element
         }
     }
     fn previous(&mut self) -> Option<Token> {
