@@ -7,10 +7,9 @@ import "color.spwn"
 import "item.spwn"
 import "block.spwn"
 import "array.spwn"
-import "object.spwn"
-import "string.spwn"
 import "counter.spwn"
 import "fileio.spwn"
+import "string.spwn" // sertdfyguhi Jan 2021
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"

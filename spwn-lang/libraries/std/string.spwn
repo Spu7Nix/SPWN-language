@@ -1,0 +1,27 @@
+#[no_std]
+impl @string {
+	substr: (self, start: @number, end: @number) {
+		return $.substr(self, start, end);
+	},
+	join: (self, list: @array) {
+		let out = "";
+		for i in list {
+			out += @string(i);
+			out += self;
+		}
+		return out.substr(0, out.length-self.length);	
+	},
+	split: (self, spstr: @string) {
+		if spstr.length == 0 {
+			return self as @array;
+		} else {
+			return $.split_str(self, spstr);
+		}
+	},
+	starts_with: (self, substr: @string) {
+		return self.substr(0, substr.length) == substr;
+	},
+	ends_with: (self, substr: @string) {
+		return self.substr(self.length-substr.length, self.length) == substr;
+	}
+}

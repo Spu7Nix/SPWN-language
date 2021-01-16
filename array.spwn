@@ -43,6 +43,15 @@ impl @array {
             self.pop();
         }
     },
+    all_mutable: (self) {
+        let ret = [];
+        for el in self {
+            let mt = 2;
+            mt = el;
+            ret.push(mt);
+        }
+        return ret;
+    },
     reverse: (self) {
         if self.length == 0 {
             return [];
@@ -55,6 +64,17 @@ impl @array {
         ret.push(self[0]);
         return ret;
     },
+    join: (self, string) {
+        let s = '';
+        for i in 0..self.length {
+            if i != self.length - 1 {
+                s += self[i] + string;
+            } else {
+                s += self[i];
+            }
+        }
+        return s;
+    },
     push: (self, value) {
         $.append(self, value)
     },
@@ -63,39 +83,5 @@ impl @array {
     },
     remove: (self, index: @number) {
         return $.remove_index(self, index)
-    },
-    map: (self, map_func: @macro) {
-        let output = [];
-        for iter in self {
-            output.push(map_func(iter));
-        }
-        return output;
-    },
-    filter: (self, filter_func: @macro) {
-        let output = [];
-        for iter in self {
-            let r = filter_func(iter);
-            if r.type != @bool {
-                throw "Filter must return a boolean value";
-            } else if r {
-                output.push(iter)
-            }
-        }
-        return output
-    },
-    reduce: (self, reduce_func: @macro) {
-        let acum = self[0];
-        for iter in 1..self.length {
-            acum = reduce_func(acum, self[iter]);
-        }
-        return acum;
-    },
-    any: (self) {
-        let numerical = self.reduce((t, v)=>@number(@bool(t))+@number(@bool(v)))
-        return numerical as @bool;
-    },
-    all: (self) {
-        let numerical = self.reduce((t, v)=>@number(@bool(t))*@number(@bool(v)))
-        return numerical as @bool;
-    },
+    }
 }

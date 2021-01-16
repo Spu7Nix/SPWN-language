@@ -36,6 +36,7 @@ pub enum StatementBody {
     Extract(Expression),
 
     Break,
+    Continue,
     //EOI,
 }
 #[derive(Clone, PartialEq, Debug)]
@@ -127,6 +128,7 @@ pub enum Operator {
     Divide,
     IntDivide,
     As,
+    Has,
 
     Exponate,
     Modulate,

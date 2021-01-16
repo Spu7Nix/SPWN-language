@@ -1,18 +1,3 @@
-split_char = (str, char) {
-    let l = [];
-    let i = 0;
-    let first = true;
-    for c in str {
-        $.print("c: ", c, ", char: ", char)
-        if char == c {
-            i++;
-            $.print('equal');
-        } else {
-            $.print('not equal');
-            
-        }
-    }
-    return l;
+for i in [1,2,3,4,5] {
+4i.add(i);
 }
-
-split_char("hello", "e")

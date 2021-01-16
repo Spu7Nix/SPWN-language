@@ -8,7 +8,7 @@ coming soon
 
 # Documentation
 
-coming soon ish
+The documentation for the SPWN language is located at https://spu7nix.net/spwn/#/. There you can find more detailed information about SPWN, and how to use it. You can also visit the standard documentation at https://spu7nix.net/spwn/#/std-docs/std-docs.
 
 # Todo before release:
 
@@ -16,14 +16,14 @@ coming soon ish
 - [x] Type annotations for function arguments, variable definitions etc.
 - [x] `as` operator for automatically changing type
 - [ ] finish documentation
-- [x] break statement
+- [x] break/continue statement
 - [x] operation order
 - [x] escaped characters in string
 - [x] fix post-compile optimizations
 
 # Todo at some point
 
-- [ ] implement live editor features
-- [ ] make it work on mac (and linux?)
+- [x] implement live editor features for windows
+- [ ] make it work on linux
 - [ ] nested comments
-- [ ] get and edit obj and trigger properties
+- [x] get and edit obj and trigger properties

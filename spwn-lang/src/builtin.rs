@@ -8,6 +8,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use std::io::Write;
+use std::io::stdout;
+use text_io;
+
 macro_rules! arg_length {
     ($info:expr , $count:expr, $args:expr , $message:expr) => {
         if $args.len() != $count {
@@ -267,8 +271,11 @@ pub const BUILTIN_LIST: &[&str] = &[
     "append",
     "dict_add",
     "dict_keys",
+    "edit_obj",
+    "get_input",
     "pop",
     "remove_index",
+    "split_str",
     "readfile",
     "substr",
     "matches",
@@ -293,6 +300,7 @@ pub const BUILTIN_LIST: &[&str] = &[
     "_not_equal_",
     "_assign_",
     "_swap_",
+    "_has_",
     "_as_",
     "_add_",
     "_subtract_",
@@ -325,6 +333,16 @@ pub fn built_in_function(
             //out.pop();
             println!("{}", out);
             Value::Null
+        }
+
+        "get_input" => {
+            let mut out = String::new();
+            for val in arguments {
+                out += &globals.stored_values[val].to_str(globals);
+            }
+            print!("{}", out);
+            stdout().flush().expect("Unexpected error occurred when trying to get user input");
+            Value::Str(text_io::read!("{}\n"))
         }
 
         "matches" => {
@@ -453,17 +471,22 @@ pub fn built_in_function(
             arg_length!(info, 1, arguments, "Expected one argument".to_string());
 
             match &globals.stored_values[arguments[0]] {
+                // if its an object
                 Value::Obj(obj, mode) => {
-                    let c_t = context_trigger(context, &mut globals.uid_counter);
+
+                    let c_t = context_trigger(context, &mut globals.uid_counter); // i dont know
+
                     let mut obj_map = HashMap::<u16, ObjParam>::new();
 
                     for p in obj {
                         obj_map.insert(p.0, p.1.clone());
+                        // add params into map
                     }
+
                     match mode {
                         ObjectMode::Object => {
                             if context.start_group.id != ID::Specific(0) {
-                                return Err(RuntimeError::BuiltinError {
+                                return Err(RuntimeError::BuiltinError { // objects cant be added dynamically, of course
                                     message: String::from("you cannot add an obj type object in a trigger function context. Consider moving this add function call to another context, or changing the object to a trigger type"), 
                                     info
                                 });
@@ -614,6 +637,221 @@ pub fn built_in_function(
                     })
                 }
             }
+
+            Value::Null
+        }
+
+        "split_str" => {
+            arg_length!(info, 2, arguments, "Expected two strings as arguments".to_string());
+            let mut output = Vec::<StoredValue>::new();
+            let mut valid_args = true;
+            if let Value::Str(s) = globals.stored_values[arguments[0]].clone() {
+                if let Value::Str(substr) = globals.stored_values[arguments[1]].clone() {
+                    for split in s.split(&substr) {
+                        let entry = store_const_value(Value::Str(split.to_string()), 1, globals, context);
+                        output.push(entry);
+                    }
+                } else {
+                    valid_args = false;
+                }
+            } else {
+                valid_args = false;
+            }
+
+            if !valid_args {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected string".to_string(),
+                    info,
+                });
+            }
+            Value::Array(output)
+        }
+
+        "edit_obj" => {
+            arg_length!(info, 3, arguments, "Expected three arguments".to_string());
+            if !globals.is_mutable(arguments[0]) {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Cannot modify an immutable value".to_string(),
+                    info,
+                });
+            }
+
+
+            let (okey, oval) = match globals.stored_values[arguments[0]].clone() {
+                Value::Obj(_o, m) => {
+                    //println!("{:?}", *o);
+                    //println!("context {:?}", context);
+                    if context.start_group.id != ID::Specific(0) {
+                        return Err(RuntimeError::BuiltinError { // editing objects dynamically? not possible
+                            message: String::from("You cannot edit an obj type object in a trigger function context. Consider moving this edit function call to another context"), 
+                            info
+                        });
+                    }
+                    let value = globals.stored_values[arguments[2]].clone();
+
+                    let (key, pattern) = match globals.stored_values[arguments[1]].clone() {
+                        Value::Number(n) => {
+                            let out = n as u16;
+
+                            if m == ObjectMode::Trigger && (out == 57 || out == 62) {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
+                                    info,
+                                });
+                            }
+                            (out, None)
+                        }
+                        Value::Dict(d) => { // this is specifically for object_key dicts
+                            let gotten_type = d.get(TYPE_MEMBER_NAME);
+                            if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
+                                return Err(RuntimeError::RuntimeError {
+                                    message: "expected either @number or @object_key as object key".to_string(),
+                                    info,
+                                })
+                            }
+                            let id = d.get("id");
+                            if id == None {
+                                return Err(RuntimeError::RuntimeError { // object_key has an ID member for the key basically
+                                    message: "object key has no 'id' member".to_string(),
+                                    info,
+                                })
+                            }
+                            let pattern = d.get("pattern");
+                            if pattern == None {
+                                return Err(RuntimeError::RuntimeError { // same with pattern, for the expected type
+                                    message: "object key has no 'pattern' member".to_string(),
+                                    info,
+                                })
+                            }
+
+                            (match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
+                                Value::Number(n) => {
+                                    let out = *n as u16;
+
+                                    if m == ObjectMode::Trigger && (out == 57 || out == 62) { // group ids and stuff on triggers
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
+                                            info,
+                                        })
+                                    }
+                                    out
+                                }
+                                _ => return Err(RuntimeError::RuntimeError {
+                                    message: format!("object key's id has to be @number, found {}", globals.get_type_str(*id.unwrap())),
+                                    info,
+                                })
+                            }, Some(globals.stored_values[*pattern.unwrap()].clone()))
+                            
+                        }
+                        a => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!(
+                                    "expected either @number or @object_key as object key, found: {}",
+                                    a.to_str(globals)
+                                ),
+                                info,
+                            })
+                        }
+                    };
+
+                    if let Some(ref pat) = pattern {
+                        if !value.matches_pat(&pat, &info, globals, &context)? {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!(
+                                    "key required value to match {}, found {}",
+                                    pat.to_str(globals), value.to_str(globals)
+                                ),
+                                info,
+                            })
+                        }
+                    }
+                    let err = Err(RuntimeError::RuntimeError {
+                        message: format!(
+                            "{} is not a valid object value",
+                            value.to_str(globals)
+                        ),
+                        info: info.clone(),
+                    });
+
+                    let out_val = match &value { // its just converting value to objparam basic level stuff
+                        Value::Number(n) => {
+                            
+                            ObjParam::Number(*n)
+                        },
+                        Value::Str(s) => ObjParam::Text(s.clone()),
+                        Value::TriggerFunc(g) => ObjParam::Group(g.start_group),
+
+                        Value::Group(g) => ObjParam::Group(*g),
+                        Value::Color(c) => ObjParam::Color(*c),
+                        Value::Block(b) => ObjParam::Block(*b),
+                        Value::Item(i) => ObjParam::Item(*i),
+
+                        Value::Bool(b) => ObjParam::Bool(*b),
+
+                        Value::Array(a) => ObjParam::GroupList({
+                            let mut out = Vec::new();
+                            for s in a {
+                                out.push(match globals.stored_values[*s] {
+                                    Value::Group(g) => g,
+                                    _ => return Err(RuntimeError::RuntimeError {
+                                        message: "Arrays in object parameters can only contain groups".to_string(),
+                                        info,
+                                    })
+                                })
+                            }
+                            
+                            out
+                        }),
+                        Value::Dict(d) => {
+                            if let Some(t) = d.get(TYPE_MEMBER_NAME) {
+                                if let Value::TypeIndicator(t) = globals.stored_values[*t] {
+                                    if t == 20 { // type indicator number 20 is epsilon ig
+                                        ObjParam::Epsilon
+                                    } else {
+                                        return err;
+                                    }
+                                } else {
+                                    return err;
+                                }
+                            } else {
+                                return err;
+                            }
+                        }
+                        _ => {
+                            return err;
+                        }
+                    };
+
+                    (key, out_val)
+
+                }
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: "Expected Obj".to_string(),
+                        info,
+                    })
+                }
+            };
+
+            match &mut globals.stored_values[arguments[0]] {
+                Value::Obj(o, _m) => {
+                    let mut contains = false;
+                    for iter in o.iter_mut() {
+                        if iter.0 == okey {
+                            iter.1 = oval.clone();
+                            contains = true;
+                            break;
+                        }
+                    }
+
+                    if !contains {
+                        (*o).push((okey, oval.clone()))
+                    }
+                }
+                _ => unreachable!()
+            }
+
+            //println!("key is {:?}, value is {:?}", okey, oval);
 
             Value::Null
         }
@@ -796,7 +1034,7 @@ pub fn built_in_function(
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
         | "_less_or_equal_" | "_divided_by_" | "_intdivided_by_" | "_times_" | "_mod_"
         | "_pow_" | "_plus_" | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_swap_"
-        | "_as_" | "_add_" | "_subtract_" | "_multiply_" | "_divide_" | "_intdivide_"
+        | "_has_" | "_as_" | "_add_" | "_subtract_" | "_multiply_" | "_divide_" | "_intdivide_"
         | "_either_" | "_exponate_" | "_modulate_" | "_range_" => {
             if arguments.len() != 2 {
                 return Err(RuntimeError::BuiltinError {
@@ -1068,6 +1306,105 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     globals.stored_values[val] = globals.stored_values[acum_val].clone();
                     globals.stored_values[acum_val] = swap_temp;
                     Value::Null
+                }
+
+                "_has_" => match (&globals.stored_values[acum_val], val_b) {
+                    (Value::Array(ar), _) => {
+                        let mut out = false;
+                        for v in ar.clone() {
+                            if value_equality(v, val, globals) {
+                                out = true;
+                                break;
+                            }
+                        }
+                        Value::Bool(out)
+                    },
+
+                    (Value::Dict(d), Value::Str(b)) => {
+                        let mut out = false;
+                        for k in d.keys() {
+                            if *k == b {
+                                out = true;
+                                break;
+                            }
+                        }
+                        Value::Bool(out)
+                    }
+
+                    (Value::Str(s), Value::Str(s2)) => {
+                        Value::Bool(s.contains(&s2))
+                    }
+
+                    (Value::Obj(o, _m), Value::Number(n)) => {
+                        let obj_has: bool = o.iter()
+                                             .any(|k| k.0==n as u16);
+                        Value::Bool(obj_has)
+                    }
+
+                    (Value::Obj(o, _m), Value::Dict(d)) => {
+                        let gotten_type = d.get(TYPE_MEMBER_NAME);
+
+                        if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
+                            return Err(RuntimeError::TypeError {
+                                expected: "either @number or @object_key".to_string(),
+                                found: format!("{}", b_type),
+                                info,
+                            })
+                        }
+
+                        let id = d.get("id");
+                        if id == None {
+                            return Err(RuntimeError::BuiltinError { // object_key has an ID member for the key basically
+                                message: "object key has no 'id' member".to_string(),
+                                info,
+                            })
+                        }
+                        let ob_key = match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
+                            Value::Number(n) => {
+                                *n as u16
+                            }
+                            _ => return Err(RuntimeError::TypeError {
+                                expected: "@number as object key".to_string(),
+                                found: format!("{}", globals.get_type_str(*id.unwrap())),
+                                info,
+                            })
+                        };
+                        let obj_has: bool = o.iter()
+                                             .any(|k| k.0==ob_key);
+                        Value::Bool(obj_has)
+                    }
+
+                    (Value::Obj(_, _), _) => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "@number or @object_key".to_string(),
+                            found: format!("{}", b_type),
+                            info,
+                        })
+                    }
+
+                    (Value::Str(_), _) => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "string to compare".to_string(),
+                            found: format!("{}", b_type),
+                            info,
+                        })
+                    }
+
+                    (Value::Dict(_), _) => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "string as key".to_string(),
+                            found: format!("{}", b_type),
+                            info,
+                        })
+                    }
+
+                    _ => {
+                        return Err(RuntimeError::TypeError {
+                            expected: "array, dictionary, object, or string".to_string(),
+                            found: format!("{}", a_type),
+                            info,
+                        })
+                    }
                 }
 
                 "_as_" => match globals.stored_values[val] {

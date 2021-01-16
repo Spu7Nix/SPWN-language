@@ -720,12 +720,17 @@ pub fn compile_scope(
 
                                 new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
-                                    // add contexts made in the loop to the new_contexts, if theyre not broken
-                                    if let Some((_, BreakType::Loop)) = c.broken {
-                                        c.broken = None;
-                                        out_contexts.push(c)
-                                    } else {
-                                        new_contexts.push(c)
+                                    // add contexts made in the loop to the new_contexts, if they dont have a break
+                                    match c.broken {
+                                        Some((_, BreakType::Loop)) => {
+                                            c.broken = None;
+                                            out_contexts.push(c)
+                                        }
+                                        Some((_, BreakType::ContinueLoop)) => {
+                                            c.broken = None;
+                                            new_contexts.push(c)
+                                        }
+                                        _ => new_contexts.push(c)
                                     }
                                 }
 
@@ -903,6 +908,15 @@ pub fn compile_scope(
                 }
                 break;
             }
+
+            Continue => {
+                //set all contexts to broken
+                for c in &mut contexts {
+                    (*c).broken = Some((info.clone(), BreakType::ContinueLoop));
+                }
+                break;
+            }
+
             Return(return_val) => {
                 match return_val {
                     Some(val) => {

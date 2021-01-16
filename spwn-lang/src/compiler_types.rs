@@ -24,8 +24,6 @@ pub struct ValStorage {
     pub map: HashMap<usize, (Value, Group, bool, u16)>, //val, fn context, mutable, lifetime
 }
 
-
-
 /*
 LIFETIME:
 
@@ -51,6 +49,7 @@ impl std::ops::IndexMut<usize> for ValStorage {
         &mut self.map.get_mut(&i).unwrap().0
     }
 }
+
 use std::collections::HashSet;
 impl ValStorage {
     pub fn new() -> Self {
@@ -175,7 +174,6 @@ pub fn store_value(
     (*globals).val_id += 1;
     index
 }
-
 pub fn clone_and_get_value(
     index: usize,
     lifetime: u16,
@@ -298,6 +296,7 @@ pub enum ImportType {
 pub enum BreakType {
     Macro,
     Loop,
+    ContinueLoop,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -781,6 +780,33 @@ pub fn convert_type(
                 return Err(RuntimeError::RuntimeError {
                     message: format!(
                         "Range can't be converted to '{}'!",
+                        find_key_for_value(&globals.type_ids, typ).unwrap()
+                    ),
+                    info: info.clone(),
+                })
+            }
+        },
+
+        Value::Str(s) => match typ {
+            4 => {
+                let out: std::result::Result<f64, _> = s.parse();
+                match out {
+                    Ok(n) => Value::Number(n),
+                    _ => {
+                        return Err(RuntimeError::RuntimeError {
+                            message: format!("Cannot convert '{}' to @number", s),
+                            info: info.clone()
+                        })
+                    }
+                }
+            },
+            10 => {
+                Value::Array(s.chars().map(|x| store_value(Value::Str(x.to_string()), 1, globals, &context)).collect::<Vec<StoredValue>>())
+            },
+            _ => {
+                return Err(RuntimeError::RuntimeError {
+                    message: format!(
+                        "String can't be converted to '{}'!",
                         find_key_for_value(&globals.type_ids, typ).unwrap()
                     ),
                     info: info.clone(),
@@ -1402,6 +1428,8 @@ impl ast::Expression {
                         },
 
                         As => handle_operator(acum_val, *val, "_as_", c2, globals, &info)?,
+
+                        Has => handle_operator(acum_val, *val, "_has_", c2, globals, &info)?,
 
                         Add => handle_operator(acum_val, *val, "_add_", c2, globals, &info)?,
 
@@ -2059,25 +2087,32 @@ impl ast::Variable {
 
 
             }
-            ast::ValueBody::Obj(o) => {
-                let mut all_expr: Vec<ast::Expression> = Vec::new();
-                for prop in &o.props {
-                    all_expr.push(prop.0.clone());
-                    all_expr.push(prop.1.clone());
+            ast::ValueBody::Obj(o) => { // parsing an obj
+
+                let mut all_expr: Vec<ast::Expression> = Vec::new(); // all expressions
+
+                for prop in &o.props { // iterate through obj properties
+
+                    all_expr.push(prop.0.clone()); // this is the object key expression
+                    all_expr.push(prop.1.clone()); // this is the object value expression
                 }
                 let new_info = info.clone();
+
                 let (evaled, returns) =
-                    all_combinations(all_expr, &context, globals, new_info, constant)?;
+                    all_combinations(all_expr, &context, globals, new_info, constant)?; // evaluate all expressions gathered
                 inner_returns.extend(returns);
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, ObjParam)> = Vec::new();
                     for i in 0..(o.props.len()) {
-                        let v = expressions[i * 2];
-                        let v2 = expressions[i * 2 + 1];
 
+                        let o_key = expressions[i * 2]; 
+                        let o_val = expressions[i * 2 + 1];
+                        // hopefully self explanatory
 
-                        let (key, pattern) = match &globals.stored_values[v] {
-                            Value::Number(n) => {
+                        let (key, pattern) = match &globals.stored_values[o_key] {
+                        // key = int of the id, pattern = what type should be expected from the value
+
+                            Value::Number(n) => { // number, i have no clue why people would use this over an obj_key
                                 let out = *n as u16;
 
                                 if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
@@ -2089,9 +2124,9 @@ impl ast::Variable {
 
                                 (out, None)
                             },
-                            Value::Dict(d) => {
+                            Value::Dict(d) => { // this is specifically for object_key dicts
                                 let gotten_type = d.get(TYPE_MEMBER_NAME);
-                                if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) {
+                                if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
                                     return Err(RuntimeError::RuntimeError {
                                         message: "expected either @number or @object_key as object key".to_string(),
                                         info,
@@ -2099,24 +2134,24 @@ impl ast::Variable {
                                 }
                                 let id = d.get("id");
                                 if id == None {
-                                    return Err(RuntimeError::RuntimeError {
+                                    return Err(RuntimeError::RuntimeError { // object_key has an ID member for the key basically
                                         message: "object key has no 'id' member".to_string(),
                                         info,
                                     })
                                 }
                                 let pattern = d.get("pattern");
                                 if pattern == None {
-                                    return Err(RuntimeError::RuntimeError {
+                                    return Err(RuntimeError::RuntimeError { // same with pattern, for the expected type
                                         message: "object key has no 'pattern' member".to_string(),
                                         info,
                                     })
                                 }
 
-                                (match &globals.stored_values[*id.unwrap()] {
+                                (match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
                                     Value::Number(n) => {
                                         let out = *n as u16;
 
-                                        if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
+                                        if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) { // group ids and stuff on triggers
                                             return Err(RuntimeError::RuntimeError {
                                                 message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
                                                 info,
@@ -2144,10 +2179,10 @@ impl ast::Variable {
 
                         obj.push((
                             key,
-                            {   
-                                let val = globals.stored_values[v2].clone();
+                            {   // parse the value
+                                let val = globals.stored_values[o_val].clone();
 
-                                if let Some(pat) = pattern {
+                                if let Some(pat) = pattern { // check if pattern is actually enforced (not null)
                                     if !val.matches_pat(&pat, &info, globals, &context)? {
                                         return Err(RuntimeError::RuntimeError {
                                             message: format!(
@@ -2166,7 +2201,7 @@ impl ast::Variable {
                                     info: info.clone(),
                                 });
                                 
-                                match &val {
+                                match &val { // its just converting value to objparam basic level stuff
                                     Value::Number(n) => {
                                         
                                         ObjParam::Number(*n)
@@ -2198,7 +2233,7 @@ impl ast::Variable {
                                     Value::Dict(d) => {
                                         if let Some(t) = d.get(TYPE_MEMBER_NAME) {
                                             if let Value::TypeIndicator(t) = globals.stored_values[*t] {
-                                                if t == 20 {
+                                                if t == 20 { // type indicator number 20 is epsilon ig
                                                     ObjParam::Epsilon
                                                 } else {
                                                     return err;
@@ -2457,6 +2492,99 @@ impl ast::Variable {
                                         }
                                     }
                                 }
+                            }
+
+                            Value::Obj(o, _) => {
+
+                                let (evaled, returns) =
+                                    i.eval(&prev_c, globals, info.clone(), constant)?;
+                                inner_returns.extend(returns);
+                                for index in evaled {
+                                    match &globals.stored_values[index.0] {
+                                        Value::Dict(d) => {
+                                            let gotten_type = d.get(TYPE_MEMBER_NAME);
+                                            if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: "expected either @number or @object_key in index".to_string(),
+                                                    info,
+                                                })
+                                            }
+
+                                            let id = d.get("id");
+                                            if id == None {
+                                                return Err(RuntimeError::RuntimeError { // object_key has an ID member for the key basically
+                                                    message: "object key has no 'id' member".to_string(),
+                                                    info,
+                                                })
+                                            }
+                                            let okey = match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
+                                                Value::Number(n) => {
+                                                    *n as u16
+                                                }
+                                                _ => return Err(RuntimeError::RuntimeError {
+                                                    message: format!("object key's id has to be @number, found {}", globals.get_type_str(*id.unwrap())),
+                                                    info,
+                                                })
+                                            };
+
+                                            let mut contains = false;
+                                            for iter in o.iter() {
+                                                if iter.0 == okey {
+                                                    contains = true;
+
+                                                    let out_val = match &iter.1 { // its just converting value to objparam basic level stuff
+                                                        ObjParam::Number(n) => Value::Number(*n),
+                                                        ObjParam::Text(s) => Value::Str(s.clone()),
+
+                                                        ObjParam::Group(g) => Value::Group(*g),
+                                                        ObjParam::Color(c) => Value::Color(*c),
+                                                        ObjParam::Block(b) => Value::Block(*b),
+                                                        ObjParam::Item(i) => Value::Item(*i),
+
+                                                        ObjParam::Bool(b) => Value::Bool(*b),
+
+                                                        ObjParam::GroupList(g) => {
+                                                            let mut out = Vec::new();
+                                                            for s in g {
+                                                                let stored = store_const_value(Value::Group(*s), 1, globals, &index.1);
+                                                                out.push(stored);
+                                                            }
+                                                            Value::Array(out)
+                                                        },
+                                                        
+                                                        ObjParam::Epsilon => {
+                                                            let mut map = HashMap::<String, StoredValue>::new();
+                                                            let stored = store_const_value(Value::TypeIndicator(20), 1, globals, &index.1);
+                                                            map.insert(TYPE_MEMBER_NAME.to_string(), stored);
+                                                            Value::Dict(map)
+                                                        }
+                                                    };
+                                                    let stored = store_const_value(out_val, globals.stored_values.map.get(&prev_v).unwrap().3, globals, &index.1);
+                                                    new_out.push((stored, index.1, prev_v));
+                                                    break;
+                                                }
+                                            }
+
+                                            if !contains {
+                                                return Err(RuntimeError::RuntimeError {
+                                                    message: "Cannot find key in object".to_string(),
+                                                    info,
+                                                });
+                                            }
+
+                                        }
+                                        _ => {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: format!(
+                                                    "expected @object_key or @number in index, found @{}",
+                                                    globals.get_type_str(index.0)
+                                                ),
+                                                info,
+                                            })
+                                        }
+                                    }
+                                }
+
                             }
                             Value::Str(s)  => {
                                 let arr: Vec<char> = s.chars().collect();
@@ -2914,11 +3042,49 @@ impl ast::Variable {
                         }
                     };
                 }
-                ast::Path::Index(_) => {
-                    return Err(RuntimeError::RuntimeError {
-                        message: "No implementation yet, oopsies".to_string(),
-                        info: info.clone()
-                    });
+                ast::Path::Index(i) => {
+                    let (evaled, _) = i.eval(&context, globals, info.clone(), true)?;
+                    let first_context_eval = evaled[0].0;
+                    match &globals.stored_values[current_ptr] {
+                        Value::Dict(d)  => {
+                            if evaled.len() > 1 {
+                                println!("Warning: context splitting inside of an index definition. Use $.dict_add for better results");
+                            }
+                            if let Value::Str(st) = globals.stored_values[first_context_eval].clone() {
+
+                                match d.get(&st) {
+                                    Some(_) => current_ptr = first_context_eval,
+                                    None => {
+                                        let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
+                                        if !stored.2 {
+                                            return Err(RuntimeError::RuntimeError {
+                                                message: "Cannot edit members of a constant value".to_string(),
+                                                info: info.clone(),
+                                            });
+                                        }
+                                        if let Value::Dict(d) = &mut stored.0 {
+                                            (*d).insert(st.to_string(), value);
+                                            defined = false;
+                                            current_ptr = value;
+                                        } else {
+                                            unreachable!();
+                                        }
+                                    }
+                                };
+                            } else {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: "Only string indexes are supported for dicts".to_string(),
+                                    info: info.clone(),
+                                });
+                            }
+                        }
+                        _ => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: "Other values are not supported yet".to_string(),
+                                info: info.clone()
+                            })
+                        },
+                    }
                 }
                 ast::Path::Associated(m) => {
                     match &globals.stored_values[current_ptr] {
@@ -2999,6 +3165,14 @@ impl ast::CompoundStatement {
                     BreakType::Loop => {
                         return Err(RuntimeError::RuntimeError {
                             message: "break statement is never used because it's inside a trigger function"
+                                .to_string(),
+                            info: i,
+                        });
+                    }
+
+                    BreakType::ContinueLoop => {
+                        return Err(RuntimeError::RuntimeError {
+                            message: "continue statement is never used because it's inside a trigger function"
                                 .to_string(),
                             info: i,
                         });

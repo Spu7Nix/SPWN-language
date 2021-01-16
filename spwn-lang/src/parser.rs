@@ -170,6 +170,9 @@ pub enum Token {
     #[token("/%")]
     IntDividedBy,
 
+    #[token("has")]
+    Has,
+
     #[token("!")]
     Exclamation,
 
@@ -343,7 +346,7 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Either
+            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either
             | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap => "operator",
             Symbol => "identifier",
             Number => "number literal",
@@ -355,12 +358,12 @@ impl Token {
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
             | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
-            While | Continue => {
+            While => {
                 "reserved keyword (not currently in use, but may be used in future updates)"
             }
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Switch | Case => "keyword",
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case => "keyword",
             Comment => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -709,6 +712,7 @@ pub fn parse_statement(
         }
 
         Some(Token::Break) => ast::StatementBody::Break, // its just break
+        Some(Token::Continue) => ast::StatementBody::Continue,
 
         Some(Token::If) => {
             //parse if statement
@@ -1024,6 +1028,7 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
         Less => 3,
 
         Equal => 2,
+        Has => 2,
         NotEqual => 2,
 
         Or => 1,
@@ -1361,6 +1366,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Exponate => Some(ast::Operator::Exponate),
         Token::Modulate => Some(ast::Operator::Modulate),
         Token::Swap => Some(ast::Operator::Swap),
+        Token::Has => Some(ast::Operator::Has),
         Token::As => Some(ast::Operator::As),
         _ => None,
     }
@@ -1886,8 +1892,38 @@ fn parse_variable(
         Some(Token::SelfVal) => ast::ValueBody::SelfVal,
         Some(Token::Symbol) => {
             let symbol = tokens.slice();
-            is_valid_symbol(&symbol, tokens, notes)?;
-            ast::ValueBody::Symbol(symbol)
+
+            match tokens.next(false, false) {
+                Some(Token::ThickArrow) => { // Woo macro shorthand
+                    let arg = if symbol != "_" {
+                        is_valid_symbol(&symbol, tokens, notes)?;
+                        vec![(symbol, None, properties.clone(), None)]
+                    } else {
+                        Vec::new()
+                    };
+
+                    let start = tokens.position().0;
+                    let expr = parse_expr(tokens, notes, true, true)?;
+                    let end = tokens.position().1;
+                    let macro_body = vec![ast::Statement {
+                        body: ast::StatementBody::Return(Some(expr)),
+                        arrow: false,
+                        comment: (None, None),
+                        pos: (start, end),
+                    }];
+
+                    ast::ValueBody::Macro(ast::Macro {
+                        args: arg,
+                        body: ast::CompoundStatement { statements: macro_body },
+                        properties,
+                    })
+                },
+                _ => {
+                    is_valid_symbol(&symbol, tokens, notes)?;
+                    tokens.previous_no_ignore(false, false);
+                    ast::ValueBody::Symbol(symbol)
+                }
+            }
         }
 
         Some(Token::OpenSquareBracket) => {

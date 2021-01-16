@@ -35,7 +35,7 @@
 > **Value:** `(self, number: @number = 0) { /* code omitted */ }` (`@macro`) 
 >
 >## Description: 
-> _Implementation of the count trigger (returns an event)_
+> _Implementation of the count trigger (-> returns an event)_
 >## Arguments:
 >
 >| # | name | type | default value | description |
