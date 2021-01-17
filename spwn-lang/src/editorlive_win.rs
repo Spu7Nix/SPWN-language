@@ -4,20 +4,27 @@ use std::time::Duration;
 use std::io::Write;
 
 pub fn editor_paste(message: &str) -> Result<bool, String> {
-	let data = message.as_bytes();
 	let pipe_name = OsStr::new("\\\\.\\pipe\\GDPipe");
 
 	match PipeClient::connect_ms(pipe_name, 5) {
 		Ok(mut client) => {
-			client.set_write_timeout(Some(Duration::new(0,5)));
-			match client.write(data) {
-				Ok(_) => (),
-				Err(e) => {
-					return Err(format!("Could not send a message to GD with this error: {:?}", e));
+			client.set_write_timeout(Some(Duration::new(1,0)));
+			let split = message.split(";").collect::<Vec<&str>>();
+			for iter in split.chunks(2) {
+				let mut data = iter.join(";").to_string();
+
+				if data.ends_with(";") {
+					data.pop();
 				}
-			};
+				match client.write(format!("{};",data).as_bytes()) {
+					Ok(_) => (),
+					Err(e) => {
+						return Err(format!("Could not send a message to GD with this error: {:?}", e));
+					}
+				};
+			}
 			Ok(true)
 		}
-		Err(e) => Err("Could not make a connection to GD, try injecting the live editor library into geometry dash".to_string())
+		Err(_) => Err("Could not make a connection to GD, try injecting the live editor library into geometry dash".to_string())
 	}
 }

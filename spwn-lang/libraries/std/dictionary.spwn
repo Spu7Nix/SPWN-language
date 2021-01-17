@@ -1,0 +1,46 @@
+#[no_std]
+import "array.spwn"
+
+type @dict_not_found;
+
+impl @dictionary {
+	keys: (self) {
+		let ret = []
+		for kv in self {
+			ret.push(kv[0])
+		}
+		return ret
+	},
+	values: (self) {
+		let ret = []
+		for kv in self {
+			ret.push(kv[1])
+		}
+		return ret
+	},
+	items: (self) {
+		let ret = []
+		for kv in self {
+			ret.push(kv)
+		}
+		return ret
+	},
+	set: (self, key: @string, val) {
+		if self has key {
+			self[key] = val
+		} else {
+			let self[key] = val
+		}
+	},
+	get: (self, key: @string, value = @dict_not_found::{}) {
+		if self has key {
+			return self[key]
+		} else {
+			if value.type == @dict_not_found {
+				throw "Key doesn't exist and no fallback was provided"
+			} else {
+				return value
+			}
+		}
+	}
+}

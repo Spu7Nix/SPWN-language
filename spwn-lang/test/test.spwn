@@ -1,10 +1,6 @@
-for i in [1,2,3,4,5] {
-4i.add(i);
-/* epic
+let a = counter(10)
 
-/* :flushed: */
-
-*/
-
-$.print(i)
+for i in 0..10 {
+	a *= i;
+	wait(0.1)
 }

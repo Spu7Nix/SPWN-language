@@ -269,8 +269,6 @@ pub const BUILTIN_LIST: &[&str] = &[
     "ceil",
     "add",
     "append",
-    "dict_add",
-    "dict_keys",
     "edit_obj",
     "get_input",
     "pop",
@@ -526,33 +524,6 @@ pub fn built_in_function(
             Value::Null
         }
 
-        "dict_keys" => {
-            arg_length!(info, 1, arguments, "Expected one argument.".to_string());
-            let typ = globals.get_type_str(arguments[0]);
-            let val = globals.stored_values[arguments[0]].clone();
-            match val {
-                Value::Dict(d) => {
-                    let mut stored = vec![];
-                    for key in d.keys() {
-                        let stored_key = store_const_value(
-                            // store the dict key
-                            Value::Str(key.clone()),
-                            1,
-                            globals,
-                            context,
-                        );
-                        stored.push(stored_key);
-                    }
-                    Value::Array(stored)
-                }
-                _ => {
-                    return Err(RuntimeError::BuiltinError {
-                        message: format!("Expected dictionary, found @{}", typ),
-                        info,
-                    })
-                }
-            }
-        }
         "append" => {
             arg_length!(
                 info,
@@ -585,54 +556,6 @@ pub fn built_in_function(
                 _ => {
                     return Err(RuntimeError::BuiltinError {
                         message: format!("Expected array, found @{}", typ),
-                        info,
-                    })
-                }
-            }
-
-            Value::Null
-        }
-
-        "dict_add" => {
-            arg_length!(info, 3, arguments, "Expected 3 arguments, a dictionary, a key, and a value to be added to it".to_string());
-
-            if !globals.is_mutable(arguments[0]) {
-                return Err(RuntimeError::BuiltinError {
-                    message: String::from("This dictionary is not mutable"),
-                    info,
-                });
-            }
-
-            //set lifetime to the lifetime of the dictionary
-
-            let cloned = clone_value(
-                arguments[2],
-                globals.stored_values.map.get(&arguments[0]).unwrap().3,
-                globals,
-                context,
-                !globals.is_mutable(arguments[2]),
-            );
-
-            let key = globals.stored_values[arguments[1]].clone();
-            let key_type = globals.get_type_str(arguments[1]);
-
-            let typ = globals.get_type_str(arguments[0]);
-            match &mut globals.stored_values[arguments[0]] {
-                Value::Dict(d) => {
-                    match key {
-                        Value::Str(s) => (*d).insert(s,cloned),
-                        _ => {
-                            return Err(RuntimeError::BuiltinError {
-                                message: format!("Expected str, found @{}", key_type),
-                                info,
-                            })
-                        }
-                    };
-                },
-
-                _ => {
-                    return Err(RuntimeError::BuiltinError {
-                        message: format!("Expected dictionary, found @{}", typ),
                         info,
                     })
                 }
