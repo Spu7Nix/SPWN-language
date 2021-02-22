@@ -32,6 +32,8 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     let mut info = CompilerInfo::new();
     info.includes
         .push(std::env::current_dir().expect("Cannot access current directory"));
+    info.includes
+        .push(std::env::current_exe().expect("Cannot access directory of executable").parent().expect("Executable must be in some directory").to_path_buf());
 
     let module = import_module(
         &ImportType::Lib(path.to_string()),

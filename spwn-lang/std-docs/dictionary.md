@@ -1,0 +1,55 @@
+  
+
+# **@dictionary**: 
+ 
+## **get**:
+
+> **Value:** `(self, key: @string, value = @dict_not_found::{}) { /* code omitted */ }` (`@macro`) 
+>
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`key`** | @string | | |
+>  | 3 | `value` |any | `@dict_not_found::{}` | |
+>  
+>  
+>
+
+## **items**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>
+>  
+>
+
+## **keys**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>
+>  
+>
+
+## **set**:
+
+> **Value:** `(self, key: @string, val) { /* code omitted */ }` (`@macro`) 
+>
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`key`** | @string | | |
+>  | 3 | **`val`** |any | | |
+>  
+>  
+>
+
+## **values**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>
+>  
+>
