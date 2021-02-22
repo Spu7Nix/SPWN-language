@@ -1,0 +1,128 @@
+type @textdisplay 
+
+impl @textdisplay {
+    new: (offset: [@number], letters: @number) {
+        extract obj_props
+        order = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        writer = ?b
+        writer_group = ?g
+        list = []
+        for i in ..letters {
+           
+            group = ?g
+            block = ?b
+
+            default_pos = ?g
+            group.alpha(0)
+            default_pos.alpha(0)
+            follow_group = ?g
+            for ch in ..order.length {
+                $.add(obj {
+                    OBJ_ID: 914,
+                    X: offset[0] + i * 30 + (ch + 1) * 30 * letters,
+                    Y: offset[1],
+                    TEXT: $.b64encrypt(order[ch]),
+                    GROUPS: follow_group,
+                })
+            }
+            $.add(obj {
+                OBJ_ID: 1816,
+                X:  offset[0],
+                Y:  offset[1] + i * 30 + 60,
+                BLOCK_A: block,
+                SCALING: 0.2,
+                GROUPS: follow_group,
+            })
+
+            lock = !{
+                group.follow(writer_group)
+                follow_group.follow(writer_group)
+            }
+
+            collision(block, writer).on_triggered(lock)
+
+            $.add(obj {
+                OBJ_ID: 1765,
+                X:  offset[0] + i * 30,
+                Y:  offset[1],
+                GROUPS: group,
+            })
+            $.add(obj {
+                OBJ_ID: 1765,
+                X:  offset[0] + i * 30,
+                Y:  offset[1],
+                GROUPS: default_pos,
+            })
+
+            -> follow_group.follow(group)
+
+            list.push({
+                group,
+                default_pos,
+                lock,
+            })
+            
+        }
+
+        //writer
+        $.add(obj {
+            OBJ_ID: 1816,
+            X:  offset[0],
+            Y:  offset[1] + 30,
+            BLOCK_A: writer,
+            GROUPS: writer_group,
+            DYNAMIC_BLOCK: true,
+        })
+
+        writer_default = ?g
+        $.add(obj {
+            OBJ_ID: 1765,
+            X:  offset[0],
+            Y:  offset[1] + 30,
+            GROUPS: writer_default,
+        })
+        
+        return @textdisplay::{list, writer: writer_group, writer_default, letters}
+    },
+    write: (self, letter: @counter, speed = 3) {
+        temp = counter()
+        read_counter = () {
+            read = !{
+                mini_read = (num){
+                    letter.item.if_is(LARGER_THAN, num - 1, !{
+                        letter.add(-num)
+                        temp.add(num)
+                        self.writer.move(-10 * self.letters * num, 0)
+                        call_with_delay(@epsilon::{}, read)
+                    })
+                }
+
+                for i in 0..speed {
+                    mini_read(3^i)
+                }
+                letter.item.if_is(EQUAL_TO, 0, !{
+                    wait()
+                    if speed > 1  { supress_signal(0.1) }
+                    -> return
+                })
+            }
+            read!
+        }
+        self.writer.move(0, 10)
+        wait()
+        read_counter()
+        temp.add_to([letter], speed=speed)
+        for l in self.list {
+            l.lock.start_group.stop()
+        }
+        wait()
+        self.writer.move_to(self.writer_default, x_only = true)
+    },
+
+    reset: (self) {
+        self.writer.move_to(self.writer_default)
+        for letter in self.list {
+            letter.group.move_to(letter.default_pos)
+        }
+    }
+}

@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use std::io::Write;
 use std::io::stdout;
-use text_io;
+use std::io::Write;
+//use text_io;
 
 macro_rules! arg_length {
     ($info:expr , $count:expr, $args:expr , $message:expr) => {
@@ -281,7 +281,6 @@ pub const BUILTIN_LIST: &[&str] = &[
     "matches",
     "b64encrypt",
     "b64decrypt",
-
     "mutability", // for testing purposes
     //operators
     "_or_",
@@ -341,7 +340,9 @@ pub fn built_in_function(
                 out += &globals.stored_values[val].to_str(globals);
             }
             print!("{}", out);
-            stdout().flush().expect("Unexpected error occurred when trying to get user input");
+            stdout()
+                .flush()
+                .expect("Unexpected error occurred when trying to get user input");
             Value::Str(text_io::read!("{}\n"))
         }
 
@@ -473,7 +474,6 @@ pub fn built_in_function(
             match &globals.stored_values[arguments[0]] {
                 // if its an object
                 Value::Obj(obj, mode) => {
-
                     let c_t = context_trigger(context, &mut globals.uid_counter); // i dont know
 
                     let mut obj_map = HashMap::<u16, ObjParam>::new();
@@ -594,7 +594,13 @@ pub fn built_in_function(
         }
 
         "dict_add" => {
-            arg_length!(info, 3, arguments, "Expected 3 arguments, a dictionary, a key, and a value to be added to it".to_string());
+            arg_length!(
+                info,
+                3,
+                arguments,
+                "Expected 3 arguments, a dictionary, a key, and a value to be added to it"
+                    .to_string()
+            );
 
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
@@ -620,7 +626,7 @@ pub fn built_in_function(
             match &mut globals.stored_values[arguments[0]] {
                 Value::Dict(d) => {
                     match key {
-                        Value::Str(s) => (*d).insert(s,cloned),
+                        Value::Str(s) => (*d).insert(s, cloned),
                         _ => {
                             return Err(RuntimeError::BuiltinError {
                                 message: format!("Expected str, found @{}", key_type),
@@ -628,7 +634,7 @@ pub fn built_in_function(
                             })
                         }
                     };
-                },
+                }
 
                 _ => {
                     return Err(RuntimeError::BuiltinError {
@@ -642,13 +648,19 @@ pub fn built_in_function(
         }
 
         "split_str" => {
-            arg_length!(info, 2, arguments, "Expected two strings as arguments".to_string());
+            arg_length!(
+                info,
+                2,
+                arguments,
+                "Expected two strings as arguments".to_string()
+            );
             let mut output = Vec::<StoredValue>::new();
             let mut valid_args = true;
             if let Value::Str(s) = globals.stored_values[arguments[0]].clone() {
                 if let Value::Str(substr) = globals.stored_values[arguments[1]].clone() {
                     for split in s.split(&substr) {
-                        let entry = store_const_value(Value::Str(split.to_string()), 1, globals, context);
+                        let entry =
+                            store_const_value(Value::Str(split.to_string()), 1, globals, context);
                         output.push(entry);
                     }
                 } else {
@@ -676,7 +688,6 @@ pub fn built_in_function(
                 });
             }
 
-
             let (okey, oval) = match globals.stored_values[arguments[0]].clone() {
                 Value::Obj(_o, m) => {
                     //println!("{:?}", *o);
@@ -701,54 +712,71 @@ pub fn built_in_function(
                             }
                             (out, None)
                         }
-                        Value::Dict(d) => { // this is specifically for object_key dicts
+                        Value::Dict(d) => {
+                            // this is specifically for object_key dicts
                             let gotten_type = d.get(TYPE_MEMBER_NAME);
-                            if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
+                            if gotten_type == None
+                                || globals.stored_values[*gotten_type.unwrap()]
+                                    != Value::TypeIndicator(19)
+                            {
+                                // 19 = object_key??
                                 return Err(RuntimeError::RuntimeError {
-                                    message: "expected either @number or @object_key as object key".to_string(),
+                                    message: "expected either @number or @object_key as object key"
+                                        .to_string(),
                                     info,
-                                })
+                                });
                             }
                             let id = d.get("id");
                             if id == None {
-                                return Err(RuntimeError::RuntimeError { // object_key has an ID member for the key basically
+                                return Err(RuntimeError::RuntimeError {
+                                    // object_key has an ID member for the key basically
                                     message: "object key has no 'id' member".to_string(),
                                     info,
-                                })
+                                });
                             }
                             let pattern = d.get("pattern");
                             if pattern == None {
-                                return Err(RuntimeError::RuntimeError { // same with pattern, for the expected type
+                                return Err(RuntimeError::RuntimeError {
+                                    // same with pattern, for the expected type
                                     message: "object key has no 'pattern' member".to_string(),
                                     info,
-                                })
+                                });
                             }
 
-                            (match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
-                                Value::Number(n) => {
-                                    let out = *n as u16;
+                            (
+                                match &globals.stored_values[*id.unwrap()] {
+                                    // check if the ID is actually an int. it should be
+                                    Value::Number(n) => {
+                                        let out = *n as u16;
 
-                                    if m == ObjectMode::Trigger && (out == 57 || out == 62) { // group ids and stuff on triggers
-                                        return Err(RuntimeError::RuntimeError {
+                                        if m == ObjectMode::Trigger && (out == 57 || out == 62) {
+                                            // group ids and stuff on triggers
+                                            return Err(RuntimeError::RuntimeError {
                                             message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
+                                            info,
+                                        });
+                                        }
+                                        out
+                                    }
+                                    _ => {
+                                        return Err(RuntimeError::RuntimeError {
+                                            message: format!(
+                                                "object key's id has to be @number, found {}",
+                                                globals.get_type_str(*id.unwrap())
+                                            ),
                                             info,
                                         })
                                     }
-                                    out
-                                }
-                                _ => return Err(RuntimeError::RuntimeError {
-                                    message: format!("object key's id has to be @number, found {}", globals.get_type_str(*id.unwrap())),
-                                    info,
-                                })
-                            }, Some(globals.stored_values[*pattern.unwrap()].clone()))
-                            
+                                },
+                                Some(globals.stored_values[*pattern.unwrap()].clone()),
+                            )
                         }
                         a => {
                             return Err(RuntimeError::RuntimeError {
                                 message: format!(
-                                    "expected either @number or @object_key as object key, found: {}",
-                                    a.to_str(globals)
-                                ),
+                                "expected either @number or @object_key as object key, found: {}",
+                                a.to_str(globals)
+                            ),
                                 info,
                             })
                         }
@@ -759,25 +787,21 @@ pub fn built_in_function(
                             return Err(RuntimeError::RuntimeError {
                                 message: format!(
                                     "key required value to match {}, found {}",
-                                    pat.to_str(globals), value.to_str(globals)
+                                    pat.to_str(globals),
+                                    value.to_str(globals)
                                 ),
                                 info,
-                            })
+                            });
                         }
                     }
                     let err = Err(RuntimeError::RuntimeError {
-                        message: format!(
-                            "{} is not a valid object value",
-                            value.to_str(globals)
-                        ),
+                        message: format!("{} is not a valid object value", value.to_str(globals)),
                         info: info.clone(),
                     });
 
-                    let out_val = match &value { // its just converting value to objparam basic level stuff
-                        Value::Number(n) => {
-                            
-                            ObjParam::Number(*n)
-                        },
+                    let out_val = match &value {
+                        // its just converting value to objparam basic level stuff
+                        Value::Number(n) => ObjParam::Number(*n),
                         Value::Str(s) => ObjParam::Text(s.clone()),
                         Value::TriggerFunc(g) => ObjParam::Group(g.start_group),
 
@@ -788,24 +812,27 @@ pub fn built_in_function(
 
                         Value::Bool(b) => ObjParam::Bool(*b),
 
-                        Value::Array(a) => ObjParam::GroupList({
-                            let mut out = Vec::new();
-                            for s in a {
-                                out.push(match globals.stored_values[*s] {
+                        Value::Array(a) => {
+                            ObjParam::GroupList({
+                                let mut out = Vec::new();
+                                for s in a {
+                                    out.push(match globals.stored_values[*s] {
                                     Value::Group(g) => g,
                                     _ => return Err(RuntimeError::RuntimeError {
                                         message: "Arrays in object parameters can only contain groups".to_string(),
                                         info,
                                     })
                                 })
-                            }
-                            
-                            out
-                        }),
+                                }
+
+                                out
+                            })
+                        }
                         Value::Dict(d) => {
                             if let Some(t) = d.get(TYPE_MEMBER_NAME) {
                                 if let Value::TypeIndicator(t) = globals.stored_values[*t] {
-                                    if t == 20 { // type indicator number 20 is epsilon ig
+                                    if t == 20 {
+                                        // type indicator number 20 is epsilon ig
                                         ObjParam::Epsilon
                                     } else {
                                         return err;
@@ -823,7 +850,6 @@ pub fn built_in_function(
                     };
 
                     (key, out_val)
-
                 }
                 _ => {
                     return Err(RuntimeError::BuiltinError {
@@ -845,10 +871,10 @@ pub fn built_in_function(
                     }
 
                     if !contains {
-                        (*o).push((okey, oval.clone()))
+                        (*o).push((okey, oval))
                     }
                 }
-                _ => unreachable!()
+                _ => unreachable!(),
             }
 
             //println!("key is {:?}, value is {:?}", okey, oval);
@@ -1318,7 +1344,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             }
                         }
                         Value::Bool(out)
-                    },
+                    }
 
                     (Value::Dict(d), Value::Str(b)) => {
                         let mut out = false;
@@ -1331,53 +1357,55 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         Value::Bool(out)
                     }
 
-                    (Value::Str(s), Value::Str(s2)) => {
-                        Value::Bool(s.contains(&s2))
-                    }
+                    (Value::Str(s), Value::Str(s2)) => Value::Bool(s.contains(&s2)),
 
                     (Value::Obj(o, _m), Value::Number(n)) => {
-                        let obj_has: bool = o.iter()
-                                             .any(|k| k.0==n as u16);
+                        let obj_has: bool = o.iter().any(|k| k.0 == n as u16);
                         Value::Bool(obj_has)
                     }
 
                     (Value::Obj(o, _m), Value::Dict(d)) => {
                         let gotten_type = d.get(TYPE_MEMBER_NAME);
 
-                        if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
+                        if gotten_type == None
+                            || globals.stored_values[*gotten_type.unwrap()]
+                                != Value::TypeIndicator(19)
+                        {
+                            // 19 = object_key??
                             return Err(RuntimeError::TypeError {
                                 expected: "either @number or @object_key".to_string(),
-                                found: format!("{}", b_type),
+                                found: b_type,
                                 info,
-                            })
+                            });
                         }
 
                         let id = d.get("id");
                         if id == None {
-                            return Err(RuntimeError::BuiltinError { // object_key has an ID member for the key basically
+                            return Err(RuntimeError::BuiltinError {
+                                // object_key has an ID member for the key basically
                                 message: "object key has no 'id' member".to_string(),
                                 info,
-                            })
+                            });
                         }
-                        let ob_key = match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
-                            Value::Number(n) => {
-                                *n as u16
+                        let ob_key = match &globals.stored_values[*id.unwrap()] {
+                            // check if the ID is actually an int. it should be
+                            Value::Number(n) => *n as u16,
+                            _ => {
+                                return Err(RuntimeError::TypeError {
+                                    expected: "@number as object key".to_string(),
+                                    found: globals.get_type_str(*id.unwrap()),
+                                    info,
+                                })
                             }
-                            _ => return Err(RuntimeError::TypeError {
-                                expected: "@number as object key".to_string(),
-                                found: format!("{}", globals.get_type_str(*id.unwrap())),
-                                info,
-                            })
                         };
-                        let obj_has: bool = o.iter()
-                                             .any(|k| k.0==ob_key);
+                        let obj_has: bool = o.iter().any(|k| k.0 == ob_key);
                         Value::Bool(obj_has)
                     }
 
                     (Value::Obj(_, _), _) => {
                         return Err(RuntimeError::TypeError {
                             expected: "@number or @object_key".to_string(),
-                            found: format!("{}", b_type),
+                            found: b_type,
                             info,
                         })
                     }
@@ -1385,7 +1413,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     (Value::Str(_), _) => {
                         return Err(RuntimeError::TypeError {
                             expected: "string to compare".to_string(),
-                            found: format!("{}", b_type),
+                            found: b_type,
                             info,
                         })
                     }
@@ -1393,7 +1421,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     (Value::Dict(_), _) => {
                         return Err(RuntimeError::TypeError {
                             expected: "string as key".to_string(),
-                            found: format!("{}", b_type),
+                            found: b_type,
                             info,
                         })
                     }
@@ -1401,11 +1429,11 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     _ => {
                         return Err(RuntimeError::TypeError {
                             expected: "array, dictionary, object, or string".to_string(),
-                            found: format!("{}", a_type),
+                            found: a_type,
                             info,
                         })
                     }
-                }
+                },
 
                 "_as_" => match globals.stored_values[val] {
                     Value::TypeIndicator(t) => convert_type(

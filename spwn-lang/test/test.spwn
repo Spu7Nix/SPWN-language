@@ -1,3 +1,16 @@
-for i in [1,2,3,4,5] {
-4i.add(i);
-}
+import "text_display.spwn"
+let a = 10
+std_out = @textdisplay::new([300, 300], 16)
+a += 5
+
+c = counter(0)
+func = !{std_out.write(c)}
+
+c += 10
+func!
+wait(2)
+c += 10
+func!
+wait(2)
+c += -5
+func!
