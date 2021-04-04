@@ -2,22 +2,35 @@ hidden_group = ?g
 hidden_group.alpha(0)
 hide_player()
 
+offset_y = 450
+
+extra_off = 50
+
 extract $
 extract obj_props
+
+//teleport portal
+add(obj {
+	OBJ_ID: 747,
+	X: 19,
+	Y: 0,
+	YELLOW_TELEPORTATION_PORTAL_DISTANCE: offset_y,
+	GROUPS: hidden_group,
+})
 
 //dual portal
 add(obj {
 	OBJ_ID: 286,
-	X: 0,
-	Y: 0,
+	X: 30,
+	Y: offset_y,
 	GROUPS: hidden_group,
 })
 
 //ship portal
 add(obj {
 	OBJ_ID: 13,
-	X: 0,
-	Y: 0,
+	X: 15,
+	Y: offset_y,
 	GROUPS: hidden_group,
 })
 
@@ -30,8 +43,8 @@ follow_y_group = ?g
 //this is obj type because it needs a specific position
 add(obj {
 	OBJ_ID: 901,
-	X: 75,
-	Y: 90,
+	X: 90,
+	Y: 90 + offset_y  - extra_off,
 	LOCK_TO_PLAYER_X: true,
 	TARGET: follow_x_group,
 	DURATION: 999
@@ -40,8 +53,8 @@ add(obj {
 //follop p y
 add(obj {
 	OBJ_ID: 1814,
-	X: 75,
-	Y: 120,
+	X: 90,
+	Y: 120 + offset_y  - extra_off,
 	TARGET: follow_y_group,
 	DURATION: 999,
 	SPEED: 1
@@ -54,8 +67,17 @@ add(obj {
 	OBJ_ID: 1744,
 	HORIZONTAL_FLIP: true,
 	ROTATION: -90,
-	X: 75,
-	Y: 60 + ramp_offset,
+	X: 90,
+	Y: 60 + ramp_offset + offset_y  - extra_off, 
+
+	GROUPS: [hidden_group, follow_x_group],
+})
+
+//block
+add(obj {
+	OBJ_ID: 1,
+	X: 65,
+	Y: offset_y - 15  - extra_off, 
 
 	GROUPS: [hidden_group, follow_x_group],
 })
@@ -68,8 +90,8 @@ add(obj {
 	OBJ_ID: 1816,
 	DYNAMIC_BLOCK: true,
 	BLOCK_A: player_block,
-	X: 75,
-	Y: 15,
+	X: 90,
+	Y: 15 + offset_y  - extra_off,
 	GROUPS: [hidden_group, follow_x_group, follow_y_group]
 })
 
@@ -77,11 +99,12 @@ add(obj {
 	OBJ_ID: 1816,
 	DYNAMIC_BLOCK: false,
 	BLOCK_A: collide_block,
-	X: 75,
-	Y: 45 + ramp_offset / 2,
+	X: 90,
+	Y: 46.5 + ramp_offset / 2 + offset_y  - extra_off,
 	GROUPS: [hidden_group, follow_x_group],
 	
 })
+
 
 
 return {

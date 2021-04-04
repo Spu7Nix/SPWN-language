@@ -730,11 +730,14 @@ pub fn compile_scope(
                                             c.broken = None;
                                             new_contexts.push(c)
                                         }
-                                        _ => new_contexts.push(c)
+                                        _ => new_contexts.push(c),
                                     }
                                 }
 
                                 returns.extend(inner_returns); // return stuff
+                                if new_contexts.is_empty() {
+                                    break;
+                                }
                             }
                             out_contexts.extend(new_contexts);
                             contexts.extend(out_contexts.iter().map(|c| Context {
@@ -794,6 +797,9 @@ pub fn compile_scope(
                                 }
 
                                 returns.extend(inner_returns); // return stuff
+                                if new_contexts.is_empty() {
+                                    break;
+                                }
                             }
                             out_contexts.extend(new_contexts);
                             contexts.extend(out_contexts.iter().map(|c| Context {
@@ -840,6 +846,10 @@ pub fn compile_scope(
                                 }
 
                                 returns.extend(inner_returns);
+
+                                if new_contexts.is_empty() {
+                                    break;
+                                }
                             }
                             out_contexts.extend(new_contexts);
                             contexts.extend(out_contexts.iter().map(|c| Context {
@@ -870,6 +880,8 @@ pub fn compile_scope(
 
                                 let new_info = info.clone();
 
+                                //println!("{}", new_contexts.len());
+
                                 let (end_contexts, inner_returns) =
                                     compile_scope(&f.body, new_contexts, globals, new_info)?;
 
@@ -884,6 +896,10 @@ pub fn compile_scope(
                                 }
 
                                 returns.extend(inner_returns);
+
+                                if new_contexts.is_empty() {
+                                    break;
+                                }
                             }
                             out_contexts.extend(new_contexts);
                             contexts.extend(out_contexts.iter().map(|c| Context {

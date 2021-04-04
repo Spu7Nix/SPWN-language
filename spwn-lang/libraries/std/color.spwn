@@ -28,9 +28,10 @@ impl @color {
             OPACITY: opacity,
             BLENDING: blending,
             TARGET_COLOR: self,
+            36: 1,
         })
         wait(duration)
-    },
+    }, //1,899,2,285,3,105,36,1,7,255,8,255,9,255,10,0.5,35,0;
 
     pulse: #[desc("Implementation of the pulse trigger for colors")]
     (

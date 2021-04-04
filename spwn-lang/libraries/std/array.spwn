@@ -91,11 +91,19 @@ impl @array {
         return acum;
     },
     any: (self) {
-        let numerical = self.reduce((t, v)=>@number(@bool(t))+@number(@bool(v)))
-        return numerical as @bool;
+        for item in self {
+            if @bool(item) {
+                return true
+            }
+        }
+        return false
     },
     all: (self) {
-        let numerical = self.reduce((t, v)=>@number(@bool(t))*@number(@bool(v)))
-        return numerical as @bool;
-    },
+        for item in self {
+            if !@bool(item) {
+                return false
+            }
+        }
+        return true
+    }
 }

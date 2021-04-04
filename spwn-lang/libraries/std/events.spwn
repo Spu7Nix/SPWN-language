@@ -58,6 +58,7 @@ return {
                 BLOCK_A: a,
                 BLOCK_B: b,
                 ACTIVATE_GROUP: true,
+                ACTIVATE_ON_EXIT: false,
                 TARGET: function,
                 
             })

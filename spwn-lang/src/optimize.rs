@@ -220,7 +220,7 @@ fn reads_writes(t: Trigger, objects: &Triggerlist) -> (Vec<IDData>, Vec<IDData>)
     let mut out = (Vec::new(), Vec::new());
     for (key, val) in &obj.params {
         let id_data = match val {
-            ObjParam::Group(g) => IDData::Group(*g),
+            //ObjParam::Group(g) => IDData::Group(*g),
             ObjParam::Block(b) => IDData::Block(*b),
             ObjParam::Item(i) => IDData::Item(*i),
             _ => continue,

@@ -28,11 +28,45 @@ input_layer.alpha(0)
 finished_layer.alpha(0)
 force_stop_layer.alpha(0)
 
+input_char = 26g
+
+
+move_button = 10c
+select_button = 11c
+
+input_inc_button = 12c
+input_done_button = 13c
+
 input_mode = counter()
-input_mode.display(0, 0)
+
+input_used = counter(0)
+input_used.display(90, 30)
+
+pulse_ptr = (){
+    -> 972g.move(0, 1, 0.05, easing = EASE_IN)
+    -> 973g.move(0, -1, 0.05, easing = EASE_IN)
+    -> 974g.move(1, 0, 0.05, easing = EASE_IN)
+    -> 975g.move(-1, 0, 0.05, easing = EASE_IN)
+
+    -> 972g.move(0, -1, 0.2, easing = EASE_IN_OUT)
+    -> 973g.move(0, 1, 0.2, easing = EASE_IN_OUT)
+    -> 974g.move(-1, 0, 0.2, easing = EASE_IN_OUT)
+    -> 975g.move(1, 0, 0.2, easing = EASE_IN_OUT)  
+}
+
+// win_condition = "win"
+// coin_condition = "coin tu"
+
+mem_items = [62i, 54i, 63i, 64i, 58i, 55i, 65i, 60i, 59i, 66i]
 
 impl @bfreader {
     new: (script_offset: [@number], cell_count: @number) {
+
+        std_out = @textdisplay::new([script_offset[0] + 1278, script_offset[1] - 66], 10)
+        //$.print("hello")
+        //-> BG.pulse(255, 0, 0, fade_out = 0.5)
+        //-> std_out.write(counter(5))
+            
         
         extract obj_props
         block = ?b
@@ -41,7 +75,7 @@ impl @bfreader {
             OBJ_ID: 1816,
             X: script_offset[0] - spacing * 3,
             Y: script_offset[1],
-            GROUPS: group,
+            GROUPS: [group, gs.hidden_group],
             BLOCK_A: block,
             SCALING: 0.5,
             DYNAMIC_BLOCK: true,
@@ -69,31 +103,31 @@ impl @bfreader {
         // CREATE CELLS
         let cells = []
         for i in ..cell_count {
-            c = counter()
+            c = counter(mem_items[i])
             cells.push(c)
-            c.display(script_offset[0] + i * 30 + 300, script_offset[1] + 690)
+            //c.display(script_offset[0] + i * 30 + 300, script_offset[1] + 690)
         }
         ptr = counter(0)
-        ptr.display(script_offset[0], script_offset[1] + 60)
-        std_in = counter(0)
+        //ptr.display(script_offset[0], script_offset[1] + 60)
+        std_in = counter(85i)
         std_in.display(script_offset[0], script_offset[1] - 90)
         
-        std_out = @textdisplay::new([script_offset[0], script_offset[1] + 810], 16)
         
-        num_out = counter(0)
+        
+        num_out = counter(61i)
         num_out.display(script_offset[0], script_offset[1] + 210)
         out = @bfreader::{
             group: group,
             right: counter(block.create_tracker_item(RIGHT)),
             left:  counter(block.create_tracker_item(LEFT)),
             incr:  counter(block.create_tracker_item(INCR)),
-            dot:  counter(block.create_tracker_item(DOT)),
-            input:  counter(block.create_tracker_item(INPUT)),
+            dot:   counter(block.create_tracker_item(DOT)),
+            input: counter(block.create_tracker_item(INPUT)),
             decr:  counter(block.create_tracker_item(DECR)),
             open:  counter(block.create_tracker_item(OPEN)),
             close: counter(block.create_tracker_item(CLOSE)),
-            end: counter(block.create_tracker_item(END)),
-            noop: counter(block.create_tracker_item(NOOP)),
+            end:   counter(block.create_tracker_item(END)),
+            noop:  counter(block.create_tracker_item(NOOP)),
             std_out: std_out,
             num_out: num_out,
             std_in: std_in,
@@ -133,77 +167,98 @@ impl @bfreader {
             self.group.move(spacing, 0, 0)
             -> return
         }
+
+        slow_ret = !{
+            supress_signal(0.3)
+            ret!
+        }
         current = self.currently_on()
         
         if current == RIGHT {
             self.ptr += 1
+            wait()
             if self.ptr == self.cells.length {
+                wait()
                 self.ptr -= self.cells.length
-                cell_pointer.move(-10 * self.cells.length, 0.1)
+                cell_pointer.move(-10 * (self.cells.length - 1),0, 0.1)
             } else {
-                cell_pointer.move(10, 0.1)
+                cell_pointer.move(10,0, 0.1)
             }
             
             ret!
         }
         else if current == LEFT {
             self.ptr -= 1
+            wait()
             if self.ptr == -1 {
+                wait()
                 self.ptr += self.cells.length
-                cell_pointer.move(10 * self.cells.length, 0.1)
+                cell_pointer.move(10 * (self.cells.length - 1), 0, 0.1)
             } else {
-                cell_pointer.move(-10, 0.1)
+                cell_pointer.move(-10,0, 0.1)
             }
             ret!
         }
         else if current == INCR {
             -> self.current_cell() += 1
+            pulse_ptr()
             ret!
         }
         else if current == DECR {
-            -> self.current_cell() -= 1
+            -> (){
+                cell = self.current_cell()
+                //$.print(current)
+                if cell > 0 {
+                    cell -= 1
+                }
+            }()
+            pulse_ptr()
             ret!
         }
         else if current == DOT {
             
             () {
-                self.num_out.reset(3)
+                self.num_out.reset(1)
                 cell = self.current_cell()
                 wait()
                 cell.copy_to([self.num_out], speed = 1)
             } ()
-            wait(0.1)
+            supress_signal(0.1)
             
-            self.std_out.write(self.num_out, speed = 1)
+            self.std_out.write(self.num_out)
             
             ret!
         }
         else if current == INPUT {
-            
+            supress_signal(0.1)
             std_in = self.std_in
-            input_layer.alpha(1, 0.5)
+            -> input_layer.alpha(1, 0.5)
+            if input_used == 0 {
+                input_used += 1
+            }
             input_mode += 1
             
             gs.button_a().on_triggered(!{
                 supress_signal(0.05)
                 if input_mode == 1 {
+                    -> input_inc_button.pulse(59, 144, 247, fade_out = 0.3)
                     std_in += 1
+                    input_char.move(-100, 0, 0)
                 }
             })
             gs.button_b().on_triggered(!{
-                supress_signal(0.05)
                 if input_mode == 1 {
+                    -> input_done_button.pulse(52, 247, 68, fade_out = 0.3)
                     wait()
                     input_mode -= 1
                     -> input_layer.alpha(0, 0.5)
                     cell = self.current_cell()
                     wait()
                     cell.reset(speed = 1)
-                    std_in.add_to([cell], speed = 1)
+                    std_in.add_to([cell], speed = 1, for_each = (n){ input_char.move(100 * n, 0, 0) })
                     
+                    slow_ret!
                     
-                    wait(0.3)
-                    ret!
                 }
             })
             
@@ -217,11 +272,13 @@ impl @bfreader {
                 self.group.move(spacing, 0, 0.06)
                 while_loop(condition, delay = 0, (){
                     wait(0.01)
+                    
                     if self.currently_on() == OPEN {
                         layers += 1
                     } else if self.currently_on() == CLOSE {
                         layers -= 1
                     }
+                    
                     self.group.move(spacing, 0)
                     wait()
                 })
@@ -266,6 +323,9 @@ impl @bfreader {
     }
 }
 
+move_group = 30g
+
+roll_groups = 70g..110g
 
 
 insert_bf_cmd = (ch: @string, offset: [@number], group: @group) {
@@ -290,30 +350,38 @@ insert_bf_cmd = (ch: @string, offset: [@number], group: @group) {
         X: offset[0],
         Y: offset[1],
         BLOCK_A: blockid,
-        GROUPS: group,
-        SCALING: 0.2,
+        GROUPS: [group, gs.hidden_group],
+        SCALING: 0.5,
     })
-    let scale
-    if ch.length == 1 {
-        scale = 1
-    } else {
-        scale = 0.3
-    }
-    $.add(obj {
-        OBJ_ID: 914,
-        X: offset[0],
-        Y: offset[1],
-        TEXT: $.b64encrypt(ch),
-        GROUPS: group,
-        SCALING: scale,
-        COLOR: 1c,
-    })
+    // let scale
+    // let color
+    // if ch.length == 1 {
+    //     scale = 0.8
+    // } else {
+    //     scale = 0.3
+    // }
+    // if blockid == NOOP {
+    //     color = 2c
+    // } else {
+    //     color = 40c
+    // }
+    // $.add(obj {
+    //     OBJ_ID: 914,
+    //     X: offset[0] + 41 * 30 - 1200,
+    //     Y: offset[1] - 8.6 * 30 - 600,
+    //     TEXT: $.b64encrypt(ch),
+    //     GROUPS: [group, 968g, move_group],
+    //     SCALING: scale,
+    //     COLOR: color,
+    //     EDITOR_LAYER_1: 3,
+    //     Z_LAYER: 1
+    // })
 }
 
-offset = [300, 300]
-sel_off = [300, 900]
+offset = [1500, 900]
+sel_off = [600, 1500]
 
-commands = 32
+commands = 40
 
 selector = {block: ?b, group: ?g, start: ?g}
 
@@ -323,7 +391,7 @@ $.add(obj {
     OBJ_ID: 1765,
     X: sel_off[0] - 60,
     Y: sel_off[1] - 60,
-    GROUPS: selector.start,
+    GROUPS: [selector.start, gs.hidden_group],
 })
 
 $.add(obj {
@@ -331,26 +399,13 @@ $.add(obj {
     X: sel_off[0] - 60,
     Y: sel_off[1] - 60,
     BLOCK_A: selector.block,
-    GROUPS: selector.group,
+    GROUPS: [selector.group, gs.hidden_group],
     DYNAMIC_BLOCK: true,
 })
 
 is_running = counter(0)
+block_input = counter(0)
 
-gs.button_a().on_triggered(!{
-    if is_running == 0 {
-        selector.group.move(20, 0, 0.1) 
-        prog_selector.move(10, 0, 0.1)
-    }
-})
-
-gs.button_b().on_triggered(!{
-    if is_running == 0 {
-        selector.group.move(0, 20, 0)
-        wait()
-        selector.group.move(0, -20, 0)
-    }
-})
 
 reset_selector = ?b
 
@@ -360,74 +415,24 @@ for i in ..3 {
         X: sel_off[0] + commands * 60,
         Y: sel_off[1] - 30 * i,
         BLOCK_A: reset_selector,
+        GROUPS: gs.hidden_group,
         SCALING: 0.5,
     })
 }
 reset_selector_func = !{
+    block_input += 1
     -> selector.group.move(-10, 0, 0.09, EASE_IN_OUT)
     wait(0.1)
-    prog_selector.follow(selector.group, duration = 0.15, x_mod = 0.5)
+    prog_selector.follow(selector.group, duration = 0.45, x_mod = 0.5)
     wait(0.01)
-    -> selector.group.move_to(selector.start, 0.1, easing = EASE_IN_OUT)
-    -> prog_selector.move(-5, 0, 0.1, easing = EASE_IN_OUT)
-}   
-
-collision(reset_selector, selector.block).on_triggered(reset_selector_func)
-y_spacing = 15
-
-for i in ..commands {
-    sg = ?g
-    c = counter(0)
-    c.display(sel_off[0] + i * 60, sel_off[1] + 30)
-    order = ["no\nop","+","-","<",">","[","]",".",",","end"]
-    for c in ..order.length {
-        off = [offset[0] + i * spacing * 3, offset[1] + c * y_spacing * 3]
-        insert_bf_cmd(order[c], off, sg)
-    }
-    // block that increments the selector
-    inc_block = ?b
-    $.add(obj {
-        OBJ_ID: 1816,
-        X: sel_off[0] + i * 60,
-        Y: sel_off[1],
-        BLOCK_A: inc_block,
-        SCALING: 0.5,
-    })
-
-    // block that checks for end
-    end_check_block = ?b
-    $.add(obj {
-        OBJ_ID: 1816,
-        X: sel_off[0] + i * 60 + 30,
-        Y: sel_off[1] - 60,
-        BLOCK_A: end_check_block,
-        SCALING: 0.5,
-    })
-
-    // block that resets the selector
-    reset_block = ?b
-    $.add(obj {
-        OBJ_ID: 1816,
-        X: offset[0] + i * spacing * 3,
-        Y: offset[1] - order.length * y_spacing * 3,
-        BLOCK_A: reset_block,
-        DYNAMIC_BLOCK: true,
-        SCALING: 0.5,
-    })
-
-    collision(end_check_block, selector.block).on_triggered(!{c.item.if_is(EQUAL_TO, order.length - 1, reset_selector_func)})
-
-    collision(inc_block, selector.block).on_triggered(!{
-        sg.move(0, -y_spacing, 0.1)
-        c += 1
-    })
-
-    collision(INCR, reset_block).on_triggered(!{
-        sg.move(0, y_spacing * order.length, 0.1)
-        c -= order.length
-    })
-    
+    -> selector.group.move_to(selector.start, 0.4, easing = EASE_IN_OUT)
+    prog_selector.move(-5, 0, 0.4, easing = EASE_IN_OUT)
+    block_input -= 1
 }
+
+y_spacing = 20
+
+
 // end
 $.add(obj {
     OBJ_ID: 1816,
@@ -435,6 +440,7 @@ $.add(obj {
     Y:  offset[1],
     BLOCK_A: END,
     SCALING: 0.2,
+    GROUPS: gs.hidden_group
 })
 
 //run button
@@ -447,52 +453,352 @@ $.add(obj {
     Y: sel_off[1],
     BLOCK_A: run_block,
     SCALING: 0.5,
+    GROUPS: gs.hidden_group
 })
-force_quit_taps = counter(0)
-force_quit_taps.display(90, 0)
+force_quit_taps = counter(56i)
+//force_quit_taps.display(90, 0)
 
-reader = @bfreader::new(offset, 12)
+reader = @bfreader::new(offset, 6)
 prog_pointer.follow(reader.group)
 
 ended = counter(0)
 
-touch().on_triggered(!{
-    if ended == 1 {
-        for c in reader.cells {
-            -> c.reset(speed = 1)
+-> move_group.move(-235, 100, 0)
+-> move_group.follow(981g)
+
+
+
+all = (arr) {
+    for item in arr {
+        if !@bool(item) {
+            return false
+        }
+    }
+    return true
+}
+
+for i in 0..3 {
+    reader.std_out.win[i].display(60 + i * 30, 60)
+}
+
+for i in 0..4 {
+    reader.std_out.coin[i].display(60 + i * 30, 90)
+}
+
+for i in 0..4 {
+    reader.std_out.coin_coin[i].display(60 + i * 30, 120)
+}
+
+for i in ..commands {
+    sg = roll_groups[i]
+    c = counter(0)
+    //c.display(sel_off[0] + i * 60, sel_off[1] + 30)
+    order = ["no\nop","+","-","<",">","[","]",".",",","end"]
+    for c in ..order.length {
+        off = [offset[0] + i * spacing * 3, offset[1] + c * y_spacing * 3]
+        insert_bf_cmd(order[c], off, sg)
+    }
+    // block that increments the selector 
+    inc_block = ?b
+    $.add(obj {
+        OBJ_ID: 1816,
+        X: sel_off[0] + i * 60,
+        Y: sel_off[1],
+        BLOCK_A: inc_block,
+        SCALING: 0.5,
+        GROUPS: gs.hidden_group
+    })
+
+    // block that checks for end
+    end_check_block = ?b
+    $.add(obj {
+        OBJ_ID: 1816,
+        X: sel_off[0] + i * 60 + 30,
+        Y: sel_off[1] - 60,
+        BLOCK_A: end_check_block,
+        SCALING: 0.5,
+        GROUPS: gs.hidden_group
+    })
+
+    // block that resets the selector
+    reset_block = ?b
+    $.add(obj {
+        OBJ_ID: 1816,
+        X: offset[0] + i * spacing * 3,
+        Y: offset[1] - order.length * y_spacing * 3 + 10,
+        BLOCK_A: reset_block,
+        DYNAMIC_BLOCK: true,
+        SCALING: 1,
+        GROUPS: gs.hidden_group
+    })
+
+    collision(end_check_block, selector.block).on_triggered(!{c.item.if_is(EQUAL_TO, order.length - 1, reset_selector_func)})
+
+    collision(inc_block, selector.block).on_triggered(!{
+        sg.move(0, -y_spacing, 0.1)
+        c += 1
+    })
+
+    collision(NOOP, reset_block).on_triggered(!{
+        sg.move(0, y_spacing * order.length, 0.1)
+        c -= order.length
+    })
+    
+}
+
+
+
+coin1 = 101g
+coin2 = 102g
+end_wall = 100g
+
+coin1.toggle_off()
+coin2.toggle_off()
+
+gamemode = counter(20i) // 0 = tutorial, 2 = challenge, 3 = sandbox
+started = counter(0)
+challenge = counter(0)
+
+// challenge 1: run any program
+// challenge 2: output 10
+// challenge 3: output 128 no input
+// challenge 4: write "win" using no input
+// coin 5: write "coin" using no input
+// coin 6: write "coin coin" using no input
+
+challenge_board = 103g
+challenge_board_color = 103c
+
+
+next_challenge = (){
+    challenge += 1
+    -> challenge_board.move(-200, 0)
+    -> challenge_board_color.pulse(81, 252, 95, fade_out = 0.5)
+}
+
+start = (){
+
+   
+
+    collision(reset_selector, selector.block).on_triggered(reset_selector_func)
+    
+
+    touch().on_triggered(!{
+        if ended == 1 {
+            for c in reader.cells {
+                -> c.reset(speed = 1)
+            }
+
+            if input_used == 1 {
+                wait()
+                input_used -= 1
+            }
+
+            -> reader.ptr.reset(speed = 1, for_each = (n) { cell_pointer.move(-10 * n, 0, 0.1, easing = EASE_IN_OUT) })
+            -> reader.num_out.reset(speed = 1)
+            -> reader.group.move_to(reader.start_point, 0.3)
+            -> cell_pointer.move_to(reader.start_point, 0.3)
+            -> force_quit_taps -= force_quit_taps.to_const(1..4)
+            -> reader.std_out.reset()
+            
+            wait()
+            finished_layer.alpha(0, 0.5)
+            is_running -= 1
+            block_input -= 1
+            ended -= 1
+            
+        } else if is_running == 1 && reader.input != 1 {
+            if force_quit_taps < 3 {
+                force_quit_taps += 1
+            }
+            force_stop_layer.alpha(1, 0.5)
+            force_stop_layer.alpha(0, 2)
+            
+        }
+    })
+
+    
+
+    collision(run_block, selector.block).on_triggered(!{
+        is_running += 1
+        block_input += 1
+        // reader.num_out.add(10)
+        // wait(0.1)
+        // reader.std_out.write(reader.num_out)
+        // wait(0.1)
+        reader.group.move(10, 0, 0.05)
+        while_loop(()=> reader.end == 0 && force_quit_taps < 3, (){
+            reader.interpret()
+        })
+        
+        -> finished_layer.alpha(1, 0.5)
+        if gamemode == 1 {
+            //challenges
+            if challenge == 0 {
+                next_challenge()
+            }
+
+            if challenge == 1 {
+                if reader.num_out == 10 {
+                    next_challenge()
+                }
+            }
+
+            if input_used == 0 {
+                if challenge == 2 {
+                    if reader.num_out == 64 {
+                        next_challenge()
+                    }
+                }
+
+                if challenge == 3 {
+                    if all(reader.std_out.win) {
+                        end_wall.toggle_off()
+                        next_challenge()
+                    }
+                }
+
+
+                if all(reader.std_out.coin) {
+
+                    if challenge == 4 {
+                        coin1.toggle_on()
+                        next_challenge()
+                    }
+
+                    if challenge == 5 {
+                        if all(reader.std_out.coin_coin) {
+                            coin2.toggle_on()
+                            next_challenge()
+                        }  
+                    }
+                    
+                }
+
+                
+            }
+
+            wait(0.2)
+        }
+        ended += 1
+        
+        
+        
+    })
+}
+8c.set(0, 0, 0)
+// start menu
+gm_selector = 50g
+menu_timer = 51g
+gm_name_colors = 20c..29c
+allow_menu_move = counter(0)
+
+wait(5)
+
+gs.button_a().on_triggered(!{
+    if started == 0 && allow_menu_move == 0 {
+        start_func = !{
+            start()
+        }
+        wait()
+        allow_menu_move += 1
+        -> 53c.set(255, 255, 255)
+        -> 53c.set(0, 0, 0, 0.5)
+        -> 937g.move(15, 15, 0.5, easing = EXPONENTIAL_OUT)
+        -> 938g.move(-15, -15, 0.5, easing = EXPONENTIAL_OUT)
+        wait(0.3)
+        54c.set(0,0,0, 0.5)
+        -> 54c.set(0,0,0, 0.5, opacity = 0.0)
+        started += 1
+        if gamemode == 0 {
+            //tutorial setup
+            move_group.move(0, -160, 0)
+        }
+        if gamemode == 1 {
+            // challenge setup
+            move_group.move(-1100, 0, 0)
+            start_func!
+        }
+        if gamemode == 2 {
+            // coins setup
+            challenge += 4
+            move_group.move(-1100, 0, 0)
+            challenge_board.move(-200 * 4, 0)
+            start_func!
         }
 
-        -> reader.ptr.reset()
-        -> reader.num_out.reset()
-        -> reader.group.move_to(reader.start_point, 0.1)
-        -> force_quit_taps -= force_quit_taps.to_const(1..4)
-        is_running -= 1
-        wait()
-        ended -= 1
-        
-    } else if is_running == 1 && reader.input != 1 {
-        if force_quit_taps < 3 {
-            force_quit_taps += 1
+        if gamemode == 3 {
+            // sandbox setup
+            move_group.move(-1100, 0, 0)
+            challenge_board.move(200, 0)
+            start_func!
         }
-        force_stop_layer.alpha(1, 0.5)
-        force_stop_layer.alpha(0, 2)
+
         
+
+    } else {
+        if gamemode == 0 {
+            move_group.move(-300, 0, 0)
+        } else {
+            if block_input == 0 {
+                -> move_button.pulse(59, 144, 247, fade_out = 0.3)
+                selector.group.move(20, 0, 0.1) 
+                prog_selector.move(10, 0, 0.1)
+            }
+        }
     }
 })
 
+gs.button_b().on_triggered(!{
+    if started == 0 && allow_menu_move == 0 {
+        -> 985g.move(0, -1500, 0)
+        -> 985g.move(0, 1500, 0.8)
+        -> 15c.set(0,0,0, 0.1)
+        wait()
+        allow_menu_move += 1
+        -> 978g.move(-80, 10, 0.5, easing = EASE_IN_OUT, easing_rate = 3.0)
+        -> 977g.move(-60, -10, 0.5, easing = EASE_IN_OUT, easing_rate = 3.0)
+        -> 7c.set(0, 0, 0, 0.4)
+        -> 8c.set(255, 255, 255, 0.4)
+        for i in ..gm_name_colors.length {
+            -> gm_name_colors[i].pulse(0,0,0, fade_in = 0.4, hold = 0.1 + 0.06 * i)
+        }
 
-collision(run_block, selector.block).on_triggered(!{
-    is_running += 1
-    reader.group.move(10, 0, 0.05)
-    while_loop(()=> reader.end == 0 && force_quit_taps < 3, (){
-        reader.interpret()
-    })
-    ended += 1
-    finished_layer.alpha(1, 0.5)
-    
-    
-    
+        wait(0.5)
+        -> 15c.set(255,255,255, 0)
+        allow_menu_move -= 1
+        -> if gamemode == 3 {
+            wait()
+            gamemode -= 3
+            gm_selector.move(600, 0, 0)
+        } else {
+            wait()
+            gamemode += 1
+            gm_selector.move(-200, 0, 0)
+        }
+
+
+        -> 978g.move(80, -10, 0)
+        -> 977g.move(60, 10, 0)
+        -> 8c.set(0, 0, 0)
+        -> 7c.set(255, 255, 255)
+        
+    } else {
+        if gamemode == 0 {
+            move_group.move(300, 0, 0)
+        } else {
+            if block_input == 0 {
+                -> select_button.pulse(59, 144, 247, fade_out = 0.3)
+                selector.group.move(0, 20, 0)
+                wait()
+                selector.group.move(0, -20, 0)
+            }
+        }
+    }
+
 })
+
+// +++.[->+++++>+++<<]>.>.[->++<]<-.>>++.+.
 
 
 

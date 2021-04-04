@@ -68,7 +68,8 @@ impl @counter {
         self, 
         #[desc("Item IDs to add to")] items: @array, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
-        #[desc("Multiplyer for the value added")] factor: @number = 1
+        #[desc("Multiplyer for the value added")] factor: @number = 1,
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
     ) {
         wait()
         
@@ -81,6 +82,7 @@ impl @counter {
                     for item in items {
                         item.add(num * factor)
                     }
+                    for_each(num)
                     call_with_delay(@epsilon::{}, add)
                 })
             }
@@ -106,7 +108,8 @@ impl @counter {
         self, 
         #[desc("Item IDs to add to")] items: @array, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
-        #[desc("Multiplyer for the value subtracted")] factor: @number = 1
+        #[desc("Multiplyer for the value subtracted")] factor: @number = 1,
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
     ) {
         
         sub = !{
@@ -118,6 +121,7 @@ impl @counter {
                         for item in items {
                             item.add(-num * factor)
                         }
+                        for_each(num)
                         call_with_delay(@epsilon::{}, sub)
                     })
                 }
@@ -311,7 +315,8 @@ impl @counter {
     reset: #[desc("Resets counter to 0")]
     (
         self, 
-        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
     ){
         
         //almost the same
@@ -320,6 +325,7 @@ impl @counter {
             mini_add = (num){
                 self.item.if_is(LARGER_THAN, num - 1, !{
                     self.add(-num)
+                    for_each(num)
                     call_with_delay(@epsilon::{}, add)
                 })
             }
