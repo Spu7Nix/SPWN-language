@@ -179,22 +179,34 @@ pub fn optimize(mut obj_in: Vec<FunctionID>, mut closed_group: u16) -> Vec<Funct
 
     //return rebuild(&network, &obj_in);
 
-    let len = if let Some(gang) = network.get(&NO_GROUP) {
-        gang.triggers.len()
-    } else {
-        0
-    };
-    for i in 0..len {
-        let trigger = network[&NO_GROUP].triggers[i];
+    // let len = if let Some(gang) = network.get(&NO_GROUP) {
+    //     gang.triggers.len()
+    // } else {
+    //     0
+    // };
+    // for i in 0..len {
+    //     let trigger = network[&NO_GROUP].triggers[i];
 
-        // if trigger.optimized {
-        //     continue;
-        // }
+    //     // if trigger.optimized {
+    //     //     continue;
+    //     // }
 
-        if trigger.role != TriggerRole::Output {
-            optimize_from(&mut network, &mut objects, (NO_GROUP, i), &mut closed_group);
-        } else {
-            (*network.get_mut(&NO_GROUP).unwrap()).triggers[i].deleted = false;
+    //     if trigger.role != TriggerRole::Output {
+    //         optimize_from(&mut network, &mut objects, (NO_GROUP, i), &mut closed_group);
+    //     } else {
+    //         (*network.get_mut(&NO_GROUP).unwrap()).triggers[i].deleted = false;
+    //     }
+    // }
+
+    for (group, gang) in network.clone() {
+        if let ID::Specific(_) = group.id {
+            for (i, trigger) in gang.triggers.iter().enumerate() {
+                if trigger.role != TriggerRole::Output {
+                    optimize_from(&mut network, &mut objects, (group, i), &mut closed_group);
+                } else {
+                    (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
+                }
+            }
         }
     }
 

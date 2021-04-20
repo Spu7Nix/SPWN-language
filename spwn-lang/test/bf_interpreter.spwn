@@ -15,6 +15,13 @@ extract obj_props
 gs = import gamescene
 import "text_display.spwn"
 
+bc = [64, 64, 64]
+
+activate_button = (activate, deactivate) {
+    -> activate.set(bc[0], bc[1], bc[2], 0)
+    -> deactivate.set(0, 0, 0, 0, blending = true)
+}
+
 type @bfreader
 layers = counter(0)
 //layers.display(150, 300)
@@ -30,6 +37,7 @@ force_stop_layer.alpha(0)
 
 input_char = 26g
 
+tut_page = 965g
 
 move_button = 10c
 select_button = 11c
@@ -41,6 +49,8 @@ input_mode = counter()
 
 input_used = counter(0)
 input_used.display(90, 30)
+
+
 
 pulse_ptr = (){
     -> 972g.move(0, 1, 0.05, easing = EASE_IN)
@@ -68,7 +78,7 @@ impl @bfreader {
         //-> std_out.write(counter(5))
             
         
-        extract obj_props
+        
         block = ?b
         group = ?g
         $.add(obj {
@@ -218,7 +228,7 @@ impl @bfreader {
         else if current == DOT {
             
             () {
-                self.num_out.reset(1)
+                self.num_out.reset(3)
                 cell = self.current_cell()
                 wait()
                 cell.copy_to([self.num_out], speed = 1)
@@ -322,8 +332,12 @@ impl @bfreader {
         
     }
 }
+move_group_menu = 31g
+move_group_game = 30g
+move_group_tut = 32g
 
-move_group = 30g
+move_group_game.toggle_off()
+move_group_tut.toggle_off()
 
 roll_groups = 70g..110g
 
@@ -344,7 +358,7 @@ insert_bf_cmd = (ch: @string, offset: [@number], group: @group) {
         
     }
     
-    extract obj_props
+    
     $.add(obj {
         OBJ_ID: 1816,
         X: offset[0],
@@ -421,13 +435,19 @@ for i in ..3 {
 }
 reset_selector_func = !{
     block_input += 1
+    -> 952g.move_to(953g, 0.5, x_only = true, easing = EASE_IN_OUT)
     -> selector.group.move(-10, 0, 0.09, EASE_IN_OUT)
     wait(0.1)
-    prog_selector.follow(selector.group, duration = 0.45, x_mod = 0.5)
+    prog_selector.follow(selector.group, duration = 0.15, x_mod = 0.5)
     wait(0.01)
-    -> selector.group.move_to(selector.start, 0.4, easing = EASE_IN_OUT)
-    prog_selector.move(-5, 0, 0.4, easing = EASE_IN_OUT)
+    -> selector.group.move_to(selector.start, 0.1, easing = EASE_IN_OUT)
+    prog_selector.move(-5, 0, 0.1, easing = EASE_IN_OUT)
     block_input -= 1
+
+    
+    
+    activate_button(195c, 196c)
+                
 }
 
 y_spacing = 20
@@ -463,8 +483,15 @@ prog_pointer.follow(reader.group)
 
 ended = counter(0)
 
--> move_group.move(-235, 100, 0)
--> move_group.follow(981g)
+-> move_group_menu.move(-235, 100, 0)
+-> move_group_game.move(-235 -1100, 100, 0)
+-> move_group_tut.move(-235, -60, 0)
+menu_follow = !{
+    move_group_menu.follow(981g)
+}
+menu_follow!
+
+
 
 
 
@@ -535,29 +562,88 @@ for i in ..commands {
     collision(end_check_block, selector.block).on_triggered(!{c.item.if_is(EQUAL_TO, order.length - 1, reset_selector_func)})
 
     collision(inc_block, selector.block).on_triggered(!{
-        sg.move(0, -y_spacing, 0.1)
+        sg.move(0, -y_spacing, 0)
         c += 1
     })
 
     collision(NOOP, reset_block).on_triggered(!{
-        sg.move(0, y_spacing * order.length, 0.1)
+        sg.move(0, y_spacing * order.length, 0)
         c -= order.length
     })
     
 }
 
+collision(130b, 131b).on_triggered(!{
+    952g.move(-20, 0, 0.3, easing = EASE_IN_OUT)
+})
+
+collision(130b, 132b).on_triggered(!{
+    952g.move(-60, 0, 0.3, easing = EASE_IN_OUT)
+})
 
 
-coin1 = 101g
-coin2 = 102g
-end_wall = 100g
+collision(130b, 166b).on_triggered(!{
+    952g.move(30, 0, 0.3, easing = EASE_IN_OUT)
+})
+
+coin1 = 201g
+coin2 = 202g
+end_wall = 200g
 
 coin1.toggle_off()
 coin2.toggle_off()
 
+955g.toggle_off()
+
+// bg1 = 867g
+// bg2 = 868g
+//bg2.toggle_off()
+//-> bg2.move(-1000, 0, 0) //unload
+game_bg_chooser = counter(500i)
+game_bgs = [[906g, 907g, ?g], [910g, 911g, ?g]]
+game_bg_target = 908g
+switch_game_bg = 909g
+
+while_loop(() => true, delay = 0.2, () {
+    if game_bg_chooser >= game_bgs.length - 1 {
+        wait()
+        game_bg_chooser -= game_bgs.length - 1
+    } else {
+        wait()
+        game_bg_chooser += 1
+    } 
+})
+
+$.extend_trigger_func(switch_game_bg, (){
+    bg = game_bgs[game_bg_chooser.to_const(0..game_bgs.length)]
+    
+    for g in game_bgs {
+        if g != bg {
+            g[2].stop()
+            g[0].toggle_off()
+        }
+    }
+    wait()
+    -> bg[1].move_to(game_bg_target)
+    bg[2]!
+    bg[0].toggle_on()
+})
+
+for g in game_bgs {
+    g[0].follow(g[1])
+    g[0].toggle_off()
+    $.extend_trigger_func(g[2], (){
+        g[1].follow(981g)
+        g[0].follow(981g)
+    })
+}
+
+
 gamemode = counter(20i) // 0 = tutorial, 2 = challenge, 3 = sandbox
 started = counter(0)
 challenge = counter(0)
+
+tut_text_colors = 300c..800c
 
 // challenge 1: run any program
 // challenge 2: output 10
@@ -566,24 +652,46 @@ challenge = counter(0)
 // coin 5: write "coin" using no input
 // coin 6: write "coin coin" using no input
 
-challenge_board = 103g
-challenge_board_color = 103c
+challenge_board = 203g
+challenge_board_color = 203c
 
+challenge_name_colors = 55c..65c
+challenge_desc_colors = (65c..101c) + (181c..186c)
+challenge_extra_info_colors = [186c, 188c]
 
-next_challenge = (){
+next_challenge = !{
     challenge += 1
-    -> challenge_board.move(-200, 0)
+    
     -> challenge_board_color.pulse(81, 252, 95, fade_out = 0.5)
+    -> 187c.pulse(0,0,0, fade_in = 0.4, hold = 0.2, fade_out = 0.6)
+    -> 866g.move(-40, 0, 0.4, easing = EASE_IN_OUT)
+    -> 865g.move(40, 0, 0.4, easing = EASE_IN_OUT)
+    for i in ..challenge_name_colors.length {
+        -> challenge_name_colors[i].pulse(0,0,0, fade_in = 0.4, hold = 0.1 + 0.06 * i)
+    }
+    for i in ..challenge_desc_colors.length {
+        extra_delay = $.sin(i / 10) * 0.3
+        -> challenge_desc_colors[i].pulse(0,0,0, fade_in = extra_delay + 0.1, hold = 2.0 + 0.03 * i - extra_delay, fade_out = 0.1)
+    }
+
+    for i in ..challenge_extra_info_colors.length {
+        -> challenge_extra_info_colors[i].pulse(0,0,0, fade_in = 0.4, hold = 2.3 + i * 0.1, fade_out = 0.3)
+    }
+    wait(0.45)
+    -> 866g.move(40, 0, 1.5, easing = EASE_IN)
+    -> 865g.move(-40, 0, 1.5, easing = EASE_IN)
+    -> challenge_board.move(-200, 0)
 }
 
 start = (){
 
-   
+    switch_game_bg!
 
     collision(reset_selector, selector.block).on_triggered(reset_selector_func)
     
 
     touch().on_triggered(!{
+        game_bg_chooser += 1
         if ended == 1 {
             for c in reader.cells {
                 -> c.reset(speed = 1)
@@ -596,13 +704,16 @@ start = (){
 
             -> reader.ptr.reset(speed = 1, for_each = (n) { cell_pointer.move(-10 * n, 0, 0.1, easing = EASE_IN_OUT) })
             -> reader.num_out.reset(speed = 1)
-            -> reader.group.move_to(reader.start_point, 0.3)
+            -> reader.group.move_to(reader.start_point, 0)
+            -> 952g.move_to(953g, 0.5, x_only = true, easing = EASE_IN_OUT)
             -> cell_pointer.move_to(reader.start_point, 0.3)
             -> force_quit_taps -= force_quit_taps.to_const(1..4)
             -> reader.std_out.reset()
             
             wait()
             finished_layer.alpha(0, 0.5)
+            954g.toggle_on() //prog selector collision enable
+            955g.toggle_off()
             is_running -= 1
             block_input -= 1
             ended -= 1
@@ -617,11 +728,16 @@ start = (){
         }
     })
 
-    
+    force_quit_taps.item.count(3).on_triggered(!{
+        -> finished_layer.alpha(1, 0.5)
+        ended += 1
+    })
 
     collision(run_block, selector.block).on_triggered(!{
         is_running += 1
         block_input += 1
+        954g.toggle_off() //prog selector collision disable
+        955g.toggle_on()
         // reader.num_out.add(10)
         // wait(0.1)
         // reader.std_out.write(reader.num_out)
@@ -630,57 +746,58 @@ start = (){
         while_loop(()=> reader.end == 0 && force_quit_taps < 3, (){
             reader.interpret()
         })
-        
-        -> finished_layer.alpha(1, 0.5)
-        if gamemode == 1 {
-            //challenges
-            if challenge == 0 {
-                next_challenge()
-            }
-
-            if challenge == 1 {
-                if reader.num_out == 10 {
-                    next_challenge()
+        if force_quit_taps < 3 && ended == 0 {
+            -> finished_layer.alpha(1, 0.5)
+            if gamemode == 1 {
+                //challenges
+                if challenge == 0 {
+                    next_challenge!
                 }
-            }
 
-            if input_used == 0 {
-                if challenge == 2 {
-                    if reader.num_out == 64 {
-                        next_challenge()
+                if challenge == 1 {
+                    if reader.num_out == 10 {
+                        next_challenge!
                     }
                 }
 
-                if challenge == 3 {
-                    if all(reader.std_out.win) {
-                        end_wall.toggle_off()
-                        next_challenge()
-                    }
-                }
-
-
-                if all(reader.std_out.coin) {
-
-                    if challenge == 4 {
-                        coin1.toggle_on()
-                        next_challenge()
+                if input_used == 0 {
+                    if challenge == 2 {
+                        if reader.num_out == 64 {
+                            next_challenge!
+                        }
                     }
 
-                    if challenge == 5 {
-                        if all(reader.std_out.coin_coin) {
-                            coin2.toggle_on()
-                            next_challenge()
-                        }  
+                    if challenge == 3 {
+                        if all(reader.std_out.win) {
+                            end_wall.toggle_off()
+                            next_challenge!
+                        }
                     }
+
+
+                    if all(reader.std_out.coin) {
+
+                        if challenge == 4 {
+                            coin1.toggle_on()
+                            next_challenge!
+                        }
+
+                        if challenge == 5 {
+                            if all(reader.std_out.coin_coin) {
+                                coin2.toggle_on()
+                                next_challenge!
+                            }  
+                        }
+                        
+                    }
+
                     
                 }
 
-                
+                wait(0.2)
             }
-
-            wait(0.2)
+            ended += 1
         }
-        ended += 1
         
         
         
@@ -693,63 +810,222 @@ menu_timer = 51g
 gm_name_colors = 20c..29c
 allow_menu_move = counter(0)
 
-wait(5)
+// follow group shit
+game_switch = ?g //group that toggles the triggers that switch to ingame
+tut_switch = ?g //group that toggles the triggers that switch to ingame
+switch_spacing = 150
+game_switch.toggle_off()
+tut_switch.toggle_off()
+
+start_func = !{
+    activate_button(195c, 191c)
+
+    move_group_game.toggle_on()
+    game_switch.toggle_off()
+
+    
+    
+    move_group_game.follow(981g)
+    -> 54c.set(0,0,0, 0.5, opacity = 0.0)
+    -> 900g.move(0, 33, 0)
+    -> 903g.move(0, -150, 0)
+    //-> BG.pulse(255, 0, 0, fade_out = 0.6)
+    start()
+}
+
+tut_text_anim_finished = counter(200i)
+
+for col in tut_text_colors {
+    -> col.set(255,0,0)
+}
+
+tut_letters = !{
+    activate_button(194c, 192c)
+    delta = 0.05
+    for i in 0..tut_text_colors.length {
+        -> tut_text_colors[i].pulse(0,0,0, fade_in = 0.4, hold = 0.2 + i * delta, exclusive = true)
+    }
+
+
+    //wait()
+    tut_text_anim_finished.item.if_is(EQUAL_TO, 1, !{
+        tut_text_anim_finished -= 1
+    })
+    wait(delta * 300)
+    tut_text_anim_finished.item.if_is(EQUAL_TO, 0, !{
+        tut_text_anim_finished += 1
+        activate_button(192c, 194c)
+    })
+}
+
+tut_func = !{
+    move_group_tut.toggle_on()
+    tut_switch.toggle_off()
+    -> 54c.set(0,0,0, 0.5, opacity = 0.0)
+    
+    move_group_tut.follow(981g)
+    //-> BG.pulse(255, 0, 0, fade_out = 0.6)
+    delta = 0.05
+    for i in 0..tut_text_colors.length {
+        -> tut_text_colors[i].pulse(0,0,0, fade_in = 0, hold = 0.2 + i * delta)
+    }
+    tut_text_anim_finished += 1
+    activate_button(193c, 191c)
+    
+    
+}
+
+for i in 1..500 {
+    //game
+    $.add( obj{
+        X: switch_spacing * i - 2,
+        Y: -15,
+        OBJ_ID: 901,
+        TARGET: move_group_game,
+        MOVE_X: i * switch_spacing,
+        DURATION: 0,
+        GROUPS: game_switch,
+    })
+    $.add( obj{
+        X: switch_spacing * i,
+        Y: -45,
+        OBJ_ID: 1268,
+        SPAWN_DURATION: 0,
+        TARGET: start_func,
+        GROUPS: game_switch,
+    })
+
+    //tut
+    $.add( obj{
+        X: switch_spacing * i - 2,
+        Y: -15 - 60,
+        OBJ_ID: 901,
+        TARGET: move_group_tut,
+        MOVE_X: i * switch_spacing,
+        DURATION: 0,
+        GROUPS: tut_switch,
+    })
+    $.add( obj{
+        X: switch_spacing * i,
+        Y: -45 - 60,
+        OBJ_ID: 1268,
+        SPAWN_DURATION: 0,
+        TARGET: tut_func,
+        GROUPS: tut_switch,
+    })
+}
+// added this because compiler stupid and im too lazy to fix
+-> call_with_delay(999, start_func)
+-> call_with_delay(999, tut_func)
+wait(2.5)
+
+
+
+tut_transition = (dir){
+    // seglen = tut_text_colors.length / 3
+    // part1 = 0..seglen
+    // part2 = part1.end..(part1.end + seglen)
+    // part3 = part2.end..(part2.end + seglen)
+    
+    tut_letters!
+    
+
+    if dir != 0 {
+        wait(0.4)
+        tut_page.move(300 * dir, 0, 0)
+    }
+}
+
+
+right_button = 901g
+left_button = 902g
+
+
 
 gs.button_a().on_triggered(!{
+    -> right_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
+    -> right_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
+    -> right_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
+    
     if started == 0 && allow_menu_move == 0 {
-        start_func = !{
-            start()
-        }
+        
         wait()
         allow_menu_move += 1
         -> 53c.set(255, 255, 255)
-        -> 53c.set(0, 0, 0, 0.5)
-        -> 937g.move(15, 15, 0.5, easing = EXPONENTIAL_OUT)
-        -> 938g.move(-15, -15, 0.5, easing = EXPONENTIAL_OUT)
+        -> 53c.set(0, 0, 0, 0.4)
+        -> 937g.move(10, 10, 0.5, easing = EXPONENTIAL_OUT)
+        -> 938g.move(-10, -10, 0.5, easing = EXPONENTIAL_OUT)
         wait(0.3)
         54c.set(0,0,0, 0.5)
-        -> 54c.set(0,0,0, 0.5, opacity = 0.0)
+        
         started += 1
         if gamemode == 0 {
             //tutorial setup
-            move_group.move(0, -160, 0)
+            move_group_menu.toggle_off()
+            menu_follow.start_group.stop()
+            //move_group.move(0, -160, 0)
+            tut_switch.toggle_on()
+            
+
         }
         if gamemode == 1 {
             // challenge setup
-            move_group.move(-1100, 0, 0)
-            start_func!
+            
+            move_group_menu.toggle_off()
+            menu_follow.start_group.stop()
+
+            challenge -= 1
+            next_challenge!
+            //move_group.move(-1100, 0, 0)
+            game_switch.toggle_on()
         }
         if gamemode == 2 {
             // coins setup
+            move_group_menu.toggle_off()
+            menu_follow.start_group.stop()
+            
             challenge += 4
-            move_group.move(-1100, 0, 0)
+            next_challenge!
+            //move_group.move(-1100, 0, 0)
             challenge_board.move(-200 * 4, 0)
-            start_func!
+            game_switch.toggle_on()
         }
+        
 
         if gamemode == 3 {
             // sandbox setup
-            move_group.move(-1100, 0, 0)
-            challenge_board.move(200, 0)
-            start_func!
+            move_group_menu.toggle_off()
+            menu_follow.start_group.stop()
+            
+            //-> bg2.move(1000, 0, 0) //reload
+            //move_group.move(-1100, 0, 0)
+            game_switch.toggle_on()
         }
 
         
 
     } else {
         if gamemode == 0 {
-            move_group.move(-300, 0, 0)
+            
+            -> tut_transition(1)
+            
+            
         } else {
             if block_input == 0 {
-                -> move_button.pulse(59, 144, 247, fade_out = 0.3)
-                selector.group.move(20, 0, 0.1) 
-                prog_selector.move(10, 0, 0.1)
+                -> select_button.pulse(59, 144, 247, fade_out = 0.3)
+                selector.group.move(0, 20, 0)
+                wait()
+                selector.group.move(0, -20, 0)
             }
         }
     }
 })
 
 gs.button_b().on_triggered(!{
+    -> left_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
+    -> left_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
+    -> left_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
+    
     if started == 0 && allow_menu_move == 0 {
         -> 985g.move(0, -1500, 0)
         -> 985g.move(0, 1500, 0.8)
@@ -785,13 +1061,25 @@ gs.button_b().on_triggered(!{
         
     } else {
         if gamemode == 0 {
-            move_group.move(300, 0, 0)
+            tut_text_anim_finished.item.if_is(EQUAL_TO, 0, !{
+                tut_letters.start_group.stop()
+                wait()
+                activate_button(192c, 194c)
+                tut_text_anim_finished += 1
+            })
+            tut_text_anim_finished.item.if_is(EQUAL_TO, 1, !{
+                -> tut_transition(-1)
+            })
+            
+            
         } else {
             if block_input == 0 {
-                -> select_button.pulse(59, 144, 247, fade_out = 0.3)
-                selector.group.move(0, 20, 0)
-                wait()
-                selector.group.move(0, -20, 0)
+                -> move_button.pulse(59, 144, 247, fade_out = 0.3)
+                selector.group.move(20, 0, 0.1) 
+                prog_selector.move(10, 0, 0.1)
+                
+                //-> 905g.move(0, -150, 0)
+                activate_button(196c, 195c)
             }
         }
     }

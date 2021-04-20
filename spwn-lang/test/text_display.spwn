@@ -1,5 +1,5 @@
 type @textdisplay 
-
+spacing = 0.6 * 30
 impl @textdisplay {
     new: (offset: [@number], letters: @number) {
         extract obj_props
@@ -19,12 +19,12 @@ impl @textdisplay {
             default_pos = ?g
             group.alpha(0)
             default_pos.alpha(0)
-            follow_group = ?g
+            follow_group = (500g..510g)[i]
 
             // space
             // $.add(obj {
             //     OBJ_ID: 1816,
-            //     X: offset[0] + i * 30,
+            //     X: offset[0] + i * spacing,
             //     Y: offset[1],
             //     GROUPS: follow_group,
             //     BLOCK_A: wincon[6],
@@ -37,7 +37,7 @@ impl @textdisplay {
             
             $.add(obj {
                 OBJ_ID: 1816,
-                X: offset[0] + i * 30,
+                X: offset[0] + i * spacing,
                 Y: offset[1],
                 //GROUPS: follow_group,
                 BLOCK_A: check_block,
@@ -47,7 +47,7 @@ impl @textdisplay {
             for ch in ..order.length {
                 $.add(obj {
                     OBJ_ID: 914,
-                    X: offset[0] + i * 30 + (ch + 1) * 30 * letters,
+                    X: offset[0] + i * spacing + (ch + 1) * spacing * letters,
                     Y: offset[1],
                     TEXT: $.b64encrypt(order[ch]),
                     GROUPS: follow_group,
@@ -68,7 +68,7 @@ impl @textdisplay {
                     
                     $.add(obj {
                         OBJ_ID: 1816,
-                        X: offset[0] + i * 30 + (ch + 1) * 30 * letters,
+                        X: offset[0] + i * spacing + (ch + 1) * spacing * letters,
                         Y: offset[1],
                         GROUPS: follow_group,
                         BLOCK_A: cblock,
@@ -94,13 +94,13 @@ impl @textdisplay {
 
             $.add(obj {
                 OBJ_ID: 1765,
-                X:  offset[0] + i * 30,
+                X:  offset[0] + i * spacing,
                 Y:  offset[1],
                 GROUPS: group,
             })
             $.add(obj {
                 OBJ_ID: 1765,
-                X:  offset[0] + i * 30,
+                X:  offset[0] + i * spacing,
                 Y:  offset[1],
                 GROUPS: default_pos,
             })
@@ -160,7 +160,7 @@ impl @textdisplay {
                     letter.item.if_is(LARGER_THAN, num - 1, !{
                         letter.add(-num)
                         temp.add(num)
-                        self.writer.move(-10 * self.letters * num, 0)
+                        self.writer.move(-(spacing / 3) * self.letters * num, 0)
                         call_with_delay(@epsilon::{}, read)
                     })
                 }

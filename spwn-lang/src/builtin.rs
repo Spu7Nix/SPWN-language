@@ -1,7 +1,7 @@
 //! Defining all native types (and functions?)
 
 use crate::ast::ObjectMode;
-use crate::compiler::RuntimeError;
+use crate::compiler::{RuntimeError, BUILTIN_STORAGE, CONTEXT_MAX, NULL_STORAGE};
 use crate::compiler_types::*;
 use crate::levelstring::*;
 use std::collections::HashMap;
@@ -802,6 +802,45 @@ pub fn built_in_function(
         "mutability" => {
             arg_length!(info, 1, arguments, "Expected one argument".to_string());
             Value::Bool(globals.is_mutable(arguments[0]))
+        }
+
+        "extend_trigger_func" => {
+            arg_length!(
+                info,
+                2,
+                arguments,
+                "Expected two arguments: group/function to extend and macro to extend with"
+                    .to_string()
+            );
+            let group = match globals.stored_values[arguments[0]].clone() {
+                Value::Group(g) => g,
+                Value::TriggerFunc(f) => f.start_group,
+                a => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!(
+                            "Expected group or trigger function, found {}",
+                            a.to_str(globals)
+                        ),
+                        info,
+                    })
+                }
+            };
+            let mac = match globals.stored_values[arguments[1]].clone() {
+                Value::Macro(m) => *m,
+                a => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected macro, found {}", a.to_str(globals)),
+                        info,
+                    })
+                }
+            };
+
+            let mut new_context = context.clone();
+            new_context.start_group = group;
+
+            execute_macro((mac, Vec::new()), &new_context, globals, NULL_STORAGE, info)?;
+
+            Value::Null
         }
 
         "readfile" => {

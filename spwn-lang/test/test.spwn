@@ -1,17 +1,8 @@
-import "text_display.spwn"
-gs = import gamescene
 
-let a = 10
-std_out = @textdisplay::new([300, 300], 16)
-a += 5
 
-c = counter(0)
-c.display(60, 60)
-
-gs.button_a().on_triggered(!{
-    c += 1
+$.extend_trigger_func(10g, (){
+    100g.move(0, 100, 0.5)
+    100g.move(0, -100, 0.5)
 })
 
-gs.button_b().on_triggered(!{
-    std_out.write(c)
-})
+10g!
