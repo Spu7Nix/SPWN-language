@@ -18,8 +18,12 @@ import "text_display.spwn"
 bc = [64, 64, 64]
 
 activate_button = (activate, deactivate) {
-    -> activate.set(bc[0], bc[1], bc[2], 0)
-    -> deactivate.set(0, 0, 0, 0, blending = true)
+    if activate != null {
+        -> activate.set(bc[0], bc[1], bc[2], 0)
+    }
+    if deactivate != null {
+        -> deactivate.set(0, 0, 0, 0, blending = true)
+    }
 }
 
 type @bfreader
@@ -38,6 +42,8 @@ force_stop_layer.alpha(0)
 input_char = 26g
 
 tut_page = 965g
+tut_page_num = counter(0)
+tut_pages = 7
 
 move_button = 10c
 select_button = 11c
@@ -600,11 +606,11 @@ coin2.toggle_off()
 //bg2.toggle_off()
 //-> bg2.move(-1000, 0, 0) //unload
 game_bg_chooser = counter(500i)
-game_bgs = [[906g, 907g, ?g], [910g, 911g, ?g]]
+game_bgs = [[906g, 907g, ?g], [910g, 911g, ?g], [912g, 913g, ?g], [940g, 941g, ?g], [970g, 971g, ?g]]
 game_bg_target = 908g
 switch_game_bg = 909g
 
-while_loop(() => true, delay = 0.2, () {
+random_affect = !{
     if game_bg_chooser >= game_bgs.length - 1 {
         wait()
         game_bg_chooser -= game_bgs.length - 1
@@ -612,6 +618,10 @@ while_loop(() => true, delay = 0.2, () {
         wait()
         game_bg_chooser += 1
     } 
+}
+
+while_loop(() => true, delay = 0.07, () {
+    random_affect!
 })
 
 $.extend_trigger_func(switch_game_bg, (){
@@ -691,7 +701,7 @@ start = (){
     
 
     touch().on_triggered(!{
-        game_bg_chooser += 1
+        
         if ended == 1 {
             for c in reader.cells {
                 -> c.reset(speed = 1)
@@ -809,7 +819,7 @@ gm_selector = 50g
 menu_timer = 51g
 gm_name_colors = 20c..29c
 allow_menu_move = counter(0)
-
+//212c
 // follow group shit
 game_switch = ?g //group that toggles the triggers that switch to ingame
 tut_switch = ?g //group that toggles the triggers that switch to ingame
@@ -846,6 +856,11 @@ tut_letters = !{
         -> tut_text_colors[i].pulse(0,0,0, fade_in = 0.4, hold = 0.2 + i * delta, exclusive = true)
     }
 
+    -> 197c.pulse(0,0,0, fade_in = 0.4, hold = 0.2 + 131 * delta, fade_out = 0.5, exclusive = true)
+    -> 198c.pulse(0,0,0, fade_in = 0.4, hold = 0.2 + 193 * delta, fade_out = 0.5, exclusive = true)
+    -> 199c.pulse(0,0,0, fade_in = 0.4, hold = 0.2 + 266 * delta, fade_out = 0.5, exclusive = true)
+    -> 200c.pulse(0,0,0, fade_in = 0.4, hold = 0.2 + 0 * delta, fade_out = 0.5, exclusive = true)
+    -> 211c.pulse(0,0,0, fade_in = 0.4, hold = 0.2 + 68 * delta, fade_out = 0.5, exclusive = true)
 
     //wait()
     tut_text_anim_finished.item.if_is(EQUAL_TO, 1, !{
@@ -854,7 +869,11 @@ tut_letters = !{
     wait(delta * 300)
     tut_text_anim_finished.item.if_is(EQUAL_TO, 0, !{
         tut_text_anim_finished += 1
-        activate_button(192c, 194c)
+        if tut_page_num < tut_pages - 1 {
+            activate_button(192c, 194c)
+        } else {
+            activate_button(212c, 194c)
+        }
     })
 }
 
@@ -870,7 +889,8 @@ tut_func = !{
         -> tut_text_colors[i].pulse(0,0,0, fade_in = 0, hold = 0.2 + i * delta)
     }
     tut_text_anim_finished += 1
-    activate_button(193c, 191c)
+    activate_button(null, 191c)
+    
     
     
 }
@@ -921,6 +941,7 @@ wait(2.5)
 
 
 
+
 tut_transition = (dir){
     // seglen = tut_text_colors.length / 3
     // part1 = 0..seglen
@@ -932,7 +953,8 @@ tut_transition = (dir){
 
     if dir != 0 {
         wait(0.4)
-        tut_page.move(300 * dir, 0, 0)
+        tut_page.move(300 * -dir, 0, 0)
+        tut_page_num.add(dir)
     }
 }
 
@@ -940,12 +962,23 @@ tut_transition = (dir){
 right_button = 901g
 left_button = 902g
 
+// tutorial animations
+
+inc_item = 501i
+decr_item = 502i
+decr_item.add(100)
+
+tut_arrow_items = 503i..508i
+for i in ..tut_arrow_items.length {
+    tut_arrow_items[i].add(i)
+}
 
 
 gs.button_a().on_triggered(!{
     -> right_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
     -> right_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> right_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
+    random_affect!
     
     if started == 0 && allow_menu_move == 0 {
         
@@ -966,6 +999,28 @@ gs.button_a().on_triggered(!{
             //move_group.move(0, -160, 0)
             tut_switch.toggle_on()
             
+            -> while_loop(() => gamemode == 0, delay = 1, () {
+                inc_item.add(1)
+                decr_item.add(-1)
+                -> 939g.pulse(100, 2.0, 2.0, fade_out = 0.5, hsv = true)
+                pulse_ptr()
+                -> () {
+
+                    -> 932g.move(10, 0, 0.3)
+                    -> 935g.move(-10, 0, 0.3)
+                    -> 933g.move(-10, 0, 1)
+                    -> 934g.move(10, 0, 1)
+                    wait(1)
+
+                    933g.move(10, 0, 0)
+                    932g.move(-10, 0, 0)
+                    934g.move(-10, 0, 0)
+                    935g.move(10, 0, 0)
+                    for item in tut_arrow_items {
+                        item.add(1)
+                    }
+                }()
+            })
 
         }
         if gamemode == 1 {
@@ -1006,9 +1061,15 @@ gs.button_a().on_triggered(!{
 
     } else {
         if gamemode == 0 {
+
+            tut_page_num.item.if_is(EQUAL_TO, 1, !{
+                activate_button(null, 193c)
+            })
             
-            -> tut_transition(1)
-            
+            tut_page_num.item.if_is(LARGER_THAN, 0, !{
+                -> tut_transition(-1)
+                activate_button(null, 212c)
+            })
             
         } else {
             if block_input == 0 {
@@ -1025,6 +1086,7 @@ gs.button_b().on_triggered(!{
     -> left_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
     -> left_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> left_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
+    random_affect!
     
     if started == 0 && allow_menu_move == 0 {
         -> 985g.move(0, -1500, 0)
@@ -1064,11 +1126,30 @@ gs.button_b().on_triggered(!{
             tut_text_anim_finished.item.if_is(EQUAL_TO, 0, !{
                 tut_letters.start_group.stop()
                 wait()
-                activate_button(192c, 194c)
+                if tut_page_num < tut_pages - 1 {
+                    activate_button(192c, 194c)
+                } else {
+                    activate_button(212c, 194c)
+                }
                 tut_text_anim_finished += 1
             })
             tut_text_anim_finished.item.if_is(EQUAL_TO, 1, !{
-                -> tut_transition(-1)
+                if tut_page_num < tut_pages - 1 {
+                    activate_button(193c, null)
+                    -> tut_transition(1)
+                } else {
+                    54c.set(0,0,0, 0.5)
+                    activate_button(null, 193c)
+                    gamemode += 1
+                    
+                    tut_func.start_group.stop()
+                    move_group_tut.toggle_off()
+
+                    challenge -= 1
+                    next_challenge!
+                    //move_group.move(-1100, 0, 0)
+                    game_switch.toggle_on()
+                }
             })
             
             
