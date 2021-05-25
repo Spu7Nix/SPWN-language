@@ -12,38 +12,150 @@ NOOP = ?b //NO OPERATION
 
 spacing = 10
 extract obj_props
-gs = import gamescene
-import "text_display.spwn"
-
-bc = [64, 64, 64]
-
-activate_button = (activate, deactivate) {
-    if activate != null {
-        -> activate.set(bc[0], bc[1], bc[2], 0)
-    }
-    if deactivate != null {
-        -> deactivate.set(0, 0, 0, 0, blending = true)
-    }
+gs = {
+    hidden_group: 976g,
+    button_a: () {
+		return collision(162b, 163b)
+	},
+	button_b: () {
+		return touch(dual_side = true)
+	},
 }
 
+abs = (num) {
+    if num < 0 {
+        return -num
+    } else {
+        return num
+    }
+    
+}
+import "text_display.spwn"
+
+gamemode = counter(20i) // 0 = tutorial, 1 = challenge, 2 = coins, 3 = sandbox
+started = counter(0)
+challenge = counter(556i)
+random_seed = counter(500i)
+random_bg_seed = counter(601i)
+bg_options = 2
+bg_part = counter()
+
+challenges = 9
+input_choice = counter()
+input_choice2 = counter()
+
+ended = counter(0)
+
+bg_option1 = counter(800i)
+bg_option2 = counter(801i)
+
+message_board = 931g
+
+game_bgs = [[906g, 907g, ?g], [910g, 911g, ?g], [912g, 913g, ?g],  [940g, 941g, ?g], [970g, 971g, ?g], ]
+random_max = 4
+auto_inputs = [1,3,6,8]
+auto_inputs2 = [4,5,7,10]
+
+// runs in a row, level complete, 
+messages = [804c, 808c, 809c, 900c]
+
+
+bc = [77, 93, 97]
+
+left_buttons = [193c, 195c, 191c, 196c, 803c]
+
+right_buttons = [192c, 194c,  802c, 212c]
+
+activate_button = (activate, deactivate) {
+
+    let colors = []
+    
+    
+    
+    if activate != null {
+        if left_buttons.contains(activate) {
+            colors = left_buttons
+        } else {
+            colors = right_buttons
+        }
+        for col in colors {
+            if col == activate {
+                -> col.set(bc[0], bc[1], bc[2], 0)
+            } else {
+                -> col.set(0, 0, 0, 0, blending = true)
+            }
+        }
+    } else if deactivate != null {
+        if left_buttons.contains(deactivate) {
+            colors = left_buttons
+        } else {
+            colors = right_buttons
+        }
+        for col in colors {
+            -> col.set(0, 0, 0, 0, blending = true)
+        } 
+    }
+    
+}
+
+successful_runs = counter(555i)
+
+reset_runs_in_a_row = !{
+    num = successful_runs.to_const(1..4)
+    successful_runs -= num
+    -> 962g.move(200 * num, 0, 0)
+} // fully functional programming language inside geometry dash
+
 type @bfreader
-layers = counter(0)
+layers = counter(600i)
 //layers.display(150, 300)
 cell_pointer = 20g
 input_layer = 21g
-finished_layer = 22g
+
 prog_pointer = 23g
 prog_selector = 24g
 force_stop_layer = 25g
 input_layer.alpha(0)
-finished_layer.alpha(0)
+//finished_layer.alpha(0)
 force_stop_layer.alpha(0)
+
+msg_board_anim = !{
+    -> 963g.move(0, -20, 1, easing = EXPONENTIAL_OUT)
+    wait(2)
+    -> 963g.move(0, 20, 1, easing = EXPONENTIAL_IN)
+}
+
+top_msg_board = (message, color) {
+    msg_board_anim!
+
+    for i in ..messages.length {
+        if i == message {
+            //-> messages[i].set(0,0,0, 0, blending = false)
+            -> messages[i].set(color[0], color[1], color[2], 1, blending = false)
+        } else {
+            -> messages[i].set(0,0,0, 0, blending = true)
+        }
+    }
+}
+
+
+bottom_msg_board_up = (){  
+    -> message_board.move(0, 10, 1, easing = EXPONENTIAL_OUT)
+    -> 216c.set(255, 255, 255, 1)
+    -> 942g.move(0, 30, 0.5, easing = EXPONENTIAL_OUT)
+}
+
+bottom_msg_board_down = (){  
+    -> message_board.move(0, -10, 1, easing = EXPONENTIAL_IN)
+    -> 216c.set(0, 0, 0, 1)
+    -> 942g.move(0, -30, 0.5, easing = EXPONENTIAL_IN)     
+}
 
 input_char = 26g
 
 tut_page = 965g
 tut_page_num = counter(0)
-tut_pages = 7
+tut_pages = 8
 
 move_button = 10c
 select_button = 11c
@@ -52,11 +164,13 @@ input_inc_button = 12c
 input_done_button = 13c
 
 input_mode = counter()
+input_mode.display(120, 30)
 
 input_used = counter(0)
-input_used.display(90, 30)
+//input_used.display(90, 30)
 
-
+prog_ptr_color = [94, 13, 13]
+45c.set(prog_ptr_color[0], prog_ptr_color[1], prog_ptr_color[2], blending = true)
 
 pulse_ptr = (){
     -> 972g.move(0, 1, 0.05, easing = EASE_IN)
@@ -74,6 +188,19 @@ pulse_ptr = (){
 // coin_condition = "coin tu"
 
 mem_items = [62i, 54i, 63i, 64i, 58i, 55i, 65i, 60i, 59i, 66i]
+
+
+force_stop = !{
+    -> 45c.set(prog_ptr_color[0], prog_ptr_color[1], prog_ptr_color[2], blending = true)
+    bottom_msg_board_up()
+    top_msg_board(3, [255, 255, 255])
+    //-> finished_color.set(255, 255, 255, 0)
+    ended += 1
+    -> if successful_runs > 0 {
+        reset_runs_in_a_row!
+        top_msg_board(0, [255, 0, 0])
+    }
+}
 
 impl @bfreader {
     new: (script_offset: [@number], cell_count: @number) {
@@ -126,7 +253,7 @@ impl @bfreader {
         ptr = counter(0)
         //ptr.display(script_offset[0], script_offset[1] + 60)
         std_in = counter(85i)
-        std_in.display(script_offset[0], script_offset[1] - 90)
+        //std_in.display(script_offset[0], script_offset[1] - 90)
         
         
         
@@ -180,47 +307,66 @@ impl @bfreader {
     interpret: (self) {
         
         ret = !{
-            self.group.move(spacing, 0, 0)
+            supress_signal(0.05)
+            -> self.group.move(spacing, 0, 0)
             -> return
         }
 
-        slow_ret = !{
-            supress_signal(0.3)
-            ret!
+        fast_ret = !{
+            -> self.group.move(spacing, 0, 0)
+            -> return
         }
+
+        slow_ret =  !{
+            supress_signal(0.1)
+            wait(0.1)
+            -> self.group.move(spacing, 0, 0)
+            -> return
+        }
+
+        // slow_ret = !{
+        //     supress_signal(0.06)
+        //     ret!
+        // }
+        
         current = self.currently_on()
         
-        if current == RIGHT {
-            self.ptr += 1
-            wait()
-            if self.ptr == self.cells.length {
+        -> if current == RIGHT {
+            
+            if self.ptr == self.cells.length - 1 {
                 wait()
-                self.ptr -= self.cells.length
-                cell_pointer.move(-10 * (self.cells.length - 1),0, 0.1)
+                self.ptr -= self.cells.length - 1
+                -> cell_pointer.move(-10 * (self.cells.length - 1),0, 0.1)
+                ret!
             } else {
-                cell_pointer.move(10,0, 0.1)
+                wait()
+                self.ptr += 1
+                -> cell_pointer.move(10,0, 0.1)
+                ret!
             }
             
-            ret!
+            
         }
-        else if current == LEFT {
-            self.ptr -= 1
-            wait()
-            if self.ptr == -1 {
+        -> if current == LEFT {
+            if self.ptr == 0 {
                 wait()
-                self.ptr += self.cells.length
-                cell_pointer.move(10 * (self.cells.length - 1), 0, 0.1)
+                self.ptr += self.cells.length - 1
+                -> cell_pointer.move(10 * (self.cells.length - 1), 0, 0.1)
+                ret!
             } else {
-                cell_pointer.move(-10,0, 0.1)
+                wait()
+                self.ptr -= 1
+                -> cell_pointer.move(-10,0, 0.1)
+                ret!
             }
-            ret!
+            
         }
-        else if current == INCR {
+        -> if current == INCR {
             -> self.current_cell() += 1
             pulse_ptr()
-            ret!
+            fast_ret!
         }
-        else if current == DECR {
+        -> if current == DECR {
             -> (){
                 cell = self.current_cell()
                 //$.print(current)
@@ -229,31 +375,84 @@ impl @bfreader {
                 }
             }()
             pulse_ptr()
-            ret!
+            fast_ret!
         }
-        else if current == DOT {
+        -> if current == DOT {
             
             () {
-                self.num_out.reset(3)
+                self.num_out.reset(speed = 1)
                 cell = self.current_cell()
-                wait()
+                //wait()
                 cell.copy_to([self.num_out], speed = 1)
             } ()
-            supress_signal(0.1)
+            supress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APARENTLY
+            // REQUIRED FOR TEXT TO WORK ON MOBILE FOR SOME REASON
             
-            self.std_out.write(self.num_out)
+            self.std_out.write(self.num_out, speed = 1)
             
-            ret!
+            slow_ret!
         }
-        else if current == INPUT {
-            supress_signal(0.1)
+        -> if current == INPUT {
+            //supress_signal(0.1)
             std_in = self.std_in
             -> input_layer.alpha(1, 0.5)
-            if input_used == 0 {
-                input_used += 1
-            }
-            input_mode += 1
+
+            auto_input_challenges = [3, 4, 5]
             
+            manual_input = !{
+                activate_button(802c, null)
+                activate_button(803c, null)
+                input_mode += 1
+            }
+
+            done = !{
+                -> if input_used < 2 {
+                    input_used += 1
+                }
+                activate_button(null, 802c)
+                activate_button(null, 803c)
+                
+                -> input_done_button.pulse(52, 247, 68, fade_out = 0.3)
+                -> input_layer.alpha(0, 0.5)
+                cell = self.current_cell()
+                cell.reset(speed = 1)
+                std_in.add_to([cell], speed = 1, for_each = (n){ input_char.move(100 * n, 0, 0) })
+                
+                slow_ret!
+            }
+
+            auto_input = !{
+                -> 801c.pulse(255, 255, 255, hold = 2.1)
+                -> 214c.pulse(0,0,0, hold = 2.1)
+                wait(0.5)
+                choice = random_seed.to_const(0..random_max)
+                input_used.item.if_is(EQUAL_TO, 0, !{
+                    input_choice += choice
+                    std_in += auto_inputs[choice]
+                    input_char.move(-100 * auto_inputs[choice], 0, 0)
+                })
+                input_used.item.if_is(EQUAL_TO, 1, !{
+                    input_choice2 += choice
+                    std_in += auto_inputs2[choice]
+                    input_char.move(-100 * auto_inputs2[choice], 0, 0)
+                })
+                
+                call_with_delay(0.5, done)
+            }
+
+            
+
+            for ch in 0..challenges {
+                if auto_input_challenges.contains(ch) {
+                    challenge.item.if_is(EQUAL_TO, ch, !{
+                        input_used.item.if_is(SMALLER_THAN, 2, auto_input)
+                        input_used.item.if_is(LARGER_THAN, 1, manual_input)
+                    })
+                } else {
+                    challenge.item.if_is(EQUAL_TO, ch, manual_input)
+                }
+            }
+
             gs.button_a().on_triggered(!{
                 supress_signal(0.05)
                 if input_mode == 1 {
@@ -263,76 +462,92 @@ impl @bfreader {
                 }
             })
             gs.button_b().on_triggered(!{
-                if input_mode == 1 {
-                    -> input_done_button.pulse(52, 247, 68, fade_out = 0.3)
-                    wait()
+                -> if input_mode == 1 {
                     input_mode -= 1
-                    -> input_layer.alpha(0, 0.5)
-                    cell = self.current_cell()
-                    wait()
-                    cell.reset(speed = 1)
-                    std_in.add_to([cell], speed = 1, for_each = (n){ input_char.move(100 * n, 0, 0) })
-                    
-                    slow_ret!
-                    
+                    done!
                 }
             })
             
-            
         }
-        else if current == OPEN {
+        -> if current == OPEN {
             move_to = !{
+                -> 45c.set(prog_ptr_color[0] * 0.3, prog_ptr_color[1] * 0.3, prog_ptr_color[2] * 0.3, blending = true)
                 //move to corresponding ]
                 //layers = counter(0)
-                condition = ()=> self.currently_on() != CLOSE || layers > 0
-                self.group.move(spacing, 0, 0.06)
-                while_loop(condition, delay = 0, (){
-                    wait(0.01)
+                condition = () => !(layers == 0 && self.close == 1)
+                //self.group.move(spacing, 0)
+                
+                while_loop(condition, delay = 0.03, (){
                     
-                    if self.currently_on() == OPEN {
+                    wait(0.02)
+                    -> if self.open == 1{
                         layers += 1
-                    } else if self.currently_on() == CLOSE {
-                        layers -= 1
                     }
                     
-                    self.group.move(spacing, 0)
-                    wait()
+                    -> if self.close == 1 {
+                        layers -= 1
+                    }
+
+                    -> if self.end == 1 {
+                        
+                        force_stop!
+                    } else {
+                        wait(0.01)
+                        self.group.move(spacing, 0)
+                        return
+                    }
+
+                    
                 })
+                -> 45c.set(prog_ptr_color[0], prog_ptr_color[1], prog_ptr_color[2], blending = true)
                 ret!
             }
             if self.current_cell() == 0 {
-                move_to!
+                layers -= 1
+                call_with_delay(0.05, move_to)
             } else {
                 ret!
             }
         }
-        else if current == CLOSE {
+        -> if current == CLOSE {
             move_back = !{
+                -> 45c.set(prog_ptr_color[0] * 0.3, prog_ptr_color[1] * 0.3, prog_ptr_color[2] * 0.3, blending = true)
                 //move back to corresponding [
                 //layers = counter(0)
-                condition = ()=> self.currently_on() != OPEN || layers > 0
-                self.group.move(-spacing, 0, 0.06)
-                while_loop(condition, delay = 0, (){
-                    wait(0.01)
-                    if self.currently_on() == CLOSE {
+                condition = ()=> !(layers == 0 && self.open == 1)
+                //self.group.move(-spacing, 0)
+
+                //wait()
+                while_loop(condition, delay = 0.03, (){
+                    wait(0.02)
+                    -> if self.close == 1 {
                         layers += 1
-                    } else if self.currently_on() == OPEN {
+                    }
+                    
+                    -> if self.open == 1 {
                         layers -= 1
                     }
-                    self.group.move(-spacing, 0)
-                    wait()
+                    -> if self.end == 1 {
+                        
+                        force_stop!
+                    } else {
+                        wait(0.01)
+                        self.group.move(-spacing, 0)
+                        return
+                    }
                 })
+                -> 45c.set(prog_ptr_color[0], prog_ptr_color[1], prog_ptr_color[2], blending = true)
                 ret!
             }
             if self.current_cell() != 0 {
-                move_back!
+                layers -= 1
+                call_with_delay(0.05, move_back)
             } else {
                 ret!
             }
         }
-        else if current == NOOP {
-            
-            ret!
+        -> if current == NOOP {
+            fast_ret!
         }
         
         
@@ -429,13 +644,17 @@ block_input = counter(0)
 
 reset_selector = ?b
 
+
+command_end = 665g
+command_end_block = 666g
+
 for i in ..3 {
     $.add(obj {
         OBJ_ID: 1816,
         X: sel_off[0] + commands * 60,
         Y: sel_off[1] - 30 * i,
         BLOCK_A: reset_selector,
-        GROUPS: gs.hidden_group,
+        GROUPS: [gs.hidden_group, command_end_block],
         SCALING: 0.5,
     })
 }
@@ -466,7 +685,16 @@ $.add(obj {
     Y:  offset[1],
     BLOCK_A: END,
     SCALING: 0.2,
-    GROUPS: gs.hidden_group
+    GROUPS: [gs.hidden_group, command_end]
+})
+
+$.add(obj {
+    OBJ_ID: 1816,
+    X:  offset[0] - spacing * 3,
+    Y:  offset[1],
+    BLOCK_A: END,
+    SCALING: 0.2,
+    GROUPS: [gs.hidden_group]
 })
 
 //run button
@@ -487,7 +715,7 @@ force_quit_taps = counter(56i)
 reader = @bfreader::new(offset, 6)
 prog_pointer.follow(reader.group)
 
-ended = counter(0)
+
 
 -> move_group_menu.move(-235, 100, 0)
 -> move_group_game.move(-235 -1100, 100, 0)
@@ -510,17 +738,19 @@ all = (arr) {
     return true
 }
 
-for i in 0..3 {
-    reader.std_out.win[i].display(60 + i * 30, 60)
-}
+// for i in 0..3 {
+//     reader.std_out.win[i].display(60 + i * 30, 60)
+// }
 
-for i in 0..4 {
-    reader.std_out.coin[i].display(60 + i * 30, 90)
-}
+// for i in 0..4 {
+//     reader.std_out.coin[i].display(60 + i * 30, 90)
+// }
 
-for i in 0..4 {
-    reader.std_out.coin_coin[i].display(60 + i * 30, 120)
-}
+// for i in 0..4 {
+//     reader.std_out.coin_coin[i].display(60 + i * 30, 120)
+// }
+
+
 
 for i in ..commands {
     sg = roll_groups[i]
@@ -594,10 +824,15 @@ collision(130b, 166b).on_triggered(!{
 
 coin1 = 201g
 coin2 = 202g
+coin3 = 765g
 end_wall = 200g
+end_anim = 987g
 
 coin1.toggle_off()
 coin2.toggle_off()
+coin3.toggle_off()
+end_anim.toggle_off()
+
 
 955g.toggle_off()
 
@@ -605,38 +840,54 @@ coin2.toggle_off()
 // bg2 = 868g
 //bg2.toggle_off()
 //-> bg2.move(-1000, 0, 0) //unload
-game_bg_chooser = counter(500i)
-game_bgs = [[906g, 907g, ?g], [910g, 911g, ?g], [912g, 913g, ?g], [940g, 941g, ?g], [970g, 971g, ?g]]
+
 game_bg_target = 908g
 switch_game_bg = 909g
 
 random_affect = !{
-    if game_bg_chooser >= game_bgs.length - 1 {
+    supress_signal(0.2)
+    -> if random_seed >= random_max - 1 {
         wait()
-        game_bg_chooser -= game_bgs.length - 1
+        random_seed -= random_max - 1
     } else {
         wait()
-        game_bg_chooser += 1
-    } 
+        random_seed += 1
+    }
+
+    -> if random_bg_seed >= bg_options - 1 {
+        wait()
+        random_bg_seed -= bg_options - 1
+    } else {
+        wait()
+        random_bg_seed += 1
+    }
 }
 
-while_loop(() => true, delay = 0.07, () {
+while_loop(() => true, delay = 0.47, () {
     random_affect!
 })
 
-$.extend_trigger_func(switch_game_bg, (){
-    bg = game_bgs[game_bg_chooser.to_const(0..game_bgs.length)]
-    
-    for g in game_bgs {
-        if g != bg {
-            g[2].stop()
-            g[0].toggle_off()
+let switch_to_bg = []
+for bg in game_bgs {
+    func = !{
+        for g in game_bgs {
+            if g != bg {
+                g[2].stop()
+                g[0].toggle_off()
+            }
         }
+        wait()
+        -> bg[1].move_to(game_bg_target)
+        bg[2]!
+        bg[0].toggle_on()
     }
-    wait()
-    -> bg[1].move_to(game_bg_target)
-    bg[2]!
-    bg[0].toggle_on()
+    switch_to_bg.push(func)
+}
+
+
+$.extend_trigger_func(switch_game_bg, (){
+    option = [bg_option1, bg_option2][random_bg_seed.to_const(0..bg_options)]
+    switch_to_bg[option.to_const(0..game_bgs.length)]!
 })
 
 for g in game_bgs {
@@ -649,24 +900,31 @@ for g in game_bgs {
 }
 
 
-gamemode = counter(20i) // 0 = tutorial, 2 = challenge, 3 = sandbox
-started = counter(0)
-challenge = counter(0)
+
 
 tut_text_colors = 300c..800c
 
-// challenge 1: run any program
-// challenge 2: output 10
-// challenge 3: output 128 no input
-// challenge 4: write "win" using no input
-// coin 5: write "coin" using no input
-// coin 6: write "coin coin" using no input
+// challenge 0: run any program
+// challenge 1: output 10
+// challenge 2: output 40 no input
+// challenge 3: double input
+// challenge 4: add 2 inputs
+// challenge 5: compare 2 inputs
+
+
+// challenge ideas:
+// write b if input > 10, else write s
+// square input
+// get nth fibonachi number
+
+// coin 7: write "coin" using no input
+// coin 8: write "coin coin" using no input
 
 challenge_board = 203g
 challenge_board_color = 203c
 
 challenge_name_colors = 55c..65c
-challenge_desc_colors = (65c..101c) + (181c..186c)
+challenge_desc_colors = (65c..101c) + (181c..186c) + (218c..300c)
 challenge_extra_info_colors = [186c, 188c]
 
 next_challenge = !{
@@ -687,11 +945,42 @@ next_challenge = !{
     for i in ..challenge_extra_info_colors.length {
         -> challenge_extra_info_colors[i].pulse(0,0,0, fade_in = 0.4, hold = 2.3 + i * 0.1, fade_out = 0.3)
     }
+    
     wait(0.45)
     -> 866g.move(40, 0, 1.5, easing = EASE_IN)
     -> 865g.move(-40, 0, 1.5, easing = EASE_IN)
     -> challenge_board.move(-200, 0)
+
+    -> if challenge == 6 {
+        // limit commands
+        -> command_end.move(-10 * 13, 0, 1, easing = EXPONENTIAL_OUT)
+        -> command_end_block.move(-20 * 13, 0, 1, easing = EXPONENTIAL_OUT)
+    }
+    wait(3)
+    reset_runs_in_a_row!
+    -> if challenge == 4 {
+        end_wall.toggle_off()
+        end_anim.toggle_on()
+        top_msg_board(1, [255, 255, 0])
+    }
 }
+
+reset_env = !{
+    for c in reader.cells {
+        -> c.reset(speed = 1)
+    }
+
+    -> input_used -= input_used.to_const(1..3)
+
+    -> reader.ptr.reset(speed = 1, for_each = (n) { cell_pointer.move(-10 * n, 0, 0.1, easing = EASE_IN_OUT) })
+    -> reader.num_out.reset(speed = 1)
+    -> reader.group.move_to(reader.start_point, 0)
+    -> 952g.move_to(953g, 0.5, x_only = true, easing = EASE_IN_OUT)
+    -> cell_pointer.move_to(reader.start_point, 0.3)
+    -> force_quit_taps -= force_quit_taps.to_const(1..4)
+    -> reader.std_out.reset()
+}
+
 
 start = (){
 
@@ -703,25 +992,12 @@ start = (){
     touch().on_triggered(!{
         
         if ended == 1 {
-            for c in reader.cells {
-                -> c.reset(speed = 1)
-            }
-
-            if input_used == 1 {
-                wait()
-                input_used -= 1
-            }
-
-            -> reader.ptr.reset(speed = 1, for_each = (n) { cell_pointer.move(-10 * n, 0, 0.1, easing = EASE_IN_OUT) })
-            -> reader.num_out.reset(speed = 1)
-            -> reader.group.move_to(reader.start_point, 0)
-            -> 952g.move_to(953g, 0.5, x_only = true, easing = EASE_IN_OUT)
-            -> cell_pointer.move_to(reader.start_point, 0.3)
-            -> force_quit_taps -= force_quit_taps.to_const(1..4)
-            -> reader.std_out.reset()
+            reset_env!
             
-            wait()
-            finished_layer.alpha(0, 0.5)
+            bottom_msg_board_down()
+            wait(0.2)
+            activate_button(195c, null)
+            activate_button(192c, null)
             954g.toggle_on() //prog selector collision enable
             955g.toggle_off()
             is_running -= 1
@@ -729,19 +1005,35 @@ start = (){
             ended -= 1
             
         } else if is_running == 1 && reader.input != 1 {
-            if force_quit_taps < 3 {
+            force_quit_taps.item.if_is(SMALLER_THAN, 3, !{
                 force_quit_taps += 1
-            }
+            })
             force_stop_layer.alpha(1, 0.5)
             force_stop_layer.alpha(0, 2)
             
         }
     })
 
-    force_quit_taps.item.count(3).on_triggered(!{
-        -> finished_layer.alpha(1, 0.5)
+    force_quit_taps.item.count(3).on_triggered(force_stop)
+
+    output_correct = () {
+        -> 217c.pulse(0, 255, 0, fade_out = 1)
+        -> 800c.pulse(0, 255, 0, fade_out = 1)
         ended += 1
-    })
+        bottom_msg_board_up()
+    }
+
+    output_correct_no_end = () {
+        -> 217c.pulse(69, 255, 187, fade_out = 0.5)
+        -> 800c.pulse(69, 255, 187, fade_out = 0.5)
+    }
+
+    output_wrong = !{
+        -> 217c.pulse(255, 0, 0, fade_out = 1)
+        -> 800c.pulse(255, 0, 0, fade_out = 1)
+        ended += 1
+        bottom_msg_board_up()
+    }
 
     collision(run_block, selector.block).on_triggered(!{
         is_running += 1
@@ -752,63 +1044,183 @@ start = (){
         // wait(0.1)
         // reader.std_out.write(reader.num_out)
         // wait(0.1)
-        reader.group.move(10, 0, 0.05)
-        while_loop(()=> reader.end == 0 && force_quit_taps < 3, (){
-            reader.interpret()
-        })
-        if force_quit_taps < 3 && ended == 0 {
-            -> finished_layer.alpha(1, 0.5)
-            if gamemode == 1 {
-                //challenges
-                if challenge == 0 {
-                    next_challenge!
-                }
-
-                if challenge == 1 {
-                    if reader.num_out == 10 {
-                        next_challenge!
-                    }
-                }
-
-                if input_used == 0 {
-                    if challenge == 2 {
-                        if reader.num_out == 64 {
-                            next_challenge!
-                        }
-                    }
-
-                    if challenge == 3 {
-                        if all(reader.std_out.win) {
-                            end_wall.toggle_off()
-                            next_challenge!
-                        }
-                    }
-
-
-                    if all(reader.std_out.coin) {
-
-                        if challenge == 4 {
-                            coin1.toggle_on()
-                            next_challenge!
-                        }
-
-                        if challenge == 5 {
-                            if all(reader.std_out.coin_coin) {
-                                coin2.toggle_on()
-                                next_challenge!
-                            }  
-                        }
-                        
-                    }
-
-                    
-                }
-
-                wait(0.2)
-            }
-            ended += 1
-        }
         
+        activate_button(null, 195c)
+        activate_button(null, 192c)
+        run = !{
+            wait(0.1)
+            reader.group.move(10, 0, 0.05)
+            //-> BG.pulse(255, 0, 0, fade_out = 1)
+            
+            while_loop(()=> reader.end == 0 && force_quit_taps < 3, delay = 0.1, (){
+                reader.interpret()
+            })
+            
+            if force_quit_taps < 3 && ended == 0 {
+                //-> finished_color.set(255, 255, 255, 0)
+                -> if gamemode == 1 {
+                    //challenges
+                    -> if challenge == 0 {
+                        call_with_delay(0.05, next_challenge)
+                        bottom_msg_board_up()
+                        ended += 1
+                    }
+
+                    -> if challenge == 1 {
+                        if reader.num_out == 10 {
+                            call_with_delay(0.05, next_challenge)
+                            output_correct()
+                        } else {
+                            
+                            output_wrong!
+                        }
+                    }
+
+                    -> if input_used == 0 {
+                        -> if challenge == 2 {
+                            if reader.num_out == 40 {
+                                call_with_delay(0.05, next_challenge)
+                                output_correct()
+                            } else {
+                                output_wrong!
+                            }
+                        }
+
+                        // -> if challenge == 6 {
+                        //     if all(reader.std_out.win) {
+                        //         call_with_delay(0.05, next_challenge)
+                        //         output_correct()
+                        //         top_msg_board(2, [255, 255, 0])
+                        //     } else {
+                        //         output_wrong!
+                        //     }
+                        // }
+
+
+                        -> if all(reader.std_out.coin) {
+
+                            -> if challenge == 6 {
+                                coin1.toggle_on()
+                                call_with_delay(0.05, next_challenge)
+                                -> command_end.move(10 * 13, 2, 0, easing = EXPONENTIAL_IN)
+                                -> command_end_block.move(20 * 13, 2, 0, easing = EXPONENTIAL_IN)
+                                end_wall.toggle_off()
+                                end_anim.toggle_on()
+                                top_msg_board(2, [255, 255, 0])
+                                output_correct()
+                            }
+
+                            -> if challenge == 7 {
+                                if all(reader.std_out.coin_coin) {
+                                    coin2.toggle_on()
+                                    top_msg_board(2, [255, 255, 0])
+                                    call_with_delay(0.05, next_challenge)
+                                    output_correct()
+                                    
+                                } else {
+                                    output_wrong!
+                                }
+                            }
+                            
+                        } else {
+                            -> if challenge == 6 {
+                                output_wrong!
+                            }
+
+                            -> if challenge == 7 {
+                                output_wrong!
+                            }
+                        }
+                    } else {
+                        //input challenges
+                        inc_runs_in_a_row = !{
+                            
+                            successful_runs += 1
+                            -> 962g.move(-200, 0, 0)
+                            messages[0].set(0,0,0,0)
+                            wait()
+                            
+                            -> if successful_runs == 3 {
+                                -> if challenge == 5 {
+                                    wait(4)
+                                    top_msg_board(2, [255, 255, 0])
+                                    coin3.toggle_on()
+                                }
+                                top_msg_board(0, [0, 255, 0])
+                                call_with_delay(0.05, next_challenge)
+                                output_correct()
+                                
+                            } else {
+                                top_msg_board(0, [255, 255, 255])
+                                output_correct_no_end()
+                                reset_env!
+                                call_with_delay(2, run)
+                            }
+                        }
+
+                        wrong_out = !{
+                            output_wrong!
+                            top_msg_board(0, [255, 0, 0])
+                            reset_runs_in_a_row!
+                        }
+
+                        
+
+                        input_choice.to_const_enclosed(..random_max, (choice) {
+                            -> if challenge == 3 && input_used == 1 {
+                                if reader.num_out == auto_inputs[choice] * 2 {
+                                    inc_runs_in_a_row!
+                                } else {
+                                    wrong_out!
+                                }
+                            }
+                            -> if choice != 0 {
+                                wait()
+                                input_choice -= choice
+                            }
+                            if input_used == 2 {
+                                input_choice2.to_const_enclosed(..random_max, (choice2) {
+                                    -> if challenge == 4 {
+                                        -> if reader.num_out == auto_inputs[choice] + auto_inputs2[choice2] {
+                                            inc_runs_in_a_row!
+                                        } else {
+                                            wrong_out!
+                                        }
+                                    }
+
+                                    -> if challenge == 5 {
+                                        
+                                        -> if reader.num_out == abs(auto_inputs[choice] - auto_inputs2[choice2]) {
+                                            inc_runs_in_a_row!
+                                        } else {
+                                            wrong_out!
+                                        }
+                                    }
+                                    
+                                    -> if choice2 != 0 {
+                                        wait()
+                                        input_choice2 -= choice2
+                                    }
+                                })
+                            }
+                        })
+                    }
+                    -> if challenge > 7 {
+                        bottom_msg_board_up()
+                        ended += 1
+                    }
+
+
+                    //wait(0.2)
+                } else {
+                    bottom_msg_board_up()
+                    ended += 1
+                }
+            }
+        }
+
+        run!
+        //call_with_delay(999, run)
         
         
     })
@@ -861,6 +1273,7 @@ tut_letters = !{
     -> 199c.pulse(0,0,0, fade_in = 0.4, hold = 0.2 + 266 * delta, fade_out = 0.5, exclusive = true)
     -> 200c.pulse(0,0,0, fade_in = 0.4, hold = 0.2 + 0 * delta, fade_out = 0.5, exclusive = true)
     -> 211c.pulse(0,0,0, fade_in = 0.4, hold = 0.2 + 68 * delta, fade_out = 0.5, exclusive = true)
+    -> 213c.pulse(0,0,0, fade_in = 0.4, hold = 0.2 + 450 * delta, fade_out = 0.5, exclusive = true)
 
     //wait()
     tut_text_anim_finished.item.if_is(EQUAL_TO, 1, !{
@@ -890,12 +1303,13 @@ tut_func = !{
     }
     tut_text_anim_finished += 1
     activate_button(null, 191c)
+    activate_button(192c, null)
     
     
     
 }
 
-for i in 1..500 {
+for i in 1..669 {
     //game
     $.add( obj{
         X: switch_spacing * i - 2,
@@ -975,12 +1389,13 @@ for i in ..tut_arrow_items.length {
 
 
 gs.button_a().on_triggered(!{
+    supress_signal(0.1)
     -> right_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
     -> right_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> right_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
     random_affect!
     
-    if started == 0 && allow_menu_move == 0 {
+    -> if started == 0 && allow_menu_move == 0 {
         
         wait()
         allow_menu_move += 1
@@ -992,7 +1407,7 @@ gs.button_a().on_triggered(!{
         54c.set(0,0,0, 0.5)
         
         started += 1
-        if gamemode == 0 {
+        -> if gamemode == 0 {
             //tutorial setup
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
@@ -1001,7 +1416,10 @@ gs.button_a().on_triggered(!{
             
             -> while_loop(() => gamemode == 0, delay = 1, () {
                 inc_item.add(1)
-                decr_item.add(-1)
+                -> if counter(decr_item) > 0 {
+                    decr_item.add(-1)
+                }
+                
                 -> 939g.pulse(100, 2.0, 2.0, fade_out = 0.5, hsv = true)
                 pulse_ptr()
                 -> () {
@@ -1017,37 +1435,42 @@ gs.button_a().on_triggered(!{
                     934g.move(-10, 0, 0)
                     935g.move(10, 0, 0)
                     for item in tut_arrow_items {
-                        item.add(1)
+                        -> if counter(item) < 99 {
+                            item.add(1)
+                        }
                     }
                 }()
             })
 
         }
-        if gamemode == 1 {
+        -> if gamemode == 1 {
             // challenge setup
             
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
 
             challenge -= 1
-            next_challenge!
+            call_with_delay(0.05, next_challenge)
             //move_group.move(-1100, 0, 0)
             game_switch.toggle_on()
         }
-        if gamemode == 2 {
+        -> if gamemode == 2 {
             // coins setup
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
-            
-            challenge += 4
-            next_challenge!
+            first_coin_challenge = 6
+            -> 810c.set(0,0,0)
+            challenge += first_coin_challenge - 1
+            call_with_delay(0.05, next_challenge)
             //move_group.move(-1100, 0, 0)
-            challenge_board.move(-200 * 4, 0)
+            challenge_board.move(-200 * first_coin_challenge, 0)
+            wait()
+            gamemode -= 1
             game_switch.toggle_on()
         }
         
 
-        if gamemode == 3 {
+        -> if gamemode == 3 {
             // sandbox setup
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
@@ -1060,7 +1483,8 @@ gs.button_a().on_triggered(!{
         
 
     } else {
-        if gamemode == 0 {
+        
+        -> if gamemode == 0 {
 
             tut_page_num.item.if_is(EQUAL_TO, 1, !{
                 activate_button(null, 193c)
@@ -1074,9 +1498,8 @@ gs.button_a().on_triggered(!{
         } else {
             if block_input == 0 {
                 -> select_button.pulse(59, 144, 247, fade_out = 0.3)
-                selector.group.move(0, 20, 0)
-                wait()
-                selector.group.move(0, -20, 0)
+                -> selector.group.move(0, 30, 0.05, easing = EASE_OUT, easing_rate = 10)
+                -> selector.group.move(0, -30, 0.05, easing = EASE_IN, easing_rate = 10)
             }
         }
     }
@@ -1087,8 +1510,10 @@ gs.button_b().on_triggered(!{
     -> left_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> left_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
     random_affect!
+
+    supress_signal(0.1)
     
-    if started == 0 && allow_menu_move == 0 {
+    -> if started == 0 && allow_menu_move == 0 {
         -> 985g.move(0, -1500, 0)
         -> 985g.move(0, 1500, 0.8)
         -> 15c.set(0,0,0, 0.1)
@@ -1122,15 +1547,15 @@ gs.button_b().on_triggered(!{
         -> 7c.set(255, 255, 255)
         
     } else {
-        if gamemode == 0 {
+        -> if gamemode == 0 {
             tut_text_anim_finished.item.if_is(EQUAL_TO, 0, !{
                 tut_letters.start_group.stop()
-                wait()
                 if tut_page_num < tut_pages - 1 {
                     activate_button(192c, 194c)
                 } else {
                     activate_button(212c, 194c)
                 }
+                wait()
                 tut_text_anim_finished += 1
             })
             tut_text_anim_finished.item.if_is(EQUAL_TO, 1, !{
@@ -1138,15 +1563,21 @@ gs.button_b().on_triggered(!{
                     activate_button(193c, null)
                     -> tut_transition(1)
                 } else {
+                    //stop double tap
+
+
+                    supress_signal_forever()
+                    tut_page_num.add(1)
                     54c.set(0,0,0, 0.5)
                     activate_button(null, 193c)
+                    activate_button(192c, 212c)
                     gamemode += 1
                     
                     tut_func.start_group.stop()
                     move_group_tut.toggle_off()
 
                     challenge -= 1
-                    next_challenge!
+                    call_with_delay(0.05, next_challenge)
                     //move_group.move(-1100, 0, 0)
                     game_switch.toggle_on()
                 }
@@ -1154,6 +1585,7 @@ gs.button_b().on_triggered(!{
             
             
         } else {
+            
             if block_input == 0 {
                 -> move_button.pulse(59, 144, 247, fade_out = 0.3)
                 selector.group.move(20, 0, 0.1) 
@@ -1169,5 +1601,7 @@ gs.button_b().on_triggered(!{
 
 // +++.[->+++++>+++<<]>.>.[->++<]<-.>>++.+.
 
+// +++.[->+++++>+++<<]>.>.<-.
+// +++.++++++++++++.------.+++++.
 
 

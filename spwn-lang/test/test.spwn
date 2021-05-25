@@ -1,8 +1,23 @@
+import "text_display.spwn"
+std_out = @textdisplay::new([300, 300], 10)
 
-
-$.extend_trigger_func(10g, (){
-    100g.move(0, 100, 0.5)
-    100g.move(0, -100, 0.5)
-})
-
-10g!
+c = counter(0)
+func = !{std_out.write(c)}
+wait(0.3)
+c += 1
+func!
+wait(0.3)
+c += 20
+func!
+wait(0.3)
+c -= 14
+func!
+wait(0.3)
+c += 14
+func!
+wait(0.3)
+c -= 2
+func!
+wait(0.3)
+c += 1
+func!

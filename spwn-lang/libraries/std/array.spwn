@@ -90,17 +90,17 @@ impl @array {
         }
         return acum;
     },
-    any: (self) {
+    any: (self, map: @macro = (a) => @bool(item)) {
         for item in self {
-            if @bool(item) {
+            if map(item) {
                 return true
             }
         }
         return false
     },
-    all: (self) {
+    all: (self, map: @macro = (a) => @bool(item)) {
         for item in self {
-            if !@bool(item) {
+            if !map(item) {
                 return false
             }
         }
