@@ -9,8 +9,8 @@ impl @textdisplay {
         writer_group = ?g
         list = []
         //        I   N   C   O
-        wincon = [?b, ?b, ?b, ?b]
-        let checkers = []
+        
+        
         //WINCO
         for i in ..letters {
            
@@ -20,7 +20,7 @@ impl @textdisplay {
             default_pos = ?g
             group.alpha(0)
             default_pos.alpha(0)
-            follow_group = (500g..510g)[i]
+            follow_group = (500g..515g)[i]
 
             // space
             // $.add(obj {
@@ -32,20 +32,6 @@ impl @textdisplay {
             //     SCALING: 0.7,
             // })
 
-
-            check_block = ?b
-            checkers.push(check_block)
-            
-            $.add(obj {
-                OBJ_ID: 1816,
-                X: offset[0] + i * spacing - 12,
-                Y: offset[1],
-                //GROUPS: follow_group,
-                BLOCK_A: check_block,
-                DYNAMIC_BLOCK: true,
-                SCALING: 0.2,
-            })
-
             for ch in ..order.length {
                 $.add(obj {
                     OBJ_ID: 914,
@@ -55,27 +41,6 @@ impl @textdisplay {
                     GROUPS: follow_group,
                     SCALING: 0.7,
                 })
-
-                cblock = switch order[ch] {
-                    case "I": wincon[0], 
-                    case "N": wincon[1], 
-                    case "C": wincon[2], 
-                    case "O": wincon[3], 
-                    else: null
-                }
-                //$.print(order[ch], cblock)
-                if cblock != null {
-                    
-                    
-                    $.add(obj {
-                        OBJ_ID: 1816,
-                        X: offset[0] + i * spacing + (ch + 1) * spacing * letters,
-                        Y: offset[1],
-                        GROUPS: follow_group,
-                        BLOCK_A: cblock,
-                        SCALING: 0.3,
-                    })
-                }
             }
             $.add(obj {
                 OBJ_ID: 1816,
@@ -135,20 +100,9 @@ impl @textdisplay {
             Y:  offset[1] + 30,
             GROUPS: writer_default,
         })
-        let coin = []
-        let coin_coin = []
-        for i in 0..9 {
-            if i < 4 {
-                c1 = counter(wincon[[2, 3, 0, 1][i]].create_tracker_item(checkers[i]))
-                coin.push(c1)
-            } else {
-                if i > 4 {
-                    coin_coin.push(counter(wincon[[2, 3, 0, 1][i - 5]].create_tracker_item(checkers[i])))
-                }
-            }
-        }
+        
 
-        return @textdisplay::{list, writer: writer_group, writer_default, letters, coin, coin_coin}
+        return @textdisplay::{list, writer: writer_group, writer_default, letters}
     },
     write: (self, letter: @counter, speed = 3) {
         // temp = counter()

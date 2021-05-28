@@ -164,7 +164,7 @@ input_inc_button = 12c
 input_done_button = 13c
 
 input_mode = counter()
-input_mode.display(120, 30)
+//input_mode.display(120, 30)
 
 input_used = counter(0)
 //input_used.display(90, 30)
