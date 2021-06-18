@@ -18,9 +18,15 @@ enum TriggerRole {
     Func,
 }
 
-fn get_role(obj_id: u16) -> TriggerRole {
+fn get_role(obj_id: u16, hd: bool) -> TriggerRole {
     match obj_id {
-        1268 => TriggerRole::Spawn,
+        1268 => {
+            if hd {
+                TriggerRole::Func
+            } else {
+                TriggerRole::Spawn
+            }
+        }
         1595 | 1611 | 1811 | 1815 | 1812 => TriggerRole::Func,
         _ => TriggerRole::Output,
     }
@@ -85,6 +91,8 @@ fn clone_trigger(
         mode: ObjectMode::Trigger,
         func_id: obj.func_id,
         unique_id: obj.unique_id, //this might cause a problem in the future
+        sync_group: obj.sync_group,
+        sync_part: obj.sync_part,
     };
     let fn_id = obj.func_id;
     (*objects.list)[fn_id].obj_list.push((obj.clone(), order));
@@ -123,9 +131,13 @@ pub fn optimize(mut obj_in: Vec<FunctionID>, mut closed_group: u16) -> Vec<Funct
     for (f, fnid) in obj_in.iter().enumerate() {
         for (o, (obj, order)) in fnid.obj_list.iter().enumerate() {
             if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
+                let mut hd = false;
+                if let Some(ObjParam::Bool(hd_val)) = obj.params.get(&103) {
+                    hd = *hd_val;
+                }
                 let trigger = Trigger {
                     obj: (f, o),
-                    role: get_role(*id as u16),
+                    role: get_role(*id as u16, hd),
                     order: *order,
                     deleted: true,
                     optimized: false,
@@ -394,6 +406,8 @@ fn create_spawn_trigger(
         func_id: trigger.obj.0,
         mode: ObjectMode::Trigger,
         unique_id: objects[trigger.obj].0.unique_id,
+        sync_group: 0,
+        sync_part: 0,
     };
 
     (*objects.list)[trigger.obj.0]

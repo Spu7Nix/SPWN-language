@@ -327,6 +327,9 @@ pub enum Token {
     #[token("self")]
     SelfVal,
 
+    #[token("sync")]
+    Sync,
+
     //COMMENT
     #[regex(r"//[^\n]*")]
     Comment,
@@ -363,12 +366,14 @@ impl Token {
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
             | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
-            While => {
+            While | Sync => {
                 "reserved keyword (not currently in use, but may be used in future updates)"
             }
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case => "keyword",
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case => {
+                "keyword"
+            }
             Comment | MultiCommentStart | MultiCommentEnd => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -428,7 +433,7 @@ impl<'a> Tokens<'a> {
         //println!("what ok {}", self.index);
 
         if self.index > 0 {
-            let curr_element =self.stack[self.stack.len() - self.index].0;
+            let curr_element = self.stack[self.stack.len() - self.index].0;
 
             if curr_element == Some(Token::MultiCommentStart) {
                 //println!("comment time");
@@ -437,9 +442,9 @@ impl<'a> Tokens<'a> {
                     let next_elem = self.inner_next();
 
                     if next_elem == Some(Token::MultiCommentStart) {
-                        nest+=1;
+                        nest += 1;
                     } else if next_elem == Some(Token::MultiCommentEnd) {
-                        nest-=1;
+                        nest -= 1;
                     }
 
                     if nest == 0 {
@@ -455,8 +460,9 @@ impl<'a> Tokens<'a> {
         let next_element = self.inner_next();
 
         if (!ss && next_element == Some(Token::StatementSeparator))
-            || (!comment && (next_element == Some(Token::Comment) 
-                || next_element == Some(Token::MultiCommentStart)))
+            || (!comment
+                && (next_element == Some(Token::Comment)
+                    || next_element == Some(Token::MultiCommentStart)))
         {
             self.next(ss, comment)
         } else {
@@ -1278,11 +1284,14 @@ fn parse_expr(
     }
 
     tokens.previous_no_ignore(false, true);
-    let express = fix_precedence(ast::Expression { values: values.clone(), operators: operators.clone() }); //pemdas and stuff
+    let express = fix_precedence(ast::Expression {
+        values: values.clone(),
+        operators: operators.clone(),
+    }); //pemdas and stuff
 
     match tokens.next(true, false) {
-        Some(Token::If) => { // oooh ternaries
-
+        Some(Token::If) => {
+            // oooh ternaries
 
             // remove any = from the ternary and place into a seperate stack
             let mut old_values = express.values.clone();
@@ -1291,34 +1300,33 @@ fn parse_expr(
             let mut tern_values = Vec::<ast::Variable>::new();
             let mut tern_operators = Vec::<ast::Operator>::new();
 
-
             // iterate though the operators until we get one like =
-            while old_operators.len()>0 {
+            while old_operators.len() > 0 {
                 let ol = old_operators.len();
-                if operator_precedence(&old_operators[ol-1]) == 0 { // any assign operators have a precedence of 0
+                if operator_precedence(&old_operators[ol - 1]) == 0 {
+                    // any assign operators have a precedence of 0
                     match old_values.pop() {
                         Some(v) => tern_values.push(v),
-                        _ => unreachable!() // pop should never return nothing 
+                        _ => unreachable!(), // pop should never return nothing
                     }
-                    break
+                    break;
                 }
 
-                match (old_values.pop(), old_operators.pop()) { 
+                match (old_values.pop(), old_operators.pop()) {
                     // pop off of the original expressionand put onto ternary stack
                     (Some(v), Some(o)) => {
                         tern_values.push(v);
                         tern_operators.push(o);
                     }
-                    (_, _) => unreachable!()
+                    (_, _) => unreachable!(),
                 }
             }
 
             let conditional = parse_expr(tokens, notes, false, false)?;
 
-            let do_else = match tokens.next(false, false) { // every ternary needs an else
-                Some(Token::Else) => {
-                    parse_expr(tokens, notes, false, false)
-                }
+            let do_else = match tokens.next(false, false) {
+                // every ternary needs an else
+                Some(Token::Else) => parse_expr(tokens, notes, false, false),
                 _ => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "else".to_string(),
@@ -1337,29 +1345,29 @@ fn parse_expr(
                 conditional,
                 do_if: ast::Expression {
                     values: tern_values,
-                    operators: tern_operators
+                    operators: tern_operators,
                 },
                 do_else,
             };
 
-            let ternval_literal = ast::ValueLiteral { 
-                body: ast::ValueBody::Ternary(tern)
+            let ternval_literal = ast::ValueLiteral {
+                body: ast::ValueBody::Ternary(tern),
             };
 
             old_values.push(ast::Variable {
                 operator: None,
                 value: ternval_literal,
                 path: vec![],
-                pos: (start_pos,end_pos),
+                pos: (start_pos, end_pos),
                 comment: (None, None),
             });
 
             Ok(ast::Expression {
                 values: old_values,
-                operators: old_operators
+                operators: old_operators,
             })
         }
-        _ =>  {
+        _ => {
             tokens.previous_no_ignore(false, false);
             Ok(express)
         }
@@ -1924,7 +1932,8 @@ fn parse_variable(
             let symbol = tokens.slice();
 
             match tokens.next(false, false) {
-                Some(Token::ThickArrow) => { // Woo macro shorthand
+                Some(Token::ThickArrow) => {
+                    // Woo macro shorthand
                     let arg = if symbol != "_" {
                         is_valid_symbol(&symbol, tokens, notes)?;
                         vec![(symbol, None, properties.clone(), None)]
@@ -1944,10 +1953,12 @@ fn parse_variable(
 
                     ast::ValueBody::Macro(ast::Macro {
                         args: arg,
-                        body: ast::CompoundStatement { statements: macro_body },
+                        body: ast::CompoundStatement {
+                            statements: macro_body,
+                        },
                         properties,
                     })
-                },
+                }
                 _ => {
                     is_valid_symbol(&symbol, tokens, notes)?;
                     tokens.previous_no_ignore(false, false);

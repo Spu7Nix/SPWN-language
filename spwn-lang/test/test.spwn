@@ -1,23 +1,18 @@
-import "text_display.spwn"
-std_out = @textdisplay::new([300, 300], 10)
+extract obj_props;
+import "binaryCalculator.spwn";
 
-c = counter(0)
-func = !{std_out.write(c)}
-wait(0.3)
-c += 1
-func!
-wait(0.3)
-c += 20
-func!
-wait(0.3)
-c -= 14
-func!
-wait(0.3)
-c += 14
-func!
-wait(0.3)
-c -= 2
-func!
-wait(0.3)
-c += 1
-func!
+decimal = ?i;
+decimalCounter = counter(decimal);
+calculator = @binaryCalculator::new(10, 300, 300);
+
+$.add(obj {
+    OBJ_ID: 1615,
+    X: 300,
+    Y: 330,
+    ITEM: decimal,
+    GROUPS: 999g
+});
+
+decimalCounter = 1337;
+wait(1);
+calculator.decimalToBinary(decimalCounter);

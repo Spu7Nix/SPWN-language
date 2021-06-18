@@ -127,6 +127,8 @@ pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GDObj {
         func_id: context.func_id,
         mode: ObjectMode::Trigger,
         unique_id: *uid_counter,
+        sync_group: context.sync_group,
+        sync_part: context.sync_part,
     }
 }
 
@@ -495,6 +497,8 @@ pub fn built_in_function(
                                 func_id: context.func_id,
                                 mode: ObjectMode::Object,
                                 unique_id: globals.uid_counter,
+                                sync_group: context.sync_group,
+                                sync_part: context.sync_part,
                             };
                             (*globals).objects.push(obj)
                         }

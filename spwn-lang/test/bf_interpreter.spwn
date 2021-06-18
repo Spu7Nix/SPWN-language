@@ -1,14 +1,14 @@
-RIGHT = ?b
-LEFT = ?b
-INCR = ?b
-DECR = ?b
-DOT = ?b
-INPUT = ?b
-OPEN = ?b //opening bracket
-CLOSE = ?b //closing bracket
+RIGHT = ?b // >
+LEFT = ?b  // <
+INCR = ?b  // +
+DECR = ?b  // -
+DOT = ?b   // .
+INPUT = ?b // ,
+OPEN = ?b  // [
+CLOSE = ?b // ]
 
-END = ?b //end of the program
-NOOP = ?b //NO OPERATION
+END = ?b   //end of the program
+NOOP = ?b  //NO OPERATION
 
 spacing = 10
 extract obj_props
@@ -53,11 +53,11 @@ message_board = 931g
 
 game_bgs = [[906g, 907g, ?g], [910g, 911g, ?g], [912g, 913g, ?g],  [940g, 941g, ?g], [970g, 971g, ?g], ]
 random_max = 4
-auto_inputs = [1,3,6,8]
-auto_inputs2 = [4,5,7,10]
+auto_inputs = [1,3,10,13] // 2.25
+auto_inputs2 = [2,3,6,8] // 0.5, 0.5, 0.5, 0.25
 
 // runs in a row, level complete, 
-messages = [804c, 808c, 809c, 900c]
+messages = [804c, 808c, 809c, 900c, 850c]
 
 
 bc = [77, 93, 97]
@@ -282,27 +282,33 @@ impl @bfreader {
 
         return out
     },
-    currently_on: (self) {
-        if self.right == 1 {
-            return RIGHT
-        } else if self.left == 1 {
-            return LEFT
-        } else if self.incr == 1 {
-            return INCR
-        } else if self.decr == 1 {
-            return DECR
-        } else if self.dot == 1 {
-            return DOT
-        } else if self.input == 1 {
-            return INPUT
-        } else if self.open == 1 {
-            return OPEN
-        } else if self.close == 1 {
-            return CLOSE
-        } else if self.noop == 1 {
-            return NOOP
-        }
-    },
+    // currently_on: (self) {
+    //     if self.right == 1 {
+    //         return RIGHT
+    //     }
+    //     if self.left == 1 {
+    //         return LEFT
+    //     }
+    //     if self.incr == 1 {
+    //         return INCR
+    //     }
+    //     if self.decr == 1 {
+    //         return DECR
+    //     }
+    //     if self.dot == 1 {
+    //         return DOT
+    //     } 
+    //     if self.input == 1 {
+    //         return INPUT
+    //     } 
+    //     if self.open == 1 {
+    //         return OPEN
+    //     } if self.close == 1 {
+    //         return CLOSE
+    //     } if self.noop == 1 {
+    //         return NOOP
+    //     }
+    // },
     current_cell: (self) => self.cells[self.ptr.to_const(..self.cells.length)],
     interpret: (self) {
         
@@ -329,9 +335,9 @@ impl @bfreader {
         //     ret!
         // }
         
-        current = self.currently_on()
         
-        -> if current == RIGHT {
+        
+        -> if @bool(self.right) {
             
             if self.ptr == self.cells.length - 1 {
                 wait()
@@ -347,7 +353,7 @@ impl @bfreader {
             
             
         }
-        -> if current == LEFT {
+        -> if @bool(self.left) {
             if self.ptr == 0 {
                 wait()
                 self.ptr += self.cells.length - 1
@@ -361,12 +367,12 @@ impl @bfreader {
             }
             
         }
-        -> if current == INCR {
+        -> if @bool(self.incr) {
             -> self.current_cell() += 1
             pulse_ptr()
             fast_ret!
         }
-        -> if current == DECR {
+        -> if @bool(self.decr) {
             -> (){
                 cell = self.current_cell()
                 //$.print(current)
@@ -377,7 +383,7 @@ impl @bfreader {
             pulse_ptr()
             fast_ret!
         }
-        -> if current == DOT {
+        -> if @bool(self.dot) {
             
             () {
                 self.num_out.reset(speed = 1)
@@ -385,14 +391,14 @@ impl @bfreader {
                 //wait()
                 cell.copy_to([self.num_out], speed = 1)
             } ()
-            supress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APARENTLY
+            supress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APPARENTLY
             // REQUIRED FOR TEXT TO WORK ON MOBILE FOR SOME REASON
             
             self.std_out.write(self.num_out, speed = 1)
             
             slow_ret!
         }
-        -> if current == INPUT {
+        -> if @bool(self.input) {
             //supress_signal(0.1)
             std_in = self.std_in
             -> input_layer.alpha(1, 0.5)
@@ -469,7 +475,7 @@ impl @bfreader {
             })
             
         }
-        -> if current == OPEN {
+        -> if @bool(self.open) {
             move_to = !{
                 -> 45c.set(prog_ptr_color[0] * 0.3, prog_ptr_color[1] * 0.3, prog_ptr_color[2] * 0.3, blending = true)
                 //move to corresponding ]
@@ -509,7 +515,7 @@ impl @bfreader {
                 ret!
             }
         }
-        -> if current == CLOSE {
+        -> if @bool(self.close) {
             move_back = !{
                 -> 45c.set(prog_ptr_color[0] * 0.3, prog_ptr_color[1] * 0.3, prog_ptr_color[2] * 0.3, blending = true)
                 //move back to corresponding [
@@ -546,7 +552,7 @@ impl @bfreader {
                 ret!
             }
         }
-        -> if current == NOOP {
+        -> if @bool(self.noop) {
             fast_ret!
         }
         
@@ -701,14 +707,16 @@ $.add(obj {
 
 // block that runs the thing
 run_block = ?b
-$.add(obj {
-    OBJ_ID: 1816,
-    X: sel_off[0] - 60,
-    Y: sel_off[1],
-    BLOCK_A: run_block,
-    SCALING: 0.5,
-    GROUPS: gs.hidden_group
-})
+for j in ..10 {
+    $.add(obj {
+        OBJ_ID: 1816,
+        X: sel_off[0] - 60,
+        Y: sel_off[1] + 30 * j,
+        BLOCK_A: run_block,
+        SCALING: 0.5,
+        GROUPS: gs.hidden_group
+    })
+}
 force_quit_taps = counter(56i)
 //force_quit_taps.display(90, 0)
 
@@ -763,14 +771,16 @@ for i in ..commands {
     }
     // block that increments the selector 
     inc_block = ?b
-    $.add(obj {
-        OBJ_ID: 1816,
-        X: sel_off[0] + i * 60,
-        Y: sel_off[1],
-        BLOCK_A: inc_block,
-        SCALING: 0.5,
-        GROUPS: gs.hidden_group
-    })
+    for j in ..19 {
+        $.add(obj {
+            OBJ_ID: 1816,
+            X: sel_off[0] + i * 60,
+            Y: sel_off[1] + j * 30,
+            BLOCK_A: inc_block,
+            SCALING: 1,
+            GROUPS: gs.hidden_group
+        })
+    }
 
     // block that checks for end
     end_check_block = ?b
@@ -979,10 +989,17 @@ reset_env = !{
     -> cell_pointer.move_to(reader.start_point, 0.3)
     -> force_quit_taps -= force_quit_taps.to_const(1..4)
     -> reader.std_out.reset()
+
+    
+
 }
 
 
 start = (){
+
+    
+    
+    
 
     switch_game_bg!
 
@@ -1057,6 +1074,11 @@ start = (){
             })
             
             if force_quit_taps < 3 && ended == 0 {
+                wrong_out = !{
+                    output_wrong!
+                    top_msg_board(0, [255, 0, 0])
+                    reset_runs_in_a_row!
+                }
                 //-> finished_color.set(255, 255, 255, 0)
                 -> if gamemode == 1 {
                     //challenges
@@ -1077,6 +1099,8 @@ start = (){
                     }
 
                     -> if input_used == 0 {
+
+
                         -> if challenge == 2 {
                             if reader.num_out == 40 {
                                 call_with_delay(0.05, next_challenge)
@@ -1085,6 +1109,12 @@ start = (){
                                 output_wrong!
                             }
                         }
+
+                        challenge.item.if_is(EQUAL_TO, 3, wrong_out)
+                            
+                        challenge.item.if_is(EQUAL_TO, 4, wrong_out)
+
+                        challenge.item.if_is(EQUAL_TO, 5, wrong_out)
 
                         // -> if challenge == 6 {
                         //     if all(reader.std_out.win) {
@@ -1158,27 +1188,47 @@ start = (){
                             }
                         }
 
-                        wrong_out = !{
-                            output_wrong!
-                            top_msg_board(0, [255, 0, 0])
-                            reset_runs_in_a_row!
+                        
+
+                        -> if input_used == 2 {
+                            -> if challenge == 3 {
+                                wrong_out!
+                            }
+                            
+                        }
+
+                        -> if input_used == 1 {
+                            -> if challenge == 4 {
+                                wrong_out!  
+                            }
+
+                            -> if challenge == 5 {
+                                wrong_out!
+                            }
+                            
                         }
 
                         
 
                         input_choice.to_const_enclosed(..random_max, (choice) {
-                            -> if challenge == 3 && input_used == 1 {
-                                if reader.num_out == auto_inputs[choice] * 2 {
-                                    inc_runs_in_a_row!
-                                } else {
-                                    wrong_out!
-                                }
+                            -> if challenge == 3 {
+                                -> if input_used == 1 {
+                                    -> if reader.num_out == auto_inputs[choice] * 2 {
+                                        inc_runs_in_a_row!
+                                    } else {
+                                        wrong_out!
+                                    }
+                                } 
+                                
                             }
                             -> if choice != 0 {
                                 wait()
                                 input_choice -= choice
                             }
-                            if input_used == 2 {
+                            
+                            -> if input_used == 2 {
+
+
                                 input_choice2.to_const_enclosed(..random_max, (choice2) {
                                     -> if challenge == 4 {
                                         -> if reader.num_out == auto_inputs[choice] + auto_inputs2[choice2] {
@@ -1224,6 +1274,8 @@ start = (){
         
         
     })
+
+    
 }
 8c.set(0, 0, 0)
 // start menu
@@ -1252,6 +1304,18 @@ start_func = !{
     -> 900g.move(0, 33, 0)
     -> 903g.move(0, -150, 0)
     //-> BG.pulse(255, 0, 0, fade_out = 0.6)
+
+    
+
+    -> $.add( trigger{
+        OBJ_ID: 1268,
+        SPAWN_DURATION: 3,
+        TARGET: !{
+            top_msg_board(4, [112, 215, 255])
+        },
+        HIGH_DETAIL: true,
+    })
+    
     start()
 }
 
@@ -1309,6 +1373,8 @@ tut_func = !{
     
 }
 
+
+
 for i in 1..669 {
     //game
     $.add( obj{
@@ -1332,7 +1398,7 @@ for i in 1..669 {
     //tut
     $.add( obj{
         X: switch_spacing * i - 2,
-        Y: -15 - 60,
+        Y: -15 - 90,
         OBJ_ID: 901,
         TARGET: move_group_tut,
         MOVE_X: i * switch_spacing,
@@ -1341,7 +1407,7 @@ for i in 1..669 {
     })
     $.add( obj{
         X: switch_spacing * i,
-        Y: -45 - 60,
+        Y: -45 - 90,
         OBJ_ID: 1268,
         SPAWN_DURATION: 0,
         TARGET: tut_func,
@@ -1389,7 +1455,7 @@ for i in ..tut_arrow_items.length {
 
 
 gs.button_a().on_triggered(!{
-    supress_signal(0.1)
+    
     -> right_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
     -> right_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> right_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
@@ -1443,8 +1509,16 @@ gs.button_a().on_triggered(!{
             })
 
         }
+
+        
+        
+        
+
+         
+        
         -> if gamemode == 1 {
             // challenge setup
+            
             
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
@@ -1453,9 +1527,13 @@ gs.button_a().on_triggered(!{
             call_with_delay(0.05, next_challenge)
             //move_group.move(-1100, 0, 0)
             game_switch.toggle_on()
+
+            
         }
         -> if gamemode == 2 {
             // coins setup
+            
+
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
             first_coin_challenge = 6
@@ -1467,17 +1545,25 @@ gs.button_a().on_triggered(!{
             wait()
             gamemode -= 1
             game_switch.toggle_on()
+
+            
+            
         }
         
 
         -> if gamemode == 3 {
             // sandbox setup
+            
+
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
             
             //-> bg2.move(1000, 0, 0) //reload
             //move_group.move(-1100, 0, 0)
             game_switch.toggle_on()
+            
+            
+            
         }
 
         
@@ -1496,10 +1582,11 @@ gs.button_a().on_triggered(!{
             })
             
         } else {
-            if block_input == 0 {
-                -> select_button.pulse(59, 144, 247, fade_out = 0.3)
-                -> selector.group.move(0, 30, 0.05, easing = EASE_OUT, easing_rate = 10)
-                -> selector.group.move(0, -30, 0.05, easing = EASE_IN, easing_rate = 10)
+            -> if block_input == 0 {
+                
+                selector.group.move(0, 20, 0)
+                wait(0.03)
+                selector.group.move(0, -20, 0)
             }
         }
     }
@@ -1510,8 +1597,6 @@ gs.button_b().on_triggered(!{
     -> left_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> left_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
     random_affect!
-
-    supress_signal(0.1)
     
     -> if started == 0 && allow_menu_move == 0 {
         -> 985g.move(0, -1500, 0)

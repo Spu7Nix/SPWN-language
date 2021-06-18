@@ -1,0 +1,39 @@
+
+little_guy = 10g
+arrow = 11g
+
+gamescene = import gamescene
+
+directions = 8
+PI = 3.14159
+
+dir = counter(0)
+
+is_rotating = counter(0)
+
+
+on(gamescene.button_a(), !{
+    is_rotating += 1
+    while_loop(() => @bool(is_rotating), () {
+        arrow.rotate(little_guy, 360 / directions, 0)
+        -> if dir == directions - 1 {
+            wait()
+            dir -= directions - 1
+        } else {
+            wait()
+            dir += 1
+        }
+    })
+})
+
+on(gamescene.button_a_end(), !{
+    is_rotating -= 1
+})
+
+on(gamescene.button_b(), !{
+    angle = (dir.to_const(..directions) / directions) * 2 * PI
+
+    -> little_guy.move(50 * $.cos(angle), -50 * $.sin(angle), 1, EASE_OUT)
+    -> arrow.move(50 * $.cos(angle), -50 * $.sin(angle), 1, EASE_OUT)
+
+})

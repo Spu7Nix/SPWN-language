@@ -813,7 +813,7 @@ start = (){
             reader.group.move(10, 0, 0.05)
             //-> BG.pulse(255, 0, 0, fade_out = 1)
             
-            while_loop(()=> reader.end == 0 && force_quit_taps < 3, delay = 0.05, (){
+            while_loop(()=> reader.end == 0 && force_quit_taps < 3, delay = 0.1, (){
                 reader.interpret()
             })
             
