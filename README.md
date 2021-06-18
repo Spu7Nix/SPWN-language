@@ -4,7 +4,16 @@ A language for Geometry Dash triggers
 
 # Installing
 
-coming soon
+## Windows
+1. Download the .msi file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
+2. Open the .msi file and follow the install wizard.
+
+## MacOS
+1. Download the .pkg file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
+2. Open the .pkg file and follow the install wizard.
+
+## Linux
+Coming soon.
 
 # Documentation
 
