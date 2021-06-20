@@ -98,7 +98,7 @@ impl @array {
         }
         return false
     },
-    all: (self, map: @macro = (a) => @bool(item)) {
+    all: (self, map: @macro = (a) => @bool(a)) {
         for item in self {
             if !map(item) {
                 return false

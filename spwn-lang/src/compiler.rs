@@ -70,37 +70,35 @@ pub fn print_error_intro(pos: crate::parser::FileRange, file: &PathBuf) {
     if pos.0 .0 == pos.1 .0 {
         use std::io::BufRead;
         if let Ok(file) = fs::File::open(&file) {
-            if let Some(line) = std::io::BufReader::new(file).lines().nth(pos.0 .0 - 1) {
-                if let Ok(line) = line {
-                    let line_num = pos.1 .0.to_string();
+            if let Some(Ok(line)) = std::io::BufReader::new(file).lines().nth(pos.0 .0 - 1) {
+                let line_num = pos.1 .0.to_string();
 
-                    let mut spacing = String::new();
+                let mut spacing = String::new();
 
-                    for _ in 0..line_num.len() {
-                        spacing += " ";
-                    }
-
-                    let squiggly_line = "^";
-
-                    write_with_color(
-                        (spacing.clone() + " |\n" + &line_num + " |").as_str(),
-                        TColor::Cyan,
-                    );
-                    write_with_color((line.replace("\t", " ") + "\n").as_str(), TColor::White);
-                    write_with_color((spacing + " |").as_str(), TColor::Cyan);
-                    let mut out = String::new();
-                    for _ in 0..(pos.0 .1) {
-                        out += " ";
-                    }
-                    for _ in 0..(pos.1 .1 - pos.0 .1) {
-                        out += squiggly_line;
-                    }
-                    out += "\n";
-                    write_with_color(&out, TColor::Red);
-                    stdout
-                        .set_color(ColorSpec::new().set_fg(Some(TColor::White)))
-                        .unwrap();
+                for _ in 0..line_num.len() {
+                    spacing += " ";
                 }
+
+                let squiggly_line = "^";
+
+                write_with_color(
+                    (spacing.clone() + " |\n" + &line_num + " |").as_str(),
+                    TColor::Cyan,
+                );
+                write_with_color((line.replace("\t", " ") + "\n").as_str(), TColor::White);
+                write_with_color((spacing + " |").as_str(), TColor::Cyan);
+                let mut out = String::new();
+                for _ in 0..(pos.0 .1) {
+                    out += " ";
+                }
+                for _ in 0..(pos.1 .1 - pos.0 .1) {
+                    out += squiggly_line;
+                }
+                out += "\n";
+                write_with_color(&out, TColor::Red);
+                stdout
+                    .set_color(ColorSpec::new().set_fg(Some(TColor::White)))
+                    .unwrap();
             }
         }
     };
@@ -302,6 +300,7 @@ pub fn compile_scope(
         //     info.path.join(">"),
         //     contexts.len()
         // );
+        info.pos = statement.pos;
         if contexts.is_empty() {
             return Err(RuntimeError::RuntimeError {
                 message: "No context! This is probably a bug, please contact sputnix".to_string(),
@@ -315,8 +314,6 @@ pub fn compile_scope(
         } else {
             None
         };
-
-        info.pos = statement.pos;
 
         //println!("{}:{}:{}", info.current_file.to_string_lossy(), info.pos.0.0, info.pos.0.1);
         //use crate::fmt::SpwnFmt;
@@ -716,7 +713,8 @@ pub fn compile_scope(
 
                                 let (end_contexts, inner_returns) =
                                     compile_scope(&f.body, new_contexts, globals, new_info)?; // eval the stuff
-                                                                                              // end_contexts has any new contexts made in the loop
+
+                                // end_contexts has any new contexts made in the loop
 
                                 new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
@@ -726,6 +724,7 @@ pub fn compile_scope(
                                             c.broken = None;
                                             out_contexts.push(c)
                                         }
+                                        Some((_, BreakType::Macro)) => out_contexts.push(c),
                                         Some((_, BreakType::ContinueLoop)) => {
                                             c.broken = None;
                                             new_contexts.push(c)
@@ -739,11 +738,13 @@ pub fn compile_scope(
                                     break;
                                 }
                             }
+
                             out_contexts.extend(new_contexts);
                             contexts.extend(out_contexts.iter().map(|c| Context {
                                 variables: context.variables.clone(),
                                 ..c.clone()
                             }));
+
                             // finally append all newly created ones to the global count
                         }
                         Value::Dict(d) => {
@@ -787,12 +788,18 @@ pub fn compile_scope(
 
                                 new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
-                                    // add contexts made in the loop to the new_contexts, if theyre not broken
-                                    if let Some((_, BreakType::Loop)) = c.broken {
-                                        c.broken = None;
-                                        out_contexts.push(c)
-                                    } else {
-                                        new_contexts.push(c)
+                                    // add contexts made in the loop to the new_contexts, if they dont have a break
+                                    match c.broken {
+                                        Some((_, BreakType::Loop)) => {
+                                            c.broken = None;
+                                            out_contexts.push(c)
+                                        }
+                                        Some((_, BreakType::Macro)) => out_contexts.push(c),
+                                        Some((_, BreakType::ContinueLoop)) => {
+                                            c.broken = None;
+                                            new_contexts.push(c)
+                                        }
+                                        _ => new_contexts.push(c),
                                     }
                                 }
 
@@ -837,11 +844,18 @@ pub fn compile_scope(
 
                                 new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
-                                    if let Some((_, BreakType::Loop)) = c.broken {
-                                        c.broken = None;
-                                        out_contexts.push(c)
-                                    } else {
-                                        new_contexts.push(c)
+                                    // add contexts made in the loop to the new_contexts, if they dont have a break
+                                    match c.broken {
+                                        Some((_, BreakType::Loop)) => {
+                                            c.broken = None;
+                                            out_contexts.push(c)
+                                        }
+                                        Some((_, BreakType::Macro)) => out_contexts.push(c),
+                                        Some((_, BreakType::ContinueLoop)) => {
+                                            c.broken = None;
+                                            new_contexts.push(c)
+                                        }
+                                        _ => new_contexts.push(c),
                                     }
                                 }
 
@@ -887,11 +901,18 @@ pub fn compile_scope(
 
                                 new_contexts = SmallVec::new();
                                 for mut c in end_contexts {
-                                    if let Some((_, BreakType::Loop)) = c.broken {
-                                        c.broken = None;
-                                        out_contexts.push(c)
-                                    } else {
-                                        new_contexts.push(c)
+                                    // add contexts made in the loop to the new_contexts, if they dont have a break
+                                    match c.broken {
+                                        Some((_, BreakType::Loop)) => {
+                                            c.broken = None;
+                                            out_contexts.push(c)
+                                        }
+                                        Some((_, BreakType::Macro)) => out_contexts.push(c),
+                                        Some((_, BreakType::ContinueLoop)) => {
+                                            c.broken = None;
+                                            new_contexts.push(c)
+                                        }
+                                        _ => new_contexts.push(c),
                                     }
                                 }
 
@@ -998,6 +1019,11 @@ pub fn compile_scope(
 
         for i in to_be_removed.iter().rev() {
             contexts.swap_remove(*i);
+        }
+
+        // does this make sense?? why wasn't this here earlier?? 
+        if contexts.is_empty() {
+            return Ok((broken_contexts, returns));
         }
 
         if let Some(c) = stored_context {
