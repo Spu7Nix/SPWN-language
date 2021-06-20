@@ -1021,7 +1021,7 @@ pub fn compile_scope(
             contexts.swap_remove(*i);
         }
 
-        // does this make sense?? why wasn't this here earlier?? 
+        // does this make sense?? why wasn't this here earlier??
         if contexts.is_empty() {
             return Ok((broken_contexts, returns));
         }

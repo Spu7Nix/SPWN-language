@@ -1284,10 +1284,7 @@ fn parse_expr(
     }
 
     tokens.previous_no_ignore(false, true);
-    let express = fix_precedence(ast::Expression {
-        values: values.clone(),
-        operators: operators.clone(),
-    }); //pemdas and stuff
+    let express = fix_precedence(ast::Expression { values, operators }); //pemdas and stuff
 
     match tokens.next(true, false) {
         Some(Token::If) => {
@@ -1295,13 +1292,13 @@ fn parse_expr(
 
             // remove any = from the ternary and place into a seperate stack
             let mut old_values = express.values.clone();
-            let mut old_operators = express.operators.clone();
+            let mut old_operators = express.operators;
 
             let mut tern_values = Vec::<ast::Variable>::new();
             let mut tern_operators = Vec::<ast::Operator>::new();
 
             // iterate though the operators until we get one like =
-            while old_operators.len() > 0 {
+            while !old_operators.is_empty() {
                 let ol = old_operators.len();
                 if operator_precedence(&old_operators[ol - 1]) == 0 {
                     // any assign operators have a precedence of 0

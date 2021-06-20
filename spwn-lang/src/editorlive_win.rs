@@ -1,19 +1,19 @@
 use named_pipe::PipeClient;
 use std::ffi::OsStr;
-use std::time::Duration;
 use std::io::Write;
+use std::time::Duration;
 
 pub fn editor_paste(message: &str) -> Result<bool, String> {
-	let pipe_name = OsStr::new("\\\\.\\pipe\\GDPipe");
+    let pipe_name = OsStr::new("\\\\.\\pipe\\GDPipe");
 
-	match PipeClient::connect_ms(pipe_name, 5) {
+    match PipeClient::connect_ms(pipe_name, 5) {
 		Ok(mut client) => {
 			client.set_write_timeout(Some(Duration::new(1,0)));
-			let split = message.split(";").collect::<Vec<&str>>();
+			let split = message.split(';').collect::<Vec<&str>>();
 			for iter in split.chunks(2) {
 				let mut data = iter.join(";").to_string();
 
-				if data.ends_with(";") {
+				if data.ends_with(';') {
 					data.pop();
 				}
 				match client.write(format!("{};",data).as_bytes()) {

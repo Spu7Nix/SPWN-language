@@ -24,13 +24,13 @@ impl @string {
 	ends_with: (self, substr: @string) {
 		return self.substr(self.length-substr.length, self.length) == substr;
 	},
-	// contains: (self, substr: @string) {
-	// 	r = self.length - substr.length
-	// 	for i in 0..r {
-	// 		if $.substr(self, i, i + substr.length) == substr {
-	// 			return true
-	// 		}
-	// 	}
-	// 	return false
-	// }
+	contains: (self, substr: @string) {
+		r = self.length - substr.length + 1
+		for i in 0..r {
+			if $.substr(self, i, i + substr.length) == substr {
+				return true
+			}
+		}
+		return false
+	}
 }
