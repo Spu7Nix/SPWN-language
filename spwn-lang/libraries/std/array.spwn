@@ -19,24 +19,20 @@ impl @array {
         return lowest
     },
     contains: (self, el) {
-		let ret = false
 		for e in self {
 			if e == el {
-				ret = true
-				break
+				return true
 			}
 		}
-		return ret
+		return false
 	},
     index: (self, el) {
-        let ret = null;
         for i in 0..self.length {
             if self[i] == el {
-                ret = i
-                break
+                return i
             }
         }
-        return ret
+        return null
     },
     clear: (self) {
         for i in 0..self.length {
@@ -90,7 +86,7 @@ impl @array {
         }
         return acum;
     },
-    any: (self, map: @macro = (a) => @bool(item)) {
+    any: (self, map: @macro = (a) => @bool(a)) {
         for item in self {
             if map(item) {
                 return true
@@ -105,5 +101,16 @@ impl @array {
             }
         }
         return true
+    },
+    sum: (self) {
+        if self.all(item => item.type == @number) {
+            let sum = 0
+            for item in self {
+                sum += item
+            }
+            return sum
+        } else {
+            throw "Unsupported type in array"
+        }
     }
 }
