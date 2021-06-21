@@ -110,7 +110,30 @@ impl @array {
             }
             return sum
         } else {
-            throw "Unsupported type in array"
+            throw "Unsupported type in array " + self as @string
+        }
+    },
+    sort: (self) {
+        if self.all(item => item.type == @number) {
+            min = (array, maxval = 999999999999) {
+                let lowest = [maxval, 0]
+                for i in 0..array.length {
+                    if array[i] < lowest[0] {
+                        lowest = [array[i], i]
+                    }
+                }
+                return lowest
+            }
+            let res = []
+            let copy = self
+            for _ in self {
+                i = min(copy)
+                res.push(i[0])
+                copy.remove(i[1])
+            }
+            return res
+        } else {
+            throw "Unsupported type in array " + self as @string
         }
     }
 }
