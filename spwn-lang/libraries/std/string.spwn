@@ -24,6 +24,15 @@ impl @string {
 	ends_with: (self, substr: @string) {
 		return self.substr(self.length-substr.length, self.length) == substr;
 	},
+	index: (self, substr: @string) {
+		r = self.length - substr.length + 1
+		for i in 0..r {
+			if $.substr(self, i, i + substr.length) == substr {
+				return i
+			}
+		}
+		return null
+	},
 	contains: (self, substr: @string) {
 		r = self.length - substr.length + 1
 		for i in 0..r {

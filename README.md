@@ -15,6 +15,13 @@ A language for Geometry Dash triggers
 ## Linux
 Coming soon.
 
+## Compiling from source
+1. Download source code from this repository.
+2. Install rust if you haven't already.
+3. Open `spwn-lang` folder in the terminal.
+4. Run `cargo build`.
+5. Compiled binary is placed in `target/debug`.
+
 # Documentation
 
 The documentation for the SPWN language is located at https://spu7nix.net/spwn/#/. There you can find more detailed information about SPWN, and how to use it. You can also visit the standard documentation at https://spu7nix.net/spwn/#/std-docs/std-docs.
