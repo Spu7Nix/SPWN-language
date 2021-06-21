@@ -1,9 +1,11 @@
 #[no_std]
 impl @string {
-	substr: (self, start: @number, end: @number) {
+	substr: #[desc("Gets a substring beginning at the specified start and ending at the specified end.")]
+	(self, start: @number, end: @number) {
 		return $.substr(self, start, end);
 	},
-	join: (self, list: @array) {
+	join: #[desc("Joins a list using the string.")]
+	(self, list: @array) {
 		let out = "";
 		for i in list {
 			out += @string(i);
@@ -11,20 +13,24 @@ impl @string {
 		}
 		return out.substr(0, out.length-self.length);	
 	},
-	split: (self, spstr: @string) {
+	split: #[desc("Splits the string by teh specified seperator.")]
+	(self, spstr: @string) {
 		if spstr.length == 0 {
 			return self as @array;
 		} else {
 			return $.split_str(self, spstr);
 		}
 	},
-	starts_with: (self, substr: @string) {
+	starts_with: #[desc("Checks does the string starts with a string.")]
+	(self, substr: @string) {
 		return self.substr(0, substr.length) == substr;
 	},
-	ends_with: (self, substr: @string) {
+	ends_with: #[desc("Checks does the string starts with a string.")]
+	(self, substr: @string) {
 		return self.substr(self.length-substr.length, self.length) == substr;
 	},
-	index: (self, substr: @string) {
+	index: #[desc("Gets the index of a string, if it doesn't exists returns null.")]
+	(self, substr: @string) {
 		r = self.length - substr.length + 1
 		for i in 0..r {
 			if $.substr(self, i, i + substr.length) == substr {
@@ -33,7 +39,8 @@ impl @string {
 		}
 		return null
 	},
-	contains: (self, substr: @string) {
+	contains: #[desc("Checks if the string contains a string.")]
+	(self, substr: @string) {
 		r = self.length - substr.length + 1
 		for i in 0..r {
 			if $.substr(self, i, i + substr.length) == substr {
