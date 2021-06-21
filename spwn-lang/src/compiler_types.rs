@@ -89,6 +89,10 @@ impl ValStorage {
         };    
     }
 
+    pub fn get_lifetime(&self, index: usize) -> u16 {
+        self.map.get(&index).unwrap().3
+    }
+
 
     pub fn increment_lifetimes(&mut self) {
         for (_, val) in self.map.iter_mut() {
@@ -106,7 +110,8 @@ impl ValStorage {
         let mut to_be_removed = Vec::new();
         for (index, val) in self.map.iter() {
             if val.3 == 0 {
-                to_be_removed.push(*index)
+                to_be_removed.push(*index);
+                //println!("removing value: {:?}", val.0);
             }
         }
         for index in to_be_removed {
