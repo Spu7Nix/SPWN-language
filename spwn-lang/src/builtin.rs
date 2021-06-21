@@ -1266,12 +1266,24 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         && globals.stored_values.map.get(&acum_val).unwrap().2
                     {
                         //println!("hi");
-                        globals.stored_values[acum_val] = globals.stored_values[val].clone();
+                        globals.stored_values[acum_val] = clone_and_get_value(
+                            val,
+                            globals.stored_values.get_lifetime(acum_val),
+                            globals,
+                            c2,
+                            false,
+                        );
                         globals.stored_values.set_mutability(acum_val, true);
                         globals.stored_values[acum_val].clone()
                     } else {
                         //println!("{:?}", globals.stored_values[acum_val]);
-                        globals.stored_values[acum_val] = globals.stored_values[val].clone();
+                        globals.stored_values[acum_val] = clone_and_get_value(
+                            val,
+                            globals.stored_values.get_lifetime(acum_val),
+                            globals,
+                            c2,
+                            false,
+                        );
                         globals.stored_values[acum_val].clone()
                     }
                 }
