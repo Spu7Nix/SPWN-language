@@ -6,6 +6,8 @@
 
 > **Value:** `(self, key: @string, value = @dict_not_found::{}) { /* code omitted */ }` (`@macro`) 
 >
+>## Description: 
+> _Gets an item from the dictionary._
 >## Arguments:
 >
 >| # | name | type | default value | description |
@@ -20,6 +22,8 @@
 
 > **Value:** `(self) { /* code omitted */ }` (`@macro`) 
 >
+>## Description: 
+> _Gets the dictionary's items._
 >
 >  
 >
@@ -28,6 +32,8 @@
 
 > **Value:** `(self) { /* code omitted */ }` (`@macro`) 
 >
+>## Description: 
+> _Gets the dictionary's keys._
 >
 >  
 >
@@ -36,6 +42,8 @@
 
 > **Value:** `(self, key: @string, val) { /* code omitted */ }` (`@macro`) 
 >
+>## Description: 
+> _Sets an item in the dictionary._
 >## Arguments:
 >
 >| # | name | type | default value | description |
@@ -50,6 +58,8 @@
 
 > **Value:** `(self) { /* code omitted */ }` (`@macro`) 
 >
+>## Description: 
+> _Gets the dictionary's values._
 >
 >  
 >

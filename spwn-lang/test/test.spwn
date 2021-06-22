@@ -1,14 +1,8 @@
+if button_is_pressed():
+    move(player)
+
+if hits_wall():
+    dont()
 
 
-
-min = (array, maxval = 999999999999) {
-    let lowest = [maxval, 0]
-    for i in 0..array.length {
-        if array[i] < lowest[0] {
-            lowest = [array[i], i]
-        }
-    }
-    return lowest
-}
-
-$.print(min([1, 2, 3,4, 5, 6, 7, 8, -10]))
+    

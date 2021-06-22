@@ -142,6 +142,8 @@
 >  | 7 | `fade_out` | @number | `0` |Fade-out duration |
 >  | 8 | `exclusive` | @bool | `false` |Weather to prioritize this pulse over simultaneous pulses |
 >  | 9 | `hsv` | @bool | `false` |Toggle HSV mode |
+>  | 10 | `s_checked` | @bool | `false` |HSV specific: saturation checked |
+>  | 11 | `b_checked` | @bool | `false` |HSV specific: brightness checked |
 >  
 >  
 >
