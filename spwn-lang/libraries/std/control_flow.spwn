@@ -6,7 +6,8 @@ extract constants.obj_props
 extract constants.comparisons
 
 wait = #[desc("Adds a delay before the next triggers")] (
-	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{}
+	#[desc("Delay time in seconds (leave empty for minimum delay)")]
+	time: @number | @epsilon = @epsilon::{}
 ){
 	if time.type == @epsilon || time > 0 {
 		$.add( trigger{

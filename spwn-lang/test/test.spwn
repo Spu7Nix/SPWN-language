@@ -1,8 +1,34 @@
-if button_is_pressed():
-    move(player)
+extract obj_props;
+import "binaryCalculator.spwn";
 
-if hits_wall():
-    dont()
+decimal = ?i;
+decimalCounter = counter(decimal);
+calculator = @binaryCalculator::new(11, 300, 300);
+num = "10100111001"
+
+for i in ..num.length {
+    if num[i] == "1" {
+        calculator.bitCounters[i] += 1
+    }
+}
+
+$.add(obj {
+    OBJ_ID: 1615,
+    X: 300,
+    Y: 330,
+    ITEM: decimal,
+    GROUPS: 999g
+});
+
+wait(1);
+calculator.binaryToDecimal(decimalCounter)
+wait(0.2);
+for i in ..num.length {
+    if num[i] == "1" {
+        calculator.bitCounters[i] -= 1
+    }
+}
+wait(0.2);
+calculator.decimalToBinary(decimalCounter)
 
 
-    
