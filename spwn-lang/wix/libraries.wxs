@@ -24,6 +24,10 @@
                 <File Id="lib.spwn" KeyPath="yes" Source="libraries\gamescene\lib.spwn" />
             </Component>
 
+            <Component Id="lib.spwn_1" Directory="std" Win64='$(var.Win64)' Guid="{28E262ED-A6D0-4160-9717-5D5B573939DB}">
+                <File Id="lib.spwn_1" KeyPath="yes" Source="libraries\std\lib.spwn" />
+            </Component>
+
             <Component Id="array.spwn" Directory="std" Win64='$(var.Win64)' Guid="{FC812848-8D60-4047-8475-2A1EFC997757}">
                 <File Id="array.spwn" KeyPath="yes" Source="libraries\std\array.spwn" />
             </Component>
