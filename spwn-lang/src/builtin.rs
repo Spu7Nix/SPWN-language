@@ -279,8 +279,8 @@ pub const BUILTIN_LIST: &[&str] = &[
     "readfile",
     "substr",
     "matches",
-    "b64encrypt",
-    "b64decrypt",
+    "b64encode",
+    "b64decode",
     "mutability", // for testing purposes
     //operators
     "_or_",
@@ -359,12 +359,12 @@ pub fn built_in_function(
             Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
         }
 
-        "b64encrypt" => {
+        "b64encode" => {
             arg_length!(
                 info,
                 1,
                 arguments,
-                "Expected one argument: string to be encrypted".to_string()
+                "Expected one argument: string to be encoded".to_string()
             );
 
             let val = globals.stored_values[arguments[0]].clone();
@@ -375,18 +375,18 @@ pub fn built_in_function(
                 }
                 _ => {
                     return Err(RuntimeError::BuiltinError {
-                        message: "Expected one argument: string to be encrypted".to_string(),
+                        message: "Expected one argument: string to be encoded".to_string(),
                         info,
                     })
                 }
             }
         }
-        "b64decrypt" => {
+        "b64decode" => {
             arg_length!(
                 info,
                 1,
                 arguments,
-                "Expected one argument: string to be decrypted".to_string()
+                "Expected one argument: string to be decoded".to_string()
             );
 
             let val = globals.stored_values[arguments[0]].clone();
@@ -405,7 +405,7 @@ pub fn built_in_function(
                 }
                 _ => {
                     return Err(RuntimeError::BuiltinError {
-                        message: "Expected one argument: string to be decrypted".to_string(),
+                        message: "Expected one argument: string to be decoded".to_string(),
                         info,
                     })
                 }
