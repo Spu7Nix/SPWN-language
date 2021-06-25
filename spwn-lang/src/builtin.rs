@@ -1058,19 +1058,21 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
 
             match name {
                 "_range_" => {
-                    let start = match val_a {
-                        Value::Number(n) => convert_to_int(*n, &info)?,
+                    let end = match val_b {
+                        Value::Number(n) => convert_to_int(n, &info)?,
                         _ => {
                             return Err(RuntimeError::RuntimeError {
-                                message: format!("expected @number, found @{}", b_type),
+                                message: format!("range end: expected @number, found @{}", b_type),
                                 info,
                             })
                         }
                     };
-                    match val_b {
-                        Value::Number(end) => Value::Range(start, convert_to_int(end, &info)?, 1),
-                        Value::Range(step, end, old_step) => {
-                            if old_step != 1 {
+                    match val_a {
+                        Value::Number(start) => {
+                            Value::Range(convert_to_int(*start, &info)?, end, 1)
+                        }
+                        Value::Range(start, step, old_step) => {
+                            if *old_step != 1 {
                                 return Err(RuntimeError::RuntimeError {
                                 message: "Range operator cannot be used on a range that already has a non-default stepsize"
                                     .to_string(),
@@ -1078,22 +1080,25 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             });
                             }
                             Value::Range(
-                                start,
+                                *start,
                                 end,
-                                if step < 0 {
+                                if *step < 0 {
                                     return Err(RuntimeError::RuntimeError {
                                         message: "cannot have a stepsize less than 0".to_string(),
                                         info,
                                     });
                                 } else {
-                                    step as usize
+                                    *step as usize
                                 },
                             )
                         }
                         _ => {
                             println!("{:?}", val_a);
                             return Err(RuntimeError::RuntimeError {
-                                message: format!("expected @number, found @{}", a_type),
+                                message: format!(
+                                    "range start: expected @number, found @{}",
+                                    a_type
+                                ),
                                 info,
                             });
                         }

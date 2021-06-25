@@ -1,8 +1,5 @@
 #[no_std]
-@array::push = (self, el) {
-    $.append(self, el)
-}
-let a = [10, 20, 30]
-for i in 0..10 {
-    a.push(4)
+
+for i in 1..5..100 {
+    $.print(i)
 }
