@@ -47,5 +47,9 @@ impl @dictionary {
 				return value
 			}
 		}
+	},
+	clear: #[desc("Clears the dictionary.")]
+	(self) {
+		self = {}
 	}
 }

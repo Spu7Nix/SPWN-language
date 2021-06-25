@@ -149,5 +149,16 @@ impl @array {
         } else {
             throw "Unsupported type in array " + self as @string
         }
+    },
+    shift: #[desc("Removes the first index from the array and returns it.")]
+    (self) {
+        return self.remove(0)
+    }
+    unshift: #[desc("Pushes a value to the start of the array and returns it.")]
+    (self, value) {
+        let res = [value]
+        res += self
+        self = res
+        return value
     }
 }
