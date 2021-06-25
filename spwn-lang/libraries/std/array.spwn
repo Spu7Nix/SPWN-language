@@ -31,12 +31,13 @@ impl @array {
 	},
     index: #[desc("Gets the index of an element, if it doesn't exists returns null.")]
     (self, el) {
+        let res = null
         for i in 0..self.length {
             if self[i] == el {
-                return i
+                res = i
             }
         }
-        return null
+        return res
     },
     clear: #[desc("Clears the array.")]
     (self) {
