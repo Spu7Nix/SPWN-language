@@ -50,7 +50,12 @@ return {
     },
 
     colors: {
-        BG: 1000c
+        BG: 1000c,
+        GROUND: 1001c,         
+        LINE: 1002c,        
+        _3DLINE: 1003c, 
+        OBJECT: 1004c, 
+        GROUND2: 1009c,         
     },
     
     obj_props : {
