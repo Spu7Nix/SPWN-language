@@ -330,7 +330,7 @@ pub fn compile_scope(
                         let symbol = new_expr.values.remove(0);
                         //use crate::fmt::SpwnFmt;
                         new_expr.operators.remove(0); //assign operator
-                        let constant = symbol.operator != Some(ast::UnaryOperator::Let);
+                        let mutable = symbol.operator == Some(ast::UnaryOperator::Let);
 
                         //let mut new_context = context.clone();
 
@@ -371,11 +371,10 @@ pub fn compile_scope(
                             }
                             _ => {
                                 let (evaled, inner_returns) =
-                                    new_expr.eval(context, globals, info.clone(), constant)?;
-                                if !constant {
-                                    for (val, _) in &evaled {
-                                        globals.stored_values.set_mutability(*val, !constant);
-                                    }
+                                    new_expr.eval(context, globals, info.clone(), !mutable)?;
+
+                                for (val, _) in &evaled {
+                                    globals.stored_values.set_mutability(*val, mutable);
                                 }
 
                                 returns.extend(inner_returns);
@@ -384,7 +383,7 @@ pub fn compile_scope(
                                     let storage =
                                         symbol.define(&mut new_context, globals, &info)?;
                                     //clone the value so as to not share the reference
-                                    let cloned = clone_value(e, 1, globals, &new_context, true);
+                                    let cloned = clone_value(e, 1, globals, &new_context, !mutable);
                                     globals.stored_values[storage] =
                                         globals.stored_values[cloned].clone();
                                     new_contexts.push(new_context);

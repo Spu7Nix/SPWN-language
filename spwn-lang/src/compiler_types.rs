@@ -2991,7 +2991,7 @@ impl ast::Variable {
 
         let value = match &self.operator {
             Some(ast::UnaryOperator::Let) => store_value(Value::Null, 1, globals, context),
-            None => store_value(Value::Null, 1, globals, context),
+            None => store_const_value(Value::Null, 1, globals, context),
             a => {
                 return Err(RuntimeError::RuntimeError {
                     message: format!("Cannot use operator {:?} in definition", a),
