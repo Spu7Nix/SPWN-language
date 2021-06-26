@@ -1130,9 +1130,10 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             Value::Range(
                                 *start,
                                 end,
-                                if *step < 0 {
+                                if *step <= 0 {
                                     return Err(RuntimeError::RuntimeError {
-                                        message: "cannot have a stepsize less than 0".to_string(),
+                                        message: "range cannot have a stepsize less than or 0"
+                                            .to_string(),
                                         info,
                                     });
                                 } else {
