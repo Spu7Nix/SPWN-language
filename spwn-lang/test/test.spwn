@@ -1,6 +1,1 @@
-BG.pulse(255, 0, 0, fade_out = 0.5)
-GROUND.pulse(255, 0, 0, fade_out = 0.5)
-LINE.pulse(255, 0, 0, fade_out = 0.5)
-OBJECT.pulse(255, 0, 0, fade_out = 0.5)
-_3DLINE.pulse(255, 0, 0, fade_out = 0.5)
-GROUND2.pulse(255, 0, 0, fade_out = 0.5)
+$.print($.time())

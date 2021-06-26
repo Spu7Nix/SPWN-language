@@ -282,6 +282,8 @@ pub const BUILTIN_LIST: &[&str] = &[
     "b64encode",
     "b64decode",
     "mutability", // for testing purposes
+    "time",
+    "get_input",
     //operators
     "_or_",
     "_and_",
@@ -333,8 +335,24 @@ pub fn built_in_function(
             println!("{}", out);
             Value::Null
         }
+        "time" => {
+            arg_length!(info, 0, arguments, "Expected no arguments".to_string());
+            use std::time::SystemTime;
+            let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(time) => time,
+                Err(e) => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("System time error: {}", e),
+                        info,
+                    })
+                }
+            }
+            .as_secs();
+            Value::Number(now as f64)
+        }
 
         "get_input" => {
+            arg_length!(info, 0, arguments, "Expected no arguments".to_string());
             let mut out = String::new();
             for val in arguments {
                 out += &globals.stored_values[val].to_str(globals);
