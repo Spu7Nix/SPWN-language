@@ -1102,7 +1102,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                                 end,
                                 if *step <= 0 {
                                     return Err(RuntimeError::RuntimeError {
-                                        message: "cannot have a stepsize less than or 0"
+                                        message: "range cannot have a stepsize less than or 0"
                                             .to_string(),
                                         info,
                                     });
