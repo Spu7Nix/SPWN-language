@@ -6,7 +6,8 @@ extract constants.obj_props
 extract constants.comparisons
 
 wait = #[desc("Adds a delay before the next triggers")] (
-	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{}
+	#[desc("Delay time in seconds (leave empty for minimum delay)")]
+	time: @number | @epsilon = @epsilon::{}
 ){
 	if time.type == @epsilon || time > 0 {
 		$.add( trigger{
@@ -57,6 +58,41 @@ call_with_delay = #[desc("Call a function after a delay")] (
 	
 	},
 
+	supress_signal_forever: #[desc("Stops signal from coming past after call")] (){
+		
+		checker = @counter::new(0)
+		checker.item.if_is(EQUAL_TO, 0, !{
+			checker.item.add(1)
+			-> return
+		})
+		
+	
+	},
+
+	supress_signal_quick: #[desc("Stops signal from coming past for some time (better for quick/glitchy signals)")] (
+		#[desc("Time to supress signal")] delay: @number,
+	){
+		//if checker is 0, a signal can come through
+		//if checker is 1, it will be supressed
+		checker = @counter::new(0)
+		
+		-> (){
+			checker.item.add(1)
+			wait(delay)
+			checker.item.if_is(EQUAL_TO, 1, !{
+				-> return
+			})
+			wait()
+			checker.item.if_is(LARGER_THAN, 1, !{
+				checker -= 1
+			})
+			
+		}()
+		
+		
+	
+	},
+
 	for_loop: #[desc("Implementation of a spawn loop with a counter")] 
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
@@ -89,6 +125,24 @@ call_with_delay = #[desc("Call a function after a delay")] (
 	},
 
 	while_loop: #[desc("Implementation of a conditional spawn loop")] 
+	(
+		#[desc("While loop condition, should -> return a boolean")] expr: @macro, 
+		#[desc("Macro of the code that gets looped")] code: @macro,
+		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
+	) {
+		func = !{
+			if expr() {
+				code()
+				call_with_delay(delay, func)
+			} else {
+				-> return
+			}
+        }
+
+        call_with_delay(delay, func)
+	},
+
+	do_while_loop: #[desc("Implementation of a conditional spawn loop")] 
 	(
 		#[desc("While loop condition, should -> return a boolean")] expr: @macro, 
 		#[desc("Macro of the code that gets looped")] code: @macro,

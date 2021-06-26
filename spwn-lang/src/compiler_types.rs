@@ -32,6 +32,7 @@ deeper scope => lifetime++
 shallower scopr => lifetime--
 */
 
+
 impl std::ops::Index<usize> for ValStorage {
     type Output = Value;
 
@@ -88,6 +89,10 @@ impl ValStorage {
         };    
     }
 
+    pub fn get_lifetime(&self, index: usize) -> u16 {
+        self.map.get(&index).unwrap().3
+    }
+
 
     pub fn increment_lifetimes(&mut self) {
         for (_, val) in self.map.iter_mut() {
@@ -105,7 +110,8 @@ impl ValStorage {
         let mut to_be_removed = Vec::new();
         for (index, val) in self.map.iter() {
             if val.3 == 0 {
-                to_be_removed.push(*index)
+                to_be_removed.push(*index);
+                //println!("removing value: {:?}", val.0);
             }
         }
         for index in to_be_removed {
@@ -312,6 +318,10 @@ pub struct Context {
     // broken doesn't mean something is wrong with it, it just means
     // a break statement has been used :)
     pub broken: Option<(CompilerInfo, BreakType)>,
+
+
+    pub sync_group: usize,
+    pub sync_part: SyncPartID,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerInfo {
@@ -347,6 +357,9 @@ impl Context {
             //self_val: None,
             func_id: 0,
             broken: None,
+
+            sync_group: 0,
+            sync_part: 0,
         }
     }
 
@@ -909,7 +922,7 @@ impl Value {
             }
             Value::Number(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::TriggerFunc(_) => "{ /*trigger function */ }".to_string(),
+            Value::TriggerFunc(_) => "!{ /* trigger function */ }".to_string(),
             Value::Range(start, end, stepsize) => {
                 if *stepsize != 1 {
                     format!("{}..{}..{}", start, stepsize, end)
@@ -1034,7 +1047,11 @@ pub struct FunctionID {
     pub obj_list: Vec<(GDObj, usize)>, //list of objects in this function id, + their order id
 }
 
-
+pub type SyncPartID = usize;
+pub struct SyncGroup {
+    parts: Vec<SyncPartID>,
+    groups_used: Vec<ArbitraryID>, // groups that are already used by this sync group, and can be reused in later parts
+}
 
 pub struct Globals {
     //counters for arbitrary groups
@@ -1061,6 +1078,8 @@ pub struct Globals {
 
     pub uid_counter: usize,
     pub implementations: Implementations,
+
+    pub sync_groups: Vec<SyncGroup>,
 }
 
 impl Globals {
@@ -1130,7 +1149,11 @@ impl Globals {
                 obj_list: Vec::new(),
             }],
             objects: Vec::new(),
-            implementations: HashMap::new()
+            implementations: HashMap::new(),
+            sync_groups: vec![SyncGroup {
+                parts: vec![0],
+                groups_used: Vec::new()
+            }]
         };
 
         
@@ -2968,7 +2991,7 @@ impl ast::Variable {
 
         let value = match &self.operator {
             Some(ast::UnaryOperator::Let) => store_value(Value::Null, 1, globals, context),
-            None => store_value(Value::Null, 1, globals, context),
+            None => store_const_value(Value::Null, 1, globals, context),
             a => {
                 return Err(RuntimeError::RuntimeError {
                     message: format!("Cannot use operator {:?} in definition", a),

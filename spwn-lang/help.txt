@@ -2,10 +2,13 @@ Usage: spwn [subcommand] [flags]
 
 Subcommands:
     build [script file], b [script file]
-    runs/builds a given file
+    Runs/builds a given file
     
     doc [library path]
-    generates documentation for a SPWN library, in the form of a markdown file
+    Generates documentation for a SPWN library, in the form of a markdown file
+
+    version, -v, --version
+    Gets the version of spwn you are using.
 
 Flags:
     --console-output, -c

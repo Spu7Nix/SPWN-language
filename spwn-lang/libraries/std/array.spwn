@@ -1,6 +1,7 @@
 #[no_std]
 impl @array {
-    max: (self, minval = -999999999999) {
+    max: #[desc("Gets the highest number in the array.")]
+    (self, minval = -999999999999) {
         let highest = minval
         for el in self {
             if el > highest {
@@ -9,7 +10,8 @@ impl @array {
         }
         return highest
     },
-    min: (self, max_val = 999999999999) {
+    min: #[desc("Gets the lowest number in the array.")]
+    (self, max_val = 999999999999) {
         let lowest = max_val
         for el in self {
             if el < lowest {
@@ -18,32 +20,31 @@ impl @array {
         }
         return lowest
     },
-    contains: (self, el) {
-		let ret = false
+    contains: #[desc("See if array contains an element.")]
+    (self, el) {
 		for e in self {
 			if e == el {
-				ret = true
-				break
+				return true
 			}
 		}
-		return ret
+		return false
 	},
-    index: (self, el) {
-        let ret = null;
+    index: #[desc("Gets the index of an element, if it doesn't exists returns null.")]
+    (self, el) {
+        let res = null
         for i in 0..self.length {
             if self[i] == el {
-                ret = i
-                break
+                res = i
             }
         }
-        return ret
+        return res
     },
-    clear: (self) {
-        for i in 0..self.length {
-            self.pop();
-        }
+    clear: #[desc("Clears the array.")]
+    (self) {
+        self = []
     },
-    reverse: (self) {
+    reverse: #[desc("Reverses the array.")]
+    (self) {
         if self.length == 0 {
             return [];
             break
@@ -55,26 +56,31 @@ impl @array {
         ret.push(self[0]);
         return ret;
     },
-    push: (self, value) {
+    push: #[desc("Pushes a value to the end of the array.")]
+    (self, value) {
         $.append(self, value)
     },
-    pop: (self) {
+    pop: #[desc("Removes the last value from the array and returns it.")]
+    (self) {
         return $.pop(self)
     },
-    remove: (self, index: @number) {
+    remove: #[desc("Removes a specific index from the array and returns it.")]
+    (self, index: @number) {
         return $.remove_index(self, index)
     },
-    map: (self, map_func: @macro) {
+    map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results.")]
+    (self, cb: @macro) {
         let output = [];
         for iter in self {
-            output.push(map_func(iter));
+            output.push(cb(iter));
         }
         return output;
     },
-    filter: (self, filter_func: @macro) {
+    filter: #[desc("Returns the elements of an array that meet the condition specified in the callback function.")]
+    (self, cb: @macro) {
         let output = [];
         for iter in self {
-            let r = filter_func(iter);
+            let r = cb(iter);
             if r.type != @bool {
                 throw "Filter must return a boolean value";
             } else if r {
@@ -83,19 +89,77 @@ impl @array {
         }
         return output
     },
-    reduce: (self, reduce_func: @macro) {
+    reduce: #[desc("Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")]
+    (self, cb: @macro) {
         let acum = self[0];
         for iter in 1..self.length {
-            acum = reduce_func(acum, self[iter]);
+            acum = cb(acum, self[iter]);
         }
         return acum;
     },
-    any: (self) {
-        let numerical = self.reduce((t, v)=>@number(@bool(t))+@number(@bool(v)))
-        return numerical as @bool;
+    any: #[desc("Determines whether the specified callback function returns true for any element of an array.")]
+    (self, map: @macro = (a) => @bool(a)) {
+        for item in self {
+            if map(item) {
+                return true
+            }
+        }
+        return false
     },
-    all: (self) {
-        let numerical = self.reduce((t, v)=>@number(@bool(t))*@number(@bool(v)))
-        return numerical as @bool;
+    all: #[desc("Determines whether all the members of an array satisfy the specified callback.")]
+    (self, map: @macro = (a) => @bool(a)) {
+        for item in self {
+            if !map(item) {
+                return false
+            }
+        }
+        return true
     },
+    sum: #[desc("Gets the sum of the value in the array.")]
+    (self) {
+        if self.all(item => item.type == @number) {
+            let sum = 0
+            for item in self {
+                sum += item
+            }
+            return sum
+        } else {
+            throw "Unsupported type in array " + self as @string
+        }
+    },
+    sort: #[desc("Sorts the array.")]
+    (self) {
+        if self.all(item => item.type == @number) {
+            min = (array, maxval = 999999999999) {
+                let lowest = [maxval, 0]
+                for i in 0..array.length {
+                    if array[i] < lowest[0] {
+                        lowest = [array[i], i]
+                    }
+                }
+                return lowest
+            }
+            let res = []
+            let copy = self
+            for _ in self {
+                i = min(copy)
+                res.push(i[0])
+                copy.remove(i[1])
+            }
+            return res
+        } else {
+            throw "Unsupported type in array " + self as @string
+        }
+    },
+    shift: #[desc("Removes the first index from the array and returns it.")]
+    (self) {
+        return self.remove(0)
+    },
+    unshift: #[desc("Pushes a value to the start of the array and returns it.")]
+    (self, value) {
+        let res = [value]
+        res += self
+        self = res
+        return value
+    }
 }

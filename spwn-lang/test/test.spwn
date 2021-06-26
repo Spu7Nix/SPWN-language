@@ -1,6 +1,7 @@
-let a = counter(10)
+let state = false;
+value = state;
+state = true;
 
-for i in 0..10 {
-	a *= i;
-	wait(0.1)
-}
+
+
+$.print(state, value)

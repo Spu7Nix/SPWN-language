@@ -266,7 +266,7 @@
 
 ## **add\_to**:
 
-> **Value:** `(self, items: @array, speed: @number = 3, factor: @number = 1) { /* code omitted */ }` (`@macro`) 
+> **Type:** `@macro` 
 >
 >## Description: 
 > _Adds the counter's value to all item IDs in a list, and resets the counter to 0 in the process_
@@ -277,6 +277,7 @@
 >| 2 | **`items`** | @array | |Item IDs to add to |
 >  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
 >  | 4 | `factor` | @number | `1` |Multiplyer for the value added |
+>  | 5 | `for_each` | @macro | `(n) { /* code omitted */ }` |Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1) |
 >  
 >  
 >
@@ -394,7 +395,7 @@
 
 ## **reset**:
 
-> **Value:** `(self, speed: @number = 3) { /* code omitted */ }` (`@macro`) 
+> **Value:** `(self, speed: @number = 3, for_each: @macro = (n) { /* code omitted */ }) { /* code omitted */ }` (`@macro`) 
 >
 >## Description: 
 > _Resets counter to 0_
@@ -403,13 +404,14 @@
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
+>  | 3 | `for_each` | @macro | `(n) { /* code omitted */ }` |Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1) |
 >  
 >  
 >
 
 ## **subtract\_from**:
 
-> **Value:** `(self, items: @array, speed: @number = 3, factor: @number = 1) { /* code omitted */ }` (`@macro`) 
+> **Type:** `@macro` 
 >
 >## Description: 
 > _Subtracts the counter's value from all item IDs in a list, and resets the counter to 0 in the process_
@@ -420,6 +422,7 @@
 >| 2 | **`items`** | @array | |Item IDs to add to |
 >  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
 >  | 4 | `factor` | @number | `1` |Multiplyer for the value subtracted |
+>  | 5 | `for_each` | @macro | `(n) { /* code omitted */ }` |Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1) |
 >  
 >  
 >

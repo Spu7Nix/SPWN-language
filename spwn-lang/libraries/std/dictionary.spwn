@@ -4,35 +4,40 @@ import "array.spwn"
 type @dict_not_found;
 
 impl @dictionary {
-	keys: (self) {
+	keys: #[desc("Gets the dictionary's keys.")]
+	(self) {
 		let ret = []
 		for kv in self {
 			ret.push(kv[0])
 		}
 		return ret
 	},
-	values: (self) {
+	values: #[desc("Gets the dictionary's values.")]
+	(self) {
 		let ret = []
 		for kv in self {
 			ret.push(kv[1])
 		}
 		return ret
 	},
-	items: (self) {
+	items: #[desc("Gets the dictionary's items.")]
+	(self) {
 		let ret = []
 		for kv in self {
 			ret.push(kv)
 		}
 		return ret
 	},
-	set: (self, key: @string, val) {
+	set: #[desc("Sets an item in the dictionary.")]
+	(self, key: @string, val) {
 		if self has key {
 			self[key] = val
 		} else {
 			let self[key] = val
 		}
 	},
-	get: (self, key: @string, value = @dict_not_found::{}) {
+	get: #[desc("Gets an item from the dictionary.")]
+	(self, key: @string, value = @dict_not_found::{}) {
 		if self has key {
 			return self[key]
 		} else {
@@ -42,5 +47,9 @@ impl @dictionary {
 				return value
 			}
 		}
+	},
+	clear: #[desc("Clears the dictionary.")]
+	(self) {
+		self = {}
 	}
 }

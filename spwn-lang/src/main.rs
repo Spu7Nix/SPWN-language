@@ -13,6 +13,7 @@ mod optimize;
 
 #[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
 #[cfg_attr(windows, path = "editorlive_win.rs")]
+#[cfg_attr(not(any(target_os = "macos", windows)), path = "editorlive_unavailable.rs")]
 mod editorlive;
 
 use optimize::optimize;
@@ -65,6 +66,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("{}", HELP);
                     Ok(())
                 }
+                "version" | "-v" | "--version" => {
+                    println!("v{}", env!("CARGO_PKG_VERSION"));
+                    Ok(())
+                }
                 "build" | "b" => {
                     let script_path = match args_iter.next() {
                         Some(a) => PathBuf::from(a),
@@ -80,7 +85,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut save_file = None;
                     let mut included_paths = vec![
                         std::env::current_dir().expect("Cannot access current directory"),
-                        std::env::current_exe().expect("Cannot access directory of executable").parent().expect("Executable must be in some directory").to_path_buf(),
+                        std::env::current_exe()
+                            .expect("Cannot access directory of executable")
+                            .parent()
+                            .expect("Executable must be in some directory")
+                            .to_path_buf(),
                     ];
                     //change to current_exe before release (from current_dir)
 

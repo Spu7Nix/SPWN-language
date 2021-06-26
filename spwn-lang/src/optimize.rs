@@ -18,9 +18,15 @@ enum TriggerRole {
     Func,
 }
 
-fn get_role(obj_id: u16) -> TriggerRole {
+fn get_role(obj_id: u16, hd: bool) -> TriggerRole {
     match obj_id {
-        1268 => TriggerRole::Spawn,
+        1268 => {
+            if hd {
+                TriggerRole::Func
+            } else {
+                TriggerRole::Spawn
+            }
+        }
         1595 | 1611 | 1811 | 1815 | 1812 => TriggerRole::Func,
         _ => TriggerRole::Output,
     }
@@ -85,6 +91,8 @@ fn clone_trigger(
         mode: ObjectMode::Trigger,
         func_id: obj.func_id,
         unique_id: obj.unique_id, //this might cause a problem in the future
+        sync_group: obj.sync_group,
+        sync_part: obj.sync_part,
     };
     let fn_id = obj.func_id;
     (*objects.list)[fn_id].obj_list.push((obj.clone(), order));
@@ -123,9 +131,13 @@ pub fn optimize(mut obj_in: Vec<FunctionID>, mut closed_group: u16) -> Vec<Funct
     for (f, fnid) in obj_in.iter().enumerate() {
         for (o, (obj, order)) in fnid.obj_list.iter().enumerate() {
             if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
+                let mut hd = false;
+                if let Some(ObjParam::Bool(hd_val)) = obj.params.get(&103) {
+                    hd = *hd_val;
+                }
                 let trigger = Trigger {
                     obj: (f, o),
-                    role: get_role(*id as u16),
+                    role: get_role(*id as u16, hd),
                     order: *order,
                     deleted: true,
                     optimized: false,
@@ -179,22 +191,34 @@ pub fn optimize(mut obj_in: Vec<FunctionID>, mut closed_group: u16) -> Vec<Funct
 
     //return rebuild(&network, &obj_in);
 
-    let len = if let Some(gang) = network.get(&NO_GROUP) {
-        gang.triggers.len()
-    } else {
-        0
-    };
-    for i in 0..len {
-        let trigger = network[&NO_GROUP].triggers[i];
+    // let len = if let Some(gang) = network.get(&NO_GROUP) {
+    //     gang.triggers.len()
+    // } else {
+    //     0
+    // };
+    // for i in 0..len {
+    //     let trigger = network[&NO_GROUP].triggers[i];
 
-        // if trigger.optimized {
-        //     continue;
-        // }
+    //     // if trigger.optimized {
+    //     //     continue;
+    //     // }
 
-        if trigger.role != TriggerRole::Output {
-            optimize_from(&mut network, &mut objects, (NO_GROUP, i), &mut closed_group);
-        } else {
-            (*network.get_mut(&NO_GROUP).unwrap()).triggers[i].deleted = false;
+    //     if trigger.role != TriggerRole::Output {
+    //         optimize_from(&mut network, &mut objects, (NO_GROUP, i), &mut closed_group);
+    //     } else {
+    //         (*network.get_mut(&NO_GROUP).unwrap()).triggers[i].deleted = false;
+    //     }
+    // }
+
+    for (group, gang) in network.clone() {
+        if let ID::Specific(_) = group.id {
+            for (i, trigger) in gang.triggers.iter().enumerate() {
+                if trigger.role != TriggerRole::Output {
+                    optimize_from(&mut network, &mut objects, (group, i), &mut closed_group);
+                } else {
+                    (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
+                }
+            }
         }
     }
 
@@ -220,7 +244,7 @@ fn reads_writes(t: Trigger, objects: &Triggerlist) -> (Vec<IDData>, Vec<IDData>)
     let mut out = (Vec::new(), Vec::new());
     for (key, val) in &obj.params {
         let id_data = match val {
-            ObjParam::Group(g) => IDData::Group(*g),
+            //ObjParam::Group(g) => IDData::Group(*g),
             ObjParam::Block(b) => IDData::Block(*b),
             ObjParam::Item(i) => IDData::Item(*i),
             _ => continue,
@@ -382,6 +406,8 @@ fn create_spawn_trigger(
         func_id: trigger.obj.0,
         mode: ObjectMode::Trigger,
         unique_id: objects[trigger.obj].0.unique_id,
+        sync_group: 0,
+        sync_part: 0,
     };
 
     (*objects.list)[trigger.obj.0]
