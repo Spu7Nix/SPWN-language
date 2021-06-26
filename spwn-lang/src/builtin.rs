@@ -560,6 +560,13 @@ pub fn built_in_function(
                     info,
                 });
             }
+            let fn_context = globals.get_val_fn_context(arguments[0], info.clone())?;
+            if fn_context != context.start_group {
+                return Err(RuntimeError::RuntimeError {
+                    message: CANNOT_CHANGE_ERROR.to_string(),
+                    info,
+                });
+            }
             //set lifetime to the lifetime of the array
 
             let cloned = clone_value(
@@ -623,6 +630,13 @@ pub fn built_in_function(
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: "Cannot modify an immutable value".to_string(),
+                    info,
+                });
+            }
+            let fn_context = globals.get_val_fn_context(arguments[0], info.clone())?;
+            if fn_context != context.start_group {
+                return Err(RuntimeError::RuntimeError {
+                    message: CANNOT_CHANGE_ERROR.to_string(),
                     info,
                 });
             }
@@ -914,6 +928,14 @@ pub fn built_in_function(
                 });
             }
 
+            let fn_context = globals.get_val_fn_context(arguments[0], info.clone())?;
+            if fn_context != context.start_group {
+                return Err(RuntimeError::RuntimeError {
+                    message: CANNOT_CHANGE_ERROR.to_string(),
+                    info,
+                });
+            }
+
             let typ = globals.get_type_str(arguments[0]);
 
             match &mut globals.stored_values[arguments[0]] {
@@ -1002,6 +1024,14 @@ pub fn built_in_function(
             if !globals.is_mutable(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This value is not mutable"),
+                    info,
+                });
+            }
+
+            let fn_context = globals.get_val_fn_context(arguments[0], info.clone())?;
+            if fn_context != context.start_group {
+                return Err(RuntimeError::RuntimeError {
+                    message: CANNOT_CHANGE_ERROR.to_string(),
                     info,
                 });
             }
