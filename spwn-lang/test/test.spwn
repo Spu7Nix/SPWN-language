@@ -1,1 +1,7 @@
-$.print($.spwn_version())
+let state = false;
+value = state;
+state = true;
+
+
+
+$.print(state, value)

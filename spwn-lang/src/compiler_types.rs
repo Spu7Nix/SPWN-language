@@ -922,7 +922,7 @@ impl Value {
             }
             Value::Number(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::TriggerFunc(_) => "{ /*trigger function */ }".to_string(),
+            Value::TriggerFunc(_) => "!{ /* trigger function */ }".to_string(),
             Value::Range(start, end, stepsize) => {
                 if *stepsize != 1 {
                     format!("{}..{}..{}", start, stepsize, end)

@@ -370,11 +370,11 @@ pub fn compile_scope(
                                 new_contexts.push(after_context);
                             }
                             _ => {
-                                let (evaled, inner_returns) =
+                                let (mut evaled, inner_returns) =
                                     new_expr.eval(context, globals, info.clone(), !mutable)?;
 
-                                for (val, _) in &evaled {
-                                    globals.stored_values.set_mutability(*val, mutable);
+                                for (val, _) in &mut evaled {
+                                    *val = clone_value(*val, 1, globals, context, !mutable);
                                 }
 
                                 returns.extend(inner_returns);
