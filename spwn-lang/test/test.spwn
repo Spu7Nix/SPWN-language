@@ -1,6 +1,1 @@
-let arr = []
-let num = 0
-
-wait(1)
-arr.push(1)
-num += 1
+$.print($.spwn_version())

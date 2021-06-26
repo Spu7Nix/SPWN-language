@@ -284,6 +284,7 @@ pub const BUILTIN_LIST: &[&str] = &[
     "mutability", // for testing purposes
     "time",
     "get_input",
+    "spwn_version",
     //operators
     "_or_",
     "_and_",
@@ -349,6 +350,12 @@ pub fn built_in_function(
             }
             .as_secs();
             Value::Number(now as f64)
+        }
+
+        "spwn_version" => {
+            arg_length!(info, 0, arguments, "Expected no arguments".to_string());
+
+            Value::Str(env!("CARGO_PKG_VERSION").to_string())
         }
 
         "get_input" => {
