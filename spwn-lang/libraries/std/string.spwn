@@ -48,5 +48,9 @@ impl @string {
 			}
 		}
 		return false
+	},
+	reverse: #[desc("Reverses the string.")]
+	(self) {
+		return ''.join(self.split('').reverse())
 	}
 }
