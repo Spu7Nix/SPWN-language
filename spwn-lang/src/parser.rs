@@ -330,21 +330,12 @@ pub enum Token {
     #[token("sync")]
     Sync,
 
-    //COMMENT
-    #[regex(r"//[^\n]*")]
-    Comment,
-
-    #[token("/*")]
-    MultiCommentStart,
-
-    #[token("*/")]
-    MultiCommentEnd,
     //STATEMENT SEPARATOR
-    #[regex(r"[\n\r;][ \t\f\n\r]*")]
+    #[regex(r"[\n\r;]+")]
     StatementSeparator,
 
     #[error]
-    #[regex(r"[ \t\f]+", logos::skip)]
+    #[regex(r"[ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*", logos::skip)]
     Error,
 }
 
@@ -374,7 +365,7 @@ impl Token {
             | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case => {
                 "keyword"
             }
-            Comment | MultiCommentStart | MultiCommentEnd => "comment",
+            //Comment | MultiCommentStart | MultiCommentEnd => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
         }
@@ -429,42 +420,37 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    fn next(&mut self, ss: bool, comment: bool) -> Option<Token> {
+    fn next(&mut self, ss: bool) -> Option<Token> {
         //println!("what ok {}", self.index);
 
         if self.index > 0 {
             let curr_element = self.stack[self.stack.len() - self.index].0;
 
-            if curr_element == Some(Token::MultiCommentStart) {
-                //println!("comment time");
-                let mut nest = 0;
-                loop {
-                    let next_elem = self.inner_next();
+            // if curr_element == Some(Token::MultiCommentStart) {
+            //     //println!("comment time");
+            //     let mut nest = 0;
+            //     loop {
+            //         let next_elem = self.inner_next();
 
-                    if next_elem == Some(Token::MultiCommentStart) {
-                        nest += 1;
-                    } else if next_elem == Some(Token::MultiCommentEnd) {
-                        nest -= 1;
-                    }
+            //         if next_elem == Some(Token::MultiCommentStart) {
+            //             nest += 1;
+            //         } else if next_elem == Some(Token::MultiCommentEnd) {
+            //             nest -= 1;
+            //         }
 
-                    if nest == 0 {
-                        break;
-                    }
-                }
-                if !comment {
-                    self.inner_next();
-                }
-            }
+            //         if nest == 0 {
+            //             break;
+            //         }
+            //     }
+
+            //     self.inner_next();
+            // }
         }
 
         let next_element = self.inner_next();
 
-        if (!ss && next_element == Some(Token::StatementSeparator))
-            || (!comment
-                && (next_element == Some(Token::Comment)
-                    || next_element == Some(Token::MultiCommentStart)))
-        {
-            self.next(ss, comment)
+        if !ss && next_element == Some(Token::StatementSeparator) {
+            self.next(ss)
         } else {
             next_element
         }
@@ -485,17 +471,15 @@ impl<'a> Tokens<'a> {
         } else {
             None
         }*/
-        self.previous_no_ignore(false, false)
+        self.previous_no_ignore(false)
     }
 
-    fn previous_no_ignore(&mut self, ss: bool, comment: bool) -> Option<Token> {
+    fn previous_no_ignore(&mut self, ss: bool) -> Option<Token> {
         self.index += 1;
         let len = self.stack.len();
         if len > self.index {
-            if (!ss && self.stack[len - self.index - 1].0 == Some(Token::StatementSeparator))
-                || (!comment && self.stack[len - self.index - 1].0 == Some(Token::Comment))
-            {
-                self.previous_no_ignore(ss, comment)
+            if !ss && self.stack[len - self.index - 1].0 == Some(Token::StatementSeparator) {
+                self.previous_no_ignore(ss)
             } else if len - self.index >= 1 {
                 self.stack[len - self.index - 1].0
             } else {
@@ -601,17 +585,17 @@ pub fn parse_spwn(
     notes.tag = start_tag;
     loop {
         //+ do something if we have tokens. if no more tokens, leave loop
-        match tokens.next(false, true) {
+        match tokens.next(false) {
             //oops we just advanced the tokens in an attempt to check if we have any
             Some(_) => {
-                tokens.previous_no_ignore(false, true); //bring tokens back to original
+                tokens.previous_no_ignore(false); //bring tokens back to original
 
                 //+ we are goign to parse the tokens
-                let mut parsed = parse_statement(&mut tokens, &mut notes)?;
-                if parsed.comment.0 == None && !statements.is_empty() {
-                    parsed.comment.0 = statements.last().unwrap().comment.1.clone();
-                    (*statements.last_mut().unwrap()).comment.1 = None;
-                }
+                let parsed = parse_statement(&mut tokens, &mut notes)?;
+                // if parsed.comment.0 == None && !statements.is_empty() {
+                //     parsed.comment.0 = statements.last().unwrap().comment.1.clone();
+                //     (*statements.last_mut().unwrap()).comment.1 = None;
+                // }
 
                 statements.push(parsed)
             }
@@ -619,7 +603,7 @@ pub fn parse_spwn(
         }
 
         //+ can't find any more tokens that are valid syntax, checking for line separator
-        match tokens.next(true, false) {
+        match tokens.next(true) {
             Some(Token::StatementSeparator) => {}
             Some(a) => {
                 return Err(SyntaxError::ExpectedErr {
@@ -642,16 +626,16 @@ fn parse_cmp_stmt(
 ) -> Result<Vec<ast::Statement>, SyntaxError> {
     let mut statements = Vec::<ast::Statement>::new();
     loop {
-        match tokens.next(false, true) {
+        match tokens.next(false) {
             Some(Token::ClosingCurlyBracket) => break,
             Some(_) => {
-                tokens.previous_no_ignore(false, true);
+                tokens.previous_no_ignore(false);
 
-                let mut parsed = parse_statement(tokens, notes)?;
-                if parsed.comment.0 == None && !statements.is_empty() {
-                    parsed.comment.0 = statements.last().unwrap().comment.1.clone();
-                    (*statements.last_mut().unwrap()).comment.1 = None;
-                }
+                let parsed = parse_statement(tokens, notes)?;
+                // if parsed.comment.0 == None && !statements.is_empty() {
+                //     parsed.comment.0 = statements.last().unwrap().comment.1.clone();
+                //     (*statements.last_mut().unwrap()).comment.1 = None;
+                // }
 
                 statements.push(parsed) // add to big statement list
                                         //println!("statement done");
@@ -665,7 +649,7 @@ fn parse_cmp_stmt(
             }
         }
 
-        match tokens.next(true, false) {
+        match tokens.next(true) {
             Some(Token::StatementSeparator) => {}
             Some(Token::ClosingCurlyBracket) => break,
             a => expected!(STATEMENT_SEPARATOR_DESC.to_string(), tokens, notes, a),
@@ -679,11 +663,11 @@ pub fn parse_statement(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
 ) -> Result<ast::Statement, SyntaxError> {
-    let preceding_comment = check_for_comment(tokens);
+    //let preceding_comment = check_for_comment(tokens);
 
-    let mut comment_after = None;
+    //let mut comment_after = None;
 
-    let first = tokens.next(false, false);
+    let first = tokens.next(false);
 
     let (start_pos, _) = tokens.position();
 
@@ -692,7 +676,7 @@ pub fn parse_statement(
         // ooh what type of token is it
         Some(Token::Arrow) => {
             //parse async statement
-            if tokens.next(false, false) == Some(Token::Arrow) {
+            if tokens.next(false) == Some(Token::Arrow) {
                 //double arrow (throw error)
                 return Err(SyntaxError::UnexpectedErr {
                     found: "double arrow (-> ->)".to_string(),
@@ -717,7 +701,7 @@ pub fn parse_statement(
         Some(Token::Return) => {
             //parse return statement
 
-            match tokens.next(true, false) {
+            match tokens.next(true) {
                 //do we actually return something?
                 Some(Token::StatementSeparator) | Some(Token::ClosingCurlyBracket) => {
                     // we dont return anything
@@ -728,14 +712,14 @@ pub fn parse_statement(
                 _ => {
                     // we are returning something, how fun
                     tokens.previous();
-                    let mut expr = parse_expr(tokens, notes, true, true)?; //parse whatever we are returning
-                    comment_after =
-                        if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
-                            (*expr.values.last_mut().unwrap()).comment.1 = None;
-                            Some(comment)
-                        } else {
-                            None
-                        };
+                    let expr = parse_expr(tokens, notes, true)?; //parse whatever we are returning
+                                                                 // comment_after =
+                                                                 //     if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
+                                                                 //         (*expr.values.last_mut().unwrap()).comment.1 = None;
+                                                                 //         Some(comment)
+                                                                 //     } else {
+                                                                 //         None
+                                                                 //     };
                     ast::StatementBody::Return(Some(expr))
                 }
             }
@@ -755,8 +739,8 @@ pub fn parse_statement(
 
             // println!("if statement");
 
-            let condition = parse_expr(tokens, notes, true, true)?; // parse the condition part
-            match tokens.next(false, false) {
+            let condition = parse_expr(tokens, notes, true)?; // parse the condition part
+            match tokens.next(false) {
                 // check for a { character
                 Some(Token::OpenCurlyBracket) => (),
                 a => {
@@ -766,9 +750,9 @@ pub fn parse_statement(
             }
             let if_body = parse_cmp_stmt(tokens, notes)?; // parse whatever is inside if statement
 
-            let else_body = match tokens.next(false, false) {
+            let else_body = match tokens.next(false) {
                 // is there an else?
-                Some(Token::Else) => match tokens.next(false, false) {
+                Some(Token::Else) => match tokens.next(false) {
                     // there is an else, check for else if
                     Some(Token::OpenCurlyBracket) => {
                         // no else if, just else
@@ -813,7 +797,7 @@ pub fn parse_statement(
         Some(Token::For) => {
             //parse for statement
 
-            let symbol = match tokens.next(false, false) {
+            let symbol = match tokens.next(false) {
                 // check for variable
                 Some(Token::Symbol) => tokens.slice(),
                 Some(a) => {
@@ -837,7 +821,7 @@ pub fn parse_statement(
                 }
             };
 
-            match tokens.next(false, false) {
+            match tokens.next(false) {
                 // check for an in
                 Some(Token::In) => {}
                 a => {
@@ -846,8 +830,8 @@ pub fn parse_statement(
                 }
             };
 
-            let array = parse_expr(tokens, notes, true, true)?; // parse the array (or range)
-            match tokens.next(false, false) {
+            let array = parse_expr(tokens, notes, true)?; // parse the array (or range)
+            match tokens.next(false) {
                 // check for brace
                 Some(Token::OpenCurlyBracket) => {}
                 a => {
@@ -871,26 +855,26 @@ pub fn parse_statement(
         }
 
         Some(Token::ErrorStatement) => {
-            let mut expr = parse_expr(tokens, notes, true, true)?;
-            comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
-                (*expr.values.last_mut().unwrap()).comment.1 = None;
-                Some(comment)
-            } else {
-                None
-            };
+            let expr = parse_expr(tokens, notes, true)?;
+            // comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
+            //     (*expr.values.last_mut().unwrap()).comment.1 = None;
+            //     Some(comment)
+            // } else {
+            //     None
+            // };
             ast::StatementBody::Error(ast::Error { message: expr })
             //i dont think a summary is needed for this
         }
 
         Some(Token::Type) => {
             // defining a new type
-            match tokens.next(false, false) {
+            match tokens.next(false) {
                 // all types start with @, throw error if it doesn't
                 Some(Token::At) => (),
                 a => expected!("'@'".to_string(), tokens, notes, a),
             };
 
-            match tokens.next(false, false) {
+            match tokens.next(false) {
                 // check if type name is valid
                 Some(Token::Symbol) => ast::StatementBody::TypeDef(tokens.slice()),
                 a => expected!("type name".to_string(), tokens, notes, a),
@@ -904,7 +888,7 @@ pub fn parse_statement(
 
         Some(Token::Implement) => {
             //parse impl statement
-            let symbol = parse_variable(tokens, notes, true)?;
+            let symbol = parse_variable(tokens, notes)?;
             /*
                 You might be asking yourself here,
                 "why are we parsing it as a variable and not a type?"
@@ -914,7 +898,7 @@ pub fn parse_statement(
                 want to use a variable instead.
             */
 
-            match tokens.next(false, false) {
+            match tokens.next(false) {
                 // check if it has the brace
                 Some(Token::OpenCurlyBracket) => ast::StatementBody::Impl(ast::Implementation {
                     symbol,
@@ -930,16 +914,16 @@ pub fn parse_statement(
         }
 
         Some(Token::Extract) => {
-            let mut expr = parse_expr(tokens, notes, true, true)?;
+            let expr = parse_expr(tokens, notes, true)?;
             // its an expression because dicts can also be extracted alongside imported modules
 
             //you can literally ignore this
-            comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
-                (*expr.values.last_mut().unwrap()).comment.1 = None;
-                Some(comment)
-            } else {
-                None
-            };
+            // comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone() {
+            //     (*expr.values.last_mut().unwrap()).comment.1 = None;
+            //     Some(comment)
+            // } else {
+            //     None
+            // };
 
             ast::StatementBody::Extract(expr)
             // too basic to have a summary,
@@ -950,9 +934,9 @@ pub fn parse_statement(
             //parse it
 
             //expression or call
-            tokens.previous_no_ignore(false, true);
-            let mut expr = parse_expr(tokens, notes, true, true)?;
-            if tokens.next(false, false) == Some(Token::Exclamation) {
+            tokens.previous_no_ignore(false);
+            let expr = parse_expr(tokens, notes, true)?;
+            if tokens.next(false) == Some(Token::Exclamation) {
                 //call
                 ast::StatementBody::Call(ast::Call {
                     function: expr.values[0].clone(),
@@ -960,15 +944,15 @@ pub fn parse_statement(
             } else {
                 // expression statement
                 // println!("found expr");
-                tokens.previous_no_ignore(false, true);
+                tokens.previous_no_ignore(false);
 
-                comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone()
-                {
-                    (*expr.values.last_mut().unwrap()).comment.1 = None;
-                    Some(comment)
-                } else {
-                    None
-                };
+                // comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone()
+                // {
+                //     (*expr.values.last_mut().unwrap()).comment.1 = None;
+                //     Some(comment)
+                // } else {
+                //     None
+                // };
                 /*println!(
                     "current token after stmt post comment: {}: ",
                     tokens.slice()
@@ -984,9 +968,9 @@ pub fn parse_statement(
         }
     };
     let (_, end_pos) = tokens.position();
-    if comment_after == None {
-        comment_after = check_for_comment(tokens);
-    }
+    // if comment_after == None {
+    //     comment_after = check_for_comment(tokens);
+    // }
     /*println!(
         "current token after stmt post comment: {}: ",
         tokens.slice()
@@ -997,47 +981,8 @@ pub fn parse_statement(
         body,
         arrow,
         pos: (start_pos, end_pos),
-        comment: (preceding_comment, comment_after),
+        // comment: (preceding_comment, comment_after),
     })
-}
-
-fn check_for_comment(tokens: &mut Tokens) -> Option<String> {
-    let mut comment_found = false;
-    //let mut line_break_start = false;
-
-    let mut result = String::new();
-
-    /*match tokens.next(false, true) {
-        Some(Token::Comment) => tokens.slice(),
-        //Some(Token::StatementSeparator) => String::from("\r\n"),
-        _ => {
-            //println!("comment not found: \"{}\"", tokens.slice());
-            tokens.previous_no_ignore(false, true);
-
-            return None;
-        }
-    };*/
-
-    loop {
-        result += &match tokens.next(true, true) {
-            Some(Token::Comment) => {
-                comment_found = true;
-                tokens.slice()
-            }
-            Some(Token::StatementSeparator) => tokens.slice(),
-            _ => {
-                tokens.previous_no_ignore(false, true);
-
-                break;
-            }
-        };
-    }
-
-    if comment_found {
-        Some(result)
-    } else {
-        None
-    }
 }
 
 fn operator_precedence(op: &ast::Operator) -> u8 {
@@ -1148,7 +1093,7 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
 
     let mut cases = Vec::<ast::Case>::new();
     loop {
-        match tokens.next(false, false) {
+        match tokens.next(false) {
             Some(Token::ClosingCurlyBracket) => break,
             Some(Token::Else) => {
                 // the default
@@ -1165,14 +1110,14 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
                 but since an else case never type checks and is always at the end,
                 there is no need to. */
 
-                match tokens.next(false, false) {
+                match tokens.next(false) {
                     Some(Token::Colon) => {
-                        let expr = parse_expr(tokens, notes, false, false)?; // parse whats after the :
+                        let expr = parse_expr(tokens, notes, false)?; // parse whats after the :
                         cases.push(ast::Case {
                             typ: ast::CaseType::Default,
                             body: expr,
                         });
-                        if tokens.next(false, false) != Some(Token::Comma) {
+                        if tokens.next(false) != Some(Token::Comma) {
                             // for error formatting
                             tokens.previous();
                         }
@@ -1188,18 +1133,18 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
                         file: notes.file.clone(),
                     });
                 }
-                let val = parse_expr(tokens, notes, false, false)?;
-                match tokens.next(false, false) {
+                let val = parse_expr(tokens, notes, false)?;
+                match tokens.next(false) {
                     Some(Token::Colon) => {
-                        let expr = parse_expr(tokens, notes, false, false)?; // parse whats after the :
+                        let expr = parse_expr(tokens, notes, false)?; // parse whats after the :
                         cases.push(ast::Case {
                             typ: ast::CaseType::Value(val),
                             body: expr,
                         });
 
-                        if tokens.next(false, false) != Some(Token::Comma) {
+                        if tokens.next(false) != Some(Token::Comma) {
                             // for error formatting
-                            tokens.previous_no_ignore(false, false);
+                            tokens.previous_no_ignore(false);
                         }
                     }
                     a => expected!("':'".to_string(), tokens, notes, a),
@@ -1209,7 +1154,7 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
             _ => {
                 tokens.previous();
 
-                let pat = parse_expr(tokens, notes, false, false)?;
+                let pat = parse_expr(tokens, notes, false)?;
                 if default_enabled {
                     return Err(SyntaxError::SyntaxError {
                         message: "cannot have more cases after 'else' field".to_string(),
@@ -1217,17 +1162,17 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
                         file: notes.file.clone(),
                     });
                 }
-                match tokens.next(false, false) {
+                match tokens.next(false) {
                     Some(Token::Colon) => {
-                        let expr = parse_expr(tokens, notes, false, false)?; // parse whats after the :
+                        let expr = parse_expr(tokens, notes, false)?; // parse whats after the :
                         cases.push(ast::Case {
                             typ: ast::CaseType::Pattern(pat),
                             body: expr,
                         });
 
-                        if tokens.next(false, false) != Some(Token::Comma) {
+                        if tokens.next(false) != Some(Token::Comma) {
                             // for error formatting
-                            tokens.previous_no_ignore(false, false);
+                            tokens.previous_no_ignore(false);
                         }
                     }
                     a => expected!("':'".to_string(), tokens, notes, a),
@@ -1243,7 +1188,6 @@ fn parse_expr(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
     allow_mut_op: bool,
-    check_for_comments: bool,
 ) -> Result<ast::Expression, SyntaxError> {
     // Alright lets parse an expression
     // NOTE: this parses whatever is *after* the current token
@@ -1251,14 +1195,14 @@ fn parse_expr(
     let mut values = Vec::<ast::Variable>::new();
     let mut operators = Vec::<ast::Operator>::new();
 
-    tokens.next(false, false);
+    tokens.next(false);
     let (start_pos, _) = tokens.position();
-    tokens.previous_no_ignore(false, false);
+    tokens.previous_no_ignore(false);
 
-    values.push(parse_variable(tokens, notes, check_for_comments)?);
+    values.push(parse_variable(tokens, notes)?);
     // all expressions begin with a variable
 
-    while let Some(t) = tokens.next(false, false) {
+    while let Some(t) = tokens.next(false) {
         // keep looking for operators and values
 
         if let Some(o) = parse_operator(&t) {
@@ -1277,16 +1221,16 @@ fn parse_expr(
             };
 
             operators.push(op);
-            values.push(parse_variable(tokens, notes, check_for_comments)?);
+            values.push(parse_variable(tokens, notes)?);
         } else {
             break;
         }
     }
 
-    tokens.previous_no_ignore(false, true);
+    tokens.previous_no_ignore(false);
     let express = fix_precedence(ast::Expression { values, operators }); //pemdas and stuff
 
-    match tokens.next(true, false) {
+    match tokens.next(true) {
         Some(Token::If) => {
             // oooh ternaries
 
@@ -1319,11 +1263,11 @@ fn parse_expr(
                 }
             }
 
-            let conditional = parse_expr(tokens, notes, false, false)?;
+            let conditional = parse_expr(tokens, notes, false)?;
 
-            let do_else = match tokens.next(false, false) {
+            let do_else = match tokens.next(false) {
                 // every ternary needs an else
-                Some(Token::Else) => parse_expr(tokens, notes, false, false),
+                Some(Token::Else) => parse_expr(tokens, notes, false),
                 _ => {
                     return Err(SyntaxError::ExpectedErr {
                         expected: "else".to_string(),
@@ -1356,7 +1300,7 @@ fn parse_expr(
                 value: ternval_literal,
                 path: vec![],
                 pos: (start_pos, end_pos),
-                comment: (None, None),
+                //comment: (None, None),
                 tag: ast::Tag::new(),
             });
 
@@ -1366,7 +1310,7 @@ fn parse_expr(
             })
         }
         _ => {
-            tokens.previous_no_ignore(false, false);
+            tokens.previous_no_ignore(false);
             Ok(express)
         }
     }
@@ -1415,15 +1359,15 @@ fn parse_dict(
     let mut defs = Vec::<ast::DictDef>::new();
 
     loop {
-        match tokens.next(false, false) {
+        match tokens.next(false) {
             Some(Token::Symbol) | Some(Token::Type) => {
                 let symbol = tokens.slice();
 
                 is_valid_symbol(&symbol, tokens, notes)?;
 
-                match tokens.next(false, false) {
+                match tokens.next(false) {
                     Some(Token::Colon) => {
-                        let expr = parse_expr(tokens, notes, true, true)?;
+                        let expr = parse_expr(tokens, notes, true)?;
                         defs.push(ast::DictDef::Def((symbol, expr)));
                     }
                     Some(Token::Comma) => {
@@ -1463,7 +1407,7 @@ fn parse_dict(
             }
 
             Some(Token::DotDot) => {
-                let expr = parse_expr(tokens, notes, true, true)?;
+                let expr = parse_expr(tokens, notes, true)?;
                 defs.push(ast::DictDef::Extract(expr))
             }
 
@@ -1476,7 +1420,7 @@ fn parse_dict(
                 a
             ),
         };
-        let next = tokens.next(false, false);
+        let next = tokens.next(false);
 
         if next == Some(Token::ClosingCurlyBracket) {
             break;
@@ -1500,27 +1444,27 @@ fn parse_object(
 ) -> Result<Vec<(ast::Expression, ast::Expression)>, SyntaxError> {
     let mut defs = Vec::<(ast::Expression, ast::Expression)>::new();
 
-    match tokens.next(false, false) {
+    match tokens.next(false) {
         Some(Token::OpenCurlyBracket) => (),
         a => expected!("'{'".to_string(), tokens, notes, a),
     }
 
     loop {
-        if tokens.next(false, false) == Some(Token::ClosingCurlyBracket) {
+        if tokens.next(false) == Some(Token::ClosingCurlyBracket) {
             break;
         } else {
             tokens.previous();
         }
-        let key = parse_expr(tokens, notes, true, true)?;
-        match tokens.next(false, false) {
+        let key = parse_expr(tokens, notes, true)?;
+        match tokens.next(false) {
             Some(Token::Colon) => (),
             a => expected!("':'".to_string(), tokens, notes, a),
         }
-        let val = parse_expr(tokens, notes, true, true)?;
+        let val = parse_expr(tokens, notes, true)?;
 
         defs.push((key, val));
 
-        let next = tokens.next(false, false);
+        let next = tokens.next(false);
 
         if next == Some(Token::ClosingCurlyBracket) {
             break;
@@ -1545,11 +1489,11 @@ fn parse_args(
     let mut args = Vec::<ast::Argument>::new();
 
     loop {
-        if tokens.next(false, false) == Some(Token::ClosingBracket) {
+        if tokens.next(false) == Some(Token::ClosingBracket) {
             break;
         };
 
-        args.push(match tokens.next(false, false) {
+        args.push(match tokens.next(false) {
             Some(Token::Assign) => {
                 // println!("assign ");
                 match tokens.previous() {
@@ -1566,8 +1510,8 @@ fn parse_args(
                     None => unreachable!(),
                 };
                 let symbol = Some(tokens.slice());
-                tokens.next(false, false);
-                let value = parse_expr(tokens, notes, true, true)?;
+                tokens.next(false);
+                let value = parse_expr(tokens, notes, true)?;
                 //tokens.previous();
 
                 ast::Argument { symbol, value }
@@ -1578,7 +1522,7 @@ fn parse_args(
                 tokens.previous();
                 // println!("arg with no val");
 
-                let value = parse_expr(tokens, notes, true, true)?;
+                let value = parse_expr(tokens, notes, true)?;
 
                 ast::Argument {
                     symbol: None,
@@ -1594,7 +1538,7 @@ fn parse_args(
             }
         });
 
-        match tokens.next(false, false) {
+        match tokens.next(false) {
             Some(Token::Comma) => (),
             Some(Token::ClosingBracket) => {
                 break;
@@ -1631,10 +1575,10 @@ fn parse_arg_def(
 
     loop {
         let properties = check_for_tag(tokens, notes)?;
-        if tokens.next(false, false) == Some(Token::ClosingBracket) {
+        if tokens.next(false) == Some(Token::ClosingBracket) {
             break;
         };
-        args.push(match tokens.next(false, false) {
+        args.push(match tokens.next(false) {
             Some(Token::Assign) => {
                 if tokens.previous() == Some(Token::SelfVal) {
                     return Err(SyntaxError::SyntaxError {
@@ -1644,8 +1588,8 @@ fn parse_arg_def(
                     });
                 }
                 let symbol = tokens.slice();
-                tokens.next(false, false);
-                let value = Some(parse_expr(tokens, notes, true, true)?);
+                tokens.next(false);
+                let value = Some(parse_expr(tokens, notes, true)?);
                 //tokens.previous();
 
                 (symbol, value, properties, None)
@@ -1660,13 +1604,13 @@ fn parse_arg_def(
                     });
                 }
                 let symbol = tokens.slice();
-                tokens.next(false, false);
-                let type_value = Some(parse_expr(tokens, notes, false, true)?);
+                tokens.next(false);
+                let type_value = Some(parse_expr(tokens, notes, false)?);
                 //tokens.previous();
 
-                match tokens.next(false, false) {
+                match tokens.next(false) {
                     Some(Token::Assign) => {
-                        let value = Some(parse_expr(tokens, notes, true, true)?);
+                        let value = Some(parse_expr(tokens, notes, true)?);
 
                         //tokens.previous();
 
@@ -1707,7 +1651,7 @@ fn parse_arg_def(
             }
         });
 
-        match tokens.next(false, false) {
+        match tokens.next(false) {
             Some(Token::Comma) => (),
             Some(Token::ClosingBracket) => break,
 
@@ -1735,12 +1679,12 @@ fn parse_arg_def(
 }
 
 fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag, SyntaxError> {
-    let first = tokens.next(false, false);
+    let first = tokens.next(false);
 
     match first {
         Some(Token::Hash) => {
             //parse tag
-            match tokens.next(false, false) {
+            match tokens.next(false) {
                 Some(Token::OpenSquareBracket) => (),
                 a => expected!("'['".to_string(), tokens, notes, a),
             };
@@ -1748,11 +1692,11 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
             let mut contents = ast::Tag::new();
 
             loop {
-                match tokens.next(false, false) {
+                match tokens.next(false) {
                     Some(Token::ClosingSquareBracket) => break,
                     Some(Token::Symbol) => {
                         let name = tokens.slice();
-                        let args = match tokens.next(false, false) {
+                        let args = match tokens.next(false) {
                             Some(Token::OpenBracket) => parse_args(tokens, notes)?,
                             Some(Token::Comma) => Vec::new(),
                             Some(Token::ClosingSquareBracket) => {
@@ -1775,7 +1719,7 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
             Ok(contents)
         }
         _ => {
-            tokens.previous_no_ignore(false, true);
+            tokens.previous_no_ignore(false);
             Ok(ast::Tag::new())
         }
     }
@@ -1820,52 +1764,52 @@ pub fn str_content(
 fn parse_variable(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
-    check_for_comments: bool,
+    //check_for_comments: bool,
 ) -> Result<ast::Variable, SyntaxError> {
     // for the vars and stuff that isnt operators
-    let preceding_comment = if check_for_comments {
-        check_for_comment(tokens)
-    } else {
-        None
-    };
+    // let preceding_comment = if check_for_comments {
+    //     check_for_comment(tokens)
+    // } else {
+    //     None
+    // };
 
     let properties = check_for_tag(tokens, notes)?;
 
-    let mut first_token = tokens.next(false, false);
+    let mut first_token = tokens.next(false);
     let (start_pos, _) = tokens.position();
 
     let operator = match first_token {
         // does it start with an op? (e.g -3, let i)
         Some(Token::Minus) => {
-            first_token = tokens.next(false, false);
+            first_token = tokens.next(false);
             Some(ast::UnaryOperator::Minus)
         }
         Some(Token::Exclamation) => {
-            if tokens.next(true, true) == Some(Token::OpenCurlyBracket) {
-                tokens.previous_no_ignore(true, true);
+            if tokens.next(true) == Some(Token::OpenCurlyBracket) {
+                tokens.previous_no_ignore(true);
                 None
             } else {
-                tokens.previous_no_ignore(true, true);
-                first_token = tokens.next(false, false);
+                tokens.previous_no_ignore(true);
+                first_token = tokens.next(false);
                 Some(ast::UnaryOperator::Not)
             }
         }
 
         Some(Token::DotDot) => {
-            first_token = tokens.next(false, false);
+            first_token = tokens.next(false);
             Some(ast::UnaryOperator::Range)
         }
 
         Some(Token::Let) => {
-            first_token = tokens.next(false, false);
+            first_token = tokens.next(false);
             Some(ast::UnaryOperator::Let)
         }
         Some(Token::Increment) => {
-            first_token = tokens.next(false, false);
+            first_token = tokens.next(false);
             Some(ast::UnaryOperator::Increment)
         }
         Some(Token::Decrement) => {
-            first_token = tokens.next(false, false);
+            first_token = tokens.next(false);
             Some(ast::UnaryOperator::Decrement)
         }
         _ => None,
@@ -1929,7 +1873,7 @@ fn parse_variable(
         Some(Token::Symbol) => {
             let symbol = tokens.slice();
 
-            match tokens.next(false, false) {
+            match tokens.next(false) {
                 Some(Token::ThickArrow) => {
                     // Woo macro shorthand
                     let arg = if symbol != "_" {
@@ -1940,12 +1884,12 @@ fn parse_variable(
                     };
 
                     let start = tokens.position().0;
-                    let expr = parse_expr(tokens, notes, true, true)?;
+                    let expr = parse_expr(tokens, notes, true)?;
                     let end = tokens.position().1;
                     let macro_body = vec![ast::Statement {
                         body: ast::StatementBody::Return(Some(expr)),
                         arrow: false,
-                        comment: (None, None),
+                        //comment: (None, None),
                         pos: (start, end),
                     }];
 
@@ -1959,7 +1903,7 @@ fn parse_variable(
                 }
                 _ => {
                     is_valid_symbol(&symbol, tokens, notes)?;
-                    tokens.previous_no_ignore(false, false);
+                    tokens.previous_no_ignore(false);
                     ast::ValueBody::Symbol(symbol)
                 }
             }
@@ -1969,14 +1913,14 @@ fn parse_variable(
             //Array
             let mut arr = Vec::new();
 
-            if tokens.next(false, false) != Some(Token::ClosingSquareBracket) {
+            if tokens.next(false) != Some(Token::ClosingSquareBracket) {
                 tokens.previous();
                 loop {
-                    arr.push(parse_expr(tokens, notes, true, true)?);
-                    match tokens.next(false, false) {
+                    arr.push(parse_expr(tokens, notes, true)?);
+                    match tokens.next(false) {
                         Some(Token::Comma) => {
                             //accounting for trailing comma
-                            if let Some(Token::ClosingSquareBracket) = tokens.next(false, false) {
+                            if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
                                 break;
                             } else {
                                 tokens.previous();
@@ -1992,11 +1936,11 @@ fn parse_variable(
         }
 
         Some(Token::Import) => {
-            let mut first = tokens.next(false, false);
+            let mut first = tokens.next(false);
             let mut forced = false;
             if first == Some(Token::Exclamation) {
                 forced = true;
-                first = tokens.next(false, false);
+                first = tokens.next(false);
             }
             match first {
                 Some(Token::StringLiteral) => ast::ValueBody::Import(
@@ -2011,7 +1955,7 @@ fn parse_variable(
         }
 
         Some(Token::At) => {
-            let type_name = match tokens.next(false, false) {
+            let type_name = match tokens.next(false) {
                 Some(Token::Symbol) => tokens.slice(),
                 a => expected!("type name".to_string(), tokens, notes, a),
             };
@@ -2020,9 +1964,9 @@ fn parse_variable(
         }
 
         Some(Token::Switch) => {
-            let value = parse_expr(tokens, notes, true, true)?; // what are we switching?
+            let value = parse_expr(tokens, notes, true)?; // what are we switching?
 
-            let cases = match tokens.next(false, false) {
+            let cases = match tokens.next(false) {
                 Some(Token::OpenCurlyBracket) => parse_cases(tokens, notes)?, // check for {
                 a => expected!("'{'".to_string(), tokens, notes, a),
             };
@@ -2036,16 +1980,16 @@ fn parse_variable(
              -> Result<ast::ValueBody, SyntaxError> {
                 let args = parse_arg_def(tokens, notes)?;
 
-                let body = match tokens.next(false, false) {
+                let body = match tokens.next(false) {
                     Some(Token::OpenCurlyBracket) => parse_cmp_stmt(tokens, notes)?,
                     Some(Token::ThickArrow) => {
                         let start = tokens.position().0;
-                        let expr = parse_expr(tokens, notes, true, true)?;
+                        let expr = parse_expr(tokens, notes, true)?;
                         let end = tokens.position().1;
                         vec![ast::Statement {
                             body: ast::StatementBody::Return(Some(expr)),
                             arrow: false,
-                            comment: (None, None),
+                            //comment: (None, None),
                             pos: (start, end),
                         }]
                     }
@@ -2061,11 +2005,11 @@ fn parse_variable(
 
             let mut test_tokens = tokens.clone();
 
-            match parse_expr(&mut test_tokens, notes, true, true) {
+            match parse_expr(&mut test_tokens, notes, true) {
                 Ok(expr) => {
                     //macro def
-                    match test_tokens.next(false, false) {
-                        Some(Token::ClosingBracket) => match test_tokens.next(false, false) {
+                    match test_tokens.next(false) {
+                        Some(Token::ClosingBracket) => match test_tokens.next(false) {
                             Some(Token::OpenCurlyBracket) => parse_macro_def(tokens, notes)?,
                             Some(Token::ThickArrow) => parse_macro_def(tokens, notes)?,
                             _ => {
@@ -2136,7 +2080,7 @@ fn parse_variable(
         }
         Some(Token::Exclamation) => {
             //next token is a curly bracket, checked earlier
-            tokens.next(false, false);
+            tokens.next(false);
             ast::ValueBody::CmpStmt(ast::CompoundStatement {
                 statements: parse_cmp_stmt(tokens, notes)?,
             })
@@ -2158,10 +2102,10 @@ fn parse_variable(
     let mut path = Vec::<ast::Path>::new();
 
     loop {
-        match tokens.next(true, false) {
+        match tokens.next(true) {
             Some(Token::OpenSquareBracket) => {
-                let index = parse_expr(tokens, notes, true, true)?;
-                match tokens.next(false, false) {
+                let index = parse_expr(tokens, notes, true)?;
+                match tokens.next(false) {
                     Some(Token::ClosingSquareBracket) => path.push(ast::Path::Index(index)),
                     a => {
                         return Err(SyntaxError::ExpectedErr {
@@ -2181,14 +2125,14 @@ fn parse_variable(
                 }
             }
             Some(Token::OpenBracket) => path.push(ast::Path::Call(parse_args(tokens, notes)?)),
-            Some(Token::Period) => match tokens.next(false, false) {
+            Some(Token::Period) => match tokens.next(false) {
                 Some(Token::Symbol) | Some(Token::Type) => {
                     path.push(ast::Path::Member(tokens.slice()))
                 }
                 a => expected!("member name".to_string(), tokens, notes, a),
             },
 
-            Some(Token::DoubleColon) => match tokens.next(false, false) {
+            Some(Token::DoubleColon) => match tokens.next(false) {
                 Some(Token::Symbol) | Some(Token::Type) => {
                     path.push(ast::Path::Associated(tokens.slice()))
                 }
@@ -2218,15 +2162,15 @@ fn parse_variable(
             _ => break,
         }
     }
-    tokens.previous_no_ignore(false, true);
+    tokens.previous_no_ignore(false);
 
     let (_, end_pos) = tokens.position();
 
-    let comment_after = if check_for_comments {
-        check_for_comment(tokens)
-    } else {
-        None
-    };
+    // let comment_after = if check_for_comments {
+    //     check_for_comment(tokens)
+    // } else {
+    //     None
+    // };
 
     /*if tokens.stack.len() - tokens.index > 0 {
         println!("current token after val post comment: {}: ", tokens.slice());
@@ -2236,7 +2180,7 @@ fn parse_variable(
         operator,
         value: ast::ValueLiteral { body: value },
         pos: (start_pos, end_pos),
-        comment: (preceding_comment, comment_after),
+        //comment: (preceding_comment, comment_after),
         path,
         tag: properties,
     })
