@@ -21,9 +21,16 @@ pub type Implementations = HashMap<TypeID, HashMap<String, (StoredValue, bool)>>
 pub type StoredValue = usize; //index to stored value in globals.stored_values
 
 pub struct ValStorage {
-    pub map: HashMap<usize, (Value, Group, bool, u16)>, //val, fn context, mutable, lifetime
+    pub map: HashMap<usize, StoredValData>, //val, fn context, mutable, lifetime
 }
 
+#[derive(Debug, Clone)]
+pub struct StoredValData {
+    pub val: Value,
+    pub fn_context: Group,
+    pub mutable: bool,
+    pub lifetime: u16,
+}
 /*
 LIFETIME:
 
@@ -41,13 +48,13 @@ impl std::ops::Index<usize> for ValStorage {
             .map
             .get(&i)
             .unwrap_or_else(|| panic!("index {} not found", i))
-            .0
+            .val
     }
 }
 
 impl std::ops::IndexMut<usize> for ValStorage {
     fn index_mut(&mut self, i: usize) -> &mut Self::Output {
-        &mut self.map.get_mut(&i).unwrap().0
+        &mut self.map.get_mut(&i).unwrap().val
     }
 }
 
@@ -56,8 +63,8 @@ impl ValStorage {
     pub fn new() -> Self {
         ValStorage {
             map: vec![
-                (BUILTIN_STORAGE, (Value::Builtins, Group::new(0), false, 1)),
-                (NULL_STORAGE, (Value::Null, Group::new(0), false, 1)),
+                (BUILTIN_STORAGE, StoredValData {val:Value::Builtins, fn_context:Group::new(0), mutable:false, lifetime:1,}),
+                (NULL_STORAGE, StoredValData {val:Value::Null, fn_context:Group::new(0), mutable:false, lifetime:1,}),
             ]
             .iter()
             .cloned()
@@ -69,7 +76,7 @@ impl ValStorage {
         &mut self, index: usize, mutable: bool,
     ) {
         if !mutable || !matches!(self[index], Value::Macro(_)) {
-            (*self.map.get_mut(&index).unwrap()).2 = mutable;
+            (*self.map.get_mut(&index).unwrap()).mutable = mutable;
         }
        
         
@@ -90,26 +97,26 @@ impl ValStorage {
     }
 
     pub fn get_lifetime(&self, index: usize) -> u16 {
-        self.map.get(&index).unwrap().3
+        self.map.get(&index).unwrap().lifetime
     }
 
 
     pub fn increment_lifetimes(&mut self) {
         for (_, val) in self.map.iter_mut() {
-            (*val).3 += 1;
+            (*val).lifetime += 1;
         }
     }
 
     pub fn decrement_lifetimes(&mut self) {
         for (_, val) in self.map.iter_mut() {
-            (*val).3 -= 1;
+            (*val).lifetime -= 1;
         }
     }
 
     pub fn clean_up(&mut self) {
         let mut to_be_removed = Vec::new();
         for (index, val) in self.map.iter() {
-            if val.3 == 0 {
+            if val.lifetime == 0 {
                 to_be_removed.push(*index);
                 //println!("removing value: {:?}", val.0);
             }
@@ -127,7 +134,7 @@ impl ValStorage {
         } else {
             return
         }
-        let val = &mut (*self.map.get_mut(&index).expect(&(index.to_string() + " index not found"))).3;
+        let val = &mut (*self.map.get_mut(&index).expect(&(index.to_string() + " index not found"))).lifetime;
         
         if *val < 10000 - amount {
             *val += amount;
@@ -176,7 +183,7 @@ pub fn store_value(
     (*globals)
         .stored_values
         .map
-        .insert(index, (val, context.start_group, mutable, lifetime));
+        .insert(index, StoredValData{val, fn_context: context.start_group, mutable, lifetime, });
     (*globals).val_id += 1;
     index
 }
@@ -184,7 +191,7 @@ pub fn clone_and_get_value(
     index: usize,
     lifetime: u16,
     globals: &mut Globals,
-    context: &Context,
+    fn_context: Group,
     constant: bool,
 ) -> Value {
     let mut old_val = globals.stored_values[index].clone();
@@ -193,7 +200,7 @@ pub fn clone_and_get_value(
         Value::Array(arr) => {
             old_val = Value::Array(
                 arr.iter()
-                    .map(|x| clone_value(*x, lifetime, globals, context, constant))
+                    .map(|x| clone_value(*x, lifetime, globals, fn_context, constant))
                     .collect(),
             );
         }
@@ -204,7 +211,7 @@ pub fn clone_and_get_value(
                     .map(|(k, v)| {
                         (
                             k.clone(),
-                            clone_value(*v, lifetime, globals, context, constant),
+                            clone_value(*v, lifetime, globals, fn_context, constant),
                         )
                     })
                     .collect(),
@@ -214,11 +221,11 @@ pub fn clone_and_get_value(
         Value::Macro(m) => {
             for arg in &mut m.args {
                 if let Some(def_val) = &mut arg.1 {
-                    (*def_val) = clone_value(*def_val, lifetime, globals, context, constant);
+                    (*def_val) = clone_value(*def_val, lifetime, globals, fn_context, constant);
                 }
 
                 if let Some(def_val) = &mut arg.3 {
-                    (*def_val) = clone_value(*def_val, lifetime, globals, context, constant);
+                    (*def_val) = clone_value(*def_val, lifetime, globals, fn_context, constant);
                 }
             }
 
@@ -237,20 +244,27 @@ pub fn clone_value(
     index: usize,
     lifetime: u16,
     globals: &mut Globals,
-    context: &Context,
+    fn_context: Group,
     constant: bool,
 ) -> StoredValue {
-    let old_val = clone_and_get_value(index, lifetime, globals, context, constant);
+    let old_val = clone_and_get_value(index, lifetime, globals, fn_context, constant);
 
     //clone all inner values
     //do the thing
     //bing bang
     //profit
-    if constant {
-        store_const_value(old_val, lifetime, globals, context)
-    } else {
-        store_value(old_val, lifetime, globals, context)
-    }
+    let new_index = globals.val_id;
+    
+    (*globals)
+        .stored_values
+        .map
+        .insert(new_index, StoredValData{
+            val:old_val, 
+            fn_context, 
+            mutable:!constant, lifetime, 
+            });
+    (*globals).val_id += 1;
+    new_index
 }
 
 pub fn store_const_value(
@@ -265,7 +279,7 @@ pub fn store_const_value(
     (*globals)
         .stored_values
         .map
-        .insert(index, (val, context.start_group, false, lifetime));
+        .insert(index, StoredValData{val, fn_context:context.start_group, mutable:false, lifetime,});
     (*globals).val_id += 1;
     index
 }
@@ -283,7 +297,7 @@ pub fn store_val_m(
     (*globals)
         .stored_values
         .map
-        .insert(index, (val, context.start_group, constant, lifetime));
+        .insert(index, StoredValData{val, fn_context:context.start_group, mutable:!constant, lifetime, });
     (*globals).val_id += 1;
     index
 }
@@ -375,7 +389,60 @@ impl Context {
         out
     }
 
+    // pub fn reset_mut_values(&mut self, globals: &mut Globals) {
+       
+        
+    //     for (key, val) in self.variables.clone() {
+
+    //         println!("{}: {:?}", key, globals.stored_values[val]);
+
+    //         let new = clone_value(val, globals.get_lifetime(val), globals, globals.get_fn_context(val), !globals.is_mutable(val));
+    //         (*self.variables.get_mut(&key).unwrap()) = new;
+        
+    //         reset_mut_value(new, globals);
+            
+            
+            
+    //     }
+    // }
+
 }
+
+// fn reset_mut_value(val: StoredValue, globals: &mut Globals) {
+    
+
+//     match globals.stored_values[val].clone() {
+//         Value::Array(a) => {
+//             for e in a {
+//                 reset_mut_value(e, globals);
+//             }
+//         }
+//         Value::Dict(a) => {
+//             for (_, e) in a {
+//                 reset_mut_value(e, globals);
+//             }
+//         }
+//         Value::Macro(m) => {
+//             for (_, e, _, e2) in m.args {
+//                 if let Some(val) = e {
+//                     reset_mut_value(val, globals);
+//                 }
+//                 if let Some(val) = e2 {
+//                     reset_mut_value(val, globals);
+//                 }
+//             }
+
+//             for (_, v) in m.def_context.variables.iter() {
+//                 reset_mut_value(*v, globals);
+//             }
+//         }
+//         _ => (),
+//     };
+    
+//     if globals.context_change_allowed(val) {
+//         globals.stored_values[val] = Value::Null;
+//     }
+// }
 // pub fn compare_contexts(context1: Context, context2: Context, globals: &mut Globals) -> bool {
 //     // returns true if the contexts are equal/mergable
 
@@ -943,12 +1010,18 @@ impl Value {
                 out += "{";
                 let mut d_iter = d.iter();
                 for (key, val) in &mut d_iter {
-                    count += 1;
+                    
 
                     if count > MAX_DICT_EL_DISPLAY {
-                        out += &format!("... ({} more)  ", d_iter.count());
+                        let left = d_iter.count();
+                        if left > 0 {
+                            out += &format!("... ({} more)  ", left);
+    
+                        }
                         break;
+                        
                     }
+                    count += 1;
                     let stored_val = (*globals).stored_values[*val as usize].to_str(globals);
                     out += &format!("{}: {},", key, stored_val);
                 }
@@ -1089,7 +1162,7 @@ impl Globals {
         info: CompilerInfo,
     ) -> Result<Group, RuntimeError> {
         match self.stored_values.map.get(&p) {
-            Some(val) => Ok(val.1),
+            Some(val) => Ok(val.fn_context),
             None => Err(RuntimeError::RuntimeError {
                 message: "Pointer points to no data!".to_string(),
                 info,
@@ -1098,10 +1171,30 @@ impl Globals {
     }
     pub fn is_mutable(&self, p: StoredValue) -> bool {
         match self.stored_values.map.get(&p) {
-            Some(val) => val.2,
+            Some(val) => val.mutable,
             None => unreachable!(),
         }
     }
+
+    pub fn can_mutate(&self, p: StoredValue) -> bool {
+        self.is_mutable(p)
+    }
+
+    pub fn get_fn_context(&self, p: StoredValue) -> Group {
+        match self.stored_values.map.get(&p) {
+            Some(val) => val.fn_context,
+            None => unreachable!(),
+        }
+    }
+
+    pub fn get_lifetime(&self, p: StoredValue) -> u16 {
+        match self.stored_values.map.get(&p) {
+            Some(val) => val.lifetime,
+            None => unreachable!(),
+        }
+    }
+
+    
 
     pub fn get_type_str(&self, p: StoredValue) -> String {
         let val = &self.stored_values[p];
@@ -1244,7 +1337,7 @@ fn handle_operator(
                         *m,
                         //copies argument so the original value can't be mutated
                         //prevents side effects and shit
-                        vec![ast::Argument::from(store_value(val2, 1, globals, &context))],
+                        vec![ast::Argument::from(clone_value(value2, 1, globals, context.start_group, false))],
                     ),
                     context,
                     globals,
@@ -1593,7 +1686,7 @@ pub fn execute_macro(
 
                         new_variables.insert(
                             m.args[def_index].0.clone(),
-                            clone_value(arg_values[i], 1, globals, &context, true),
+                            clone_value(arg_values[i], 1, globals, context.start_group, true),
                         );
                         def_index += 1;
                     }
@@ -1619,7 +1712,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
                         Some(default) => {
                             new_variables.insert(
                                 arg.0.clone(),
-                                clone_value(*default, 1, globals, &context, true),
+                                clone_value(*default, 1, globals, context.start_group, true),
                             );
                         }
 
@@ -1679,7 +1772,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
             .iter()
             .map(|x| {
                 //set mutable to false
-                (*globals.stored_values.map.get_mut(&x.0).unwrap()).2 = false;
+                (*globals.stored_values.map.get_mut(&x.0).unwrap()).mutable = false;
                 (
                     x.0,
                     Context {
@@ -2309,7 +2402,7 @@ impl ast::Variable {
                             Some(_) => {
                                 expr_index += 1;
                                 Some(
-                                    clone_value(defaults.0[expr_index - 1], 1, globals, &defaults.1, true)
+                                    clone_value(defaults.0[expr_index - 1], 1, globals, defaults.1.start_group, true)
                                 )
                             }
                             None => None,
@@ -2582,7 +2675,7 @@ impl ast::Variable {
                                                             Value::Dict(map)
                                                         }
                                                     };
-                                                    let stored = store_const_value(out_val, globals.stored_values.map.get(&prev_v).unwrap().3, globals, &index.1);
+                                                    let stored = store_const_value(out_val, globals.stored_values.map.get(&prev_v).unwrap().lifetime, globals, &index.1);
                                                     new_out.push((stored, index.1, prev_v));
                                                     break;
                                                 }
@@ -2673,7 +2766,7 @@ impl ast::Variable {
 
                 ast::Path::Increment => {
                     for (prev_v,prev_c, _) in &mut with_parent {
-                        let is_mutable = globals.stored_values.map[&prev_v].2;
+                        let is_mutable = globals.stored_values.map[&prev_v].mutable;
                         match &mut globals.stored_values[*prev_v] {
                             Value::Number(n) => {
                                 *n += 1.0;
@@ -2691,7 +2784,7 @@ impl ast::Variable {
 
                 ast::Path::Decrement => {
                     for (prev_v,prev_c, _) in &mut with_parent {
-                        let is_mutable = globals.stored_values.map[&prev_v].2;
+                        let is_mutable = globals.stored_values.map[&prev_v].mutable;
                         match &mut globals.stored_values[*prev_v] {
                             Value::Number(n) => {
                                 *n -= 1.0;                          
@@ -2909,15 +3002,34 @@ impl ast::Variable {
             }
         }
 
+        // if self
+        //         .tag
+        //         .tags
+        //         .iter()
+        //         .any(|x| x.0 == "allow_context_change")
+        // {
+            
+        //     for (val, _) in &out {
+        //         (*globals
+        //             .stored_values
+        //             .map
+        //             .get_mut(val)
+        //             .expect("index not found"))
+        //             .allow_context_change = true;
+
+                
+        //     }
+        // }
+
         Ok((out, inner_returns))
     }
 
     //more like is_undefinable
-    pub fn is_defined(&self, context: &Context, globals: &mut Globals) -> bool {
+    pub fn is_undefinable(&self, context: &Context, globals: &mut Globals) -> bool {
         //use crate::fmt::SpwnFmt;
-        if self.operator == Some(ast::UnaryOperator::Let) {
-            return true
-        }
+        // if self.operator == Some(ast::UnaryOperator::Let) {
+        //     return true
+        // }
         
         // println!("hello? {}", self.fmt(0));
         let mut current_ptr = match &self.value.body {
@@ -2932,6 +3044,14 @@ impl ast::Variable {
             ast::ValueBody::TypeIndicator(t) => {
                 if let Some(typ) = globals.type_ids.get(t) {
                     store_const_value(Value::TypeIndicator(typ.0), 1, globals, context)
+                } else {
+                    return false;
+                }
+            }
+
+            ast::ValueBody::SelfVal => {
+                if let Some(ptr) = context.variables.get("self") {
+                    *ptr
                 } else {
                     return false;
                 }
@@ -2970,6 +3090,28 @@ impl ast::Variable {
                         return true;
                     }
                 },
+                ast::Path::Index(i) => {
+                    if i.values.len() == 1 {
+                        if let ast::ValueBody::Str(s) = &i.values[0].value.body {
+                            match &globals.stored_values[current_ptr] {
+                                Value::Dict(d)  => {
+                                    if let Some(_) = d.get(s) {
+                                        return true
+                                    } else {
+                                        return false
+                                    }
+                                    
+                                }
+                                _ => return true,
+                            }
+                        } else {
+                            return true
+                        }
+                    } else {
+                        return true
+                    }
+                    
+                }
                 _ => return true,
             }
         }
@@ -3022,6 +3164,17 @@ impl ast::Variable {
                 }
             }
 
+            ast::ValueBody::SelfVal => {
+                if let Some(ptr) = context.variables.get("self") {
+                    *ptr
+                } else {
+                    return Err(RuntimeError::RuntimeError {
+                        message: format!("Cannot use 'self' outside macros"),
+                        info: info.clone(),
+                    });
+                }
+            }
+
             a => {
                 return Err(RuntimeError::RuntimeError {
                     message: format!("Expected symbol or type-indicator, found {}", a.fmt(0)),
@@ -3030,7 +3183,10 @@ impl ast::Variable {
             }
         };
 
+        
+
         for p in &self.path {
+            (*globals.stored_values.map.get_mut(&value).unwrap()).lifetime = globals.get_lifetime(current_ptr);
             if !defined {
                 return Err(RuntimeError::RuntimeError {
                     message: format!("Cannot run {} on an undefined value", p.fmt(0)),
@@ -3045,13 +3201,13 @@ impl ast::Variable {
                         Some(s) => current_ptr = s,
                         None => {
                             let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
-                            if !stored.2 {
+                            if !stored.mutable {
                                 return Err(RuntimeError::RuntimeError {
                                     message: "Cannot edit members of a constant value".to_string(),
                                     info: info.clone(),
                                 });
                             }
-                            if let Value::Dict(d) = &mut stored.0 {
+                            if let Value::Dict(d) = &mut stored.val {
                                 (*d).insert(m.clone(), value);
                                 defined = false;
                                 current_ptr = value;
@@ -3079,13 +3235,13 @@ impl ast::Variable {
                                     Some(_) => current_ptr = first_context_eval,
                                     None => {
                                         let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
-                                        if !stored.2 {
+                                        if !stored.mutable {
                                             return Err(RuntimeError::RuntimeError {
                                                 message: "Cannot edit members of a constant value".to_string(),
                                                 info: info.clone(),
                                             });
                                         }
-                                        if let Value::Dict(d) = &mut stored.0 {
+                                        if let Value::Dict(d) = &mut stored.val {
                                             (*d).insert(st.to_string(), value);
                                             defined = false;
                                             current_ptr = value;
@@ -3148,6 +3304,7 @@ impl ast::Variable {
                 }
             }
         }
+        
         if defined {
             Err(RuntimeError::RuntimeError {
                 message: format!("{} is already defined!", self.fmt(0)),
@@ -3178,6 +3335,7 @@ impl ast::CompoundStatement {
         };
 
         new_context.start_group = start_group;
+        
         let new_info = info;
         let (contexts, inner_returns) =
             compile_scope(&self.statements, smallvec![new_context], globals, new_info)?;

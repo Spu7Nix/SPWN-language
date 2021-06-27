@@ -1357,6 +1357,7 @@ fn parse_expr(
                 path: vec![],
                 pos: (start_pos, end_pos),
                 comment: (None, None),
+                tag: ast::Tag::new(),
             });
 
             Ok(ast::Expression {
@@ -1953,7 +1954,7 @@ fn parse_variable(
                         body: ast::CompoundStatement {
                             statements: macro_body,
                         },
-                        properties,
+                        properties: properties.clone(),
                     })
                 }
                 _ => {
@@ -2054,7 +2055,7 @@ fn parse_variable(
                 Ok(ast::ValueBody::Macro(ast::Macro {
                     args,
                     body: ast::CompoundStatement { statements: body },
-                    properties,
+                    properties: properties.clone(),
                 }))
             };
 
@@ -2237,5 +2238,6 @@ fn parse_variable(
         pos: (start_pos, end_pos),
         comment: (preceding_comment, comment_after),
         path,
+        tag: properties,
     })
 }

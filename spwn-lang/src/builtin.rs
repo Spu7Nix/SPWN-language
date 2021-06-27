@@ -561,7 +561,7 @@ pub fn built_in_function(
                 "Expected two arguments, the first one being an array and the other being the value to append.".to_string()
             );
 
-            if !globals.is_mutable(arguments[0]) {
+            if !globals.can_mutate(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This array is not mutable"),
                     info,
@@ -578,9 +578,9 @@ pub fn built_in_function(
 
             let cloned = clone_value(
                 arguments[1],
-                globals.stored_values.map.get(&arguments[0]).unwrap().3,
+                globals.get_lifetime(arguments[0]),
                 globals,
-                context,
+                context.start_group,
                 !globals.is_mutable(arguments[1]),
             );
 
@@ -634,7 +634,7 @@ pub fn built_in_function(
 
         "edit_obj" => {
             arg_length!(info, 3, arguments, "Expected three arguments".to_string());
-            if !globals.is_mutable(arguments[0]) {
+            if !globals.can_mutate(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: "Cannot modify an immutable value".to_string(),
                     info,
@@ -844,7 +844,7 @@ pub fn built_in_function(
 
         "mutability" => {
             arg_length!(info, 1, arguments, "Expected one argument".to_string());
-            Value::Bool(globals.is_mutable(arguments[0]))
+            Value::Bool(globals.can_mutate(arguments[0]))
         }
 
         "extend_trigger_func" => {
@@ -928,7 +928,7 @@ pub fn built_in_function(
                 "Expected one arguments, the array or string to pop from".to_string()
             );
 
-            if !globals.is_mutable(arguments[0]) {
+            if !globals.can_mutate(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This value is not mutable"),
                     info,
@@ -1028,7 +1028,7 @@ pub fn built_in_function(
                 "Expected two arguments, the array or string to remove from and the index of the element to be removed".to_string()
             );
 
-            if !globals.is_mutable(arguments[0]) {
+            if !globals.can_mutate(arguments[0]) {
                 return Err(RuntimeError::BuiltinError {
                     message: String::from("This value is not mutable"),
                     info,
@@ -1093,8 +1093,8 @@ pub fn built_in_function(
             let acum_val_fn_context = globals.get_val_fn_context(acum_val, info.clone())?;
             let val_fn_context = globals.get_val_fn_context(val, info.clone())?;
 
-            let mutable = globals.is_mutable(acum_val);
-            let val_mutable = globals.is_mutable(val);
+            let mutable = globals.can_mutate(acum_val);
+            let val_mutable = globals.can_mutate(val);
 
             let val_b = globals.stored_values[val].clone();
             let val_a = &mut globals.stored_values[acum_val];
@@ -1324,14 +1324,14 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                     }
 
                     if globals.stored_values[acum_val] == Value::Null
-                        && globals.stored_values.map.get(&acum_val).unwrap().2
+                        && globals.stored_values.map.get(&acum_val).unwrap().mutable
                     {
                         //println!("hi");
                         globals.stored_values[acum_val] = clone_and_get_value(
                             val,
                             globals.stored_values.get_lifetime(acum_val),
                             globals,
-                            c2,
+                            c2.start_group,
                             false,
                         );
                         globals.stored_values.set_mutability(acum_val, true);
@@ -1342,7 +1342,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             val,
                             globals.stored_values.get_lifetime(acum_val),
                             globals,
-                            c2,
+                            c2.start_group,
                             false,
                         );
                         globals.stored_values[acum_val].clone()
@@ -1556,7 +1556,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                                 info,
                             })
                         }
-                    };
+                    }
                     Value::Null
                 }
                 "_multiply_" => {

@@ -323,7 +323,9 @@ pub fn compile_scope(
                 for context in &contexts {
                     let is_assign = !expr.operators.is_empty()
                         && expr.operators[0] == ast::Operator::Assign
-                        && !expr.values[0].is_defined(&context, globals);
+                        && !expr.values[0].is_undefinable(&context, globals);
+
+                    //println!("{:?}, {}", expr, is_assign);
 
                     if is_assign {
                         let mut new_expr = expr.clone();
@@ -370,12 +372,25 @@ pub fn compile_scope(
                                 new_contexts.push(after_context);
                             }
                             _ => {
-                                let (mut evaled, inner_returns) =
+                                let (evaled, inner_returns) =
                                     new_expr.eval(context, globals, info.clone(), !mutable)?;
 
-                                for (val, _) in &mut evaled {
-                                    *val = clone_value(*val, 1, globals, context, !mutable);
-                                }
+                                // if mutable
+                                //     && symbol
+                                //         .tag
+                                //         .tags
+                                //         .iter()
+                                //         .any(|x| x.0 == "allow_context_change")
+                                // {
+                                //     for (val, _) in &evaled {
+                                //         globals
+                                //             .stored_values
+                                //             .map
+                                //             .get_mut(val)
+                                //             .expect("index not found")
+                                //             .allow_context_change = true;
+                                //     }
+                                // }
 
                                 returns.extend(inner_returns);
                                 for (e, c2) in evaled {
@@ -383,7 +398,15 @@ pub fn compile_scope(
                                     let storage =
                                         symbol.define(&mut new_context, globals, &info)?;
                                     //clone the value so as to not share the reference
-                                    let cloned = clone_value(e, 1, globals, &new_context, !mutable);
+
+                                    let cloned = clone_value(
+                                        e,
+                                        globals.get_lifetime(storage),
+                                        globals,
+                                        new_context.start_group,
+                                        !mutable,
+                                    );
+
                                     globals.stored_values[storage] =
                                         globals.stored_values[cloned].clone();
                                     new_contexts.push(new_context);
@@ -419,7 +442,10 @@ pub fn compile_scope(
                             context.variables.extend(
                                 d.iter()
                                     .map(|(k, v)| {
-                                        (k.clone(), clone_value(*v, 1, globals, &context, false))
+                                        (
+                                            k.clone(),
+                                            clone_value(*v, 1, globals, context.start_group, false),
+                                        )
                                     })
                                     .collect::<HashMap<String, StoredValue>>(),
                             );
@@ -1267,7 +1293,7 @@ pub fn import_module(
     };
 
     if out.len() == 1 && &out[0].1 == context {
-        let cloned = clone_and_get_value(out[0].0, 9999, globals, context, true);
+        let cloned = clone_and_get_value(out[0].0, 9999, globals, context.start_group, true);
         let s_impl = globals.implementations.clone();
 
         globals.prev_imports.insert(path.clone(), (cloned, s_impl));
