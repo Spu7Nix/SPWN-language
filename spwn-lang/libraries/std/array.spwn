@@ -162,4 +162,33 @@ impl @array {
         self = res
         return value
     }
+
+    _plus_: (self, arr: @array) {
+        return self.add(arr)
+    }
+
+    add: #[desc("Allows you to do arithmetic on two arrays")]
+    (self, arra: @array) {
+        let size1 = self.length;
+        let size2 = arra.length;
+        let out = [];
+
+        if self.all(elem => elem.type != @number) || arra.all(elem => elem.type != @number) {
+            throw "Unsupported type while adding arrays " + self as @string + " and " + arra as @string
+        }
+
+        if size1 >= size2 {
+            for i in 0..size1 {
+                if i > size2 { break }
+                out.push(self[i] + arra[i]);
+            }
+            return out;
+        } else {
+            for i in 0..size1 {
+                if i > size1 { break }
+                out.push(self[i] + arra[i]);
+            }
+            return out;
+        }
+    }
 }
