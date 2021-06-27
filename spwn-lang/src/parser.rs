@@ -261,6 +261,12 @@ pub enum Token {
     #[token("@")]
     At,
 
+    #[token("static")]
+    Static,
+
+    #[token("alloc")]
+    Alloc,
+
     #[token("#")]
     Hash,
 
@@ -275,6 +281,7 @@ pub enum Token {
 
     #[token("for")]
     For,
+
 
     #[token("in")]
     In,
@@ -362,7 +369,8 @@ impl Token {
             }
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case => {
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch 
+            | Case | Static | Alloc => {
                 "keyword"
             }
             //Comment | MultiCommentStart | MultiCommentEnd => "comment",
@@ -616,7 +624,6 @@ pub fn parse_spwn(
             None => break,
         }
     }
-
     Ok((statements, notes))
 }
 
@@ -733,6 +740,62 @@ pub fn parse_statement(
 
         Some(Token::Break) => ast::StatementBody::Break, // its just break
         Some(Token::Continue) => ast::StatementBody::Continue,
+
+        Some(Token::Alloc) => {
+            let new_var = match tokens.next(false) {
+                Some(Token::Symbol) => tokens.slice(),
+                a => {
+                    expected!("identifier".to_string(), tokens, notes, a)
+                }
+            };
+
+
+            match tokens.next(false) {
+                Some(Token::LessThan) => (),
+                a => {
+                    expected!("'<'".to_string(), tokens, notes, a)
+                }
+            }
+
+            let allocator = match tokens.next(false) {
+                Some(Token::Symbol) => tokens.slice(),
+                a => {
+                    expected!("identifier".to_string(), tokens, notes, a)
+                }
+            };
+
+            match tokens.next(false) {
+                Some(Token::MoreThan) => (),
+                a => {
+                    expected!("'>'".to_string(), tokens, notes, a)
+                }
+            }
+
+            let name_literal = ast::ValueLiteral { 
+                body: ast::ValueBody::Symbol(new_var)
+            };
+            let alloc_literal = ast::ValueLiteral { 
+                body: ast::ValueBody::Symbol(allocator)
+            };
+
+            let alloc = ast::Allocation {
+                symbol: ast::Variable {
+                    operator: None,
+                    value: name_literal,
+                    pos: ((0, 0), (0, 0)),
+                    path: Vec::new(),
+                    tag: ast::Tag::new()
+                },
+                allocator: ast::Variable {
+                    operator: None,
+                    value: alloc_literal,
+                    pos: ((0, 0), (0, 0)),
+                    path: Vec::new(),
+                    tag: ast::Tag::new()
+                }
+            };
+            ast::StatementBody::Alloc(alloc)
+        }
 
         Some(Token::If) => {
             //parse if statement
@@ -1804,6 +1867,12 @@ fn parse_variable(
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Let)
         }
+
+        Some(Token::Static) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::Static)
+        }
+
         Some(Token::Increment) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Increment)

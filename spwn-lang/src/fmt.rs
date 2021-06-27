@@ -231,6 +231,7 @@ impl SpwnFmt for StatementBody {
             StatementBody::Extract(x) => format!("extract {}", x.fmt(ind)),
             StatementBody::Break => String::from("break"),
             StatementBody::Continue => String::from("continue"),
+            StatementBody::Alloc(x) => String::from("nobody even uses this who cares")
         }
     }
 }
@@ -450,6 +451,7 @@ impl SpwnFmt for UnaryOperator {
             UnaryOperator::Let => "let ",
             UnaryOperator::Decrement => "--",
             UnaryOperator::Increment => "++",
+            UnaryOperator::Static => "static "
         }
         .to_string()
     }

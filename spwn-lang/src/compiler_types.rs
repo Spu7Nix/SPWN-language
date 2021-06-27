@@ -2977,7 +2977,7 @@ impl ast::Variable {
                         }
                     }
 
-                    UnaryOperator::Let => (),
+                    UnaryOperator::Let | UnaryOperator::Static => (),
 
                     UnaryOperator::Range => {
                         if let Value::Number(n) = globals.stored_values[final_value.0] {

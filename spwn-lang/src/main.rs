@@ -163,6 +163,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         None
                     };
 
+                    eprint_with_color(&format!("{}\n", "i dont care about compiling yet"), Color::White);
+                    std::process::exit(ERROR_EXIT_CODE); //LOG
+
                     let mut compiled = match compiler::compile_spwn(
                         statements,
                         script_path,

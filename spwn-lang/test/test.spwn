@@ -1,0 +1,4 @@
+static a = 4
+
+
+alloc a<counter>;

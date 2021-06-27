@@ -28,6 +28,7 @@ pub enum StatementBody {
 
     TypeDef(String),
 
+    Alloc(Allocation),
     Return(Option<Expression>),
     Impl(Implementation),
     If(If),
@@ -142,6 +143,7 @@ pub enum UnaryOperator {
     Minus,
     Range,
     Let,
+    Static,
     Increment,
     Decrement,
 }
@@ -348,6 +350,12 @@ pub struct CompoundStatement {
 pub struct Implementation {
     pub symbol: Variable,
     pub members: Vec<DictDef>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Allocation {
+    pub symbol: Variable,
+    pub allocator: Variable
 }
 
 #[derive(Clone, PartialEq, Debug)]

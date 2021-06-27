@@ -167,6 +167,7 @@ pub fn compile_spwn(
     included_paths: Vec<PathBuf>,
     notes: ParseNotes,
 ) -> Result<Globals, RuntimeError> {
+
     //variables that get changed throughout the compiling
     let mut globals = Globals::new(path.clone());
     if statements.is_empty() {
@@ -318,6 +319,10 @@ pub fn compile_scope(
         //println!("{}:{}:{}", info.current_file.to_string_lossy(), info.pos.0.0, info.pos.0.1);
         //use crate::fmt::SpwnFmt;
         match &statement.body {
+            
+            Alloc(_) => {
+                // i do not care lmao
+            }
             Expr(expr) => {
                 let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> = SmallVec::new();
                 for context in &contexts {
