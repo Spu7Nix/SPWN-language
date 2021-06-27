@@ -107,43 +107,43 @@ impl SpwnFmt for DictDef {
     }
 }
 
-fn trim_start_tabs(string: &str) -> (&str, Indent) {
-    //https://doc.rust-lang.org/src/core/str/mod.rs.html#4082-4090
-    let mut ind = 0;
-    for (i, c) in string.chars().enumerate() {
-        match c {
-            '\t' => ind += 4,
-            ' ' => ind += 1,
-            _ => return (unsafe { string.get_unchecked(i..string.len()) }, ind),
-        }
-    }
-    ("", ind)
-}
+// fn trim_start_tabs(string: &str) -> (&str, Indent) {
+//     //https://doc.rust-lang.org/src/core/str/mod.rs.html#4082-4090
+//     let mut ind = 0;
+//     for (i, c) in string.chars().enumerate() {
+//         match c {
+//             '\t' => ind += 4,
+//             ' ' => ind += 1,
+//             _ => return (unsafe { string.get_unchecked(i..string.len()) }, ind),
+//         }
+//     }
+//     ("", ind)
+// }
 
-fn indent_comment(comment: &str, ind: Indent) -> String {
-    let mut in_comment = false;
-    let mut current_off = 0;
-    let mut out = String::new();
-    for line in comment.lines() {
-        let (trimmed, ind_offset) = trim_start_tabs(line);
-        if !in_comment {
-            if trimmed.starts_with("//") {
-                out += &format!("{}{}\r\n", tabs(ind), trimmed);
-            } else if trimmed.starts_with("/*") {
-                in_comment = true;
-                current_off = ind_offset;
-                out += &format!("{}{}\r\n", tabs(ind), trimmed);
-            }
-        } else {
-            out += &format!("{}{}\r\n", tabs(ind_offset - current_off), trimmed);
-        }
+// fn indent_comment(comment: &str, ind: Indent) -> String {
+//     let mut in_comment = false;
+//     let mut current_off = 0;
+//     let mut out = String::new();
+//     for line in comment.lines() {
+//         let (trimmed, ind_offset) = trim_start_tabs(line);
+//         if !in_comment {
+//             if trimmed.starts_with("//") {
+//                 out += &format!("{}{}\r\n", tabs(ind), trimmed);
+//             } else if trimmed.starts_with("/*") {
+//                 in_comment = true;
+//                 current_off = ind_offset;
+//                 out += &format!("{}{}\r\n", tabs(ind), trimmed);
+//             }
+//         } else {
+//             out += &format!("{}{}\r\n", tabs(ind_offset - current_off), trimmed);
+//         }
 
-        if line.trim_end().ends_with("*/") {
-            in_comment = false
-        }
-    }
-    out
-}
+//         if line.trim_end().ends_with("*/") {
+//             in_comment = false
+//         }
+//     }
+//     out
+// }
 
 /*#[cfg(test)]
 mod tests {
@@ -185,30 +185,30 @@ mod tests {
 impl SpwnFmt for Statement {
     fn fmt(&self, ind: Indent) -> String {
         let mut out = String::new();
-        if let Some(comment) = &self.comment.0 {
-            //out += "[stmt pre]";
+        // if let Some(comment) = &self.comment.0 {
+        //     //out += "[stmt pre]";
 
-            out += &indent_comment(comment, ind);
-            //
-            if !comment.ends_with('\n') {
-                out += "\n";
-            }
-            out += &tabs(ind);
-        }
+        //     out += &indent_comment(comment, ind);
+        //     //
+        //     if !comment.ends_with('\n') {
+        //         out += "\n";
+        //     }
+        //     out += &tabs(ind);
+        // }
         out += &if self.arrow {
             format!("-> {}\n", self.body.fmt(ind))
         } else {
             format!("{}\n", self.body.fmt(ind))
         };
-        if let Some(comment) = &self.comment.1 {
-            if !comment.starts_with('\n') {
-                out += "\n";
-            }
+        // if let Some(comment) = &self.comment.1 {
+        //     if !comment.starts_with('\n') {
+        //         out += "\n";
+        //     }
 
-            //out += &tabs(ind);
-            //out += "[stmt post]";
-            out += &indent_comment(comment, ind);
-        }
+        //     //out += &tabs(ind);
+        //     //out += "[stmt post]";
+        //     out += &indent_comment(comment, ind);
+        // }
         out
     }
 }
@@ -267,7 +267,12 @@ impl SpwnFmt for ValueBody {
             TypeIndicator(x) => format!("@{}", x),
             Null => "null".to_string(),
             SelfVal => "self".to_string(),
-            Ternary(t) => format!("{} if {} else {}", t.do_if.fmt(ind), t.conditional.fmt(ind), t.do_else.fmt(ind)),
+            Ternary(t) => format!(
+                "{} if {} else {}",
+                t.do_if.fmt(ind),
+                t.conditional.fmt(ind),
+                t.do_else.fmt(ind)
+            ),
             Switch(_, _) => "switch".to_string(),
         }
     }
@@ -340,14 +345,14 @@ impl SpwnFmt for Variable {
     fn fmt(&self, ind: Indent) -> String {
         let mut out = String::new();
 
-        if let Some(comment) = &self.comment.0 {
-            //out += "[var pre]";
-            out += &indent_comment(comment, ind);
+        // if let Some(comment) = &self.comment.0 {
+        //     //out += "[var pre]";
+        //     out += &indent_comment(comment, ind);
 
-            if comment.ends_with('\n') {
-                out += &tabs(ind);
-            }
-        }
+        //     if comment.ends_with('\n') {
+        //         out += &tabs(ind);
+        //     }
+        // }
 
         if let Some(op) = &self.operator {
             out += &op.fmt(ind);
@@ -359,15 +364,15 @@ impl SpwnFmt for Variable {
             out += &p.fmt(ind).to_string();
         }
 
-        if let Some(comment) = &self.comment.1 {
-            //out += "[var post]";
+        // if let Some(comment) = &self.comment.1 {
+        //     //out += "[var post]";
 
-            out += &indent_comment(comment, ind);
+        //     out += &indent_comment(comment, ind);
 
-            /*if comment.ends_with("\n") {
-                out += &tabs(ind);
-            }*/
-        }
+        //     /*if comment.ends_with("\n") {
+        //         out += &tabs(ind);
+        //     }*/
+        // }
 
         out
     }

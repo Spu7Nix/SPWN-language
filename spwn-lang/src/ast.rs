@@ -17,7 +17,7 @@ pub struct Statement {
     pub body: StatementBody,
     pub arrow: bool, /*context changing */
     pub pos: FileRange,
-    pub comment: Comment,
+    //pub comment: Comment,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -82,8 +82,9 @@ impl ValueBody {
             value: ValueLiteral { body: self.clone() },
             operator: None,
             pos: ((0, 0), (0, 0)),
-            comment: (None, None),
+            //comment: (None, None),
             path: Vec::new(),
+            tag: Tag::new(),
         }
     }
 }
@@ -223,7 +224,8 @@ impl Argument {
                     path: Vec::new(),
                     operator: None,
                     pos: ((0, 0), (0, 0)),
-                    comment: (None, None),
+                    //comment: (None, None),
+                    tag: Tag::new(),
                 }],
                 operators: Vec::new(),
             },
@@ -293,7 +295,8 @@ pub struct Variable {
     pub value: ValueLiteral,
     pub path: Vec<Path>,
     pub pos: FileRange,
-    pub comment: Comment,
+    //pub comment: Comment,
+    pub tag: Tag,
 }
 
 impl Variable {
@@ -320,7 +323,7 @@ pub struct Expression {
 pub struct Ternary {
     pub conditional: Expression,
     pub do_if: Expression,
-    pub do_else: Expression
+    pub do_else: Expression,
 }
 
 impl Expression {
@@ -330,7 +333,8 @@ impl Expression {
             value: ValueLiteral::new(ValueBody::Expression(self.clone())),
             pos: ((0, 0), (0, 0)),
             path: Vec::new(),
-            comment: (None, None),
+            //comment: (None, None),
+            tag: Tag::new(),
         }
     }
 }
