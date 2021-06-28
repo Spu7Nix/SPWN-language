@@ -285,6 +285,7 @@ pub const BUILTIN_LIST: &[&str] = &[
     "time",
     "get_input",
     "spwn_version",
+    "regex",
     //operators
     "_or_",
     "_and_",
@@ -1069,6 +1070,77 @@ pub fn built_in_function(
                         info,
                     })
                 }
+            }
+        }
+
+        "regex" => {
+            use regex::Regex;
+
+            arg_length!(
+                info,
+                4,
+                arguments,
+                "Expected four arguments, a string for regex, a string to process, type of regex operation to perform, string for \"replace\" mode (?)"
+                    .to_string()
+            );
+
+            if let Value::Str(s) = &globals.stored_values[arguments[0]] {
+                if let Ok(r) = Regex::new(s) {
+                    if let Value::Str(s) = &globals.stored_values[arguments[1]] {
+                        if let Value::Str(mode) = &globals.stored_values[arguments[2]] {
+                            match &**mode {
+                                "match" => return Ok(Value::Bool(r.is_match(s))),
+                                "replace" => {
+                                    match &globals.stored_values[arguments[3]] {
+                                        Value::Str(replacer) => {
+                                            return Ok(Value::Str(r.replace_all(s, replacer).to_string()))
+                                        }
+                                        _ => {
+                                            return Err(
+                                                RuntimeError::BuiltinError {
+                                                    message: format!("Invalid or missing replacer. Expected @string, found @{}", &globals.get_type_str(arguments[3])),
+                                                    info
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(RuntimeError::BuiltinError {
+                                        message: format!(
+                                            "Invaid regex mode \"{}\" in regex {}. Expected \"match\" or \"replace\"",
+                                            mode, r
+                                        ),
+                                        info,
+                                    })
+                                }
+                            }
+                        } else {
+                            return Err(RuntimeError::TypeError {
+                                expected: "String".into(),
+                                found: globals.get_type_str(arguments[2]),
+                                info,
+                            });
+                        }
+                    } else {
+                        return Err(RuntimeError::TypeError {
+                            expected: "String".into(),
+                            found: globals.get_type_str(arguments[1]),
+                            info,
+                        });
+                    }
+                } else {
+                    return Err(RuntimeError::BuiltinError {
+                        message: "Failed to build regex (invalid syntax)".to_string(),
+                        info,
+                    });
+                }
+            } else {
+                return Err(RuntimeError::TypeError {
+                    expected: "String".into(),
+                    found: globals.get_type_str(arguments[0]),
+                    info,
+                });
             }
         }
 
