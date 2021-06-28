@@ -2,6 +2,16 @@
 
 # **@dictionary**: 
  
+## **clear**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Clears the dictionary._
+>
+>  
+>
+
 ## **get**:
 
 > **Value:** `(self, key: @string, value = @dict_not_found::{}) { /* code omitted */ }` (`@macro`) 

@@ -3,7 +3,9 @@ extract import "constants.spwn"
 type @obj_set
 
 impl @obj_set {
-    new: #[desc("Create a new object set")]
+    new: #[example("
+    @obj_set::new([]);
+    ")]
     (
         objects: @array, 
         #[desc("The group to use for rotation (?)")] group: @group = ?g
