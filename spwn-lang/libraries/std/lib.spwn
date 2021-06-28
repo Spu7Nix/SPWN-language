@@ -13,6 +13,7 @@ import "dictionary.spwn"
 import "string.spwn"
 import "counter.spwn"
 import "fileio.spwn"
+import "regex.spwn"
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"
@@ -32,6 +33,7 @@ ctrl_flow = import "control_flow.spwn"
     obj_props: constants.obj_props,
     open: @file::new,
     obj_set: @obj_set::new,
+    regex: @regex::new
 }
 
 
