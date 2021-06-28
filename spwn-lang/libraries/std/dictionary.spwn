@@ -4,6 +4,16 @@ import "array.spwn"
 type @dict_not_found;
 
 impl @dictionary {
+	is_empty: #[desc("Returns true if there are no entries in the dictionary, false otherwise.")]
+	(self) {
+		// no way to get number of entries currently afaik
+		// so this 'loop' will get skipped over if empty,
+		// or otherwise early exit on the first entry if not
+		for kv in self {
+			return false;
+		}
+		return true;
+	},
 	keys: #[desc("Gets the dictionary's keys.")]
 	(self) {
 		let ret = []

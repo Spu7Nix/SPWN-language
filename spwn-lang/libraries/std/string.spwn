@@ -1,5 +1,9 @@
 #[no_std]
 impl @string {
+	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise")]
+	(self) {
+		return self.length == 0;
+	},
 	substr: #[desc("Gets a substring beginning at the specified start and ending at the specified end.")]
 	(self, start: @number, end: @number) {
 		return $.substr(self, start, end);
@@ -13,7 +17,7 @@ impl @string {
 		}
 		return out.substr(0, out.length-self.length);	
 	},
-	split: #[desc("Splits the string by teh specified seperator.")]
+	split: #[desc("Splits the string by the specified seperator.")]
 	(self, spstr: @string) {
 		if spstr.length == 0 {
 			return self as @array;

@@ -22,16 +22,20 @@
 >  
 >
 
+## **is\_empty**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Returns true if this set contains no objects, false otherwise._
+>
+>  
+>
+
 ## **new**:
 
 > **Value:** `(objects: @array, group: @group = ?g) { /* code omitted */ }` (`@macro`) 
 >
->### Example: 
->```spwn
-> 
->    @obj_set::new([]);
->    
->```
 >## Arguments:
 >
 >| # | name | type | default value | description |

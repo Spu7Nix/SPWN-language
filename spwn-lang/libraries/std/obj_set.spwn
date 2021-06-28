@@ -20,6 +20,10 @@ impl @obj_set {
             group: group,
         }
     },
+    is_empty: #[desc("Returns true if this set contains no objects, false otherwise.")]
+    (self) {
+        return self.objects.is_empty();
+    },
     // ! The append builtin is broken at the moment, mutability is not preserved 
     push: #[desc("Add new objects to the set")]
     (self, object: @object) {
