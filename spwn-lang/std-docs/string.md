@@ -47,6 +47,16 @@
 >  
 >
 
+## **is\_empty**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Returns true if the string has a length of 0, false otherwise_
+>
+>  
+>
+
 ## **join**:
 
 > **Value:** `(self, list: @array) { /* code omitted */ }` (`@macro`) 
@@ -77,7 +87,7 @@
 > **Value:** `(self, spstr: @string) { /* code omitted */ }` (`@macro`) 
 >
 >## Description: 
-> _Splits the string by teh specified seperator._
+> _Splits the string by the specified seperator._
 >## Arguments:
 >
 >| # | name | type | default value | description |

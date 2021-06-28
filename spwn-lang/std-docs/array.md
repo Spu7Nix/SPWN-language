@@ -102,6 +102,16 @@
 >  
 >
 
+## **is\_empty**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Returns true if the array has a length of 0, false otherwise._
+>
+>  
+>
+
 ## **map**:
 
 > **Value:** `(self, cb: @macro) { /* code omitted */ }` (`@macro`) 

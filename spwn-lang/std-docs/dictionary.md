@@ -28,6 +28,16 @@
 >  
 >
 
+## **is\_empty**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Returns true if there are no entries in the dictionary, false otherwise._
+>
+>  
+>
+
 ## **items**:
 
 > **Value:** `(self) { /* code omitted */ }` (`@macro`) 

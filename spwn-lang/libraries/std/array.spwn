@@ -1,5 +1,9 @@
 #[no_std]
 impl @array {
+    is_empty: #[desc("Returns true if the array has a length of 0, false otherwise.")]
+    (self) {
+        return self.length == 0;
+    },
     max: #[desc("Gets the highest number in the array.")]
     (self, minval = -999999999999) {
         let highest = minval
