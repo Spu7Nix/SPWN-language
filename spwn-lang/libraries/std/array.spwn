@@ -162,12 +162,12 @@ impl @array {
         self = res
         return value
     },
-    flat_map: #[desc("Works the same way as map but flattens any sub-arrays into one big array")]
+    flat_map: #[desc("Works the same way as map but flattens any sub-arrays into one big array.")]
     (self, cb: @macro) {
         let output = [];
         for iter in self {
             if iter.type == @array {
-                iter.map(elem => output.push(cb(elem)))
+                output += iter.map(elem => cb(elem))
             } else {
                 output.push(cb(iter));
             }
