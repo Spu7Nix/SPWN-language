@@ -185,6 +185,10 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
         doc += &format!("## Description: \n _{}_\n", s)
     };
 
+    if let Some(example) = mac.tag.get_example() {
+        doc += &format!("### Example: \n```spwn\n {}\n```\n", example)
+    }
+
     if !(mac.args.is_empty() || (mac.args.len() == 1 && mac.args[0].0 == "self")) {
         doc += "## Arguments:\n";
         doc += "
