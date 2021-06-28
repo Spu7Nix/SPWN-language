@@ -8,6 +8,7 @@ import "item.spwn"
 import "block.spwn"
 import "array.spwn"
 import "object.spwn"
+import "obj_set.spwn"
 import "dictionary.spwn"
 import "string.spwn"
 import "counter.spwn"
@@ -30,6 +31,7 @@ ctrl_flow = import "control_flow.spwn"
     on: @event::on,
     obj_props: constants.obj_props,
     open: @file::new,
+    obj_set: @obj_set::new,
 }
 
 
