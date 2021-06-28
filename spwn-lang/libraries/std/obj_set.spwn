@@ -26,7 +26,9 @@ impl @obj_set {
     },
     add: #[desc("Add all the objects in the set to the game")]
     (self) {
-        self.objects.map(o => o.add());
+        for object in self.objects {
+            object.add()
+        }
     },
     copy: #[desc("Create a copy of all the objects in this set as a new set")]
     (self) {
