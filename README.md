@@ -20,7 +20,7 @@ The documentation for the SPWN language is located [here](https://spu7nix.net/sp
  - Note: *If you get a message telling you that you cant open files from unidentified developers, control click the .pkg file and click open*
 
 ###### Linux
-*Coming soon.*
+ - Linux is not currently supported natively. Please compile from source, or use Wine to use SPWN. Join the discord if you have more questions.
 
 ###### Compiling from source
 1. Download source code from this repository.
@@ -28,6 +28,33 @@ The documentation for the SPWN language is located [here](https://spu7nix.net/sp
 3. Open `spwn-lang` folder in the terminal.
 4. Run `cargo build`.
 5. Compiled binary is placed in `target/debug`.
+
+## Using SPWN - Setup
+
+Alright, enough talk, how do we actually use spwn?
+
+SPWN code can be programmed in any code editor, but the ones that have had SPWN extensions or plugins written for them are [Visual Studio Code](https://code.visualstudio.com/), and [Vim](https://www.vim.org/).
+
+###### VSCode
+Navigate to [VSCode SPWN language support](https://marketplace.visualstudio.com/items?itemName=Spu7Nix.spwn-language-support) and hit install. In VSCode, hit enable and then create a new file with the extension .spwn
+- Note: Make sure to have the file in the same directory as the libraries folder
+VSCode should automatically change the language syntax to SPWN, but if it dosent, navigate to the bottom right of the screen and click on `select language mode`, then select SPWN.
+
+###### Vim
+Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-viml) and follow to instructions on that page.
+
+###### Other Editors
+For any other editor with syntax highlighting, most C type syntax higliting scheme work fine
+
+###### Using SPWN - How to run SPWN Code
+Head to the [docs](https://spu7nix.net/spwn/#/) to create a simple program, such as the one below
+```
+test = 5g
+-> test.move(5,100,0.25)
+test.move(10,-10,2)
+```
+
+Save the file, then open a command line and type in `spwn build YOURFILENAME.spwn`. Make sure to have GD closed during this process. After running this command, reopen GD, and the levels content will be modified. Head over to the docs to learn how to program in SPWN.
 
 
 
