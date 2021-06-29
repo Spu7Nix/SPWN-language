@@ -373,14 +373,14 @@ impl Token {
 }
 
 pub struct ParseNotes {
-    pub tag: ast::Tag,
+    pub tag: ast::Attribute,
     pub file: PathBuf,
 }
 
 impl ParseNotes {
     pub fn new(path: PathBuf) -> Self {
         ParseNotes {
-            tag: ast::Tag::new(),
+            tag: ast::Attribute::new(),
             file: path,
         }
     }
@@ -1301,7 +1301,7 @@ fn parse_expr(
                 path: vec![],
                 pos: (start_pos, end_pos),
                 //comment: (None, None),
-                tag: ast::Tag::new(),
+                tag: ast::Attribute::new(),
             });
 
             Ok(ast::Expression {
@@ -1678,7 +1678,7 @@ fn parse_arg_def(
     Ok(args)
 }
 
-fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag, SyntaxError> {
+fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Attribute, SyntaxError> {
     let first = tokens.next(false);
 
     match first {
@@ -1689,7 +1689,7 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
                 a => expected!("'['".to_string(), tokens, notes, a),
             };
 
-            let mut contents = ast::Tag::new();
+            let mut contents = ast::Attribute::new();
 
             loop {
                 match tokens.next(false) {
@@ -1720,7 +1720,7 @@ fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Tag
         }
         _ => {
             tokens.previous_no_ignore(false);
-            Ok(ast::Tag::new())
+            Ok(ast::Attribute::new())
         }
     }
 }

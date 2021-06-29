@@ -540,11 +540,11 @@ pub fn merge_contexts(contexts: &mut SmallVec<[Context; CONTEXT_MAX]>, globals: 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
     //             name         default val      tag          pattern
-    pub args: Vec<(String, Option<StoredValue>, ast::Tag, Option<StoredValue>)>,
+    pub args: Vec<(String, Option<StoredValue>, ast::Attribute, Option<StoredValue>)>,
     pub def_context: Context,
     pub def_file: PathBuf,
     pub body: Vec<ast::Statement>,
-    pub tag: ast::Tag,
+    pub tag: ast::Attribute,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct TriggerFunction {
@@ -2393,7 +2393,7 @@ impl ast::Variable {
                     all_combinations(all_expr, &context, globals, new_info, constant)?;
                 inner_returns.extend(returns);
                 for defaults in argument_possibilities {
-                    let mut args: Vec<(String, Option<StoredValue>, ast::Tag, Option<StoredValue>)> =
+                    let mut args: Vec<(String, Option<StoredValue>, ast::Attribute, Option<StoredValue>)> =
                         Vec::new();
                     let mut expr_index = 0;
                     

@@ -558,7 +558,7 @@ impl SpwnFmt for (String, Vec<Argument>) {
     }
 }
 
-impl SpwnFmt for Tag {
+impl SpwnFmt for Attribute {
     fn fmt(&self, ind: Indent) -> String {
         if self.tags.is_empty() {
             return String::new();

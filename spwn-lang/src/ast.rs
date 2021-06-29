@@ -84,7 +84,7 @@ impl ValueBody {
             pos: ((0, 0), (0, 0)),
             //comment: (None, None),
             path: Vec::new(),
-            tag: Tag::new(),
+            tag: Attribute::new(),
         }
     }
 }
@@ -155,13 +155,13 @@ pub enum IDClass {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Tag {
+pub struct Attribute {
     pub tags: Vec<(String, Vec<Argument>)>,
 }
 
-impl Tag {
+impl Attribute {
     pub fn new() -> Self {
-        Tag { tags: Vec::new() }
+        Attribute { tags: Vec::new() }
     }
     pub fn get(&self, t: &str) -> Option<Vec<Argument>> {
         for (key, args) in &self.tags {
@@ -186,6 +186,21 @@ impl Tag {
             }
 
             None => None,
+        }
+    }
+
+    pub fn get_example(&self) -> Option<String> {
+        if let Some(args) =  self.get("example") {
+            if args.is_empty() {
+                None
+            } else {
+                match &args[0].value.values[0].value.body {
+                    ValueBody::Str(s) => Some(s.clone()),
+                    val => Some(val.fmt(0))
+                }
+            }
+        } else {
+            None
         }
     }
 }
@@ -225,7 +240,7 @@ impl Argument {
                     operator: None,
                     pos: ((0, 0), (0, 0)),
                     //comment: (None, None),
-                    tag: Tag::new(),
+                    tag: Attribute::new(),
                 }],
                 operators: Vec::new(),
             },
@@ -251,12 +266,12 @@ pub struct Native {
     pub args: Vec<Argument>,
 }*/
 //                 name         def value     props       type ind.
-pub type ArgDef = (String, Option<Expression>, Tag, Option<Expression>);
+pub type ArgDef = (String, Option<Expression>, Attribute, Option<Expression>);
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
     pub args: Vec<ArgDef>,
     pub body: CompoundStatement,
-    pub properties: Tag,
+    pub properties: Attribute,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -296,7 +311,7 @@ pub struct Variable {
     pub path: Vec<Path>,
     pub pos: FileRange,
     //pub comment: Comment,
-    pub tag: Tag,
+    pub tag: Attribute,
 }
 
 impl Variable {
@@ -334,7 +349,7 @@ impl Expression {
             pos: ((0, 0), (0, 0)),
             path: Vec::new(),
             //comment: (None, None),
-            tag: Tag::new(),
+            tag: Attribute::new(),
         }
     }
 }

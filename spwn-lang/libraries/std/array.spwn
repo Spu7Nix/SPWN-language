@@ -1,5 +1,9 @@
 #[no_std]
 impl @array {
+    is_empty: #[desc("Returns true if the array has a length of 0, false otherwise.")]
+    (self) {
+        return self.length == 0;
+    },
     max: #[desc("Gets the highest number in the array.")]
     (self, minval = -999999999999) {
         let highest = minval
@@ -161,5 +165,17 @@ impl @array {
         res += self
         self = res
         return value
-    }
+    },
+    flat_map: #[desc("Works the same way as map but flattens any sub-arrays into one big array.")]
+    (self, cb: @macro) {
+        let output = [];
+        for iter in self {
+            if iter.type == @array {
+                output += iter.map(elem => cb(elem))
+            } else {
+                output.push(cb(iter));
+            }
+        }
+        return output;
+    },
 }

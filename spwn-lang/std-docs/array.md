@@ -72,6 +72,21 @@
 >  
 >
 
+## **flat\_map**:
+
+> **Value:** `(self, cb: @macro) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Works the same way as map but flattens any sub-arrays into one big array._
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`cb`** | @macro | | |
+>  
+>  
+>
+
 ## **index**:
 
 > **Value:** `(self, el) { /* code omitted */ }` (`@macro`) 
@@ -84,6 +99,16 @@
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`el`** |any | | |
 >  
+>  
+>
+
+## **is\_empty**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Returns true if the array has a length of 0, false otherwise._
+>
 >  
 >
 
