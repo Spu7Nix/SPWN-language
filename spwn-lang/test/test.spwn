@@ -1,2 +1,1 @@
-$.print('TESTs'.lowercase())
-$.print('testS'.uppercase())
+$.print('aaaa'.contains(''))
