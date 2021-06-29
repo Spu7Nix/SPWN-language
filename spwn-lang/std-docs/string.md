@@ -62,6 +62,16 @@
 >  
 >
 
+## **reverse**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Reverses the string._
+>
+>  
+>
+
 ## **split**:
 
 > **Value:** `(self, spstr: @string) { /* code omitted */ }` (`@macro`) 

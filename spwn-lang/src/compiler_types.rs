@@ -943,7 +943,7 @@ pub fn convert_type(
             return Err(RuntimeError::RuntimeError {
                 message: format!(
                     "'{}' can't be converted to '{}'!",
-                    find_key_for_value(&globals.type_ids, typ).unwrap(), find_key_for_value(&globals.type_ids, val.to_num(globals)).unwrap()
+                     find_key_for_value(&globals.type_ids, val.to_num(globals)).unwrap(), find_key_for_value(&globals.type_ids, typ).unwrap(),
                 ),
                 info: info.clone(),
             })

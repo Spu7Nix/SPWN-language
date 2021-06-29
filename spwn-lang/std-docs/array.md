@@ -197,6 +197,16 @@
 >  
 >
 
+## **shift**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Removes the first index from the array and returns it._
+>
+>  
+>
+
 ## **sort**:
 
 > **Value:** `(self) { /* code omitted */ }` (`@macro`) 
@@ -214,5 +224,20 @@
 >## Description: 
 > _Gets the sum of the value in the array._
 >
+>  
+>
+
+## **unshift**:
+
+> **Value:** `(self, value) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Pushes a value to the start of the array and returns it._
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`value`** |any | | |
+>  
 >  
 >
