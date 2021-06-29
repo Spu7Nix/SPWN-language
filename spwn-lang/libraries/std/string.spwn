@@ -40,8 +40,8 @@ impl @string {
 	},
 	index: #[desc("Gets the index of a string, if it doesn't exists returns null.")]
 	(self, substr: @string) {
-		if substr == '' { return true }
-		if substr.length > self.length { return false }
+		if substr == '' { return null }
+		if substr.length > self.length { return null }
 		r = self.length - substr.length + 1
 		for i in 0..r {
 			if $.substr(self, i, i + substr.length) == substr {
