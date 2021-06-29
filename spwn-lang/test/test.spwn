@@ -1,0 +1,2 @@
+$.print('TESTs'.lowercase())
+$.print('testS'.uppercase())
