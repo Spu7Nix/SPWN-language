@@ -46,7 +46,7 @@ Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-viml) and follow to ins
 ###### Other Editors
 For any other editor with syntax highlighting, most C type syntax higliting scheme work fine
 
-###### Using SPWN - How to run SPWN Code
+## Using SPWN - How to run SPWN Code
 Head to the [docs](https://spu7nix.net/spwn/#/) to create a simple program, such as the one below
 ```
 test = 5g
