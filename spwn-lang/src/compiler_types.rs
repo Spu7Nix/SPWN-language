@@ -2055,7 +2055,7 @@ impl ast::Variable {
 
             ast::ValueBody::Ternary(t) => {
                 
-                let (evaled, returns) = t.conditional.eval(&context, globals, info.clone(), constant)?;
+                let (evaled, returns) = t.condition.eval(&context, globals, info.clone(), constant)?;
                 // contexts of the conditional
 
                 inner_returns.extend(returns);
@@ -2063,7 +2063,7 @@ impl ast::Variable {
                 for (condition, context) in evaled { // through every condictional context
                     match &globals.stored_values[condition] {
                         Value::Bool(b) => {
-                            let answer = if *b {&t.do_if} else {&t.do_else};
+                            let answer = if *b {&t.if_expr} else {&t.else_expr};
 
                             let (evaled, returns) = answer.eval(&context, globals, info.clone(), constant)?;
                             inner_returns.extend(returns);
