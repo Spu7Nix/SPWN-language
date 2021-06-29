@@ -45,7 +45,6 @@ impl @string {
 	},
 	contains: #[desc("Checks if the string contains a string.")]
 	(self, substr: @string) {
-		if substr == '' { return true }
 		r = self.length - substr.length + 1
 		for i in 0..r {
 			if $.substr(self, i, i + substr.length) == substr {
@@ -69,5 +68,21 @@ impl @string {
 		dict = {a:'A',b:'B',c:'C',d:'D',e:'E',f:'F',g:'G',h:'H',i:'I',j:'J',k:'K',l:'L',m:'M',n:'N',o:'O',p:'P',q:'Q',r:'R',s:'S',t:'T',u:'U',v:'V',w:'W',x:'X',y:'Y',z:'Z'}
 
 		return ''.join(self.split('').map(el => dict.get(el, el)))
+	},
+	is_upper: #[desc("Checks if whole string is uppercase, ignores characters that is not in the alphabet.")]
+	(self) {
+		return self.split('').map((c) {
+			if 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.contains(c) {
+				return c
+			} else { return 'A' }
+		}).all(c => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.contains(c))
+	},
+	is_lower: #[desc("Checks if whole string is lowercase, ignores characters that is not in the alphabet.")]
+	(self) {
+		return self.split('').map((c) {
+			if 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.contains(c) {
+				return c
+			} else { return 'a' }
+		}).all(c => 'abcdefghijklmnopqrstuvwxyz'.contains(c))
 	}
 }

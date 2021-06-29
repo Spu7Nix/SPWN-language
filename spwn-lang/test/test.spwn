@@ -1,1 +1,2 @@
-$.print('aaaa'.contains(''))
+$.print('SJ.'.is_upper())
+$.print('ss.'.is_lower())
