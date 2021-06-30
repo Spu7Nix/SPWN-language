@@ -1,0 +1,1 @@
+$.print('sdsadsa'.split_every(3))
