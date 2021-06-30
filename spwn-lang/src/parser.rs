@@ -1241,15 +1241,20 @@ fn parse_expr(
             let mut tern_values = Vec::<ast::Variable>::new();
             let mut tern_operators = Vec::<ast::Operator>::new();
 
+            match old_values.pop() {
+                Some(v) => tern_values.push(v),
+                _ => {
+                    return Err(SyntaxError::SyntaxError {
+                        message: "expected expression before 'if'".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
+            };
+
             // iterate though the operators until we get one like =
             while !old_operators.is_empty() {
-                let ol = old_operators.len();
-                if operator_precedence(&old_operators[ol - 1]) == 0 {
-                    // any assign operators have a precedence of 0
-                    match old_values.pop() {
-                        Some(v) => tern_values.push(v),
-                        _ => unreachable!(), // pop should never return nothing
-                    }
+                if operator_precedence(&old_operators.last().unwrap()) == 0 {
                     break;
                 }
 
@@ -1283,17 +1288,19 @@ fn parse_expr(
             // SPWN syntax structures can get pretty messy with variables, valuebodies,
             // valueliterals, expressions, etc.
             let tern = ast::Ternary {
-                conditional,
-                do_if: ast::Expression {
+                condition: conditional,
+                if_expr: ast::Expression {
                     values: tern_values,
                     operators: tern_operators,
                 },
-                do_else,
+                else_expr: do_else,
             };
 
             let ternval_literal = ast::ValueLiteral {
                 body: ast::ValueBody::Ternary(tern),
             };
+
+            //println!("operators: {:?} values: {:?}", old_operators, old_values);
 
             old_values.push(ast::Variable {
                 operator: None,
@@ -1678,7 +1685,10 @@ fn parse_arg_def(
     Ok(args)
 }
 
-fn check_for_tag(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<ast::Attribute, SyntaxError> {
+fn check_for_tag(
+    tokens: &mut Tokens,
+    notes: &mut ParseNotes,
+) -> Result<ast::Attribute, SyntaxError> {
     let first = tokens.next(false);
 
     match first {

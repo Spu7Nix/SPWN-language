@@ -269,9 +269,9 @@ impl SpwnFmt for ValueBody {
             SelfVal => "self".to_string(),
             Ternary(t) => format!(
                 "{} if {} else {}",
-                t.do_if.fmt(ind),
-                t.conditional.fmt(ind),
-                t.do_else.fmt(ind)
+                t.if_expr.fmt(ind),
+                t.condition.fmt(ind),
+                t.else_expr.fmt(ind)
             ),
             Switch(_, _) => "switch".to_string(),
         }

@@ -190,13 +190,13 @@ impl Attribute {
     }
 
     pub fn get_example(&self) -> Option<String> {
-        if let Some(args) =  self.get("example") {
+        if let Some(args) = self.get("example") {
             if args.is_empty() {
                 None
             } else {
                 match &args[0].value.values[0].value.body {
                     ValueBody::Str(s) => Some(s.clone()),
-                    val => Some(val.fmt(0))
+                    val => Some(val.fmt(0)),
                 }
             }
         } else {
@@ -336,9 +336,9 @@ pub struct Expression {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Ternary {
-    pub conditional: Expression,
-    pub do_if: Expression,
-    pub do_else: Expression,
+    pub condition: Expression,
+    pub if_expr: Expression,
+    pub else_expr: Expression,
 }
 
 impl Expression {
