@@ -360,7 +360,7 @@ pub fn built_in_function(
         }
 
         "get_input" => {
-            arg_length!(info, 0, arguments, "Expected no arguments".to_string());
+            arg_length!(info, 1, arguments, "Expected one arguments, the prompt".to_string());
             let mut out = String::new();
             for val in arguments {
                 out += &globals.stored_values[val].to_str(globals);
