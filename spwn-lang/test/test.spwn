@@ -1,7 +1,4 @@
 
-
-c = counter(2)
-
-num = 20 if c == 2 else 100
-
-10g.move(num, 0, 0.5)
+for i in 0..(10 + 10) {
+    $.print(i)
+}
