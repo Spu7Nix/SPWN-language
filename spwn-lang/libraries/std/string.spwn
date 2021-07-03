@@ -69,29 +69,19 @@ impl @string {
 	lowercase: #[desc("Makes whole string lowercase.")]
 	(self) {
 		dict = {A:'a',B:'b',C:'c',D:'d',E:'e',F:'f',G:'g',H:'h',I:'i',J:'j',K:'k',L:'l',M:'m',N:'n',O:'o',P:'p',Q:'q',R:'r',S:'s',T:'t',U:'u',V:'v',W:'w',X:'x',Y:'y',Z:'z'}
-
 		return ''.join(self.split('').map(el => dict.get(el, el)))
 	},
 	uppercase: #[desc("Makes whole string uppercase.")]
 	(self) {
 		dict = {a:'A',b:'B',c:'C',d:'D',e:'E',f:'F',g:'G',h:'H',i:'I',j:'J',k:'K',l:'L',m:'M',n:'N',o:'O',p:'P',q:'Q',r:'R',s:'S',t:'T',u:'U',v:'V',w:'W',x:'X',y:'Y',z:'Z'}
-
 		return ''.join(self.split('').map(el => dict.get(el, el)))
 	},
 	is_upper: #[desc("Checks if whole string is uppercase, ignores characters that is not in the alphabet.")]
 	(self) {
-		return self.split('').map((c) {
-			if 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.contains(c) {
-				return c
-			} else { return 'A' }
-		}).all(c => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.contains(c))
+		return self.uppercase() == self
 	},
 	is_lower: #[desc("Checks if whole string is lowercase, ignores characters that is not in the alphabet.")]
 	(self) {
-		return self.split('').map((c) {
-			if 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.contains(c) {
-				return c
-			} else { return 'a' }
-		}).all(c => 'abcdefghijklmnopqrstuvwxyz'.contains(c))
+		return self.lowercase() == self
 	}
 }

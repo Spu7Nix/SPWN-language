@@ -26,12 +26,7 @@ impl @array {
     },
     contains: #[desc("See if array contains an element.")]
     (self, el) {
-		for e in self {
-			if e == el {
-				return true
-			}
-		}
-		return false
+		return self has el
 	},
     index: #[desc("Gets the index of an element, if it doesn't exists returns null.")]
     (self, el) {
