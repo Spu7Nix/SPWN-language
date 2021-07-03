@@ -1,16 +1,20 @@
 //! Defining all native types (and functions?)
-
 use crate::ast::ObjectMode;
-use crate::compiler::{RuntimeError, BUILTIN_STORAGE, CONTEXT_MAX, NULL_STORAGE};
+use crate::compiler::{RuntimeError, NULL_STORAGE};
 use crate::compiler_types::*;
+use crate::context::*;
+use crate::globals::Globals;
 use crate::levelstring::*;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use crate::value::*;
+use crate::value_storage::*;
 use std::io::stdout;
 use std::io::Write;
 //use text_io;
+use crate::compiler_info::CompilerInfo;
 
 macro_rules! arg_length {
     ($info:expr , $count:expr, $args:expr , $message:expr) => {
@@ -360,7 +364,12 @@ pub fn built_in_function(
         }
 
         "get_input" => {
-            arg_length!(info, 1, arguments, "Expected one arguments, the prompt".to_string());
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one arguments, the prompt".to_string()
+            );
             let mut out = String::new();
             for val in arguments {
                 out += &globals.stored_values[val].to_str(globals);

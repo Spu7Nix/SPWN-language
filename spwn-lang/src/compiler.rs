@@ -1,7 +1,12 @@
 //! Tools for compiling SPWN into GD object strings
 use crate::ast;
 use crate::builtin::*;
+use crate::compiler_info::CompilerInfo;
+use crate::context::*;
+use crate::globals::Globals;
 use crate::levelstring::*;
+use crate::value::*;
+use crate::value_storage::*;
 use crate::STD_PATH;
 use std::collections::{HashMap, HashSet};
 

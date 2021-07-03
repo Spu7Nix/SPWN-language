@@ -2,6 +2,7 @@
 use crate::ast::ObjectMode;
 use crate::builtin::*;
 use crate::compiler_types::*;
+use crate::context::Context;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, PartialEq, Debug)]

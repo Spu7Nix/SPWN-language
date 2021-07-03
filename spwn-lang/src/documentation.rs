@@ -2,9 +2,11 @@
 //use crate::ast::*;
 use crate::builtin::TYPE_MEMBER_NAME;
 use crate::compiler::{import_module, RuntimeError};
-use crate::compiler_types::{
-    find_key_for_value, CompilerInfo, Context, Globals, ImportType, Macro, Value,
-};
+use crate::compiler_info::CompilerInfo;
+use crate::compiler_types::ImportType;
+use crate::context::Context;
+use crate::globals::Globals;
+use crate::value::*;
 use std::fs::File;
 
 use std::path::PathBuf;
@@ -32,8 +34,13 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     let mut info = CompilerInfo::new();
     info.includes
         .push(std::env::current_dir().expect("Cannot access current directory"));
-    info.includes
-        .push(std::env::current_exe().expect("Cannot access directory of executable").parent().expect("Executable must be in some directory").to_path_buf());
+    info.includes.push(
+        std::env::current_exe()
+            .expect("Cannot access directory of executable")
+            .parent()
+            .expect("Executable must be in some directory")
+            .to_path_buf(),
+    );
 
     let module = import_module(
         &ImportType::Lib(path.to_string()),

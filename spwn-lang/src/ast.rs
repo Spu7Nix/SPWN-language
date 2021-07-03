@@ -1,9 +1,9 @@
 //! Abstract Syntax Tree (AST) type definitions
 
+use crate::compiler_types::ImportType;
 use crate::fmt::SpwnFmt;
-
-use crate::compiler_types::{ImportType, StoredValue};
 use crate::parser::FileRange;
+use crate::value_storage::StoredValue;
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
     Def((String, Expression)),
