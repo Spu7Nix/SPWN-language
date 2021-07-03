@@ -800,6 +800,7 @@ pub fn parse_statement(
             let symbol = match tokens.next(false) {
                 // check for variable
                 Some(Token::Symbol) => tokens.slice(),
+
                 Some(a) => {
                     // invalid variable name
                     return Err(SyntaxError::ExpectedErr {

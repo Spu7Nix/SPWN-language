@@ -1733,7 +1733,7 @@ impl ast::Variable {
         Ok((out, inner_returns))
     }
 
-    //more like is_undefinable
+    
     pub fn is_undefinable(&self, context: &Context, globals: &mut Globals) -> bool {
         //use crate::fmt::SpwnFmt;
         // if self.operator == Some(ast::UnaryOperator::Let) {
@@ -1743,7 +1743,12 @@ impl ast::Variable {
         // println!("hello? {}", self.fmt(0));
         let mut current_ptr = match &self.value.body {
             ast::ValueBody::Symbol(a) => {
+                
                 if let Some(ptr) = context.variables.get(a) {
+                    if self.path.is_empty() {
+                        //redifine
+                        return false
+                    }
                     *ptr
                 } else {
                     return false;
@@ -1839,6 +1844,7 @@ impl ast::Variable {
         use crate::fmt::SpwnFmt;
         let mut defined = true;
         
+        
 
         let value = match &self.operator {
             Some(ast::UnaryOperator::Let) => store_value(Value::Null, 1, globals, context),
@@ -1853,7 +1859,12 @@ impl ast::Variable {
 
         let mut current_ptr = match &self.value.body {
             ast::ValueBody::Symbol(a) => {
-                if let Some(ptr) = context.variables.get(a) {
+                if let Some(ptr) = context.variables.get_mut(a) {
+                    if self.path.is_empty() {
+                        //redifine
+                        *ptr = value;
+                        return Ok(value)
+                    }
                     *ptr
                 } else {
                     (*context).variables.insert(a.clone(), value);
@@ -1878,7 +1889,7 @@ impl ast::Variable {
                     *ptr
                 } else {
                     return Err(RuntimeError::RuntimeError {
-                        message: format!("Cannot use 'self' outside macros"),
+                        message: String::from("Cannot use 'self' outside macros"),
                         info: info.clone(),
                     });
                 }
