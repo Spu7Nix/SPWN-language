@@ -1,5 +1,7 @@
 # SPWN-language
 
+<a href="https://github.com/Spu7Nix/SPWN-language/blob/master/LICENSE"><img alt="GitHub license" src="https://img.shields.io/github/license/Spu7Nix/SPWN-language"></a> <a href="https://github.com/Spu7Nix/SPWN-language/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Spu7Nix/SPWN-language"></a> <img alt="GitHub all releases" src="https://img.shields.io/github/downloads/spu7nix/SPWN-language/total"> <img alt="Discord" src="https://img.shields.io/discord/791323294301290546?label=Discord%20Chat"> <img alt="GitHub tag (latest by date)" src="https://img.shields.io/github/v/tag/spu7nix/spwn-language?label=Version">
+
 A language for Geometry Dash triggers. An easy way to create levels using code.
 
 SPWN is a programming language that compiles to Geometry Dash levels. What that means is that you can create levels by using not only the visual representation in the GD-editor, but using a "verbal" and abstracted representation as well. This is especially useful for using GD triggers, which (if you want to make complicated stuff) are not really suited for the graphical workflow of the in-game editor.
