@@ -1,5 +1,10 @@
-let NONE = 1
+c = counter(1i)
 
-NONE += 1
+num = switch c {
+    case 1: 10,
+    case 2: 20,
+    case 3: 30,
+    else: -10
+}
 
-$.print(NONE)
+10g.move(num, 0, 0.5)

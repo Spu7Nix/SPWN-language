@@ -2,7 +2,7 @@
 
 extract import "control_flow.spwn"
 extract import "constants.spwn".comparisons
-let DEFAULT_SPEED = 3
+let DEFAULT_SPEED = 1
 let SWAP_ID = ?i
 type @counter
 
