@@ -19,8 +19,7 @@ impl @file {
 		self.fseek = s;
 	},
 	read: (self, s=-1) {
-		let s = size;
-		if size == -1 {
+		if s == -1 {
 			s = self.size;
 		}
 		if self.fseek >= self.size {
