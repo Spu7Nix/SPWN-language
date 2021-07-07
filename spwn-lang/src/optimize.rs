@@ -4,7 +4,7 @@ use crate::ast::ObjectMode;
 use crate::builtin::{Block, Group, Item, ID};
 use crate::compiler_types::FunctionID;
 use crate::levelstring::{GDObj, ObjParam};
-use std::cmp::{self, max, min};
+use std::cmp::{self, max, min, Ordering};
 use std::collections::btree_map::Range;
 use std::collections::{HashMap, HashSet};
 
@@ -855,335 +855,196 @@ enum IcExpr {
     LessThan(Item, i32),
 }
 
-impl IcExpr {
-    fn flatten_and(&self) -> Vec<Self> {
-        match &self {
-            &Self::And(a, b) => a
-                .flatten_and()
-                .into_iter()
-                .chain(b.flatten_and().into_iter())
-                .collect(),
-            a => vec![(*a).clone()],
-        }
+#[derive(Debug, Clone, Eq)]
+struct HeapItem {
+    complexity: (u16, u16),
+    formula: IcExpr,
+}
+
+impl PartialEq for HeapItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.complexity == other.complexity
     }
-
-    fn flatten_or(&self) -> Vec<Self> {
-        match &self {
-            &Self::Or(a, b) => a
-                .flatten_or()
-                .into_iter()
-                .chain(b.flatten_or().into_iter())
-                .collect(),
-            a => vec![(*a).clone()],
-        }
+}
+impl PartialOrd for HeapItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.complexity.cmp(&other.complexity))
     }
+}
 
-    fn stack_and(list: Vec<Self>) -> Self {
-        let mut iter = list.iter();
-        let mut out = iter.next().unwrap().clone();
-        for expr in list {
-            out = Self::And(out.into(), expr.remove_duplicates().into());
-        }
-        out
+impl Ord for HeapItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        //not the same as the original implementation, might have to change
+        (self.complexity.0 + self.complexity.1).cmp(&(other.complexity.0 + other.complexity.1))
     }
-    fn stack_or(list: Vec<Self>) -> Self {
-        let mut iter = list.iter();
-        let mut out = iter.next().unwrap().clone();
-        for expr in list {
-            out = Self::Or(out.into(), expr.remove_duplicates().into());
-        }
-        out
-    }
+}
 
-    fn remove_duplicates(&self) -> Self {
-        match self {
-            Self::And(_, _) => {
-                let list = self.flatten_and();
-                let set: HashSet<_> = list.iter().collect();
-                let mut set_iter = set.iter().cloned();
-
-                let mut out = (*set_iter.next().unwrap()).remove_duplicates();
-                for expr in set_iter {
-                    out = Self::And(out.into(), expr.remove_duplicates().into());
-                }
-                out
-            }
-            Self::Or(_, _) => {
-                let list = self.flatten_or();
-                let set: HashSet<_> = list.iter().collect();
-                let mut set_iter = set.iter().cloned();
-
-                let mut out = (*set_iter.next().unwrap()).remove_duplicates();
-                for expr in set_iter {
-                    out = Self::Or(out.into(), expr.remove_duplicates().into());
-                }
-                out
-            }
-            a => a.clone(),
-        }
-    }
-
-    fn decrease_and(&self) -> Self {
-        // remove duplicates before using this
-        match self {
-            Self::Or(a, b) => {
-                if let Self::And(a1, b1) = *a.clone() {
-                    if let Self::And(a2, b2) = *b.clone() {
-                        let a1 = a1.decrease_and();
-                        let b1 = b1.decrease_and();
-                        let a2 = a2.decrease_and();
-                        let b2 = b2.decrease_and();
-                        if a1 == a2 {
-                            Self::And(a1.into(), Self::Or(b1.into(), b2.into()).into())
-                        } else if a1 == b2 {
-                            Self::And(a1.into(), Self::Or(b1.into(), a2.into()).into())
-                        } else if b1 == a2 {
-                            Self::And(b1.into(), Self::Or(a1.into(), b2.into()).into())
-                        } else if b1 == b2 {
-                            Self::And(b1.into(), Self::Or(a1.into(), a2.into()).into())
-                        } else {
-                            Self::Or(a.decrease_and().into(), b.decrease_and().into())
-                        }
-                    } else {
-                        Self::Or(a.decrease_and().into(), b.decrease_and().into())
-                    }
-                } else {
-                    Self::Or(a.decrease_and().into(), b.decrease_and().into())
-                }
-            }
-            Self::And(a, b) => Self::And(a.decrease_and().into(), b.decrease_and().into()),
-            a => a.clone(),
+impl HeapItem {
+    fn new(formula: IcExpr) -> Self {
+        Self {
+            complexity: get_complexity(&formula),
+            formula,
         }
     }
 }
 
-// fn more_or_equally_limiting(expr1: IcExpr, expr2: IcExpr) -> Option<bool> {
-//     //this function takes two icexprs that are NOT and nor or
-//     // and have THE SAME ITEM
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+type CriticalValueSets = HashMap<Item, HashSet<i32>>;
 
-//     // true = first argument
-//     // false = second argument
-//     use IcExpr::*;
-//     match (expr1, expr2) {
-//         (Equals(_, num1), Equals(_, num2)) => {
-//             if num1 == num2 {
-//                 return Some(true);
-//             } else {
-//                 return None;
-//             }
-//         }
-//         (MoreThan(_, num1), MoreThan(_, num2)) => Some(num1 > num2),
-//         (LessThan(_, num1), LessThan(_, num2)) => Some(num1 < num2),
-//         (LessThan(_, num1), MoreThan(_, num2)) | (MoreThan(_, num2), LessThan(_, num1)) => {
-//             if num1 <= num2 + 1 {
-//                 return None;
-//             } else {
-//                 return Some(true);
-//             }
-//         }
-//         (Equals(_, num1), MoreThan(_, num2)) | (MoreThan(_, num2), Equals(_, num1)) => {
-//             if num1 > num2 {
-//                 return Some(true);
-//             } else {
-//                 return None;
-//             }
-//         }
-//         (Equals(_, num1), LessThan(_, num2)) | (LessThan(_, num2), Equals(_, num1)) => {
-//             if num1 < num2 {
-//                 return Some(true);
-//             } else {
-//                 return None;
-//             }
-//         }
-//         (_, _) => unreachable!(),
-//     }
-// }
+// Returns a map from each variable to the set of values such that the formula
+// might evaluate differently for variable = value-1 versus variable = value.
+fn get_critical_value_sets(formula: &IcExpr, result: &mut CriticalValueSets) {
+    let mut insert_to_result = |item, num: &i32| {
+        if let Some(set) = result.get_mut(item) {
+            set.insert(*num);
+        } else {
+            let mut new_set = HashSet::new();
+            new_set.insert(*num);
+            result.insert(*item, new_set);
+        }
+    };
+    match formula {
+        IcExpr::True | IcExpr::False => (),
+        IcExpr::LessThan(item, num) => insert_to_result(item, num),
+        IcExpr::Equals(item, num) => {
+            insert_to_result(item, num);
+            insert_to_result(item, &(*num + 1));
+        }
+        IcExpr::MoreThan(item, num) => {
+            insert_to_result(item, &(*num + 1));
+        }
+        IcExpr::And(lhs, rhs) | IcExpr::Or(lhs, rhs) => {
+            get_critical_value_sets(&**lhs, result); //ladies and gentlemen, the penis operator
+            get_critical_value_sets(&**rhs, result);
+        }
+    };
+}
+// Returns a list of inputs sufficient to compare Boolean combinations of the
+// primitives returned by enumerate_useful_primitives.
+fn enumerate_truth_table_inputs(
+    critical_value_sets: &CriticalValueSets,
+) -> Vec<HashMap<Item, i32>> {
+    use itertools::Itertools;
 
-fn overlap(expr: IcExpr) -> IcExpr {
-    //only allow the most limiting condition for each item
-    let mut most_limiting = IcExpr::True;
+    let value_sets = critical_value_sets.values();
 
-    use IcExpr::*;
-    for c in expr.flatten_and() {
-        let expr1 = match simplify_ic_expr(c) {
-            True => continue,
-            False => return False,
-            a => a,
-        };
-        let expr2 = most_limiting.clone();
-        let base_expr = And(Box::from(expr1.clone()), Box::from(expr2.clone()));
-        match (expr1.clone(), expr2.clone()) {
-            (Equals(item1, num1), Equals(item2, num2)) => {
-                if item1 == item2 {
-                    if num1 != num2 {
-                        return False;
-                    }
-                } else {
-                    most_limiting = base_expr;
-                }
-            }
-            (MoreThan(item1, num1), MoreThan(item2, num2)) => {
-                if item1 == item2 {
-                    most_limiting = MoreThan(item1, max(num1, num2));
-                } else {
-                    most_limiting = base_expr;
-                }
-            }
-            (LessThan(item1, num1), LessThan(item2, num2)) => {
-                if item1 == item2 {
-                    most_limiting = LessThan(item1, min(num1, num2));
-                } else {
-                    most_limiting = base_expr;
-                }
-            }
-            (LessThan(item1, num1), MoreThan(item2, num2))
-            | (MoreThan(item2, num2), LessThan(item1, num1)) => {
-                if item1 == item2 && num1 <= num2 + 1 {
-                    return False;
-                } else if item1 == item2 && num1 == num2 + 2 {
-                    most_limiting = Equals(item1, num2 + 1);
-                } else {
-                    most_limiting = base_expr;
-                }
-            }
-            (Equals(item1, num1), MoreThan(item2, num2))
-            | (MoreThan(item2, num2), Equals(item1, num1)) => {
-                if item1 == item2 {
-                    if num1 > num2 {
-                        most_limiting = Equals(item1, num1);
-                    } else {
-                        return False;
-                    }
-                } else {
-                    most_limiting = Equals(item1, num1);
-                }
-            }
-            (Equals(item1, num1), LessThan(item2, num2))
-            | (LessThan(item2, num2), Equals(item1, num1)) => {
-                if item1 == item2 {
-                    if num1 < num2 {
-                        most_limiting = Equals(item1, num1);
-                    } else {
-                        return False;
-                    }
-                } else {
-                    most_limiting = Equals(item1, num1);
-                }
-            }
-            (Or(e1, e2), a) | (a, Or(e1, e2)) => {
-                if overlap(And(a.clone().into(), e1)) == a
-                    && overlap(And(a.clone().into(), e2)) == a
-                {
-                    most_limiting.insert(item, a);
-                } else {
-                    most_limiting.insert(item, base_expr);
-                }
-            }
+    let product = value_sets
+        .map(|value_set| {
+            let mut new_set = value_set.clone();
+            new_set.insert(i32::MIN);
+            new_set.iter().copied().collect::<Vec<i32>>()
+        })
+        .multi_cartesian_product();
 
-            (_, _) => {
-                most_limiting.insert(item, base_expr);
+    product
+        .map(|values| {
+            let mut dict = HashMap::new();
+            let mut values_iter = values.iter();
+            for variable in critical_value_sets.keys() {
+                dict.insert(*variable, *values_iter.next().unwrap());
             }
+            dict
+        })
+        .collect()
+
+    // def enumerate_truth_table_inputs(critical_value_sets):
+    //     variables, value_sets = zip(*critical_value_sets.items())
+    //     return [
+    //         dict(zip(variables, values))
+    //         for values in product(*({-inf} | value_set for value_set in value_sets))
+    //     ]
+}
+
+// Returns both constants and all single comparisons whose critical value set is
+// a subset of the given ones.
+fn enumerate_useful_primitives(critical_value_sets: &CriticalValueSets) -> Vec<IcExpr> {
+    let mut out = Vec::new();
+    out.push(IcExpr::True);
+    out.push(IcExpr::False);
+    for (variable, value_set) in critical_value_sets.iter() {
+        for value in value_set {
+            out.push(IcExpr::LessThan(*variable, *value));
+            if let Some(_) = value_set.get(&(value + 1)) {
+                out.push(IcExpr::Equals(*variable, *value));
+            }
+            out.push(IcExpr::MoreThan(*variable, *value - 1));
         }
     }
-
-    most_limiting
+    out
 }
 
-fn union(expr: IcExpr) -> IcExpr {
-    //only allow the least limiting condition for each item
-    let mut least_limiting = HashMap::<Item, IcExpr>::new();
-    let mut out_conditions = Vec::new();
-    use IcExpr::*;
-    for c in expr.flatten_or() {
-        let expr1 = match simplify_ic_expr(c) {
-            False => continue,
-            True => return True,
-            a => a,
-        };
-        let (expr2, item) = match expr1 {
-            Equals(item, _) | MoreThan(item, _) | LessThan(item, _) => {
-                match least_limiting.get(&item) {
-                    None => {
-                        least_limiting.insert(item, expr1);
-                        continue;
-                    }
-                    Some(e) => (e.clone(), item),
-                }
-            }
-            a => {
-                out_conditions.push(a);
-                continue;
-            }
-        };
-        let base_expr = Or(Box::from(expr1.clone()), Box::from(expr2.clone()));
-        match (expr1.clone(), expr2.clone()) {
-            (Equals(_, num1), Equals(_, num2)) => {
-                if num1 != num2 {
-                    least_limiting.insert(item, base_expr);
-                }
-            }
-            (MoreThan(_, num1), MoreThan(_, num2)) => {
-                least_limiting.insert(item, MoreThan(item, min(num1, num2)));
-            }
-            (LessThan(_, num1), LessThan(_, num2)) => {
-                least_limiting.insert(item, LessThan(item, max(num1, num2)));
-            }
-            (LessThan(_, num1), MoreThan(_, num2)) | (MoreThan(_, num2), LessThan(_, num1)) => {
-                if num1 == num2 - 1 {
-                    return True;
-                }
-                least_limiting.insert(item, base_expr);
-            }
-            (Equals(_, num1), MoreThan(_, num2)) | (MoreThan(_, num2), Equals(_, num1)) => {
-                if num1 > num2 {
-                    least_limiting.insert(item, MoreThan(item, num2));
-                } else {
-                    least_limiting.insert(item, base_expr);
-                }
-            }
-            (Equals(_, num1), LessThan(_, num2)) | (LessThan(_, num2), Equals(_, num1)) => {
-                if num1 < num2 {
-                    least_limiting.insert(item, LessThan(item, num2));
-                } else {
-                    least_limiting.insert(item, base_expr);
-                }
-            }
-            (And(e1, e2), a) | (a, And(e1, e2)) => {
-                if union(And(a.clone().into(), e1)) == a || union(And(a.clone().into(), e2)) == a {
-                    least_limiting.insert(item, a);
-                } else {
-                    least_limiting.insert(item, base_expr);
-                }
-            }
+// Evaluates the formula recursively on the given input.
+fn evaluate(formula: &IcExpr, input: &HashMap<Item, i32>) -> bool {
+    match formula {
+        IcExpr::True => true,
+        IcExpr::False => false,
+        IcExpr::LessThan(item, num) => input[item] < *num,
+        IcExpr::Equals(item, num) => input[item] == *num,
+        IcExpr::MoreThan(item, num) => input[item] > *num,
+        IcExpr::And(e1, e2) => evaluate(&**e1, input) && evaluate(&**e2, input),
+        IcExpr::Or(e1, e2) => evaluate(&**e1, input) || evaluate(&**e2, input),
+    }
+}
+//Evaluates the formula on the many inputs, packing the values into an integer.
+fn get_truth_table(formula: &IcExpr, inputs: &Vec<HashMap<Item, i32>>) -> i32 {
+    let mut truth_table = 0;
+    for input in inputs {
+        truth_table = (truth_table << 1) + evaluate(formula, input) as i32;
+    }
+    truth_table
+}
 
-            (_, _) => {
-                least_limiting.insert(item, base_expr);
-            }
+// Returns (the number of operations in the formula, the number of Ands).
+fn get_complexity(formula: &IcExpr) -> (u16, u16) {
+    match formula {
+        IcExpr::True | IcExpr::False => (0, 0),
+        IcExpr::LessThan(_, _) | IcExpr::MoreThan(_, _) | IcExpr::Equals(_, _) => (1, 0),
+        IcExpr::And(lhs, rhs) => {
+            let (ops_lhs, ands_lhs) = get_complexity(&**lhs);
+            let (ops_rhs, ands_rhs) = get_complexity(&**rhs);
+            (ops_lhs + 1 + ops_rhs, ands_lhs + 1 + ands_rhs)
+        }
+        IcExpr::Or(lhs, rhs) => {
+            let (ops_lhs, ands_lhs) = get_complexity(&**lhs);
+            let (ops_rhs, ands_rhs) = get_complexity(&**rhs);
+            (ops_lhs + 1 + ops_rhs, ands_lhs + ands_rhs)
         }
     }
-    for (_, expr) in least_limiting {
-        out_conditions.push(expr);
-    }
-
-    IcExpr::stack_or(out_conditions)
 }
+fn simplify_ic_expr_full(target_formula: IcExpr) -> IcExpr {
+    println!("\nstart: {:?}\n", target_formula);
+    let mut critical_value_sets = HashMap::new();
+    get_critical_value_sets(&target_formula, &mut critical_value_sets);
+    let inputs = enumerate_truth_table_inputs(&critical_value_sets);
+    let target_truth_table = get_truth_table(&target_formula, &inputs);
+    let mut best = HashMap::<i32, IcExpr>::new();
+    let mut heap: BinaryHeap<Reverse<HeapItem>> = enumerate_useful_primitives(&critical_value_sets)
+        .iter()
+        .map(|a| Reverse(HeapItem::new(a.clone())))
+        .collect();
+    while let None = best.get(&target_truth_table) {
+        let formula = heap.pop().unwrap().0.formula;
+        let truth_table = get_truth_table(&formula, &inputs);
+        if let Some(_) = best.get(&truth_table) {
+            continue;
+        }
 
-fn simplify_ic_expr(expr: IcExpr) -> IcExpr {
-    use IcExpr::*;
-    match expr {
-        And(_, _) => overlap(expr),
-        Or(_, _) => union(expr),
-        a => a,
+        for other_formula in best.values() {
+            heap.push(Reverse(HeapItem::new(IcExpr::And(
+                formula.clone().into(),
+                other_formula.clone().into(),
+            ))));
+            heap.push(Reverse(HeapItem::new(IcExpr::Or(
+                formula.clone().into(),
+                other_formula.clone().into(),
+            ))));
+        }
+        best.insert(truth_table, formula);
     }
-}
-
-fn simplify_ic_expr_full(mut expr: IcExpr) -> IcExpr {
-    println!("\n\nstart: {:?}\n", expr);
-    expr = expr.remove_duplicates();
-    expr = expr.decrease_and();
-    expr = simplify_ic_expr(expr);
-    println!("end: {:?}", expr);
-    expr
+    let out = best[&target_truth_table].clone();
+    println!("end: {:?}\n", out);
+    out
 }
 
 fn build_instant_count_network<'a>(
@@ -1366,14 +1227,16 @@ fn get_instant_count_network<'a>(
             if !trigger.deleted {
                 out.insert(target_out);
             }
-        } else if network[&trigger_ptr.0].connections_in > 1 {
-            (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
-            if optimize_from(network, objects, trigger_ptr, closed_group) {
-                out.insert(target_out);
-            } else {
-                (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = true;
-            }
-        } else {
+        }
+        // else if network[&trigger_ptr.0].connections_in > 1 {
+        //     (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
+        //     if optimize_from(network, objects, trigger_ptr, closed_group) {
+        //         out.insert(target_out);
+        //     } else {
+        //         (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = true;
+        //     }
+        // }
+        else {
             match trigger.role {
                 TriggerRole::Operator => {
                     match get_instant_count_network(
@@ -1437,15 +1300,12 @@ mod tests {
         };
         use IcExpr::*;
 
-        let mut expr = And(
-            Or(LessThan(A, 1).into(), MoreThan(A, 1).into()).into(),
-            Equals(A, 1).into(),
+        let expr = Or(
+            And(LessThan(A, 1).into(), Equals(A, 5).into()).into(),
+            And(MoreThan(A, 1).into(), Equals(A, 5).into()).into(),
         );
+
         println!("start: {:?}\n", expr);
-        expr = expr.remove_duplicates();
-        println!("duplicates removed: {:?}\n", expr);
-        expr = expr.decrease_and();
-        println!("ands decreased: {:?}\n", expr);
 
         /*
         duplicates removed:
@@ -1465,7 +1325,7 @@ mod tests {
 
         */
 
-        println!("simplified: {:?}\n", simplify_ic_expr(expr));
+        println!("simplified: {:?}\n", simplify_ic_expr_full(expr));
     }
 }
 
