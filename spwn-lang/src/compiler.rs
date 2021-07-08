@@ -201,6 +201,7 @@ pub fn compile_spwn(
     print_with_color("Building script ...", TColor::Cyan);
     print_with_color("———————————————————————————\n", TColor::White);
     let start_time = Instant::now();
+    
 
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
         let standard_lib = import_module(
@@ -247,13 +248,56 @@ pub fn compile_spwn(
     }
 
     print_with_color("———————————————————————————\n", TColor::White);
-    print_with_color(
+    
+    
+    
+    /*  Build Timing ----------------------------------------------------- **
+        New build timing changes the unit form milliseconds, to seconds,
+        to minutes depending on the time building took.
+    */
+    
+    
+    // Define the different units
+    let build_time_secs = start_time.elapsed().as_secs();
+    let build_time_millis = start_time.elapsed().as_millis();
+    let build_time_mins = build_time_secs/60;
+    
+    // Check which unit to unit to use
+    if  build_time_secs < 1{
+     print_with_color(
         &format!(
             "Built in {} milliseconds!",
-            start_time.elapsed().as_millis()
+            build_time_millis
         ),
         TColor::Green,
-    );
+    );   
+    } 
+    
+    else if build_time_secs > 1 && build_time_secs < 60{
+        print_with_color(
+            &format!(
+                "Built in {} seconds!",
+                build_time_secs
+            ),
+            TColor::Green,
+        );   
+    }
+
+    else {
+        print_with_color(
+            &format!(
+                "Built in {} minutes!",
+                build_time_mins
+            ),
+            TColor::Green,
+        );   
+    }
+    
+    //----------------------------------------------------------------------- **
+
+
+
+
 
     Ok(globals)
 }
