@@ -7,9 +7,11 @@ A language for Geometry Dash triggers. An easy way to create levels using code.
 SPWN is a programming language that compiles to Geometry Dash levels. What that means is that you can create levels by using not only the visual representation in the GD-editor, but using a "verbal" and abstracted representation as well. This is especially useful for using GD triggers, which (if you want to make complicated stuff) are not really suited for the graphical workflow of the in-game editor.
 
 
-The documentation for the SPWN language is located [here](https://spu7nix.net/spwn/#/). You can also [contribute to the docs here](https://github.com/Spu7Nix/spwn_docs). If you have questions, comments, need help, or want to share your work, [join the discord server here](https://discord.gg/qKZAhKXqgw).
+ The documentation for the SPWN language is located [here](https://spu7nix.net/spwn/#/). You can also [contribute to the docs here](https://github.com/Spu7Nix/spwn_docs). If you have questions, comments, need help, or want to share your work, [join the discord server here](https://discord.gg/qKZAhKXqgw).
 
 ## Installing - How To Install
+
+You can either use the installers for your operating system, or build SPWN frmo the source. Please note that building from source will give you access to newer features and bug fixes, but may be unstable.
 
 ###### Windows
 1. Download the .msi file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
@@ -46,7 +48,7 @@ VSCode should automatically change the language syntax to SPWN, but if it dosent
 Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-viml) and follow to instructions on that page.
 
 ###### Other Editors
-For any other editor with syntax highlighting, most C type syntax higliting scheme work fine
+For any other editor with syntax highlighting, most C type syntax highlighting schemes work fine.
 
 ## Using SPWN - How to run SPWN Code
 Head to the [docs](https://spu7nix.net/spwn/#/) to create a simple program, such as the one below
