@@ -1230,7 +1230,6 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             )
                         }
                         _ => {
-                            println!("{:?}", val_a);
                             return Err(RuntimeError::RuntimeError {
                                 message: format!(
                                     "range start: expected @number, found @{}",

@@ -1,10 +1,1 @@
-c = counter(1i)
-
-num = switch c {
-    case 1: 10,
-    case 2: 20,
-    case 6: 60,
-    else: -10
-}
-
-10g.move(num, 0, 0.5)
+$.print($._range_($, 1))
