@@ -60,6 +60,53 @@ test.move(10,-10,2)
 
 Save the file, then open a command line and type in `spwn build YOURFILENAME.spwn`. Make sure to have GD closed during this process. After running this command, reopen GD, and the levels content will be modified. Head over to the docs to learn how to program in SPWN.
 
+## Using SPWN - Command Line Reference
+
+###### Subcommands:
+    build [script file], b [script file]
+    Runs/builds a given file
+
+    doc [library path]
+    Generates documentation for a SPWN library, in the form of a markdown file
+    
+    version, -v, --version
+    Gets the version of spwn you are using
+
+###### Flags:
+    --console-output, -c
+    Makes the script print the created level into the console instead of
+    writing it to your save file
+
+    --no-level, -l
+    Only compiles the script, no level creation at all
+
+    --no-optimize, -o
+    Removes post-optimization of triggers, making the output more readable,
+    while also using a lot more objects and groups
+
+    --level-name [name], -n [name]
+    Targets a specific level
+
+    --live-editor, -e
+    Instead of writing the level to the save file, the script will use a
+    live editor library if it's installed (Currently works only for MacOS)
+
+    --save-file [file], -s [file]
+    Chooses a specific save file to write to
+
+    --include-path [folder], -i [folder]
+    Adds a search path to look for libraries
+
+###### Examples:
+
+`spwn build addition.spwn --level-name add`
+Build a file called addition.spwn and write it to the level named add.
+
+`spwn build subtraction.spwn --no-level`
+Build a file called subtraction.spwn but dont write to a level.
+
+`spwn build AI.spwn -c`
+Build a file called AI.spwn and output the level string to the console.
 
 
 ## Todo before release:
