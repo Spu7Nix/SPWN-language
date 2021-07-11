@@ -769,7 +769,7 @@ impl ast::Variable {
 
                 inner_returns.extend(returns);
 
-                for (condition, context) in evaled { // through every condictional context
+                for (condition, context) in evaled { // through every conditional context
                     match &globals.stored_values[condition] {
                         Value::Bool(b) => {
                             let answer = if *b {&t.if_expr} else {&t.else_expr};
@@ -794,7 +794,7 @@ impl ast::Variable {
                 // output multiple values in multiple contexts. This is called context splitting. A list of 
                 // values and contexts (Vec<(Value, Context)>) is called bundled together in a type called Returns
                 let (evaled, returns) = expr.eval(&context, globals, info.clone(), constant)?;
-                //inner returns are return statements that are inside the expession, for example in a function/trigger context/ whatever we call it now
+                //inner returns are return statements that are inside the expression, for example in a function/trigger context/ whatever we call it now
                 inner_returns.extend(returns);
 
                 // now we loop through every value the first expression outputted
@@ -1746,7 +1746,7 @@ impl ast::Variable {
                 
                 if let Some(ptr) = context.variables.get(a) {
                     if self.path.is_empty() {
-                        //redifine
+                        //redefine
                         return false
                     }
                     *ptr
@@ -1861,7 +1861,7 @@ impl ast::Variable {
             ast::ValueBody::Symbol(a) => {
                 if let Some(ptr) = context.variables.get_mut(a) {
                     if self.path.is_empty() {
-                        //redifine
+                        //redefine
                         *ptr = value;
                         return Ok(value)
                     }

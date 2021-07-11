@@ -287,7 +287,7 @@ pub fn append_objects(
                                     id
                                 } else {
                                     return Err(format!(
-                                        "This level exeeds the {} limit!",
+                                        "This level exceeds the {} limit!",
                                         ["group", "color", "block ID", "item ID"][class_index]
                                     ));
                                 }
@@ -302,7 +302,7 @@ pub fn append_objects(
     for (i, list) in closed_ids.iter().enumerate() {
         if list.len() > ID_MAX as usize {
             return Err(format!(
-                "This level exeeds the {} limit! ({}/{})",
+                "This level exceeds the {} limit! ({}/{})",
                 ["group", "color", "block ID", "item ID"][i],
                 list.len(),
                 ID_MAX

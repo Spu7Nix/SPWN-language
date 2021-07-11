@@ -104,7 +104,7 @@ return {
         GROUPS : ok(57, [@group] | @group),
         LOCK_TO_PLAYER_X : ok(58, @bool),
         LOCK_TO_PLAYER_Y : ok(59, @bool),
-        COPY_OPACTITY : ok(60, @bool),
+        COPY_OPACITY : ok(60, @bool),
         EDITOR_LAYER_2 : ok(61, @number),
         SPAWN_TRIGGERED : ok(62, @bool),
         SPAWN_DURATION : ok(63, @number | @epsilon),

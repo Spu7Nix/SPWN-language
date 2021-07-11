@@ -27,7 +27,7 @@ LIFETIME:
 
 value gets deleted when lifetime reaches 0
 deeper scope => lifetime++
-shallower scopr => lifetime--
+shallower scope => lifetime--
 */
 
 impl std::ops::Index<usize> for ValStorage {

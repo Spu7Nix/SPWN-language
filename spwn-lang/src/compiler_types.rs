@@ -397,7 +397,7 @@ This macro requires a parent (a \"self\" value), but it seems to have been calle
 Should be used like this: value.macro(arguments)".to_string(), info
                     });
                 }
-                //self doesn't need to be cloned, as it is a referance (kinda)
+                //self doesn't need to be cloned, as it is a reference (kinda)
                 new_context.variables.insert("self".to_string(), parent);
                 m_args_iter.next();
             }
