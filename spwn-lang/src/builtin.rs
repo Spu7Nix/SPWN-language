@@ -1117,7 +1117,7 @@ pub fn built_in_function(
                                 _ => {
                                     return Err(RuntimeError::BuiltinError {
                                         message: format!(
-                                            "Invaid regex mode \"{}\" in regex {}. Expected \"match\" or \"replace\"",
+                                            "Invalid regex mode \"{}\" in regex {}. Expected \"match\" or \"replace\"",
                                             mode, r
                                         ),
                                         info,
@@ -1767,7 +1767,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
 
         a => {
             return Err(RuntimeError::RuntimeError {
-                message: format!("Nonexistant builtin-function: {}", a),
+                message: format!("Nonexistent builtin-function: {}", a),
                 info,
             })
         }
