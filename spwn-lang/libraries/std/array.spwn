@@ -128,6 +128,7 @@ impl @array {
     },
     sort: #[desc("Sorts the array.")]
     (self) {
+        // uses selection sort
         if self.all(item => item.type == @number) {
             min = (array, maxval = 999999999999) {
                 let lowest = [maxval, 0]
@@ -140,7 +141,7 @@ impl @array {
             }
             let res = []
             let copy = self
-            for _ in self {
+            for i in self {
                 i = min(copy)
                 res.push(i[0])
                 copy.remove(i[1])
@@ -156,9 +157,7 @@ impl @array {
     },
     unshift: #[desc("Pushes a value to the start of the array and returns it.")]
     (self, value) {
-        let res = [value]
-        res += self
-        self = res
+        self = [value] + self
         return value
     },
     flat_map: #[desc("Works the same way as map but flattens any sub-arrays into one big array.")]
