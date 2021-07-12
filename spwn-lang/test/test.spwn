@@ -1,10 +1,21 @@
 c = counter(1i)
 
-num = switch c {
-    case 1: 10,
-    case 2: 20,
-    case 6: 60,
-    else: -10
-}
+wait(1)
 
-10g.move(num, 0, 0.5)
+f = !{
+    if c == 10 {
+        10g.move(10, 0, 0.5)
+    }
+}
+on(collision(1b, 2b), !{
+    if c > 4 {
+        f!
+    }
+})
+
+on(collision(3b, 4b), !{
+    if c > 4 {
+        f!
+    }
+})
+
