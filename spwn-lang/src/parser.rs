@@ -590,7 +590,7 @@ pub fn parse_spwn(
             Some(_) => {
                 tokens.previous_no_ignore(false); //bring tokens back to original
 
-                //+ we are goign to parse the tokens
+                //+ we are going to parse the tokens
                 let parsed = parse_statement(&mut tokens, &mut notes)?;
                 // if parsed.comment.0 == None && !statements.is_empty() {
                 //     parsed.comment.0 = statements.last().unwrap().comment.1.clone();
@@ -881,7 +881,7 @@ pub fn parse_statement(
                 a => expected!("type name".to_string(), tokens, notes, a),
             }
             /*Summary:
-            check for @ sybol at the start
+            check for @ symbol at the start
             check if type name is actually valid
             return typedef syntax tree
             */
@@ -1228,7 +1228,7 @@ fn parse_expr(
         Some(Token::If) => {
             // oooh ternaries
 
-            // remove any = from the ternary and place into a seperate stack
+            // remove any = from the ternary and place into a separate stack
             let mut old_values = express.values.clone();
             let mut old_operators = express.operators;
 
@@ -1253,7 +1253,7 @@ fn parse_expr(
                 }
 
                 match (old_values.pop(), old_operators.pop()) {
-                    // pop off of the original expressionand put onto ternary stack
+                    // pop off of the original expression and put onto ternary stack
                     (Some(v), Some(o)) => {
                         tern_values.push(v);
                         tern_operators.push(o);
