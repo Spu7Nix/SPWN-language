@@ -52,15 +52,7 @@ impl @string {
 	},
 	contains: #[desc("Checks if the string contains a string.")]
 	(self, substr: @string) {
-		if substr == '' { return true }
-		if substr.length > self.length { return false }
-		r = self.length - substr.length + 1
-		for i in 0..r {
-			if $.substr(self, i, i + substr.length) == substr {
-				return true
-			}
-		}
-		return false
+		return self has substr
 	},
 	reverse: #[desc("Reverses the string.")]
 	(self) {

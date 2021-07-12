@@ -61,5 +61,9 @@ impl @dictionary {
 	clear: #[desc("Clears the dictionary.")]
 	(self) {
 		self = {}
+	},
+	contains_value: #[desc("See if array contains a value.")]
+	(self, value) {
+		return self.values().contains(value)
 	}
 }
