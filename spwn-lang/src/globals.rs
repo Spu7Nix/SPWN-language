@@ -1,6 +1,6 @@
 ///types and functions used by the compiler
 use crate::builtin::*;
-use crate::levelstring::GDObj;
+use crate::levelstring::GdObj;
 
 use crate::compiler_types::*;
 use crate::value::*;
@@ -29,8 +29,8 @@ pub struct Globals {
     pub type_ids: HashMap<String, (u16, PathBuf, (usize, usize))>,
     pub type_id_count: u16,
 
-    pub func_ids: Vec<FunctionID>,
-    pub objects: Vec<GDObj>,
+    pub func_ids: Vec<FunctionId>,
+    pub objects: Vec<GdObj>,
 
     pub prev_imports: HashMap<ImportType, (Value, Implementations)>,
 
@@ -67,12 +67,12 @@ impl Globals {
         self.is_mutable(p)
     }
 
-    pub fn get_fn_context(&self, p: StoredValue) -> Group {
-        match self.stored_values.map.get(&p) {
-            Some(val) => val.fn_context,
-            None => unreachable!(),
-        }
-    }
+    // pub fn get_fn_context(&self, p: StoredValue) -> Group {
+    //     match self.stored_values.map.get(&p) {
+    //         Some(val) => val.fn_context,
+    //         None => unreachable!(),
+    //     }
+    // }
 
     pub fn get_lifetime(&self, p: StoredValue) -> u16 {
         match self.stored_values.map.get(&p) {
@@ -119,7 +119,7 @@ impl Globals {
 
             val_id: storage.map.len(),
             stored_values: storage,
-            func_ids: vec![FunctionID {
+            func_ids: vec![FunctionId {
                 parent: None,
                 width: None,
                 obj_list: Vec::new(),

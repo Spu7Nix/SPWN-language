@@ -16,12 +16,12 @@ use smallvec::{smallvec, SmallVec};
 
 use crate::compiler::{compile_scope, RuntimeError, CONTEXT_MAX};
 
-pub type TypeID = u16;
+pub type TypeId = u16;
 //                                                               This bool is for if this value
 //                                                               was implemented in the current module
-pub type Implementations = HashMap<TypeID, HashMap<String, (StoredValue, bool)>>;
+pub type Implementations = HashMap<TypeId, HashMap<String, (StoredValue, bool)>>;
 
-pub type FnIDPtr = usize;
+pub type FnIdPtr = usize;
 
 pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
 
@@ -39,17 +39,17 @@ pub enum BreakType {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct FunctionID {
+pub struct FunctionId {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id
     pub width: Option<u32>,    //width of this id, is none when its not calculated yet
     //pub name: String,          //name of this id, used for the label
-    pub obj_list: Vec<(GDObj, usize)>, //list of objects in this function id, + their order id
+    pub obj_list: Vec<(GdObj, usize)>, //list of objects in this function id, + their order id
 }
 
-pub type SyncPartID = usize;
+pub type SyncPartId = usize;
 pub struct SyncGroup {
-    pub parts: Vec<SyncPartID>,
-    pub groups_used: Vec<ArbitraryID>, // groups that are already used by this sync group, and can be reused in later parts
+    pub parts: Vec<SyncPartId>,
+    pub groups_used: Vec<ArbitraryId>, // groups that are already used by this sync group, and can be reused in later parts
 }
 
 pub fn handle_operator(
@@ -429,6 +429,12 @@ Should be used like this: value.macro(arguments)".to_string(), info
             new_contexts.push(new_context);
         }
     } else {
+        if !args.is_empty() {
+            return Err(RuntimeError::RuntimeError {
+                message: "This macro takes no arguments!".to_string(),
+                info,
+            });
+        }
         let mut new_context = context.clone();
         new_context.variables = m.def_context.variables.clone();
         /*let mut new_variables: HashMap<String, StoredValue> = HashMap::new();

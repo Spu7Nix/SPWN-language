@@ -18,7 +18,7 @@ pub struct Context {
     //pub spawn_triggered: bool,
     pub variables: HashMap<String, StoredValue>,
     //pub self_val: Option<StoredValue>,
-    pub func_id: FnIDPtr,
+    pub func_id: FnIdPtr,
 
     // info stores the info for the break statement if the context is "broken"
     // broken doesn't mean something is wrong with it, it just means
@@ -26,7 +26,7 @@ pub struct Context {
     pub broken: Option<(CompilerInfo, BreakType)>,
 
     pub sync_group: usize,
-    pub sync_part: SyncPartID,
+    pub sync_part: SyncPartId,
 }
 
 impl Context {
@@ -47,7 +47,7 @@ impl Context {
     }
 
     pub fn next_fn_id(&self, globals: &mut Globals) -> Context {
-        (*globals).func_ids.push(FunctionID {
+        (*globals).func_ids.push(FunctionId {
             parent: Some(self.func_id),
             obj_list: Vec::new(),
             width: None,
@@ -123,7 +123,7 @@ pub fn merge_contexts(
         (*globals).trigger_order += 1;
 
         (*globals).func_ids[context.func_id].obj_list.push((
-            GDObj {
+            GdObj {
                 params,
 
                 ..context_trigger(&context, &mut globals.uid_counter)

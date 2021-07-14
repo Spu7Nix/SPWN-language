@@ -27,13 +27,13 @@ pub enum Value {
     Obj(Vec<(u16, ObjParam)>, ast::ObjectMode),
     Builtins,
     BuiltinFunction(String),
-    TypeIndicator(TypeID),
+    TypeIndicator(TypeId),
     Range(i32, i32, usize), //start, end, step
     Pattern(Pattern),
     Null,
 }
 
-const MAX_DICT_EL_DISPLAY: u16 = 10;
+const MAX_DICT_EL_DISPLAY: usize = 10;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
@@ -56,7 +56,7 @@ pub struct TriggerFunction {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Pattern {
-    Type(TypeID),
+    Type(TypeId),
     Array(Vec<Pattern>),
     Either(Box<Pattern>, Box<Pattern>),
 }
@@ -101,7 +101,7 @@ pub fn value_equality(val1: StoredValue, val2: StoredValue, globals: &Globals) -
 
 impl Value {
     //numeric representation of value
-    pub fn to_num(&self, globals: &Globals) -> TypeID {
+    pub fn to_num(&self, globals: &Globals) -> TypeId {
         match self {
             Value::Group(_) => 0,
             Value::Color(_) => 1,
@@ -190,28 +190,28 @@ impl Value {
     pub fn to_str(&self, globals: &Globals) -> String {
         match self {
             Value::Group(g) => {
-                (if let ID::Specific(id) = g.id {
+                (if let Id::Specific(id) = g.id {
                     id.to_string()
                 } else {
                     "?".to_string()
                 }) + "g"
             }
             Value::Color(c) => {
-                (if let ID::Specific(id) = c.id {
+                (if let Id::Specific(id) = c.id {
                     id.to_string()
                 } else {
                     "?".to_string()
                 }) + "c"
             }
             Value::Block(b) => {
-                (if let ID::Specific(id) = b.id {
+                (if let Id::Specific(id) = b.id {
                     id.to_string()
                 } else {
                     "?".to_string()
                 }) + "b"
             }
             Value::Item(i) => {
-                (if let ID::Specific(id) = i.id {
+                (if let Id::Specific(id) = i.id {
                     id.to_string()
                 } else {
                     "?".to_string()
@@ -229,7 +229,7 @@ impl Value {
             }
             Value::Dict(dict_in) => {
                 let mut out = String::new();
-                let mut count = 0;
+                
                 let mut d = dict_in.clone();
                 if let Some(n) = d.get(TYPE_MEMBER_NAME) {
                     let val = &globals.stored_values[*n];
@@ -239,7 +239,7 @@ impl Value {
                 }
                 out += "{";
                 let mut d_iter = d.iter();
-                for (key, val) in &mut d_iter {
+                for (count, (key, val)) in (&mut d_iter).enumerate() {
                     
 
                     if count > MAX_DICT_EL_DISPLAY {
@@ -251,7 +251,7 @@ impl Value {
                         break;
                         
                     }
-                    count += 1;
+                    
                     let stored_val = (*globals).stored_values[*val as usize].to_str(globals);
                     out += &format!("{}: {},", key, stored_val);
                 }
@@ -315,10 +315,7 @@ impl Value {
             Value::Null => "Null".to_string(),
             Value::TypeIndicator(id) => format!(
                 "@{}",
-                match find_key_for_value(&globals.type_ids, *id) {
-                    Some(name) => name,
-                    None => "[TYPE NOT FOUND]",
-                }
+                find_key_for_value(&globals.type_ids, *id).unwrap_or(&String::from("[TYPE NOT FOUND]"))
             ),
 
             Value::Pattern(p) => match p {
@@ -344,7 +341,7 @@ impl Value {
 
 pub fn convert_type(
     val: &Value,
-    typ: TypeID,
+    typ: TypeId,
     info: &CompilerInfo,
     globals: &mut Globals,
     context: &Context,
@@ -381,7 +378,7 @@ pub fn convert_type(
         Value::Group(g) => match typ {
             
             4 => Value::Number(match g.id {
-                ID::Specific(n) => n as f64,
+                Id::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
                     message: "This group isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
                     info: info.clone(),
@@ -401,7 +398,7 @@ pub fn convert_type(
         Value::Color(c) => match typ {
             
             4 => Value::Number(match c.id {
-                ID::Specific(n) => n as f64,
+                Id::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
                     message: "This color isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
                     info: info.clone(),
@@ -421,7 +418,7 @@ pub fn convert_type(
         Value::Block(b) => match typ {
             
             4 => Value::Number(match b.id {
-                ID::Specific(n) => n as f64,
+                Id::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
                     message: "This block ID isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
                     info: info.clone(),
@@ -441,7 +438,7 @@ pub fn convert_type(
         Value::Item(i) => match typ {
             
             4 => Value::Number(match i.id {
-                ID::Specific(n) => n as f64,
+                Id::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
                     message: "This item ID isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
                     info: info.clone(),
@@ -598,6 +595,84 @@ pub fn find_key_for_value(map: &HashMap<String, (u16, PathBuf, (usize, usize))>,
         .find_map(|(key, val)| if val.0 == value { Some(key) } else { None })
 }
 
+pub fn macro_to_value(
+    m:&ast::Macro,
+    context: &Context,
+    globals: &mut Globals,
+    info: CompilerInfo,
+    //mut define_new: bool,
+    constant: bool,
+    
+) -> Result<(Returns, Returns), RuntimeError> {
+    let mut all_expr: Vec<ast::Expression> = Vec::new();
+    let mut start_val = Returns::new();
+    let mut inner_returns = Returns::new();
+    for arg in &m.args {
+        if let Some(e) = &arg.1 {
+            all_expr.push(e.clone());
+        }
+
+        if let Some(e) = &arg.3 {
+            all_expr.push(e.clone());
+        }
+    }
+    let new_info = info.clone();
+    let (argument_possibilities, returns) =
+        all_combinations(all_expr, &context, globals, new_info, constant)?;
+    inner_returns.extend(returns);
+    for defaults in argument_possibilities {
+        let mut args: Vec<(String, Option<StoredValue>, ast::Attribute, Option<StoredValue>)> =
+            Vec::new();
+        let mut expr_index = 0;
+        
+        for arg in m.args.iter() {
+            let def_val = match &arg.1 {
+                Some(_) => {
+                    expr_index += 1;
+                    Some(
+                        clone_value(defaults.0[expr_index - 1], 1, globals, defaults.1.start_group, true)
+                    )
+                }
+                None => None,
+            };
+            let pat = match &arg.3 {
+                Some(_) => {
+                    expr_index += 1;
+                    Some(defaults.0[expr_index - 1])
+                }
+                None => None,
+            };
+            args.push((
+                arg.0.clone(),
+                def_val,
+                arg.2.clone(),
+                pat,
+            ));
+        }
+
+        
+            start_val.push((
+                store_const_value(
+                    Value::Macro(Box::new(Macro {
+                        args,
+                        body: m.body.statements.clone(),
+                        def_context: defaults.1.clone(),
+                        def_file: info.current_file.clone(),
+                        tag: m.properties.clone(),
+                    })),
+                    1,
+                    globals,
+                    &context,
+                ),
+                defaults.1,
+            ))
+        
+
+        
+    }
+    Ok((start_val, inner_returns))
+}
+
 
 impl ast::Variable {
     pub fn to_value(
@@ -620,8 +695,8 @@ impl ast::Variable {
             return Ok((start_val, inner_returns));
         }
 
-        use ast::IDClass;
-
+        use ast::IdClass;
+ 
         
 
         match &self.value.body {
@@ -631,36 +706,36 @@ impl ast::Variable {
                     start_val.push((*val, context.clone()))
                 } else {
                     return Err(RuntimeError::RuntimeError {
-                        message: "Cannot use \"self\" outside of macros!".to_string(),
+                        message: "\"self\" is not defined!".to_string(),
                         info,
                     });
                 }
             }
-            ast::ValueBody::ID(id) => start_val.push((
+            ast::ValueBody::Id(id) => start_val.push((
                 store_const_value(
                     match id.class_name {
-                        IDClass::Group => {
+                        IdClass::Group => {
                             if id.unspecified {
                                 Value::Group(Group::next_free(&mut globals.closed_groups))
                             } else {
                                 Value::Group(Group::new(id.number))
                             }
                         }
-                        IDClass::Color => {
+                        IdClass::Color => {
                             if id.unspecified {
                                 Value::Color(Color::next_free(&mut globals.closed_colors))
                             } else {
                                 Value::Color(Color::new(id.number))
                             }
                         }
-                        IDClass::Block => {
+                        IdClass::Block => {
                             if id.unspecified {
                                 Value::Block(Block::next_free(&mut globals.closed_blocks))
                             } else {
                                 Value::Block(Block::new(id.number))
                             }
                         }
-                        IDClass::Item => {
+                        IdClass::Item => {
                             if id.unspecified {
                                 Value::Item(Item::next_free(&mut globals.closed_items))
                             } else {
@@ -1087,66 +1162,8 @@ impl ast::Variable {
             }
 
             ast::ValueBody::Macro(m) => {
-                let mut all_expr: Vec<ast::Expression> = Vec::new();
-                for arg in &m.args {
-                    if let Some(e) = &arg.1 {
-                        all_expr.push(e.clone());
-                    }
-
-                    if let Some(e) = &arg.3 {
-                        all_expr.push(e.clone());
-                    }
-                }
-                let new_info = info.clone();
-                let (argument_possibilities, returns) =
-                    all_combinations(all_expr, &context, globals, new_info, constant)?;
-                inner_returns.extend(returns);
-                for defaults in argument_possibilities {
-                    let mut args: Vec<(String, Option<StoredValue>, ast::Attribute, Option<StoredValue>)> =
-                        Vec::new();
-                    let mut expr_index = 0;
-                    
-                    for arg in m.args.iter() {
-                        let def_val = match &arg.1 {
-                            Some(_) => {
-                                expr_index += 1;
-                                Some(
-                                    clone_value(defaults.0[expr_index - 1], 1, globals, defaults.1.start_group, true)
-                                )
-                            }
-                            None => None,
-                        };
-                        let pat = match &arg.3 {
-                            Some(_) => {
-                                expr_index += 1;
-                                Some(defaults.0[expr_index - 1])
-                            }
-                            None => None,
-                        };
-                        args.push((
-                            arg.0.clone(),
-                            def_val,
-                            arg.2.clone(),
-                            pat,
-                        ));
-                    }
-
-                    start_val.push((
-                        store_const_value(
-                            Value::Macro(Box::new(Macro {
-                                args,
-                                body: m.body.statements.clone(),
-                                def_context: defaults.1.clone(),
-                                def_file: info.current_file.clone(),
-                                tag: m.properties.clone(),
-                            })),
-                            1,
-                            globals,
-                            &context,
-                        ),
-                        defaults.1,
-                    ))
-                }
+                let (vals, inner_ret) = macro_to_value(m, &context, globals, info.clone(), constant)?;
+                start_val.extend(vals); inner_returns.extend(inner_ret);
             }
             //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
             ast::ValueBody::Null => start_val.push((1, context.clone())),
@@ -1747,6 +1764,9 @@ impl ast::Variable {
                 if let Some(ptr) = context.variables.get(a) {
                     if self.path.is_empty() {
                         //redefine
+                        if globals.is_mutable(*ptr) {
+                            return true
+                        }
                         return false
                     }
                     *ptr
@@ -1809,11 +1829,7 @@ impl ast::Variable {
                         if let ast::ValueBody::Str(s) = &i.values[0].value.body {
                             match &globals.stored_values[current_ptr] {
                                 Value::Dict(d)  => {
-                                    if let Some(_) = d.get(s) {
-                                        return true
-                                    } else {
-                                        return false
-                                    }
+                                    return d.get(s).is_some()
                                     
                                 }
                                 _ => return true,
@@ -1839,6 +1855,7 @@ impl ast::Variable {
         context: &mut Context,
         globals: &mut Globals,
         info: &CompilerInfo,
+        
     ) -> Result<StoredValue, RuntimeError> {
         // when None, the value is already defined
         use crate::fmt::SpwnFmt;
@@ -1851,7 +1868,7 @@ impl ast::Variable {
             None => store_const_value(Value::Null, 1, globals, context),
             a => {
                 return Err(RuntimeError::RuntimeError {
-                    message: format!("Cannot use operator {:?} in definition", a),
+                    message: format!("Cannot use operator {:?} when defining a variable", a),
                     info: info.clone(),
                 })
             }
@@ -1889,7 +1906,7 @@ impl ast::Variable {
                     *ptr
                 } else {
                     return Err(RuntimeError::RuntimeError {
-                        message: String::from("Cannot use 'self' outside macros"),
+                        message: String::from("\"self\" is not defined!"),
                         info: info.clone(),
                     });
                 }

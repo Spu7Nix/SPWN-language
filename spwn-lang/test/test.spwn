@@ -1,21 +1,9 @@
-c = counter(1i)
 
-wait(1)
-
-f = !{
-    if c == 10 {
-        10g.move(10, 0, 0.5)
+rec = (d){
+    if d != 0 {
+        $.print(d)
+        rec(d-1)
     }
 }
-on(collision(1b, 2b), !{
-    if c > 4 {
-        f!
-    }
-})
 
-on(collision(3b, 4b), !{
-    if c > 4 {
-        f!
-    }
-})
-
+rec(10)

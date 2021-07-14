@@ -222,7 +222,7 @@ pub enum Token {
     False,
 
     #[regex(r"[0-9?]+[gbci]")]
-    ID,
+    Id,
 
     //TERMINATORS
     #[token(",")]
@@ -351,7 +351,7 @@ impl Token {
             Number => "number literal",
             StringLiteral => "string literal",
             True | False => "boolean literal",
-            ID => "ID literal",
+            Id => "ID literal",
 
             Comma | OpenCurlyBracket | ClosingCurlyBracket | OpenSquareBracket
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
@@ -1837,13 +1837,13 @@ fn parse_variable(
             // is a string
             ast::ValueBody::Str(str_content(tokens.slice(), tokens, notes)?)
         }
-        Some(Token::ID) => {
+        Some(Token::Id) => {
             let mut text = tokens.slice();
             let class_name = match text.pop().unwrap() {
-                'g' => ast::IDClass::Group,
-                'c' => ast::IDClass::Color,
-                'i' => ast::IDClass::Item,
-                'b' => ast::IDClass::Block,
+                'g' => ast::IdClass::Group,
+                'c' => ast::IdClass::Color,
+                'i' => ast::IdClass::Item,
+                'b' => ast::IdClass::Block,
                 _ => unreachable!(),
             };
 
@@ -1865,7 +1865,7 @@ fn parse_variable(
                 ),
             };
 
-            ast::ValueBody::ID(ast::ID {
+            ast::ValueBody::Id(ast::Id {
                 class_name,
                 unspecified,
                 number,

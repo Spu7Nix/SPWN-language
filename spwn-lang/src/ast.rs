@@ -10,7 +10,7 @@ pub enum DictDef {
     Extract(Expression),
 }
 
-pub type Comment = (Option<String>, Option<String>);
+//pub type Comment = (Option<String>, Option<String>);
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Statement {
@@ -56,7 +56,7 @@ impl ValueLiteral {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ValueBody {
-    ID(ID),
+    Id(Id),
     Number(f64),
     CmpStmt(CompoundStatement),
     Dictionary(Vec<DictDef>),
@@ -147,7 +147,7 @@ pub enum UnaryOperator {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum IDClass {
+pub enum IdClass {
     Group,
     Color,
     Item,
@@ -373,8 +373,8 @@ pub struct If {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct ID {
+pub struct Id {
     pub number: u16,
     pub unspecified: bool,
-    pub class_name: IDClass,
+    pub class_name: IdClass,
 }
