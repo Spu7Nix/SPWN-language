@@ -12,6 +12,21 @@
 >  
 >
 
+## **contains\_value**:
+
+> **Value:** `(self, value) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _See if array contains a value._
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 2 | **`value`** |any | | |
+>  
+>  
+>
+
 ## **get**:
 
 > **Value:** `(self, key: @string, value = @dict_not_found::{}) { /* code omitted */ }` (`@macro`) 

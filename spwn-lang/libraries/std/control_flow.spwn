@@ -5,7 +5,11 @@ constants = import "constants.spwn"
 extract constants.obj_props
 extract constants.comparisons
 
-wait = #[desc("Adds a delay before the next triggers")] (
+wait = #[desc("Adds a delay before the next triggers") example("
+BG.set(255, 0, 0) // turn background red
+wait(2) // wait 2 seconds
+BG.set(0, 255, 0) // turn background green
+")] (
 	#[desc("Delay time in seconds (leave empty for minimum delay)")]
 	time: @number | @epsilon = @epsilon::{}
 ){
@@ -22,7 +26,12 @@ wait = #[desc("Adds a delay before the next triggers")] (
 	}
 	
 }
-call_with_delay = #[desc("Call a function after a delay")] (
+call_with_delay = #[desc("Call a function after a delay") example("
+BG.set(255, 0, 0) // turn background red
+call_with_delay(2, !{
+	BG.set(0, 255, 0) // turn background green 2 seconds later
+})
+")] (
 	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{}, 
 	#[desc("Function to call after the delay")] function: @trigger_function
 ) {
@@ -38,7 +47,20 @@ call_with_delay = #[desc("Call a function after a delay")] (
 	
 	
 
-	supress_signal: #[desc("Stops signal from coming past for some time")] (
+	supress_signal: #[desc("Stops signal from coming past for some time") example("
+f = !{
+	supress_signal(1)
+	10g.move(10, 0)
+}
+
+f! // moves
+wait(0.4)
+f! // does nothing
+wait(0.4)
+f! // does nothing
+wait(0.4)
+f! // moves
+	")] (
 		#[desc("Time to supress signal")] delay: @number
 	){
 		//if checker is 0, a signal can come through
@@ -58,7 +80,17 @@ call_with_delay = #[desc("Call a function after a delay")] (
 	
 	},
 
-	supress_signal_forever: #[desc("Stops signal from coming past after call")] (){
+	supress_signal_forever: #[desc("Stops signal from coming past after call") example("
+f = !{
+	supress_signal_forever()
+	10g.move(10, 0)
+}
+f! // moves
+wait(0.4)
+f! // does nothing
+wait(1000)
+f! // does nothing
+	")] (){
 		
 		checker = @counter::new(0)
 		checker.item.if_is(EQUAL_TO, 0, !{
@@ -69,31 +101,39 @@ call_with_delay = #[desc("Call a function after a delay")] (
 	
 	},
 
-	supress_signal_quick: #[desc("Stops signal from coming past for some time (better for quick/glitchy signals)")] (
-		#[desc("Time to supress signal")] delay: @number,
-	){
-		//if checker is 0, a signal can come through
-		//if checker is 1, it will be supressed
-		checker = @counter::new(0)
+	// supress_signal_quick: #[desc("Stops signal from coming past for some time (better for quick/glitchy signals)")] (
+	// 	#[desc("Time to supress signal")] delay: @number,
+	// ){
+	// 	//if checker is 0, a signal can come through
+	// 	//if checker is 1, it will be supressed
+	// 	checker = @counter::new(0)
 		
-		-> (){
-			checker.item.add(1)
-			wait(delay)
-			checker.item.if_is(EQUAL_TO, 1, !{
-				-> return
-			})
-			wait()
-			checker.item.if_is(LARGER_THAN, 1, !{
-				checker -= 1
-			})
+	// 	-> (){
+	// 		checker.item.add(1)
+	// 		wait(delay)
+	// 		checker.item.if_is(EQUAL_TO, 1, !{
+	// 			-> return
+	// 		})
+	// 		wait()
+	// 		checker.item.if_is(LARGER_THAN, 1, !{
+	// 			checker -= 1
+	// 		})
 			
-		}()
+	// 	}()
 		
 		
 	
-	},
+	// },
 
-	for_loop: #[desc("Implementation of a spawn loop with a counter")] 
+	for_loop: #[desc("Implementation of a spawn loop with a counter") example("
+for_loop(0..10, (i) {
+	if i < 5 {
+		10g.move(-10, 0)
+	} else {
+		10g.move(10, 0)
+	}
+})
+	")] 
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
 		#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: @macro, 
@@ -124,7 +164,15 @@ call_with_delay = #[desc("Call a function after a delay")] (
         
 	},
 
-	while_loop: #[desc("Implementation of a conditional spawn loop")] 
+	while_loop: #[desc("Implementation of a conditional spawn loop") example("
+c = counter(11)
+
+while_loop(() => c > 4, () {
+	c -= 2
+})
+
+// c is now 3
+	")] 
 	(
 		#[desc("While loop condition, should -> return a boolean")] expr: @macro, 
 		#[desc("Macro of the code that gets looped")] code: @macro,
@@ -142,7 +190,15 @@ call_with_delay = #[desc("Call a function after a delay")] (
         call_with_delay(delay, func)
 	},
 
-	do_while_loop: #[desc("Implementation of a conditional spawn loop")] 
+	do_while_loop: #[desc("Implementation of a conditional spawn loop") example("
+c = counter(4)
+
+do_while_loop(() => c > 10, () {
+	c -= 2
+})
+
+// c is now 2
+	")] 
 	(
 		#[desc("While loop condition, should -> return a boolean")] expr: @macro, 
 		#[desc("Macro of the code that gets looped")] code: @macro,

@@ -21,6 +21,10 @@
 >
 >## Description: 
 > _Implementation of the pulse trigger for colors_
+>### Example: 
+>```spwn
+> BG.pulse(255, 0, 0, fade_out = 0.5) // pulses the background red
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
@@ -45,6 +49,10 @@
 >
 >## Description: 
 > _Implementation of the color trigger_
+>### Example: 
+>```spwn
+> BG.set(0, 0, 0, 0.5) // turns the background color black
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |

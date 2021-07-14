@@ -195,7 +195,7 @@ impl Attribute {
                 None
             } else {
                 match &args[0].value.values[0].value.body {
-                    ValueBody::Str(s) => Some(s.clone()),
+                    ValueBody::Str(s) => Some(s.trim().to_string()),
                     val => Some(val.fmt(0)),
                 }
             }

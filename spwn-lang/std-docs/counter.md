@@ -275,7 +275,7 @@
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`items`** | @array | |Item IDs to add to |
->  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
+>  | 3 | `speed` | @number | `1` |Speed of operation (higher number increases group usage) |
 >  | 4 | `factor` | @number | `1` |Multiplyer for the value added |
 >  | 5 | `for_each` | @macro | `(n) { /* code omitted */ }` |Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1) |
 >  
@@ -284,7 +284,7 @@
 
 ## **clone**:
 
-> **Value:** `(self, speed: @number = 3) { /* code omitted */ }` (`@macro`) 
+> **Value:** `(self, speed: @number = 1) { /* code omitted */ }` (`@macro`) 
 >
 >## Description: 
 > _Copies the counter and -> returns the copy_
@@ -292,28 +292,28 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
+>| 2 | `speed` | @number | `1` |Speed of operation (higher number increases group usage) |
 >  
 >  
 >
 
 ## **compare**:
 
-> **Value:** `(self, other: @counter, speed: @number = 3) { /* code omitted */ }` (`@macro`) 
+> **Value:** `(self, other: @counter, speed: @number = 1) { /* code omitted */ }` (`@macro`) 
 >
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`other`** | @counter | | |
->  | 3 | `speed` | @number | `3` | |
+>  | 3 | `speed` | @number | `1` | |
 >  
 >  
 >
 
 ## **copy\_to**:
 
-> **Value:** `(self, items: [@item | @counter], speed: @number = 3, factor: @number = 1) { /* code omitted */ }` (`@macro`) 
+> **Value:** `(self, items: [@item | @counter], speed: @number = 1, factor: @number = 1) { /* code omitted */ }` (`@macro`) 
 >
 >## Description: 
 > _Copies the value of the counter to another item ID, without consuming the original_
@@ -322,7 +322,7 @@
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`items`** | [@item or @counter] | |Items to copy to |
->  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
+>  | 3 | `speed` | @number | `1` |Speed of operation (higher number increases group usage) |
 >  | 4 | `factor` | @number | `1` |Factor of to multiply the copy by |
 >  
 >  
@@ -356,14 +356,14 @@
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`divisor`** | @counter or @number | |Divisor to divide by, either another counter (very expensive) or a normal number |
 >  | 3 | `remainder` | @counter or @item | `@counter::{item: ?i}` |Counter or item to set to the remainder value |
->  | 4 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
+>  | 4 | `speed` | @number | `1` |Speed of operation (higher number increases group usage) |
 >  
 >  
 >
 
 ## **multiply**:
 
-> **Value:** `(self, factor: @counter | @number, speed: @number = 3) { /* code omitted */ }` (`@macro`) 
+> **Value:** `(self, factor: @counter | @number, speed: @number = 1) { /* code omitted */ }` (`@macro`) 
 >
 >## Description: 
 > _Multiplies the value of the counter by some factor (does not consume the factor)_
@@ -372,7 +372,7 @@
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`factor`** | @counter or @number | |Factor to multiply by, either another counter (very expensive) or a normal number |
->  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
+>  | 3 | `speed` | @number | `1` |Speed of operation (higher number increases group usage) |
 >  
 >  
 >
@@ -395,7 +395,7 @@
 
 ## **reset**:
 
-> **Value:** `(self, speed: @number = 3, for_each: @macro = (n) { /* code omitted */ }) { /* code omitted */ }` (`@macro`) 
+> **Value:** `(self, speed: @number = 1, for_each: @macro = (n) { /* code omitted */ }) { /* code omitted */ }` (`@macro`) 
 >
 >## Description: 
 > _Resets counter to 0_
@@ -403,7 +403,7 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
+>| 2 | `speed` | @number | `1` |Speed of operation (higher number increases group usage) |
 >  | 3 | `for_each` | @macro | `(n) { /* code omitted */ }` |Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1) |
 >  
 >  
@@ -420,7 +420,7 @@
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`items`** | @array | |Item IDs to add to |
->  | 3 | `speed` | @number | `3` |Speed of operation (higher number increases group usage) |
+>  | 3 | `speed` | @number | `1` |Speed of operation (higher number increases group usage) |
 >  | 4 | `factor` | @number | `1` |Multiplyer for the value subtracted |
 >  | 5 | `for_each` | @macro | `(n) { /* code omitted */ }` |Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1) |
 >  

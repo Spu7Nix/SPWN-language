@@ -36,6 +36,10 @@
 
 > **Value:** `(objects: @array, group: @group = ?g) { /* code omitted */ }` (`@macro`) 
 >
+>### Example: 
+>```spwn
+> @obj_set::new([]);
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |

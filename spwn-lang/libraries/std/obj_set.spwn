@@ -4,7 +4,7 @@ type @obj_set
 
 impl @obj_set {
     new: #[example("
-    @obj_set::new([]);
+@obj_set::new([]);
     ")]
     (
         objects: @array, 

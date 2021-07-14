@@ -57,6 +57,26 @@
 >  
 >
 
+## **is\_lower**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Checks if whole string is lowercase, ignores characters that is not in the alphabet._
+>
+>  
+>
+
+## **is\_upper**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Checks if whole string is uppercase, ignores characters that is not in the alphabet._
+>
+>  
+>
+
 ## **join**:
 
 > **Value:** `(self, list: @array) { /* code omitted */ }` (`@macro`) 
@@ -69,6 +89,16 @@
 >| - | ---- | ---- | ------------- | ----------- |
 >| 2 | **`list`** | @array | | |
 >  
+>  
+>
+
+## **lowercase**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Makes whole string lowercase._
+>
 >  
 >
 
@@ -125,5 +155,15 @@
 >| 2 | **`start`** | @number | | |
 >  | 3 | **`end`** | @number | | |
 >  
+>  
+>
+
+## **uppercase**:
+
+> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
+>
+>## Description: 
+> _Makes whole string uppercase._
+>
 >  
 >
