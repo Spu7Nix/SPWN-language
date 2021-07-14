@@ -269,6 +269,7 @@ impl Value {
 }
 
 pub const BUILTIN_LIST: &[&str] = &[
+    "assert",
     "print",
     "time",
     "get_input",
@@ -337,6 +338,28 @@ pub fn built_in_function(
     context: &Context,
 ) -> Result<Value, RuntimeError> {
     Ok(match name {
+        "assert" => {
+            arg_length!(info, 1, arguments, "Expected one argument".to_string());
+            match &globals.stored_values[arguments[0]] {
+                Value::Bool(b) => {
+                    if !b {
+                        return Err(RuntimeError::BuiltinError {
+                            message: String::from("Assertion failed"),
+                            info,
+                        });
+                    } else {
+                        Value::Null
+                    }
+                }
+
+                a => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected boolean, found {}", a.to_str(globals)),
+                        info,
+                    })
+                }
+            }
+        }
         "print" => {
             let mut out = String::new();
             for val in arguments {

@@ -1,9 +1,2 @@
 
-rec = (d){
-    if d != 0 {
-        $.print(d)
-        rec(d-1)
-    }
-}
-
-rec(10)
+$.assert(false)
