@@ -7,7 +7,11 @@ extract import "control_flow.spwn"
 extract import "util.spwn"
 impl @color {
     
-    _range_: create_range_macro(@color),
+    _range_: #[desc("Implementation of the range operator (`..`) for colors") example("
+for color in 1c..10c {
+    -> color.set(0,0,0, 0.5)
+}
+    ")] create_range_macro(@color),
     set: 
     #[desc("Implementation of the color trigger") example("BG.set(0, 0, 0, 0.5) // turns the background color black")]
     (

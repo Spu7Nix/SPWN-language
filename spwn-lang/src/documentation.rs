@@ -90,35 +90,37 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 ",
         used_groups, used_colors, used_blocks, used_items, total_objects
     );
-    doc += "# Type Implementations:\n";
+    if !implementations.is_empty() && implementations.iter().any(|(_, a)| !a.is_empty()) {
+        doc += "# Type Implementations:\n";
 
-    let mut list: Vec<(&u16, HashMap<String, usize>)> = implementations
-        .iter()
-        .map(|(key, val)| {
-            (
-                key,
-                val.iter()
-                    .map(|(key, val)| (key.clone(), val.0))
-                    .collect::<HashMap<String, usize>>(),
-            )
-        })
-        .collect();
-    list.sort_by(|a, b| a.0.cmp(b.0));
+        let mut list: Vec<(&u16, HashMap<String, usize>)> = implementations
+            .iter()
+            .filter(|(_, a)| !a.is_empty())
+            .map(|(key, val)| {
+                (
+                    key,
+                    val.iter()
+                        .map(|(key, val)| (key.clone(), val.0))
+                        .collect::<HashMap<String, usize>>(),
+                )
+            })
+            .collect();
+        list.sort_by(|a, b| a.0.cmp(b.0));
+        for (typ, dict) in list.iter() {
+            let type_name = find_key_for_value(&globals.type_ids, **typ)
+                .expect("Implemented type was not found!")
+                .clone();
 
-    for (typ, dict) in list.iter() {
-        let type_name = find_key_for_value(&globals.type_ids, **typ)
-            .expect("Implemented type was not found!")
-            .clone();
+            doc += &format!("- [**@{1}**]({}-docs/{1}.md)\n", path, type_name);
 
-        doc += &format!("- [**@{1}**]({}-docs/{1}.md)\n", path, type_name);
+            let content = &format!(
+                "  \n# **@{}**: \n {}",
+                type_name,
+                document_dict(dict, &mut globals)
+            );
 
-        let content = &format!(
-            "  \n\n# **@{}**: \n {}",
-            type_name,
-            document_dict(dict, &mut globals)
-        );
-
-        create_doc_file(output_path.clone(), type_name, content);
+            create_doc_file(output_path.clone(), type_name, content);
+        }
     }
 
     doc += &format!("# Exports:\n{}", document_val(&exports, &mut globals));
@@ -168,7 +170,7 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
     };
     if !macro_list.is_empty() {
         if !val_list.is_empty() {
-            doc += "\n\n## Macros:\n\n";
+            doc += "\n## Macros:\n";
         }
         for (key, val) in macro_list.iter() {
             doc += &document_member(*key, *val)
@@ -176,7 +178,7 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
     }
     if !val_list.is_empty() {
         if !macro_list.is_empty() {
-            doc += "## Other values:\n\n";
+            doc += "## Other values:\n";
         }
         for (key, val) in val_list.iter() {
             doc += &document_member(*key, *val)
@@ -202,17 +204,19 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
 | # | name | type | default value | description |
 | - | ---- | ---- | ------------- | ----------- |
 ";
-        for (i, arg) in mac.args.iter().enumerate() {
+        let mut i = 0;
+        for arg in mac.args.iter() {
             let mut arg_string = String::new();
 
             if arg.0 == "self" {
                 continue;
             }
+            i += 1;
 
             if arg.1 != None {
-                arg_string += &format!("| {} | `{}` |", i + 1, arg.0);
+                arg_string += &format!("| {} | `{}` |", i, arg.0);
             } else {
-                arg_string += &format!("| {} | **`{}`** |", i + 1, arg.0);
+                arg_string += &format!("| {} | **`{}`** |", i, arg.0);
             }
 
             if let Some(typ) = arg.3 {
@@ -230,16 +234,16 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
             }
 
             if let Some(desc) = arg.2.get_desc() {
-                arg_string += &format!("{} |", desc);
+                arg_string += &format!("{} |\n", desc);
             } else {
-                arg_string += " |";
+                arg_string += " |\n";
             }
 
             //add_arrows(&mut arg_string);
 
             doc += &arg_string;
 
-            doc += "\n  ";
+            //doc += "\n  ";
         }
     }
 
@@ -262,10 +266,13 @@ fn document_val(val: &Value, globals: &mut Globals) -> String {
         find_key_for_value(&globals.type_ids, type_id).expect("Implemented type was not found!");
 
     let literal = val.to_str(globals);
-    if literal.len() < 100 {
-        doc += &format!(" **Value:** `{}` (`@{}`) \n\n", literal, type_name);
+    if literal.len() < 300 {
+        doc += &format!(
+            " **Value:** \n```spwn\n{}\n``` \n**Type:** `@{}` \n",
+            literal, type_name
+        );
     } else {
-        doc += &format!(" **Type:** `@{}` \n\n", type_name);
+        doc += &format!(" **Type:** `@{}` \n", type_name);
     }
 
     doc += &match &val {
@@ -276,7 +283,7 @@ fn document_val(val: &Value, globals: &mut Globals) -> String {
 
     //add_arrows(&mut doc);
 
-    doc += "\n  ";
+    //doc += "\n  ";
     doc
 }
 

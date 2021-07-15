@@ -1,38 +1,40 @@
   
-
 # **@object**: 
  
 ## **add**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
->
->  
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >
 
 ## **add\_groups**:
 
-> **Value:** `(self, groups: @group | [@group]) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, groups: @group | [@group]) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`groups`** | @group or [@group] | | |
->  
->  
+>| 1 | **`groups`** | @group or [@group] | | |
 >
 
 ## **set**:
 
-> **Value:** `(self, key: @object_key, value) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, key: @object_key, value) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`key`** | @object_key | | |
->  | 3 | **`value`** |any | | |
->  
->  
+>| 1 | **`key`** | @object_key | | |
+>| 2 | **`value`** |any | | |
 >

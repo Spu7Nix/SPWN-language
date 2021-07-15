@@ -1,11 +1,13 @@
   
-
 # **@array**: 
  
 ## **all**:
 
-> **Value:** `(self, map: @macro = (a) { /* code omitted */ }) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, map: @macro = (a) { /* code omitted */ }) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Determines whether all the members of an array satisfy the specified callback._
 >### Example: 
@@ -19,15 +21,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | `map` | @macro | `(a) { /* code omitted */ }` | |
->  
->  
+>| 1 | `map` | @macro | `(a) { /* code omitted */ }` | |
 >
 
 ## **any**:
 
-> **Value:** `(self, map: @macro = (a) { /* code omitted */ }) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, map: @macro = (a) { /* code omitted */ }) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Determines whether the specified callback function returns true for any element of an array._
 >### Example: 
@@ -41,15 +44,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | `map` | @macro | `(a) { /* code omitted */ }` | |
->  
->  
+>| 1 | `map` | @macro | `(a) { /* code omitted */ }` | |
 >
 
 ## **clear**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Clears the array._
 >### Example: 
@@ -59,13 +63,14 @@
 >$.assert(arr.is_empty())
 >```
 >
->  
->
 
 ## **contains**:
 
-> **Value:** `(self, el) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, el) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _See if array contains an element._
 >### Example: 
@@ -77,15 +82,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`el`** |any | | |
->  
->  
+>| 1 | **`el`** |any | | |
 >
 
 ## **filter**:
 
-> **Value:** `(self, cb: @macro) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, cb: @macro) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Returns the elements of an array that meet the condition specified in the callback function._
 >### Example: 
@@ -97,15 +103,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`cb`** | @macro | | |
->  
->  
+>| 1 | **`cb`** | @macro | | |
 >
 
 ## **flat\_map**:
 
-> **Value:** `(self, cb: @macro = () { /* code omitted */ }) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, cb: @macro = () { /* code omitted */ }) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Works the same way as map but flattens any sub-arrays into one big array._
 >### Example: 
@@ -117,15 +124,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | `cb` | @macro | `() { /* code omitted */ }` | |
->  
->  
+>| 1 | `cb` | @macro | `() { /* code omitted */ }` | |
 >
 
 ## **index**:
 
-> **Value:** `(self, el) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, el) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Gets the index of an element (if it doesn't exist, `null` is returned)_
 >### Example: 
@@ -138,15 +146,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`el`** |any | | |
->  
->  
+>| 1 | **`el`** |any | | |
 >
 
 ## **is\_empty**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Returns true if the array has a length of 0, false otherwise._
 >### Example: 
@@ -157,13 +166,14 @@
 >$.assert(!arr2.is_empty())
 >```
 >
->  
->
 
 ## **map**:
 
-> **Value:** `(self, cb: @macro) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, cb: @macro) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Calls a defined callback function on each element of an array, and returns an array that contains the results._
 >### Example: 
@@ -175,15 +185,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`cb`** | @macro | | |
->  
->  
+>| 1 | **`cb`** | @macro | | |
 >
 
 ## **max**:
 
-> **Value:** `(self, minval = -999999999999) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, minval = -999999999999) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Gets the highest number in the array._
 >### Example: 
@@ -195,15 +206,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | `minval` |any | `-999999999999` | |
->  
->  
+>| 1 | `minval` |any | `-999999999999` | |
 >
 
 ## **min**:
 
-> **Value:** `(self, max_val = 999999999999) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, max_val = 999999999999) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Gets the lowest number in the array._
 >### Example: 
@@ -215,15 +227,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | `max_val` |any | `999999999999` | |
->  
->  
+>| 1 | `max_val` |any | `999999999999` | |
 >
 
 ## **pop**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Removes the last value from the array and returns it._
 >### Example: 
@@ -233,13 +246,14 @@
 >$.assert(arr == [1, 2, 3])
 >```
 >
->  
->
 
 ## **push**:
 
-> **Value:** `(self, value) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, value) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Pushes a value to the end of the array._
 >### Example: 
@@ -252,15 +266,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`value`** |any | | |
->  
->  
+>| 1 | **`value`** |any | | |
 >
 
 ## **reduce**:
 
-> **Value:** `(self, cb: @macro) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, cb: @macro) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function._
 >### Example: 
@@ -273,15 +288,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`cb`** | @macro | | |
->  
->  
+>| 1 | **`cb`** | @macro | | |
 >
 
 ## **remove**:
 
-> **Value:** `(self, index: @number) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, index: @number) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Removes a specific index from the array and returns it._
 >### Example: 
@@ -294,15 +310,16 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`index`** | @number | | |
->  
->  
+>| 1 | **`index`** | @number | | |
 >
 
 ## **reverse**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Reverses the array._
 >### Example: 
@@ -312,13 +329,14 @@
 >$.assert(arr == [3, 2, 1])
 >```
 >
->  
->
 
 ## **shift**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Removes the first index from the array and returns it._
 >### Example: 
@@ -328,13 +346,14 @@
 >$.assert(arr == [1, 5, 3, 2])
 >```
 >
->  
->
 
 ## **sort**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Returns a sorted version of the array._
 >### Example: 
@@ -343,13 +362,14 @@
 >$.assert(arr.sort() == [1, 2, 3, 5, 5])
 >```
 >
->  
->
 
 ## **sum**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Gets the sum of the value in the array._
 >### Example: 
@@ -358,13 +378,14 @@
 >$.assert(arr.sum() == 15)
 >```
 >
->  
->
 
 ## **unshift**:
 
-> **Value:** `(self, value) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, value) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Pushes a value to the start of the array and returns it._
 >### Example: 
@@ -377,7 +398,5 @@
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`value`** |any | | |
->  
->  
+>| 1 | **`value`** |any | | |
 >

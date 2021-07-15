@@ -7,7 +7,7 @@ extract import "control_flow.spwn"
 
 return {
     
-    shake: #[desc("Implementation of the shake trigger")]
+    shake: #[desc("Implementation of the shake trigger") example("shake()")]
     (
         #[desc("Strength value")] strength: @number = 1,
         #[desc("Interval value")] interval: @number = 0,
@@ -22,31 +22,31 @@ return {
         wait(duration)
     },
 
-    disable_trail: #[desc("Disables the player's trail")] (){
+    disable_trail: #[desc("Disables the player's trail") example("disable_trail()")] (){
         $.add( trigger{
             OBJ_ID: 33,
         })
     },
 
-    enable_trail: #[desc("Enables the player's trail")] (){
+    enable_trail: #[desc("Enables the player's trail") example("enable_trail()")] (){
         $.add( trigger{
             OBJ_ID: 32,
         })
     },
 
-    show_player: #[desc("Shows the player")] (){
+    show_player: #[desc("Shows the player") example("show_player()")] (){
         $.add( trigger{
             OBJ_ID: 1613,
         })
     },
     
-    hide_player: #[desc("Hides the player")] (){
+    hide_player: #[desc("Hides the player") example("hide_player()")] (){
         $.add( trigger{
             OBJ_ID: 1612,
         })
     },
 
-    toggle_bg_effect: #[desc("Implementation of the bg effect on/off triggers")] (
+    toggle_bg_effect: #[desc("Implementation of the bg effect on/off triggers") example("toggle_bg_effect(false)")] (
         #[desc("Weather to toggle bg effect on or off")] on: @bool = false
     ) {
         if on {

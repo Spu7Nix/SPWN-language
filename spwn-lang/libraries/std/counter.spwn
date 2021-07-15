@@ -3,12 +3,16 @@
 extract import "control_flow.spwn"
 extract import "constants.spwn".comparisons
 let DEFAULT_SPEED = 1
-let SWAP_ID = ?i
 type @counter
 
 impl @counter {
 
-    new: #[desc("Creates a new counter")] (
+    new: #[desc("Creates a new counter") example("
+@counter::new()     // creates a new counter with a starting value of 0
+@counter::new(10)   // creates a new counter with a starting value of 10
+@counter::new(5i)   // creates a new counter thaat uses item ID 5
+@counter::new(true)   // creates a new counter with a starting value of true (1)
+    ")] (
         #[desc("Source (can be a number, item ID or boolean)")] source: @number | @item | @bool = 0,
         #[desc("Adds a delay if a value gets added to the new item (to avoid confusing behavior)")] delay: @bool = true
     ){
@@ -45,7 +49,10 @@ impl @counter {
         
     },
     display: 
-    #[desc("Creates a item display object that displays the value of the counter")]
+    #[desc("Creates a item display object that displays the value of the counter") example("
+points = counter(0)
+points.display(75, 75)
+    ")]
     (
         self, 
         #[desc("X pos of display in units (1 grid square = 30 units)")] x, 
@@ -63,10 +70,16 @@ impl @counter {
     },
 
     add_to: 
-    #[desc("Adds the counter's value to all item IDs in a list, and resets the counter to 0 in the process")]
+    #[desc("Adds the counter's value to a counter (or all counters in a list), and resets the counter to 0 in the process") example("
+a = counter(100)
+b = counter(0)
+wait(1)
+a.add_to(b)
+// a is now 0, b is now 100
+    ")]
     (
         self, 
-        #[desc("Item IDs to add to")] items: @array, 
+        #[desc("Counter(s) to add to")] items: [@counter | @item] | @counter | @item, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         #[desc("Multiplyer for the value added")] factor: @number = 1,
         #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
@@ -79,8 +92,12 @@ impl @counter {
             mini_add = (num){
                 self.item.if_is(LARGER_THAN, num - 1, !{
                     self.add(-num)
-                    for item in items {
-                        item.add(num * factor)
+                    if items.type == @array {
+                        for item in items {
+                            item.add(num * factor)
+                        }
+                    } else {
+                        items.add(num * factor)
                     }
                     for_each(num)
                     call_with_delay(@epsilon::{}, add)
@@ -103,10 +120,16 @@ impl @counter {
     },
 
     subtract_from:
-    #[desc("Subtracts the counter's value from all item IDs in a list, and resets the counter to 0 in the process")]
+    #[desc("Subtracts the counter's value from another counter (or all counters in a list), and resets the counter to 0 in the process") example("
+a = counter(100)
+b = counter(70)
+wait(1)
+b.add_to(a)
+// a is now 30, b is now 0
+    ")]
     (
         self, 
-        #[desc("Item IDs to add to")] items: @array, 
+        #[desc("Counter(s) to subtract from")] items: [@counter | @item] | @counter | @item,  
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
         #[desc("Multiplyer for the value subtracted")] factor: @number = 1,
         #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
@@ -118,8 +141,12 @@ impl @counter {
                 mini_sub = (num){
                     self.item.if_is(LARGER_THAN, num - 1, !{
                         self.add(-num)
-                        for item in items {
-                            item.add(-num * factor)
+                        if items.type == @array {
+                            for item in items {
+                                item.add(-num * factor)
+                            }
+                        } else {
+                            items.add(-num * factor)
                         }
                         for_each(num)
                         call_with_delay(@epsilon::{}, sub)
@@ -142,7 +169,12 @@ impl @counter {
     },
 
     multiply:
-    #[desc("Multiplies the value of the counter by some factor (does not consume the factor)")]
+    #[desc("Multiplies the value of the counter by some factor (does not consume the factor)") example("
+c = counter(5)
+wait(1)
+c.multiply(10)
+// c is now 50
+    ")]
     (
         self,
         #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor: @counter | @number,
@@ -192,7 +224,14 @@ impl @counter {
     },
 
 
-    divide: #[desc("Devides the value of the counter by some divisor")]
+    divide: #[desc("Devides the value of the counter by some divisor") example("
+c = counter(7)
+r = counter(0)
+wait(1)
+
+c.divide(2, remainder = r)
+// c is now 3, r is now 1
+    ")]
     (
         self, 
         #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor: @counter | @number,
@@ -285,7 +324,7 @@ impl @counter {
                 mini_div(5^i)
                 wait(delay)
             }
-            -> divisor.reset(speed)
+            //-> divisor.reset(speed)
             self.add_to([remainder.item], speed)
             
             result.add_to([self.item], speed * 2)
@@ -301,7 +340,13 @@ impl @counter {
     },
 
     //will consume both numbers
-    compare: (self, other: @counter, speed: @number = DEFAULT_SPEED) {
+    compare: #[desc("Returns 0 if both counters are equal, 1 if the other is smaller, and -1 if the other is greater. After the macro the other counter will be equal to 0, while the first will be equal to the other minus the first") example("
+c1 = counter(10)
+c2 = counter(15)
+
+cmp = c1.compare(c2) // -1
+// c1 is now -5, c2 is now 0
+    ")](self, other: @counter, speed: @number = DEFAULT_SPEED) {
         other.subtract_from([self.item], speed)
         if self == 0 {
             -> return 0
@@ -312,7 +357,12 @@ impl @counter {
         }
     },
 
-    reset: #[desc("Resets counter to 0")]
+    reset: #[desc("Resets counter to 0") example("
+c = counter(100)
+wait(1)
+c.reset()
+// c is now 0
+    ")]
     (
         self, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
@@ -345,10 +395,16 @@ impl @counter {
         add!
     },
 
-    copy_to: #[desc("Copies the value of the counter to another item ID, without consuming the original")] 
+    copy_to: #[desc("Copies the value of the counter to another counter (or to all counters in a list), without consuming the original") example("
+c1 = counter(100)
+c2 = counter(0)
+wait(1)
+c1.copy_to(c2)
+// both counters are now 100  
+    ")] 
     (
         self, 
-        #[desc("Items to copy to")] items: [@item | @counter], 
+        #[desc("Items to copy to")] items: [@counter | @item] | @counter | @item, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED, 
         #[desc("Factor of to multiply the copy by")] factor: @number = 1
     ) {
@@ -362,8 +418,12 @@ impl @counter {
                     
                     self.item.if_is(LARGER_THAN, num - 1, !{
                         self.add(-num)
-                        for item in items {
-                            item.add(num * factor)
+                        if items.type == @array {
+                            for item in items {
+                                item.add(num * factor)
+                            }
+                        } else {
+                            items.add(num * factor)
                         }
                         temp_storage.add(num)
                         
@@ -387,16 +447,25 @@ impl @counter {
         add! 
     },
 
-    clone: #[desc("Copies the counter and -> returns the copy")] (
+    clone: #[desc("Copies the counter and returns the copy") example("
+c1 = counter(100)
+c2 = c1.clone()
+// c1 and c2 are now 100
+    ")] (
         self, 
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
         new_counter = ?i
         self.copy_to([new_counter], speed)
-        -> return @counter::new(new_counter, false)
+        return @counter::new(new_counter, false)
     },
 
-    _plus_: (self, other: @number | @counter) {
+    _plus_: #[desc("Implementation of the plus (`+`) operator") example("
+c = counter(10)
+c2 = c1 + 10
+// c2 is 20
+    ")]
+    (self, other: @number | @counter) {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.add(other)
@@ -410,7 +479,12 @@ impl @counter {
         }
     },
 
-    _minus_: (self, other: @number | @counter) {
+    _minus_: #[desc("Implementation of the minus (`-`) operator") example("
+c = counter(10)
+c2 = c1 - 3
+// c2 is 7
+    ")]
+    (self, other: @number | @counter) {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.add(-other)
@@ -420,34 +494,59 @@ impl @counter {
         }
     },
 
-    _times_: (self, num: @number | @counter) {
+    _times_: #[desc("Implementation of the times (`*`) operator") example("
+c = counter(10)
+c2 = c1 * 10
+// c2 is 100
+    ")]
+    (self, num: @number | @counter) {
         clone = self.clone()
         clone.multiply(num)
         -> return clone
         
     },
 
-    _divided_by_: (self, num: @number | @counter) {
+    _divided_by_: #[desc("Implementation of the divided by (`/`) operator") example("
+c = counter(100)
+c2 = c1 / 10
+// c2 is 10
+    ")]
+    (self, num: @number | @counter) {
         clone = self.clone()
         clone.divide(num)
         -> return clone
     },
 
-    _mod_: (self, num: @number | @counter) {
+    _mod_: #[desc("Implementation of the modulus (`%`) operator") example("
+c = counter(42)
+c2 = c1 % 10
+// c2 is 2
+    ")]
+    (self, num: @number | @counter) {
         clone = self.clone()
         out = @counter::new()
         clone.divide(num, remainder = out)
         -> return out
     },
 
-    _modulate_: (self, num: @number | @counter) {
+    _modulate_: #[desc("Implementation of the modulate (`%=`) operator") example("
+c = counter(42)
+c %= 10
+// c is 2
+    ")]
+    (self, num: @number | @counter) {
         out = @counter::new()
         self.divide(num, remainder = out)
         self.reset()
         out.add_to([self])
     },
 
-    _more_than_: (self, other: @number | @counter) {
+    _more_than_: #[desc("Implementation of the more than (`>`) operator") example("
+c = counter(42)
+more = c > 10
+// more is now true
+    ")]
+    (self, other: @number | @counter) {
         
         if other.type == @number {
             
@@ -468,7 +567,12 @@ impl @counter {
         }
     },
 
-    _less_than_: (self, other: @number | @counter) {
+    _less_than_: #[desc("Implementation of the less than (`<`) operator") example("
+c = counter(42)
+less = c < 42
+// less is now false
+    ")]
+    (self, other: @number | @counter) {
         
         if other.type == @number {
             
@@ -489,7 +593,12 @@ impl @counter {
         }
     },
 
-    _more_or_equal_: (self, other: @number | @counter) {
+    _more_or_equal_: #[desc("Implementation of the more than or equal (`>=`) operator") example("
+c = counter(42)
+more_or_eq = c >= 10
+// more_or_eq is now true
+    ")]
+    (self, other: @number | @counter) {
         
         if other.type == @number {
             
@@ -510,7 +619,12 @@ impl @counter {
         }
     },
 
-    _less_or_equal_: (self, other: @number | @counter) {
+    _less_or_equal_: #[desc("Implementation of the less than or equal (`<=`) operator") example("
+c = counter(42)
+less_or_eq = c <= 42
+// less_or_eq is now true
+    ")]
+    (self, other: @number | @counter) {
         
         if other.type == @number {
             
@@ -531,7 +645,12 @@ impl @counter {
         }
     },
 
-    _equal_: (self, other: @number | @counter) {
+    _equal_: #[desc("Implementation of the equals (`==`) operator") example("
+c = counter(42)
+eq = c == 42
+// eq is now true
+    ")]
+    (self, other: @number | @counter) {
         if other.type == @number {
             
             self.item.if_is(EQUAL_TO, other, !{
@@ -554,16 +673,28 @@ impl @counter {
         }
     },
 
-    _not_equal_: (self, other: @number | @counter) {
+    _not_equal_: #[desc("Implementation of the not equal (`!=`) operator") example("
+c = counter(42)
+not_eq = c != 42
+// not_eq is now false
+    ")](self, other: @number | @counter) {
         -> return !(self == other)
     },
 
-    add: #[desc("Implementation of the pickup trigger")]
+    add: #[desc("Implementation of the pickup trigger") example("
+c = counter(10)
+c.add(10)
+// c is now 20
+    ")]
     (self, #[desc("Amount to add")] num: @number) {
         self.item.add(num)
     },
 
-    _add_: (self, num: @number | @counter) {
+    _add_: #[desc("Implementation of the add (`+=`) operator") example("
+c = counter(10)
+c += 10
+// c is now 20
+    ")](self, num: @number | @counter) {
         if num.type == @number {
             
             self.add(num)
@@ -574,7 +705,11 @@ impl @counter {
         }
     },
 
-    _subtract_: (self, num: @number | @counter) {
+    _subtract_: #[desc("Implementation of the subtract (`-=`) operator") example("
+c = counter(20)
+c -= 5
+// c is now 15
+    ")](self, num: @number | @counter) {
         if num.type == @number {
             
             self.add(-num)
@@ -586,7 +721,11 @@ impl @counter {
         }
     },
 
-    _multiply_: (self, num: @number | @counter) {
+    _multiply_: #[desc("Implementation of the multiply (`*=`) operator") example("
+c = counter(5)
+c *= 6
+// c is now 30
+    ")](self, num: @number | @counter) {
         
         if num.type == @number {
             self.multiply(num)
@@ -597,7 +736,11 @@ impl @counter {
         }
     },
 
-    _divide_: (self, num: @number | @counter) {
+    _divide_: #[desc("Implementation of the divide (`/=`) operator") example("
+c = counter(30)
+c /= 6
+// c is now 5
+    ")](self, num: @number | @counter) {
         if num.type == @number {
             self.divide(num)
         } else if num.type == @counter {
@@ -607,7 +750,11 @@ impl @counter {
         }
     },
 
-    _assign_: (self, num: @number | @counter) {
+    _assign_: #[desc("Implementation of the assign (`=`) operator") example("
+c = counter(23)
+c = 42
+// c is now 42
+    ")](self, num: @number | @counter) {
         self.reset()
         if num.type == @number {
             if num > 0 {
@@ -620,21 +767,30 @@ impl @counter {
         }
     },
 
-    _swap_: (self, num: @counter) {
+    _swap_: #[desc("Implementation of the swap (`<=>`) operator") example("
+c = counter(23)
+c2 = counter(42)
+wait(1)
+c <=> c2
+// c is now 42, c2 is now 23
+    ")]
+    (self, num: @counter) {
         if num.type == @counter {
-            let swap_tmp = @counter::new(SWAP_ID);
-
-            num.copy_to([swap_tmp]);
-            wait()
-            self.copy_to([num]);
-            wait()
-            swap_tmp.copy_to([self]);
-        } else {
+            swap_tmp = @counter::new();
+            self.add_to(swap_tmp)
+            num.add_to(self)
+            swap_tmp.add_to(num)
+        }else {
             throw "Cannot swap counter with " + num.type as @string
         }
     },
 
-    to_const: #[desc("Converts the counter into a normal number (very context-splitting, be careful)")] (
+    to_const: #[desc("Converts the counter into a normal number (very context-splitting, be careful)") example("
+c = counter(3)
+wait(1)
+10g.move(c.to_const(0..10) * 10, 0, 1)
+// group ID 10 moves 3 blocks
+    ")] (
         self, 
         #[desc("Array or range of possible output values")] range: [@number] | @range
     ) {
@@ -646,7 +802,14 @@ impl @counter {
         }
     },
 
-    to_const_enclosed: #[desc("Converts the counter into a normal number that you can use within a macro")] (
+    to_const_enclosed: #[desc("Converts the counter into a normal number that you can use within a macro") example("
+c = counter(3)
+wait(1)
+c.to_const_enclosed(0..10, (c_const) {
+    10g.move(c_const * 10, 0, 1)
+})
+// group ID 10 moves 3 blocks
+    ")] (
         self, 
         #[desc("Array or range of possible output values")] range: [@number] | @range,
         #[desc("Closure where you can use the const value, should take the value as the first argument")] closure: @macro,
@@ -659,7 +822,12 @@ impl @counter {
         }
     },
     
-    _as_: (self, _type: @type_indicator) {
+    _as_: #[desc("Implementation of the as (`as`) operator") example("
+c = counter(1)
+b = c as @bool
+// b is now true
+    ")]
+    (self, _type: @type_indicator) {
         if _type == @bool {
             -> return self != 0
         } else {

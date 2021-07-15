@@ -1746,6 +1746,11 @@ impl ast::Variable {
                 
         //     }
         // }
+        if !self.tag.tags.is_empty() {
+            for (val, _) in &out {
+                if let Value::Macro(m) = &mut globals.stored_values[*val] { m.tag.tags.extend(self.tag.tags.clone()) }
+            }
+        }
 
         Ok((out, inner_returns))
     }

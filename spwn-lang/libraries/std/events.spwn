@@ -6,7 +6,11 @@ extract constants.obj_props
 type @event
 
 impl @event {
-    on: #[desc("Triggers a function every time an event fires")] (
+    on: #[desc("Triggers a function every time an event fires") example("
+on(touch(), !{
+    10g.move(10, 0)
+})
+    ")] (
         #[desc("Event to trigger on")] event: @event, 
         #[desc("Function to trigger")] function: @trigger_function
     ){
@@ -16,7 +20,11 @@ impl @event {
 
 return {
     
-    touch: #[desc("Implementation of the touch trigger (returns an event)")] (
+    touch: #[desc("Implementation of the touch trigger (returns an event)") example("
+on(touch(), !{
+    10g.move(10, 0)
+})
+    ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) {
         return @event::{
@@ -32,7 +40,11 @@ return {
         
     },
 
-    touch_end: #[desc("Returns an event for when a touch ends")] (
+    touch_end: #[desc("Returns an event for when a touch ends") example("
+on(touch_end(), !{
+    10g.move(-10, 0)
+})
+    ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) {
         return @event::{
@@ -48,7 +60,11 @@ return {
         
     },
 
-    collision: #[desc("Implementation of the collision trigger (returns an event)")] (
+    collision: #[desc("Implementation of the collision trigger (returns an event)") example("
+on(collision(1b, 2b), !{
+    BG.set(255, 0, 0)
+})
+    ")] (
         #[desc("Block A ID")] a: @block, 
         #[desc("Block B ID")] b: @block
     ) {
@@ -66,7 +82,11 @@ return {
         
     },
 
-    collision_exit: #[desc("Returns an event for when a collision exits")] (
+    collision_exit: #[desc("Returns an event for when a collision exits") example("
+on(collision_exit(1b, 2b), !{
+    BG.set(0, 0, 0)
+})
+    ")] (
         #[desc("Block A ID")] a: @block, 
         #[desc("Block B ID")] b: @block
     ) {
@@ -83,7 +103,11 @@ return {
         }
     },
 
-    death: #[desc("Returns an event for when the player dies")] (){
+    death: #[desc("Returns an event for when the player dies") example("
+on(death(), !{
+    BG.set(0, 0, 0)
+})
+    ")] (){
         return @event::{
             on_triggered: (function) => $.add( trigger{
                 OBJ_ID: 1812,

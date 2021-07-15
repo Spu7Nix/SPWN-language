@@ -1,101 +1,113 @@
   
-
 # **@obj_set**: 
  
 ## **add**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Add all the objects in the set to the game_
->
->  
 >
 
 ## **copy**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Create a copy of all the objects in this set as a new set_
->
->  
 >
 
 ## **is\_empty**:
 
-> **Value:** `(self) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Returns true if this set contains no objects, false otherwise._
->
->  
+>### Example: 
+>```spwn
+> $.assert(@obj_set::new().is_empty())
+>```
 >
 
 ## **new**:
 
-> **Value:** `(objects: @array, group: @group = ?g) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(objects: @array = [], group: @group = ?g) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
+>## Description: 
+> _Creates a new object set_
 >### Example: 
 >```spwn
-> @obj_set::new([]);
+> my_objects = @obj_set::new()
 >```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 1 | **`objects`** | @array | | |
->  | 2 | `group` | @group | `?g` |The group to use for rotation (?) |
->  
->  
+>| 1 | `objects` | @array | `[]` | |
+>| 2 | `group` | @group | `?g` |The center group to use for rotation |
 >
 
 ## **push**:
 
-> **Value:** `(self, object: @object) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, object: @object) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Add new objects to the set_
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`object`** | @object | | |
->  
->  
+>| 1 | **`object`** | @object | | |
 >
 
 ## **rotate**:
 
-> **Value:** `(self, deg: @number) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(self, deg: @number) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Applies a single rotation value to all of the objects in this set_
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`deg`** | @number | | |
->  
->  
+>| 1 | **`deg`** | @number | | |
 >
 
 ## **rotate\_relative**:
 
-> **Type:** `@macro` 
->
+> **Value:** 
+>```spwn
+>(self, center_group: @group, deg: @number, duration: @number, easing: @easing_type, easing_rate: @number, lock_object_rotation: @bool) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Rotates objects in a set around a centerpoint_
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
->| 2 | **`center_group`** | @group | | |
->  | 3 | **`deg`** | @number | | |
->  | 4 | **`duration`** | @number | | |
->  | 5 | **`easing`** | @easing_type | | |
->  | 6 | **`easing_rate`** | @number | | |
->  | 7 | **`lock_object_rotation`** | @bool | | |
->  
->  
+>| 1 | **`center_group`** | @group | | |
+>| 2 | **`deg`** | @number | | |
+>| 3 | **`duration`** | @number | | |
+>| 4 | **`easing`** | @easing_type | | |
+>| 5 | **`easing_rate`** | @number | | |
+>| 6 | **`lock_object_rotation`** | @bool | | |
 >

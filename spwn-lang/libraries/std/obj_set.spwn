@@ -3,12 +3,12 @@ extract import "constants.spwn"
 type @obj_set
 
 impl @obj_set {
-    new: #[example("
-@obj_set::new([]);
+    new: #[desc("Creates a new object set") example("
+my_objects = @obj_set::new()
     ")]
     (
-        objects: @array, 
-        #[desc("The group to use for rotation (?)")] group: @group = ?g
+        objects: @array = [], 
+        #[desc("The center group to use for rotation")] group: @group = ?g
     ) {
         if objects.any(elem => elem.type != @object) {
             throw "Unsupported type while creating obj_set" 
@@ -20,7 +20,7 @@ impl @obj_set {
             group: group,
         }
     },
-    is_empty: #[desc("Returns true if this set contains no objects, false otherwise.")]
+    is_empty: #[desc("Returns true if this set contains no objects, false otherwise.") example("$.assert(@obj_set::new().is_empty())")]
     (self) {
         return self.objects.is_empty();
     },

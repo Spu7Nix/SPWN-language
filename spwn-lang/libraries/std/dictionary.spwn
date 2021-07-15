@@ -4,7 +4,10 @@ import "array.spwn"
 type @dict_not_found;
 
 impl @dictionary {
-	is_empty: #[desc("Returns true if there are no entries in the dictionary, false otherwise.")]
+	is_empty: #[desc("Returns true if there are no entries in the dictionary, false otherwise.") example("
+dict = {}
+$.assert(dict.is_empty())
+	")]
 	(self) {
 		// no way to get number of entries currently afaik
 		// so this 'loop' will get skipped over if empty,
@@ -14,7 +17,14 @@ impl @dictionary {
 		}
 		return true;
 	},
-	keys: #[desc("Gets the dictionary's keys.")]
+	keys: #[desc("Gets the dictionary's keys.") example("
+wares = {
+	apple: 10,
+	gold: 1000,
+	peanuts: 5,
+}
+$.assert(wares.keys() == ['apple', 'gold', 'peanuts'])
+	")]
 	(self) {
 		let ret = []
 		for kv in self {
@@ -22,7 +32,14 @@ impl @dictionary {
 		}
 		return ret
 	},
-	values: #[desc("Gets the dictionary's values.")]
+	values: #[desc("Gets the dictionary's values.") example("
+wares = {
+	apple: 10,
+	gold: 1000,
+	peanuts: 5,
+}
+$.assert(wares.values() == [10, 1000, 5])
+	")]
 	(self) {
 		let ret = []
 		for kv in self {
@@ -30,7 +47,18 @@ impl @dictionary {
 		}
 		return ret
 	},
-	items: #[desc("Gets the dictionary's items.")]
+	items: #[desc("Gets the dictionary's items.") example("
+wares = {
+	apple: 10,
+	gold: 1000,
+	peanuts: 5,
+}
+$.assert(wares.items() == [
+	['apple', 10],
+	['gold', 1000],
+	['peanuts', 5],
+])
+	")]
 	(self) {
 		let ret = []
 		for kv in self {
@@ -38,7 +66,18 @@ impl @dictionary {
 		}
 		return ret
 	},
-	set: #[desc("Sets an item in the dictionary.")]
+	set: #[desc("Sets an item in the dictionary.") example("
+let wares = {
+	apple: 10,
+	gold: 1000,
+}
+wares.set('peanuts', 5)
+$.assert(wares == {
+	apple: 10,
+	gold: 1000,
+	peanuts: 5,
+})
+	")]
 	(self, key: @string, val) {
 		if self has key {
 			self[key] = val
@@ -46,23 +85,49 @@ impl @dictionary {
 			let self[key] = val
 		}
 	},
-	get: #[desc("Gets an item from the dictionary.")]
-	(self, key: @string, value = @dict_not_found::{}) {
+	get: #[desc("Gets an item from the dictionary.") example("
+let wares = {
+	apple: 10,
+	gold: 1000,
+	peanuts: 5,
+}
+
+$.assert(wares.get('peanuts') == 5)
+$.assert(wares.get('silver', default = 42) == 42)
+	")]
+	(self, key: @string, default = @dict_not_found::{}) {
 		if self has key {
 			return self[key]
 		} else {
-			if value.type == @dict_not_found {
+			if default.type == @dict_not_found {
 				throw "Key doesn't exist and no fallback was provided"
 			} else {
-				return value
+				return default
 			}
 		}
 	},
-	clear: #[desc("Clears the dictionary.")]
+	clear: #[desc("Clears the dictionary.") example("
+let wares = {
+	apple: 10,
+	gold: 1000,
+	peanuts: 5,
+}
+wares.clear()
+
+$.assert(wares.is_empty())
+	")]
 	(self) {
 		self = {}
 	},
-	contains_value: #[desc("See if array contains a value.")]
+	contains_value: #[desc("Checks if the dictionary contains a value.") example("
+let wares = {
+	apple: 10,
+	gold: 1000,
+	peanuts: 5,
+}
+
+$.assert(wares.contains(5))
+	")]
 	(self, value) {
 		return self.values().contains(value)
 	}
