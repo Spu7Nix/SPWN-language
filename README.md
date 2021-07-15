@@ -107,24 +107,3 @@ Build a file called subtraction.spwn but dont write to a level.
 
 `spwn build AI.spwn -c`
 Build a file called AI.spwn and output the level string to the console.
-
-
-## Todo before release:
-
-- [x] Finish mutable variables
-- [x] Type annotations for function arguments, variable definitions etc.
-- [x] `as` operator for automatically changing type
-- [ ] finish documentation
-- [x] break/continue statement
-- [x] operation order
-- [x] escaped characters in string
-- [x] fix post-compile optimizations
-
-## Todo at some point
-
-- [x] implement live editor features for windows
-- [ ] make it work on linux
-- [x] nested comments
-- [x] get and edit obj and trigger properties
-
-# Enjoy SPWN!
