@@ -37,12 +37,15 @@ You can either use the installers for your operating system, or build SPWN frmo 
 
 Alright, enough talk, how do we actually use spwn?
 
-SPWN code can be programmed in any code editor, but the ones that have had SPWN extensions or plugins written for them are [Visual Studio Code](https://code.visualstudio.com/), and [Vim](https://www.vim.org/).
+SPWN code can be programmed in any code editor, but the ones that have had SPWN extensions or plugins written for them are [Visual Studio Code](https://code.visualstudio.com/), [Sublime Text](https://www.sublimetext.com/) and [Vim](https://www.vim.org/).
 
 ###### VSCode
 Navigate to [VSCode SPWN language support](https://marketplace.visualstudio.com/items?itemName=Spu7Nix.spwn-language-support) and hit install. In VSCode, hit enable and then create a new file with the extension .spwn
 - Note: Make sure to have the file in the same directory as the libraries folder
 VSCode should automatically change the language syntax to SPWN, but if it dosent, navigate to the bottom right of the screen and click on `select language mode`, then select SPWN.
+
+###### Sublime Text
+
 
 ###### Vim
 Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-viml) and follow to instructions on that page.
