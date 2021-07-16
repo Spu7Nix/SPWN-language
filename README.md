@@ -45,7 +45,7 @@ Navigate to [VSCode SPWN language support](https://marketplace.visualstudio.com/
 VSCode should automatically change the language syntax to SPWN, but if it dosent, navigate to the bottom right of the screen and click on `select language mode`, then select SPWN.
 
 ###### Sublime Text
-
+Open Sublime Text and open the Command Palette... by selecting Command Palette from the Tools pull-down menu. In the menu that opens type install which will result in the Install Package Control option being presented. Hit Enter or left click the entry to install Package Control. Open the Command Palette again, and type 'install'. When `Package Control: Install Package` is highlighted press 'Enter' then type 'SPWN Language' and press 'Enter' when `SPWN Language` is highlighted.
 
 ###### Vim
 Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-viml) and follow to instructions on that page.
