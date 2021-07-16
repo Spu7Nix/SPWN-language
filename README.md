@@ -58,7 +58,7 @@ Head to the [docs](https://spu7nix.net/spwn/#/) to create a simple program, such
 ```
 test = 5g
 -> test.move(5, 100, 0.25)
-test.move(10,-10, 2)
+test.move(10, -10, 2)
 ```
 
 Save the file, then open a command line and type in `spwn build YOURFILENAME.spwn`. Make sure to have GD closed during this process. After running this command, reopen GD, and the levels content will be modified. Head over to the docs to learn how to program in SPWN.
