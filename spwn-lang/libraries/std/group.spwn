@@ -9,8 +9,12 @@ extract import "util.spwn"
 
 impl @group {
     
-    _range_: create_range_macro(@group),
-    move: #[desc("Implementation of the move trigger")] 
+    _range_: #[desc("Implementation of the range operator (`..`) for groups") example("
+for group in 1g..10g {
+    -> group.move(10, 0, 0.5)
+}
+    ")] create_range_macro(@group),
+    move: #[desc("Implementation of the move trigger") example("10g.move(100, 0, 0.5, easing = EASE_IN_OUT)")] 
     (
         self, 
         #[desc("Units to move on the X axis")] x: @number, 
@@ -32,7 +36,7 @@ impl @group {
         wait(duration)
     },
 
-    lock_to_player: #[desc("Lock group to player position")] 
+    lock_to_player: #[desc("Lock group to player position") example("10g.lock_to_player(lock_x = true, duration = 20)")] 
     (
         self,
         #[desc("Lock to player X")] lock_x: @bool = true,
@@ -48,7 +52,14 @@ impl @group {
         })
     },
 
-    stop: #[desc("Implementation of the stop trigger")]
+    stop: #[desc("Implementation of the stop trigger") example("
+move = !{
+    10g.move(1000, 0, 10)
+}
+move!
+wait(2)
+move.start_group.stop()
+    ")]
     (self){
         $.add( trigger{
             OBJ_ID: 1616,
@@ -56,7 +67,7 @@ impl @group {
         })
     },
 
-    alpha: #[desc("Implementation of the alpha trigger")] 
+    alpha: #[desc("Implementation of the alpha trigger") example("1g.alpha(0)")] 
     (self, opacity: @number = 1, duration: @number = 0){
         $.add( trigger {
             OBJ_ID: 1007,
@@ -68,7 +79,7 @@ impl @group {
     },
 
     toggle_on:
-    #[desc("Toggles the group on")] 
+    #[desc("Toggles the group on") example("10g.toggle_on()")] 
     (self){
         $.add( trigger{
             OBJ_ID: 1049,
@@ -77,7 +88,7 @@ impl @group {
         })
     },
 
-    toggle_off: #[desc("Toggles the group off")] 
+    toggle_off: #[desc("Toggles the group off") example("10g.toggle_off()")] 
     (self){
         $.add( trigger{
             OBJ_ID: 1049,
@@ -86,7 +97,10 @@ impl @group {
         })
     },
 
-    rotate: #[desc("Implementation of the rotate trigger")] 
+    rotate: #[desc("Implementation of the rotate trigger") example("
+center = 3g
+10g.rotate(center, 360, 2, easing = EASE_IN_OUT)
+    ")] 
     (
         self, 
         #[desc("Group of object to rotate around")] center: @group, 
@@ -110,7 +124,7 @@ impl @group {
     },
 
     follow: 
-    #[desc("Implementation of the follow trigger")]
+    #[desc("Implementation of the follow trigger") example("10g.follow(11g)")]
     (
         self, 
         #[desc("Group of object to follow")] other: @group, 
@@ -130,7 +144,7 @@ impl @group {
     },
 
     follow_player_y:
-    #[desc("Implementation of the follow player Y trigger")] 
+    #[desc("Implementation of the follow player Y trigger") example("10g.follow_player_y(delay = 0.5)")] 
     (
         self, 
         #[desc("Interpolation factor (?)")] speed: @number = 1, 
@@ -152,7 +166,7 @@ impl @group {
     },
 
     move_to: 
-    #[desc("Implementation of the 'Move target' feature of the move trigger")]
+    #[desc("Implementation of the 'Move target' feature of the move trigger. Remember that both groups can only contain one object.") example("10g.move_to(20g)")]
     (
         self, 
         #[desc("Group of the object to move to")] target: @group, 
@@ -188,7 +202,7 @@ impl @group {
     },
 
     pulse: 
-    #[desc("Implementation of the pulse trigger for groups")]
+    #[desc("Implementation of the pulse trigger for groups") example("10g.pulse(255, 0, 0, fade_out = 0.5)")]
     (
         self, 
         #[desc("Red value of pulse color (or hue if HSV is enabled)")] r: @number, 

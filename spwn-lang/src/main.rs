@@ -3,14 +3,16 @@
 mod ast;
 mod builtin;
 mod compiler;
+mod compiler_info;
 mod compiler_types;
 mod documentation;
 mod fmt;
+mod globals;
 mod levelstring;
 mod parser;
+mod value;
 
-mod optimize;
-
+mod context;
 #[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
 #[cfg_attr(windows, path = "editorlive_win.rs")]
 #[cfg_attr(
@@ -18,6 +20,8 @@ mod optimize;
     path = "editorlive_unavailable.rs"
 )]
 mod editorlive;
+mod optimize;
+mod value_storage;
 
 use optimize::optimize;
 

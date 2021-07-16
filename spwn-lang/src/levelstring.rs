@@ -2,6 +2,7 @@
 use crate::ast::ObjectMode;
 use crate::builtin::*;
 use crate::compiler_types::*;
+use crate::context::Context;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -26,7 +27,7 @@ impl fmt::Display for ObjParam {
             | ObjParam::Color(Color { id })
             | ObjParam::Block(Block { id })
             | ObjParam::Item(Item { id }) => match id {
-                ID::Specific(id) => write!(f, "{}", id),
+                Id::Specific(id) => write!(f, "{}", id),
                 _ => write!(f, "0"),
             },
             ObjParam::Number(n) => {
@@ -42,7 +43,7 @@ impl fmt::Display for ObjParam {
                 let mut out = String::new();
 
                 for g in list {
-                    if let ID::Specific(id) = g.id {
+                    if let Id::Specific(id) = g.id {
                         out += &(id.to_string() + ".")
                     } else {
                         out += "?."
@@ -56,7 +57,7 @@ impl fmt::Display for ObjParam {
     }
 }
 #[derive(Clone, PartialEq, Debug)]
-pub struct GDObj {
+pub struct GdObj {
     /*pub obj_id: u16,
     pub groups: Vec<Group>,
     pub target: Group,
@@ -66,11 +67,11 @@ pub struct GDObj {
     pub mode: ObjectMode,
     pub unique_id: usize,
     pub sync_group: usize,
-    pub sync_part: SyncPartID,
+    pub sync_part: SyncPartId,
 }
 
-impl GDObj {
-    pub fn context_parameters(&mut self, context: &Context) -> GDObj {
+impl GdObj {
+    pub fn context_parameters(&mut self, context: &Context) -> GdObj {
         self.params.insert(57, ObjParam::Group(context.start_group));
 
         (*self).clone()
@@ -153,13 +154,13 @@ const START_HEIGHT: u16 = 10;
 const MAX_HEIGHT: u16 = 40;
 
 pub const SPWN_SIGNATURE_GROUP: Group = Group {
-    id: ID::Specific(1001),
+    id: Id::Specific(1001),
 };
 //use crate::ast::ObjectMode;
 
 pub fn remove_spwn_objects(file_content: &mut String) {
     let spwn_group = match SPWN_SIGNATURE_GROUP.id {
-        ID::Specific(n) => n.to_string(),
+        Id::Specific(n) => n.to_string(),
         _ => unreachable!(),
     };
     (*file_content) = file_content
@@ -184,7 +185,7 @@ pub fn remove_spwn_objects(file_content: &mut String) {
 
 //returns the string to be appended to the old string
 pub fn append_objects(
-    mut objects: Vec<GDObj>,
+    mut objects: Vec<GdObj>,
     old_ls: &str,
 ) -> Result<(String, [usize; 4]), String> {
     let mut closed_ids = get_used_ids(&old_ls);
@@ -221,7 +222,7 @@ pub fn append_objects(
             }
             for id in id {
                 match id {
-                    ID::Specific(i) => {
+                    Id::Specific(i) => {
                         closed_ids[class_index].insert(i);
                     }
                     _ => continue,
@@ -231,7 +232,7 @@ pub fn append_objects(
     }
 
     //find new ids for all the arbitrary ones
-    let mut id_maps: [HashMap<ArbitraryID, SpecificID>; 4] = [
+    let mut id_maps: [HashMap<ArbitraryId, SpecificId>; 4] = [
         HashMap::new(),
         HashMap::new(),
         HashMap::new(),
@@ -243,7 +244,7 @@ pub fn append_objects(
     for obj in &mut objects {
         for prop in obj.params.values_mut() {
             let class_index;
-            let ids: Vec<&mut ID>;
+            let ids: Vec<&mut Id>;
             match prop {
                 ObjParam::Group(g) => {
                     class_index = 0;
@@ -269,8 +270,8 @@ pub fn append_objects(
             }
             for id in ids {
                 match &id {
-                    ID::Arbitrary(i) => {
-                        *id = ID::Specific(match id_maps[class_index].get(i) {
+                    Id::Arbitrary(i) => {
+                        *id = Id::Specific(match id_maps[class_index].get(i) {
                             Some(a) => *a,
                             None => {
                                 let mut out = None;
@@ -286,7 +287,7 @@ pub fn append_objects(
                                     id
                                 } else {
                                     return Err(format!(
-                                        "This level exeeds the {} limit!",
+                                        "This level exceeds the {} limit!",
                                         ["group", "color", "block ID", "item ID"][class_index]
                                     ));
                                 }
@@ -301,7 +302,7 @@ pub fn append_objects(
     for (i, list) in closed_ids.iter().enumerate() {
         if list.len() > ID_MAX as usize {
             return Err(format!(
-                "This level exeeds the {} limit! ({}/{})",
+                "This level exceeds the {} limit! ({}/{})",
                 ["group", "color", "block ID", "item ID"][i],
                 list.len(),
                 ID_MAX
@@ -311,7 +312,7 @@ pub fn append_objects(
 
     //println!("group_map: {:?}", id_maps[0]);
 
-    fn serialize_obj(mut trigger: GDObj) -> String {
+    fn serialize_obj(mut trigger: GdObj) -> String {
         let mut obj_string = String::new();
         match trigger.mode {
             ObjectMode::Object => {
@@ -397,18 +398,18 @@ pub fn append_objects(
     ))
 }
 
-pub fn apply_fn_ids(func_ids: &[FunctionID]) -> Vec<GDObj> {
+pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
     //println!("{:?}", trigger);
 
     fn apply_fn_id(
         id_index: usize,
-        func_ids: &[FunctionID],
+        func_ids: &[FunctionId],
         x_offset: u32,
         y_offset: u16,
-    ) -> (Vec<GDObj>, u32) {
+    ) -> (Vec<GdObj>, u32) {
         let id = func_ids[id_index].clone();
 
-        let mut objects = Vec::<GDObj>::new();
+        let mut objects = Vec::<GdObj>::new();
 
         let mut current_x = 0;
         /*if !id.obj_list.is_empty() {
@@ -440,7 +441,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionID]) -> Vec<GDObj> {
                             // Some(ObjParam::GroupList(l)) => {
                             //     l.iter().any(|x| x.id != ID::Specific(0))
                             // }
-                            Some(ObjParam::Group(g)) => g.id != ID::Specific(0),
+                            Some(ObjParam::Group(g)) => g.id != Id::Specific(0),
                             _ => unreachable!(),
                         },
                     };
@@ -486,7 +487,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionID]) -> Vec<GDObj> {
         (objects, current_x)
     }
 
-    let mut full_obj_list = Vec::<GDObj>::new();
+    let mut full_obj_list = Vec::<GdObj>::new();
 
     let mut current_x = 0;
     for (i, func_id) in func_ids.iter().enumerate() {

@@ -1,16 +1,16 @@
 //! Abstract Syntax Tree (AST) type definitions
 
+use crate::compiler_types::ImportType;
 use crate::fmt::SpwnFmt;
-
-use crate::compiler_types::{ImportType, StoredValue};
 use crate::parser::FileRange;
+use crate::value_storage::StoredValue;
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
     Def((String, Expression)),
     Extract(Expression),
 }
 
-pub type Comment = (Option<String>, Option<String>);
+//pub type Comment = (Option<String>, Option<String>);
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Statement {
@@ -56,7 +56,7 @@ impl ValueLiteral {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ValueBody {
-    ID(ID),
+    Id(Id),
     Number(f64),
     CmpStmt(CompoundStatement),
     Dictionary(Vec<DictDef>),
@@ -84,7 +84,7 @@ impl ValueBody {
             pos: ((0, 0), (0, 0)),
             //comment: (None, None),
             path: Vec::new(),
-            tag: Tag::new(),
+            tag: Attribute::new(),
         }
     }
 }
@@ -147,7 +147,7 @@ pub enum UnaryOperator {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum IDClass {
+pub enum IdClass {
     Group,
     Color,
     Item,
@@ -155,13 +155,13 @@ pub enum IDClass {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Tag {
+pub struct Attribute {
     pub tags: Vec<(String, Vec<Argument>)>,
 }
 
-impl Tag {
+impl Attribute {
     pub fn new() -> Self {
-        Tag { tags: Vec::new() }
+        Attribute { tags: Vec::new() }
     }
     pub fn get(&self, t: &str) -> Option<Vec<Argument>> {
         for (key, args) in &self.tags {
@@ -186,6 +186,21 @@ impl Tag {
             }
 
             None => None,
+        }
+    }
+
+    pub fn get_example(&self) -> Option<String> {
+        if let Some(args) = self.get("example") {
+            if args.is_empty() {
+                None
+            } else {
+                match &args[0].value.values[0].value.body {
+                    ValueBody::Str(s) => Some(s.trim().to_string()),
+                    val => Some(val.fmt(0)),
+                }
+            }
+        } else {
+            None
         }
     }
 }
@@ -225,7 +240,7 @@ impl Argument {
                     operator: None,
                     pos: ((0, 0), (0, 0)),
                     //comment: (None, None),
-                    tag: Tag::new(),
+                    tag: Attribute::new(),
                 }],
                 operators: Vec::new(),
             },
@@ -251,12 +266,12 @@ pub struct Native {
     pub args: Vec<Argument>,
 }*/
 //                 name         def value     props       type ind.
-pub type ArgDef = (String, Option<Expression>, Tag, Option<Expression>);
+pub type ArgDef = (String, Option<Expression>, Attribute, Option<Expression>);
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
     pub args: Vec<ArgDef>,
     pub body: CompoundStatement,
-    pub properties: Tag,
+    pub properties: Attribute,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -296,7 +311,7 @@ pub struct Variable {
     pub path: Vec<Path>,
     pub pos: FileRange,
     //pub comment: Comment,
-    pub tag: Tag,
+    pub tag: Attribute,
 }
 
 impl Variable {
@@ -321,9 +336,9 @@ pub struct Expression {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Ternary {
-    pub conditional: Expression,
-    pub do_if: Expression,
-    pub do_else: Expression,
+    pub condition: Expression,
+    pub if_expr: Expression,
+    pub else_expr: Expression,
 }
 
 impl Expression {
@@ -334,7 +349,7 @@ impl Expression {
             pos: ((0, 0), (0, 0)),
             path: Vec::new(),
             //comment: (None, None),
-            tag: Tag::new(),
+            tag: Attribute::new(),
         }
     }
 }
@@ -358,8 +373,8 @@ pub struct If {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct ID {
+pub struct Id {
     pub number: u16,
     pub unspecified: bool,
-    pub class_name: IDClass,
+    pub class_name: IdClass,
 }

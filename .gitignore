@@ -2,3 +2,4 @@ spwn-lang/target
 spwn-lang/.vscode
 **/*.rs.bk
 .DS_Store
+spwn-lang/std-docs

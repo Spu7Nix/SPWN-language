@@ -7,9 +7,13 @@ extract import "control_flow.spwn"
 extract import "util.spwn"
 impl @color {
     
-    _range_: create_range_macro(@color),
+    _range_: #[desc("Implementation of the range operator (`..`) for colors") example("
+for color in 1c..10c {
+    -> color.set(0,0,0, 0.5)
+}
+    ")] create_range_macro(@color),
     set: 
-    #[desc("Implementation of the color trigger")]
+    #[desc("Implementation of the color trigger") example("BG.set(0, 0, 0, 0.5) // turns the background color black")]
     (
         self, 
         #[desc("Red value of the target color")] r: @number, 
@@ -33,7 +37,7 @@ impl @color {
         wait(duration)
     }, //1,899,2,285,3,105,36,1,7,255,8,255,9,255,10,0.5,35,0;
 
-    pulse: #[desc("Implementation of the pulse trigger for colors")]
+    pulse: #[desc("Implementation of the pulse trigger for colors") example("BG.pulse(255, 0, 0, fade_out = 0.5) // pulses the background red")]
     (
         self, 
         #[desc("Red value of pulse color (or hue if HSV is enabled)")] r: @number, 

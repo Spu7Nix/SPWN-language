@@ -246,7 +246,7 @@ impl SpwnFmt for ValueBody {
     fn fmt(&self, ind: Indent) -> String {
         use ValueBody::*;
         match self {
-            ID(x) => x.fmt(ind),
+            Id(x) => x.fmt(ind),
             Number(x) => format!("{}", x),
             CmpStmt(x) => format!("{{\n{}\n{}}}", x.fmt(ind + 4), tabs(ind)),
             Dictionary(x) => element_list(x, '{', '}', ind),
@@ -269,9 +269,9 @@ impl SpwnFmt for ValueBody {
             SelfVal => "self".to_string(),
             Ternary(t) => format!(
                 "{} if {} else {}",
-                t.do_if.fmt(ind),
-                t.conditional.fmt(ind),
-                t.do_else.fmt(ind)
+                t.if_expr.fmt(ind),
+                t.condition.fmt(ind),
+                t.else_expr.fmt(ind)
             ),
             Switch(_, _) => "switch".to_string(),
         }
@@ -284,13 +284,13 @@ impl SpwnFmt for ValueLiteral {
     }
 }
 
-impl SpwnFmt for IDClass {
+impl SpwnFmt for IdClass {
     fn fmt(&self, _ind: Indent) -> String {
         match self {
-            IDClass::Group => "g",
-            IDClass::Color => "c",
-            IDClass::Item => "i",
-            IDClass::Block => "b",
+            IdClass::Group => "g",
+            IdClass::Color => "c",
+            IdClass::Item => "i",
+            IdClass::Block => "b",
         }
         .to_string()
     }
@@ -395,7 +395,7 @@ impl SpwnFmt for Expression {
     }
 }
 
-impl SpwnFmt for ID {
+impl SpwnFmt for Id {
     fn fmt(&self, ind: Indent) -> String {
         if self.unspecified {
             format!("?{}", self.class_name.fmt(ind))
@@ -558,7 +558,7 @@ impl SpwnFmt for (String, Vec<Argument>) {
     }
 }
 
-impl SpwnFmt for Tag {
+impl SpwnFmt for Attribute {
     fn fmt(&self, ind: Indent) -> String {
         if self.tags.is_empty() {
             return String::new();

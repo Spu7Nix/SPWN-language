@@ -1,16 +1,20 @@
 //! Defining all native types (and functions?)
-
 use crate::ast::ObjectMode;
-use crate::compiler::{RuntimeError, BUILTIN_STORAGE, CONTEXT_MAX, NULL_STORAGE};
+use crate::compiler::{RuntimeError, NULL_STORAGE};
 use crate::compiler_types::*;
+use crate::context::*;
+use crate::globals::Globals;
 use crate::levelstring::*;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+use crate::value::*;
+use crate::value_storage::*;
 use std::io::stdout;
 use std::io::Write;
 //use text_io;
+use crate::compiler_info::CompilerInfo;
 
 macro_rules! arg_length {
     ($info:expr , $count:expr, $args:expr , $message:expr) => {
@@ -23,106 +27,106 @@ macro_rules! arg_length {
     };
 }
 
-pub type ArbitraryID = u16;
-pub type SpecificID = u16;
+pub type ArbitraryId = u16;
+pub type SpecificId = u16;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum ID {
-    Specific(SpecificID),
-    Arbitrary(ArbitraryID), // will be given specific ids at the end of compilation
+pub enum Id {
+    Specific(SpecificId),
+    Arbitrary(ArbitraryId), // will be given specific ids at the end of compilation
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Group {
-    pub id: ID,
+    pub id: Id,
 }
 
 impl Group {
-    pub fn new(id: SpecificID) -> Self {
+    pub fn new(id: SpecificId) -> Self {
         //creates new specific group
         Group {
-            id: ID::Specific(id),
+            id: Id::Specific(id),
         }
     }
 
-    pub fn next_free(counter: &mut ArbitraryID) -> Self {
+    pub fn next_free(counter: &mut ArbitraryId) -> Self {
         //creates new specific group
         (*counter) += 1;
         Group {
-            id: ID::Arbitrary(*counter),
+            id: Id::Arbitrary(*counter),
         }
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Color {
-    pub id: ID,
+    pub id: Id,
 }
 
 impl Color {
-    pub fn new(id: SpecificID) -> Self {
+    pub fn new(id: SpecificId) -> Self {
         //creates new specific color
         Self {
-            id: ID::Specific(id),
+            id: Id::Specific(id),
         }
     }
 
-    pub fn next_free(counter: &mut ArbitraryID) -> Self {
+    pub fn next_free(counter: &mut ArbitraryId) -> Self {
         //creates new specific color
         (*counter) += 1;
         Self {
-            id: ID::Arbitrary(*counter),
+            id: Id::Arbitrary(*counter),
         }
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Block {
-    pub id: ID,
+    pub id: Id,
 }
 
 impl Block {
-    pub fn new(id: SpecificID) -> Self {
+    pub fn new(id: SpecificId) -> Self {
         //creates new specific block
         Self {
-            id: ID::Specific(id),
+            id: Id::Specific(id),
         }
     }
 
-    pub fn next_free(counter: &mut ArbitraryID) -> Self {
+    pub fn next_free(counter: &mut ArbitraryId) -> Self {
         //creates new specific block
         (*counter) += 1;
         Self {
-            id: ID::Arbitrary(*counter),
+            id: Id::Arbitrary(*counter),
         }
     }
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Item {
-    pub id: ID,
+    pub id: Id,
 }
 
 impl Item {
-    pub fn new(id: SpecificID) -> Self {
+    pub fn new(id: SpecificId) -> Self {
         //creates new specific item id
         Self {
-            id: ID::Specific(id),
+            id: Id::Specific(id),
         }
     }
 
-    pub fn next_free(counter: &mut ArbitraryID) -> Self {
+    pub fn next_free(counter: &mut ArbitraryId) -> Self {
         //creates new specific item id
         (*counter) += 1;
         Self {
-            id: ID::Arbitrary(*counter),
+            id: Id::Arbitrary(*counter),
         }
     }
 }
 
-pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GDObj {
+pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GdObj {
     let mut params = HashMap::new();
     params.insert(57, ObjParam::Group(context.start_group));
     (*uid_counter) += 1;
-    GDObj {
+    GdObj {
         params: HashMap::new(),
         func_id: context.func_id,
         mode: ObjectMode::Trigger,
@@ -231,12 +235,17 @@ impl Value {
             let my_type = self.to_num(globals);
 
             match self {
-                Value::Builtins => Some(store_value(
-                    Value::BuiltinFunction(member),
-                    1,
-                    globals,
-                    context,
-                )),
+                Value::Builtins => {
+                    if !BUILTIN_LIST.contains(&member.as_str()) {
+                        return None;
+                    }
+                    Some(store_value(
+                        Value::BuiltinFunction(member),
+                        1,
+                        globals,
+                        context,
+                    ))
+                }
                 Value::Dict(dict) => match dict.get(&member) {
                     Some(value) => Some(*value),
                     None => get_impl(my_type, member),
@@ -260,7 +269,14 @@ impl Value {
 }
 
 pub const BUILTIN_LIST: &[&str] = &[
+    "assert",
     "print",
+    "time",
+    "get_input",
+    "matches",
+    "b64encode",
+    "b64decode",
+    "spwn_version",
     "sin",
     "cos",
     "tan",
@@ -271,20 +287,15 @@ pub const BUILTIN_LIST: &[&str] = &[
     "ceil",
     "add",
     "append",
-    "edit_obj",
-    "get_input",
-    "pop",
-    "remove_index",
     "split_str",
+    "edit_obj",
+    "mutability",
+    "extend_trigger_func",
     "readfile",
+    "pop",
     "substr",
-    "matches",
-    "b64encode",
-    "b64decode",
-    "mutability", // for testing purposes
-    "time",
-    "get_input",
-    "spwn_version",
+    "remove_index",
+    "regex",
     //operators
     "_or_",
     "_and_",
@@ -327,6 +338,28 @@ pub fn built_in_function(
     context: &Context,
 ) -> Result<Value, RuntimeError> {
     Ok(match name {
+        "assert" => {
+            arg_length!(info, 1, arguments, "Expected one argument".to_string());
+            match &globals.stored_values[arguments[0]] {
+                Value::Bool(b) => {
+                    if !b {
+                        return Err(RuntimeError::BuiltinError {
+                            message: String::from("Assertion failed"),
+                            info,
+                        });
+                    } else {
+                        Value::Null
+                    }
+                }
+
+                a => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected boolean, found {}", a.to_str(globals)),
+                        info,
+                    })
+                }
+            }
+        }
         "print" => {
             let mut out = String::new();
             for val in arguments {
@@ -359,7 +392,12 @@ pub fn built_in_function(
         }
 
         "get_input" => {
-            arg_length!(info, 0, arguments, "Expected no arguments".to_string());
+            arg_length!(
+                info,
+                1,
+                arguments,
+                "Expected one arguments, the prompt".to_string()
+            );
             let mut out = String::new();
             for val in arguments {
                 out += &globals.stored_values[val].to_str(globals);
@@ -510,14 +548,14 @@ pub fn built_in_function(
 
                     match mode {
                         ObjectMode::Object => {
-                            if context.start_group.id != ID::Specific(0) {
+                            if context.start_group.id != Id::Specific(0) {
                                 return Err(RuntimeError::BuiltinError { // objects cant be added dynamically, of course
                                     message: String::from("you cannot add an obj type object in a trigger function context. Consider moving this add function call to another context, or changing the object to a trigger type"), 
                                     info
                                 });
                             }
                             (*globals).uid_counter += 1;
-                            let obj = GDObj {
+                            let obj = GdObj {
                                 params: obj_map,
                                 func_id: context.func_id,
                                 mode: ObjectMode::Object,
@@ -528,7 +566,7 @@ pub fn built_in_function(
                             (*globals).objects.push(obj)
                         }
                         ObjectMode::Trigger => {
-                            let obj = GDObj {
+                            let obj = GdObj {
                                 params: obj_map,
                                 mode: ObjectMode::Trigger,
                                 ..c_t
@@ -652,7 +690,7 @@ pub fn built_in_function(
                 Value::Obj(_o, m) => {
                     //println!("{:?}", *o);
                     //println!("context {:?}", context);
-                    if context.start_group.id != ID::Specific(0) {
+                    if context.start_group.id != Id::Specific(0) {
                         return Err(RuntimeError::BuiltinError { // editing objects dynamically? not possible
                             message: String::from("You cannot edit an obj type object in a trigger function context. Consider moving this edit function call to another context"), 
                             info
@@ -1072,6 +1110,77 @@ pub fn built_in_function(
             }
         }
 
+        "regex" => {
+            use regex::Regex;
+
+            arg_length!(
+                info,
+                4,
+                arguments,
+                "Expected four arguments, a string for regex, a string to process, type of regex operation to perform, string for \"replace\" mode (?)"
+                    .to_string()
+            );
+
+            if let Value::Str(s) = &globals.stored_values[arguments[0]] {
+                if let Ok(r) = Regex::new(s) {
+                    if let Value::Str(s) = &globals.stored_values[arguments[1]] {
+                        if let Value::Str(mode) = &globals.stored_values[arguments[2]] {
+                            match &**mode {
+                                "match" => return Ok(Value::Bool(r.is_match(s))),
+                                "replace" => {
+                                    match &globals.stored_values[arguments[3]] {
+                                        Value::Str(replacer) => {
+                                            return Ok(Value::Str(r.replace_all(s, replacer).to_string()))
+                                        }
+                                        _ => {
+                                            return Err(
+                                                RuntimeError::BuiltinError {
+                                                    message: format!("Invalid or missing replacer. Expected @string, found @{}", &globals.get_type_str(arguments[3])),
+                                                    info
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(RuntimeError::BuiltinError {
+                                        message: format!(
+                                            "Invalid regex mode \"{}\" in regex {}. Expected \"match\" or \"replace\"",
+                                            mode, r
+                                        ),
+                                        info,
+                                    })
+                                }
+                            }
+                        } else {
+                            return Err(RuntimeError::TypeError {
+                                expected: "String".into(),
+                                found: globals.get_type_str(arguments[2]),
+                                info,
+                            });
+                        }
+                    } else {
+                        return Err(RuntimeError::TypeError {
+                            expected: "String".into(),
+                            found: globals.get_type_str(arguments[1]),
+                            info,
+                        });
+                    }
+                } else {
+                    return Err(RuntimeError::BuiltinError {
+                        message: "Failed to build regex (invalid syntax)".to_string(),
+                        info,
+                    });
+                }
+            } else {
+                return Err(RuntimeError::TypeError {
+                    expected: "String".into(),
+                    found: globals.get_type_str(arguments[0]),
+                    info,
+                });
+            }
+        }
+
         "_or_" | "_and_" | "_more_than_" | "_less_than_" | "_more_or_equal_"
         | "_less_or_equal_" | "_divided_by_" | "_intdivided_by_" | "_times_" | "_mod_"
         | "_pow_" | "_plus_" | "_minus_" | "_equal_" | "_not_equal_" | "_assign_" | "_swap_"
@@ -1149,7 +1258,6 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
                             )
                         }
                         _ => {
-                            println!("{:?}", val_a);
                             return Err(RuntimeError::RuntimeError {
                                 message: format!(
                                     "range start: expected @number, found @{}",
@@ -1687,7 +1795,7 @@ Consider defining it with 'let', or implementing a '{}' macro on its type.",
 
         a => {
             return Err(RuntimeError::RuntimeError {
-                message: format!("Nonexistant builtin-function: {}", a),
+                message: format!("Nonexistent builtin-function: {}", a),
                 info,
             })
         }

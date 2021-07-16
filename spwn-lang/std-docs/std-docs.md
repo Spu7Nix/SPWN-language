@@ -2,10 +2,10 @@
 _Generated using `spwn doc [file name]`_
 ## Info:
 
-- Uses 0 groups
+- Uses 1 groups
 - Uses 0 colors
 - Uses 0 block IDs
-- Uses 2 item IDs
+- Uses 1 item IDs
 
 - Adds 0 objects
 # Type Implementations:
@@ -18,3913 +18,4584 @@ _Generated using `spwn doc [file name]`_
 - [**@array**](std-docs/array.md)
 - [**@object**](std-docs/object.md)
 - [**@event**](std-docs/event.md)
+- [**@obj_set**](std-docs/obj_set.md)
 - [**@counter**](std-docs/counter.md)
 - [**@file**](std-docs/file.md)
+- [**@regex**](std-docs/regex.md)
 # Exports:
  **Type:** `@dictionary` 
 
-
-
 ## Macros:
-
 
 ## **call\_with\_delay**:
 
-> **Value:** `(time: @number | @epsilon = @epsilon::{}, function: @trigger_function) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(time: @number | @epsilon = @epsilon::{}, function: @trigger_function) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Call a function after a delay_
+>### Example: 
+>```spwn
+> BG.set(255, 0, 0) // turn background red
+>call_with_delay(2, !{
+>	BG.set(0, 255, 0) // turn background green 2 seconds later
+>})
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | `time` | @number or @epsilon | `@epsilon::{}` |Delay time in seconds (leave empty for minimum delay) |
->  | 2 | **`function`** | @trigger_function | |Function to call after the delay |
->  
->  
+>| 2 | **`function`** | @trigger_function | |Function to call after the delay |
 >
 
 ## **collision**:
 
-> **Value:** `(a: @block, b: @block) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(a: @block, b: @block) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Implementation of the collision trigger (returns an event)_
+>### Example: 
+>```spwn
+> on(collision(1b, 2b), !{
+>    BG.set(255, 0, 0)
+>})
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | **`a`** | @block | |Block A ID |
->  | 2 | **`b`** | @block | |Block B ID |
->  
->  
+>| 2 | **`b`** | @block | |Block B ID |
 >
 
 ## **collision\_exit**:
 
-> **Value:** `(a: @block, b: @block) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(a: @block, b: @block) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Returns an event for when a collision exits_
+>### Example: 
+>```spwn
+> on(collision_exit(1b, 2b), !{
+>    BG.set(0, 0, 0)
+>})
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | **`a`** | @block | |Block A ID |
->  | 2 | **`b`** | @block | |Block B ID |
->  
->  
+>| 2 | **`b`** | @block | |Block B ID |
 >
 
 ## **counter**:
 
-> **Value:** `(source: @number | @item | @bool = 0, delay: @bool = true) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(source: @number | @item | @bool = 0, delay: @bool = true) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Creates a new counter_
+>### Example: 
+>```spwn
+> @counter::new()     // creates a new counter with a starting value of 0
+>@counter::new(10)   // creates a new counter with a starting value of 10
+>@counter::new(5i)   // creates a new counter thaat uses item ID 5
+>@counter::new(true)   // creates a new counter with a starting value of true (1)
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | `source` | @number or @item or @bool | `0` |Source (can be a number, item ID or boolean) |
->  | 2 | `delay` | @bool | `true` |Adds a delay if a value gets added to the new item (to avoid confusing behavior) |
->  
->  
+>| 2 | `delay` | @bool | `true` |Adds a delay if a value gets added to the new item (to avoid confusing behavior) |
 >
 
 ## **death**:
 
-> **Value:** `() { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>() { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Returns an event for when the player dies_
->
->  
+>### Example: 
+>```spwn
+> on(death(), !{
+>    BG.set(0, 0, 0)
+>})
+>```
 >
 
 ## **disable\_trail**:
 
-> **Value:** `() { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>() { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Disables the player's trail_
->
->  
+>### Example: 
+>```spwn
+> disable_trail()
+>```
 >
 
 ## **do\_while\_loop**:
 
-> **Value:** `(expr: @macro, code: @macro, delay: @number | @epsilon = @epsilon::{}) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(expr: @macro, code: @macro, delay: @number | @epsilon = @epsilon::{}) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Implementation of a conditional spawn loop_
+>### Example: 
+>```spwn
+> c = counter(4)
+>
+>do_while_loop(() => c > 10, () {
+>	c -= 2
+>})
+>
+>// c is now 2
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | **`expr`** | @macro | |While loop condition, should -> return a boolean |
->  | 2 | **`code`** | @macro | |Macro of the code that gets looped |
->  | 3 | `delay` | @number or @epsilon | `@epsilon::{}` |Delay between loops (less than 0.05 may be unstable) |
->  
->  
+>| 2 | **`code`** | @macro | |Macro of the code that gets looped |
+>| 3 | `delay` | @number or @epsilon | `@epsilon::{}` |Delay between loops (less than 0.05 may be unstable) |
 >
 
 ## **enable\_trail**:
 
-> **Value:** `() { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>() { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Enables the player's trail_
->
->  
+>### Example: 
+>```spwn
+> enable_trail()
+>```
 >
 
 ## **for\_loop**:
 
-> **Type:** `@macro` 
->
+> **Value:** 
+>```spwn
+>(range: @range, code: @macro, delay: @number | @epsilon = @epsilon::{}, reset: @bool = true, reset_speed: @number = 1) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Implementation of a spawn loop with a counter_
+>### Example: 
+>```spwn
+> for_loop(0..10, (i) {
+>	if i < 5 {
+>		10g.move(-10, 0)
+>	} else {
+>		10g.move(10, 0)
+>	}
+>})
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | **`range`** | @range | |Range of values (for example 0..10) |
->  | 2 | **`code`** | @macro | |Macro of the code that gets looped, should take the iterator (a counter) as the first argument. |
->  | 3 | `delay` | @number or @epsilon | `@epsilon::{}` |Delay between loops (less than 0.05 may be unstable) |
->  | 4 | `reset` | @bool | `true` |Weather to reset the iterator after looping (only disable if the loop is only triggered once) |
->  | 5 | `reset_speed` | @number | `1` |Operation speed of the reset of the iterator, if enabled |
->  
->  
+>| 2 | **`code`** | @macro | |Macro of the code that gets looped, should take the iterator (a counter) as the first argument. |
+>| 3 | `delay` | @number or @epsilon | `@epsilon::{}` |Delay between loops (less than 0.05 may be unstable) |
+>| 4 | `reset` | @bool | `true` |Weather to reset the iterator after looping (only disable if the loop is only triggered once) |
+>| 5 | `reset_speed` | @number | `1` |Operation speed of the reset of the iterator, if enabled |
 >
 
 ## **hide\_player**:
 
-> **Value:** `() { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>() { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Hides the player_
+>### Example: 
+>```spwn
+> hide_player()
+>```
 >
->  
+
+## **obj\_set**:
+
+> **Value:** 
+>```spwn
+>(objects: @array = [], group: @group = ?g) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
+>## Description: 
+> _Creates a new object set_
+>### Example: 
+>```spwn
+> my_objects = @obj_set::new()
+>```
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 1 | `objects` | @array | `[]` | |
+>| 2 | `group` | @group | `?g` |The center group to use for rotation |
 >
 
 ## **on**:
 
-> **Value:** `(event: @event, function: @trigger_function) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(event: @event, function: @trigger_function) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Triggers a function every time an event fires_
+>### Example: 
+>```spwn
+> on(touch(), !{
+>    10g.move(10, 0)
+>})
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | **`event`** | @event | |Event to trigger on |
->  | 2 | **`function`** | @trigger_function | |Function to trigger |
->  
->  
+>| 2 | **`function`** | @trigger_function | |Function to trigger |
 >
 
 ## **open**:
 
-> **Value:** `(path: @string) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(path: @string) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
+>## Description: 
+> _Creates a new file IO object_
+>### Example: 
+>```spwn
+> @file::new('C:/path/to/file.txt')
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | **`path`** | @string | | |
->  
->  
+>
+
+## **regex**:
+
+> **Value:** 
+>```spwn
+>(re: @string) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
+>## Description: 
+> _Create a new instance of regex_
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 1 | **`re`** | @string | |A regex string. Make sure to use two backslashes to escape selectors instead of one or it will error |
 >
 
 ## **shake**:
 
-> **Value:** `(strength: @number = 1, interval: @number = 0, duration: @number = 0.5) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(strength: @number = 1, interval: @number = 0, duration: @number = 0.5) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Implementation of the shake trigger_
+>### Example: 
+>```spwn
+> shake()
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | `strength` | @number | `1` |Strength value |
->  | 2 | `interval` | @number | `0` |Interval value |
->  | 3 | `duration` | @number | `0.5` |Duration of shake |
->  
->  
+>| 2 | `interval` | @number | `0` |Interval value |
+>| 3 | `duration` | @number | `0.5` |Duration of shake |
 >
 
 ## **show\_player**:
 
-> **Value:** `() { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>() { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Shows the player_
->
->  
+>### Example: 
+>```spwn
+> show_player()
+>```
 >
 
 ## **supress\_signal**:
 
-> **Value:** `(delay: @number) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(delay: @number) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Stops signal from coming past for some time_
+>### Example: 
+>```spwn
+> f = !{
+>	supress_signal(1)
+>	10g.move(10, 0)
+>}
+>
+>f! // moves
+>wait(0.4)
+>f! // does nothing
+>wait(0.4)
+>f! // does nothing
+>wait(0.4)
+>f! // moves
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | **`delay`** | @number | |Time to supress signal |
->  
->  
 >
 
 ## **supress\_signal\_forever**:
 
-> **Value:** `() { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>() { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Stops signal from coming past after call_
->
->  
->
-
-## **supress\_signal\_quick**:
-
-> **Value:** `(delay: @number) { /* code omitted */ }` (`@macro`) 
->
->## Description: 
-> _Stops signal from coming past for some time (better for quick/glitchy signals)_
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 1 | **`delay`** | @number | |Time to supress signal |
->  
->  
+>### Example: 
+>```spwn
+> f = !{
+>	supress_signal_forever()
+>	10g.move(10, 0)
+>}
+>f! // moves
+>wait(0.4)
+>f! // does nothing
+>wait(1000)
+>f! // does nothing
+>```
 >
 
 ## **toggle\_bg\_effect**:
 
-> **Value:** `(on: @bool = false) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(on: @bool = false) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Implementation of the bg effect on/off triggers_
+>### Example: 
+>```spwn
+> toggle_bg_effect(false)
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | `on` | @bool | `false` |Weather to toggle bg effect on or off |
->  
->  
 >
 
 ## **touch**:
 
-> **Value:** `(dual_side: @bool = false) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(dual_side: @bool = false) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Implementation of the touch trigger (returns an event)_
+>### Example: 
+>```spwn
+> on(touch(), !{
+>    10g.move(10, 0)
+>})
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | `dual_side` | @bool | `false` |Dual mode (only check for touch on the dual side) |
->  
->  
 >
 
 ## **touch\_end**:
 
-> **Value:** `(dual_side: @bool = false) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(dual_side: @bool = false) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Returns an event for when a touch ends_
+>### Example: 
+>```spwn
+> on(touch_end(), !{
+>    10g.move(-10, 0)
+>})
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | `dual_side` | @bool | `false` |Dual mode (only check for touch on the dual side) |
->  
->  
 >
 
 ## **wait**:
 
-> **Value:** `(time: @number | @epsilon = @epsilon::{}) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(time: @number | @epsilon = @epsilon::{}) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Adds a delay before the next triggers_
+>### Example: 
+>```spwn
+> BG.set(255, 0, 0) // turn background red
+>wait(2) // wait 2 seconds
+>BG.set(0, 255, 0) // turn background green
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | `time` | @number or @epsilon | `@epsilon::{}` |Delay time in seconds (leave empty for minimum delay) |
->  
->  
 >
 
 ## **while\_loop**:
 
-> **Value:** `(expr: @macro, code: @macro, delay: @number | @epsilon = @epsilon::{}) { /* code omitted */ }` (`@macro`) 
->
+> **Value:** 
+>```spwn
+>(expr: @macro, code: @macro, delay: @number | @epsilon = @epsilon::{}) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
 >## Description: 
 > _Implementation of a conditional spawn loop_
+>### Example: 
+>```spwn
+> c = counter(11)
+>
+>while_loop(() => c > 4, () {
+>	c -= 2
+>})
+>
+>// c is now 3
+>```
 >## Arguments:
 >
 >| # | name | type | default value | description |
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | **`expr`** | @macro | |While loop condition, should -> return a boolean |
->  | 2 | **`code`** | @macro | |Macro of the code that gets looped |
->  | 3 | `delay` | @number or @epsilon | `@epsilon::{}` |Delay between loops (less than 0.05 may be unstable) |
->  
->  
+>| 2 | **`code`** | @macro | |Macro of the code that gets looped |
+>| 3 | `delay` | @number or @epsilon | `@epsilon::{}` |Delay between loops (less than 0.05 may be unstable) |
 >
 ## Other values:
 
-
 ## **BACK\_IN**:
 
-> **Value:** `@easing_type::{id: 17}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 17}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `17` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>17
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **BACK\_IN\_OUT**:
 
-> **Value:** `@easing_type::{id: 16}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 16}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `16` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>16
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **BACK\_OUT**:
 
-> **Value:** `@easing_type::{id: 18}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 18}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `18` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>18
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **BG**:
 
-> **Value:** `1000c` (`@color`) 
->
->
->  
+> **Value:** 
+>```spwn
+>1000c
+>``` 
+>**Type:** `@color` 
 >
 
 ## **BOUNCE\_IN**:
 
-> **Value:** `@easing_type::{id: 8}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 8}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `8` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>8
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **BOUNCE\_IN\_OUT**:
 
-> **Value:** `@easing_type::{id: 7}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 7}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `7` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>7
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **BOUNCE\_OUT**:
 
-> **Value:** `@easing_type::{id: 9}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 9}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `9` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>9
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **EASE\_IN**:
 
-> **Value:** `@easing_type::{id: 2}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 2}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `2` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>2
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **EASE\_IN\_OUT**:
 
-> **Value:** `@easing_type::{id: 1}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 1}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `1` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>1
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **EASE\_OUT**:
 
-> **Value:** `@easing_type::{id: 3}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 3}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `3` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>3
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **ELASTIC\_IN**:
 
-> **Value:** `@easing_type::{id: 5}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 5}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `5` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>5
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **ELASTIC\_IN\_OUT**:
 
-> **Value:** `@easing_type::{id: 4}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 4}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `4` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>4
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **ELASTIC\_OUT**:
 
-> **Value:** `@easing_type::{id: 6}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 6}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `6` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>6
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **EQUAL\_TO**:
 
-> **Value:** `@comparison::{id: 0}` (`@comparison`) 
->
+> **Value:** 
+>```spwn
+>@comparison::{id: 0}
+>``` 
+>**Type:** `@comparison` 
 >
 >## **id**:
 >
->> **Value:** `0` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>0
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@comparison` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@comparison
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **EXPONENTIAL\_IN**:
 
-> **Value:** `@easing_type::{id: 11}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 11}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `11` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>11
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **EXPONENTIAL\_IN\_OUT**:
 
-> **Value:** `@easing_type::{id: 10}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 10}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `10` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>10
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **EXPONENTIAL\_OUT**:
 
-> **Value:** `@easing_type::{id: 12}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 12}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `12` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>12
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
 >
->  
+
+## **GROUND**:
+
+> **Value:** 
+>```spwn
+>1001c
+>``` 
+>**Type:** `@color` 
+>
+
+## **GROUND2**:
+
+> **Value:** 
+>```spwn
+>1009c
+>``` 
+>**Type:** `@color` 
 >
 
 ## **LARGER\_THAN**:
 
-> **Value:** `@comparison::{id: 1}` (`@comparison`) 
->
+> **Value:** 
+>```spwn
+>@comparison::{id: 1}
+>``` 
+>**Type:** `@comparison` 
 >
 >## **id**:
 >
->> **Value:** `1` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>1
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@comparison` (`@type_indicator`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>@comparison
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
 >
->  
+
+## **LINE**:
+
+> **Value:** 
+>```spwn
+>1002c
+>``` 
+>**Type:** `@color` 
 >
 
 ## **NONE**:
 
-> **Value:** `@easing_type::{id: 0}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 0}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `0` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>0
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
 >
->  
+
+## **OBJECT**:
+
+> **Value:** 
+>```spwn
+>1004c
+>``` 
+>**Type:** `@color` 
 >
 
 ## **SINE\_IN**:
 
-> **Value:** `@easing_type::{id: 14}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 14}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `14` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>14
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **SINE\_IN\_OUT**:
 
-> **Value:** `@easing_type::{id: 13}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 13}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `13` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>13
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **SINE\_OUT**:
 
-> **Value:** `@easing_type::{id: 15}` (`@easing_type`) 
->
+> **Value:** 
+>```spwn
+>@easing_type::{id: 15}
+>``` 
+>**Type:** `@easing_type` 
 >
 >## **id**:
 >
->> **Value:** `15` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>15
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@easing_type` (`@type_indicator`) 
+>> **Value:** 
+>>```spwn
+>>@easing_type
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
->>
->>  
->>
->
->  
 >
 
 ## **SMALLER\_THAN**:
 
-> **Value:** `@comparison::{id: 2}` (`@comparison`) 
->
+> **Value:** 
+>```spwn
+>@comparison::{id: 2}
+>``` 
+>**Type:** `@comparison` 
 >
 >## **id**:
 >
->> **Value:** `2` (`@number`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>2
+>>``` 
+>>**Type:** `@number` 
 >>
 >
 >## **type**:
 >
->> **Value:** `@comparison` (`@type_indicator`) 
->>
->>
->>  
+>> **Value:** 
+>>```spwn
+>>@comparison
+>>``` 
+>>**Type:** `@type_indicator` 
 >>
 >
->  
+
+## **\_3DLINE**:
+
+> **Value:** 
+>```spwn
+>1003c
+>``` 
+>**Type:** `@color` 
 >
 
 ## **obj\_props**:
 
 > **Type:** `@dictionary` 
 >
->
 >## **ACTIVATE\_GROUP**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 56}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 56}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `56` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>56
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **ACTIVATE\_ON\_EXIT**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 93}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 93,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `93` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>93
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **ACTIVE\_TRIGGER**:
 >
->> **Value:** `@object_key::{id: 36,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 36}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `36` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>36
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **ANIMATION\_ID**:
 >
->> **Value:** `@object_key::{id: 76,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 76,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `76` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>76
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **ANIMATION\_SPEED**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 107}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 107}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `107` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>107
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **BLENDING**:
 >
->> **Value:** `@object_key::{id: 17,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 17}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `17` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>17
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **BLOCK\_A**:
 >
->> **Value:** `@object_key::{pattern: @block,id: 80}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @block,id: 80}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `80` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>80
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@block` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@block
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **BLOCK\_B**:
 >
->> **Value:** `@object_key::{pattern: @block,id: 95}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 95,pattern: @block}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `95` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>95
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@block` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@block
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **CENTER**:
 >
->> **Value:** `@object_key::{pattern: @group,id: 71}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @group,id: 71}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `71` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>71
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@group` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@group
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **COLOR**:
 >
->> **Value:** `@object_key::{pattern: @color,id: 21}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 21,pattern: @color}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `21` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>21
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@color` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@color
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **COLOR\_2**:
 >
->> **Value:** `@object_key::{id: 22,pattern: @color}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @color,id: 22}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `22` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>22
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@color` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@color
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **COLOR\_2\_HVS**:
 >
->> **Value:** `@object_key::{pattern: @string,id: 44}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @string,id: 44}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `44` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>44
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@string` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@string
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **COLOR\_2\_HVS\_ENABLED**:
 >
->> **Value:** `@object_key::{id: 42,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 42}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `42` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>42
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **COMPARISON**:
 >
->> **Value:** `@object_key::{id: 88,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 88,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `88` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>88
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **COPIED\_COLOR\_HVS**:
 >
->> **Value:** `@object_key::{id: 49,pattern: @string}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 49,pattern: @string}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `49` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>49
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@string` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@string
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **COPIED\_COLOR\_ID**:
 >
->> **Value:** `@object_key::{pattern: @color,id: 50}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @color,id: 50}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `50` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>50
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@color` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@color
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
->## **COPY\_OPACTITY**:
+>## **COPY\_OPACITY**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 60}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 60,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `60` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>60
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **COUNT**:
 >
->> **Value:** `@object_key::{id: 77,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 77,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `77` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>77
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **COUNT\_MULTI\_ACTIVATE**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 104}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 104}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `104` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>104
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **DELAY**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 91}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 91,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `91` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>91
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **DETAIL\_ONLY**:
 >
->> **Value:** `@object_key::{id: 66,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 66,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `66` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>66
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **DISABLE\_ROTATION**:
 >
->> **Value:** `@object_key::{id: 98,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 98}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `98` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>98
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **DONT\_ENTER**:
 >
->> **Value:** `@object_key::{id: 67,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 67,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `67` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>67
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **DONT\_FADE**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 64}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 64}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `64` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>64
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **DUAL\_MODE**:
 >
->> **Value:** `@object_key::{id: 89,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 89}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `89` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>89
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **DURATION**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 10}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 10}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `10` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>10
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **DYNAMIC\_BLOCK**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 94}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 94}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `94` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>94
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **EASING**:
 >
->> **Value:** `@object_key::{id: 30,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 30,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `30` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>30
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **EASING\_RATE**:
 >
->> **Value:** `@object_key::{id: 85,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 85,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `85` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>85
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **EDITOR\_DISABLE**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 102}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 102,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `102` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>102
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **EDITOR\_LAYER\_1**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 20}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 20,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `20` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>20
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **EDITOR\_LAYER\_2**:
 >
->> **Value:** `@object_key::{id: 61,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 61}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `61` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>61
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **EXCLUSIVE**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 86}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 86,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `86` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>86
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **FADE\_IN**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 45}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 45}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `45` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>45
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **FADE\_OUT**:
 >
->> **Value:** `@object_key::{id: 47,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 47}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `47` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>47
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **FOLLOW**:
 >
->> **Value:** `@object_key::{pattern: @group,id: 71}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 71,pattern: @group}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `71` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>71
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@group` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@group
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **GLOW\_DISABLED**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 96}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 96}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `96` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>96
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **GROUPS**:
 >
->> **Value:** `@object_key::{id: 57,pattern: [@group] | @group}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 57,pattern: [@group] | @group}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `57` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>57
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `[@group] | @group` (`@pattern`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>[@group] | @group
+>>>``` 
+>>>**Type:** `@pattern` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **GROUP\_PARENT**:
 >
->> **Value:** `@object_key::{id: 34,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 34,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `34` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>34
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **HIGH\_DETAIL**:
 >
->> **Value:** `@object_key::{id: 103,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 103}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `103` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>103
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **HOLD**:
 >
->> **Value:** `@object_key::{id: 46,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 46,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `46` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>46
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **HOLD\_MODE**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 81}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 81,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `81` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>81
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **HORIZONTAL\_FLIP**:
 >
->> **Value:** `@object_key::{id: 4,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 4}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `4` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>4
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **HVS**:
 >
->> **Value:** `@object_key::{pattern: @string,id: 43}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @string,id: 43}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `43` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>43
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@string` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@string
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **HVS\_ENABLED**:
 >
->> **Value:** `@object_key::{id: 41,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 41,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `41` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>41
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **INTERVAL**:
 >
->> **Value:** `@object_key::{id: 84,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 84}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `84` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>84
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **ITEM**:
 >
->> **Value:** `@object_key::{pattern: @item,id: 80}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @item,id: 80}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `80` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>80
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@item` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@item
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **LINKED\_GROUP**:
 >
->> **Value:** `@object_key::{id: 108,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 108,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `108` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>108
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **LOCK\_OBJECT\_ROTATION**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 70}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 70,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `70` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>70
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **LOCK\_TO\_PLAYER\_X**:
 >
->> **Value:** `@object_key::{id: 58,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 58}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `58` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>58
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **LOCK\_TO\_PLAYER\_Y**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 59}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 59}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `59` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>59
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **MAIN\_ONLY**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 65}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 65}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `65` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>65
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **MAX\_SPEED**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 105}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 105,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `105` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>105
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **MOVE\_X**:
 >
->> **Value:** `@object_key::{id: 28,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 28,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `28` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>28
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **MOVE\_Y**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 29}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 29}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `29` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>29
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **MULTI\_TRIGGER**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 87}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 87,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `87` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>87
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **OBJ\_ID**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 1}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 1}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `1` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>1
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **OPACITY**:
 >
->> **Value:** `@object_key::{id: 35,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 35}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `35` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>35
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **PICKUP\_MODE**:
 >
->> **Value:** `@object_key::{id: 79,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 79}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `79` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>79
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **PLAYER\_COLOR\_1**:
 >
->> **Value:** `@object_key::{id: 15,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 15}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `15` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>15
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **PLAYER\_COLOR\_2**:
 >
->> **Value:** `@object_key::{id: 16,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 16,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `16` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>16
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **PORTAL\_CHECKED**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 13}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 13,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `13` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>13
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **PULSE\_HSV**:
 >
->> **Value:** `@object_key::{id: 48,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 48,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `48` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>48
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **RANDOMIZE\_START**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 106}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @bool,id: 106}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `106` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>106
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **ROTATE\_DEGREES**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 68}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 68}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `68` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>68
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **ROTATION**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 6}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 6}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `6` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>6
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **ROTATION\_SPEED**:
 >
->> **Value:** `@object_key::{id: 97,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 97}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `97` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>97
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **SCALING**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 32}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 32,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `32` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>32
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **SPAWN\_DURATION**:
 >
->> **Value:** `@object_key::{pattern: @number | @epsilon,id: 63}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 63,pattern: @number | @epsilon}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `63` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>63
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number | @epsilon` (`@pattern`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number | @epsilon
+>>>``` 
+>>>**Type:** `@pattern` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **SPAWN\_TRIGGERED**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 62}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 62,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `62` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>62
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **SPEED**:
 >
->> **Value:** `@object_key::{id: 90,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 90,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `90` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>90
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **STRENGTH**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 75}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 75}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `75` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>75
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **SUBTRACT\_COUNT**:
 >
->> **Value:** `@object_key::{id: 78,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 78}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `78` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>78
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TARGET**:
 >
->> **Value:** `@object_key::{id: 51,pattern: @color | @group | @trigger_function}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @color | @group | @trigger_function,id: 51}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `51` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>51
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@color | @group | @trigger_function` (`@pattern`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@color | @group | @trigger_function
+>>>``` 
+>>>**Type:** `@pattern` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TARGET\_COLOR**:
 >
->> **Value:** `@object_key::{pattern: @color,id: 23}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 23,pattern: @color}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `23` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>23
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@color` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@color
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TARGET\_POS**:
 >
->> **Value:** `@object_key::{id: 71,pattern: @group}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @group,id: 71}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `71` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>71
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@group` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@group
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TARGET\_POS\_AXES**:
 >
->> **Value:** `@object_key::{id: 101,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 101}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `101` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>101
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TARGET\_TYPE**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 52}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 52,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `52` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>52
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TEXT**:
 >
->> **Value:** `@object_key::{pattern: @string,id: 31}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 31,pattern: @string}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `31` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>31
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@string` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@string
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TIMES\_360**:
 >
->> **Value:** `@object_key::{id: 69,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 69,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `69` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>69
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TOGGLE\_MODE**:
 >
->> **Value:** `@object_key::{id: 82,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 82,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `82` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>82
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TOUCH\_TRIGGERED**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 11}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 11,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `11` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>11
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TRIGGER\_BLUE**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 9}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 9,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `9` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>9
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TRIGGER\_GREEN**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 8}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 8,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `8` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>8
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **TRIGGER\_RED**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 7}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 7,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `7` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>7
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **USE\_TARGET**:
 >
->> **Value:** `@object_key::{pattern: @bool,id: 100}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 100,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `100` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>100
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **VERTICAL\_FLIP**:
 >
->> **Value:** `@object_key::{id: 5,pattern: @bool}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 5,pattern: @bool}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `5` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>5
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@bool` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@bool
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **X**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 2}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 2,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `2` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>2
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **X\_MOD**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 72}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 72,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `72` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>72
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **Y**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 3}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 3}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `3` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>3
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **YELLOW\_TELEPORTATION\_PORTAL\_DISTANCE**:
 >
->> **Value:** `@object_key::{id: 54,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 54,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `54` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>54
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **Y\_MOD**:
 >
->> **Value:** `@object_key::{id: 73,pattern: @number}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 73,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `73` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>73
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **Y\_OFFSET**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 92}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 92}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `92` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>92
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **Z\_LAYER**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 24}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{id: 24,pattern: @number}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `24` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>24
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
->>>
->>>  
->>>
->>
->>  
 >>
 >
 >## **Z\_ORDER**:
 >
->> **Value:** `@object_key::{pattern: @number,id: 25}` (`@object_key`) 
->>
+>> **Value:** 
+>>```spwn
+>>@object_key::{pattern: @number,id: 25}
+>>``` 
+>>**Type:** `@object_key` 
 >>
 >>## **id**:
 >>
->>> **Value:** `25` (`@number`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>25
+>>>``` 
+>>>**Type:** `@number` 
 >>>
 >>
 >>## **pattern**:
 >>
->>> **Value:** `@number` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@number
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
 >>## **type**:
 >>
->>> **Value:** `@object_key` (`@type_indicator`) 
->>>
->>>
->>>  
+>>> **Value:** 
+>>>```spwn
+>>>@object_key
+>>>``` 
+>>>**Type:** `@type_indicator` 
 >>>
 >>
->>  
->>
 >
->  
->
-
-  

@@ -1,13 +1,18 @@
 //! Tools for compiling SPWN into GD object strings
 use crate::ast;
 use crate::builtin::*;
+use crate::compiler_info::CompilerInfo;
+use crate::context::*;
+use crate::globals::Globals;
 use crate::levelstring::*;
+use crate::value::*;
+use crate::value_storage::*;
 use crate::STD_PATH;
 use std::collections::{HashMap, HashSet};
 
 use crate::parser::{ParseNotes, SyntaxError};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::compiler_types::*;
 use crate::print_with_color;
@@ -44,7 +49,7 @@ pub enum RuntimeError {
         info: CompilerInfo,
     },
 }
-pub fn print_error_intro(pos: crate::parser::FileRange, file: &PathBuf) {
+pub fn print_error_intro(pos: crate::parser::FileRange, file: &Path) {
     use std::io::Write;
     use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -247,13 +252,36 @@ pub fn compile_spwn(
     }
 
     print_with_color("———————————————————————————\n", TColor::White);
-    print_with_color(
-        &format!(
-            "Built in {} milliseconds!",
-            start_time.elapsed().as_millis()
-        ),
-        TColor::Green,
-    );
+
+    /*  Build Timing ----------------------------------------------------- **
+        New build timing changes the unit form milliseconds, to seconds,
+        to minutes depending on the time building took.
+    */
+
+    // Define the different units
+    let build_time_secs = start_time.elapsed().as_secs();
+    let build_time_millis = start_time.elapsed().as_millis();
+    let build_time_mins = build_time_secs / 60;
+
+    // Check which unit to unit to use
+    if build_time_secs < 1 {
+        print_with_color(
+            &format!("Built in {} milliseconds!", build_time_millis),
+            TColor::Green,
+        );
+    } else if build_time_secs > 1 && build_time_secs < 60 {
+        print_with_color(
+            &format!("Built in {} seconds!", build_time_secs),
+            TColor::Green,
+        );
+    } else {
+        print_with_color(
+            &format!("Built in {} minutes!", build_time_mins),
+            TColor::Green,
+        );
+    }
+
+    //----------------------------------------------------------------------- **
 
     Ok(globals)
 }
@@ -336,7 +364,12 @@ pub fn compile_scope(
 
                         //let mut new_context = context.clone();
 
-                        match (new_expr.values.len() == 1, &new_expr.values[0].value.body) {
+                        match (
+                            new_expr.values.len() == 1
+                                && new_expr.values[0].path.is_empty()
+                                && new_expr.values[0].operator.is_none(),
+                            &new_expr.values[0].value.body,
+                        ) {
                             (true, ast::ValueBody::CmpStmt(f)) => {
                                 //to account for recursion
 
@@ -371,26 +404,30 @@ pub fn compile_scope(
 
                                 new_contexts.push(after_context);
                             }
+                            // (true, ast::ValueBody::Macro(m)) => {
+                            //     let (evaled, inner_returns) =
+                            //         new_expr.eval(context, globals, info.clone(), !mutable)?;
+
+                            //     returns.extend(inner_returns);
+                            //     for (e, c2) in evaled {
+                            //         let mut new_context = c2.clone();
+                            //         let storage =
+                            //             symbol.define(&mut new_context, globals, &info, None)?;
+
+                            //         if let Value::Macro(m) = &mut globals.stored_values[e] {
+                            //             m.def_context
+                            //         } else {
+                            //             unreachable!()
+                            //         }
+
+                            //         globals.stored_values[storage] =
+                            //             globals.stored_values[e].clone();
+                            //         new_contexts.push(new_context);
+                            //     }
+                            // }
                             _ => {
                                 let (evaled, inner_returns) =
                                     new_expr.eval(context, globals, info.clone(), !mutable)?;
-
-                                // if mutable
-                                //     && symbol
-                                //         .tag
-                                //         .tags
-                                //         .iter()
-                                //         .any(|x| x.0 == "allow_context_change")
-                                // {
-                                //     for (val, _) in &evaled {
-                                //         globals
-                                //             .stored_values
-                                //             .map
-                                //             .get_mut(val)
-                                //             .expect("index not found")
-                                //             .allow_context_change = true;
-                                //     }
-                                // }
 
                                 returns.extend(inner_returns);
                                 for (e, c2) in evaled {
@@ -562,7 +599,7 @@ pub fn compile_scope(
 
             Impl(imp) => {
                 let message = "cannot run impl statement in a trigger function context, consider moving it to the start of your script.".to_string();
-                if contexts.len() > 1 || contexts[0].start_group.id != ID::Specific(0) {
+                if contexts.len() > 1 || contexts[0].start_group.id != Id::Specific(0) {
                     return Err(RuntimeError::RuntimeError { message, info });
                 }
 
@@ -581,7 +618,7 @@ pub fn compile_scope(
                 returns.extend(inner_returns);
                 let (typ, c) = evaled[0].clone();
 
-                if c.start_group.id != ID::Specific(0) {
+                if c.start_group.id != Id::Specific(0) {
                     return Err(RuntimeError::RuntimeError { message, info });
                 }
                 match globals.stored_values[typ].clone() {
@@ -683,7 +720,7 @@ pub fn compile_scope(
                     (*globals).trigger_order += 1;
 
                     (*globals).func_ids[context.func_id].obj_list.push((
-                        GDObj {
+                        GdObj {
                             params,
 
                             ..context_trigger(&context, &mut globals.uid_counter)

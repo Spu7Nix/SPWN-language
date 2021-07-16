@@ -1,6 +1,18 @@
 #[no_std]
 impl @array {
-    max: #[desc("Gets the highest number in the array.")]
+    is_empty: #[desc("Returns true if the array has a length of 0, false otherwise.") example("
+arr = []
+arr2 = [1, 2, 3]
+$.assert(arr.is_empty())
+$.assert(!arr2.is_empty())
+    ")]
+    (self) {
+        return self.length == 0;
+    },
+    max: #[desc("Gets the highest number in the array.") example("
+arr = [3, 1, 4, 1]
+$.assert(arr.max() == 4)
+    ")]
     (self, minval = -999999999999) {
         let highest = minval
         for el in self {
@@ -10,7 +22,10 @@ impl @array {
         }
         return highest
     },
-    min: #[desc("Gets the lowest number in the array.")]
+    min: #[desc("Gets the lowest number in the array.") example("
+arr = [3, 1, 4, 1]
+$.assert(arr.min() == 1)
+    ")]
     (self, max_val = 999999999999) {
         let lowest = max_val
         for el in self {
@@ -20,16 +35,18 @@ impl @array {
         }
         return lowest
     },
-    contains: #[desc("See if array contains an element.")]
+    contains: #[desc("See if array contains an element.") example("
+fruit = ['apple', 'banana', 'mango']
+$.assert(arr.contains('banana'))
+    ")]
     (self, el) {
-		for e in self {
-			if e == el {
-				return true
-			}
-		}
-		return false
+		return self has el
 	},
-    index: #[desc("Gets the index of an element, if it doesn't exists returns null.")]
+    index: #[desc("Gets the index of an element (if it doesn't exist, `null` is returned)") example("
+fruit = ['apple', 'banana', 'mango']
+$.assert(fruit.index('apple') == 0)
+$.assert(fruit.index('carrot') == null)
+    ")]
     (self, el) {
         let res = null
         for i in 0..self.length {
@@ -39,11 +56,19 @@ impl @array {
         }
         return res
     },
-    clear: #[desc("Clears the array.")]
+    clear: #[desc("Clears the array.") example("
+let arr = [1, 2, 3]
+arr.clear()
+$.assert(arr.is_empty())
+    ")]
     (self) {
         self = []
     },
-    reverse: #[desc("Reverses the array.")]
+    reverse: #[desc("Reverses the array.") example("
+let arr = [1, 2, 3]
+arr.reverse()
+$.assert(arr == [3, 2, 1])
+    ")]
     (self) {
         if self.length == 0 {
             return [];
@@ -56,19 +81,34 @@ impl @array {
         ret.push(self[0]);
         return ret;
     },
-    push: #[desc("Pushes a value to the end of the array.")]
+    push: #[desc("Pushes a value to the end of the array.") example("
+let arr = [1, 2, 3]
+arr.push(4)
+$.assert(arr == [1, 2, 3, 4])
+    ")]
     (self, value) {
         $.append(self, value)
     },
-    pop: #[desc("Removes the last value from the array and returns it.")]
+    pop: #[desc("Removes the last value from the array and returns it.") example("
+let arr = [1, 2, 3, 4]
+arr.pop()
+$.assert(arr == [1, 2, 3])
+    ")]
     (self) {
         return $.pop(self)
     },
-    remove: #[desc("Removes a specific index from the array and returns it.")]
+    remove: #[desc("Removes a specific index from the array and returns it.") example("
+let arr = [1, 2, 3, 4, 5]
+arr.remove(3)
+$.assert(arr == [1, 2, 3, 5])
+    ")]
     (self, index: @number) {
         return $.remove_index(self, index)
     },
-    map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results.")]
+    map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results.") example("
+arr = [1, 2, 3, 4, 5]
+$.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
+    ")]
     (self, cb: @macro) {
         let output = [];
         for iter in self {
@@ -76,7 +116,10 @@ impl @array {
         }
         return output;
     },
-    filter: #[desc("Returns the elements of an array that meet the condition specified in the callback function.")]
+    filter: #[desc("Returns the elements of an array that meet the condition specified in the callback function.") example("
+arr = [1, 2, 3, 4, 5]
+$.assert(arr.filter(el => el > 3) == [4, 5])
+    ")]
     (self, cb: @macro) {
         let output = [];
         for iter in self {
@@ -89,7 +132,12 @@ impl @array {
         }
         return output
     },
-    reduce: #[desc("Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")]
+    reduce: #[desc("Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    example("
+arr = [1, 2, 3, 4, 5]
+sum = arr.reduce((acum, el) => acum + el)
+$.assert(sum == 15)
+    ")]
     (self, cb: @macro) {
         let acum = self[0];
         for iter in 1..self.length {
@@ -97,7 +145,12 @@ impl @array {
         }
         return acum;
     },
-    any: #[desc("Determines whether the specified callback function returns true for any element of an array.")]
+    any: #[desc("Determines whether the specified callback function returns true for any element of an array.") example("
+arr = [false, false, true, false]
+$.assert(arr.any())
+arr2 = [1, 2, 3, 1, 4, -1, 7]
+$.assert(arr2.any(el => el < 0)) // checks if the array contains any negative elements
+    ")]
     (self, map: @macro = (a) => @bool(a)) {
         for item in self {
             if map(item) {
@@ -106,7 +159,12 @@ impl @array {
         }
         return false
     },
-    all: #[desc("Determines whether all the members of an array satisfy the specified callback.")]
+    all: #[desc("Determines whether all the members of an array satisfy the specified callback.") example("
+arr = [true, true, true]
+$.assert(arr.all())
+arr2 = [1, 2, 3, 1, 4, 7]
+$.assert(arr2.all(el => el > 0)) // checks if the array contains only positive elements
+    ")]
     (self, map: @macro = (a) => @bool(a)) {
         for item in self {
             if !map(item) {
@@ -115,20 +173,19 @@ impl @array {
         }
         return true
     },
-    sum: #[desc("Gets the sum of the value in the array.")]
+    sum: #[desc("Gets the sum of the value in the array.") example("
+arr = [1, 2, 3, 4, 5]
+$.assert(arr.sum() == 15)
+    ")]
     (self) {
-        if self.all(item => item.type == @number) {
-            let sum = 0
-            for item in self {
-                sum += item
-            }
-            return sum
-        } else {
-            throw "Unsupported type in array " + self as @string
-        }
+        return self.reduce((acum, el) => acum + el)
     },
-    sort: #[desc("Sorts the array.")]
+    sort: #[desc("Returns a sorted version of the array.") example("
+arr = [5, 1, 5, 3, 2]
+$.assert(arr.sort() == [1, 2, 3, 5, 5])
+    ")]
     (self) {
+        // uses selection sort
         if self.all(item => item.type == @number) {
             min = (array, maxval = 999999999999) {
                 let lowest = [maxval, 0]
@@ -141,7 +198,7 @@ impl @array {
             }
             let res = []
             let copy = self
-            for _ in self {
+            for i in self {
                 i = min(copy)
                 res.push(i[0])
                 copy.remove(i[1])
@@ -151,15 +208,36 @@ impl @array {
             throw "Unsupported type in array " + self as @string
         }
     },
-    shift: #[desc("Removes the first index from the array and returns it.")]
+    shift: #[desc("Removes the first index from the array and returns it.") example("
+let arr = [5, 1, 5, 3, 2]
+$.assert(arr.shift() == 5)
+$.assert(arr == [1, 5, 3, 2])
+    ")]
     (self) {
         return self.remove(0)
     },
-    unshift: #[desc("Pushes a value to the start of the array and returns it.")]
+    unshift: #[desc("Pushes a value to the start of the array and returns it.") example("
+let arr = [1, 5, 3, 2]
+$.assert(arr.unshift(5) == 5)
+$.assert(arr == [5, 1, 5, 3, 2])
+    ")]
     (self, value) {
-        let res = [value]
-        res += self
-        self = res
+        self = [value] + self
         return value
-    }
+    },
+    flat_map: #[desc("Works the same way as map but flattens any sub-arrays into one big array.") example("
+arr = [1, 2, [3, 4], 5, [6, 7, [8]]]
+$.assert(arr.flat_map(el => el > 4) == [5, 6, 7, 8])
+    ")]
+    (self, cb: @macro = () => true) {
+        let output = [];
+        for iter in self {
+            if iter.type == @array {
+                output += iter.map(elem => cb(elem))
+            } else {
+                output.push(cb(iter));
+            }
+        }
+        return output;
+    },
 }
