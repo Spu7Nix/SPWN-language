@@ -5,7 +5,7 @@ use crate::levelstring::{GdObj, ObjParam};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum TriggerRole {
+pub enum TriggerRole {
     // Spawn triggers have their own catagory
     // because they can be combined by adding their delays
     Spawn,
@@ -34,12 +34,12 @@ fn get_role(obj_id: u16, hd: bool) -> TriggerRole {
 
 type ObjPtr = (usize, usize);
 //                                     triggers      connections in
-type TriggerNetwork = HashMap<Group, TriggerGang>;
+pub type TriggerNetwork = HashMap<Group, TriggerGang>;
 
 #[derive(Debug, Clone)]
 // what do you mean? its a trigger gang!
-struct TriggerGang {
-    triggers: Vec<Trigger>,
+pub struct TriggerGang {
+    pub triggers: Vec<Trigger>,
     connections_in: u32,
 }
 
@@ -53,15 +53,15 @@ impl TriggerGang {
 }
 
 #[derive(Debug, Copy, Clone)]
-struct Trigger {
-    obj: ObjPtr,
-    role: TriggerRole,
-    order: usize,
-    deleted: bool,
-    optimized: bool,
+pub struct Trigger {
+    pub obj: ObjPtr,
+    pub role: TriggerRole,
+    pub order: usize,
+    pub deleted: bool,
+    pub optimized: bool,
 }
 
-struct Triggerlist<'a> {
+pub struct Triggerlist<'a> {
     list: &'a mut Vec<FunctionId>,
 }
 

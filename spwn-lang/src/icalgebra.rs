@@ -1,6 +1,12 @@
+use crate::ast::ObjectMode;
+use crate::builtin::{Group, Id, Item};
+use crate::levelstring::ObjParam;
+use crate::optimize::*;
+use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
 // instant count algebra :pog:
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum IcExpr {
+pub enum IcExpr {
     Or(Box<IcExpr>, Box<IcExpr>),
     And(Box<IcExpr>, Box<IcExpr>),
     True,
@@ -114,13 +120,12 @@ fn enumerate_truth_table_inputs(
 // Returns both constants and all single comparisons whose critical value set is
 // a subset of the given ones.
 fn enumerate_useful_primitives(critical_value_sets: &CriticalValueSets) -> Vec<IcExpr> {
-    let mut out = Vec::new();
-    out.push(IcExpr::True);
-    out.push(IcExpr::False);
+    let mut out = vec![IcExpr::True, IcExpr::False];
+
     for (variable, value_set) in critical_value_sets.iter() {
         for value in value_set {
             out.push(IcExpr::LessThan(*variable, *value));
-            if let Some(_) = value_set.get(&(value + 1)) {
+            if value_set.get(&(value + 1)).is_some() {
                 out.push(IcExpr::Equals(*variable, *value));
             }
             out.push(IcExpr::MoreThan(*variable, *value - 1));
@@ -142,7 +147,7 @@ fn evaluate(formula: &IcExpr, input: &HashMap<Item, i32>) -> bool {
     }
 }
 //Evaluates the formula on the many inputs, packing the values into an integer.
-fn get_truth_table(formula: &IcExpr, inputs: &Vec<HashMap<Item, i32>>) -> u64 {
+fn get_truth_table(formula: &IcExpr, inputs: &[HashMap<Item, i32>]) -> u64 {
     let mut truth_table = 0;
     for input in inputs {
         truth_table = (truth_table << 1) + evaluate(formula, input) as u64;
@@ -167,7 +172,7 @@ fn get_complexity(formula: &IcExpr) -> (u16, u16) {
         }
     }
 }
-fn simplify_ic_expr_full(target_formula: IcExpr) -> IcExpr {
+pub fn simplify_ic_expr_full(target_formula: IcExpr) -> IcExpr {
     println!("\nstart: {:?}\n", target_formula);
     let mut critical_value_sets = HashMap::new();
     get_critical_value_sets(&target_formula, &mut critical_value_sets);
@@ -178,10 +183,10 @@ fn simplify_ic_expr_full(target_formula: IcExpr) -> IcExpr {
         .iter()
         .map(|a| Reverse(HeapItem::new(a.clone())))
         .collect();
-    while let None = best.get(&target_truth_table) {
+    while best.get(&target_truth_table).is_none() {
         let formula = heap.pop().unwrap().0.formula;
         let truth_table = get_truth_table(&formula, &inputs);
-        if let Some(_) = best.get(&truth_table) {
+        if best.get(&truth_table).is_some() {
             continue;
         }
 
@@ -202,102 +207,102 @@ fn simplify_ic_expr_full(target_formula: IcExpr) -> IcExpr {
     out
 }
 
-fn build_instant_count_network<'a>(
-    network: &'a mut TriggerNetwork,
-    objects: &'a mut Triggerlist,
-    start_group: Option<Group>,
-    target: Group,
-    expr: IcExpr,
-    reference_trigger: Trigger,
-    closed_group: &mut u16,
-) -> bool {
-    match expr {
-        IcExpr::Equals(item, num) | IcExpr::MoreThan(item, num) | IcExpr::LessThan(item, num) => {
-            create_instant_count_trigger(
-                reference_trigger,
-                target,
-                start_group,
-                match expr {
-                    IcExpr::Equals(_, _) => 0,
-                    IcExpr::MoreThan(_, _) => 1,
-                    IcExpr::LessThan(_, _) => 2,
-                    _ => unreachable!(),
-                },
-                num,
-                item,
-                objects,
-                network,
-                (true, false),
-            );
-            true
-        }
+// pub fn build_instant_count_network<'a>(
+//     network: &'a mut TriggerNetwork,
+//     objects: &'a mut Triggerlist,
+//     start_group: Option<Group>,
+//     target: Group,
+//     expr: IcExpr,
+//     reference_trigger: Trigger,
+//     closed_group: &mut u16,
+// ) -> bool {
+//     match expr {
+//         IcExpr::Equals(item, num) | IcExpr::MoreThan(item, num) | IcExpr::LessThan(item, num) => {
+//             create_instant_count_trigger(
+//                 reference_trigger,
+//                 target,
+//                 start_group,
+//                 match expr {
+//                     IcExpr::Equals(_, _) => 0,
+//                     IcExpr::MoreThan(_, _) => 1,
+//                     IcExpr::LessThan(_, _) => 2,
+//                     _ => unreachable!(),
+//                 },
+//                 num,
+//                 item,
+//                 objects,
+//                 network,
+//                 (true, false),
+//             );
+//             true
+//         }
 
-        IcExpr::True => {
-            // This can be optimized
-            create_spawn_trigger(
-                reference_trigger,
-                target,
-                start_group,
-                0.0,
-                objects,
-                network,
-                (true, false),
-            );
-            true
-        }
+//         IcExpr::True => {
+//             // This can be optimized
+//             create_spawn_trigger(
+//                 reference_trigger,
+//                 target,
+//                 start_group,
+//                 0.0,
+//                 objects,
+//                 network,
+//                 (true, false),
+//             );
+//             true
+//         }
 
-        IcExpr::And(expr1, expr2) => {
-            (*closed_group) += 1;
-            let middle_group = Group {
-                id: ID::Arbitrary(*closed_group),
-            };
-            if build_instant_count_network(
-                network,
-                objects,
-                start_group,
-                middle_group,
-                *expr1,
-                reference_trigger,
-                closed_group,
-            ) {
-                build_instant_count_network(
-                    network,
-                    objects,
-                    Some(middle_group),
-                    target,
-                    *expr2,
-                    reference_trigger,
-                    closed_group,
-                )
-            } else {
-                false
-            }
-        }
+//         IcExpr::And(expr1, expr2) => {
+//             (*closed_group) += 1;
+//             let middle_group = Group {
+//                 id: ID::Arbitrary(*closed_group),
+//             };
+//             if build_instant_count_network(
+//                 network,
+//                 objects,
+//                 start_group,
+//                 middle_group,
+//                 *expr1,
+//                 reference_trigger,
+//                 closed_group,
+//             ) {
+//                 build_instant_count_network(
+//                     network,
+//                     objects,
+//                     Some(middle_group),
+//                     target,
+//                     *expr2,
+//                     reference_trigger,
+//                     closed_group,
+//                 )
+//             } else {
+//                 false
+//             }
+//         }
 
-        IcExpr::Or(expr1, expr2) => {
-            let result1 = build_instant_count_network(
-                network,
-                objects,
-                start_group,
-                target,
-                *expr1,
-                reference_trigger,
-                closed_group,
-            );
-            let result2 = build_instant_count_network(
-                network,
-                objects,
-                start_group,
-                target,
-                *expr2,
-                reference_trigger,
-                closed_group,
-            );
-            result1 || result2
-        }
-        _ => unreachable!(),
-    }
-}
+//         IcExpr::Or(expr1, expr2) => {
+//             let result1 = build_instant_count_network(
+//                 network,
+//                 objects,
+//                 start_group,
+//                 target,
+//                 *expr1,
+//                 reference_trigger,
+//                 closed_group,
+//             );
+//             let result2 = build_instant_count_network(
+//                 network,
+//                 objects,
+//                 start_group,
+//                 target,
+//                 *expr2,
+//                 reference_trigger,
+//                 closed_group,
+//             );
+//             result1 || result2
+//         }
+//         _ => unreachable!(),
+//     }
+// }
 
 // fn get_instant_count_network<'a>(
 //     network: &'a mut TriggerNetwork,
@@ -484,14 +489,15 @@ mod tests {
     use super::*;
     #[test]
     fn it_works() {
+        use crate::builtin::Id;
         let A = Item {
-            id: ID::Specific(1),
+            id: Id::Specific(1),
         };
         let B = Item {
-            id: ID::Specific(2),
+            id: Id::Specific(2),
         };
         let C = Item {
-            id: ID::Specific(3),
+            id: Id::Specific(3),
         };
         use IcExpr::*;
 
@@ -524,67 +530,139 @@ mod tests {
     }
 }
 
-fn create_instant_count_trigger(
-    reference_trigger: Trigger,
-    target_group: Group,
-    group: Option<Group>,
-    operation: u8,
-    num: i32,
-    item: Item,
-    objects: &mut Triggerlist,
-    network: &mut TriggerNetwork,
-    //         opt   del
-    settings: (bool, bool),
-) {
-    let mut new_obj_map = HashMap::new();
-    new_obj_map.insert(1, ObjParam::Number(1811.0));
-    new_obj_map.insert(51, ObjParam::Group(target_group));
-    new_obj_map.insert(80, ObjParam::Item(item));
-    new_obj_map.insert(77, ObjParam::Number(num.into()));
-    new_obj_map.insert(88, ObjParam::Number(operation.into()));
+// fn create_instant_count_trigger(
+//     reference_trigger: Trigger,
+//     target_group: Group,
+//     group: Option<Group>,
+//     operation: u8,
+//     num: i32,
+//     item: Item,
+//     objects: &mut Triggerlist,
+//     network: &mut TriggerNetwork,
+//     //         opt   del
+//     settings: (bool, bool),
+// ) {
+//     let mut new_obj_map = HashMap::new();
+//     new_obj_map.insert(1, ObjParam::Number(1811.0));
+//     new_obj_map.insert(51, ObjParam::Group(target_group));
+//     new_obj_map.insert(80, ObjParam::Item(item));
+//     new_obj_map.insert(77, ObjParam::Number(num.into()));
+//     new_obj_map.insert(88, ObjParam::Number(operation.into()));
 
-    if let Some(g) = group {
-        new_obj_map.insert(57, ObjParam::Group(g));
+//     if let Some(g) = group {
+//         new_obj_map.insert(57, ObjParam::Group(g));
+//     }
+
+//     let new_obj = GDObj {
+//         params: new_obj_map,
+//         func_id: reference_trigger.obj.0,
+//         mode: ObjectMode::Trigger,
+//         unique_id: objects[reference_trigger.obj].0.unique_id,
+//         sync_group: 0,
+//         sync_part: 0,
+//     };
+
+//     (*objects.list)[reference_trigger.obj.0]
+//         .obj_list
+//         .push((new_obj.clone(), reference_trigger.order));
+
+//     let obj_index = (
+//         reference_trigger.obj.0,
+//         objects.list[reference_trigger.obj.0].obj_list.len() - 1,
+//     );
+//     let new_trigger = Trigger {
+//         obj: obj_index,
+//         optimized: settings.0,
+//         deleted: settings.1,
+//         role: TriggerRole::Operator,
+//         ..reference_trigger
+//     };
+
+//     if let Some(ObjParam::Group(group)) = new_obj.params.get(&57) {
+//         match network.get_mut(group) {
+//             Some(gang) => (*gang).triggers.push(new_trigger),
+//             None => {
+//                 network.insert(*group, TriggerGang::new(vec![new_trigger]));
+//             }
+//         }
+//     } else {
+//         match network.get_mut(&NO_GROUP) {
+//             Some(gang) => (*gang).triggers.push(new_trigger),
+//             None => {
+//                 network.insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
+//             }
+//         }
+//     }
+// }
+
+fn get_all_ic_connections(triggers: &TriggerNetwork, objects: &Triggerlist) {
+    let mut list = Vec::new();
+
+    for gang in triggers.values() {
+        for trigger in &gang.triggers {
+            if !trigger.deleted {
+                let obj = &objects[trigger.obj].0.params;
+                if let Some(ObjParam::Number(n)) = obj.get(&1) {
+                    if (*n - 1811.0).abs() < f64::EPSILON {
+                        // dont include ones that dont activate a group
+                        if obj.get(&56) == Some(&ObjParam::Bool(false)) {
+                            continue;
+                        }
+                        let target = match obj.get(&51) {
+                            Some(ObjParam::Group(g)) => *g,
+
+                            _ => continue,
+                        };
+                        let perserve_target = if let Some(gang) = triggers.get(&target) {
+                            gang.triggers.iter().any(|t| {
+                                !t.deleted
+                                    && objects[t.obj].0.params.get(&1)
+                                        != Some(&ObjParam::Number(1811.0))
+                            })
+                        } else {
+                            unreachable!()
+                        };
+                        let item = if let ObjParam::Item(i) =
+                            obj.get(&80).unwrap_or(&ObjParam::Item(Item {
+                                id: Id::Specific(0),
+                            })) {
+                            *i
+                        } else {
+                            Item {
+                                id: Id::Specific(0),
+                            }
+                        };
+                        let num = if let ObjParam::Number(a) =
+                            obj.get(&77).unwrap_or(&ObjParam::Number(0.0))
+                        {
+                            *a as i32
+                        } else {
+                            0
+                        };
+                        let expr = match obj.get(&88) {
+                            Some(ObjParam::Number(1.0)) => IcExpr::MoreThan(item, num),
+                            Some(ObjParam::Number(2.0)) => IcExpr::LessThan(item, num),
+                            _ => IcExpr::Equals(item, num),
+                        };
+
+                        let group = match obj.get(&57) {
+                            Some(ObjParam::Group(g)) => *g,
+                            Some(ObjParam::GroupList(g)) => unimplemented!(),
+                            _ => Group {
+                                id: Id::Specific(0),
+                            },
+                        };
+
+                        list.push((group, target, expr, perserve_target));
+                    }
+                }
+            }
+        }
     }
 
-    let new_obj = GDObj {
-        params: new_obj_map,
-        func_id: reference_trigger.obj.0,
-        mode: ObjectMode::Trigger,
-        unique_id: objects[reference_trigger.obj].0.unique_id,
-        sync_group: 0,
-        sync_part: 0,
-    };
-
-    (*objects.list)[reference_trigger.obj.0]
-        .obj_list
-        .push((new_obj.clone(), reference_trigger.order));
-
-    let obj_index = (
-        reference_trigger.obj.0,
-        objects.list[reference_trigger.obj.0].obj_list.len() - 1,
-    );
-    let new_trigger = Trigger {
-        obj: obj_index,
-        optimized: settings.0,
-        deleted: settings.1,
-        role: TriggerRole::Operator,
-        ..reference_trigger
-    };
-
-    if let Some(ObjParam::Group(group)) = new_obj.params.get(&57) {
-        match network.get_mut(group) {
-            Some(gang) => (*gang).triggers.push(new_trigger),
-            None => {
-                network.insert(*group, TriggerGang::new(vec![new_trigger]));
-            }
-        }
-    } else {
-        match network.get_mut(&NO_GROUP) {
-            Some(gang) => (*gang).triggers.push(new_trigger),
-            None => {
-                network.insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
-            }
-        }
+    // combine the expressions in a loop until they can't be combined more
+    loop {
+        let mut new_list = Vec::new();
+        for (start, end, expr, perserve_target) in &list {}
     }
 }

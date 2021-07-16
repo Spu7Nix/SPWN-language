@@ -925,33 +925,89 @@ pub fn built_in_function(
         }
 
         "readfile" => {
-            arg_length!(info, 1, arguments, "Expected file name".to_string());
+            if arguments.is_empty() || arguments.len() > 2 {
+                return Err(RuntimeError::BuiltinError {
+                    message: String::from("Expected 1 or 2 arguments, the path to the file and the data format (default: utf-8)"),
+                    info,
+                });
+            }
 
             let val = globals.stored_values[arguments[0]].clone();
             match val {
-                Value::Str(s) => {
-                    let path = Path::new(&s);
+                Value::Str(p) => {
+                    let format = match arguments.get(1) {
+                        Some(val) => {
+                            if let Value::Str(s) = &globals.stored_values[*val] {
+                                s
+                            } else {
+                                return Err(RuntimeError::BuiltinError {
+                                    message:
+                                        "Data format needs to be a string (\"text\" or \"bin\")"
+                                            .to_string(),
+                                    info,
+                                });
+                            }
+                        }
+                        _ => "text",
+                    };
+                    let path = globals
+                        .path
+                        .clone()
+                        .parent()
+                        .expect("Your file must be in a folder!")
+                        .join(&p);
+
                     if !path.exists() {
                         return Err(RuntimeError::BuiltinError {
                             message: "Path doesn't exist".to_string(),
                             info,
                         });
                     }
-                    let ret = fs::read_to_string(s);
-                    let rval = match ret {
-                        Ok(file) => file,
-                        Err(_) => {
-                            return Err(RuntimeError::BuiltinError {
-                                message: "File cannot be opened".to_string(),
-                                info,
-                            });
+                    match format {
+                        "text" => {
+                            let ret = fs::read_to_string(path);
+                            let rval = match ret {
+                                Ok(file) => file,
+                                Err(e) => {
+                                    return Err(RuntimeError::BuiltinError {
+                                        message: format!("Problem opening the file: {}", e),
+                                        info,
+                                    });
+                                }
+                            };
+                            Value::Str(rval)
                         }
-                    };
-                    Value::Str(rval)
+                        "bin" => {
+                            let ret = fs::read(path);
+                            let rval = match ret {
+                                Ok(file) => file,
+                                Err(e) => {
+                                    return Err(RuntimeError::BuiltinError {
+                                        message: format!("Problem opening the file: {}", e),
+                                        info,
+                                    });
+                                }
+                            };
+                            Value::Array(
+                                rval.iter()
+                                    .map(|b| {
+                                        store_value(Value::Number(*b as f64), 1, globals, context)
+                                    })
+                                    .collect(),
+                            )
+                        }
+                        _ => {
+                            return Err(RuntimeError::BuiltinError {
+                                message: "Invalid data format ( use \"text\" or \"bin\")"
+                                    .to_string(),
+                                info,
+                            })
+                        }
+                    }
                 }
                 _ => {
                     return Err(RuntimeError::BuiltinError {
-                        message: "Expected one argument: string as path".to_string(),
+                        message: "Path needs to be a string".to_string(),
                         info,
                     });
                 }

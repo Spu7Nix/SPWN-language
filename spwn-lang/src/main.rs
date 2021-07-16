@@ -8,6 +8,7 @@ mod compiler_types;
 mod documentation;
 mod fmt;
 mod globals;
+//mod icalgebra;
 mod levelstring;
 mod parser;
 mod value;
