@@ -21,7 +21,7 @@ You can either use the installers for your operating system, or build SPWN frmo 
 1. Download the .pkg file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
 2. Open the .pkg file and follow the install wizard.
 
- - Note: *If you get a message telling you that you cant open files from unidentified developers, control click the .pkg file and click open*
+ - Note: *If you get a message telling you that you cant open files from unidentified developers, open 'System Preferences' then click 'Security & Privacy' and click 'Open Anyway' on the 'General' menu*
 
 ###### Linux
  - Linux is not currently supported natively. Please compile from source, or use Wine to use SPWN. Join the discord if you have more questions.
