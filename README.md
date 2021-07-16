@@ -21,7 +21,7 @@ You can either use the installers for your operating system, or build SPWN frmo 
 1. Download the .pkg file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
 2. Open the .pkg file and follow the install wizard.
 
- - Note: *If you get a message telling you that you cant open files from unidentified developers, control click the .pkg file and click open*
+ - Note: *If you get a message telling you that you cant open files from unidentified developers, open 'System Preferences' then click 'Security & Privacy' and click 'Open Anyway' on the 'General' menu*
 
 ###### Linux
  - Linux is not currently supported natively. Please compile from source, or use Wine to use SPWN. Join the discord if you have more questions.
@@ -37,12 +37,15 @@ You can either use the installers for your operating system, or build SPWN frmo 
 
 Alright, enough talk, how do we actually use spwn?
 
-SPWN code can be programmed in any code editor, but the ones that have had SPWN extensions or plugins written for them are [Visual Studio Code](https://code.visualstudio.com/), and [Vim](https://www.vim.org/).
+SPWN code can be programmed in any code editor, but the ones that have had SPWN extensions or plugins written for them are [Visual Studio Code](https://code.visualstudio.com/), [Sublime Text](https://www.sublimetext.com/) and [Vim](https://www.vim.org/).
 
 ###### VSCode
 Navigate to [VSCode SPWN language support](https://marketplace.visualstudio.com/items?itemName=Spu7Nix.spwn-language-support) and hit install. In VSCode, hit enable and then create a new file with the extension .spwn
 - Note: Make sure to have the file in the same directory as the libraries folder
 VSCode should automatically change the language syntax to SPWN, but if it dosent, navigate to the bottom right of the screen and click on `select language mode`, then select SPWN.
+
+###### Sublime Text
+Open Sublime Text and open the Command Palette... by selecting Command Palette from the Tools pull-down menu. In the menu that opens type install which will result in the Install Package Control option being presented. Hit Enter or left click the entry to install Package Control. Open the Command Palette again, and type 'install'. When `Package Control: Install Package` is highlighted press 'Enter' then type 'SPWN Language' and press 'Enter' when `SPWN Language` is highlighted.
 
 ###### Vim
 Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-viml) and follow to instructions on that page.
