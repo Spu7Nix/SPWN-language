@@ -29,7 +29,7 @@ You can either use the installers for your operating system, or build SPWN from 
  - Note: *If you get a message telling you that you cant open files from unidentified developers, open 'System Preferences' then click 'Security & Privacy' and click 'Open Anyway' on the 'General' menu*
 
 ###### Linux
- - Linux is not currently supported natively. Please compile from source, or use Wine to use SPWN. Join the [discord](https://discord.gg/xqny9rX9hA)if you have more questions.
+ - Linux is not currently supported natively. Please compile from source, or use Wine to use SPWN. Join the [discord](https://discord.gg/xqny9rX9hA) if you have more questions.
 
 ###### Compiling from source
 1. Download source code from this repository.
