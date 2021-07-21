@@ -83,7 +83,7 @@ Here is a list of SPWN command line subcommands and flags. This Information can 
     Generates documentation for a SPWN library, in the form of a markdown file
 
     version, -v, --version
-    Gets the version of spwn you are using
+    Gets the version of spwn
 
 ###### Flags:
     --console-output, -c
