@@ -1,6 +1,7 @@
 use crate::ast::ObjectMode;
 use crate::builtin::{Block, Group, Id, Item};
 use crate::compiler_types::FunctionId;
+use crate::icalgebra::{build_ic_connections, get_all_ic_connections, IcExpr};
 use crate::levelstring::{GdObj, ObjParam};
 use std::collections::{HashMap, HashSet};
 
@@ -40,7 +41,9 @@ pub type TriggerNetwork = HashMap<Group, TriggerGang>;
 // what do you mean? its a trigger gang!
 pub struct TriggerGang {
     pub triggers: Vec<Trigger>,
-    connections_in: u32,
+    pub connections_in: u32,
+    // wether any of the connections in are not instant count triggers
+    pub non_ic_triggers_in: bool,
 }
 
 impl TriggerGang {
@@ -48,6 +51,7 @@ impl TriggerGang {
         TriggerGang {
             triggers,
             connections_in: 0,
+            non_ic_triggers_in: false,
         }
     }
 }
@@ -97,7 +101,7 @@ pub fn optimize(mut obj_in: Vec<FunctionId>, mut closed_group: u16) -> Vec<Funct
                     obj: (f, o),
                     role: get_role(*id as u16, hd),
                     order: *order,
-                    deleted: true,
+                    deleted: false,
                     optimized: false,
                 };
                 if let Some(ObjParam::Group(group)) = obj.params.get(&57) {
@@ -119,25 +123,12 @@ pub fn optimize(mut obj_in: Vec<FunctionId>, mut closed_group: u16) -> Vec<Funct
         }
     }
 
-    // count connection in for all triggers
-    for fnid in &obj_in {
-        for (obj, _) in &fnid.obj_list {
-            //if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
-            //if get_role(*id as u16) != TriggerRole::Output {
-            if let Some(ObjParam::Group(id)) = obj.params.get(&51) {
-                if let Some(gang) = network.get_mut(id) {
-                    (*gang).connections_in += 1;
-                }
-            }
-            //}
-            //}
-        }
-    }
-
     //optimize
     //optimize_network(&mut network);
 
     let mut objects = Triggerlist { list: &mut obj_in };
+
+    clean_network(&mut network, &objects, true);
 
     // fix read write order
     // not an optimization, more like a consistancy fix
@@ -145,25 +136,109 @@ pub fn optimize(mut obj_in: Vec<FunctionId>, mut closed_group: u16) -> Vec<Funct
     // this somewhere else if i want to add an option to not have optimization
     network = fix_read_write_order(&mut objects, &network, &mut closed_group);
 
+    // round 1
+    spawn_and_dead_code_optimization(&mut network, &mut objects, &mut closed_group);
+
+    // clean_network(&mut network, &objects, false);
+
+    // instant_count_optimization(&mut network, &mut objects, &mut closed_group);
+
+    // //cleanup
+
+    // clean_network(&mut network, &objects, true);
+
+    // // round 2
+
+    // spawn_and_dead_code_optimization(&mut network, &mut objects, &mut closed_group);
+
+    // clean_network(&mut network, &objects, false);
+
+    //instant_count_optimization(&mut network, &mut objects, &mut closed_group);
+
+    rebuild(&network, &obj_in)
+}
+
+fn spawn_and_dead_code_optimization(
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+    closed_group: &mut u16,
+) {
     for (group, gang) in network.clone() {
         if let Id::Specific(_) = group.id {
             for (i, trigger) in gang.triggers.iter().enumerate() {
                 if trigger.role != TriggerRole::Output {
-                    optimize_from(&mut network, &mut objects, (group, i), &mut closed_group);
+                    optimize_from(network, objects, (group, i), closed_group);
                 } else {
                     (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
                 }
             }
         }
     }
+}
 
-    //for (g, len) in group_sizes {}
+fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete_objects: bool) {
+    let mut new_network = TriggerNetwork::new();
 
-    // put into new fn ids and lists
+    for (_, gang) in network.iter() {
+        let new_triggers: Vec<Trigger> = gang
+            .triggers
+            .iter()
+            .filter(|a| !a.deleted)
+            .map(|a| Trigger {
+                optimized: false,
+                deleted: delete_objects,
+                ..*a
+            })
+            .collect();
 
-    //profit
+        for trigger in new_triggers {
+            let obj = &objects[trigger.obj].0;
+            if let Some(ObjParam::Group(group)) = obj.params.get(&57) {
+                match new_network.get_mut(group) {
+                    Some(l) => (*l).triggers.push(trigger),
+                    None => {
+                        new_network.insert(*group, TriggerGang::new(vec![trigger]));
+                    }
+                }
+            } else {
+                match new_network.get_mut(&NO_GROUP) {
+                    Some(l) => (*l).triggers.push(trigger),
+                    None => {
+                        new_network.insert(NO_GROUP, TriggerGang::new(vec![trigger]));
+                    }
+                }
+            }
+        }
+    }
 
-    rebuild(&network, &obj_in)
+    for (_, gang) in new_network.clone() {
+        for trigger in gang.triggers {
+            let obj = &objects[trigger.obj].0;
+            if let Some(ObjParam::Group(id)) = obj.params.get(&51) {
+                if let Some(gang) = new_network.get_mut(id) {
+                    (*gang).connections_in += 1;
+
+                    if let Some(ObjParam::Number(objid)) = obj.params.get(&1) {
+                        if *objid as i16 != 1811 {
+                            (*gang).non_ic_triggers_in = true;
+                        }
+                    } else {
+                        (*gang).non_ic_triggers_in = true;
+                    }
+                }
+            }
+        }
+    }
+    *network = new_network;
+}
+
+fn instant_count_optimization(
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+    closed_group: &mut u16,
+) {
+    let c = get_all_ic_connections(network, &objects);
+    build_ic_connections(network, objects, closed_group, c);
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -285,6 +360,7 @@ fn get_targets<'a>(
                 TriggerRole::Output => {
                     (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted =
                         false;
+
                     out.insert(target_out);
                 }
                 TriggerRole::Func => {
@@ -320,7 +396,7 @@ fn get_targets<'a>(
     Some(out.iter().copied().collect())
 }
 
-fn create_spawn_trigger(
+pub fn create_spawn_trigger(
     trigger: Trigger,
     target_group: Group,
     group: Option<Group>,
@@ -460,12 +536,17 @@ fn optimize_from<'a>(
                 _ => None,
             }
         };
+        //println!("{}", targets.len());
 
         for (g, delay) in targets {
             // add spawn trigger to obj.fn_id with target group: g and delay: delay
+            // {
+            //     println!("target: {:?}", g);
+            // }
 
             if delay == 0 && network[&g].connections_in == 1 {
                 for trigger in &network[&g].triggers {
+                    //println!("target trigger: {:?}", trigger);
                     if let Some(gr) = spawn_group {
                         match objects[trigger.obj].0.params.get_mut(&57) {
                             Some(ObjParam::Group(g)) => (*g) = gr,
@@ -551,7 +632,7 @@ fn fix_read_write_order(
             current_group,
             TriggerGang {
                 triggers: Vec::new(),
-                connections_in: gang.connections_in,
+                ..*gang
             },
         );
         let mut sorted = gang.triggers.clone();
@@ -590,6 +671,7 @@ fn fix_read_write_order(
                     TriggerGang {
                         triggers: Vec::new(),
                         connections_in: 1,
+                        non_ic_triggers_in: true,
                     },
                 );
                 written_to.clear();
@@ -671,4 +753,70 @@ fn fix_read_write_order(
         }
     }
     new_network
+}
+
+pub fn create_instant_count_trigger(
+    reference_trigger: Trigger,
+    target_group: Group,
+    group: Option<Group>,
+    operation: u8,
+    num: i32,
+    item: Item,
+    objects: &mut Triggerlist,
+    network: &mut TriggerNetwork,
+    //         opt   del
+    settings: (bool, bool),
+) {
+    let mut new_obj_map = HashMap::new();
+    new_obj_map.insert(1, ObjParam::Number(1811.0));
+    new_obj_map.insert(51, ObjParam::Group(target_group));
+    new_obj_map.insert(80, ObjParam::Item(item));
+    new_obj_map.insert(77, ObjParam::Number(num.into()));
+    new_obj_map.insert(88, ObjParam::Number(operation.into()));
+    new_obj_map.insert(56, ObjParam::Bool(true));
+
+    if let Some(g) = group {
+        new_obj_map.insert(57, ObjParam::Group(g));
+    }
+
+    let new_obj = GdObj {
+        params: new_obj_map,
+        func_id: reference_trigger.obj.0,
+        mode: ObjectMode::Trigger,
+        unique_id: objects[reference_trigger.obj].0.unique_id,
+        sync_group: 0,
+        sync_part: 0,
+    };
+
+    (*objects.list)[reference_trigger.obj.0]
+        .obj_list
+        .push((new_obj.clone(), reference_trigger.order));
+
+    let obj_index = (
+        reference_trigger.obj.0,
+        objects.list[reference_trigger.obj.0].obj_list.len() - 1,
+    );
+    let new_trigger = Trigger {
+        obj: obj_index,
+        optimized: settings.0,
+        deleted: settings.1,
+        role: TriggerRole::Func,
+        ..reference_trigger
+    };
+
+    if let Some(ObjParam::Group(group)) = new_obj.params.get(&57) {
+        match network.get_mut(group) {
+            Some(gang) => (*gang).triggers.push(new_trigger),
+            None => {
+                network.insert(*group, TriggerGang::new(vec![new_trigger]));
+            }
+        }
+    } else {
+        match network.get_mut(&NO_GROUP) {
+            Some(gang) => (*gang).triggers.push(new_trigger),
+            None => {
+                network.insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
+            }
+        }
+    }
 }

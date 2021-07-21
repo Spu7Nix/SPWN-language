@@ -112,7 +112,7 @@ a.add_to(b)
             
             self.item.if_is(EQUAL_TO, 0, !{
                 wait()
-                if speed > 1  { supress_signal(0.1) }
+                supress_signal(0.06)
                 -> return
             })
         }
@@ -266,7 +266,7 @@ c.divide(2, remainder = r)
                     wait()
                     self.add_to([remainder], speed)
                     result.add_to([self], speed)
-                    if speed > 1  { supress_signal(0.1) }
+                    
                     -> return remainder
                 })
             }
@@ -299,13 +299,13 @@ c.divide(2, remainder = r)
                     self.item.if_is(SMALLER_THAN, 1, !{
 
                         ret = !{
-                            supress_signal(0.1)
                             -> return
                         }
                         supress_signal(0.1)
                         
                         self.item.if_is(SMALLER_THAN, 0, !{
                             result.add(-num)
+                            wait()
                             divisor.copy_to([self], speed, factor = num)
                             ret!
                         })
@@ -388,7 +388,7 @@ c.reset()
             
             self.item.if_is(EQUAL_TO, 0, !{
                 wait()
-                if speed > 1  { supress_signal(0.1) }
+                supress_signal(0.06)
                 -> return
             })
         }
@@ -439,7 +439,7 @@ c1.copy_to(c2)
             })
             self.item.if_is(EQUAL_TO, 0, !{
                 wait()
-                if speed > 1  { supress_signal(0.1) }
+                supress_signal(0.06)
                 @counter::new(temp_storage, false).add_to([self.item], speed)
                 -> return
             })

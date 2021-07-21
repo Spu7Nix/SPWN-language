@@ -1772,6 +1772,11 @@ impl ast::Variable {
                         if globals.is_mutable(*ptr) {
                             return true
                         }
+                        if globals.stored_values[*ptr].clone()
+                        .member(String::from("_assign_"), &context, globals).is_some() {
+                            // if it has assign operator implemented
+                            return true
+                        }
                         return false
                     }
                     *ptr

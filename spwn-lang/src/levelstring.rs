@@ -18,6 +18,37 @@ pub enum ObjParam {
     Epsilon,
 }
 
+impl std::cmp::PartialOrd for GdObj {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        for param in [1, 51, 57].iter() {
+            if let Some(p1) = self.params.get(param) {
+                if let Some(p2) = other.params.get(param) {
+                    match (p1, p2) {
+                        (ObjParam::Number(n1), ObjParam::Number(n2)) => {
+                            return (*n1).partial_cmp(n2)
+                        }
+                        (ObjParam::Group(g1), ObjParam::Group(g2)) => {
+                            let num1 = match g1.id {
+                                Id::Arbitrary(n) => n,
+                                Id::Specific(n) => n,
+                            };
+
+                            let num2 = match g2.id {
+                                Id::Arbitrary(n) => n,
+                                Id::Specific(n) => n,
+                            };
+
+                            return num1.partial_cmp(&num2);
+                        }
+                        (_, _) => (),
+                    }
+                }
+            }
+        }
+        Some(std::cmp::Ordering::Equal)
+    }
+}
+
 use std::fmt;
 
 impl fmt::Display for ObjParam {
@@ -424,8 +455,10 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
 
         //add top layer
         let possible_height = MAX_HEIGHT - (START_HEIGHT + y_offset); //30 is max (TODO: case for if y_offset is more than 30)
+        let mut objectlist = id.obj_list;
+        objectlist.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
 
-        for (i, (obj, _)) in id.obj_list.iter().enumerate() {
+        for (i, (obj, _)) in objectlist.iter().enumerate() {
             match obj.mode {
                 ObjectMode::Object => {
                     objects.push(obj.clone());
@@ -468,8 +501,8 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
                 }
             }
         }
-        if !id.obj_list.is_empty() {
-            current_x += (id.obj_list.len() as f64 / possible_height as f64).floor() as u32 + 1;
+        if !objectlist.is_empty() {
+            current_x += (objectlist.len() as f64 / possible_height as f64).floor() as u32 + 1;
         }
 
         //add all children

@@ -1,7 +1,49 @@
-let move_funcs = []
-dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]]
-for d in dirs {
-    move_funcs.push(!{ 10g.move(d[0] * 300, d[1] * 300, 10) })
+ictriggers: {
+    Group { id: Arbitrary(3) }: [
+        (Group { id: Arbitrary(4) }, Equals(ITEM, 2)),
+        (Group { id: Arbitrary(5) }, MoreThan(ITEM, 2)),
+        (Group { id: Arbitrary(5) }, LessThan(ITEM, 2))
+    ], 
+    Group { id: Specific(0) }: [
+        (Group { id: Arbitrary(2) }, Equals(ITEM, 1)),
+        (Group { id: Arbitrary(3) }, MoreThan(ITEM, 1)),
+        (Group { id: Arbitrary(3) }, LessThan(ITEM, 1))
+    ]
 }
-dir = counter(0)
-on(touch(), !{ move_funcs[dir.to_const(..4)]! })
+
+ inputs: {Group { id: Specific(0) }}
+
+ outputs: {Group { id: Arbitrary(4) }, Group { id: Arbitrary(5) }, Group { id: Arbitrary(2) }}
+
+finished simplifying
+connections:
+
+
+(Group { id: Specific(0) }, Group { id: Arbitrary(4) }, And(MoreThan(ITEM, 1), Equals(ITEM, 2)))
+(Group { id: Specific(0) }, Group { id: Arbitrary(5) }, And(MoreThan(ITEM, 1), MoreThan(ITEM, 2)))
+(Group { id: Specific(0) }, Group { id: Arbitrary(5) }, And(MoreThan(ITEM, 1), LessThan(ITEM, 2)))
+
+
+
+
+(Group { id: Specific(0) }, Group { id: Arbitrary(4) }, And(LessThan(ITEM, 1), Equals(ITEM, 2)))
+(Group { id: Specific(0) }, Group { id: Arbitrary(5) }, And(LessThan(ITEM, 1), MoreThan(ITEM, 2)))
+(Group { id: Specific(0) }, Group { id: Arbitrary(5) }, And(LessThan(ITEM, 1), LessThan(ITEM, 2)))
+
+
+MoreThan(ITEM, 1): 0, 1, 2
+LessThan(ITEM, 1): 3, 4, 5
+
+Equals(ITEM, 2):   0, 3
+MoreThan(ITEM, 2): 1, 4
+LessThan(ITEM, 2): 2, 5
+
+
+io: Start(Group { id: Specific(0) })
+first/last: (LessThan(ITEM, 1), 3, Trigger { obj: (0, 3), role: Func, order: 5, deleted: true, optimized: true }, 0)
+connections:
+(Group { id: Specific(0) }, Group { id: Arbitrary(4) }, And(MoreThan(ITEM, 1), Equals(ITEM, 2)))
+(Group { id: Specific(0) }, Group { id: Arbitrary(5) }, And(MoreThan(ITEM, 1), MoreThan(ITEM, 2)))
+(Group { id: Specific(0) }, Group { id: Arbitrary(5) }, And(MoreThan(ITEM, 1), LessThan(ITEM, 2)))
+io: Start(Group { id: Specific(0) })
+first/last: (MoreThan(ITEM, 1), 3, Trigger { obj: (0, 3), role: Func, order: 5, deleted: true, optimized: true }, 0)

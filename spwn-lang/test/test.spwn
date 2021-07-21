@@ -1,3 +1,11 @@
-file = $.readfile("readfiletest.txt", "bin")
 
-$.print(file)
+c = counter(1i)
+
+if c == 1 {
+    1g!
+} else if c == 2 {
+    2g!
+} else {
+    3g!
+}
+
