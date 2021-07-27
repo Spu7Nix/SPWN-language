@@ -17,8 +17,7 @@ et = (id: @number) {
 ok = (id: @number, pat: @pattern | @type_indicator) {
     return @object_key::{id: id, pattern: pat}
 }
-
-
+ 
 
 return {
     easing_types : {

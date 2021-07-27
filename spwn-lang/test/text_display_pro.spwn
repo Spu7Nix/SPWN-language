@@ -7,7 +7,7 @@ impl @textdisplay {
         order = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         writer = ?b
         writer_group = ?g
-        list = []
+        let list = []
         //        I   N   C   O
         
         
@@ -37,7 +37,7 @@ impl @textdisplay {
                     OBJ_ID: 914,
                     X: offset[0] + i * spacing + (ch + 1) * spacing * letters,
                     Y: offset[1],
-                    TEXT: $.b64encrypt(order[ch]),
+                    TEXT: $.b64encode(order[ch]),
                     GROUPS: follow_group,
                     SCALING: 0.7,
                 })

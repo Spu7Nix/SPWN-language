@@ -1,11 +1,50 @@
+extract obj_props;
 
-c = counter(1i)
+decimalMemory = 10i;
+decimalCounter = counter(decimalMemory);
+binaryMemory = [11i, 12i, 13i, 14i, 15i, 16i, 17i, 18i];
+let binaryCounters = [];
 
-if c == 1 {
-    1g!
-} else if c == 2 {
-    2g!
-} else {
-    3g!
+$.add(obj {
+    OBJ_ID: 1615,
+    X: 300,
+    Y: 300,
+    ITEM: decimalMemory,
+    GROUPS: 999g
+});
+
+for i in 0..binaryMemory.length {
+    $.add(obj {
+        OBJ_ID: 1615,
+        X: 300 + i * 30,
+        Y: 270,
+        ITEM: binaryMemory[i],
+        GROUPS: 999g
+    });
+    binaryCounters.push(counter(binaryMemory[i]));
 }
 
+binaryToNumeric = !{
+    decimalCounter = 0;
+    wait(1);
+
+    for i in 0..binaryCounters.length {
+        if binaryCounters[binaryCounters.length - 1 - i] as @bool {
+            decimalCounter += 2 ^ i;
+        }
+    }
+}
+
+decimalToBinary = !{
+    tempLength = binaryCounters.length + 1;
+
+    for i in 1..tempLength {
+        decimalCounter.divide(2, remainder = binaryCounters[binaryCounters.length - i], speed = 4);
+    }
+
+    binaryToNumeric!;
+}
+
+decimalCounter = 213; // Edit this
+wait(1);
+decimalToBinary!;

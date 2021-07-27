@@ -166,7 +166,7 @@ fn equal_behaviour(first: IcExpr, other: IcExpr) -> bool {
 
 #[derive(Debug, Clone, Eq)]
 struct HeapItem {
-    complexity: (u16, u16),
+    complexity: u16,
     formula: IcExpr,
 }
 
@@ -184,10 +184,7 @@ impl PartialOrd for HeapItem {
 impl Ord for HeapItem {
     fn cmp(&self, other: &Self) -> Ordering {
         //not the same as the original implementation, might have to change
-        match self.complexity.1.cmp(&other.complexity.1) {
-            Ordering::Equal => self.complexity.0.cmp(&other.complexity.0),
-            a => a,
-        }
+        self.complexity.cmp(&other.complexity)
     }
 }
 
@@ -350,20 +347,20 @@ fn get_truth_table(formula: &IcExpr, inputs: &[HashMap<Item, i32>]) -> u64 {
     truth_table
 }
 
-// Returns (the number of operations in the formula, the number of Ands).
-pub fn get_complexity(formula: &IcExpr) -> (u16, u16) {
+// Returns the number of Ands.
+pub fn get_complexity(formula: &IcExpr) -> u16 {
     match formula {
-        IcExpr::True | IcExpr::False => (0, 0),
-        IcExpr::LessThan(_, _) | IcExpr::MoreThan(_, _) | IcExpr::Equals(_, _) => (1, 0),
+        IcExpr::True | IcExpr::False => 0,
+        IcExpr::LessThan(_, _) | IcExpr::MoreThan(_, _) | IcExpr::Equals(_, _) => 0,
         IcExpr::And(lhs, rhs) => {
-            let (ops_lhs, ands_lhs) = get_complexity(&**lhs);
-            let (ops_rhs, ands_rhs) = get_complexity(&**rhs);
-            (ops_lhs + 1 + ops_rhs, ands_lhs + 1 + ands_rhs)
+            let ands_lhs = get_complexity(&**lhs);
+            let ands_rhs = get_complexity(&**rhs);
+            ands_lhs + 1 + ands_rhs
         }
         IcExpr::Or(lhs, rhs) => {
-            let (ops_lhs, ands_lhs) = get_complexity(&**lhs);
-            let (ops_rhs, ands_rhs) = get_complexity(&**rhs);
-            (ops_lhs + 1 + ops_rhs, ands_lhs + ands_rhs)
+            let ands_lhs = get_complexity(&**lhs);
+            let ands_rhs = get_complexity(&**rhs);
+            ands_lhs + ands_rhs
         }
     }
 }
@@ -444,7 +441,6 @@ impl Combinations {
 }
 
 pub fn simplify_ic_expr_full(target_formula: IcExpr) -> IcExpr {
-    println!("\n\nstart: {:?}", target_formula);
     let mut critical_value_sets = HashMap::new();
     get_critical_value_sets(&target_formula, &mut critical_value_sets);
     let inputs = enumerate_truth_table_inputs(&critical_value_sets);
@@ -461,7 +457,6 @@ pub fn simplify_ic_expr_full(target_formula: IcExpr) -> IcExpr {
 
     loop {
         if let Some(out) = best.get(&target_truth_table) {
-            println!("\nend: {:?}", out);
             return out.clone();
         }
         let item = match merge.next() {
@@ -547,7 +542,7 @@ pub fn build_ic_connections(
                 build_instant_count_network(
                     network,
                     objects,
-                    Some(*start),
+                    *start,
                     *end,
                     expr.clone(),
                     *trigger,
@@ -561,202 +556,167 @@ pub fn build_ic_connections(
         return;
     }
 
-    connections = new_connections;
-    println!(
-        "connections: \n{}",
-        connections
-            .iter()
-            .map(|(a, b, c, _)| format!("{:?}", (a, b, c)))
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    enum MatchingIoGroup {
-        End(Group),
-        Start(Group),
-    }
-    use MatchingIoGroup::*;
-
-    #[derive(Debug, Clone)]
-    struct ExprFrequency {
-        expr: IcExpr,
-        count: u16,
-        ref_trigger: Trigger,
-        complexity: u16,
-        appears_in: HashSet<usize>, // connections it appears in
-    }
-    //(IcExpr, u16, Trigger, u16)
-    let mut equal_io = HashMap::<MatchingIoGroup, Vec<ExprFrequency>>::new();
-
-    for (i, (start, end, expr, trigger)) in connections.iter().enumerate() {
-        let sub_exprs = expr.flatten_and();
-        // starts
-        match equal_io.get_mut(&Start(*start)) {
-            Some(list) => {
-                for e in sub_exprs.clone() {
-                    let mut added = false;
-
-                    for el in list.iter_mut() {
-                        if equal_behaviour(el.expr.clone(), e.clone()) {
-                            let complexity = get_complexity(&e).1;
-                            if complexity < el.complexity {
-                                (*el).expr = e.clone();
-                                (*el).complexity = complexity;
-                                (*el).ref_trigger = *trigger;
-                            }
-                            (*el).appears_in.insert(i);
-                            (*el).count += 1;
-                            added = true;
-                            break;
-                        }
-                    }
-                    if !added {
-                        list.push(ExprFrequency {
-                            expr: e.clone(),
-                            count: 1,
-                            ref_trigger: *trigger,
-                            complexity: get_complexity(&e).1,
-                            appears_in: [i].iter().copied().collect(),
-                        });
-                    }
-                }
-            }
-
-            None => {
-                equal_io.insert(
-                    Start(*start),
-                    sub_exprs
-                        .clone()
-                        .iter()
-                        .map(|e| ExprFrequency {
-                            expr: e.clone(),
-                            count: 1,
-                            ref_trigger: *trigger,
-                            complexity: get_complexity(&e).1,
-                            appears_in: [i].iter().copied().collect(),
-                        })
-                        .collect(), //vec![(e.clone(), 1, *end, *trigger, get_complexity(&e).1)],
-                );
-            }
-        }
-        //ends
-        match equal_io.get_mut(&End(*end)) {
-            Some(list) => {
-                for e in sub_exprs {
-                    let mut added = false;
-
-                    for el in list.iter_mut() {
-                        if equal_behaviour(el.expr.clone(), e.clone()) {
-                            let complexity = get_complexity(&e).1;
-                            if complexity < el.complexity {
-                                (*el).expr = e.clone();
-                                (*el).complexity = complexity;
-                                (*el).ref_trigger = *trigger;
-                            }
-                            (*el).count += 1;
-                            (*el).appears_in.insert(i);
-                            added = true;
-                            break;
-                        }
-                    }
-                    if !added {
-                        list.push(ExprFrequency {
-                            expr: e.clone(),
-                            count: 1,
-                            ref_trigger: *trigger,
-                            complexity: get_complexity(&e).1,
-                            appears_in: [i].iter().copied().collect(),
-                        });
-                    }
-                }
-            }
-
-            None => {
-                equal_io.insert(
-                    End(*end),
-                    sub_exprs
-                        .iter()
-                        .map(|e| ExprFrequency {
-                            expr: e.clone(),
-                            count: 1,
-                            ref_trigger: *trigger,
-                            complexity: get_complexity(&e).1,
-                            appears_in: [i].iter().copied().collect(),
-                        })
-                        .collect(), //vec![(e.clone(), 1, *end, *trigger, get_complexity(&e).1)],
-                );
-            }
-        }
-    }
-
-    let (io, first_or_last_in_chain) = equal_io
+    let connections = new_connections
         .iter()
-        .map(|(g, list)| list.iter().map(move |el| (*g, el)))
-        .flatten()
-        .max_by(|a, b| (a.1.count * (a.1.complexity + 1)).cmp(&(b.1.count * (b.1.complexity + 1))))
-        .unwrap();
+        .map(|(s, e, expr, t)| (*s, *e, expr.flatten_and(), *t))
+        .collect::<Vec<_>>();
 
-    println!("io: {:?}", io);
-    println!("first/last: {:?}", first_or_last_in_chain);
+    let mut nodes = Vec::<(IcExpr, u16)>::new();
+    let mut costs = HashMap::new();
 
-    (*closed_group) += 1;
-    let middle_group = Group {
-        id: Id::Arbitrary(*closed_group),
-    };
-    let mut new_connections = Vec::new();
+    use connection_combiner::{erase_blank, reduce, IoNode, Sets};
 
-    match io {
-        Start(start) => new_connections.push((
-            start,
-            middle_group,
-            first_or_last_in_chain.expr.clone(),
-            first_or_last_in_chain.ref_trigger,
-        )),
-        End(end) => new_connections.push((
-            middle_group,
-            end,
-            first_or_last_in_chain.expr.clone(),
-            first_or_last_in_chain.ref_trigger,
-        )),
-    };
+    let mut sets = Sets::new();
+    let mut ref_trigger = connections[0].3;
 
-    for connection in &connections {
-        let correct_group = match io {
-            Start(start) => connection.0 == start,
-            End(end) => connection.1 == end,
-        };
-        if correct_group {
-            let mut sub_exprs = connection.2.flatten_and();
-            if sub_exprs.len() == 1 {
-                new_connections.push(connection.clone());
-                continue;
-            }
-            match sub_exprs.iter().position(|sub_expr| {
-                equal_behaviour(sub_expr.clone(), first_or_last_in_chain.expr.clone())
-            }) {
-                Some(pos) => {
-                    sub_exprs.swap_remove(pos);
+    for (start, end, list, trigger) in connections {
+        let mut new_list = HashSet::new();
+        for node in list {
+            let compl = get_complexity(&node) + 1;
+            let mut found = false;
+            for (i, (other, other_compl)) in nodes.iter_mut().enumerate() {
+                if equal_behaviour(node.clone(), other.clone()) {
+                    if compl < *other_compl {
+                        *other = node.clone();
+                        costs.insert(i, compl);
+                    }
+                    new_list.insert(i);
 
-                    let mut new_connection = connection.clone();
-                    match io {
-                        Start(_) => new_connection.0 = middle_group,
-                        End(_) => new_connection.1 = middle_group,
-                    };
-
-                    new_connection.2 = IcExpr::stack_and(sub_exprs.iter().cloned());
-                    new_connections.push(new_connection);
-                }
-                None => {
-                    new_connections.push(connection.clone());
+                    found = true;
+                    break;
                 }
             }
+            if !found {
+                new_list.insert(nodes.len());
+                costs.insert(nodes.len(), compl);
+                nodes.push((node, compl));
+            }
+        }
+        sets.push((
+            [IoNode::Input(start)].iter().copied().collect(),
+            new_list,
+            [IoNode::Output(end)].iter().copied().collect(),
+            trigger,
+        ))
+    }
+
+    // println!(
+    //     "nodes:\n{}",
+    //     nodes
+    //         .iter()
+    //         .enumerate()
+    //         .map(|(i, (e, _))| format!("{}: {:?}", i, e))
+    //         .collect::<Vec<String>>()
+    //         .join("\n")
+    // );
+    // println!(
+    //     "costs:\n{}",
+    //     costs
+    //         .iter()
+    //         .map(|a| format!("{:?}", a))
+    //         .collect::<Vec<String>>()
+    //         .join("\n")
+    // );
+
+    let mut edges = Vec::new();
+    let mut index = 0;
+    // erase_blank(&mut sets, |a, b| {
+    //     println!("connect {:?} to {:?}", a, b);
+    //     edges.push((a, b));
+    // });
+
+    while !sets.is_empty() {
+        reduce(&mut sets, &mut index, &costs, |a, b| {
+            //println!("connect {:?} to {:?}", a, b);
+            edges.push((a, b));
+        });
+    }
+
+    let mut graph = HashMap::<IoNode, HashSet<IoNode>>::new();
+    for (start, end) in edges {
+        // if let IoNode::Color(_, _) = start {
+        //     // select new group
+        //     (*closed_group) += 1;
+        //     let new_group = Group {
+        //         id: Id::Arbitrary(*closed_group),
+        //     };
+        //     color_node_targets.insert(start, new_group);
+        // };
+        if let Some(list) = graph.get_mut(&start) {
+            list.insert(end);
         } else {
-            new_connections.push(connection.clone());
+            graph.insert(start, [end].iter().copied().collect());
         }
     }
 
-    build_ic_connections(network, objects, closed_group, new_connections);
+    let mut compressed: Vec<(HashSet<IoNode>, HashSet<IoNode>)> = Vec::new();
+    for (node, set) in graph {
+        let mut added = false;
+        for el in &mut compressed {
+            if el.1 == set {
+                (*el).0.insert(node);
+                added = true;
+                break;
+            }
+        }
+        if !added {
+            compressed.push(([node].iter().cloned().collect(), set))
+        }
+    }
+
+    let mut color_node_targets: HashMap<IoNode, Group> = HashMap::new();
+
+    for (starts, _) in &compressed {
+        (*closed_group) += 1;
+        let new_group = Group {
+            id: Id::Arbitrary(*closed_group),
+        };
+        for start in starts {
+            assert_eq!(color_node_targets.insert(*start, new_group), None);
+        }
+    }
+
+    //println!("{:?}", color_node_targets);
+
+    for (starts, list) in compressed {
+        for start in starts {
+            let g = match start {
+                IoNode::Input(g) => g,
+                IoNode::Output(_) => unreachable!(),
+                IoNode::Color(col, i, t) => {
+                    ref_trigger = t;
+                    color_node_targets[&IoNode::Color(col, i, t)]
+                }
+            };
+            for connection in &list {
+                match *connection {
+                    IoNode::Input(_) => unreachable!(),
+                    IoNode::Output(g2) => {
+                        //println!("{:?} -> {:?}", g, g2);
+                        build_instant_count_network(
+                            network,
+                            objects,
+                            g,
+                            g2,
+                            IcExpr::True,
+                            ref_trigger,
+                            closed_group,
+                        );
+                    }
+                    IoNode::Color(col, i, ref_trigger) => {
+                        let target = color_node_targets[&IoNode::Color(col, i, ref_trigger)];
+
+                        build_ic_connections(
+                            network,
+                            objects,
+                            closed_group,
+                            vec![(g, target, nodes[col].0.clone(), ref_trigger)],
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     // for (start, end, expr, ref_trigger) in connections {
     //     build_instant_count_network(
@@ -771,10 +731,197 @@ pub fn build_ic_connections(
     // }
 }
 
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+// enum MatchingIoGroup {
+//     End(Group),
+//     Start(Group),
+// }
+// use MatchingIoGroup::*;
+
+// #[derive(Debug, Clone)]
+// struct ExprFrequency {
+//     expr: IcExpr,
+//     count: u16,
+//     ref_trigger: Trigger,
+//     complexity: u16,
+//     appears_in: HashSet<usize>, // connections it appears in
+// }
+// //(IcExpr, u16, Trigger, u16)
+// let mut equal_io = HashMap::<MatchingIoGroup, Vec<ExprFrequency>>::new();
+
+// for (i, (start, end, expr, trigger)) in connections.iter().enumerate() {
+//     let sub_exprs = expr.flatten_and();
+//     // starts
+//     match equal_io.get_mut(&Start(*start)) {
+//         Some(list) => {
+//             for e in sub_exprs.clone() {
+//                 let mut added = false;
+
+//                 for el in list.iter_mut() {
+//                     if equal_behaviour(el.expr.clone(), e.clone()) {
+//                         let complexity = get_complexity(&e).1;
+//                         if complexity < el.complexity {
+//                             (*el).expr = e.clone();
+//                             (*el).complexity = complexity;
+//                             (*el).ref_trigger = *trigger;
+//                         }
+//                         (*el).appears_in.insert(i);
+//                         (*el).count += 1;
+//                         added = true;
+//                         break;
+//                     }
+//                 }
+//                 if !added {
+//                     list.push(ExprFrequency {
+//                         expr: e.clone(),
+//                         count: 1,
+//                         ref_trigger: *trigger,
+//                         complexity: get_complexity(&e).1,
+//                         appears_in: [i].iter().copied().collect(),
+//                     });
+//                 }
+//             }
+//         }
+
+//         None => {
+//             equal_io.insert(
+//                 Start(*start),
+//                 sub_exprs
+//                     .clone()
+//                     .iter()
+//                     .map(|e| ExprFrequency {
+//                         expr: e.clone(),
+//                         count: 1,
+//                         ref_trigger: *trigger,
+//                         complexity: get_complexity(&e).1,
+//                         appears_in: [i].iter().copied().collect(),
+//                     })
+//                     .collect(), //vec![(e.clone(), 1, *end, *trigger, get_complexity(&e).1)],
+//             );
+//         }
+//     }
+//     //ends
+//     match equal_io.get_mut(&End(*end)) {
+//         Some(list) => {
+//             for e in sub_exprs {
+//                 let mut added = false;
+
+//                 for el in list.iter_mut() {
+//                     if equal_behaviour(el.expr.clone(), e.clone()) {
+//                         let complexity = get_complexity(&e).1;
+//                         if complexity < el.complexity {
+//                             (*el).expr = e.clone();
+//                             (*el).complexity = complexity;
+//                             (*el).ref_trigger = *trigger;
+//                         }
+//                         (*el).count += 1;
+//                         (*el).appears_in.insert(i);
+//                         added = true;
+//                         break;
+//                     }
+//                 }
+//                 if !added {
+//                     list.push(ExprFrequency {
+//                         expr: e.clone(),
+//                         count: 1,
+//                         ref_trigger: *trigger,
+//                         complexity: get_complexity(&e).1,
+//                         appears_in: [i].iter().copied().collect(),
+//                     });
+//                 }
+//             }
+//         }
+
+//         None => {
+//             equal_io.insert(
+//                 End(*end),
+//                 sub_exprs
+//                     .iter()
+//                     .map(|e| ExprFrequency {
+//                         expr: e.clone(),
+//                         count: 1,
+//                         ref_trigger: *trigger,
+//                         complexity: get_complexity(&e).1,
+//                         appears_in: [i].iter().copied().collect(),
+//                     })
+//                     .collect(), //vec![(e.clone(), 1, *end, *trigger, get_complexity(&e).1)],
+//             );
+//         }
+//     }
+// }
+
+// let (io, first_or_last_in_chain) = equal_io
+//     .iter()
+//     .map(|(g, list)| list.iter().map(move |el| (*g, el)))
+//     .flatten()
+//     .max_by(|a, b| (a.1.count * (a.1.complexity + 1)).cmp(&(b.1.count * (b.1.complexity + 1))))
+//     .unwrap();
+
+// println!("io: {:?}", io);
+// println!("first/last: {:?}", first_or_last_in_chain);
+
+// (*closed_group) += 1;
+// let middle_group = Group {
+//     id: Id::Arbitrary(*closed_group),
+// };
+// let mut new_connections = Vec::new();
+
+// match io {
+//     Start(start) => new_connections.push((
+//         start,
+//         middle_group,
+//         first_or_last_in_chain.expr.clone(),
+//         first_or_last_in_chain.ref_trigger,
+//     )),
+//     End(end) => new_connections.push((
+//         middle_group,
+//         end,
+//         first_or_last_in_chain.expr.clone(),
+//         first_or_last_in_chain.ref_trigger,
+//     )),
+// };
+
+// for connection in &connections {
+//     let correct_group = match io {
+//         Start(start) => connection.0 == start,
+//         End(end) => connection.1 == end,
+//     };
+//     if correct_group {
+//         let mut sub_exprs = connection.2.flatten_and();
+//         if sub_exprs.len() == 1 {
+//             new_connections.push(connection.clone());
+//             continue;
+//         }
+//         match sub_exprs.iter().position(|sub_expr| {
+//             equal_behaviour(sub_expr.clone(), first_or_last_in_chain.expr.clone())
+//         }) {
+//             Some(pos) => {
+//                 sub_exprs.swap_remove(pos);
+
+//                 let mut new_connection = connection.clone();
+//                 match io {
+//                     Start(_) => new_connection.0 = middle_group,
+//                     End(_) => new_connection.1 = middle_group,
+//                 };
+
+//                 new_connection.2 = IcExpr::stack_and(sub_exprs.iter().cloned());
+//                 new_connections.push(new_connection);
+//             }
+//             None => {
+//                 new_connections.push(connection.clone());
+//             }
+//         }
+//     } else {
+//         new_connections.push(connection.clone());
+//     }
+// }
+
+// build_ic_connections(network, objects, closed_group, new_connections);
+
 pub fn build_instant_count_network<'a>(
     network: &'a mut TriggerNetwork,
     objects: &'a mut Triggerlist,
-    start_group: Option<Group>,
+    start_group: Group,
     target: Group,
     expr: IcExpr,
     reference_trigger: Trigger,
@@ -803,6 +950,9 @@ pub fn build_instant_count_network<'a>(
 
         IcExpr::True => {
             // This can be optimized
+            // if let Some(gang) = network.get(&target) {
+            //     if gang.connections_in > 1 {
+
             create_spawn_trigger(
                 reference_trigger,
                 target,
@@ -812,59 +962,65 @@ pub fn build_instant_count_network<'a>(
                 network,
                 (false, false),
             );
+            //     } else {
+            //         replace_group(target, start_group, network, objects);
+            //     }
+            // } else {
+            //     unreachable!()
+            // }
+
             true
         }
 
         IcExpr::And(expr1, expr2) => {
-            unreachable!()
-            // (*closed_group) += 1;
-            // let middle_group = Group {
-            //     id: Id::Arbitrary(*closed_group),
-            // };
-            // if build_instant_count_network(
-            //     network,
-            //     objects,
-            //     start_group,
-            //     middle_group,
-            //     *expr1,
-            //     reference_trigger,
-            //     closed_group,
-            // ) {
-            //     build_instant_count_network(
-            //         network,
-            //         objects,
-            //         Some(middle_group),
-            //         target,
-            //         *expr2,
-            //         reference_trigger,
-            //         closed_group,
-            //     )
-            // } else {
-            //     false
-            // }
+            (*closed_group) += 1;
+            let middle_group = Group {
+                id: Id::Arbitrary(*closed_group),
+            };
+            if build_instant_count_network(
+                network,
+                objects,
+                start_group,
+                middle_group,
+                *expr1,
+                reference_trigger,
+                closed_group,
+            ) {
+                build_instant_count_network(
+                    network,
+                    objects,
+                    middle_group,
+                    target,
+                    *expr2,
+                    reference_trigger,
+                    closed_group,
+                )
+            } else {
+                false
+            }
         }
 
         IcExpr::Or(expr1, expr2) => {
-            unreachable!()
-            // let result1 = build_instant_count_network(
-            //     network,
-            //     objects,
-            //     start_group,
-            //     target,
-            //     *expr1,
-            //     reference_trigger,
-            //     closed_group,
-            // );
-            // let result2 = build_instant_count_network(
-            //     network,
-            //     objects,
-            //     start_group,
-            //     target,
-            //     *expr2,
-            //     reference_trigger,
-            //     closed_group,
-            // );
-            // result1 || result2
+            //unreachable!()
+            let result1 = build_instant_count_network(
+                network,
+                objects,
+                start_group,
+                target,
+                *expr1,
+                reference_trigger,
+                closed_group,
+            );
+            let result2 = build_instant_count_network(
+                network,
+                objects,
+                start_group,
+                target,
+                *expr2,
+                reference_trigger,
+                closed_group,
+            );
+            result1 || result2
         }
         IcExpr::False => {
             // delete branch
@@ -1078,11 +1234,274 @@ pub fn build_instant_count_network<'a>(
 //     Some(out.iter().cloned().collect())
 // }
 
+mod connection_combiner {
+    use std::collections::{BTreeSet, HashMap, HashSet};
+
+    use crate::{
+        builtin::{Group, Id},
+        optimize::Trigger,
+    };
+    type Color = usize;
+
+    #[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
+    pub enum IoNode {
+        Input(Group),
+        Output(Group),
+        Color(Color, u16, Trigger),
+    }
+
+    impl std::fmt::Debug for IoNode {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Input(n) => f.write_str(&format!("input {:?}", n)),
+                Self::Output(n) => f.write_str(&format!("output {:?}", n)),
+                Self::Color(n, index, _) => f.write_str(&format!("{}_{}", n, index)),
+            }
+        }
+    }
+
+    pub type Sets = Vec<(BTreeSet<IoNode>, HashSet<Color>, BTreeSet<IoNode>, Trigger)>;
+
+    fn combine(sets: &mut Sets) {
+        let mut i = 0;
+        while i < sets.len() {
+            let mut j = i + 1;
+            while j < sets.len() {
+                if sets[j].1 == sets[i].1 && sets[j].2 == sets[i].2 {
+                    for k in sets[j].0.clone() {
+                        if !sets[i].0.contains(&k) {
+                            sets[i].0.insert(k);
+                        }
+                    }
+                    sets.remove(j);
+                    j -= 1;
+                }
+                j += 1;
+            }
+            i += 1;
+        }
+        i = 0;
+        while i < sets.len() {
+            let mut j = i + 1;
+            while j < sets.len() {
+                if sets[j].1 == sets[i].1 && sets[j].0 == sets[i].0 {
+                    for k in sets[j].2.clone() {
+                        if !sets[i].2.contains(&k) {
+                            sets[i].2.insert(k);
+                        }
+                    }
+                    sets.remove(j);
+                    j -= 1;
+                }
+                j += 1;
+            }
+            i += 1;
+        }
+    }
+    fn push_input<F>(
+        input: BTreeSet<IoNode>,
+        point: Color,
+        ref_trigger: Trigger,
+        sets: &mut Sets,
+        index: &mut u16,
+        mut connect: F,
+    ) where
+        F: FnMut(IoNode, IoNode),
+    {
+        (*index) += 1;
+        let current_index = *index;
+
+        for i in &input {
+            connect(*i, IoNode::Color(point, current_index, ref_trigger));
+        }
+
+        for set in sets.iter_mut() {
+            if set.0 == input && set.1.contains(&point) {
+                (*set).1.remove(&point);
+                (*set).0 = [IoNode::Color(point, current_index, ref_trigger)]
+                    .iter()
+                    .copied()
+                    .collect()
+            }
+        }
+        erase_blank(sets, connect)
+    }
+    fn push_output<F>(
+        output: BTreeSet<IoNode>,
+        point: Color,
+        ref_trigger: Trigger,
+        sets: &mut Sets,
+        index: &mut u16,
+        mut connect: F,
+    ) where
+        F: FnMut(IoNode, IoNode),
+    {
+        (*index) += 1;
+        let current_index = *index;
+
+        for o in &output {
+            connect(IoNode::Color(point, current_index, ref_trigger), *o);
+        }
+        for set in sets.iter_mut() {
+            if set.2 == output && set.1.contains(&point) {
+                (*set).1.remove(&point);
+                (*set).2 = [IoNode::Color(point, current_index, ref_trigger)]
+                    .iter()
+                    .copied()
+                    .collect();
+            }
+        }
+        erase_blank(sets, connect)
+    }
+    pub fn erase_blank<F>(sets: &mut Sets, mut connect: F)
+    where
+        F: FnMut(IoNode, IoNode),
+    {
+        for set in sets.iter() {
+            if set.1.is_empty() {
+                for a in &set.0 {
+                    for b in &set.2 {
+                        connect(*a, *b);
+                    }
+                }
+            }
+        }
+
+        sets.retain(|a| !a.1.is_empty())
+    }
+
+    pub fn reduce<F>(sets: &mut Sets, index: &mut u16, costs: &HashMap<Color, u16>, connect: F)
+    where
+        F: FnMut(IoNode, IoNode),
+    {
+        combine(sets);
+        #[derive(Debug)]
+        struct Score {
+            inputs: HashMap<BTreeSet<IoNode>, u16>,
+            outputs: HashMap<BTreeSet<IoNode>, u16>,
+            ref_trigger: Trigger,
+        }
+        let mut scores = HashMap::<Color, Score>::new();
+
+        for (input, nodes, output, ref_trigger) in sets.iter_mut() {
+            for node in nodes.iter() {
+                let score = if let Some(score) = scores.get_mut(node) {
+                    score
+                } else {
+                    scores.insert(
+                        *node,
+                        Score {
+                            inputs: HashMap::new(),
+                            outputs: HashMap::new(),
+                            ref_trigger: *ref_trigger,
+                        },
+                    );
+                    scores.get_mut(node).unwrap()
+                };
+
+                if let Some(num) = score.inputs.get_mut(input) {
+                    *num += 1;
+                } else {
+                    score.inputs.insert(input.clone(), 1);
+                }
+                if let Some(num) = score.outputs.get_mut(output) {
+                    *num += 1;
+                } else {
+                    score.outputs.insert(output.clone(), 1);
+                }
+            }
+        }
+
+        let mut i_max = 0;
+        let mut o_max = 0;
+        let mut i_max_point = 0;
+        let mut o_max_point = 0;
+        let mut max_input = BTreeSet::new();
+        let mut max_output = BTreeSet::new();
+        let mut max_trigger = sets[0].3;
+
+        for (node, score) in scores {
+            let cost = costs[&node];
+            for (input, mut num) in score.inputs {
+                num *= cost;
+                if num > i_max {
+                    i_max = num;
+                    i_max_point = node;
+                    max_input = input;
+                    max_trigger = score.ref_trigger;
+                }
+            }
+            for (output, mut num) in score.outputs {
+                num *= cost;
+                if num > o_max {
+                    o_max = num;
+                    o_max_point = node;
+                    max_output = output;
+                    max_trigger = score.ref_trigger;
+                }
+            }
+        }
+
+        if o_max < i_max {
+            push_input(max_input, i_max_point, max_trigger, sets, index, connect);
+        } else {
+            push_output(max_output, o_max_point, max_trigger, sets, index, connect);
+        }
+    }
+
+    // #[test]
+    // fn combining_algo() {
+    //     let sets: &[(u16, &[char], u16)] = &[(1, &['A', 'B'], 1), (1, &['A'], 1), (1, &['B'], 1)];
+
+    //     let costs = [('A', 1), ('B', 3), ('C', 2)];
+
+    //     let costs = costs
+    //         .iter()
+    //         .map(|(k, v)| (*k as Color, *v))
+    //         .collect::<HashMap<_, _>>();
+
+    //     println!("initial sets:");
+
+    //     let mut indices = HashMap::new();
+    //     let mut real_sets: Sets = Vec::new();
+
+    //     for set in sets {
+    //         println!("{:?}", set);
+    //         real_sets.push((
+    //             [IoNode {
+    //                 index: 0,
+    //                 node: Node::Input(set.0),
+    //             }]
+    //             .iter()
+    //             .copied()
+    //             .collect(),
+    //             set.1.iter().map(|c| *c as Color).collect(),
+    //             [IoNode {
+    //                 index: 0,
+    //                 node: Node::Output(set.2),
+    //             }]
+    //             .iter()
+    //             .copied()
+    //             .collect(),
+    //         ));
+    //     }
+    //     println!("-------------");
+    //     let mut sets = real_sets;
+    //     while !sets.is_empty() {
+    //         reduce(&mut sets, &mut indices, &costs, |a, b| {
+    //             println!("connect {:?} to {:?}", a, b)
+    //         });
+    //     }
+    //     println!("-------------");
+    // }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn it_works() {
+    fn ic_expr_simplify() {
         use crate::builtin::Id::*;
         let a = Item {
             id: Id::Specific(1),
@@ -1242,10 +1661,10 @@ pub fn get_all_ic_connections(
         }
     }
 
-    println!(
-        "ictriggers: {:?}\n\n inputs: {:?}\n\n outputs: {:?}\n",
-        ictriggers, inputs, outputs
-    );
+    // println!(
+    //     "ictriggers: {:?}\n\n inputs: {:?}\n\n outputs: {:?}\n",
+    //     ictriggers, inputs, outputs
+    // );
 
     let mut all = Vec::new();
     // set triggers that make cycles to inputs and outputs
@@ -1392,24 +1811,24 @@ pub fn get_all_ic_connections(
         //}
     }
 
-    // for ((_, _), (expr, _)) in &mut finished_expressions {
-    //     *expr = simplify_ic_expr_fast(expr.clone());
-    //     match expr {
-    //         IcExpr::True
-    //         | IcExpr::False
-    //         | IcExpr::LessThan(_, _)
-    //         | IcExpr::MoreThan(_, _)
-    //         | IcExpr::Equals(_, _) => continue,
-    //         _ => (),
-    //     };
+    for ((_, _), (expr, _)) in &mut finished_expressions {
+        *expr = simplify_ic_expr_fast(expr.clone());
+        // match expr {
+        //     IcExpr::True
+        //     | IcExpr::False
+        //     | IcExpr::LessThan(_, _)
+        //     | IcExpr::MoreThan(_, _)
+        //     | IcExpr::Equals(_, _) => continue,
+        //     _ => (),
+        // };
 
-    //     if expr.get_variables().len() > 2 || get_solve_complexity(&expr) > 24 {
-    //         continue;
-    //     }
-    //     *expr = simplify_ic_expr_full(expr.clone());
-    // }
+        // if expr.get_variables().len() > 2 || get_solve_complexity(&expr) > 24 {
+        //     continue;
+        // }
+        // *expr = simplify_ic_expr_full(expr.clone());
+    }
 
-    println!("finished simplifying");
+    //println!("finished simplifying");
 
     let out = finished_expressions
         .iter()
@@ -1488,6 +1907,32 @@ fn overlap(mut expr1: IcExpr, mut expr2: IcExpr) -> IcExpr {
                 base_expr
             }
         }
+        (Or(or1, or2), expr2) | (expr2, Or(or1, or2)) => {
+            let attempt = simplify_ic_expr_fast(Or(
+                And(or1, expr2.clone().into()).into(),
+                And(or2, expr2.into()).into(),
+            ));
+            if get_complexity(&attempt) < get_complexity(&base_expr) {
+                attempt
+            } else {
+                base_expr
+            }
+        }
+        (And(and1, and2), expr2) | (expr2, And(and1, and2)) => {
+            let combinations = [
+                And(
+                    simplify_ic_expr_fast(And(and1.clone(), expr2.clone().into())).into(),
+                    and2.clone(),
+                ),
+                And(simplify_ic_expr_fast(And(and2, expr2.into())).into(), and1),
+                base_expr,
+            ];
+            combinations
+                .iter()
+                .min_by(|a, b| get_complexity(&a).cmp(&get_complexity(&b)))
+                .unwrap()
+                .clone()
+        }
 
         (_, _) => base_expr,
     }
@@ -1498,76 +1943,76 @@ fn union(mut expr1: IcExpr, mut expr2: IcExpr) -> IcExpr {
     expr1 = simplify_ic_expr_fast(expr1);
     expr2 = simplify_ic_expr_fast(expr2);
 
-    let base_expr = And(Box::from(expr1.clone()), Box::from(expr2.clone()));
-    match (expr1, expr2) {
-        (False, False) => False,
-        (True, _) | (_, True) => True,
-        (Equals(item1, num1), Equals(item2, num2)) => {
-            if item1 == item2 {
-                if num1 != num2 {
-                    base_expr
-                } else {
-                    Equals(item1, num1)
-                }
-            } else {
-                base_expr
-            }
-        }
-        (MoreThan(item1, num1), MoreThan(item2, num2)) => {
-            if item1 == item2 {
-                MoreThan(item1, min(num1, num2))
-            } else {
-                base_expr
-            }
-        }
-        (LessThan(item1, num1), LessThan(item2, num2)) => {
-            if item1 == item2 {
-                LessThan(item1, max(num1, num2))
-            } else {
-                base_expr
-            }
-        }
-        (LessThan(item1, num1), MoreThan(item2, num2))
-        | (MoreThan(item2, num2), LessThan(item1, num1)) => {
-            if item1 == item2 && num1 > num2 {
-                True
-            } else {
-                base_expr
-            }
-        }
-        (Equals(item1, num1), MoreThan(item2, num2))
-        | (MoreThan(item2, num2), Equals(item1, num1)) => {
-            if item1 == item2 {
-                match num1.cmp(&num2) {
-                    Ordering::Greater => MoreThan(item2, num2),
-                    Ordering::Equal => MoreThan(item2, num1 - 1),
-                    _ => base_expr,
-                }
-            } else {
-                base_expr
-            }
-        }
-        (Equals(item1, num1), LessThan(item2, num2))
-        | (LessThan(item2, num2), Equals(item1, num1)) => {
-            if item1 == item2 {
-                match num1.cmp(&num2) {
-                    Ordering::Less => LessThan(item2, num2),
-                    Ordering::Equal => LessThan(item2, num1 + 1),
-                    _ => base_expr,
-                }
-            } else {
-                base_expr
-            }
-        }
+    And(Box::from(expr1), Box::from(expr2))
+    // match (expr1, expr2) {
+    //     (False, False) => False,
+    //     (True, _) | (_, True) => True,
+    //     (Equals(item1, num1), Equals(item2, num2)) => {
+    //         if item1 == item2 {
+    //             if num1 != num2 {
+    //                 base_expr
+    //             } else {
+    //                 Equals(item1, num1)
+    //             }
+    //         } else {
+    //             base_expr
+    //         }
+    //     }
+    //     (MoreThan(item1, num1), MoreThan(item2, num2)) => {
+    //         if item1 == item2 {
+    //             MoreThan(item1, min(num1, num2))
+    //         } else {
+    //             base_expr
+    //         }
+    //     }
+    //     (LessThan(item1, num1), LessThan(item2, num2)) => {
+    //         if item1 == item2 {
+    //             LessThan(item1, max(num1, num2))
+    //         } else {
+    //             base_expr
+    //         }
+    //     }
+    //     (LessThan(item1, num1), MoreThan(item2, num2))
+    //     | (MoreThan(item2, num2), LessThan(item1, num1)) => {
+    //         if item1 == item2 && num1 > num2 {
+    //             True
+    //         } else {
+    //             base_expr
+    //         }
+    //     }
+    //     (Equals(item1, num1), MoreThan(item2, num2))
+    //     | (MoreThan(item2, num2), Equals(item1, num1)) => {
+    //         if item1 == item2 {
+    //             match num1.cmp(&num2) {
+    //                 Ordering::Greater => MoreThan(item2, num2),
+    //                 Ordering::Equal => MoreThan(item2, num1 - 1),
+    //                 _ => base_expr,
+    //             }
+    //         } else {
+    //             base_expr
+    //         }
+    //     }
+    //     (Equals(item1, num1), LessThan(item2, num2))
+    //     | (LessThan(item2, num2), Equals(item1, num1)) => {
+    //         if item1 == item2 {
+    //             match num1.cmp(&num2) {
+    //                 Ordering::Less => LessThan(item2, num2),
+    //                 Ordering::Equal => LessThan(item2, num1 + 1),
+    //                 _ => base_expr,
+    //             }
+    //         } else {
+    //             base_expr
+    //         }
+    //     }
 
-        (_, _) => base_expr,
-    }
+    //     (_, _) => base_expr,
+    // }
 }
 
 fn simplify_ic_expr_fast(mut expr: IcExpr) -> IcExpr {
     //println!("\n\nstart fast: {:?}", expr);
-    expr = expr.remove_duplicates();
-    expr = expr.decrease_and();
+    // expr = expr.remove_duplicates();
+    // expr = expr.decrease_and();
     expr = match expr {
         IcExpr::And(e1, e2) => overlap(*e1, *e2),
         IcExpr::Or(e1, e2) => union(*e1, *e2),

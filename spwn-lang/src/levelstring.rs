@@ -330,7 +330,8 @@ pub fn append_objects(
             }
         }
     }
-    for (i, list) in closed_ids.iter().enumerate() {
+    for (i, list) in closed_ids.iter_mut().enumerate() {
+        list.remove(&0);
         if list.len() > ID_MAX as usize {
             return Err(format!(
                 "This level exceeds the {} limit! ({}/{})",

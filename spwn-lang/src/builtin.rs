@@ -29,15 +29,24 @@ macro_rules! arg_length {
 
 pub type ArbitraryId = u16;
 pub type SpecificId = u16;
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Id {
     Specific(SpecificId),
     Arbitrary(ArbitraryId), // will be given specific ids at the end of compilation
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Group {
     pub id: Id,
+}
+
+impl std::fmt::Debug for Group {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.id {
+            Id::Specific(n) => f.write_str(&format!("{}g", n)),
+            Id::Arbitrary(n) => f.write_str(&format!("{}?g", n)),
+        }
+    }
 }
 
 impl Group {
