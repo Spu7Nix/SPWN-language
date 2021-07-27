@@ -243,38 +243,44 @@ fn instant_count_optimization(
     build_ic_connections(network, objects, closed_group, c);
 }
 
-// pub fn replace_group(
-//     from: Group,
-//     to: Group,
-//     network: &mut TriggerNetwork,
-//     objects: &mut Triggerlist,
-// ) {
-//     if let Some(gang) = network.remove(&from) {
-//         network.insert(to, gang);
-//     }
+pub fn replace_groups(
+    table: HashMap<Group, Group>,
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+) {
+    for fn_id in objects.list.iter_mut() {
+        for (object, _) in &mut fn_id.obj_list {
+            for param in &mut object.params.values_mut() {
+                match param {
+                    ObjParam::Group(g) => {
+                        if let Some(to) = table.get(g) {
+                            *g = *to;
+                        }
+                    }
+                    ObjParam::GroupList(list) => {
+                        for g in list {
+                            if let Some(to) = table.get(g) {
+                                *g = *to;
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+    let mut new_network = TriggerNetwork::new();
+    for (group, gang) in network.iter() {
+        let new_group = if let Some(new) = table.get(group) {
+            new
+        } else {
+            group
+        };
+        new_network.insert(*new_group, gang.clone());
+    }
 
-//     for fn_id in objects.list.iter_mut() {
-//         for (object, _) in &mut fn_id.obj_list {
-//             for param in &mut object.params.values_mut() {
-//                 match param {
-//                     ObjParam::Group(g) => {
-//                         if *g == from {
-//                             *g = to
-//                         }
-//                     }
-//                     ObjParam::GroupList(list) => {
-//                         for g in list {
-//                             if *g == from {
-//                                 *g = to
-//                             }
-//                         }
-//                     }
-//                     _ => (),
-//                 }
-//             }
-//         }
-//     }
-// }
+    *network = new_network;
+}
 
 pub fn connect(
     from: Option<Group>,

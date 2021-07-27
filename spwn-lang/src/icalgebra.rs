@@ -227,7 +227,6 @@ impl HeapItem {
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
-use std::iter::FromIterator;
 
 type CriticalValueSets = HashMap<Item, HashSet<i32>>;
 
@@ -564,7 +563,7 @@ pub fn build_ic_connections(
     let mut nodes = Vec::<(IcExpr, u16)>::new();
     let mut costs = HashMap::new();
 
-    use connection_combiner::{erase_blank, reduce, IoNode, Sets};
+    use connection_combiner::{reduce, IoNode, Sets};
 
     let mut sets = Sets::new();
     let mut ref_trigger = connections[0].3;
@@ -677,6 +676,7 @@ pub fn build_ic_connections(
     }
 
     //println!("{:?}", color_node_targets);
+    let mut direct_connections = HashMap::new();
 
     for (starts, list) in compressed {
         for start in starts {
@@ -693,15 +693,16 @@ pub fn build_ic_connections(
                     IoNode::Input(_) => unreachable!(),
                     IoNode::Output(g2) => {
                         //println!("{:?} -> {:?}", g, g2);
-                        build_instant_count_network(
-                            network,
-                            objects,
-                            g,
-                            g2,
-                            IcExpr::True,
-                            ref_trigger,
-                            closed_group,
-                        );
+                        direct_connections.insert((g, g2), ref_trigger);
+                        // build_instant_count_network(
+                        //     network,
+                        //     objects,
+                        //     g,
+                        //     g2,
+                        //     IcExpr::True,
+                        //     ref_trigger,
+                        //     closed_group,
+                        // );
                     }
                     IoNode::Color(col, i, ref_trigger) => {
                         let target = color_node_targets[&IoNode::Color(col, i, ref_trigger)];
@@ -717,6 +718,24 @@ pub fn build_ic_connections(
             }
         }
     }
+
+    let mut swaps = HashMap::new();
+
+    for ((start, end), t) in &direct_connections {
+        let indirect = direct_connections
+            .iter()
+            .filter(|((_, e), _)| e == end)
+            .nth(1)
+            .is_some();
+
+        if indirect {
+            create_spawn_trigger(*t, *end, *start, 0.0, objects, network, (false, false));
+        } else {
+            swaps.insert(*start, *end);
+        }
+    }
+
+    replace_groups(swaps, network, objects);
 
     // for (start, end, expr, ref_trigger) in connections {
     //     build_instant_count_network(
@@ -973,54 +992,55 @@ pub fn build_instant_count_network<'a>(
         }
 
         IcExpr::And(expr1, expr2) => {
-            (*closed_group) += 1;
-            let middle_group = Group {
-                id: Id::Arbitrary(*closed_group),
-            };
-            if build_instant_count_network(
-                network,
-                objects,
-                start_group,
-                middle_group,
-                *expr1,
-                reference_trigger,
-                closed_group,
-            ) {
-                build_instant_count_network(
-                    network,
-                    objects,
-                    middle_group,
-                    target,
-                    *expr2,
-                    reference_trigger,
-                    closed_group,
-                )
-            } else {
-                false
-            }
+            unreachable!()
+            // (*closed_group) += 1;
+            // let middle_group = Group {
+            //     id: Id::Arbitrary(*closed_group),
+            // };
+            // if build_instant_count_network(
+            //     network,
+            //     objects,
+            //     start_group,
+            //     middle_group,
+            //     *expr1,
+            //     reference_trigger,
+            //     closed_group,
+            // ) {
+            //     build_instant_count_network(
+            //         network,
+            //         objects,
+            //         middle_group,
+            //         target,
+            //         *expr2,
+            //         reference_trigger,
+            //         closed_group,
+            //     )
+            // } else {
+            //     false
+            // }
         }
 
         IcExpr::Or(expr1, expr2) => {
-            //unreachable!()
-            let result1 = build_instant_count_network(
-                network,
-                objects,
-                start_group,
-                target,
-                *expr1,
-                reference_trigger,
-                closed_group,
-            );
-            let result2 = build_instant_count_network(
-                network,
-                objects,
-                start_group,
-                target,
-                *expr2,
-                reference_trigger,
-                closed_group,
-            );
-            result1 || result2
+            unreachable!()
+            // let result1 = build_instant_count_network(
+            //     network,
+            //     objects,
+            //     start_group,
+            //     target,
+            //     *expr1,
+            //     reference_trigger,
+            //     closed_group,
+            // );
+            // let result2 = build_instant_count_network(
+            //     network,
+            //     objects,
+            //     start_group,
+            //     target,
+            //     *expr2,
+            //     reference_trigger,
+            //     closed_group,
+            // );
+            // result1 || result2
         }
         IcExpr::False => {
             // delete branch
@@ -1237,10 +1257,7 @@ pub fn build_instant_count_network<'a>(
 mod connection_combiner {
     use std::collections::{BTreeSet, HashMap, HashSet};
 
-    use crate::{
-        builtin::{Group, Id},
-        optimize::Trigger,
-    };
+    use crate::{builtin::Group, optimize::Trigger};
     type Color = usize;
 
     #[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
@@ -1503,10 +1520,10 @@ mod tests {
     #[test]
     fn ic_expr_simplify() {
         use crate::builtin::Id::*;
-        let a = Item {
+        let _a = Item {
             id: Id::Specific(1),
         };
-        let b = Item {
+        let _b = Item {
             id: Id::Specific(2),
         };
         // let c = Item {
@@ -1581,7 +1598,9 @@ pub fn get_all_ic_connections(
     let mut inputs = HashSet::<Group>::new();
     let mut outputs = HashSet::<Group>::new();
 
-    for (group, gang) in triggers {
+    let mut to_be_subtracted_from = Vec::new();
+
+    for (group, gang) in triggers.iter_mut() {
         let output_condition = gang
             .triggers
             .iter()
@@ -1650,6 +1669,7 @@ pub fn get_all_ic_connections(
                     // delete trigger that will be rebuilt
                     (*trigger).deleted = true;
                     (*trigger).optimized = true;
+                    to_be_subtracted_from.push(target);
 
                     if let Some(l) = ictriggers.get_mut(&group) {
                         l.push((target, expr, *trigger))
@@ -1659,6 +1679,10 @@ pub fn get_all_ic_connections(
                 }
             }
         }
+    }
+
+    for g in &to_be_subtracted_from {
+        (*triggers.get_mut(g).unwrap()).connections_in -= 1;
     }
 
     // println!(
@@ -1801,32 +1825,44 @@ pub fn get_all_ic_connections(
         //println!("</{:?}>", start);
     }
 
-    let mut finished_expressions = Vec::<((Group, Group), (IcExpr, Trigger))>::new();
+    let mut finished_expressions = HashMap::<(Group, Group), (IcExpr, Trigger)>::new();
 
     for (start, end, expr, trigger) in all {
-        // if let Some(e) = finished_expressions.get_mut(&(start, end)) {
-        //     *e = (IcExpr::Or(e.0.clone().into(), expr.clone().into()), e.1)
-        // } else {
-        finished_expressions.push(((start, end), (expr.clone(), trigger)));
-        //}
+        if let Some(e) = finished_expressions.get_mut(&(start, end)) {
+            *e = (IcExpr::Or(e.0.clone().into(), expr.clone().into()), e.1)
+        } else {
+            finished_expressions.insert((start, end), (expr.clone(), trigger));
+        }
     }
+    // let starts = finished_expressions
+    //     .iter()
+    //     .map(|((a, _), _)| *a)
+    //     .collect::<Vec<_>>();
+    // let ends = finished_expressions
+    //     .iter()
+    //     .map(|((_, a), _)| *a)
+    //     .collect::<Vec<_>>();
 
-    for ((_, _), (expr, _)) in &mut finished_expressions {
-        *expr = simplify_ic_expr_fast(expr.clone());
-        // match expr {
-        //     IcExpr::True
-        //     | IcExpr::False
-        //     | IcExpr::LessThan(_, _)
-        //     | IcExpr::MoreThan(_, _)
-        //     | IcExpr::Equals(_, _) => continue,
-        //     _ => (),
-        // };
+    // for ((start, end), (expr, _)) in &mut finished_expressions {
+    //     if starts.iter().filter(|a| *a == start).nth(1).is_none()
+    //         && ends.iter().filter(|a| *a == end).nth(1).is_none()
+    //     {
+    //         *expr = simplify_ic_expr_fast(expr.clone());
+    //     }
+    //     // match expr {
+    //     //     IcExpr::True
+    //     //     | IcExpr::False
+    //     //     | IcExpr::LessThan(_, _)
+    //     //     | IcExpr::MoreThan(_, _)
+    //     //     | IcExpr::Equals(_, _) => continue,
+    //     //     _ => (),
+    //     // };
 
-        // if expr.get_variables().len() > 2 || get_solve_complexity(&expr) > 24 {
-        //     continue;
-        // }
-        // *expr = simplify_ic_expr_full(expr.clone());
-    }
+    //     // if expr.get_variables().len() > 2 || get_solve_complexity(&expr) > 24 {
+    //     //     continue;
+    //     // }
+    //     // *expr = simplify_ic_expr_full(expr.clone());
+    // }
 
     //println!("finished simplifying");
 
