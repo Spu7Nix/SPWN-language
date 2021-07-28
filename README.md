@@ -35,7 +35,7 @@ You can either use the installers for your operating system, or build SPWN from 
 1. Download source code from this repository.
 2. Install rust if you haven't already.
 3. Open `spwn-lang` folder in the terminal.
-4. Run `cargo build`.
+4. Run `cargo build --release`.
 5. Compiled binary is placed in `target/debug`.
 
 ## Using SPWN - Setup
