@@ -15,6 +15,69 @@ pub enum IcExpr {
     MoreThan(Item, i32),
     LessThan(Item, i32),
 }
+fn create_instant_count_trigger(
+    reference_trigger: Trigger,
+    target_group: Group,
+    group: Group,
+    operation: u8,
+    num: i32,
+    item: Item,
+    objects: &mut Triggerlist,
+    network: &mut TriggerNetwork,
+    //         opt   del
+    settings: (bool, bool),
+) {
+    let mut new_obj_map = HashMap::new();
+    new_obj_map.insert(1, ObjParam::Number(1811.0));
+    new_obj_map.insert(51, ObjParam::Group(target_group));
+    new_obj_map.insert(80, ObjParam::Item(item));
+    new_obj_map.insert(77, ObjParam::Number(num.into()));
+    new_obj_map.insert(88, ObjParam::Number(operation.into()));
+    new_obj_map.insert(56, ObjParam::Bool(true));
+
+    new_obj_map.insert(57, ObjParam::Group(group));
+
+    let new_obj = GdObj {
+        params: new_obj_map,
+        func_id: reference_trigger.obj.0,
+        mode: ObjectMode::Trigger,
+        unique_id: objects[reference_trigger.obj].0.unique_id,
+        sync_group: 0,
+        sync_part: 0,
+    };
+
+    (*objects.list)[reference_trigger.obj.0]
+        .obj_list
+        .push((new_obj.clone(), reference_trigger.order));
+
+    let obj_index = (
+        reference_trigger.obj.0,
+        objects.list[reference_trigger.obj.0].obj_list.len() - 1,
+    );
+    let new_trigger = Trigger {
+        obj: obj_index,
+        optimized: settings.0,
+        deleted: settings.1,
+        role: TriggerRole::Func,
+        ..reference_trigger
+    };
+
+    if let Some(ObjParam::Group(group)) = new_obj.params.get(&57) {
+        match network.get_mut(group) {
+            Some(gang) => (*gang).triggers.push(new_trigger),
+            None => {
+                network.insert(*group, TriggerGang::new(vec![new_trigger]));
+            }
+        }
+    } else {
+        match network.get_mut(&NO_GROUP) {
+            Some(gang) => (*gang).triggers.push(new_trigger),
+            None => {
+                network.insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
+            }
+        }
+    }
+}
 
 impl IcExpr {
     fn get_variables(&self) -> HashSet<Item> {
@@ -510,10 +573,12 @@ pub fn build_ic_connections(
     objects: &mut Triggerlist,
     closed_group: &mut u16,
     mut connections: Vec<(Group, Group, IcExpr, Trigger)>,
-) {
+) -> HashMap<Group, Group> {
     if connections.is_empty() {
-        return;
+        return HashMap::new();
     }
+
+    let mut swaps = HashMap::new();
     connections = {
         let mut new_connections = Vec::new();
         for (start, end, expr, trigger) in connections {
@@ -533,29 +598,32 @@ pub fn build_ic_connections(
     //         .join("\n")
     // );
 
-    let mut new_connections = Vec::new();
-    for (start, end, expr, trigger) in &connections {
-        match &expr {
-            IcExpr::And(_, _) => new_connections.push((*start, *end, expr.clone(), *trigger)),
-            _ => {
-                build_instant_count_network(
-                    network,
-                    objects,
-                    *start,
-                    *end,
-                    expr.clone(),
-                    *trigger,
-                    closed_group,
-                );
-            }
-        }
-    }
+    // let mut new_connections = Vec::new();
+    // for (start, end, expr, trigger) in &connections {
+    //     match &expr {
+    //         IcExpr::And(_, _) => new_connections.push((*start, *end, expr.clone(), *trigger)),
+    //         IcExpr::True => {
+    //             swaps.insert(*start, *end);
+    //         }
+    //         _ => {
+    //             build_instant_count_network(
+    //                 network,
+    //                 objects,
+    //                 *start,
+    //                 *end,
+    //                 expr.clone(),
+    //                 *trigger,
+    //                 closed_group,
+    //             );
+    //         }
+    //     }
+    // }
 
-    if new_connections.is_empty() {
-        return;
-    }
+    // if new_connections.is_empty() {
+    //     return swaps;
+    // }
 
-    let connections = new_connections
+    let connections = connections
         .iter()
         .map(|(s, e, expr, t)| (*s, *e, expr.flatten_and(), *t))
         .collect::<Vec<_>>();
@@ -566,7 +634,7 @@ pub fn build_ic_connections(
     use connection_combiner::{reduce, IoNode, Sets};
 
     let mut sets = Sets::new();
-    let mut ref_trigger = connections[0].3;
+    //let mut ref_trigger = connections[0].3;
 
     for (start, end, list, trigger) in connections {
         let mut new_list = HashSet::new();
@@ -623,119 +691,201 @@ pub fn build_ic_connections(
     //     println!("connect {:?} to {:?}", a, b);
     //     edges.push((a, b));
     // });
+    let mut ref_triggers = HashMap::new();
 
     while !sets.is_empty() {
-        reduce(&mut sets, &mut index, &costs, |a, b| {
+        reduce(&mut sets, &mut index, &mut ref_triggers, &costs, |a, b| {
             //println!("connect {:?} to {:?}", a, b);
             edges.push((a, b));
         });
     }
 
-    let mut graph = HashMap::<IoNode, HashSet<IoNode>>::new();
-    for (start, end) in edges {
-        // if let IoNode::Color(_, _) = start {
-        //     // select new group
-        //     (*closed_group) += 1;
-        //     let new_group = Group {
-        //         id: Id::Arbitrary(*closed_group),
-        //     };
-        //     color_node_targets.insert(start, new_group);
-        // };
-        if let Some(list) = graph.get_mut(&start) {
-            list.insert(end);
-        } else {
-            graph.insert(start, [end].iter().copied().collect());
-        }
-    }
-
-    let mut compressed: Vec<(HashSet<IoNode>, HashSet<IoNode>)> = Vec::new();
-    for (node, set) in graph {
-        let mut added = false;
-        for el in &mut compressed {
-            if el.1 == set {
-                (*el).0.insert(node);
-                added = true;
-                break;
-            }
-        }
-        if !added {
-            compressed.push(([node].iter().cloned().collect(), set))
-        }
-    }
-
-    let mut color_node_targets: HashMap<IoNode, Group> = HashMap::new();
-
-    for (starts, _) in &compressed {
-        (*closed_group) += 1;
-        let new_group = Group {
-            id: Id::Arbitrary(*closed_group),
-        };
-        for start in starts {
-            assert_eq!(color_node_targets.insert(*start, new_group), None);
-        }
-    }
-
-    //println!("{:?}", color_node_targets);
-    let mut direct_connections = HashMap::new();
-
-    for (starts, list) in compressed {
-        for start in starts {
-            let g = match start {
-                IoNode::Input(g) => g,
-                IoNode::Output(_) => unreachable!(),
-                IoNode::Color(col, i, t) => {
-                    ref_trigger = t;
-                    color_node_targets[&IoNode::Color(col, i, t)]
-                }
+    let mut trigger_groups: HashMap<IoNode, Group> = HashMap::new(); // the group of the trigger an io node represents
+    let mut get_group = |node: &IoNode, closed_group: &mut u16| match trigger_groups.get(node) {
+        Some(g) => *g,
+        None => {
+            (*closed_group) += 1;
+            let new_group = Group {
+                id: Id::Arbitrary(*closed_group),
             };
-            for connection in &list {
-                match *connection {
-                    IoNode::Input(_) => unreachable!(),
-                    IoNode::Output(g2) => {
-                        //println!("{:?} -> {:?}", g, g2);
-                        direct_connections.insert((g, g2), ref_trigger);
-                        // build_instant_count_network(
-                        //     network,
-                        //     objects,
-                        //     g,
-                        //     g2,
-                        //     IcExpr::True,
-                        //     ref_trigger,
-                        //     closed_group,
-                        // );
-                    }
-                    IoNode::Color(col, i, ref_trigger) => {
-                        let target = color_node_targets[&IoNode::Color(col, i, ref_trigger)];
+            trigger_groups.insert(*node, new_group);
+            new_group
+        }
+    };
+    for (start, end) in edges {
+        match start {
+            IoNode::Output(_) => unreachable!(),
+            IoNode::Input(input) => match end {
+                IoNode::Color(col, i) => {
+                    let node_group = get_group(&IoNode::Color(col, i), closed_group);
+                    create_spawn_trigger(
+                        ref_triggers[&(col, i)],
+                        node_group,
+                        input,
+                        0.0,
+                        objects,
+                        network,
+                        (false, false),
+                    );
+                }
+                _ => unreachable!(),
+            },
 
-                        build_ic_connections(
+            IoNode::Color(col, i) => {
+                let start_group = get_group(&IoNode::Color(col, i), closed_group);
+                let end_group = match end {
+                    node @ IoNode::Color(_, _) => get_group(&node, closed_group),
+                    IoNode::Output(output) => output,
+                    _ => unreachable!(),
+                };
+                let ref_trigger = ref_triggers[&(col, i)];
+
+                match &nodes[col].0 {
+                    expr @ IcExpr::And(_, _) | expr @ IcExpr::Or(_, _) => {
+                        let new_swaps = build_ic_connections(
                             network,
                             objects,
                             closed_group,
-                            vec![(g, target, nodes[col].0.clone(), ref_trigger)],
-                        )
+                            vec![(start_group, end_group, expr.clone(), ref_trigger)],
+                        );
+                        for swap in new_swaps {
+                            assert!(swaps.insert(swap.0, swap.1).is_none());
+                        }
+                    }
+                    IcExpr::True => {
+                        assert!(swaps.insert(start_group, end_group).is_none());
+                    }
+                    expr => {
+                        build_instant_count_network(
+                            network,
+                            objects,
+                            start_group,
+                            end_group,
+                            expr.clone(),
+                            ref_trigger,
+                            closed_group,
+                        );
                     }
                 }
             }
         }
     }
+    swaps
 
-    let mut swaps = HashMap::new();
+    // let mut graph = HashMap::<IoNode, HashSet<IoNode>>::new();
+    // for (start, end) in edges {
+    //     // if let IoNode::Color(_, _) = start {
+    //     //     // select new group
+    //     //     (*closed_group) += 1;
+    //     //     let new_group = Group {
+    //     //         id: Id::Arbitrary(*closed_group),
+    //     //     };
+    //     //     color_node_targets.insert(start, new_group);
+    //     // };
+    //     if let Some(list) = graph.get_mut(&start) {
+    //         list.insert(end);
+    //     } else {
+    //         graph.insert(start, [end].iter().copied().collect());
+    //     }
+    // }
 
-    for ((start, end), t) in &direct_connections {
-        let indirect = direct_connections
-            .iter()
-            .filter(|((_, e), _)| e == end)
-            .nth(1)
-            .is_some();
+    // let mut compressed: Vec<(HashSet<IoNode>, HashSet<IoNode>)> = Vec::new();
+    // for (node, set) in graph {
+    //     let mut added = false;
+    //     for el in &mut compressed {
+    //         if el.1 == set {
+    //             (*el).0.insert(node);
+    //             added = true;
+    //             break;
+    //         }
+    //     }
+    //     if !added {
+    //         compressed.push(([node].iter().cloned().collect(), set))
+    //     }
+    // }
 
-        if indirect {
-            create_spawn_trigger(*t, *end, *start, 0.0, objects, network, (false, false));
-        } else {
-            swaps.insert(*start, *end);
-        }
-    }
+    // println!(
+    //     "compressed :\n{}",
+    //     compressed
+    //         .iter()
+    //         .map(|(a, b)| format!("{:?}: {:?}", a, b))
+    //         .collect::<Vec<String>>()
+    //         .join("\n")
+    // );
 
-    replace_groups(swaps, network, objects);
+    // let mut color_node_targets: HashMap<IoNode, Group> = HashMap::new();
+
+    // for (starts, _) in &compressed {
+    //     (*closed_group) += 1;
+    //     let new_group = Group {
+    //         id: Id::Arbitrary(*closed_group),
+    //     };
+    //     for start in starts {
+    //         assert_eq!(color_node_targets.insert(*start, new_group), None);
+    //     }
+    // }
+
+    // //println!("{:?}", color_node_targets);
+
+    // for (starts, list) in compressed {
+    //     for start in starts {
+    //         let g = match start {
+    //             IoNode::Input(g) => g,
+    //             IoNode::Output(_) => unreachable!(),
+    //             IoNode::Color(col, i) => color_node_targets[&IoNode::Color(col, i)],
+    //         };
+    //         for connection in &list {
+    //             match *connection {
+    //                 IoNode::Input(_) => unreachable!(),
+    //                 IoNode::Output(g2) => {
+    //                     //println!("{:?} -> {:?}", g, g2);
+    //                     swaps.insert(g, g2);
+    //                     // build_instant_count_network(
+    //                     //     network,
+    //                     //     objects,
+    //                     //     g,
+    //                     //     g2,
+    //                     //     IcExpr::True,
+    //                     //     ref_trigger,
+    //                     //     closed_group,
+    //                     // );
+    //                 }
+    //                 IoNode::Color(col, i) => {
+    //                     let target = color_node_targets[&IoNode::Color(col, i)];
+    //                     let ref_trigger = ref_triggers[&(col, i)];
+
+    //                     match &nodes[col].0 {
+    //                         expr @ IcExpr::And(_, _) => {
+    //                             let new_swaps = build_ic_connections(
+    //                                 network,
+    //                                 objects,
+    //                                 closed_group,
+    //                                 vec![(g, target, expr.clone(), ref_trigger)],
+    //                             );
+    //                             for swap in new_swaps {
+    //                                 assert!(swaps.insert(swap.0, swap.1).is_none());
+    //                             }
+    //                         }
+    //                         IcExpr::True => {
+    //                             assert!(swaps.insert(g, target).is_none());
+    //                         }
+    //                         expr => {
+    //                             build_instant_count_network(
+    //                                 network,
+    //                                 objects,
+    //                                 g,
+    //                                 target,
+    //                                 expr.clone(),
+    //                                 ref_trigger,
+    //                                 closed_group,
+    //                             );
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     // for (start, end, expr, ref_trigger) in connections {
     //     build_instant_count_network(
@@ -1264,7 +1414,7 @@ mod connection_combiner {
     pub enum IoNode {
         Input(Group),
         Output(Group),
-        Color(Color, u16, Trigger),
+        Color(Color, u16),
     }
 
     impl std::fmt::Debug for IoNode {
@@ -1272,7 +1422,7 @@ mod connection_combiner {
             match self {
                 Self::Input(n) => f.write_str(&format!("input {:?}", n)),
                 Self::Output(n) => f.write_str(&format!("output {:?}", n)),
-                Self::Color(n, index, _) => f.write_str(&format!("{}_{}", n, index)),
+                Self::Color(n, index) => f.write_str(&format!("{}_{}", n, index)),
             }
         }
     }
@@ -1321,6 +1471,7 @@ mod connection_combiner {
         ref_trigger: Trigger,
         sets: &mut Sets,
         index: &mut u16,
+        ref_triggers: &mut HashMap<(Color, u16), Trigger>,
         mut connect: F,
     ) where
         F: FnMut(IoNode, IoNode),
@@ -1329,16 +1480,17 @@ mod connection_combiner {
         let current_index = *index;
 
         for i in &input {
-            connect(*i, IoNode::Color(point, current_index, ref_trigger));
+            connect(*i, IoNode::Color(point, current_index));
         }
 
         for set in sets.iter_mut() {
             if set.0 == input && set.1.contains(&point) {
                 (*set).1.remove(&point);
-                (*set).0 = [IoNode::Color(point, current_index, ref_trigger)]
+                (*set).0 = [IoNode::Color(point, current_index)]
                     .iter()
                     .copied()
-                    .collect()
+                    .collect();
+                ref_triggers.insert((point, current_index), ref_trigger);
             }
         }
         erase_blank(sets, connect)
@@ -1349,6 +1501,7 @@ mod connection_combiner {
         ref_trigger: Trigger,
         sets: &mut Sets,
         index: &mut u16,
+        ref_triggers: &mut HashMap<(Color, u16), Trigger>,
         mut connect: F,
     ) where
         F: FnMut(IoNode, IoNode),
@@ -1357,15 +1510,16 @@ mod connection_combiner {
         let current_index = *index;
 
         for o in &output {
-            connect(IoNode::Color(point, current_index, ref_trigger), *o);
+            connect(IoNode::Color(point, current_index), *o);
         }
         for set in sets.iter_mut() {
             if set.2 == output && set.1.contains(&point) {
                 (*set).1.remove(&point);
-                (*set).2 = [IoNode::Color(point, current_index, ref_trigger)]
+                (*set).2 = [IoNode::Color(point, current_index)]
                     .iter()
                     .copied()
                     .collect();
+                ref_triggers.insert((point, current_index), ref_trigger);
             }
         }
         erase_blank(sets, connect)
@@ -1387,8 +1541,13 @@ mod connection_combiner {
         sets.retain(|a| !a.1.is_empty())
     }
 
-    pub fn reduce<F>(sets: &mut Sets, index: &mut u16, costs: &HashMap<Color, u16>, connect: F)
-    where
+    pub fn reduce<F>(
+        sets: &mut Sets,
+        index: &mut u16,
+        ref_triggers: &mut HashMap<(Color, u16), Trigger>,
+        costs: &HashMap<Color, u16>,
+        connect: F,
+    ) where
         F: FnMut(IoNode, IoNode),
     {
         combine(sets);
@@ -1460,9 +1619,25 @@ mod connection_combiner {
         }
 
         if o_max < i_max {
-            push_input(max_input, i_max_point, max_trigger, sets, index, connect);
+            push_input(
+                max_input,
+                i_max_point,
+                max_trigger,
+                sets,
+                index,
+                ref_triggers,
+                connect,
+            );
         } else {
-            push_output(max_output, o_max_point, max_trigger, sets, index, connect);
+            push_output(
+                max_output,
+                o_max_point,
+                max_trigger,
+                sets,
+                index,
+                ref_triggers,
+                connect,
+            );
         }
     }
 
@@ -1844,11 +2019,13 @@ pub fn get_all_ic_connections(
     //     .collect::<Vec<_>>();
 
     // for ((start, end), (expr, _)) in &mut finished_expressions {
-    //     if starts.iter().filter(|a| *a == start).nth(1).is_none()
-    //         && ends.iter().filter(|a| *a == end).nth(1).is_none()
-    //     {
-    //         *expr = simplify_ic_expr_fast(expr.clone());
-    //     }
+    //     // if starts.iter().filter(|a| *a == start).nth(1).is_none()
+    //     //     && ends.iter().filter(|a| *a == end).nth(1).is_none()
+    //     // {
+
+    //     *expr = simplify_ic_expr_fast(expr.clone());
+
+    //     //}
     //     // match expr {
     //     //     IcExpr::True
     //     //     | IcExpr::False
@@ -1979,7 +2156,7 @@ fn union(mut expr1: IcExpr, mut expr2: IcExpr) -> IcExpr {
     expr1 = simplify_ic_expr_fast(expr1);
     expr2 = simplify_ic_expr_fast(expr2);
 
-    And(Box::from(expr1), Box::from(expr2))
+    Or(Box::from(expr1), Box::from(expr2))
     // match (expr1, expr2) {
     //     (False, False) => False,
     //     (True, _) | (_, True) => True,

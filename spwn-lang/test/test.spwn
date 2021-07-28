@@ -1,50 +1,16 @@
 extract obj_props;
 
-decimalMemory = 10i;
-decimalCounter = counter(decimalMemory);
-binaryMemory = [11i, 12i, 13i, 14i, 15i, 16i, 17i, 18i];
-let binaryCounters = [];
-
-$.add(obj {
-    OBJ_ID: 1615,
-    X: 300,
-    Y: 300,
-    ITEM: decimalMemory,
-    GROUPS: 999g
-});
-
-for i in 0..binaryMemory.length {
-    $.add(obj {
-        OBJ_ID: 1615,
-        X: 300 + i * 30,
-        Y: 270,
-        ITEM: binaryMemory[i],
-        GROUPS: 999g
-    });
-    binaryCounters.push(counter(binaryMemory[i]));
-}
-
-binaryToNumeric = !{
-    decimalCounter = 0;
-    wait(1);
-
-    for i in 0..binaryCounters.length {
-        if binaryCounters[binaryCounters.length - 1 - i] as @bool {
-            decimalCounter += 2 ^ i;
-        }
-    }
-}
-
-decimalToBinary = !{
-    tempLength = binaryCounters.length + 1;
-
-    for i in 1..tempLength {
-        decimalCounter.divide(2, remainder = binaryCounters[binaryCounters.length - i], speed = 4);
-    }
-
-    binaryToNumeric!;
-}
-
-decimalCounter = 213; // Edit this
 wait(1);
-decimalToBinary!;
+
+for i in 0..2 {
+    if counter() as @bool {
+        100i.add(10)
+    }
+}
+
+impl @counter {
+
+    _plus_<@counter>: (self, other) {
+        dhueh
+    }
+}
