@@ -16,7 +16,7 @@ impl @string {
 			out += @string(i);
 			out += self;
 		}
-		return out.substr(0, out.length-self.length);	
+		return out.substr(0, out.length-self.length);
 	},
 	split: #[desc("Splits the string by the specified seperator.")]
 	(self, spstr: @string) {

@@ -24,7 +24,7 @@ BG.set(0, 255, 0) // turn background green
 	} else {
 		-> return
 	}
-	
+
 }
 call_with_delay = #[desc("Call a function after a delay") example("
 BG.set(255, 0, 0) // turn background red
@@ -32,7 +32,7 @@ call_with_delay(2, !{
 	BG.set(0, 255, 0) // turn background green 2 seconds later
 })
 ")] (
-	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{}, 
+	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{},
 	#[desc("Function to call after the delay")] function: @trigger_function
 ) {
 	$.add(trigger{
@@ -44,8 +44,8 @@ call_with_delay(2, !{
 -> return {
 	wait: wait,
 	call_with_delay: call_with_delay,
-	
-	
+
+
 
 	supress_signal: #[desc("Stops signal from coming past for some time") example("
 f = !{
@@ -76,8 +76,8 @@ f! // moves
 			checker.item.add(1)
 			-> return
 		})
-		
-	
+
+
 	},
 
 	supress_signal_forever: #[desc("Stops signal from coming past after call") example("
@@ -91,14 +91,14 @@ f! // does nothing
 wait(1000)
 f! // does nothing
 	")] (){
-		
+
 		checker = @counter::new(0)
 		checker.item.if_is(EQUAL_TO, 0, !{
 			checker.item.add(1)
 			-> return
 		})
-		
-	
+
+
 	},
 
 	// supress_signal_quick: #[desc("Stops signal from coming past for some time (better for quick/glitchy signals)")] (
@@ -107,7 +107,7 @@ f! // does nothing
 	// 	//if checker is 0, a signal can come through
 	// 	//if checker is 1, it will be supressed
 	// 	checker = @counter::new(0)
-		
+
 	// 	-> (){
 	// 		checker.item.add(1)
 	// 		wait(delay)
@@ -118,11 +118,11 @@ f! // does nothing
 	// 		checker.item.if_is(LARGER_THAN, 1, !{
 	// 			checker -= 1
 	// 		})
-			
+
 	// 	}()
-		
-		
-	
+
+
+
 	// },
 
 	for_loop: #[desc("Implementation of a spawn loop with a counter") example("
@@ -133,12 +133,12 @@ for_loop(0..10, (i) {
 		10g.move(10, 0)
 	}
 })
-	")] 
+	")]
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
-		#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: @macro, 
-        #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{}, 
-        #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true, 
+		#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: @macro,
+        #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
+        #[desc("Weather to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true,
         #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1,
     ) {
 		i = @counter::new(range.start)
@@ -161,7 +161,7 @@ for_loop(0..10, (i) {
         }
 
         func!
-        
+
 	},
 
 	while_loop: #[desc("Implementation of a conditional spawn loop") example("
@@ -172,9 +172,9 @@ while_loop(() => c > 4, () {
 })
 
 // c is now 3
-	")] 
+	")]
 	(
-		#[desc("While loop condition, should -> return a boolean")] expr: @macro, 
+		#[desc("While loop condition, should -> return a boolean")] expr: @macro,
 		#[desc("Macro of the code that gets looped")] code: @macro,
 		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
 	) {
@@ -198,9 +198,9 @@ do_while_loop(() => c > 10, () {
 })
 
 // c is now 2
-	")] 
+	")]
 	(
-		#[desc("While loop condition, should -> return a boolean")] expr: @macro, 
+		#[desc("While loop condition, should -> return a boolean")] expr: @macro,
 		#[desc("Macro of the code that gets looped")] code: @macro,
 		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
 	) {
@@ -216,6 +216,6 @@ do_while_loop(() => c > 10, () {
 
         call_with_delay(delay, func)
 	},
-	
+
 
 }

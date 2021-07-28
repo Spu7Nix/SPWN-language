@@ -68,14 +68,14 @@ test.move(10, -10, 2)
 
 Save the file, then open a command line and type in `spwn build YOURFILENAME.spwn`. Make sure to have GD closed during this process. After running this command, reopen GD, and the levels content will be modified. Head over to the docs to learn how to program in SPWN.
 
-> **Note:** SPWN would generate trigger at the near top of your level. so you might won't see any difference. 
+> **Note:** SPWN would generate trigger at the near top of your level. so you might won't see any difference.
 
 ## Using SPWN - Command Line Reference
 
 Here is a list of SPWN command line subcommands and flags. This Information can be found by typing `spwn help` in the command line as well.
 
 ###### Subcommands:
-    
+
     build [script file], b [script file]
     Runs/builds a given file
 

@@ -559,7 +559,7 @@ pub fn built_in_function(
                         ObjectMode::Object => {
                             if context.start_group.id != Id::Specific(0) {
                                 return Err(RuntimeError::BuiltinError { // objects cant be added dynamically, of course
-                                    message: String::from("you cannot add an obj type object in a trigger function context. Consider moving this add function call to another context, or changing the object to a trigger type"), 
+                                    message: String::from("you cannot add an obj type object in a trigger function context. Consider moving this add function call to another context, or changing the object to a trigger type"),
                                     info
                                 });
                             }
@@ -701,7 +701,7 @@ pub fn built_in_function(
                     //println!("context {:?}", context);
                     if context.start_group.id != Id::Specific(0) {
                         return Err(RuntimeError::BuiltinError { // editing objects dynamically? not possible
-                            message: String::from("You cannot edit an obj type object in a trigger function context. Consider moving this edit function call to another context"), 
+                            message: String::from("You cannot edit an obj type object in a trigger function context. Consider moving this edit function call to another context"),
                             info
                         });
                     }
@@ -1277,7 +1277,7 @@ pub fn built_in_function(
                 RuntimeError::RuntimeError {
                     message: format!(
                         "
-This value is not mutable! 
+This value is not mutable!
 Consider defining it with 'let', or implementing a '{}' macro on its type.",
                         attempted_op_macro
                     ),

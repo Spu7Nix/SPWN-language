@@ -75,7 +75,7 @@
             <Component Id="item.spwn" Directory="std" Win64='$(var.Win64)' Guid="{4E5CB2E4-4C38-4DD5-8017-AB953600155E}">
                 <File Id="item.spwn" KeyPath="yes" Source="libraries\std\item.spwn" />
             </Component>
-            
+
             <Component Id="object.spwn" Directory="std" Win64='$(var.Win64)' Guid="{4E5CB2E4-4C38-4DD5-8017-AB953601155E}">
                 <File Id="object.spwn" KeyPath="yes" Source="libraries\std\object.spwn" />
             </Component>
@@ -83,7 +83,7 @@
             <Component Id="string.spwn" Directory="std" Win64='$(var.Win64)' Guid="{4E5CB2E4-4C38-4DD5-8017-AB853600155E}">
                 <File Id="string.spwn" KeyPath="yes" Source="libraries\std\string.spwn" />
             </Component>
-            
+
             <Component Id="util.spwn" Directory="std" Win64='$(var.Win64)' Guid="{10DD3DE1-58A3-48F1-A459-C24D2F4CC47D}">
                 <File Id="util.spwn" KeyPath="yes" Source="libraries\std\util.spwn" />
             </Component>
