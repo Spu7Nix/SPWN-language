@@ -66,9 +66,9 @@ test = 5g
 test.move(10, -10, 2)
 ```
 
-Save the file, then open a command line and type in `spwn build YOURFILENAME.spwn`. Make sure to have GD closed during this process. After running this command, reopen GD, and the levels content will be modified. Head over to the docs to learn how to program in SPWN.
+Save the file, then open a terminal and type in `spwn build YOURFILENAME.spwn`. Make sure to have GD closed during this process. After running this command, open GD, and the levels content will be modified. Head over to the docs to learn how to program in SPWN.
 
-> **Note:** SPWN would generate trigger at the near top of your level. so you might won't see any difference.
+> **Note:** SPWN generates triggers near the top of your level, so you might not see any difference.
 
 ## Using SPWN - Command Line Reference
 
