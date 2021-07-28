@@ -17,7 +17,7 @@
 
 
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
-   
+
   <Product Id='*' Name='spwn' UpgradeCode='1890CFF1-7537-4D34-A49E-74B194D35006' Manufacturer='Spu7Nix' Language='1033'
     Codepage='1252' Version='$(var.Version)'>
 
@@ -111,7 +111,7 @@
         <ComponentGroupRef Id='libraries' />
 
     </Feature>
-    
+
 
 
 
@@ -189,6 +189,6 @@
 
   </Product>
 
-  
+
 
 </Wix>

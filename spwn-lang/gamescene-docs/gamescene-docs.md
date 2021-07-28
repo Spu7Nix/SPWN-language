@@ -1,4 +1,4 @@
-# Documentation for `gamescene` 
+# Documentation for `gamescene`
 _Generated using `spwn doc [file name]`_
 ## Info:
 
@@ -9,64 +9,64 @@ _Generated using `spwn doc [file name]`_
 
 - Adds 11 objects
 # Exports:
- **Value:** 
+ **Value:**
 ```spwn
 {hidden_group: ?g,button_a: () { /* code omitted */ },button_b: () { /* code omitted */ },button_b_end: () { /* code omitted */ },button_a_end: () { /* code omitted */ }}
-``` 
-**Type:** `@dictionary` 
+```
+**Type:** `@dictionary`
 
 ## Macros:
 
 ## **button\_a**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >() { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Returns an event for when button A is pressed (the right side by default)_
 >
 
 ## **button\_a\_end**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >() { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Returns an event for when button A is released (the right side by default)_
 >
 
 ## **button\_b**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >() { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Returns an event for when button B is pressed (the left side by default)_
 >
 
 ## **button\_b\_end**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >() { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Returns an event for when button B is released (the left side by default)_
 >
 ## Other values:
 
 ## **hidden\_group**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >?g
->``` 
->**Type:** `@group` 
+>```
+>**Type:** `@group`
 >

@@ -11,7 +11,7 @@ on(touch(), !{
     10g.move(10, 0)
 })
     ")] (
-        #[desc("Event to trigger on")] event: @event, 
+        #[desc("Event to trigger on")] event: @event,
         #[desc("Function to trigger")] function: @trigger_function
     ){
         event.on_triggered(function)
@@ -19,7 +19,7 @@ on(touch(), !{
 }
 
 return {
-    
+
     touch: #[desc("Implementation of the touch trigger (returns an event)") example("
 on(touch(), !{
     10g.move(10, 0)
@@ -34,10 +34,10 @@ on(touch(), !{
                 TOGGLE_MODE: 1,
                 TARGET: function,
                 DUAL_MODE: dual_side,
-                
+
             })
         }
-        
+
     },
 
     touch_end: #[desc("Returns an event for when a touch ends") example("
@@ -54,10 +54,10 @@ on(touch_end(), !{
                 TOGGLE_MODE: 2,
                 TARGET: function,
                 DUAL_MODE: dual_side,
-                
+
             })
         }
-        
+
     },
 
     collision: #[desc("Implementation of the collision trigger (returns an event)") example("
@@ -65,7 +65,7 @@ on(collision(1b, 2b), !{
     BG.set(255, 0, 0)
 })
     ")] (
-        #[desc("Block A ID")] a: @block, 
+        #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
     ) {
         return @event::{
@@ -76,10 +76,10 @@ on(collision(1b, 2b), !{
                 ACTIVATE_GROUP: true,
                 ACTIVATE_ON_EXIT: false,
                 TARGET: function,
-                
+
             })
         }
-        
+
     },
 
     collision_exit: #[desc("Returns an event for when a collision exits") example("
@@ -87,7 +87,7 @@ on(collision_exit(1b, 2b), !{
     BG.set(0, 0, 0)
 })
     ")] (
-        #[desc("Block A ID")] a: @block, 
+        #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
     ) {
         return @event::{
@@ -98,7 +98,7 @@ on(collision_exit(1b, 2b), !{
                 ACTIVATE_GROUP: true,
                 ACTIVATE_ON_EXIT: true,
                 TARGET: function,
-                
+
             })
         }
     },

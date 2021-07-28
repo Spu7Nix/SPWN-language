@@ -1,16 +1,16 @@
-  
-# **@item**: 
- 
+
+# **@item**:
+
 ## **\_range\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @item) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the range operator (`..`) for item IDs_
->### Example: 
+>### Example:
 >```spwn
 > for item in 1i..10i {
 >    item.add(10)
@@ -25,14 +25,14 @@
 
 ## **add**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, amount: @number) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the pickup trigger_
->### Example: 
+>### Example:
 >```spwn
 > 10i.add(5)
 >```
@@ -45,14 +45,14 @@
 
 ## **count**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, number: @number = 0) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the count trigger (-> returns an event for when an item reaches a certain value)_
->### Example: 
+>### Example:
 >```spwn
 > on(10i.count(100), !{
 >    BG.pulse(0, 255, 0, fade_out = 0.5) // will pulse each time item ID 10 becomes 100
@@ -67,14 +67,14 @@
 
 ## **if\_is**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, comparison: @comparison, other: @number, function: @trigger_function) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the instant count trigger_
->### Example: 
+>### Example:
 >```spwn
 > 10i.if_is(EQUAL_TO, 5, !{
 >    BG.pulse(255, 0, 0, fade_out = 0.5)

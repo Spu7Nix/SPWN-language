@@ -1,4 +1,4 @@
-# Documentation for `gamescene` 
+# Documentation for `gamescene`
 _This file was generated using `spwn doc [file name]`_
 ## Info:
 
@@ -9,9 +9,9 @@ _This file was generated using `spwn doc [file name]`_
 
 - Adds 9 objects
 ## Exports:
-**Type:** `dictionary` 
+**Type:** `dictionary`
 
-**Literal:** 
+**Literal:**
 
  ```
 
@@ -23,7 +23,7 @@ button_b_end: () { /* code omitted */ },
 hidden_group: ?g
 }
 
-``` 
+```
 
 <details>
 <summary> View members </summary>
@@ -34,44 +34,44 @@ hidden_group: ?g
 
 **`button_a`**:
 
->**Type:** `macro` 
+>**Type:** `macro`
 >
->**Literal:** ```() { /* code omitted */ }``` 
+>**Literal:** ```() { /* code omitted */ }```
 >
->## Description: 
+>## Description:
 > _Returns an event for when button A is pressed (the right side by default)_
 >
 >
 
 **`button_a_end`**:
 
->**Type:** `macro` 
+>**Type:** `macro`
 >
->**Literal:** ```() { /* code omitted */ }``` 
+>**Literal:** ```() { /* code omitted */ }```
 >
->## Description: 
+>## Description:
 > _Returns an event for when button A is released (the right side by default)_
 >
 >
 
 **`button_b`**:
 
->**Type:** `macro` 
+>**Type:** `macro`
 >
->**Literal:** ```() { /* code omitted */ }``` 
+>**Literal:** ```() { /* code omitted */ }```
 >
->## Description: 
+>## Description:
 > _Returns an event for when button B is pressed (the left side by default)_
 >
 >
 
 **`button_b_end`**:
 
->**Type:** `macro` 
+>**Type:** `macro`
 >
->**Literal:** ```() { /* code omitted */ }``` 
+>**Literal:** ```() { /* code omitted */ }```
 >
->## Description: 
+>## Description:
 > _Returns an event for when button B is released (the left side by default)_
 >
 >
@@ -82,9 +82,9 @@ hidden_group: ?g
 
 **`hidden_group`**:
 
->**Type:** `group` 
+>**Type:** `group`
 >
->**Literal:** ```?g``` 
+>**Literal:** ```?g```
 >
 >
 >
@@ -96,24 +96,24 @@ hidden_group: ?g
 
 
 ## Type Implementations:
-### **@group**: 
+### **@group**:
  <details>
 <summary> View members </summary>
-### **@color**: 
+### **@color**:
  <details>
 <summary> View members </summary>
-### **@block**: 
+### **@block**:
  <details>
 <summary> View members </summary>
-### **@item**: 
+### **@item**:
  <details>
 <summary> View members </summary>
-### **@array**: 
+### **@array**:
  <details>
 <summary> View members </summary>
-### **@event**: 
+### **@event**:
  <details>
 <summary> View members </summary>
-### **@counter**: 
+### **@counter**:
  <details>
 <summary> View members </summary>

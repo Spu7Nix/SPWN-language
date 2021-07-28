@@ -1,4 +1,4 @@
-type @textdisplay 
+type @textdisplay
 spacing = 0.6 * 30
 y_spacing = 20
 impl @textdisplay {
@@ -9,11 +9,11 @@ impl @textdisplay {
         writer_group = ?g
         let list = []
         //        I   N   C   O
-        
-        
+
+
         //WINCO
         for i in ..letters {
-           
+
             group = ?g
             block = ?b
 
@@ -80,7 +80,7 @@ impl @textdisplay {
                 lock,
                 follow_group,
             })
-            
+
         }
 
         //writer
@@ -100,7 +100,7 @@ impl @textdisplay {
             Y:  offset[1] + 30,
             GROUPS: writer_default,
         })
-        
+
 
         return @textdisplay::{list, writer: writer_group, writer_default, letters}
     },
@@ -128,7 +128,7 @@ impl @textdisplay {
         //     }
         //     read!
         // }
-        
+
         self.writer.move(0, y_spacing, 0)
         -> if letter < 27 {
             -> self.writer.move(-5, 0, 0.2, easing = EXPONENTIAL_OUT)
@@ -143,7 +143,7 @@ impl @textdisplay {
             wait(0.05)
             self.writer.move_to(self.writer_default, x_only = true)
         }
-        
+
     },
 
     reset: (self) {

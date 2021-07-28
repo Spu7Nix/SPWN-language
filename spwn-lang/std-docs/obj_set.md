@@ -1,38 +1,38 @@
-  
-# **@obj_set**: 
- 
+
+# **@obj_set**:
+
 ## **add**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Add all the objects in the set to the game_
 >
 
 ## **copy**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Create a copy of all the objects in this set as a new set_
 >
 
 ## **is\_empty**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Returns true if this set contains no objects, false otherwise._
->### Example: 
+>### Example:
 >```spwn
 > $.assert(@obj_set::new().is_empty())
 >```
@@ -40,14 +40,14 @@
 
 ## **new**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(objects: @array = [], group: @group = ?g) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Creates a new object set_
->### Example: 
+>### Example:
 >```spwn
 > my_objects = @obj_set::new()
 >```
@@ -61,12 +61,12 @@
 
 ## **push**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, object: @object) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Add new objects to the set_
 >## Arguments:
 >
@@ -77,12 +77,12 @@
 
 ## **rotate**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, deg: @number) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Applies a single rotation value to all of the objects in this set_
 >## Arguments:
 >
@@ -93,12 +93,12 @@
 
 ## **rotate\_relative**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, center_group: @group, deg: @number, duration: @number, easing: @easing_type, easing_rate: @number, lock_object_rotation: @bool) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Rotates objects in a set around a centerpoint_
 >## Arguments:
 >
