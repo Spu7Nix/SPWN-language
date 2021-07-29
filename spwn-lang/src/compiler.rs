@@ -490,7 +490,7 @@ pub fn compile_scope(
                         Value::Builtins => {
                             for name in BUILTIN_LIST.iter() {
                                 let p = store_value(
-                                    Value::BuiltinFunction(String::from(*name)),
+                                    Value::BuiltinFunction(*name),
                                     1,
                                     globals,
                                     &context,

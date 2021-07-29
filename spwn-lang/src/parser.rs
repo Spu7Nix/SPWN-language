@@ -3,10 +3,11 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
-use crate::builtin::BUILTIN_LIST;
+use crate::builtin::Builtin;
 
 //use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 //use ast::ValueLiteral;
 use logos::Lexer;
@@ -60,7 +61,7 @@ pub enum SyntaxError {
 
 pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Result<(), SyntaxError> {
     if name.starts_with('_') && name.ends_with('_') {
-        if BUILTIN_LIST.contains(&name) {
+        if Builtin::from_str(&name).is_ok() {
             Ok(())
         } else {
             Err(SyntaxError::SyntaxError {

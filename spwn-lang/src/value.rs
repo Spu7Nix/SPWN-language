@@ -26,7 +26,7 @@ pub enum Value {
     Array(Vec<StoredValue>),
     Obj(Vec<(u16, ObjParam)>, ast::ObjectMode),
     Builtins,
-    BuiltinFunction(String),
+    BuiltinFunction(Builtin),
     TypeIndicator(TypeId),
     Range(i32, i32, usize), //start, end, step
     Pattern(Pattern),
@@ -311,7 +311,7 @@ impl Value {
                 out
             }
             Value::Builtins => "SPWN".to_string(),
-            Value::BuiltinFunction(n) => format!("<built-in-function: {}>", n),
+            Value::BuiltinFunction(n) => format!("<built-in-function: {}>", String::from(*n)),
             Value::Null => "Null".to_string(),
             Value::TypeIndicator(id) => format!(
                 "@{}",
@@ -912,7 +912,7 @@ impl ast::Variable {
                                     let results = handle_operator(
                                         val1, 
                                         val2, 
-                                        "_equal_", 
+                                        Builtin::EqOp, 
                                         &c, 
                                         globals, 
                                         &info
@@ -1597,7 +1597,7 @@ impl ast::Variable {
 
                                 // go through each context, c = context
                                 for (val, c) in evaled {
-                                    let evaled = handle_operator(val, *v, "_as_", &c, globals, &info)?; // just use the "as" operator
+                                    let evaled = handle_operator(val, *v, Builtin::AsOp, &c, globals, &info)?; // just use the "as" operator
                                     all_values.extend(evaled);
                                 }
                                 
@@ -1619,7 +1619,7 @@ impl ast::Variable {
 
                                 for (args, context) in evaled_args {
                                     let evaled = built_in_function(
-                                        &name,
+                                        name,
                                         args,
                                         info.clone(),
                                         globals,

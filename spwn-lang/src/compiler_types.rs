@@ -55,17 +55,17 @@ pub struct SyncGroup {
 pub fn handle_operator(
     value1: StoredValue,
     value2: StoredValue,
-    macro_name: &str,
+    macro_name: Builtin,
     context: &Context,
     globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<Returns, RuntimeError> {
     Ok(
-        if let Some(val) =
-            globals.stored_values[value1]
-                .clone()
-                .member(macro_name.to_string(), &context, globals)
-        {
+        if let Some(val) = globals.stored_values[value1].clone().member(
+            String::from(macro_name),
+            &context,
+            globals,
+        ) {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
                 if m.args.is_empty() {
                     return Err(RuntimeError::RuntimeError {
@@ -80,6 +80,7 @@ pub fn handle_operator(
 
                     if !val2.matches_pat(pat, &info, globals, context)? {
                         //if types dont match, act as if there is no macro at all
+
                         return Ok(smallvec![(
                             store_value(
                                 built_in_function(
@@ -224,71 +225,70 @@ impl ast::Expression {
 
                 for (val, c2) in &evaled.0 {
                     //let val_fn_context = globals.get_val_fn_context(val, info.clone());
+                    use Builtin::*;
                     let vals: Returns = match self.operators[i] {
-                        Or => handle_operator(acum_val, *val, "_or_", c2, globals, &info)?,
-                        And => handle_operator(acum_val, *val, "_and_", c2, globals, &info)?,
-                        More => handle_operator(acum_val, *val, "_more_than_", c2, globals, &info)?,
-                        Less => handle_operator(acum_val, *val, "_less_than_", c2, globals, &info)?,
+                        Or => handle_operator(acum_val, *val, OrOp, c2, globals, &info)?,
+                        And => handle_operator(acum_val, *val, AndOp, c2, globals, &info)?,
+                        More => handle_operator(acum_val, *val, MoreThanOp, c2, globals, &info)?,
+                        Less => handle_operator(acum_val, *val, LessThanOp, c2, globals, &info)?,
                         MoreOrEqual => {
-                            handle_operator(acum_val, *val, "_more_or_equal_", c2, globals, &info)?
+                            handle_operator(acum_val, *val, MoreOrEqOp, c2, globals, &info)?
                         }
                         LessOrEqual => {
-                            handle_operator(acum_val, *val, "_less_or_equal_", c2, globals, &info)?
+                            handle_operator(acum_val, *val, LessOrEqOp, c2, globals, &info)?
                         }
-                        Slash => {
-                            handle_operator(acum_val, *val, "_divided_by_", c2, globals, &info)?
-                        }
+                        Slash => handle_operator(acum_val, *val, DividedByOp, c2, globals, &info)?,
 
                         IntDividedBy => {
-                            handle_operator(acum_val, *val, "_intdivided_by_", c2, globals, &info)?
+                            handle_operator(acum_val, *val, IntdividedByOp, c2, globals, &info)?
                         }
 
-                        Star => handle_operator(acum_val, *val, "_times_", c2, globals, &info)?,
+                        Star => handle_operator(acum_val, *val, TimesOp, c2, globals, &info)?,
 
-                        Modulo => handle_operator(acum_val, *val, "_mod_", c2, globals, &info)?,
+                        Modulo => handle_operator(acum_val, *val, ModOp, c2, globals, &info)?,
 
-                        Power => handle_operator(acum_val, *val, "_pow_", c2, globals, &info)?,
-                        Plus => handle_operator(acum_val, *val, "_plus_", c2, globals, &info)?,
-                        Minus => handle_operator(acum_val, *val, "_minus_", c2, globals, &info)?,
-                        Equal => handle_operator(acum_val, *val, "_equal_", c2, globals, &info)?,
-                        NotEqual => {
-                            handle_operator(acum_val, *val, "_not_equal_", c2, globals, &info)?
-                        }
+                        Power => handle_operator(acum_val, *val, PowOp, c2, globals, &info)?,
+                        Plus => handle_operator(acum_val, *val, PlusOp, c2, globals, &info)?,
+                        Minus => handle_operator(acum_val, *val, MinusOp, c2, globals, &info)?,
+                        Equal => handle_operator(acum_val, *val, EqOp, c2, globals, &info)?,
+                        NotEqual => handle_operator(acum_val, *val, NotEqOp, c2, globals, &info)?,
 
-                        Either => handle_operator(acum_val, *val, "_either_", c2, globals, &info)?,
-                        Range => handle_operator(acum_val, *val, "_range_", c2, globals, &info)?,
+                        Either => handle_operator(acum_val, *val, EitherOp, c2, globals, &info)?,
+                        Range => handle_operator(acum_val, *val, RangeOp, c2, globals, &info)?,
                         //MUTABLE ONLY
                         //ADD CHECk
-                        Assign => handle_operator(acum_val, *val, "_assign_", c2, globals, &info)?,
+                        Assign => handle_operator(acum_val, *val, AssignOp, c2, globals, &info)?,
 
-                        Swap => handle_operator(acum_val, *val, "_swap_", c2, globals, &info)?,
+                        Swap => handle_operator(acum_val, *val, SwapOp, c2, globals, &info)?,
 
-                        As => handle_operator(acum_val, *val, "_as_", c2, globals, &info)?,
+                        As => handle_operator(acum_val, *val, AsOp, c2, globals, &info)?,
 
-                        Has => handle_operator(acum_val, *val, "_has_", c2, globals, &info)?,
+                        Has => handle_operator(acum_val, *val, HasOp, c2, globals, &info)?,
 
-                        Add => handle_operator(acum_val, *val, "_add_", c2, globals, &info)?,
+                        ast::Operator::Add => {
+                            handle_operator(acum_val, *val, AddOp, c2, globals, &info)?
+                        }
 
                         Subtract => {
-                            handle_operator(acum_val, *val, "_subtract_", c2, globals, &info)?
+                            handle_operator(acum_val, *val, SubtractOp, c2, globals, &info)?
                         }
 
                         Multiply => {
-                            handle_operator(acum_val, *val, "_multiply_", c2, globals, &info)?
+                            handle_operator(acum_val, *val, MultiplyOp, c2, globals, &info)?
                         }
 
                         Exponate => {
-                            handle_operator(acum_val, *val, "_exponate_", c2, globals, &info)?
+                            handle_operator(acum_val, *val, ExponateOp, c2, globals, &info)?
                         }
 
                         Modulate => {
-                            handle_operator(acum_val, *val, "_modulate_", c2, globals, &info)?
+                            handle_operator(acum_val, *val, ModulateOp, c2, globals, &info)?
                         }
 
-                        Divide => handle_operator(acum_val, *val, "_divide_", c2, globals, &info)?,
+                        Divide => handle_operator(acum_val, *val, DivideOp, c2, globals, &info)?,
 
                         IntDivide => {
-                            handle_operator(acum_val, *val, "_intdivide_", c2, globals, &info)?
+                            handle_operator(acum_val, *val, IntdivideOp, c2, globals, &info)?
                         }
                     };
                     new_acum.extend(vals);

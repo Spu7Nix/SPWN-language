@@ -6,7 +6,6 @@ use crate::compiler_types::FunctionId;
 use crate::levelstring::{GdObj, ObjParam};
 
 use std::collections::{HashMap, HashSet};
-use std::mem::swap;
 
 pub type Swaps = HashMap<Group, Group>;
 
@@ -181,7 +180,7 @@ fn spawn_and_dead_code_optimization(
             }
         }
     }
-    replace_groups(swaps, network, objects);
+    replace_groups(swaps, objects);
 }
 
 fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete_objects: bool) {
@@ -252,7 +251,7 @@ fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete_obj
 //     replace_groups(swaps, network, objects);
 // }
 
-pub fn replace_groups(table: Swaps, network: &mut TriggerNetwork, objects: &mut Triggerlist) {
+pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
     for fn_id in objects.list.iter_mut() {
         for (object, _) in &mut fn_id.obj_list {
             for param in &mut object.params.values_mut() {
@@ -823,5 +822,3 @@ fn fix_read_write_order(
     }
     new_network
 }
-
-
