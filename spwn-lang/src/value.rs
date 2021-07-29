@@ -1,13 +1,13 @@
 use crate::ast;
-use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};
-use crate::compiler_info::CompilerInfo;
-use crate::compiler::import_module;
 use crate::builtin::*;
+use crate::compiler::import_module;
+use crate::compiler_info::CompilerInfo;
+use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};
 //use std::boxed::Box;
 
+use smallvec::smallvec;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use smallvec::smallvec;
 
 use crate::compiler::RuntimeError;
 
@@ -229,7 +229,7 @@ impl Value {
             }
             Value::Dict(dict_in) => {
                 let mut out = String::new();
-                
+
                 let mut d = dict_in.clone();
                 if let Some(n) = d.get(TYPE_MEMBER_NAME) {
                     let val = &globals.stored_values[*n];
@@ -240,25 +240,20 @@ impl Value {
                 out += "{";
                 let mut d_iter = d.iter();
                 for (count, (key, val)) in (&mut d_iter).enumerate() {
-                    
-
                     if count > MAX_DICT_EL_DISPLAY {
                         let left = d_iter.count();
                         if left > 0 {
                             out += &format!("... ({} more)  ", left);
-    
                         }
                         break;
-                        
                     }
-                    
+
                     let stored_val = (*globals).stored_values[*val as usize].to_str(globals);
                     out += &format!("{}: {},", key, stored_val);
                 }
                 if !d.is_empty() {
                     out.pop();
                 }
-                
 
                 out += "}"; //why do i have to do this twice? idk
 
@@ -270,10 +265,7 @@ impl Value {
                     for arg in m.args.iter() {
                         out += &arg.0;
                         if let Some(val) = arg.3 {
-                            out += &format!(
-                                ": {}",
-                                globals.stored_values[val].to_str(globals),
-                            )
+                            out += &format!(": {}", globals.stored_values[val].to_str(globals),)
                         };
                         if let Some(val) = arg.1 {
                             out += &format!(" = {}", globals.stored_values[val].to_str(globals))
@@ -315,25 +307,32 @@ impl Value {
             Value::Null => "Null".to_string(),
             Value::TypeIndicator(id) => format!(
                 "@{}",
-                find_key_for_value(&globals.type_ids, *id).unwrap_or(&String::from("[TYPE NOT FOUND]"))
+                find_key_for_value(&globals.type_ids, *id)
+                    .unwrap_or(&String::from("[TYPE NOT FOUND]"))
             ),
 
             Value::Pattern(p) => match p {
                 Pattern::Type(t) => Value::TypeIndicator(*t).to_str(globals),
-                Pattern::Either(p1, p2) => format!("{} | {}", Value::Pattern(*p1.clone()).to_str(globals), Value::Pattern(*p2.clone()).to_str(globals)),
-                Pattern::Array(a) => if a.is_empty() {
-                    "[]".to_string()
-                } else {
-                    let mut out = String::from("[");
-                    for p in a {
-                        out += &Value::Pattern(p.clone()).to_str(globals);
-                        out += ",";
-                    }
-                    out.pop();
-                    out += "]";
+                Pattern::Either(p1, p2) => format!(
+                    "{} | {}",
+                    Value::Pattern(*p1.clone()).to_str(globals),
+                    Value::Pattern(*p2.clone()).to_str(globals)
+                ),
+                Pattern::Array(a) => {
+                    if a.is_empty() {
+                        "[]".to_string()
+                    } else {
+                        let mut out = String::from("[");
+                        for p in a {
+                            out += &Value::Pattern(p.clone()).to_str(globals);
+                            out += ",";
+                        }
+                        out.pop();
+                        out += "]";
 
-                    out
-                },
+                        out
+                    }
+                }
             },
         }
     }
@@ -346,9 +345,8 @@ pub fn convert_type(
     globals: &mut Globals,
     context: &Context,
 ) -> Result<Value, RuntimeError> {
-
     if val.to_num(globals) == typ {
-        return Ok(val.clone())
+        return Ok(val.clone());
     }
 
     if typ == 9 {
@@ -376,7 +374,7 @@ pub fn convert_type(
         },
 
         Value::Group(g) => match typ {
-            
+
             4 => Value::Number(match g.id {
                 Id::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
@@ -396,7 +394,7 @@ pub fn convert_type(
         },
 
         Value::Color(c) => match typ {
-            
+
             4 => Value::Number(match c.id {
                 Id::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
@@ -416,7 +414,7 @@ pub fn convert_type(
         },
 
         Value::Block(b) => match typ {
-            
+
             4 => Value::Number(match b.id {
                 Id::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
@@ -436,7 +434,7 @@ pub fn convert_type(
         },
 
         Value::Item(i) => match typ {
-            
+
             4 => Value::Number(match i.id {
                 Id::Specific(n) => n as f64,
                 _ => return Err(RuntimeError::RuntimeError {
@@ -456,7 +454,7 @@ pub fn convert_type(
         },
 
         Value::Bool(b) => match typ {
-            
+
             4 => Value::Number(if *b { 1.0 } else { 0.0 }),
             _ => {
                 return Err(RuntimeError::RuntimeError {
@@ -470,7 +468,7 @@ pub fn convert_type(
         },
 
         Value::TriggerFunc(f) => match typ {
-            
+
             0 => Value::Group(f.start_group),
             _ => {
                 return Err(RuntimeError::RuntimeError {
@@ -485,11 +483,11 @@ pub fn convert_type(
 
         Value::Range(start, end, step) => match typ {
             10 => {
-                Value::Array(if start < end { 
-                    (*start..*end).step_by(*step).map(|x| 
-                        store_value(Value::Number(x as f64), 1, globals, &context)).collect::<Vec<StoredValue>>() 
-                } else { 
-                    (*end..*start).step_by(*step).rev().map(|x| 
+                Value::Array(if start < end {
+                    (*start..*end).step_by(*step).map(|x|
+                        store_value(Value::Number(x as f64), 1, globals, &context)).collect::<Vec<StoredValue>>()
+                } else {
+                    (*end..*start).step_by(*step).rev().map(|x|
                         store_value(Value::Number(x as f64), 1, globals, &context)).collect::<Vec<StoredValue>>()
                 })
             },
@@ -561,7 +559,7 @@ pub fn convert_type(
         }
         Value::TypeIndicator(t) =>  match typ {
             18 => {
-                
+
                 Value::Pattern(Pattern::Type(*t))
             }
 
@@ -586,23 +584,24 @@ pub fn convert_type(
             })
         }
     })
-
 }
 
 //copied from https://stackoverflow.com/questions/59401720/how-do-i-find-the-key-for-a-value-in-a-hashmap
-pub fn find_key_for_value(map: &HashMap<String, (u16, PathBuf, (usize, usize))>, value: u16) -> Option<&String> {
+pub fn find_key_for_value(
+    map: &HashMap<String, (u16, PathBuf, (usize, usize))>,
+    value: u16,
+) -> Option<&String> {
     map.iter()
         .find_map(|(key, val)| if val.0 == value { Some(key) } else { None })
 }
 
 pub fn macro_to_value(
-    m:&ast::Macro,
+    m: &ast::Macro,
     context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
     //mut define_new: bool,
     constant: bool,
-    
 ) -> Result<(Returns, Returns), RuntimeError> {
     let mut all_expr: Vec<ast::Expression> = Vec::new();
     let mut start_val = Returns::new();
@@ -621,17 +620,25 @@ pub fn macro_to_value(
         all_combinations(all_expr, &context, globals, new_info, constant)?;
     inner_returns.extend(returns);
     for defaults in argument_possibilities {
-        let mut args: Vec<(String, Option<StoredValue>, ast::Attribute, Option<StoredValue>)> =
-            Vec::new();
+        let mut args: Vec<(
+            String,
+            Option<StoredValue>,
+            ast::Attribute,
+            Option<StoredValue>,
+        )> = Vec::new();
         let mut expr_index = 0;
-        
+
         for arg in m.args.iter() {
             let def_val = match &arg.1 {
                 Some(_) => {
                     expr_index += 1;
-                    Some(
-                        clone_value(defaults.0[expr_index - 1], 1, globals, defaults.1.start_group, true)
-                    )
+                    Some(clone_value(
+                        defaults.0[expr_index - 1],
+                        1,
+                        globals,
+                        defaults.1.start_group,
+                        true,
+                    ))
                 }
                 None => None,
             };
@@ -642,37 +649,27 @@ pub fn macro_to_value(
                 }
                 None => None,
             };
-            args.push((
-                arg.0.clone(),
-                def_val,
-                arg.2.clone(),
-                pat,
-            ));
+            args.push((arg.0.clone(), def_val, arg.2.clone(), pat));
         }
 
-        
-            start_val.push((
-                store_const_value(
-                    Value::Macro(Box::new(Macro {
-                        args,
-                        body: m.body.statements.clone(),
-                        def_context: defaults.1.clone(),
-                        def_file: info.current_file.clone(),
-                        tag: m.properties.clone(),
-                    })),
-                    1,
-                    globals,
-                    &context,
-                ),
-                defaults.1,
-            ))
-        
-
-        
+        start_val.push((
+            store_const_value(
+                Value::Macro(Box::new(Macro {
+                    args,
+                    body: m.body.statements.clone(),
+                    def_context: defaults.1.clone(),
+                    def_file: info.current_file.clone(),
+                    tag: m.properties.clone(),
+                })),
+                1,
+                globals,
+                &context,
+            ),
+            defaults.1,
+        ))
     }
     Ok((start_val, inner_returns))
 }
-
 
 impl ast::Variable {
     pub fn to_value(
@@ -684,7 +681,7 @@ impl ast::Variable {
         constant: bool,
     ) -> Result<(Returns, Returns), RuntimeError> {
         info.pos = self.pos;
-        
+
         let mut start_val = Returns::new();
         let mut inner_returns = Returns::new();
 
@@ -696,8 +693,6 @@ impl ast::Variable {
         }
 
         use ast::IdClass;
- 
-        
 
         match &self.value.body {
             ast::ValueBody::Resolved(r) => start_val.push((*r, context.clone())),
@@ -838,26 +833,31 @@ impl ast::Variable {
             }
 
             ast::ValueBody::Ternary(t) => {
-                
-                let (evaled, returns) = t.condition.eval(&context, globals, info.clone(), constant)?;
+                let (evaled, returns) =
+                    t.condition
+                        .eval(&context, globals, info.clone(), constant)?;
                 // contexts of the conditional
 
                 inner_returns.extend(returns);
 
-                for (condition, context) in evaled { // through every conditional context
+                for (condition, context) in evaled {
+                    // through every conditional context
                     match &globals.stored_values[condition] {
                         Value::Bool(b) => {
-                            let answer = if *b {&t.if_expr} else {&t.else_expr};
+                            let answer = if *b { &t.if_expr } else { &t.else_expr };
 
-                            let (evaled, returns) = answer.eval(&context, globals, info.clone(), constant)?;
+                            let (evaled, returns) =
+                                answer.eval(&context, globals, info.clone(), constant)?;
                             inner_returns.extend(returns);
                             start_val.extend(evaled);
                         }
                         a => {
                             return Err(RuntimeError::RuntimeError {
-                                message: format!("Expected boolean condition in ternary statement, found {}", a.to_str(globals)),
+                                message: format!(
+                                    "Expected boolean condition in ternary statement, found {}",
+                                    a.to_str(globals)
+                                ),
                                 info,
-
                             })
                         }
                     }
@@ -866,7 +866,7 @@ impl ast::Variable {
 
             ast::ValueBody::Switch(expr, cases) => {
                 // ok so in spwn you have to always assume every expression will split the context, that is,
-                // output multiple values in multiple contexts. This is called context splitting. A list of 
+                // output multiple values in multiple contexts. This is called context splitting. A list of
                 // values and contexts (Vec<(Value, Context)>) is called bundled together in a type called Returns
                 let (evaled, returns) = expr.eval(&context, globals, info.clone(), constant)?;
                 //inner returns are return statements that are inside the expression, for example in a function/trigger context/ whatever we call it now
@@ -878,11 +878,10 @@ impl ast::Variable {
                     // outputted from the first expression
                     let mut contexts = vec![context.clone()];
 
-
                     for case in cases {
                         // if there are no contexts left to deal with, we can leave the loop
                         if contexts.is_empty() {
-                            break
+                            break;
                         }
 
                         match &case.typ {
@@ -894,7 +893,8 @@ impl ast::Variable {
                                 // remember, we have to evaluate it in all the contexts we are working with
                                 let mut all_values = Vec::new();
                                 for c in &contexts {
-                                    let (evaled, returns) = v.eval(c, globals, info.clone(), constant)?;
+                                    let (evaled, returns) =
+                                        v.eval(c, globals, info.clone(), constant)?;
                                     inner_returns.extend(returns);
                                     all_values.extend(evaled);
                                 }
@@ -902,20 +902,19 @@ impl ast::Variable {
                                 // lets clear the contexts list for now, as we will refill it
                                 // with new contexts from the next few evaluations
                                 contexts.clear();
-                                
+
                                 // looping through all the values of the expression we just evaled
                                 for (val2, c) in all_values {
-
                                     // lets compare the two values with the == operator
                                     // since this is an expression in itself, we also have to assume
                                     // this will output multiple values
                                     let results = handle_operator(
-                                        val1, 
-                                        val2, 
-                                        Builtin::EqOp, 
-                                        &c, 
-                                        globals, 
-                                        &info
+                                        val1,
+                                        val2,
+                                        Builtin::EqOp,
+                                        &c,
+                                        globals,
+                                        &info,
                                     )?;
 
                                     // lets loop through all those result values
@@ -925,7 +924,12 @@ impl ast::Variable {
                                                 // if the two values match, we output this value to the output "start val"
                                                 // we can't break here, because the two values might only match in this one context,
                                                 // and there may be more contexts left to check
-                                                let (evaled, returns) = case.body.eval(&c, globals, info.clone(), constant)?;
+                                                let (evaled, returns) = case.body.eval(
+                                                    &c,
+                                                    globals,
+                                                    info.clone(),
+                                                    constant,
+                                                )?;
                                                 inner_returns.extend(returns);
                                                 start_val.extend(evaled);
                                             } else {
@@ -936,62 +940,63 @@ impl ast::Variable {
                                             // if the == operator for that type doesn't output a boolean, it can't be
                                             // used in a switch statement
                                             return Err(RuntimeError::RuntimeError {
-                                                message: "== operator returned non-boolean value".to_string(),
+                                                message: "== operator returned non-boolean value"
+                                                    .to_string(),
                                                 info,
-                                                
                                             });
                                         }
                                     }
                                 }
-
                             }
                             ast::CaseType::Pattern(p) => {
                                 // this is pretty much the same as the one before, except that we use .matches_pat
                                 // to check instead of ==
                                 let mut all_patterns = Vec::new();
                                 for c in &contexts {
-                                    let (evaled, returns) = p.eval(c, globals, info.clone(), constant)?;
+                                    let (evaled, returns) =
+                                        p.eval(c, globals, info.clone(), constant)?;
                                     inner_returns.extend(returns);
                                     all_patterns.extend(evaled);
                                 }
                                 contexts.clear();
-                                
+
                                 for (pat, c) in all_patterns {
                                     let pat_val = globals.stored_values[pat].clone();
-                                    let b = globals.stored_values[val1].clone().matches_pat(&pat_val, &info, globals, &context)?;
+                                    let b = globals.stored_values[val1]
+                                        .clone()
+                                        .matches_pat(&pat_val, &info, globals, &context)?;
 
                                     if b {
-                                        let (evaled, returns) = case.body.eval(&c, globals, info.clone(), constant)?;
+                                        let (evaled, returns) =
+                                            case.body.eval(&c, globals, info.clone(), constant)?;
                                         inner_returns.extend(returns);
                                         start_val.extend(evaled);
                                     } else {
                                         contexts.push(c)
                                     }
-                                        
                                 }
                             }
 
                             ast::CaseType::Default => {
                                 //this should be the last case, so we just return the body
                                 for c in &contexts {
-                                    let (evaled, returns) = case.body.eval(&c, globals, info.clone(), constant)?;
+                                    let (evaled, returns) =
+                                        case.body.eval(&c, globals, info.clone(), constant)?;
                                     inner_returns.extend(returns);
                                     start_val.extend(evaled);
                                 }
                             }
                         }
-                        
                     }
                 }
-
-
-
             }
-            ast::ValueBody::Obj(o) => { // parsing an obj
+            ast::ValueBody::Obj(o) => {
+                // parsing an obj
 
                 let mut all_expr: Vec<ast::Expression> = Vec::new(); // all expressions
 
-                for prop in &o.props { // iterate through obj properties
+                for prop in &o.props {
+                    // iterate through obj properties
 
                     all_expr.push(prop.0.clone()); // this is the object key expression
                     all_expr.push(prop.1.clone()); // this is the object value expression
@@ -1004,8 +1009,7 @@ impl ast::Variable {
                 for (expressions, context) in evaled {
                     let mut obj: Vec<(u16, ObjParam)> = Vec::new();
                     for i in 0..(o.props.len()) {
-
-                        let o_key = expressions[i * 2]; 
+                        let o_key = expressions[i * 2];
                         let o_val = expressions[i * 2 + 1];
                         // hopefully self explanatory
 
@@ -1064,7 +1068,7 @@ impl ast::Variable {
                                         info,
                                     })
                                 }, Some(globals.stored_values[*pattern.unwrap()].clone()))
-                                
+
                             }
                             a => {
                                 return Err(RuntimeError::RuntimeError {
@@ -1100,10 +1104,10 @@ impl ast::Variable {
                                     ),
                                     info: info.clone(),
                                 });
-                                
+
                                 match &val { // its just converting value to objparam basic level stuff
                                     Value::Number(n) => {
-                                        
+
                                         ObjParam::Number(*n)
                                     },
                                     Value::Str(s) => ObjParam::Text(s.clone()),
@@ -1127,7 +1131,7 @@ impl ast::Variable {
                                                 })
                                             })
                                         }
-                                        
+
                                         out
                                     }),
                                     Value::Dict(d) => {
@@ -1149,11 +1153,11 @@ impl ast::Variable {
                                         return err;
                                     }
                                 }
-                        
+
                             },
                         ))
                     }
-                    
+
                     start_val.push((
                         store_const_value(Value::Obj(obj, o.mode), 1, globals, &context),
                         context,
@@ -1162,8 +1166,10 @@ impl ast::Variable {
             }
 
             ast::ValueBody::Macro(m) => {
-                let (vals, inner_ret) = macro_to_value(m, &context, globals, info.clone(), constant)?;
-                start_val.extend(vals); inner_returns.extend(inner_ret);
+                let (vals, inner_ret) =
+                    macro_to_value(m, &context, globals, info.clone(), constant)?;
+                start_val.extend(vals);
+                inner_returns.extend(inner_ret);
             }
             //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
             ast::ValueBody::Null => start_val.push((1, context.clone())),
@@ -1184,7 +1190,7 @@ impl ast::Variable {
                 ast::Path::Member(m) => {
                     for x in &mut with_parent {
                         let val = globals.stored_values[x.0].clone(); // this is the object we are getting member of
-                        *x = ( 
+                        *x = (
                             match val.member(m.clone(), &x.1, globals) {
                                 Some(m) => m,
                                 None => {
@@ -1262,10 +1268,8 @@ impl ast::Variable {
                     let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
 
                     for (prev_v, prev_c, _) in with_parent.clone() {
-                        
                         match globals.stored_values[prev_v].clone() {
-                            Value::Array(arr)  => {
-                                
+                            Value::Array(arr) => {
                                 let (evaled, returns) =
                                     i.eval(&prev_c, globals, info.clone(), constant)?;
                                 inner_returns.extend(returns);
@@ -1279,7 +1283,7 @@ impl ast::Variable {
                                                     info,
                                                 });
                                             }
-                                            
+
                                             if *n as usize >= len {
                                                 return Err(RuntimeError::RuntimeError {
                                                     message: format!("Index too high! Index is {}, but length is {}.", n, len),
@@ -1288,12 +1292,14 @@ impl ast::Variable {
                                             }
 
                                             if *n < 0.0 {
-                                                new_out.push((arr[len - (-n as usize)], index.1, prev_v));
+                                                new_out.push((
+                                                    arr[len - (-n as usize)],
+                                                    index.1,
+                                                    prev_v,
+                                                ));
                                             } else {
                                                 new_out.push((arr[*n as usize], index.1, prev_v));
                                             }
-
-                                            
                                         }
                                         _ => {
                                             return Err(RuntimeError::RuntimeError {
@@ -1307,8 +1313,7 @@ impl ast::Variable {
                                     }
                                 }
                             }
-                            Value::Dict(d)  => {
-                                
+                            Value::Dict(d) => {
                                 let (evaled, returns) =
                                     i.eval(&prev_c, globals, info.clone(), constant)?;
                                 inner_returns.extend(returns);
@@ -1317,11 +1322,14 @@ impl ast::Variable {
                                         Value::Str(s) => {
                                             if !d.contains_key(s) {
                                                 return Err(RuntimeError::RuntimeError {
-                                                    message: format!("Cannot find key '{}' in dictionary",s),
+                                                    message: format!(
+                                                        "Cannot find key '{}' in dictionary",
+                                                        s
+                                                    ),
                                                     info,
-                                                })
+                                                });
                                             }
-                                            new_out.push((d[s], index.1, prev_v));  
+                                            new_out.push((d[s], index.1, prev_v));
                                         }
                                         _ => {
                                             return Err(RuntimeError::RuntimeError {
@@ -1337,7 +1345,6 @@ impl ast::Variable {
                             }
 
                             Value::Obj(o, _) => {
-
                                 let (evaled, returns) =
                                     i.eval(&prev_c, globals, info.clone(), constant)?;
                                 inner_returns.extend(returns);
@@ -1393,7 +1400,7 @@ impl ast::Variable {
                                                             }
                                                             Value::Array(out)
                                                         },
-                                                        
+
                                                         ObjParam::Epsilon => {
                                                             let mut map = HashMap::<String, StoredValue>::new();
                                                             let stored = store_const_value(Value::TypeIndicator(20), 1, globals, &index.1);
@@ -1426,11 +1433,10 @@ impl ast::Variable {
                                         }
                                     }
                                 }
-
                             }
-                            Value::Str(s)  => {
+                            Value::Str(s) => {
                                 let arr: Vec<char> = s.chars().collect();
-                                
+
                                 let (evaled, returns) =
                                     i.eval(&prev_c, globals, info.clone(), constant)?;
                                 inner_returns.extend(returns);
@@ -1444,7 +1450,7 @@ impl ast::Variable {
                                                     info,
                                                 });
                                             }
-                                            
+
                                             if *n as usize >= len {
                                                 return Err(RuntimeError::RuntimeError {
                                                     message: format!("Index too high! Index is {}, but length is {}.", n, len),
@@ -1454,14 +1460,13 @@ impl ast::Variable {
 
                                             let val = if *n < 0.0 {
                                                 Value::Str(arr[len - (-n as usize)].to_string())
-                                               
                                             } else {
                                                 Value::Str(arr[*n as usize].to_string())
                                             };
-                                            let stored = store_const_value(val, 1, globals, &index.1);
+                                            let stored =
+                                                store_const_value(val, 1, globals, &index.1);
 
                                             new_out.push((stored, index.1, prev_v));
-                                            
                                         }
                                         _ => {
                                             return Err(RuntimeError::RuntimeError {
@@ -1491,12 +1496,18 @@ impl ast::Variable {
                 }
 
                 ast::Path::Increment => {
-                    for (prev_v,prev_c, _) in &mut with_parent {
+                    for (prev_v, prev_c, _) in &mut with_parent {
                         let is_mutable = globals.stored_values.map[&prev_v].mutable;
                         match &mut globals.stored_values[*prev_v] {
                             Value::Number(n) => {
                                 *n += 1.0;
-                                *prev_v = store_val_m(Value::Number(*n - 1.0),1, globals, prev_c, is_mutable);
+                                *prev_v = store_val_m(
+                                    Value::Number(*n - 1.0),
+                                    1,
+                                    globals,
+                                    prev_c,
+                                    is_mutable,
+                                );
                             }
                             _ => {
                                 return Err(RuntimeError::RuntimeError {
@@ -1505,16 +1516,22 @@ impl ast::Variable {
                                 })
                             }
                         }
-                    } 
+                    }
                 }
 
                 ast::Path::Decrement => {
-                    for (prev_v,prev_c, _) in &mut with_parent {
+                    for (prev_v, prev_c, _) in &mut with_parent {
                         let is_mutable = globals.stored_values.map[&prev_v].mutable;
                         match &mut globals.stored_values[*prev_v] {
                             Value::Number(n) => {
-                                *n -= 1.0;                          
-                                *prev_v = store_val_m(Value::Number(*n + 1.0),1, globals, prev_c, is_mutable);
+                                *n -= 1.0;
+                                *prev_v = store_val_m(
+                                    Value::Number(*n + 1.0),
+                                    1,
+                                    globals,
+                                    prev_c,
+                                    is_mutable,
+                                );
                             }
                             _ => {
                                 return Err(RuntimeError::RuntimeError {
@@ -1523,7 +1540,7 @@ impl ast::Variable {
                                 })
                             }
                         }
-                    } 
+                    }
                 }
 
                 ast::Path::Constructor(defs) => {
@@ -1579,30 +1596,43 @@ impl ast::Variable {
                             }
 
                             Value::TypeIndicator(_) => {
-                                if args.len() != 1 { // cast takes 1 argument only
+                                if args.len() != 1 {
+                                    // cast takes 1 argument only
                                     return Err(RuntimeError::RuntimeError {
-                                        message: format!("casting takes one argument, but {} were provided", args.len()),
+                                        message: format!(
+                                            "casting takes one argument, but {} were provided",
+                                            args.len()
+                                        ),
                                         info,
-                                    })
+                                    });
                                 }
 
                                 // one value for each context
                                 let mut all_values = Returns::new();
 
                                 //find out whats in the thing we are casting first, its a tuple because contexts and stuff
-                                let (evaled, returns) = args[0].value.eval(cont, globals, info.clone(), constant)?; 
+                                let (evaled, returns) =
+                                    args[0].value.eval(cont, globals, info.clone(), constant)?;
 
-                                //return statements are weird in spwn 
+                                //return statements are weird in spwn
                                 inner_returns.extend(returns);
 
                                 // go through each context, c = context
                                 for (val, c) in evaled {
-                                    let evaled = handle_operator(val, *v, Builtin::AsOp, &c, globals, &info)?; // just use the "as" operator
+                                    let evaled = handle_operator(
+                                        val,
+                                        *v,
+                                        Builtin::AsOp,
+                                        &c,
+                                        globals,
+                                        &info,
+                                    )?; // just use the "as" operator
                                     all_values.extend(evaled);
                                 }
-                                
+
                                 with_parent =
-                                all_values.iter().map(|x| (x.0, x.1.clone(), *v)).collect(); // not sure but it looks important
+                                    all_values.iter().map(|x| (x.0, x.1.clone(), *v)).collect();
+                                // not sure but it looks important
                             }
 
                             Value::BuiltinFunction(name) => {
@@ -1709,12 +1739,7 @@ impl ast::Variable {
                         if let Value::Number(n) = globals.stored_values[final_value.0] {
                             let end = convert_to_int(n, &info)?;
                             *final_value = (
-                                store_value(
-                                    Value::Range(0, end, 1),
-                                    1,
-                                    globals,
-                                    &context,
-                                ),
+                                store_value(Value::Range(0, end, 1), 1, globals, &context),
                                 final_value.1.clone(),
                             );
                         } else {
@@ -1734,7 +1759,7 @@ impl ast::Variable {
         //         .iter()
         //         .any(|x| x.0 == "allow_context_change")
         // {
-            
+
         //     for (val, _) in &out {
         //         (*globals
         //             .stored_values
@@ -1743,41 +1768,43 @@ impl ast::Variable {
         //             .expect("index not found"))
         //             .allow_context_change = true;
 
-                
         //     }
         // }
         if !self.tag.tags.is_empty() {
             for (val, _) in &out {
-                if let Value::Macro(m) = &mut globals.stored_values[*val] { m.tag.tags.extend(self.tag.tags.clone()) }
+                if let Value::Macro(m) = &mut globals.stored_values[*val] {
+                    m.tag.tags.extend(self.tag.tags.clone())
+                }
             }
         }
 
         Ok((out, inner_returns))
     }
 
-    
     pub fn is_undefinable(&self, context: &Context, globals: &mut Globals) -> bool {
         //use crate::fmt::SpwnFmt;
         // if self.operator == Some(ast::UnaryOperator::Let) {
         //     return true
         // }
-        
+
         // println!("hello? {}", self.fmt(0));
         let mut current_ptr = match &self.value.body {
             ast::ValueBody::Symbol(a) => {
-                
                 if let Some(ptr) = context.variables.get(a) {
                     if self.path.is_empty() {
                         //redefine
                         if globals.is_mutable(*ptr) {
-                            return true
+                            return true;
                         }
-                        if globals.stored_values[*ptr].clone()
-                        .member(String::from("_assign_"), &context, globals).is_some() {
+                        if globals.stored_values[*ptr]
+                            .clone()
+                            .member(String::from("_assign_"), &context, globals)
+                            .is_some()
+                        {
                             // if it has assign operator implemented
-                            return true
+                            return true;
                         }
-                        return false
+                        return false;
                     }
                     *ptr
                 } else {
@@ -1807,15 +1834,12 @@ impl ast::Variable {
         for p in &self.path {
             match p {
                 ast::Path::Member(m) => {
-                    
                     if let Value::Dict(d) = &globals.stored_values[current_ptr] {
                         match d.get(m) {
                             Some(s) => current_ptr = *s,
                             None => return false,
                         }
-                        
                     } else {
-                        
                         return true;
                     }
                 }
@@ -1838,19 +1862,15 @@ impl ast::Variable {
                     if i.values.len() == 1 {
                         if let ast::ValueBody::Str(s) = &i.values[0].value.body {
                             match &globals.stored_values[current_ptr] {
-                                Value::Dict(d)  => {
-                                    return d.get(s).is_some()
-                                    
-                                }
+                                Value::Dict(d) => return d.get(s).is_some(),
                                 _ => return true,
                             }
                         } else {
-                            return true
+                            return true;
                         }
                     } else {
-                        return true
+                        return true;
                     }
-                    
                 }
                 _ => return true,
             }
@@ -1858,20 +1878,17 @@ impl ast::Variable {
 
         true
     }
-    
+
     pub fn define(
         &self,
         //value: StoredValue,
         context: &mut Context,
         globals: &mut Globals,
         info: &CompilerInfo,
-        
     ) -> Result<StoredValue, RuntimeError> {
         // when None, the value is already defined
         use crate::fmt::SpwnFmt;
         let mut defined = true;
-        
-        
 
         let value = match &self.operator {
             Some(ast::UnaryOperator::Let) => store_value(Value::Null, 1, globals, context),
@@ -1890,7 +1907,7 @@ impl ast::Variable {
                     if self.path.is_empty() {
                         //redefine
                         *ptr = value;
-                        return Ok(value)
+                        return Ok(value);
                     }
                     *ptr
                 } else {
@@ -1930,10 +1947,9 @@ impl ast::Variable {
             }
         };
 
-        
-
         for p in &self.path {
-            (*globals.stored_values.map.get_mut(&value).unwrap()).lifetime = globals.get_lifetime(current_ptr);
+            (*globals.stored_values.map.get_mut(&value).unwrap()).lifetime =
+                globals.get_lifetime(current_ptr);
             if !defined {
                 return Err(RuntimeError::RuntimeError {
                     message: format!("Cannot run {} on an undefined value", p.fmt(0)),
@@ -1972,19 +1988,25 @@ impl ast::Variable {
                     let (evaled, _) = i.eval(&context, globals, info.clone(), true)?;
                     let first_context_eval = evaled[0].0;
                     match &globals.stored_values[current_ptr] {
-                        Value::Dict(d)  => {
+                        Value::Dict(d) => {
                             if evaled.len() > 1 {
                                 println!("Warning: context splitting inside of an index definition. Use $.dict_add for better results");
                             }
-                            if let Value::Str(st) = globals.stored_values[first_context_eval].clone() {
-
+                            if let Value::Str(st) =
+                                globals.stored_values[first_context_eval].clone()
+                            {
                                 match d.get(&st) {
                                     Some(_) => current_ptr = first_context_eval,
                                     None => {
-                                        let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
+                                        let stored = globals
+                                            .stored_values
+                                            .map
+                                            .get_mut(&current_ptr)
+                                            .unwrap();
                                         if !stored.mutable {
                                             return Err(RuntimeError::RuntimeError {
-                                                message: "Cannot edit members of a constant value".to_string(),
+                                                message: "Cannot edit members of a constant value"
+                                                    .to_string(),
                                                 info: info.clone(),
                                             });
                                         }
@@ -1999,7 +2021,8 @@ impl ast::Variable {
                                 };
                             } else {
                                 return Err(RuntimeError::RuntimeError {
-                                    message: "Only string indexes are supported for dicts".to_string(),
+                                    message: "Only string indexes are supported for dicts"
+                                        .to_string(),
                                     info: info.clone(),
                                 });
                             }
@@ -2007,16 +2030,16 @@ impl ast::Variable {
                         _ => {
                             return Err(RuntimeError::RuntimeError {
                                 message: "Other values are not supported yet".to_string(),
-                                info: info.clone()
+                                info: info.clone(),
                             })
-                        },
+                        }
                     }
                 }
                 ast::Path::Associated(m) => {
                     match &globals.stored_values[current_ptr] {
                         Value::TypeIndicator(t) => match (*globals).implementations.get_mut(t) {
                             Some(imp) => {
-                                if let Some((val,_)) = imp.get(m) {
+                                if let Some((val, _)) = imp.get(m) {
                                     current_ptr = *val;
                                 } else {
                                     (*imp).insert(m.clone(), (value, true));
@@ -2051,7 +2074,7 @@ impl ast::Variable {
                 }
             }
         }
-        
+
         if defined {
             Err(RuntimeError::RuntimeError {
                 message: format!("{} is already defined!", self.fmt(0)),

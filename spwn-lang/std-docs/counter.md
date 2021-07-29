@@ -1,16 +1,16 @@
-  
-# **@counter**: 
- 
+
+# **@counter**:
+
 ## **\_add\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the add (`+=`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(10)
 >c += 10
@@ -25,14 +25,14 @@
 
 ## **\_as\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, _type: @type_indicator) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the as (`as`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(1)
 >b = c as @bool
@@ -47,14 +47,14 @@
 
 ## **\_assign\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the assign (`=`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(23)
 >c = 42
@@ -69,14 +69,14 @@
 
 ## **\_divide\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the divide (`/=`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(30)
 >c /= 6
@@ -91,14 +91,14 @@
 
 ## **\_divided\_by\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the divided by (`/`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(100)
 >c2 = c1 / 10
@@ -113,14 +113,14 @@
 
 ## **\_equal\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the equals (`==`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(42)
 >eq = c == 42
@@ -135,14 +135,14 @@
 
 ## **\_less\_or\_equal\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the less than or equal (`<=`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(42)
 >less_or_eq = c <= 42
@@ -157,14 +157,14 @@
 
 ## **\_less\_than\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the less than (`<`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(42)
 >less = c < 42
@@ -179,14 +179,14 @@
 
 ## **\_minus\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the minus (`-`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(10)
 >c2 = c1 - 3
@@ -201,14 +201,14 @@
 
 ## **\_mod\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the modulus (`%`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(42)
 >c2 = c1 % 10
@@ -223,14 +223,14 @@
 
 ## **\_modulate\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the modulate (`%=`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(42)
 >c %= 10
@@ -245,14 +245,14 @@
 
 ## **\_more\_or\_equal\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the more than or equal (`>=`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(42)
 >more_or_eq = c >= 10
@@ -267,14 +267,14 @@
 
 ## **\_more\_than\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the more than (`>`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(42)
 >more = c > 10
@@ -289,14 +289,14 @@
 
 ## **\_multiply\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the multiply (`*=`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(5)
 >c *= 6
@@ -311,14 +311,14 @@
 
 ## **\_not\_equal\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the not equal (`!=`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(42)
 >not_eq = c != 42
@@ -333,14 +333,14 @@
 
 ## **\_plus\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the plus (`+`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(10)
 >c2 = c1 + 10
@@ -355,14 +355,14 @@
 
 ## **\_subtract\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the subtract (`-=`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(20)
 >c -= 5
@@ -377,14 +377,14 @@
 
 ## **\_swap\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the swap (`<=>`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(23)
 >c2 = counter(42)
@@ -401,14 +401,14 @@
 
 ## **\_times\_**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number | @counter) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the times (`*`) operator_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(10)
 >c2 = c1 * 10
@@ -423,14 +423,14 @@
 
 ## **add**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, num: @number) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Implementation of the pickup trigger_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(10)
 >c.add(10)
@@ -445,14 +445,14 @@
 
 ## **add\_to**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, items: [@counter | @item] | @counter | @item, speed: @number = 1, factor: @number = 1, for_each: @macro = (n) { /* code omitted */ }) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Adds the counter's value to a counter (or all counters in a list), and resets the counter to 0 in the process_
->### Example: 
+>### Example:
 >```spwn
 > a = counter(100)
 >b = counter(0)
@@ -472,14 +472,14 @@
 
 ## **clone**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, speed: @number = 1) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Copies the counter and returns the copy_
->### Example: 
+>### Example:
 >```spwn
 > c1 = counter(100)
 >c2 = c1.clone()
@@ -494,14 +494,14 @@
 
 ## **compare**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, other: @counter, speed: @number = 1) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Returns 0 if both counters are equal, 1 if the other is smaller, and -1 if the other is greater. After the macro the other counter will be equal to 0, while the first will be equal to the other minus the first_
->### Example: 
+>### Example:
 >```spwn
 > c1 = counter(10)
 >c2 = counter(15)
@@ -519,14 +519,14 @@
 
 ## **copy\_to**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, items: [@counter | @item] | @counter | @item, speed: @number = 1, factor: @number = 1) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Copies the value of the counter to another counter (or to all counters in a list), without consuming the original_
->### Example: 
+>### Example:
 >```spwn
 > c1 = counter(100)
 >c2 = counter(0)
@@ -545,14 +545,14 @@
 
 ## **display**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, x, y) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Creates a item display object that displays the value of the counter_
->### Example: 
+>### Example:
 >```spwn
 > points = counter(0)
 >points.display(75, 75)
@@ -567,14 +567,14 @@
 
 ## **divide**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, divisor: @counter | @number, remainder: @counter | @item = @counter::{item: ?i}, speed: @number = 1) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Devides the value of the counter by some divisor_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(7)
 >r = counter(0)
@@ -594,14 +594,14 @@
 
 ## **multiply**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, factor: @counter | @number, speed: @number = 1) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Multiplies the value of the counter by some factor (does not consume the factor)_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(5)
 >wait(1)
@@ -618,14 +618,14 @@
 
 ## **new**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(source: @number | @item | @bool = 0, delay: @bool = true) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Creates a new counter_
->### Example: 
+>### Example:
 >```spwn
 > @counter::new()     // creates a new counter with a starting value of 0
 >@counter::new(10)   // creates a new counter with a starting value of 10
@@ -642,14 +642,14 @@
 
 ## **reset**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, speed: @number = 1, for_each: @macro = (n) { /* code omitted */ }) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Resets counter to 0_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(100)
 >wait(1)
@@ -666,14 +666,14 @@
 
 ## **subtract\_from**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, items: [@counter | @item] | @counter | @item, speed: @number = 1, factor: @number = 1, for_each: @macro = (n) { /* code omitted */ }) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Subtracts the counter's value from another counter (or all counters in a list), and resets the counter to 0 in the process_
->### Example: 
+>### Example:
 >```spwn
 > a = counter(100)
 >b = counter(70)
@@ -693,14 +693,14 @@
 
 ## **to\_const**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, range: [@number] | @range) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Converts the counter into a normal number (very context-splitting, be careful)_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(3)
 >wait(1)
@@ -716,14 +716,14 @@
 
 ## **to\_const\_enclosed**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, range: [@number] | @range, closure: @macro) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Converts the counter into a normal number that you can use within a macro_
->### Example: 
+>### Example:
 >```spwn
 > c = counter(3)
 >wait(1)

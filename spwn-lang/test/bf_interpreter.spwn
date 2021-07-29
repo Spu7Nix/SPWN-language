@@ -28,7 +28,7 @@ abs = (num) {
     } else {
         return num
     }
-    
+
 }
 import "text_display.spwn"
 
@@ -56,7 +56,7 @@ random_max = 4
 auto_inputs = [1,3,10,13] // 2.25
 auto_inputs2 = [2,3,6,8] // 0.5, 0.5, 0.5, 0.25
 
-// runs in a row, level complete, 
+// runs in a row, level complete,
 messages = [804c, 808c, 809c, 900c, 850c]
 
 
@@ -69,9 +69,9 @@ right_buttons = [192c, 194c,  802c, 212c]
 activate_button = (activate, deactivate) {
 
     let colors = []
-    
-    
-    
+
+
+
     if activate != null {
         if left_buttons.contains(activate) {
             colors = left_buttons
@@ -93,9 +93,9 @@ activate_button = (activate, deactivate) {
         }
         for col in colors {
             -> col.set(0, 0, 0, 0, blending = true)
-        } 
+        }
     }
-    
+
 }
 
 successful_runs = counter(555i)
@@ -139,16 +139,16 @@ top_msg_board = (message, color) {
 }
 
 
-bottom_msg_board_up = (){  
+bottom_msg_board_up = (){
     -> message_board.move(0, 10, 1, easing = EXPONENTIAL_OUT)
     -> 216c.set(255, 255, 255, 1)
     -> 942g.move(0, 30, 0.5, easing = EXPONENTIAL_OUT)
 }
 
-bottom_msg_board_down = (){  
+bottom_msg_board_down = (){
     -> message_board.move(0, -10, 1, easing = EXPONENTIAL_IN)
     -> 216c.set(0, 0, 0, 1)
-    -> 942g.move(0, -30, 0.5, easing = EXPONENTIAL_IN)     
+    -> 942g.move(0, -30, 0.5, easing = EXPONENTIAL_IN)
 }
 
 input_char = 26g
@@ -181,7 +181,7 @@ pulse_ptr = (){
     -> 972g.move(0, -1, 0.2, easing = EASE_IN_OUT)
     -> 973g.move(0, 1, 0.2, easing = EASE_IN_OUT)
     -> 974g.move(-1, 0, 0.2, easing = EASE_IN_OUT)
-    -> 975g.move(1, 0, 0.2, easing = EASE_IN_OUT)  
+    -> 975g.move(1, 0, 0.2, easing = EASE_IN_OUT)
 }
 
 // win_condition = "win"
@@ -209,9 +209,9 @@ impl @bfreader {
         //$.print("hello")
         //-> BG.pulse(255, 0, 0, fade_out = 0.5)
         //-> std_out.write(counter(5))
-            
-        
-        
+
+
+
         block = ?b
         group = ?g
         $.add(obj {
@@ -241,7 +241,7 @@ impl @bfreader {
             Y: script_offset[1],
             GROUPS: start_point
         })
-        
+
 
         // CREATE CELLS
         let cells = []
@@ -254,9 +254,9 @@ impl @bfreader {
         //ptr.display(script_offset[0], script_offset[1] + 60)
         std_in = counter(85i)
         //std_in.display(script_offset[0], script_offset[1] - 90)
-        
-        
-        
+
+
+
         num_out = counter(61i)
         num_out.display(script_offset[0], script_offset[1] + 210)
         out = @bfreader::{
@@ -278,7 +278,7 @@ impl @bfreader {
             cells: cells,
             start_point: start_point
         }
-        
+
 
         return out
     },
@@ -297,10 +297,10 @@ impl @bfreader {
     //     }
     //     if self.dot == 1 {
     //         return DOT
-    //     } 
+    //     }
     //     if self.input == 1 {
     //         return INPUT
-    //     } 
+    //     }
     //     if self.open == 1 {
     //         return OPEN
     //     } if self.close == 1 {
@@ -311,7 +311,7 @@ impl @bfreader {
     // },
     current_cell: (self) => self.cells[self.ptr.to_const(..self.cells.length)],
     interpret: (self) {
-        
+
         ret = !{
             supress_signal(0.05)
             -> self.group.move(spacing, 0, 0)
@@ -334,11 +334,11 @@ impl @bfreader {
         //     supress_signal(0.06)
         //     ret!
         // }
-        
-        
-        
+
+
+
         -> if @bool(self.right) {
-            
+
             if self.ptr == self.cells.length - 1 {
                 wait()
                 self.ptr -= self.cells.length - 1
@@ -350,8 +350,8 @@ impl @bfreader {
                 -> cell_pointer.move(10,0, 0.1)
                 ret!
             }
-            
-            
+
+
         }
         -> if @bool(self.left) {
             if self.ptr == 0 {
@@ -365,7 +365,7 @@ impl @bfreader {
                 -> cell_pointer.move(-10,0, 0.1)
                 ret!
             }
-            
+
         }
         -> if @bool(self.incr) {
             -> self.current_cell() += 1
@@ -384,7 +384,7 @@ impl @bfreader {
             fast_ret!
         }
         -> if @bool(self.dot) {
-            
+
             () {
                 self.num_out.reset(speed = 1)
                 cell = self.current_cell()
@@ -393,9 +393,9 @@ impl @bfreader {
             } ()
             supress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APPARENTLY
             // REQUIRED FOR TEXT TO WORK ON MOBILE FOR SOME REASON
-            
+
             self.std_out.write(self.num_out, speed = 1)
-            
+
             slow_ret!
         }
         -> if @bool(self.input) {
@@ -404,7 +404,7 @@ impl @bfreader {
             -> input_layer.alpha(1, 0.5)
 
             auto_input_challenges = [3, 4, 5]
-            
+
             manual_input = !{
                 activate_button(802c, null)
                 activate_button(803c, null)
@@ -417,13 +417,13 @@ impl @bfreader {
                 }
                 activate_button(null, 802c)
                 activate_button(null, 803c)
-                
+
                 -> input_done_button.pulse(52, 247, 68, fade_out = 0.3)
                 -> input_layer.alpha(0, 0.5)
                 cell = self.current_cell()
                 cell.reset(speed = 1)
                 std_in.add_to([cell], speed = 1, for_each = (n){ input_char.move(100 * n, 0, 0) })
-                
+
                 slow_ret!
             }
 
@@ -442,11 +442,11 @@ impl @bfreader {
                     std_in += auto_inputs2[choice]
                     input_char.move(-100 * auto_inputs2[choice], 0, 0)
                 })
-                
+
                 call_with_delay(0.5, done)
             }
 
-            
+
 
             for ch in 0..challenges {
                 if auto_input_challenges.contains(ch) {
@@ -473,7 +473,7 @@ impl @bfreader {
                     done!
                 }
             })
-            
+
         }
         -> if @bool(self.open) {
             move_to = !{
@@ -482,20 +482,20 @@ impl @bfreader {
                 //layers = counter(0)
                 condition = () => !(layers == 0 && self.close == 1)
                 //self.group.move(spacing, 0)
-                
+
                 while_loop(condition, delay = 0.03, (){
-                    
+
                     wait(0.02)
                     -> if self.open == 1{
                         layers += 1
                     }
-                    
+
                     -> if self.close == 1 {
                         layers -= 1
                     }
 
                     -> if self.end == 1 {
-                        
+
                         force_stop!
                     } else {
                         wait(0.01)
@@ -503,7 +503,7 @@ impl @bfreader {
                         return
                     }
 
-                    
+
                 })
                 -> 45c.set(prog_ptr_color[0], prog_ptr_color[1], prog_ptr_color[2], blending = true)
                 ret!
@@ -529,12 +529,12 @@ impl @bfreader {
                     -> if self.close == 1 {
                         layers += 1
                     }
-                    
+
                     -> if self.open == 1 {
                         layers -= 1
                     }
                     -> if self.end == 1 {
-                        
+
                         force_stop!
                     } else {
                         wait(0.01)
@@ -555,8 +555,8 @@ impl @bfreader {
         -> if @bool(self.noop) {
             fast_ret!
         }
-        
-        
+
+
     }
 }
 move_group_menu = 31g
@@ -570,7 +570,7 @@ roll_groups = 70g..110g
 
 
 insert_bf_cmd = (ch: @string, offset: [@number], group: @group) {
-    
+
     blockid = switch ch {
         case ">": RIGHT,//increment the data pointer (to point to the next cell to the right).
         case "<": LEFT,	//decrement the data pointer (to point to the next cell to the left).
@@ -578,14 +578,14 @@ insert_bf_cmd = (ch: @string, offset: [@number], group: @group) {
         case "-": DECR,	//decrement (decrease by one) the byte at the data pointer.
         case ".": DOT,	//output the byte at the data pointer.
         case ",": INPUT,//accept one byte of input, storing its value in the byte at the data pointer.
-        case "[": OPEN,	
+        case "[": OPEN,
         case "]": CLOSE,
         case "end": END,
         case "no\nop": NOOP,
-        
+
     }
-    
-    
+
+
     $.add(obj {
         OBJ_ID: 1816,
         X: offset[0],
@@ -675,10 +675,10 @@ reset_selector_func = !{
     prog_selector.move(-5, 0, 0.1, easing = EASE_IN_OUT)
     block_input -= 1
 
-    
-    
+
+
     activate_button(195c, 196c)
-                
+
 }
 
 y_spacing = 20
@@ -769,7 +769,7 @@ for i in ..commands {
         off = [offset[0] + i * spacing * 3, offset[1] + c * y_spacing * 3]
         insert_bf_cmd(order[c], off, sg)
     }
-    // block that increments the selector 
+    // block that increments the selector
     inc_block = ?b
     for j in ..19 {
         $.add(obj {
@@ -816,7 +816,7 @@ for i in ..commands {
         sg.move(0, y_spacing * order.length, 0)
         c -= order.length
     })
-    
+
 }
 
 collision(130b, 131b).on_triggered(!{
@@ -939,7 +939,7 @@ challenge_extra_info_colors = [186c, 188c]
 
 next_challenge = !{
     challenge += 1
-    
+
     -> challenge_board_color.pulse(81, 252, 95, fade_out = 0.5)
     -> 187c.pulse(0,0,0, fade_in = 0.4, hold = 0.2, fade_out = 0.6)
     -> 866g.move(-40, 0, 0.4, easing = EASE_IN_OUT)
@@ -955,7 +955,7 @@ next_challenge = !{
     for i in ..challenge_extra_info_colors.length {
         -> challenge_extra_info_colors[i].pulse(0,0,0, fade_in = 0.4, hold = 2.3 + i * 0.1, fade_out = 0.3)
     }
-    
+
     wait(0.45)
     -> 866g.move(40, 0, 1.5, easing = EASE_IN)
     -> 865g.move(-40, 0, 1.5, easing = EASE_IN)
@@ -990,27 +990,27 @@ reset_env = !{
     -> force_quit_taps -= force_quit_taps.to_const(1..4)
     -> reader.std_out.reset()
 
-    
+
 
 }
 
 
 start = (){
 
-    
-    
-    
+
+
+
 
     switch_game_bg!
 
     collision(reset_selector, selector.block).on_triggered(reset_selector_func)
-    
+
 
     touch().on_triggered(!{
-        
+
         if ended == 1 {
             reset_env!
-            
+
             bottom_msg_board_down()
             wait(0.2)
             activate_button(195c, null)
@@ -1020,14 +1020,14 @@ start = (){
             is_running -= 1
             block_input -= 1
             ended -= 1
-            
+
         } else if is_running == 1 && reader.input != 1 {
             force_quit_taps.item.if_is(SMALLER_THAN, 3, !{
                 force_quit_taps += 1
             })
             force_stop_layer.alpha(1, 0.5)
             force_stop_layer.alpha(0, 2)
-            
+
         }
     })
 
@@ -1061,18 +1061,18 @@ start = (){
         // wait(0.1)
         // reader.std_out.write(reader.num_out)
         // wait(0.1)
-        
+
         activate_button(null, 195c)
         activate_button(null, 192c)
         run = !{
             wait(0.1)
             reader.group.move(10, 0, 0.05)
             //-> BG.pulse(255, 0, 0, fade_out = 1)
-            
+
             while_loop(()=> reader.end == 0 && force_quit_taps < 3, delay = 0.1, (){
                 reader.interpret()
             })
-            
+
             if force_quit_taps < 3 && ended == 0 {
                 wrong_out = !{
                     output_wrong!
@@ -1093,7 +1093,7 @@ start = (){
                             call_with_delay(0.05, next_challenge)
                             output_correct()
                         } else {
-                            
+
                             output_wrong!
                         }
                     }
@@ -1111,7 +1111,7 @@ start = (){
                         }
 
                         challenge.item.if_is(EQUAL_TO, 3, wrong_out)
-                            
+
                         challenge.item.if_is(EQUAL_TO, 4, wrong_out)
 
                         challenge.item.if_is(EQUAL_TO, 5, wrong_out)
@@ -1146,12 +1146,12 @@ start = (){
                                     top_msg_board(2, [255, 255, 0])
                                     call_with_delay(0.05, next_challenge)
                                     output_correct()
-                                    
+
                                 } else {
                                     output_wrong!
                                 }
                             }
-                            
+
                         } else {
                             -> if challenge == 6 {
                                 output_wrong!
@@ -1164,12 +1164,12 @@ start = (){
                     } else {
                         //input challenges
                         inc_runs_in_a_row = !{
-                            
+
                             successful_runs += 1
                             -> 962g.move(-200, 0, 0)
                             messages[0].set(0,0,0,0)
                             wait()
-                            
+
                             -> if successful_runs == 3 {
                                 -> if challenge == 5 {
                                     wait(4)
@@ -1179,7 +1179,7 @@ start = (){
                                 top_msg_board(0, [0, 255, 0])
                                 call_with_delay(0.05, next_challenge)
                                 output_correct()
-                                
+
                             } else {
                                 top_msg_board(0, [255, 255, 255])
                                 output_correct_no_end()
@@ -1188,27 +1188,27 @@ start = (){
                             }
                         }
 
-                        
+
 
                         -> if input_used == 2 {
                             -> if challenge == 3 {
                                 wrong_out!
                             }
-                            
+
                         }
 
                         -> if input_used == 1 {
                             -> if challenge == 4 {
-                                wrong_out!  
+                                wrong_out!
                             }
 
                             -> if challenge == 5 {
                                 wrong_out!
                             }
-                            
+
                         }
 
-                        
+
 
                         input_choice.to_const_enclosed(..random_max, (choice) {
                             -> if challenge == 3 {
@@ -1218,14 +1218,14 @@ start = (){
                                     } else {
                                         wrong_out!
                                     }
-                                } 
-                                
+                                }
+
                             }
                             -> if choice != 0 {
                                 wait()
                                 input_choice -= choice
                             }
-                            
+
                             -> if input_used == 2 {
 
 
@@ -1239,14 +1239,14 @@ start = (){
                                     }
 
                                     -> if challenge == 5 {
-                                        
+
                                         -> if reader.num_out == abs(auto_inputs[choice] - auto_inputs2[choice2]) {
                                             inc_runs_in_a_row!
                                         } else {
                                             wrong_out!
                                         }
                                     }
-                                    
+
                                     -> if choice2 != 0 {
                                         wait()
                                         input_choice2 -= choice2
@@ -1271,11 +1271,11 @@ start = (){
 
         run!
         //call_with_delay(999, run)
-        
-        
+
+
     })
 
-    
+
 }
 8c.set(0, 0, 0)
 // start menu
@@ -1297,15 +1297,15 @@ start_func = !{
     move_group_game.toggle_on()
     game_switch.toggle_off()
 
-    
-    
+
+
     move_group_game.follow(981g)
     -> 54c.set(0,0,0, 0.5, opacity = 0.0)
     -> 900g.move(0, 33, 0)
     -> 903g.move(0, -150, 0)
     //-> BG.pulse(255, 0, 0, fade_out = 0.6)
 
-    
+
 
     -> $.add( trigger{
         OBJ_ID: 1268,
@@ -1315,7 +1315,7 @@ start_func = !{
         },
         HIGH_DETAIL: true,
     })
-    
+
     start()
 }
 
@@ -1358,7 +1358,7 @@ tut_func = !{
     move_group_tut.toggle_on()
     tut_switch.toggle_off()
     -> 54c.set(0,0,0, 0.5, opacity = 0.0)
-    
+
     move_group_tut.follow(981g)
     //-> BG.pulse(255, 0, 0, fade_out = 0.6)
     delta = 0.05
@@ -1368,9 +1368,9 @@ tut_func = !{
     tut_text_anim_finished += 1
     activate_button(null, 191c)
     activate_button(192c, null)
-    
-    
-    
+
+
+
 }
 
 
@@ -1427,9 +1427,9 @@ tut_transition = (dir){
     // part1 = 0..seglen
     // part2 = part1.end..(part1.end + seglen)
     // part3 = part2.end..(part2.end + seglen)
-    
+
     tut_letters!
-    
+
 
     if dir != 0 {
         wait(0.4)
@@ -1455,14 +1455,14 @@ for i in ..tut_arrow_items.length {
 
 
 gs.button_a().on_triggered(!{
-    
+
     -> right_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
     -> right_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> right_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
     random_affect!
-    
+
     -> if started == 0 && allow_menu_move == 0 {
-        
+
         wait()
         allow_menu_move += 1
         -> 53c.set(255, 255, 255)
@@ -1471,7 +1471,7 @@ gs.button_a().on_triggered(!{
         -> 938g.move(-10, -10, 0.5, easing = EXPONENTIAL_OUT)
         wait(0.3)
         54c.set(0,0,0, 0.5)
-        
+
         started += 1
         -> if gamemode == 0 {
             //tutorial setup
@@ -1479,13 +1479,13 @@ gs.button_a().on_triggered(!{
             menu_follow.start_group.stop()
             //move_group.move(0, -160, 0)
             tut_switch.toggle_on()
-            
+
             -> while_loop(() => gamemode == 0, delay = 1, () {
                 inc_item.add(1)
                 -> if counter(decr_item) > 0 {
                     decr_item.add(-1)
                 }
-                
+
                 -> 939g.pulse(100, 2.0, 2.0, fade_out = 0.5, hsv = true)
                 pulse_ptr()
                 -> () {
@@ -1510,16 +1510,16 @@ gs.button_a().on_triggered(!{
 
         }
 
-        
-        
-        
 
-         
-        
+
+
+
+
+
         -> if gamemode == 1 {
             // challenge setup
-            
-            
+
+
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
 
@@ -1528,11 +1528,11 @@ gs.button_a().on_triggered(!{
             //move_group.move(-1100, 0, 0)
             game_switch.toggle_on()
 
-            
+
         }
         -> if gamemode == 2 {
             // coins setup
-            
+
 
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
@@ -1546,44 +1546,44 @@ gs.button_a().on_triggered(!{
             gamemode -= 1
             game_switch.toggle_on()
 
-            
-            
+
+
         }
-        
+
 
         -> if gamemode == 3 {
             // sandbox setup
-            
+
 
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
-            
+
             //-> bg2.move(1000, 0, 0) //reload
             //move_group.move(-1100, 0, 0)
             game_switch.toggle_on()
-            
-            
-            
+
+
+
         }
 
-        
+
 
     } else {
-        
+
         -> if gamemode == 0 {
 
             tut_page_num.item.if_is(EQUAL_TO, 1, !{
                 activate_button(null, 193c)
             })
-            
+
             tut_page_num.item.if_is(LARGER_THAN, 0, !{
                 -> tut_transition(-1)
                 activate_button(null, 212c)
             })
-            
+
         } else {
             -> if block_input == 0 {
-                
+
                 selector.group.move(0, 20, 0)
                 wait(0.03)
                 selector.group.move(0, -20, 0)
@@ -1597,7 +1597,7 @@ gs.button_b().on_triggered(!{
     -> left_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> left_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
     random_affect!
-    
+
     -> if started == 0 && allow_menu_move == 0 {
         -> 985g.move(0, -1500, 0)
         -> 985g.move(0, 1500, 0.8)
@@ -1630,7 +1630,7 @@ gs.button_b().on_triggered(!{
         -> 977g.move(60, 10, 0)
         -> 8c.set(0, 0, 0)
         -> 7c.set(255, 255, 255)
-        
+
     } else {
         -> if gamemode == 0 {
             tut_text_anim_finished.item.if_is(EQUAL_TO, 0, !{
@@ -1657,7 +1657,7 @@ gs.button_b().on_triggered(!{
                     activate_button(null, 193c)
                     activate_button(192c, 212c)
                     gamemode += 1
-                    
+
                     tut_func.start_group.stop()
                     move_group_tut.toggle_off()
 
@@ -1667,15 +1667,15 @@ gs.button_b().on_triggered(!{
                     game_switch.toggle_on()
                 }
             })
-            
-            
+
+
         } else {
-            
+
             if block_input == 0 {
                 -> move_button.pulse(59, 144, 247, fade_out = 0.3)
-                selector.group.move(20, 0, 0.1) 
+                selector.group.move(20, 0, 0.1)
                 prog_selector.move(10, 0, 0.1)
-                
+
                 //-> 905g.move(0, -150, 0)
                 activate_button(196c, 195c)
             }

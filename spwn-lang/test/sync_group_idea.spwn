@@ -19,11 +19,11 @@ part2 = ?g
 }
 
 if n == 12 {
-    // since this could happen at the 
+    // since this could happen at the
     // same time as a[1] (bacause of the ->)
     // this must also be a[1]
     a[part1] {
-        // ... 
+        // ...
     }
 }
 
@@ -63,5 +63,5 @@ m = sync (arguments) {
 // so its triggers can be toggled off
 // if it is called with a -> it is not assumed to be sync anymore
 
-// if it should still be sync with a ->, 
+// if it should still be sync with a ->,
 // the tag #[force_sync] can be applied

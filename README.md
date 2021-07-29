@@ -12,11 +12,11 @@ A language for Geometry Dash triggers. An easy way to create levels using code.
 SPWN is a programming language that compiles to Geometry Dash levels. What that means is that you can create levels by using not only the visual representation in the GD-editor, but using a "verbal" and abstracted representation as well. This is especially useful for using GD triggers, which (if you want to make complicated stuff) are not really suited for the graphical workflow of the in-game editor.
 
 
- The documentation for the SPWN language is located [here](https://spu7nix.net/spwn/#/). You can also [contribute to the docs here](https://github.com/Spu7Nix/spwn_docs). If you have questions, comments, need help, or want to share your work, [join the discord server here](https://discord.gg/qKZAhKXqgw).
+ The documentation for the SPWN language is located [here](https://spu7nix.net/spwn/#/). You can also contribute to the docs [here](https://github.com/Spu7Nix/spwn_docs). If you have questions, comments, need help, or want to share your work, join the discord server [here](https://discord.gg/qKZAhKXqgw).
 
 ## Installing - How To Install
 
-You can either use the installers for your operating system, or build SPWN from the source. Please note that building from source will give you access to newer features and bug fixes, but may be unstable.
+You can either use the installers for your operating system, or build SPWN from source. Please note that building from source will give you access to newer features and bug fixes, but may be unstable.
 
 ###### Windows
 1. Download the .msi file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
@@ -35,7 +35,7 @@ You can either use the installers for your operating system, or build SPWN from 
 1. Download source code from this repository.
 2. Install rust if you haven't already.
 3. Open `spwn-lang` folder in the terminal.
-4. Run `cargo build`.
+4. Run `cargo build --release`.
 5. Compiled binary is placed in `target/debug`.
 
 ## Using SPWN - Setup
@@ -66,16 +66,16 @@ test = 5g
 test.move(10, -10, 2)
 ```
 
-Save the file, then open a command line and type in `spwn build YOURFILENAME.spwn`. Make sure to have GD closed during this process. After running this command, reopen GD, and the levels content will be modified. Head over to the docs to learn how to program in SPWN.
+Save the file, then open a terminal and type in `spwn build YOURFILENAME.spwn`. Make sure to have GD closed during this process. After running this command, open GD, and the levels content will be modified. Head over to the docs to learn how to program in SPWN.
 
-> **Note:** SPWN would generate trigger at the near top of your level. so you might won't see any difference. 
+> **Note:** SPWN generates triggers near the top of your level, so you might not see any difference.
 
 ## Using SPWN - Command Line Reference
 
 Here is a list of SPWN command line subcommands and flags. This Information can be found by typing `spwn help` in the command line as well.
 
 ###### Subcommands:
-    
+
     build [script file], b [script file]
     Runs/builds a given file
 
