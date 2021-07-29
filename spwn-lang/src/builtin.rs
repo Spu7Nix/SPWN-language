@@ -600,6 +600,15 @@ builtins! {
     [Expm1] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
     [Fract] fn fract((n): Number) {Value::Number(n.fract())}
 
+    [Sqrt] fn sqrt((n): Number) {Value::Number(n.sqrt())}
+    [Sinh] fn sinh((n): Number) {Value::Number(n.sinh())}
+    [Tanh] fn tanh((n): Number) {Value::Number(n.tanh())}
+    [NaturalLog] fn ln((n): Number) {Value::Number(n.ln())}
+    [Log] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
+    [Min] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
+    [Max] fn min((a): Number, (b): Number) {Value::Number(a.max(b))}
+    [Round] fn round((n): Number) {Value::Number(n.round())}
+    [Hypot] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
 
     [Add]
     fn add((obj, mode): Obj) {
