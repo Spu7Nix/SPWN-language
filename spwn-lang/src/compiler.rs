@@ -136,7 +136,7 @@ impl std::fmt::Display for RuntimeError {
             } => {
                 print_error(
                     info.position.clone(),
-                    "Type missmatch",
+                    "Type mismatch",
                     &[(
                         info.position.clone(),
                         &format!("Expected {}, found {}", expected.fg(a), found.fg(b)),
