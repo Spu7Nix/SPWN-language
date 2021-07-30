@@ -24,12 +24,8 @@ impl CompilerInfo {
 
     pub fn from_area(a: CodeArea) -> Self {
         CompilerInfo {
-            depth: 0,
-            call_stack: Vec::new(),
-
-            current_module: String::new(),
             position: a,
-            includes: vec![],
+            ..Self::new()
         }
     }
 

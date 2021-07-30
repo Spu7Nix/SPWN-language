@@ -165,7 +165,7 @@ impl ValStorage {
                 }
             }
             Value::Macro(m) => {
-                for (_, e, _, e2) in m.args {
+                for (_, e, _, e2, _) in m.args {
                     if let Some(val) = e {
                         self.increment_single_lifetime(val, amount, already_done)
                     }

@@ -1601,12 +1601,14 @@ fn parse_arg_def(
                         file: notes.file.clone(),
                     });
                 }
+                let start = tokens.position().0;
                 let symbol = tokens.slice();
                 tokens.next(false);
                 let value = Some(parse_expr(tokens, notes, true, true)?);
+                let end = tokens.position().1;
                 //tokens.previous();
 
-                (symbol, value, properties, None)
+                (symbol, value, properties, None, (start, end))
             }
 
             Some(Token::Colon) => {
@@ -1617,6 +1619,7 @@ fn parse_arg_def(
                         file: notes.file.clone(),
                     });
                 }
+                let start = tokens.position().0;
                 let symbol = tokens.slice();
                 tokens.next(false);
                 let type_value = Some(parse_expr(tokens, notes, false, true)?);
@@ -1625,15 +1628,15 @@ fn parse_arg_def(
                 match tokens.next(false) {
                     Some(Token::Assign) => {
                         let value = Some(parse_expr(tokens, notes, true, true)?);
-
+                        let end = tokens.position().1;
                         //tokens.previous();
 
-                        (symbol, value, properties, type_value)
+                        (symbol, value, properties, type_value, (start, end))
                     }
                     Some(_) => {
                         tokens.previous();
-
-                        (symbol, None, properties, type_value)
+                        let end = tokens.position().1;
+                        (symbol, None, properties, type_value, (start, end))
                     }
                     None => {
                         return Err(SyntaxError::SyntaxError {
@@ -1654,7 +1657,7 @@ fn parse_arg_def(
                     });
                 }
 
-                (tokens.slice(), None, properties, None)
+                (tokens.slice(), None, properties, None, tokens.position())
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
@@ -1896,7 +1899,7 @@ fn parse_variable(
                     // Woo macro shorthand
                     let arg = if symbol != "_" {
                         is_valid_symbol(&symbol, tokens, notes)?;
-                        vec![(symbol, None, properties.clone(), None)]
+                        vec![(symbol, None, properties.clone(), None, tokens.position())]
                     } else {
                         Vec::new()
                     };

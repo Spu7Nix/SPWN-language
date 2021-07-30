@@ -318,6 +318,7 @@ pub fn execute_macro(
 ) -> Result<(Returns, Returns), RuntimeError> {
     let mut inner_inner_returns = SmallVec::new();
     let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> = SmallVec::new();
+    let fn_context = context.start_group;
     if !m.args.is_empty() {
         // second returns is for any compound statements in the args
         let (evaled_args, inner_returns) = all_combinations(
@@ -395,7 +396,7 @@ pub fn execute_macro(
                                 globals,
                                 context.start_group,
                                 true,
-                                info.position.clone(),
+                                m.args[def_index].4.clone(),
                             ),
                         );
                         def_index += 1;
@@ -428,7 +429,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
                                     globals,
                                     context.start_group,
                                     true,
-                                    info.position.clone(),
+                                    arg.4.clone(),
                                 ),
                             );
                         }
@@ -469,7 +470,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
         new_contexts.push(new_context);
     }
-    let mut new_info = info;
+    let mut new_info = info.clone();
 
     new_info.add_to_call_stack(CodeArea {
         file: m.def_file,
@@ -488,11 +489,17 @@ Should be used like this: value.macro(arguments)".to_string(), info
         (*c).broken = None;
     }
 
-    let returns = if compiled.1.is_empty() {
+    let mut returns = if compiled.1.is_empty() {
         compiled.0.iter().map(|x| (1, x.clone())).collect()
     } else {
         compiled.1
     };
+
+    for (_, c) in &mut returns {
+        if c.start_group != fn_context {
+            c.fn_context_change_stack.push(info.position.clone());
+        }
+    }
 
     Ok((
         returns
@@ -643,7 +650,8 @@ impl ast::CompoundStatement {
 
         new_context.start_group = start_group;
 
-        let new_info = info;
+        let new_info = info.clone();
+        new_context.fn_context_change_stack = vec![info.position];
         let (contexts, inner_returns) =
             compile_scope(&self.statements, smallvec![new_context], globals, new_info)?;
 

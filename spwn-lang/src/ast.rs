@@ -266,7 +266,13 @@ pub struct Native {
     pub args: Vec<Argument>,
 }*/
 //                 name         def value     props       type ind.
-pub type ArgDef = (String, Option<Expression>, Attribute, Option<Expression>);
+pub type ArgDef = (
+    String,
+    Option<Expression>,
+    Attribute,
+    Option<Expression>,
+    FileRange,
+);
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
     pub args: Vec<ArgDef>,

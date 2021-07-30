@@ -1,1 +1,9 @@
-import "bugtest.spwn"
+let a = 10
+
+m = (a) {
+    a += 1
+}
+
+
+
+m(a)

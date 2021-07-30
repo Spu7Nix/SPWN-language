@@ -374,9 +374,10 @@ macro_rules! builtin_arg_mut_check {
         }
         let fn_context = $globals.get_val_fn_context($arguments[$arg_index], $info.clone())?;
         if fn_context != $context.start_group {
-            return Err(RuntimeError::RuntimeError {
-                message: CANNOT_CHANGE_ERROR.to_string(),
-                info: $info.with_area($globals.get_area($arguments[$arg_index])),
+            return Err(RuntimeError::ContextChangeMutateError {
+                info: $info,
+                val_def: $globals.get_area($arguments[$arg_index]),
+                context_changes: $context.fn_context_change_stack.clone(),
             });
         }
     };
@@ -868,8 +869,11 @@ builtins! {
 
         let mut new_context = context.clone();
         new_context.start_group = group;
+        let new_info = info.clone();
+        new_context.fn_context_change_stack = vec![info.position];
+        //new_info.last_context_change_stack = vec![info.position];
 
-        execute_macro((*mac, Vec::new()), &new_context, globals, NULL_STORAGE, info)?;
+        execute_macro((*mac, Vec::new()), &new_context, globals, NULL_STORAGE, new_info)?;
 
         Value::Null
     }

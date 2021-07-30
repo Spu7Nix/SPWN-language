@@ -44,6 +44,7 @@ pub struct Macro {
         Option<StoredValue>,
         ast::Attribute,
         Option<StoredValue>,
+        CodeArea,
     )>,
     pub def_context: Context,
     pub def_file: PathBuf,
@@ -626,11 +627,12 @@ pub fn macro_to_value(
             Option<StoredValue>,
             ast::Attribute,
             Option<StoredValue>,
+            CodeArea,
         )> = Vec::new();
         let mut expr_index = 0;
 
-        for arg in m.args.iter() {
-            let def_val = match &arg.1 {
+        for (name, default, attr, pat, pos) in m.args.iter() {
+            let def_val = match default {
                 Some(_) => {
                     expr_index += 1;
                     Some(clone_value(
@@ -644,14 +646,23 @@ pub fn macro_to_value(
                 }
                 None => None,
             };
-            let pat = match &arg.3 {
+            let pat = match pat {
                 Some(_) => {
                     expr_index += 1;
                     Some(defaults.0[expr_index - 1])
                 }
                 None => None,
             };
-            args.push((arg.0.clone(), def_val, arg.2.clone(), pat));
+            args.push((
+                name.clone(),
+                def_val,
+                attr.clone(),
+                pat,
+                CodeArea {
+                    pos: *pos,
+                    ..info.position.clone()
+                },
+            ));
         }
 
         start_val.push((
@@ -2134,9 +2145,15 @@ impl ast::Variable {
                                 });
                             }
                         }
+                        Value::Array(_) => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: "Only dictionaries can define new elements with [...] (consider using `array.push(value)`)".to_string(),
+                                info: info.clone(),
+                            })
+                        }
                         _ => {
                             return Err(RuntimeError::RuntimeError {
-                                message: "Other values are not supported yet".to_string(),
+                                message: "Only dictionaries can define new elements with [...]".to_string(),
                                 info: info.clone(),
                             })
                         }

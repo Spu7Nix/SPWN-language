@@ -38,6 +38,11 @@ pub enum RuntimeError {
         info: CompilerInfo,
     },
 
+    PackageError {
+        err: Box<RuntimeError>,
+        info: CompilerInfo,
+    },
+
     TypeError {
         expected: String,
         found: String,
@@ -58,9 +63,14 @@ pub enum RuntimeError {
         val_def: CodeArea,
         info: CompilerInfo,
     },
+    ContextChangeMutateError {
+        val_def: CodeArea,
+        info: CompilerInfo,
+        context_changes: Vec<CodeArea>,
+    },
 }
 pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
-    use ariadne::{Color, Config, FileCache, Label, Report, ReportKind};
+    use ariadne::{ColorGenerator, Config, FileCache, Label, Report, ReportKind};
 
     let info = rep.info;
     let message = rep.message;
@@ -68,21 +78,34 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
     let note = rep.note;
     let position = info.position;
 
+    let mut colors = ColorGenerator::from_state([128, 191, 255], 0.9);
+
     let mut report = Report::build(ReportKind::Error, position.file.clone(), position.pos.0)
         .with_message(message)
-        .with_config(Config::default().with_multiline_arrows(false));
-    let mut i = 0;
+        .with_config(Config::default().with_cross_gap(true));
+    let mut i = 1;
     for area in info.call_stack {
+        let color = colors.next();
         report = report.with_label(
             Label::new(area.clone())
                 .with_order(i)
-                .with_message("Coming from this macro call"),
+                .with_message(&format!(
+                    "{}: Error comes from this macro call",
+                    i.to_string().fg(color)
+                ))
+                .with_color(color),
         );
         i += 1;
     }
 
     for (area, label) in labels {
-        report = report.with_label(Label::new(area.clone()).with_message(label).with_order(i));
+        let color = colors.next();
+        report = report.with_label(
+            Label::new(area.clone())
+                .with_message(&format!("{}: {}", i.to_string().fg(color), label))
+                .with_order(i)
+                .with_color(color),
+        );
         i += 1;
     }
 
@@ -102,7 +125,7 @@ pub fn create_error(
         info,
         message: message.to_string(),
         labels: labels
-            .into_iter()
+            .iter()
             .map(|(a, s)| (a.clone(), s.to_string()))
             .collect(),
         note: match note {
@@ -133,7 +156,10 @@ impl From<RuntimeError> for ErrorReport {
             } => create_error(
                 info.clone(),
                 &format!("Use of undefined {}", desc),
-                &[(info.position, &format!("'{}' is udefined", undefined.fg(b)))],
+                &[(
+                    info.position,
+                    &format!("'{}' is undefined", undefined.fg(b)),
+                )],
                 None,
             ),
             RuntimeError::PackageSyntaxError { err, info } => {
@@ -141,6 +167,21 @@ impl From<RuntimeError> for ErrorReport {
                 let mut labels = vec![(
                     info.position.clone(),
                     "Error when parsing this library/module",
+                )];
+                labels.extend(
+                    syntax_error
+                        .labels
+                        .iter()
+                        .map(|(a, b)| (a.clone(), b.as_str())),
+                );
+                create_error(info, &syntax_error.message, &labels, None)
+            }
+
+            RuntimeError::PackageError { err, info } => {
+                let syntax_error = ErrorReport::from(*err);
+                let mut labels = vec![(
+                    info.position.clone(),
+                    "Error when running this library/module",
                 )];
                 labels.extend(
                     syntax_error
@@ -188,6 +229,44 @@ impl From<RuntimeError> for ErrorReport {
                 ],
                 None,
             ),
+
+            RuntimeError::ContextChangeMutateError {
+                val_def,
+                info,
+                context_changes,
+            } => {
+                let mut labels = vec![(val_def, "Value was defined here")];
+
+                if context_changes.len() == 1 {
+                    labels.push((
+                        context_changes[0].clone(),
+                        "New trigger function context was defined here",
+                    ));
+                } else if context_changes.len() > 1 {
+                    labels.push((
+                        context_changes.last().unwrap().clone(),
+                        "Context was changed here",
+                    ));
+
+                    for change in context_changes[1..(context_changes.len() - 1)].iter().rev() {
+                        labels.push((change.clone(), "This changes the context inside the macro"));
+                    }
+
+                    labels.push((
+                        context_changes[0].clone(),
+                        "New trigger function context was defined here",
+                    ));
+                }
+
+                labels.push((info.position.clone(), "Attempted to change value here"));
+
+                create_error(
+                    info,
+                    "Attempted to change a variable defined in a different trigger function context",
+                    &labels,
+                    Some("Consider using a counter"),
+                )
+            }
         }
     }
 }
@@ -206,17 +285,10 @@ pub fn compile_spwn(
     if statements.is_empty() {
         return Err(RuntimeError::RuntimeError {
             message: "this script is empty".to_string(),
-            info: CompilerInfo {
-                depth: 0,
-                call_stack: Vec::new(),
-                position: crate::compiler_info::CodeArea {
-                    file: path,
-                    pos: (0, 0),
-                },
-
-                current_module: String::new(),
-                includes: vec![],
-            },
+            info: CompilerInfo::from_area(crate::compiler_info::CodeArea {
+                file: path,
+                pos: (0, 0),
+            }),
         });
     }
     let mut start_context = Context::new();
@@ -225,15 +297,11 @@ pub fn compile_spwn(
     // store_value(Value::Null, 1, &mut globals, &start_context);
 
     let start_info = CompilerInfo {
-        depth: 0,
-        call_stack: Vec::new(),
-        position: crate::compiler_info::CodeArea {
+        includes: included_paths,
+        ..CompilerInfo::from_area(crate::compiler_info::CodeArea {
             file: path,
             pos: statements[0].pos,
-        },
-
-        current_module: String::new(),
-        includes: included_paths,
+        })
     };
     use std::time::Instant;
 
@@ -299,12 +367,12 @@ pub fn compile_spwn(
     let build_time_mins = build_time_secs / 60;
 
     // Check which unit to unit to use
-    if build_time_secs < 1 {
+    if build_time_millis < 1000 {
         print_with_color(
             &format!("Built in {} milliseconds!", build_time_millis),
             TColor::Green,
         );
-    } else if build_time_secs > 1 && build_time_secs < 60 {
+    } else if build_time_millis < 60000 {
         print_with_color(
             &format!("Built in {} seconds!", build_time_secs),
             TColor::Green,
@@ -421,6 +489,8 @@ pub fn compile_scope(
                                 new_context.start_group = start_group;
 
                                 let new_info = info.clone();
+                                new_context.fn_context_change_stack = vec![info.position.clone()];
+                                //new_info.last_context_change_stack = vec![info.position.clone()];
                                 let (_, inner_returns) = compile_scope(
                                     &f.statements,
                                     smallvec![new_context],
@@ -522,7 +592,7 @@ pub fn compile_scope(
                                                 1,
                                                 globals,
                                                 context.start_group,
-                                                false,
+                                                !globals.is_mutable(*v),
                                                 info.position.clone(),
                                             ),
                                         )
@@ -1117,11 +1187,9 @@ pub fn compile_scope(
                     let (evaled, _) = e.message.eval(context, globals, info.clone(), true)?;
                     for (msg, _) in evaled {
                         eprintln!(
-                            "{}",
-                            match &globals.stored_values[msg] {
-                                Value::Str(s) => s,
-                                _ => "no message",
-                            },
+                            "{}: {}",
+                            "Error".fg(ariadne::Color::Red),
+                            &globals.stored_values[msg].to_str(globals)
                         );
                     }
                 }
@@ -1350,7 +1418,15 @@ pub fn import_module(
     }
 
     let (contexts, mut returns) =
-        compile_scope(&parsed, smallvec![start_context], globals, new_info)?;
+        match compile_scope(&parsed, smallvec![start_context], globals, new_info) {
+            Ok(a) => a,
+            Err(err) => {
+                return Err(RuntimeError::PackageError {
+                    err: Box::new(err),
+                    info,
+                })
+            }
+        };
 
     for c in &contexts {
         if let Some((i, BreakType::Loop)) = &c.broken {
