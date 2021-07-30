@@ -1,5 +1,6 @@
 ///types and functions used by the compiler
 use crate::builtin::*;
+use crate::compiler_info::CodeArea;
 use crate::levelstring::GdObj;
 
 use crate::compiler_types::*;
@@ -77,6 +78,13 @@ impl Globals {
     pub fn get_lifetime(&self, p: StoredValue) -> u16 {
         match self.stored_values.map.get(&p) {
             Some(val) => val.lifetime,
+            None => unreachable!(),
+        }
+    }
+
+    pub fn get_area(&self, p: StoredValue) -> CodeArea {
+        match self.stored_values.map.get(&p) {
+            Some(val) => val.area.clone(),
             None => unreachable!(),
         }
     }

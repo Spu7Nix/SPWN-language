@@ -1,6 +1,7 @@
 ///types and functions used by the compiler
 use crate::builtin::*;
 
+use crate::compiler_info::CodeArea;
 use crate::context::*;
 use crate::globals::Globals;
 use crate::value::*;
@@ -21,6 +22,7 @@ pub struct StoredValData {
     pub fn_context: Group,
     pub mutable: bool,
     pub lifetime: u16,
+    pub area: CodeArea,
 }
 /*
 LIFETIME:
@@ -60,6 +62,7 @@ impl ValStorage {
                         fn_context: Group::new(0),
                         mutable: false,
                         lifetime: 1,
+                        area: CodeArea::new(),
                     },
                 ),
                 (
@@ -69,6 +72,7 @@ impl ValStorage {
                         fn_context: Group::new(0),
                         mutable: false,
                         lifetime: 1,
+                        area: CodeArea::new(),
                     },
                 ),
             ]
@@ -184,6 +188,7 @@ pub fn store_value(
     lifetime: u16,
     globals: &mut Globals,
     context: &Context,
+    area: CodeArea,
 ) -> StoredValue {
     let index = globals.val_id;
     let mutable = !matches!(val, Value::Macro(_));
@@ -195,6 +200,7 @@ pub fn store_value(
             fn_context: context.start_group,
             mutable,
             lifetime,
+            area,
         },
     );
     (*globals).val_id += 1;
@@ -206,6 +212,7 @@ pub fn clone_and_get_value(
     globals: &mut Globals,
     fn_context: Group,
     constant: bool,
+    area: CodeArea,
 ) -> Value {
     let mut old_val = globals.stored_values[index].clone();
 
@@ -213,7 +220,7 @@ pub fn clone_and_get_value(
         Value::Array(arr) => {
             old_val = Value::Array(
                 arr.iter()
-                    .map(|x| clone_value(*x, lifetime, globals, fn_context, constant))
+                    .map(|x| clone_value(*x, lifetime, globals, fn_context, constant, area.clone()))
                     .collect(),
             );
         }
@@ -224,7 +231,7 @@ pub fn clone_and_get_value(
                     .map(|(k, v)| {
                         (
                             k.clone(),
-                            clone_value(*v, lifetime, globals, fn_context, constant),
+                            clone_value(*v, lifetime, globals, fn_context, constant, area.clone()),
                         )
                     })
                     .collect(),
@@ -234,11 +241,25 @@ pub fn clone_and_get_value(
         Value::Macro(m) => {
             for arg in &mut m.args {
                 if let Some(def_val) = &mut arg.1 {
-                    (*def_val) = clone_value(*def_val, lifetime, globals, fn_context, constant);
+                    (*def_val) = clone_value(
+                        *def_val,
+                        lifetime,
+                        globals,
+                        fn_context,
+                        constant,
+                        area.clone(),
+                    );
                 }
 
                 if let Some(def_val) = &mut arg.3 {
-                    (*def_val) = clone_value(*def_val, lifetime, globals, fn_context, constant);
+                    (*def_val) = clone_value(
+                        *def_val,
+                        lifetime,
+                        globals,
+                        fn_context,
+                        constant,
+                        area.clone(),
+                    );
                 }
             }
 
@@ -258,8 +279,9 @@ pub fn clone_value(
     globals: &mut Globals,
     fn_context: Group,
     constant: bool,
+    area: CodeArea,
 ) -> StoredValue {
-    let old_val = clone_and_get_value(index, lifetime, globals, fn_context, constant);
+    let old_val = clone_and_get_value(index, lifetime, globals, fn_context, constant, area.clone());
 
     //clone all inner values
     //do the thing
@@ -274,6 +296,7 @@ pub fn clone_value(
             fn_context,
             mutable: !constant,
             lifetime,
+            area,
         },
     );
     (*globals).val_id += 1;
@@ -285,6 +308,7 @@ pub fn store_const_value(
     lifetime: u16,
     globals: &mut Globals,
     context: &Context,
+    area: CodeArea,
 ) -> StoredValue {
     let index = globals.val_id;
 
@@ -295,6 +319,7 @@ pub fn store_const_value(
             fn_context: context.start_group,
             mutable: false,
             lifetime,
+            area,
         },
     );
     (*globals).val_id += 1;
@@ -307,6 +332,7 @@ pub fn store_val_m(
     globals: &mut Globals,
     context: &Context,
     constant: bool,
+    area: CodeArea,
 ) -> StoredValue {
     let index = globals.val_id;
 
@@ -317,6 +343,7 @@ pub fn store_val_m(
             fn_context: context.start_group,
             mutable: !constant,
             lifetime,
+            area,
         },
     );
     (*globals).val_id += 1;

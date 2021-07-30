@@ -1,6 +1,7 @@
 ///types and functions used by the compiler
 use crate::ast;
 use crate::builtin::*;
+use crate::compiler_info::CodeArea;
 use crate::context::*;
 use crate::globals::Globals;
 use crate::levelstring::*;
@@ -65,6 +66,7 @@ pub fn handle_operator(
             String::from(macro_name),
             &context,
             globals,
+            info.clone(),
         ) {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
                 if m.args.is_empty() {
@@ -93,6 +95,7 @@ pub fn handle_operator(
                                 1,
                                 globals,
                                 &context,
+                                info.position.clone()
                             ),
                             context.clone(),
                         )]);
@@ -110,6 +113,7 @@ pub fn handle_operator(
                             globals,
                             context.start_group,
                             false,
+                            info.position.clone(),
                         ))],
                     ),
                     context,
@@ -126,11 +130,12 @@ pub fn handle_operator(
                             vec![value1, value2],
                             info.clone(),
                             globals,
-                            &context,
+                            &context
                         )?,
                         1,
                         globals,
                         &context,
+                        info.position.clone()
                     ),
                     context.clone(),
                 )]
@@ -148,6 +153,7 @@ pub fn handle_operator(
                     1,
                     globals,
                     &context,
+                    info.position.clone()
                 ),
                 context.clone(),
             )]
@@ -207,14 +213,16 @@ impl ast::Expression {
                     && !or_overwritten
                     && globals.stored_values[acum_val] == Value::Bool(true)
                 {
-                    let stored = store_const_value(Value::Bool(true), 1, globals, &c);
+                    let stored =
+                        store_const_value(Value::Bool(true), 1, globals, &c, CodeArea::new());
                     new_acum.push((stored, c));
                     continue;
                 } else if self.operators[i] == And
                     && !and_overwritten
                     && globals.stored_values[acum_val] == Value::Bool(false)
                 {
-                    let stored = store_const_value(Value::Bool(false), 1, globals, &c);
+                    let stored =
+                        store_const_value(Value::Bool(false), 1, globals, &c, CodeArea::new());
                     new_acum.push((stored, c));
                     continue;
                 }
@@ -381,7 +389,14 @@ pub fn execute_macro(
 
                         new_variables.insert(
                             m.args[def_index].0.clone(),
-                            clone_value(arg_values[i], 1, globals, context.start_group, true),
+                            clone_value(
+                                arg_values[i],
+                                1,
+                                globals,
+                                context.start_group,
+                                true,
+                                info.position.clone(),
+                            ),
                         );
                         def_index += 1;
                     }
@@ -407,7 +422,14 @@ Should be used like this: value.macro(arguments)".to_string(), info
                         Some(default) => {
                             new_variables.insert(
                                 arg.0.clone(),
-                                clone_value(*default, 1, globals, context.start_group, true),
+                                clone_value(
+                                    *default,
+                                    1,
+                                    globals,
+                                    context.start_group,
+                                    true,
+                                    info.position.clone(),
+                                ),
                             );
                         }
 
@@ -448,7 +470,11 @@ Should be used like this: value.macro(arguments)".to_string(), info
         new_contexts.push(new_context);
     }
     let mut new_info = info;
-    new_info.position.file = m.def_file;
+
+    new_info.add_to_call_stack(CodeArea {
+        file: m.def_file,
+        pos: (0, 0),
+    });
     let mut compiled = compile_scope(&m.body, new_contexts, globals, new_info)?;
 
     // stop break chain
@@ -584,7 +610,13 @@ pub fn eval_dict(
             };
         }
         out.push((
-            store_value(Value::Dict(dict_out), 1, globals, &context),
+            store_value(
+                Value::Dict(dict_out),
+                1,
+                globals,
+                &context,
+                info.position.clone(),
+            ),
             expressions.1,
         ));
     }

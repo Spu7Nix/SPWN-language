@@ -53,119 +53,142 @@ pub enum RuntimeError {
         message: String,
         info: CompilerInfo,
     },
-}
-pub fn print_error(
-    position: CodeArea,
-    message: &str,
-    labels: &[(CodeArea, &str)],
-    note: Option<&str>,
-) {
-    use ariadne::{Config, FileCache, Label, Report, ReportKind};
 
-    let mut cache = FileCache::default();
-    cache.fetch(position.file.as_path()).unwrap();
+    MutabilityError {
+        val_def: CodeArea,
+        info: CompilerInfo,
+    },
+}
+pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
+    use ariadne::{Color, Config, FileCache, Label, Report, ReportKind};
+
+    let info = rep.info;
+    let message = rep.message;
+    let labels = rep.labels;
+    let note = rep.note;
+    let position = info.position;
 
     let mut report = Report::build(ReportKind::Error, position.file.clone(), position.pos.0)
         .with_message(message)
         .with_config(Config::default().with_multiline_arrows(false));
+    let mut i = 0;
+    for area in info.call_stack {
+        report = report.with_label(
+            Label::new(area.clone())
+                .with_order(i)
+                .with_message("Coming from this macro call"),
+        );
+        i += 1;
+    }
 
     for (area, label) in labels {
-        report = report.with_label(Label::new(area.clone()).with_message(*label));
+        report = report.with_label(Label::new(area.clone()).with_message(label).with_order(i));
+        i += 1;
     }
 
     if let Some(note) = note {
         report = report.with_note(note);
     }
-    report.finish().print(cache).unwrap();
+    report.finish()
 }
 
-impl std::fmt::Display for RuntimeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let info = match self {
-            RuntimeError::UndefinedErr {
-                undefined: _,
-                desc: _,
-                info,
-            } => info,
-            RuntimeError::PackageSyntaxError { err: _, info } => info,
+pub fn create_error(
+    info: CompilerInfo,
+    message: &str,
+    labels: &[(CodeArea, &str)],
+    note: Option<&str>,
+) -> ErrorReport {
+    ErrorReport {
+        info,
+        message: message.to_string(),
+        labels: labels
+            .into_iter()
+            .map(|(a, s)| (a.clone(), s.to_string()))
+            .collect(),
+        note: match note {
+            Some(s) => Some(s.to_string()),
+            _ => None,
+        },
+    }
+}
 
-            RuntimeError::TypeError {
-                expected: _,
-                found: _,
-                info,
-            } => info,
+pub struct ErrorReport {
+    pub info: CompilerInfo,
+    pub message: String,
+    pub labels: Vec<(CodeArea, String)>,
+    pub note: Option<String>,
+}
 
-            RuntimeError::RuntimeError { message: _, info } => info,
-
-            RuntimeError::BuiltinError { message: _, info } => info,
-        };
+impl From<RuntimeError> for ErrorReport {
+    fn from(err: RuntimeError) -> ErrorReport {
         let mut colors = ColorGenerator::new();
         let a = colors.next();
         let b = colors.next();
 
-        match self {
+        match err {
             RuntimeError::UndefinedErr {
                 undefined,
                 desc,
-                info: _,
-            } => {
-                print_error(
+                info,
+            } => create_error(
+                info.clone(),
+                &format!("Use of undefined {}", desc),
+                &[(info.position, &format!("'{}' is udefined", undefined.fg(b)))],
+                None,
+            ),
+            RuntimeError::PackageSyntaxError { err, info } => {
+                let syntax_error = ErrorReport::from(err);
+                let mut labels = vec![(
                     info.position.clone(),
-                    &format!("Use of undefined {}", desc),
-                    &[(
-                        info.position.clone(),
-                        &format!("'{}' is udefined", undefined.fg(b)),
-                    )],
-                    None,
+                    "Error when parsing this library/module",
+                )];
+                labels.extend(
+                    syntax_error
+                        .labels
+                        .iter()
+                        .map(|(a, b)| (a.clone(), b.as_str())),
                 );
-            }
-            RuntimeError::PackageSyntaxError { err, info: _ } => {
-                println!("{}", err);
-                print_error(
-                    info.position.clone(),
-                    "Syntax error in library/module",
-                    &[],
-                    None,
-                );
+                create_error(info, &syntax_error.message, &labels, None)
             }
 
             RuntimeError::TypeError {
                 expected,
                 found,
-                info: _,
-            } => {
-                print_error(
-                    info.position.clone(),
-                    "Type mismatch",
-                    &[(
-                        info.position.clone(),
-                        &format!("Expected {}, found {}", expected.fg(a), found.fg(b)),
-                    )],
-                    None,
-                );
-            }
+                info,
+            } => create_error(
+                info.clone(),
+                "Type mismatch",
+                &[(
+                    info.position,
+                    &format!("Expected {}, found {}", expected.fg(a), found.fg(b)),
+                )],
+                None,
+            ),
 
-            RuntimeError::RuntimeError { message, info: _ } => print_error(
-                info.position.clone(),
-                message,
+            RuntimeError::RuntimeError { message, info } => create_error(
+                info.clone(),
+                &message,
                 &[(info.position.clone(), "Error here")],
                 None,
             ),
 
-            RuntimeError::BuiltinError { message, info: _ } => print_error(
-                info.position.clone(),
+            RuntimeError::BuiltinError { message, info } => create_error(
+                info.clone(),
                 "Error when using built-in function",
-                &[(info.position.clone(), message)],
+                &[(info.position.clone(), &message)],
                 None,
             ),
-        };
-        write!(f, "")
-    }
-}
 
-impl std::error::Error for RuntimeError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
+            RuntimeError::MutabilityError { val_def, info } => create_error(
+                info.clone(),
+                "Attempted to change immutable variable",
+                &[
+                    (val_def.clone(), "Value was defined as immutable here"),
+                    (info.position.clone(), "This tries to change the value"),
+                ],
+                None,
+            ),
+        }
     }
 }
 
@@ -185,7 +208,7 @@ pub fn compile_spwn(
             message: "this script is empty".to_string(),
             info: CompilerInfo {
                 depth: 0,
-                path: vec!["main scope".to_string()],
+                call_stack: Vec::new(),
                 position: crate::compiler_info::CodeArea {
                     file: path,
                     pos: (0, 0),
@@ -203,7 +226,7 @@ pub fn compile_spwn(
 
     let start_info = CompilerInfo {
         depth: 0,
-        path: vec!["main scope".to_string()],
+        call_stack: Vec::new(),
         position: crate::compiler_info::CodeArea {
             file: path,
             pos: statements[0].pos,
@@ -454,6 +477,7 @@ pub fn compile_scope(
                                         globals,
                                         new_context.start_group,
                                         !mutable,
+                                        info.position.clone(),
                                     );
 
                                     globals.stored_values[storage] =
@@ -493,7 +517,14 @@ pub fn compile_scope(
                                     .map(|(k, v)| {
                                         (
                                             k.clone(),
-                                            clone_value(*v, 1, globals, context.start_group, false),
+                                            clone_value(
+                                                *v,
+                                                1,
+                                                globals,
+                                                context.start_group,
+                                                false,
+                                                info.position.clone(),
+                                            ),
                                         )
                                     })
                                     .collect::<HashMap<String, StoredValue>>(),
@@ -506,6 +537,7 @@ pub fn compile_scope(
                                     1,
                                     globals,
                                     &context,
+                                    info.position.clone(),
                                 );
 
                                 context.variables.insert(String::from(*name), p);
@@ -847,6 +879,7 @@ pub fn compile_scope(
                                         1,
                                         globals,
                                         c,
+                                        info.position.clone(),
                                     );
                                     let stored = store_const_value(
                                         // store the val key
@@ -854,6 +887,7 @@ pub fn compile_scope(
                                         1,
                                         globals,
                                         c,
+                                        info.position.clone(),
                                     );
                                     (*c).variables.insert(f.symbol.clone(), stored);
                                 }
@@ -911,6 +945,7 @@ pub fn compile_scope(
                                         1,
                                         globals,
                                         c,
+                                        info.position.clone(),
                                     );
                                     (*c).variables.insert(f.symbol.clone(), stored);
                                 }
@@ -963,8 +998,13 @@ pub fn compile_scope(
 
                             for num in range {
                                 //println!("{}", new_contexts.len());
-                                let element =
-                                    store_value(Value::Number(num as f64), 0, globals, &context);
+                                let element = store_value(
+                                    Value::Number(num as f64),
+                                    0,
+                                    globals,
+                                    &context,
+                                    info.position.clone(),
+                                );
                                 for c in &mut new_contexts {
                                     (*c).variables = context.variables.clone();
                                     (*c).variables.insert(f.symbol.clone(), element);
@@ -1050,7 +1090,13 @@ pub fn compile_scope(
                         let mut all_values: Returns = SmallVec::new();
                         for context in &contexts {
                             all_values.push((
-                                store_value(Value::Null, 1, globals, context),
+                                store_value(
+                                    Value::Null,
+                                    1,
+                                    globals,
+                                    context,
+                                    info.position.clone(),
+                                ),
                                 context.clone(),
                             ));
                         }
@@ -1165,24 +1211,12 @@ fn merge_impl(target: &mut Implementations, source: &Implementations) {
     }
 }
 
-pub fn import_module(
+pub fn get_import_path(
     path: &ImportType,
-    context: &Context,
     globals: &mut Globals,
     info: CompilerInfo,
-    forced: bool,
-) -> Result<Returns, RuntimeError> {
-    if !forced {
-        if let Some(ret) = globals.prev_imports.get(path) {
-            merge_impl(&mut globals.implementations, &ret.1);
-            return Ok(smallvec![(
-                store_value(ret.0.clone(), 1, globals, context),
-                context.clone()
-            )]);
-        }
-    }
-
-    let mut module_path = match path {
+) -> Result<PathBuf, RuntimeError> {
+    Ok(match path {
         ImportType::Script(p) => globals
             .path
             .clone()
@@ -1213,7 +1247,27 @@ pub fn import_module(
         // .unwrap()
         .join("libraries")
         .join(name),
-    };
+    })
+}
+
+pub fn import_module(
+    path: &ImportType,
+    context: &Context,
+    globals: &mut Globals,
+    info: CompilerInfo,
+    forced: bool,
+) -> Result<Returns, RuntimeError> {
+    if !forced {
+        if let Some(ret) = globals.prev_imports.get(path) {
+            merge_impl(&mut globals.implementations, &ret.1);
+            return Ok(smallvec![(
+                store_value(ret.0.clone(), 1, globals, context, info.position.clone()),
+                context.clone()
+            )]);
+        }
+    }
+
+    let mut module_path = get_import_path(path, globals, info.clone())?;
 
     if module_path.is_dir() {
         module_path = module_path.join("lib.spwn");
@@ -1286,7 +1340,7 @@ pub fn import_module(
     let stored_path = globals.path.clone();
     (*globals).path = module_path.clone();
 
-    let mut new_info = info;
+    let mut new_info = info.clone();
 
     new_info.position.file = module_path;
     new_info.position.pos = (0, 0);
@@ -1346,7 +1400,14 @@ pub fn import_module(
     };
 
     if out.len() == 1 && &out[0].1 == context {
-        let cloned = clone_and_get_value(out[0].0, 9999, globals, context.start_group, true);
+        let cloned = clone_and_get_value(
+            out[0].0,
+            9999,
+            globals,
+            context.start_group,
+            true,
+            info.position.clone(),
+        );
         let s_impl = globals.implementations.clone();
 
         globals.prev_imports.insert(path.clone(), (cloned, s_impl));

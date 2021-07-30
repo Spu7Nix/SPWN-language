@@ -255,7 +255,12 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
 fn document_val(val: &Value, globals: &mut Globals) -> String {
     let mut doc = String::new();
     let typ_index = val
-        .member(TYPE_MEMBER_NAME.to_string(), &Context::new(), globals)
+        .member(
+            TYPE_MEMBER_NAME.to_string(),
+            &Context::new(),
+            globals,
+            CompilerInfo::new(),
+        )
         .unwrap();
     let type_id = match globals.stored_values[typ_index] {
         Value::TypeIndicator(t) => t,

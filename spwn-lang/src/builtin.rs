@@ -13,7 +13,7 @@ use crate::value_storage::*;
 use std::io::stdout;
 use std::io::Write;
 //use text_io;
-use crate::compiler_info::CompilerInfo;
+use crate::compiler_info::{CodeArea, CompilerInfo};
 
 macro_rules! arg_length {
     ($info:expr , $count:expr, $args:expr , $message:expr) => {
@@ -151,6 +151,7 @@ impl Value {
         member: String,
         context: &Context,
         globals: &mut Globals,
+        info: CompilerInfo,
     ) -> Option<StoredValue> {
         let get_impl = |t: u16, m: String| match globals.implementations.get(&t) {
             Some(imp) => match imp.get(&m) {
@@ -168,6 +169,7 @@ impl Value {
                         1,
                         globals,
                         context,
+                        info.position,
                     ),
                 },
 
@@ -176,6 +178,7 @@ impl Value {
                     1,
                     globals,
                     context,
+                    info.position,
                 ),
             })
         } else {
@@ -197,6 +200,7 @@ impl Value {
                             1,
                             globals,
                             context,
+                            info.position,
                         ));
                     }
                 }
@@ -207,6 +211,7 @@ impl Value {
                             1,
                             globals,
                             context,
+                            info.position,
                         ));
                     }
                 }
@@ -217,6 +222,7 @@ impl Value {
                             1,
                             globals,
                             context,
+                            info.position,
                         ))
                     }
                     "end" => {
@@ -225,6 +231,7 @@ impl Value {
                             1,
                             globals,
                             context,
+                            info.position,
                         ))
                     }
                     "step_size" => {
@@ -233,6 +240,7 @@ impl Value {
                             1,
                             globals,
                             context,
+                            info.position,
                         ))
                     }
                     _ => (),
@@ -250,6 +258,7 @@ impl Value {
                         1,
                         globals,
                         context,
+                        info.position,
                     )),
                 },
                 Value::Dict(dict) => match dict.get(&member) {
@@ -263,6 +272,7 @@ impl Value {
                             1,
                             globals,
                             context,
+                            info.position,
                         ))
                     } else {
                         get_impl(my_type, member)
@@ -307,7 +317,7 @@ macro_rules! typed_argument_check {
                         $arg_index + 1,
                         a.to_str($globals)
                     ),
-                    $info,
+                    info: $info.with_area($globals.get_area($arguments[$arg_index])),
                 })
             }
         };
@@ -328,7 +338,7 @@ macro_rules! typed_argument_check {
                         $arg_index + 1,
                         a.to_str($globals)
                     ),
-                    $info,
+                    info: $info.with_area($globals.get_area($arguments[$arg_index])),
                 })
             }
         };
@@ -357,16 +367,16 @@ macro_rules! reassign_variable {
 macro_rules! builtin_arg_mut_check {
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) mut ($($arg_name:ident),*)$(: $arg_type:ident)?) => {
         if !$globals.can_mutate($arguments[$arg_index]) {
-            return Err(RuntimeError::BuiltinError {
-                message: String::from("This value is not mutable"),
-                $info,
+            return Err(RuntimeError::MutabilityError {
+                info: $info,
+                val_def: $globals.get_area($arguments[$arg_index]),
             });
         }
         let fn_context = $globals.get_val_fn_context($arguments[$arg_index], $info.clone())?;
         if fn_context != $context.start_group {
             return Err(RuntimeError::RuntimeError {
                 message: CANNOT_CHANGE_ERROR.to_string(),
-                $info,
+                info: $info.with_area($globals.get_area($arguments[$arg_index])),
             });
         }
     };
@@ -667,6 +677,7 @@ builtins! {
             globals,
             context.start_group,
             !globals.is_mutable(arguments[1]),
+            globals.get_area(arguments[1])
         );
 
         (arr).push(cloned);
@@ -681,7 +692,7 @@ builtins! {
 
         for split in s.split(&*substr) {
             let entry =
-                store_const_value(Value::Str(split.to_string()), 1, globals, context);
+                store_const_value(Value::Str(split.to_string()), 1, globals, context, CodeArea::new());
             output.push(entry);
         }
 
@@ -810,7 +821,7 @@ builtins! {
                     })
                 }
                 obj @ Value::Dict(_) => {
-                    let typ = obj.member(TYPE_MEMBER_NAME.to_string(), context, globals).unwrap();
+                    let typ = obj.member(TYPE_MEMBER_NAME.to_string(), context, globals, info.clone()).unwrap();
                     if globals.stored_values[typ] == Value::TypeIndicator(20) {
                         ObjParam::Epsilon
                     } else {
@@ -931,7 +942,7 @@ builtins! {
                         Value::Array(
                             rval.iter()
                                 .map(|b| {
-                                    store_value(Value::Number(*b as f64), 1, globals, context)
+                                    store_value(Value::Number(*b as f64), 1, globals, context, CodeArea::new())
                                 })
                                 .collect(),
                         )

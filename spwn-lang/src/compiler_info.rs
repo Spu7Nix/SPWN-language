@@ -1,13 +1,10 @@
 use crate::parser::FileRange;
 
-use std::{
-    ops::Range,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerInfo {
     pub depth: u8,
-    pub path: Vec<String>,
+    pub call_stack: Vec<CodeArea>,
     pub current_module: String, // empty string means script
     pub position: CodeArea,
     pub includes: Vec<PathBuf>,
@@ -17,15 +14,35 @@ impl CompilerInfo {
     pub fn new() -> Self {
         CompilerInfo {
             depth: 0,
-            path: vec!["main scope".to_string()],
+            call_stack: Vec::new(),
 
             current_module: String::new(),
-            position: CodeArea {
-                file: PathBuf::new(),
-                pos: (0, 0),
-            },
+            position: CodeArea::new(),
             includes: vec![],
         }
+    }
+
+    pub fn from_area(a: CodeArea) -> Self {
+        CompilerInfo {
+            depth: 0,
+            call_stack: Vec::new(),
+
+            current_module: String::new(),
+            position: a,
+            includes: vec![],
+        }
+    }
+
+    pub fn with_area(self, a: CodeArea) -> Self {
+        CompilerInfo {
+            position: a,
+            ..self
+        }
+    }
+
+    pub fn add_to_call_stack(&mut self, new: CodeArea) {
+        self.call_stack.push(self.position.clone());
+        self.position = new;
     }
 }
 
@@ -35,6 +52,14 @@ pub struct CodeArea {
     pub pos: FileRange,
 }
 
+impl CodeArea {
+    pub fn new() -> Self {
+        CodeArea {
+            file: PathBuf::new(),
+            pos: (0, 0),
+        }
+    }
+}
 use ariadne::Span;
 
 impl Span for CodeArea {

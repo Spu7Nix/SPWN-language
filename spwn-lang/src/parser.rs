@@ -4,6 +4,7 @@ use pest::Parser;
 use pest_derive::Parser;*/
 
 use crate::builtin::Builtin;
+use crate::compiler::ErrorReport;
 use crate::compiler_info::CodeArea;
 
 //use std::collections::HashMap;
@@ -19,7 +20,7 @@ use logos::Logos;
 use std::error::Error;
 use std::fmt;
 
-use crate::compiler::print_error;
+use crate::compiler::create_error;
 use crate::compiler_types::ImportType;
 
 pub type FileRange = (usize, usize);
@@ -78,87 +79,73 @@ pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Resul
     }
 }
 
-impl fmt::Display for SyntaxError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl From<SyntaxError> for ErrorReport {
+    fn from(err: SyntaxError) -> ErrorReport {
+        use crate::compiler_info::CompilerInfo;
         //write!(f, "SuperErrorSideKick is here!")
         let mut colors = ColorGenerator::new();
         let a = colors.next();
         let b = colors.next();
-        match self {
+        match err {
             SyntaxError::ExpectedErr {
                 expected,
                 found,
                 pos,
                 file,
-            } => {
-                print_error(
+            } => create_error(
+                CompilerInfo::from_area(CodeArea {
+                    pos,
+                    file: file.clone(),
+                }),
+                "Syntax error",
+                &[(
                     CodeArea {
-                        pos: *pos,
+                        pos,
                         file: file.clone(),
                     },
-                    "Syntax error",
-                    &[(
-                        CodeArea {
-                            pos: *pos,
-                            file: file.clone(),
-                        },
-                        &format!(
-                            "{} {}, {} {}",
-                            "Expected".fg(b),
-                            expected,
-                            "found".fg(a),
-                            found
-                        ),
-                    )],
-                    None,
-                );
-                write!(f, "")
-            }
+                    &format!(
+                        "{} {}, {} {}",
+                        "Expected".fg(b),
+                        expected,
+                        "found".fg(a),
+                        found
+                    ),
+                )],
+                None,
+            ),
 
-            SyntaxError::UnexpectedErr { found, pos, file } => {
-                print_error(
+            SyntaxError::UnexpectedErr { found, pos, file } => create_error(
+                CompilerInfo::from_area(CodeArea {
+                    pos,
+                    file: file.clone(),
+                }),
+                "Syntax error",
+                &[(
                     CodeArea {
-                        pos: *pos,
+                        pos,
                         file: file.clone(),
                     },
-                    "Syntax error",
-                    &[(
-                        CodeArea {
-                            pos: *pos,
-                            file: file.clone(),
-                        },
-                        &format!("Unexpected {}", found),
-                    )],
-                    None,
-                );
-                write!(f, "")
-            }
+                    &format!("Unexpected {}", found),
+                )],
+                None,
+            ),
 
-            SyntaxError::SyntaxError { message, pos, file } => {
-                print_error(
+            SyntaxError::SyntaxError { message, pos, file } => create_error(
+                CompilerInfo::from_area(CodeArea {
+                    pos,
+                    file: file.clone(),
+                }),
+                "Syntax error",
+                &[(
                     CodeArea {
-                        pos: *pos,
+                        pos,
                         file: file.clone(),
                     },
-                    "Syntax error",
-                    &[(
-                        CodeArea {
-                            pos: *pos,
-                            file: file.clone(),
-                        },
-                        message,
-                    )],
-                    None,
-                );
-                write!(f, "")
-            }
+                    &message,
+                )],
+                None,
+            ),
         }
-    }
-}
-
-impl Error for SyntaxError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
     }
 }
 
