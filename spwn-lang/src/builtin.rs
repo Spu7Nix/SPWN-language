@@ -1110,8 +1110,8 @@ builtins! {
     [MoreOrEqOp]        fn _more_or_equal_((a): Number, (b): Number)    { Value::Bool(a >= b) }
     [LessOrEqOp]        fn _less_or_equal_((a): Number, (b): Number)    { Value::Bool(a <= b) }
 
-    [EqOp]              fn _equal_((a): Number, (b): Number)            { Value::Bool((a - b).abs() < f64::EPSILON) }
-    [NotEqOp]           fn _not_equal_((a): Number, (b): Number)        { Value::Bool((a - b).abs() > f64::EPSILON) }
+    [EqOp]              fn _equal_((a), (b))                            { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
+    [NotEqOp]           fn _not_equal_((a), (b))                        { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
 
     [DividedByOp]       fn _divided_by_((a): Number, (b): Number)       { Value::Number(a / b) }
     [IntdividedByOp]    fn _intdivided_by_((a): Number, (b): Number)    { Value::Number((a / b).floor()) }

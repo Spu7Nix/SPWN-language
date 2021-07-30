@@ -81,7 +81,7 @@ impl ValueBody {
         Variable {
             value: ValueLiteral { body: self.clone() },
             operator: None,
-            pos: ((0, 0), (0, 0)),
+            pos: (0, 0),
             //comment: (None, None),
             path: Vec::new(),
             tag: Attribute::new(),
@@ -238,7 +238,7 @@ impl Argument {
                     value: ValueLiteral::new(ValueBody::Resolved(val)),
                     path: Vec::new(),
                     operator: None,
-                    pos: ((0, 0), (0, 0)),
+                    pos: (0, 0),
                     //comment: (None, None),
                     tag: Attribute::new(),
                 }],
@@ -346,7 +346,7 @@ impl Expression {
         Variable {
             operator: None,
             value: ValueLiteral::new(ValueBody::Expression(self.clone())),
-            pos: ((0, 0), (0, 0)),
+            pos: (0, 0),
             path: Vec::new(),
             //comment: (None, None),
             tag: Attribute::new(),

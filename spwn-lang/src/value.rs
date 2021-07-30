@@ -658,7 +658,7 @@ pub fn macro_to_value(
                     args,
                     body: m.body.statements.clone(),
                     def_context: defaults.1.clone(),
-                    def_file: info.current_file.clone(),
+                    def_file: info.position.file.clone(),
                     tag: m.properties.clone(),
                 })),
                 1,
@@ -680,7 +680,7 @@ impl ast::Variable {
         //mut define_new: bool,
         constant: bool,
     ) -> Result<(Returns, Returns), RuntimeError> {
-        info.pos = self.pos;
+        info.position.pos = self.pos;
 
         let mut start_val = Returns::new();
         let mut inner_returns = Returns::new();

@@ -1,6 +1,7 @@
 //! Tools for compiling SPWN into GD object strings
 use crate::ast;
 use crate::builtin::*;
+use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
 use crate::context::*;
 use crate::globals::Globals;
@@ -9,6 +10,7 @@ use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
 use std::collections::{HashMap, HashSet};
+use std::fmt::write;
 
 use crate::parser::{ParseNotes, SyntaxError};
 use std::fs;
@@ -18,6 +20,9 @@ use crate::compiler_types::*;
 use crate::print_with_color;
 pub const CONTEXT_MAX: usize = 2;
 
+use ariadne::Cache;
+use ariadne::ColorGenerator;
+use ariadne::Fmt;
 use termcolor::Color as TColor;
 
 #[derive(Debug)]
@@ -49,64 +54,29 @@ pub enum RuntimeError {
         info: CompilerInfo,
     },
 }
-pub fn print_error_intro(pos: crate::parser::FileRange, file: &Path) {
-    use std::io::Write;
-    use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+pub fn print_error(
+    position: CodeArea,
+    message: &str,
+    labels: &[(CodeArea, &str)],
+    note: Option<&str>,
+) {
+    use ariadne::{Config, FileCache, Label, Report, ReportKind};
 
-    let mut stdout = StandardStream::stderr(ColorChoice::Always);
+    let mut cache = FileCache::default();
+    cache.fetch(position.file.as_path()).unwrap();
 
-    let mut write_with_color = |text: &str, color: Color| {
-        stdout
-            .set_color(ColorSpec::new().set_fg(Some(color)))
-            .unwrap();
-        write!(&mut stdout, "{}", text).unwrap();
-    };
+    let mut report = Report::build(ReportKind::Error, position.file.clone(), position.pos.0)
+        .with_message(message)
+        .with_config(Config::default().with_multiline_arrows(false));
 
-    let path_str = format!(
-        "{}:{}:{}",
-        file.to_string_lossy().to_string(),
-        pos.0 .0,
-        pos.0 .1 + 1
-    );
+    for (area, label) in labels {
+        report = report.with_label(Label::new(area.clone()).with_message(*label));
+    }
 
-    write_with_color("Error", TColor::Red);
-    write_with_color(&format!(" at {}\n", path_str), TColor::White);
-
-    if pos.0 .0 == pos.1 .0 {
-        use std::io::BufRead;
-        if let Ok(file) = fs::File::open(&file) {
-            if let Some(Ok(line)) = std::io::BufReader::new(file).lines().nth(pos.0 .0 - 1) {
-                let line_num = pos.1 .0.to_string();
-
-                let mut spacing = String::new();
-
-                for _ in 0..line_num.len() {
-                    spacing += " ";
-                }
-
-                let squiggly_line = "^";
-
-                write_with_color(
-                    (spacing.clone() + " |\n" + &line_num + " |").as_str(),
-                    TColor::Cyan,
-                );
-                write_with_color((line.replace("\t", " ") + "\n").as_str(), TColor::White);
-                write_with_color((spacing + " |").as_str(), TColor::Cyan);
-                let mut out = String::new();
-                for _ in 0..(pos.0 .1) {
-                    out += " ";
-                }
-                for _ in 0..(pos.1 .1 - pos.0 .1) {
-                    out += squiggly_line;
-                }
-                out += "\n";
-                write_with_color(&out, TColor::Red);
-                stdout
-                    .set_color(ColorSpec::new().set_fg(Some(TColor::White)))
-                    .unwrap();
-            }
-        }
-    };
+    if let Some(note) = note {
+        report = report.with_note(note);
+    }
+    report.finish().print(cache).unwrap();
 }
 
 impl std::fmt::Display for RuntimeError {
@@ -129,31 +99,67 @@ impl std::fmt::Display for RuntimeError {
 
             RuntimeError::BuiltinError { message: _, info } => info,
         };
-
-        print_error_intro(info.pos, &info.current_file);
+        let mut colors = ColorGenerator::new();
+        let a = colors.next();
+        let b = colors.next();
 
         match self {
             RuntimeError::UndefinedErr {
                 undefined,
                 desc,
                 info: _,
-            } => write!(f, "{} '{}' is not defined", desc, undefined,),
+            } => {
+                print_error(
+                    info.position.clone(),
+                    &format!("Use of undefined {}", desc),
+                    &[(
+                        info.position.clone(),
+                        &format!("'{}' is udefined", undefined.fg(b)),
+                    )],
+                    None,
+                );
+            }
             RuntimeError::PackageSyntaxError { err, info: _ } => {
-                write!(f, "Error when parsing library: {}", err)
+                println!("{}", err);
+                print_error(
+                    info.position.clone(),
+                    "Syntax error in library/module",
+                    &[],
+                    None,
+                );
             }
 
             RuntimeError::TypeError {
                 expected,
                 found,
                 info: _,
-            } => write!(f, "Type mismatch: expected {}, found {}", expected, found,),
-
-            RuntimeError::RuntimeError { message, info: _ } => write!(f, "{}", message,),
-
-            RuntimeError::BuiltinError { message, info: _ } => {
-                write!(f, "Error when calling built-in-function: {}", message,)
+            } => {
+                print_error(
+                    info.position.clone(),
+                    "Type missmatch",
+                    &[(
+                        info.position.clone(),
+                        &format!("Expected {}, found {}", expected.fg(a), found.fg(b)),
+                    )],
+                    None,
+                );
             }
-        }
+
+            RuntimeError::RuntimeError { message, info: _ } => print_error(
+                info.position.clone(),
+                message,
+                &[(info.position.clone(), "Error here")],
+                None,
+            ),
+
+            RuntimeError::BuiltinError { message, info: _ } => print_error(
+                info.position.clone(),
+                "Error when using built-in function",
+                &[(info.position.clone(), message)],
+                None,
+            ),
+        };
+        write!(f, "")
     }
 }
 
@@ -180,8 +186,11 @@ pub fn compile_spwn(
             info: CompilerInfo {
                 depth: 0,
                 path: vec!["main scope".to_string()],
-                pos: ((0, 0), (0, 0)),
-                current_file: path,
+                position: crate::compiler_info::CodeArea {
+                    file: path,
+                    pos: (0, 0),
+                },
+
                 current_module: String::new(),
                 includes: vec![],
             },
@@ -195,8 +204,11 @@ pub fn compile_spwn(
     let start_info = CompilerInfo {
         depth: 0,
         path: vec!["main scope".to_string()],
-        pos: statements[0].pos,
-        current_file: path,
+        position: crate::compiler_info::CodeArea {
+            file: path,
+            pos: statements[0].pos,
+        },
+
         current_module: String::new(),
         includes: included_paths,
     };
@@ -328,7 +340,7 @@ pub fn compile_scope(
         //     info.path.join(">"),
         //     contexts.len()
         // );
-        info.pos = statement.pos;
+        info.position.pos = statement.pos;
         if contexts.is_empty() {
             return Err(RuntimeError::RuntimeError {
                 message: "No context! This is probably a bug, please contact sputnix".to_string(),
@@ -518,7 +530,7 @@ pub fn compile_scope(
                 //initialize type
                 let already = globals.type_ids.get(name);
                 if let Some(t) = already {
-                    if !(t.1 == info.current_file && t.2 == info.pos.0) {
+                    if !(t.1 == info.position.file && t.2 == info.position.pos) {
                         return Err(RuntimeError::RuntimeError {
                             message: format!("the type '{}' is already defined", name),
                             info,
@@ -528,7 +540,11 @@ pub fn compile_scope(
                     (*globals).type_id_count += 1;
                     (*globals).type_ids.insert(
                         name.clone(),
-                        (globals.type_id_count, info.current_file.clone(), info.pos.0),
+                        (
+                            globals.type_id_count,
+                            info.position.file.clone(),
+                            info.position.pos,
+                        ),
                     );
                 }
                 //Value::TypeIndicator(globals.type_id_count)
@@ -1272,8 +1288,8 @@ pub fn import_module(
 
     let mut new_info = info;
 
-    new_info.current_file = module_path;
-    new_info.pos = ((0, 0), (0, 0));
+    new_info.position.file = module_path;
+    new_info.position.pos = (0, 0);
 
     if let ImportType::Lib(l) = path {
         new_info.current_module = l.clone();

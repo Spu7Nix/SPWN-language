@@ -4,11 +4,14 @@ use pest::Parser;
 use pest_derive::Parser;*/
 
 use crate::builtin::Builtin;
+use crate::compiler_info::CodeArea;
 
 //use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use ariadne::ColorGenerator;
+use ariadne::Fmt;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
@@ -16,10 +19,10 @@ use logos::Logos;
 use std::error::Error;
 use std::fmt;
 
-use crate::compiler::print_error_intro;
+use crate::compiler::print_error;
 use crate::compiler_types::ImportType;
 
-pub type FileRange = ((usize, usize), (usize, usize));
+pub type FileRange = (usize, usize);
 
 macro_rules! expected {
     ($expected:expr, $tokens:expr, $notes:expr, $a:expr) => {
@@ -78,6 +81,9 @@ pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Resul
 impl fmt::Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         //write!(f, "SuperErrorSideKick is here!")
+        let mut colors = ColorGenerator::new();
+        let a = colors.next();
+        let b = colors.next();
         match self {
             SyntaxError::ExpectedErr {
                 expected,
@@ -85,18 +91,66 @@ impl fmt::Display for SyntaxError {
                 pos,
                 file,
             } => {
-                print_error_intro(*pos, file);
-                write!(f, "SyntaxError: Expected {}, found {}", expected, found)
+                print_error(
+                    CodeArea {
+                        pos: *pos,
+                        file: file.clone(),
+                    },
+                    "Syntax error",
+                    &[(
+                        CodeArea {
+                            pos: *pos,
+                            file: file.clone(),
+                        },
+                        &format!(
+                            "{} {}, {} {}",
+                            "Expected".fg(b),
+                            expected,
+                            "found".fg(a),
+                            found
+                        ),
+                    )],
+                    None,
+                );
+                write!(f, "")
             }
 
             SyntaxError::UnexpectedErr { found, pos, file } => {
-                print_error_intro(*pos, file);
-                write!(f, "SyntaxError: Unexpected {}", found)
+                print_error(
+                    CodeArea {
+                        pos: *pos,
+                        file: file.clone(),
+                    },
+                    "Syntax error",
+                    &[(
+                        CodeArea {
+                            pos: *pos,
+                            file: file.clone(),
+                        },
+                        &format!("Unexpected {}", found),
+                    )],
+                    None,
+                );
+                write!(f, "")
             }
 
             SyntaxError::SyntaxError { message, pos, file } => {
-                print_error_intro(*pos, file);
-                write!(f, "SyntaxError: {}", message)
+                print_error(
+                    CodeArea {
+                        pos: *pos,
+                        file: file.clone(),
+                    },
+                    "Syntax error",
+                    &[(
+                        CodeArea {
+                            pos: *pos,
+                            file: file.clone(),
+                        },
+                        message,
+                    )],
+                    None,
+                );
+                write!(f, "")
             }
         }
     }
@@ -506,42 +560,13 @@ impl<'a> Tokens<'a> {
         self.stack[self.stack.len() - self.index - 1].1.clone()
     }
 
-    fn position(&self) -> ((usize, usize), (usize, usize)) {
+    fn position(&self) -> (usize, usize) {
         if self.stack.len() - self.index == 0 {
-            return ((1, 0), (1, 0));
+            return (0, 0);
         }
         let file_pos1 = self.stack[self.stack.len() - self.index - 1].2.start;
         let file_pos2 = self.stack[self.stack.len() - self.index - 1].2.end;
-        /*println!(
-            "file pos: {}, line breaks: {:?}",
-            file_pos, self.line_breaks
-        );*/
-        let mut found_pos_1 = false;
-        let mut found_pos_2 = false;
-        let mut out = ((1, file_pos1), (1, file_pos2));
-
-        for (i, lb) in self.line_breaks.iter().enumerate() {
-            let line_break = *lb as usize;
-            if !found_pos_1 && line_break >= file_pos1 {
-                if i == 0 {
-                    out.0 = (1, file_pos1);
-                } else {
-                    out.0 = (i + 1, file_pos1 - self.line_breaks[i - 1] as usize - 1);
-                }
-                found_pos_1 = true;
-            }
-
-            if !found_pos_2 && line_break >= file_pos2 {
-                if i == 0 {
-                    out.1 = (1, file_pos2);
-                } else {
-                    out.1 = (i + 1, file_pos2 - self.line_breaks[i - 1] as usize - 1);
-                }
-                found_pos_2 = true;
-            }
-        }
-
-        out
+        (file_pos1, file_pos2)
     }
 
     /*fn abs_position(&self) -> usize {

@@ -1,5 +1,5 @@
-let var = 10
+let a = 10
 
-var ^= 3
+wait(1)
 
-$.print(var)
+a += 1

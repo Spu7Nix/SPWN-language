@@ -191,7 +191,7 @@ impl ast::Expression {
         for (i, var) in vals.enumerate() {
             let mut new_acum: Returns = SmallVec::new();
             let end_pos = var.pos.1;
-            info.pos = (start_pos, end_pos);
+            info.position.pos = (start_pos, end_pos);
             //every value in acum will be operated with the value of var in the corresponding context
             for (acum_val, c) in acum {
                 use ast::Operator::*;
@@ -448,7 +448,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
         new_contexts.push(new_context);
     }
     let mut new_info = info;
-    new_info.current_file = m.def_file;
+    new_info.position.file = m.def_file;
     let mut compiled = compile_scope(&m.body, new_contexts, globals, new_info)?;
 
     // stop break chain
