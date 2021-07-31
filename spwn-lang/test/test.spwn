@@ -1,6 +1,5 @@
-c = counter()
+let a = [1, 2, 3]
 
-let a = 10
+a += [1, 2, 3]
 
-c += counter(1)
-a++
+$.print(a)

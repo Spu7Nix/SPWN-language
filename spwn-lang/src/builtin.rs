@@ -1273,7 +1273,24 @@ builtins! {
     [AsOp]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,&context)? }
 
     [SubtractOp]        fn _subtract_(mut (a): Number, (b): Number)         { a -= b; Value::Null }
-    [AddOp]             fn _add_(mut (a): Number, (b): Number)              { a += b; Value::Null }
+    [AddOp]
+    fn _add_(mut (a), (b)) {
+        match (&mut a, b) {
+            (Value::Number(a), Value::Number(b)) => *a += b,
+            (Value::Str(a), Value::Str(b)) => *a += &b,
+            (Value::Array(a), Value::Array(b)) => {
+                for el in b.iter() {
+                    a.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position.clone()));
+                }
+            },
+            _ => return Err(RuntimeError::TypeError {
+                expected: "@number and @number, @string and @string or @array and @array".to_string(),
+                found: format!("@{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
+                info,
+            })
+        }
+        Value::Null
+    }
     [MultiplyOp]        fn _multiply_(mut (a): Number, (b): Number)         { a *= b; Value::Null }
     [DivideOp]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
     [IntdivideOp]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
