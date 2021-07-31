@@ -5,6 +5,7 @@ use pest_derive::Parser;*/
 
 use crate::builtin::Builtin;
 use crate::compiler::ErrorReport;
+use crate::compiler::RainbowColorGenerator;
 use crate::compiler_info::CodeArea;
 
 //use std::collections::HashMap;
@@ -83,7 +84,7 @@ impl From<SyntaxError> for ErrorReport {
     fn from(err: SyntaxError) -> ErrorReport {
         use crate::compiler_info::CompilerInfo;
         //write!(f, "SuperErrorSideKick is here!")
-        let mut colors = ColorGenerator::new();
+        let mut colors = RainbowColorGenerator::new(60.0, 1.0, 0.8);
         let a = colors.next();
         let b = colors.next();
         match err {
@@ -638,6 +639,7 @@ fn parse_cmp_stmt(
     notes: &mut ParseNotes,
 ) -> Result<Vec<ast::Statement>, SyntaxError> {
     let mut statements = Vec::<ast::Statement>::new();
+    let opening_bracket = tokens.position();
     loop {
         match tokens.next(false) {
             Some(Token::ClosingCurlyBracket) => break,
@@ -655,8 +657,8 @@ fn parse_cmp_stmt(
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing a closure".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching '}' for this '{'".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }
@@ -1501,7 +1503,7 @@ fn parse_args(
     notes: &mut ParseNotes,
 ) -> Result<Vec<ast::Argument>, SyntaxError> {
     let mut args = Vec::<ast::Argument>::new();
-
+    let opening_bracket = tokens.position();
     loop {
         if tokens.next(false) == Some(Token::ClosingBracket) {
             break;
@@ -1545,8 +1547,8 @@ fn parse_args(
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing macro arguments".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching ')' for this '('".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }
@@ -1569,8 +1571,8 @@ fn parse_args(
 
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing macro arguments".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching ')' for this '('".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }
@@ -1586,7 +1588,7 @@ fn parse_arg_def(
     notes: &mut ParseNotes,
 ) -> Result<Vec<ast::ArgDef>, SyntaxError> {
     let mut args = Vec::<ast::ArgDef>::new();
-
+    let opening_bracket = tokens.position();
     loop {
         let properties = check_for_tag(tokens, notes)?;
         if tokens.next(false) == Some(Token::ClosingBracket) {
@@ -1640,8 +1642,8 @@ fn parse_arg_def(
                     }
                     None => {
                         return Err(SyntaxError::SyntaxError {
-                            message: "File ended while parsing macro signature".to_string(),
-                            pos: tokens.position(),
+                            message: "Couldn't find matching ')' for this '('".to_string(),
+                            pos: opening_bracket,
                             file: notes.file.clone(),
                         })
                     }
@@ -1661,8 +1663,8 @@ fn parse_arg_def(
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing macro signature".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching ')' for this '('".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }
@@ -1683,8 +1685,8 @@ fn parse_arg_def(
 
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing macro signature".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching ')' for this '('".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }

@@ -161,6 +161,64 @@ pub fn handle_operator(
     )
 }
 
+pub fn handle_unary_operator(
+    value: StoredValue,
+    macro_name: Builtin,
+    context: &Context,
+    globals: &mut Globals,
+    info: &CompilerInfo,
+) -> Result<Returns, RuntimeError> {
+    Ok(
+        if let Some(val) = globals.stored_values[value].clone().member(
+            String::from(macro_name),
+            &context,
+            globals,
+            info.clone(),
+        ) {
+            if let Value::Macro(m) = globals.stored_values[val].clone() {
+                if m.args.is_empty() {
+                    return Err(RuntimeError::RuntimeError {
+                        message: String::from("Expected at least one argument in operator macro"),
+                        info: info.clone(),
+                    });
+                }
+
+                let (values, _) =
+                    execute_macro((*m, Vec::new()), context, globals, value, info.clone())?;
+                values
+            } else {
+                smallvec![(
+                    store_value(
+                        built_in_function(
+                            macro_name,
+                            vec![value],
+                            info.clone(),
+                            globals,
+                            &context
+                        )?,
+                        1,
+                        globals,
+                        &context,
+                        info.position.clone()
+                    ),
+                    context.clone(),
+                )]
+            }
+        } else {
+            smallvec![(
+                store_value(
+                    built_in_function(macro_name, vec![value], info.clone(), globals, &context)?,
+                    1,
+                    globals,
+                    &context,
+                    info.position.clone()
+                ),
+                context.clone(),
+            )]
+        },
+    )
+}
+
 pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError> {
     let rounded = num.round();
     if (num - rounded).abs() > 0.000000001 {

@@ -7,6 +7,7 @@ use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, val
 //use std::boxed::Box;
 
 use smallvec::smallvec;
+use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -279,7 +280,7 @@ impl Value {
                 }
                 out + ") { /* code omitted */ }"
             }
-            Value::Str(s) => s.clone(),
+            Value::Str(s) => format!("'{}'", s),
             Value::Array(a) => {
                 if a.is_empty() {
                     "[]".to_string()
@@ -1550,65 +1551,39 @@ impl ast::Variable {
                 }
 
                 ast::Path::Increment => {
-                    for (prev_v, prev_c, _) in &mut with_parent {
-                        let is_mutable = globals.is_mutable(*prev_v);
-                        if !is_mutable {
-                            return Err(RuntimeError::MutabilityError {
-                                val_def: globals.get_area(*prev_v),
-                                info,
-                            });
-                        }
-                        match &mut globals.stored_values[*prev_v] {
-                            Value::Number(n) => {
-                                *n += 1.0;
-                                *prev_v = store_val_m(
-                                    Value::Number(*n - 1.0),
-                                    1,
-                                    globals,
-                                    prev_c,
-                                    is_mutable,
-                                    info.position.clone(),
-                                );
-                            }
-                            _ => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: "Cannot increment this type".to_string(),
-                                    info,
-                                })
-                            }
-                        }
+                    let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
+                    for (prev_v, prev_c, parent) in &mut with_parent {
+                        new_out.extend(
+                            handle_unary_operator(
+                                *prev_v,
+                                Builtin::IncrOp,
+                                prev_c,
+                                globals,
+                                &info,
+                            )?
+                            .into_iter()
+                            .map(|(a, b)| (a, b, *prev_v)),
+                        )
                     }
+                    with_parent = new_out
                 }
 
                 ast::Path::Decrement => {
-                    for (prev_v, prev_c, _) in &mut with_parent {
-                        let is_mutable = globals.stored_values.map[&prev_v].mutable;
-                        if !is_mutable {
-                            return Err(RuntimeError::MutabilityError {
-                                val_def: globals.get_area(*prev_v),
-                                info,
-                            });
-                        }
-                        match &mut globals.stored_values[*prev_v] {
-                            Value::Number(n) => {
-                                *n -= 1.0;
-                                *prev_v = store_val_m(
-                                    Value::Number(*n + 1.0),
-                                    1,
-                                    globals,
-                                    prev_c,
-                                    is_mutable,
-                                    info.position.clone(),
-                                );
-                            }
-                            _ => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: "Cannot decrement this type".to_string(),
-                                    info,
-                                })
-                            }
-                        }
+                    let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
+                    for (prev_v, prev_c, parent) in &mut with_parent {
+                        new_out.extend(
+                            handle_unary_operator(
+                                *prev_v,
+                                Builtin::DecrOp,
+                                prev_c,
+                                globals,
+                                &info,
+                            )?
+                            .into_iter()
+                            .map(|(a, b)| (a, b, *prev_v)),
+                        )
                     }
+                    with_parent = new_out
                 }
 
                 ast::Path::Constructor(defs) => {
@@ -1762,94 +1737,53 @@ impl ast::Variable {
 
         use ast::UnaryOperator;
         if let Some(o) = &self.operator {
+            let mut new_out = Returns::new();
             for final_value in &mut out {
                 match o {
-                    UnaryOperator::Minus => {
-                        if let Value::Number(n) = globals.stored_values[final_value.0] {
-                            *final_value = (
-                                store_value(
-                                    Value::Number(-n),
-                                    1,
-                                    globals,
-                                    &context,
-                                    info.position.clone(),
-                                ),
-                                final_value.1.clone(),
-                            );
-                        } else {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "Cannot make non-number type negative".to_string(),
-                                info,
-                            });
-                        }
-                    }
+                    UnaryOperator::Minus => new_out.extend(handle_unary_operator(
+                        final_value.0,
+                        Builtin::NegOp,
+                        &context,
+                        globals,
+                        &info,
+                    )?),
 
-                    UnaryOperator::Increment => {
-                        if let Value::Number(n) = &mut globals.stored_values[final_value.0] {
-                            *n += 1.0;
-                        } else {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "Cannot increment non-number type".to_string(),
-                                info,
-                            });
-                        }
-                    }
+                    UnaryOperator::Increment => new_out.extend(handle_unary_operator(
+                        final_value.0,
+                        Builtin::PreIncrOp,
+                        &context,
+                        globals,
+                        &info,
+                    )?),
 
-                    UnaryOperator::Decrement => {
-                        if let Value::Number(n) = &mut globals.stored_values[final_value.0] {
-                            *n -= 1.0;
-                        } else {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "Cannot decrement non-number type".to_string(),
-                                info,
-                            });
-                        }
-                    }
+                    UnaryOperator::Decrement => new_out.extend(handle_unary_operator(
+                        final_value.0,
+                        Builtin::PreDecrOp,
+                        &context,
+                        globals,
+                        &info,
+                    )?),
 
-                    UnaryOperator::Not => {
-                        if let Value::Bool(b) = globals.stored_values[final_value.0] {
-                            *final_value = (
-                                store_value(
-                                    Value::Bool(!b),
-                                    1,
-                                    globals,
-                                    &context,
-                                    info.position.clone(),
-                                ),
-                                final_value.1.clone(),
-                            );
-                        } else {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "Cannot negate non-boolean type".to_string(),
-                                info,
-                            });
-                        }
-                    }
+                    UnaryOperator::Not => new_out.extend(handle_unary_operator(
+                        final_value.0,
+                        Builtin::NotOp,
+                        &context,
+                        globals,
+                        &info,
+                    )?),
 
-                    UnaryOperator::Let => (),
+                    UnaryOperator::Let => new_out.push(final_value.clone()),
 
-                    UnaryOperator::Range => {
-                        if let Value::Number(n) = globals.stored_values[final_value.0] {
-                            let end = convert_to_int(n, &info)?;
-                            *final_value = (
-                                store_value(
-                                    Value::Range(0, end, 1),
-                                    1,
-                                    globals,
-                                    &context,
-                                    info.position.clone(),
-                                ),
-                                final_value.1.clone(),
-                            );
-                        } else {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "Expected number in range".to_string(),
-                                info,
-                            });
-                        }
-                    }
+                    UnaryOperator::Range => new_out.extend(handle_unary_operator(
+                        final_value.0,
+                        Builtin::UnaryRangeOp,
+                        &context,
+                        globals,
+                        &info,
+                    )?),
                 }
             }
+            out = new_out;
         }
 
         // if self
@@ -2122,10 +2056,17 @@ impl ast::Variable {
                                             .get_mut(&current_ptr)
                                             .unwrap();
                                         if !stored.mutable {
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: "Cannot edit members of a constant value"
-                                                    .to_string(),
+                                            return Err(RuntimeError::MutabilityError {
+                                                val_def: stored.area.clone(),
                                                 info: info.clone(),
+                                            });
+                                        }
+                                        let fn_context = context.start_group;
+                                        if stored.fn_context != fn_context {
+                                            return Err(RuntimeError::ContextChangeMutateError {
+                                                val_def: stored.area.clone(),
+                                                info: info.clone(),
+                                                context_changes: context.fn_context_change_stack.clone()
                                             });
                                         }
                                         if let Value::Dict(d) = &mut stored.val {

@@ -705,6 +705,22 @@ c += 10
         }
     },
 
+    _increment_: #[desc("Implementation of the increment (`n++`) operator. Does not return any value.") example("
+c = counter(10)
+c++
+// c is now 11
+    ")](self) {
+        self.add(1)
+    },
+
+    _decrement_: #[desc("Implementation of the decrement (`n--`) operator. Does not return any value.") example("
+c = counter(10)
+c--
+// c is now 9
+    ")](self) {
+        self.add(-1)
+    },
+
     _subtract_: #[desc("Implementation of the subtract (`-=`) operator") example("
 c = counter(20)
 c -= 5

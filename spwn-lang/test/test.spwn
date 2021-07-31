@@ -1,9 +1,6 @@
+c = counter()
+
 let a = 10
 
-m = (a) {
-    a += 1
-}
-
-
-
-m(a)
+c += counter(1)
+a++

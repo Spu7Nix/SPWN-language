@@ -69,8 +69,53 @@ pub enum RuntimeError {
         context_changes: Vec<CodeArea>,
     },
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct RainbowColorGenerator {
+    h: f64,
+    s: f64,
+    b: f64,
+}
+
+impl RainbowColorGenerator {
+    pub fn new(h: f64, s: f64, b: f64) -> Self {
+        Self { h, s, b }
+    }
+
+    pub fn next(&mut self) -> ariadne::Color {
+        self.h += 20.0;
+        self.h %= 360.0;
+
+        let hsl = *self;
+
+        let c = (1.0 - (hsl.b * 2.0 - 1.0).abs()) * hsl.s;
+        let h = hsl.h / 60.0;
+        let x = c * (1.0 - (h % 2.0 - 1.0).abs());
+        let m = hsl.b - c * 0.5;
+
+        let (red, green, blue) = if h >= 0.0 && h < 0.0 {
+            (c, x, 0.0)
+        } else if (1.0..2.0).contains(&h) {
+            (x, c, 0.0)
+        } else if (2.0..3.0).contains(&h) {
+            (0.0, c, x)
+        } else if (3.0..4.0).contains(&h) {
+            (0.0, x, c)
+        } else if (4.0..5.0).contains(&h) {
+            (x, 0.0, c)
+        } else {
+            (c, 0.0, x)
+        };
+
+        ariadne::Color::RGB(
+            ((red + m) * 255.0) as u8,
+            ((green + m) * 255.0) as u8,
+            ((blue + m) * 255.0) as u8,
+        )
+    }
+}
 pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
-    use ariadne::{ColorGenerator, Config, FileCache, Label, Report, ReportKind};
+    use ariadne::{Config, FileCache, Label, Report, ReportKind};
 
     let info = rep.info;
     let message = rep.message;
@@ -78,7 +123,7 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
     let note = rep.note;
     let position = info.position;
 
-    let mut colors = ColorGenerator::from_state([128, 191, 255], 0.9);
+    let mut colors = RainbowColorGenerator::new(0.0, 1.5, 0.8);
 
     let mut report = Report::build(ReportKind::Error, position.file.clone(), position.pos.0)
         .with_message(message)
@@ -97,18 +142,26 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
         );
         i += 1;
     }
-
-    for (area, label) in labels {
+    if i == 1 && labels.len() == 1 {
         let color = colors.next();
         report = report.with_label(
-            Label::new(area.clone())
-                .with_message(&format!("{}: {}", i.to_string().fg(color), label))
+            Label::new(labels[0].0.clone())
+                .with_message(labels[0].1.clone())
                 .with_order(i)
                 .with_color(color),
         );
-        i += 1;
+    } else {
+        for (area, label) in labels {
+            let color = colors.next();
+            report = report.with_label(
+                Label::new(area.clone())
+                    .with_message(&format!("{}: {}", i.to_string().fg(color), label))
+                    .with_order(i)
+                    .with_color(color),
+            );
+            i += 1;
+        }
     }
-
     if let Some(note) = note {
         report = report.with_note(note);
     }
@@ -144,7 +197,7 @@ pub struct ErrorReport {
 
 impl From<RuntimeError> for ErrorReport {
     fn from(err: RuntimeError) -> ErrorReport {
-        let mut colors = ColorGenerator::new();
+        let mut colors = RainbowColorGenerator::new(120.0, 1.5, 0.8);
         let a = colors.next();
         let b = colors.next();
 

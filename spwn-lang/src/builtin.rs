@@ -317,7 +317,7 @@ macro_rules! typed_argument_check {
                         $arg_index + 1,
                         a.to_str($globals)
                     ),
-                    info: $info.with_area($globals.get_area($arguments[$arg_index])),
+                    info: $info,
                 })
             }
         };
@@ -338,7 +338,7 @@ macro_rules! typed_argument_check {
                         $arg_index + 1,
                         a.to_str($globals)
                     ),
-                    info: $info.with_area($globals.get_area($arguments[$arg_index])),
+                    info: $info,
                 })
             }
         };
@@ -428,9 +428,8 @@ macro_rules! builtins {
                             $(
                                 if arg_index >= $arguments.len() {
                                     return Err(RuntimeError::BuiltinError {
-                                        message: format!(
-                                            "Too many arguments provided (expected {})",
-                                            $arguments.len()
+                                        message: String::from(
+                                            "Too few arguments provided",
                                         ),
                                         $info,
                                     })
@@ -449,9 +448,8 @@ macro_rules! builtins {
                             )+
                             if arg_index < $arguments.len() - 1 {
                                 return Err(RuntimeError::BuiltinError {
-                                    message: format!(
-                                        "Too few arguments provided (expected {})",
-                                        $arguments.len()
+                                    message: String::from(
+                                        "Too many arguments provided",
                                     ),
                                     $info,
                                 })
@@ -1115,7 +1113,18 @@ builtins! {
             }
         }
     }
+    // unary operators
+    [IncrOp]            fn _increment_(mut (a): Number)                 { a += 1.0; Value::Number(a - 1.0)}
+    [DecrOp]            fn _decrement_(mut (a): Number)                 { a -= 1.0; Value::Number(a + 1.0)}
 
+    [PreIncrOp]         fn _pre_increment_(mut (a): Number)             { a += 1.0; Value::Number(a)}
+    [PreDecrOp]         fn _pre_decrement_(mut (a): Number)             { a -= 1.0; Value::Number(a)}
+
+    [NegOp]             fn _negate_((a): Number)                        { Value::Number(-a)}
+    [NotOp]             fn _not_((a): Bool)                             { Value::Bool(!a)}
+    [UnaryRangeOp]      fn _unary_range_((a): Number)                   { Value::Range(0, convert_to_int(a, &info)?, 1)}
+
+    // operators
     [OrOp]              fn _or_((a): Bool, (b): Bool)                   { Value::Bool(a || b) }
     [AndOp]             fn _and_((a): Bool, (b): Bool)                  { Value::Bool(a && b) }
 
@@ -1133,7 +1142,25 @@ builtins! {
     [TimesOp]           fn _times_((a): Number, (b): Number)            { Value::Number(a * b) }
     [ModOp]             fn _mod_((a): Number, (b): Number)              { Value::Number(a % b) }
     [PowOp]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
-    [PlusOp]            fn _plus_((a): Number, (b): Number)             { Value::Number(a + b) }
+    [PlusOp] fn _plus_((a), (b)) {
+        match (a, b) {
+            (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
+            (Value::Str(a), Value::Str(b)) => Value::Str(a + &b),
+            (Value::Array(a), Value::Array(b)) => Value::Array({
+                let mut new_arr = Vec::new();
+                for el in a.iter().chain(b.iter()) {
+                    new_arr.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position.clone()));
+                }
+                new_arr
+
+            }),
+            _ => return Err(RuntimeError::TypeError {
+                expected: "@number and @number, @string and @string or @array and @array".to_string(),
+                found: format!("@{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
+                info,
+            })
+        }
+    }
     [MinusOp]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
 
     [AssignOp]           fn _assign_(mut (a), (b))                      { a = b; Value::Null }
