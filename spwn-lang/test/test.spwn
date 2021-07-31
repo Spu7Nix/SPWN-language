@@ -1,4 +1,7 @@
 
-import "bugtest.spwn"
+c = counter(10)
 
-$.print(@array::depth([4]))
+
+for i in ..10 {
+    c++
+}

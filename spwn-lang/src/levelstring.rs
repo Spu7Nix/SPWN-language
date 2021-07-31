@@ -906,24 +906,25 @@ pub fn encrypt_level_string(
                         .is_ok());
                     done = true;
                     k4_detected = false;
-                } else if k4_detected {
-                    k4_detected = false;
                 } else {
-                    assert!(writer.write_event(Event::Text(e)).is_ok())
-                }
+                    if k4_detected {
+                        k4_detected = false;
+                    }
+                    assert!(writer.write_event(Event::Text(e)).is_ok());
 
-                if k2_detected {
-                    if let Some(level_name) = &level_name {
-                        if level_name == &text {
+                    if k2_detected {
+                        if let Some(level_name) = &level_name {
+                            if level_name == &text {
+                                level_detected = true;
+                                println!("Writing to level: {}", text);
+                            }
+                        } else {
                             level_detected = true;
                             println!("Writing to level: {}", text);
                         }
-                    } else {
-                        level_detected = true;
-                        println!("Writing to level: {}", text);
-                    }
 
-                    k2_detected = false;
+                        k2_detected = false;
+                    }
                 }
 
                 if !done && text == "k4" {
