@@ -10,6 +10,7 @@ use crate::value::*;
 use crate::compiler_info::CompilerInfo;
 use crate::value_storage::*;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::compiler::RuntimeError;
@@ -66,6 +67,16 @@ impl Globals {
 
     pub fn can_mutate(&self, p: StoredValue) -> bool {
         self.is_mutable(p)
+    }
+
+    pub fn increment_implementations(&mut self) {
+        let mut incremented = HashSet::new();
+        for imp in self.implementations.values() {
+            for (val, _) in imp.values() {
+                self.stored_values
+                    .increment_single_lifetime(*val, 1, &mut incremented);
+            }
+        }
     }
 
     // pub fn get_fn_context(&self, p: StoredValue) -> Group {

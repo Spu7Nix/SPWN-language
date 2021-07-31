@@ -1,5 +1,4 @@
-let a = [1, 2, 3]
 
-a += [1, 2, 3]
+import "bugtest.spwn"
 
-$.print(a)
+$.print(@array::depth([4]))

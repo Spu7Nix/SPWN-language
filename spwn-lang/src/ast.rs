@@ -358,6 +358,12 @@ impl Expression {
             tag: Attribute::new(),
         }
     }
+
+    pub fn get_pos(&self) -> FileRange {
+        let start = self.values.first().unwrap().pos.0;
+        let end = self.values.last().unwrap().pos.1;
+        (start, end)
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]

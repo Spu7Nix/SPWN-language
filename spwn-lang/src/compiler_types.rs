@@ -654,23 +654,39 @@ pub fn eval_dict(
         for (expr_index, def) in dict.iter().enumerate() {
             match def {
                 ast::DictDef::Def(d) => {
-                    dict_out.insert(d.0.clone(), expressions.0[expr_index]);
+                    dict_out.insert(
+                        d.0.clone(),
+                        clone_value(
+                            expressions.0[expr_index],
+                            1,
+                            globals,
+                            expressions.1.start_group,
+                            !globals.is_mutable(expressions.0[expr_index]),
+                            info.position.clone(),
+                        ),
+                    );
                 }
                 ast::DictDef::Extract(_) => {
-                    dict_out.extend(
-                        match globals.stored_values[expressions.0[expr_index]].clone() {
-                            Value::Dict(d) => d.clone(),
-                            a => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: format!(
-                                        "Cannot extract from this value: {}",
-                                        a.to_str(globals)
-                                    ),
-                                    info,
-                                })
-                            }
-                        },
+                    let val = clone_and_get_value(
+                        expressions.0[expr_index],
+                        1,
+                        globals,
+                        expressions.1.start_group,
+                        !globals.is_mutable(expressions.0[expr_index]),
+                        info.position.clone(),
                     );
+                    dict_out.extend(match val.clone() {
+                        Value::Dict(d) => d.clone(),
+                        a => {
+                            return Err(RuntimeError::RuntimeError {
+                                message: format!(
+                                    "Cannot extract from this value: {}",
+                                    a.to_str(globals)
+                                ),
+                                info,
+                            })
+                        }
+                    });
                 }
             };
         }

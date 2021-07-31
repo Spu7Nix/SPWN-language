@@ -829,16 +829,32 @@ impl ast::Variable {
                 context.clone(),
             )),
             ast::ValueBody::Array(a) => {
-                let new_info = info.clone();
                 let (evaled, returns) =
-                    all_combinations(a.clone(), &context, globals, new_info, constant)?;
+                    all_combinations(a.clone(), &context, globals, info.clone(), constant)?;
                 inner_returns.extend(returns);
                 start_val = evaled
                     .iter()
                     .map(|x| {
                         (
                             store_value(
-                                Value::Array(x.0.clone()),
+                                Value::Array(
+                                    x.0.iter()
+                                        .enumerate()
+                                        .map(|(i, v)| {
+                                            clone_value(
+                                                *v,
+                                                1,
+                                                globals,
+                                                x.1.start_group,
+                                                true, // will be changed
+                                                CodeArea {
+                                                    pos: a[i].get_pos(),
+                                                    ..info.position.clone()
+                                                },
+                                            )
+                                        })
+                                        .collect(),
+                                ),
                                 1,
                                 globals,
                                 &context,
@@ -2101,6 +2117,11 @@ impl ast::Variable {
                     }
                 }
                 ast::Path::Associated(m) => {
+                    globals.stored_values.increment_single_lifetime(
+                        value,
+                        9999,
+                        &mut Default::default(),
+                    );
                     match &globals.stored_values[current_ptr] {
                         Value::TypeIndicator(t) => match (*globals).implementations.get_mut(t) {
                             Some(imp) => {

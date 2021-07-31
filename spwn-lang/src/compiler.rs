@@ -11,16 +11,13 @@ use crate::value_storage::*;
 use crate::STD_PATH;
 use std::collections::{HashMap, HashSet};
 
-
 use crate::parser::{ParseNotes, SyntaxError};
 use std::fs;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 use crate::compiler_types::*;
 use crate::print_with_color;
 pub const CONTEXT_MAX: usize = 2;
-
-
 
 use ariadne::Fmt;
 use termcolor::Color as TColor;
@@ -1304,13 +1301,15 @@ pub fn compile_scope(
     }
 
     //return values need longer lifetimes
+    let mut incremented = HashSet::new();
     for (val, _) in &returns {
         globals
             .stored_values
-            .increment_single_lifetime(*val, 1, &mut HashSet::new());
+            .increment_single_lifetime(*val, 1, &mut incremented);
     }
 
     globals.stored_values.decrement_lifetimes();
+    globals.increment_implementations();
     //collect garbage
     globals.stored_values.clean_up();
 
@@ -1382,7 +1381,7 @@ pub fn import_module(
         if let Some(ret) = globals.prev_imports.get(path) {
             merge_impl(&mut globals.implementations, &ret.1);
             return Ok(smallvec![(
-                store_value(ret.0.clone(), 1, globals, context, info.position.clone()),
+                store_value(ret.0.clone(), 1, globals, context, info.position),
                 context.clone()
             )]);
         }
@@ -1501,6 +1500,9 @@ pub fn import_module(
                 } else {
                     to_be_deleted.push((*k1, k2.clone()));
                 }
+                // globals
+                //     .stored_values
+                //     .increment_single_lifetime(*val, 1, &mut HashSet::new());
             }
         }
         for (k1, k2) in to_be_deleted {
@@ -1535,7 +1537,7 @@ pub fn import_module(
             globals,
             context.start_group,
             true,
-            info.position.clone(),
+            info.position,
         );
         let s_impl = globals.implementations.clone();
 

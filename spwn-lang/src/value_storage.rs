@@ -135,10 +135,10 @@ impl ValStorage {
     pub fn increment_single_lifetime(
         &mut self,
         index: usize,
-        amount: u16,
+        amount: i16,
         already_done: &mut HashSet<usize>,
     ) {
-        if already_done.get(&index) == None {
+        if already_done.get(&index).is_none() {
             (*already_done).insert(index);
         } else {
             return;
@@ -146,11 +146,11 @@ impl ValStorage {
         let val = &mut (*self
             .map
             .get_mut(&index)
-            .expect(&(index.to_string() + " index not found")))
+            .unwrap_or_else(|| panic!("index {} not found ({})", index, amount)))
         .lifetime;
 
-        if *val < 10000 - amount {
-            *val += amount;
+        if *val < (10000 - amount) as u16 {
+            *val = (*val as i16 + amount) as u16;
         }
 
         match self[index].clone() {
@@ -192,7 +192,7 @@ pub fn store_value(
 ) -> StoredValue {
     let index = globals.val_id;
     let mutable = !matches!(val, Value::Macro(_));
-
+    //println!("index: {}, value: {}", index, val.to_str(&globals));
     (*globals).stored_values.map.insert(
         index,
         StoredValData {
@@ -288,6 +288,7 @@ pub fn clone_value(
     //bing bang
     //profit
     let new_index = globals.val_id;
+    //println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
 
     (*globals).stored_values.map.insert(
         new_index,
@@ -311,6 +312,12 @@ pub fn store_const_value(
     area: CodeArea,
 ) -> StoredValue {
     let index = globals.val_id;
+    // println!(
+    //     "2index: {}, value: {}, area: {:?}",
+    //     index,
+    //     val.to_str(&globals),
+    //     area
+    // );
 
     (*globals).stored_values.map.insert(
         index,

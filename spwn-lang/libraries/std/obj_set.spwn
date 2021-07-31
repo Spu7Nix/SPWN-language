@@ -7,12 +7,9 @@ impl @obj_set {
 my_objects = @obj_set::new()
     ")]
     (
-        objects: @array = [],
+        objects: [@object] = [],
         #[desc("The center group to use for rotation")] group: @group = ?g
     ) {
-        if objects.any(elem => elem.type != @object) {
-            throw "Unsupported type while creating obj_set"
-        }
 
         return {
             type: @obj_set,
