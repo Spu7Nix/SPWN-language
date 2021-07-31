@@ -12,14 +12,14 @@ use crate::compiler_info::CodeArea;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use ariadne::ColorGenerator;
+
 use ariadne::Fmt;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
 
-use std::error::Error;
-use std::fmt;
+
+
 
 use crate::compiler::create_error;
 use crate::compiler_types::ImportType;

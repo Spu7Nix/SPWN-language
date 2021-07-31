@@ -7,7 +7,7 @@ use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, val
 //use std::boxed::Box;
 
 use smallvec::smallvec;
-use smallvec::SmallVec;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -1552,7 +1552,7 @@ impl ast::Variable {
 
                 ast::Path::Increment => {
                     let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
-                    for (prev_v, prev_c, parent) in &mut with_parent {
+                    for (prev_v, prev_c, _) in &mut with_parent {
                         new_out.extend(
                             handle_unary_operator(
                                 *prev_v,
@@ -1570,7 +1570,7 @@ impl ast::Variable {
 
                 ast::Path::Decrement => {
                     let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
-                    for (prev_v, prev_c, parent) in &mut with_parent {
+                    for (prev_v, prev_c, _) in &mut with_parent {
                         new_out.extend(
                             handle_unary_operator(
                                 *prev_v,

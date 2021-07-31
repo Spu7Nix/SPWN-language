@@ -820,7 +820,7 @@ builtins! {
                     })
                 }
                 obj @ Value::Dict(_) => {
-                    let typ = obj.member(TYPE_MEMBER_NAME.to_string(), context, globals, info.clone()).unwrap();
+                    let typ = obj.member(TYPE_MEMBER_NAME.to_string(), context, globals, info).unwrap();
                     if globals.stored_values[typ] == Value::TypeIndicator(20) {
                         ObjParam::Epsilon
                     } else {
@@ -1314,8 +1314,3 @@ builtins! {
     }
 
 }
-
-const CANNOT_CHANGE_ERROR: &str = "
-Cannot change a variable that was defined in another trigger function context
-(consider using a counter)
-";

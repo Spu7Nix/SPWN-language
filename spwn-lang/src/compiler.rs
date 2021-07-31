@@ -10,18 +10,18 @@ use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
 use std::collections::{HashMap, HashSet};
-use std::fmt::write;
+
 
 use crate::parser::{ParseNotes, SyntaxError};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 
 use crate::compiler_types::*;
 use crate::print_with_color;
 pub const CONTEXT_MAX: usize = 2;
 
-use ariadne::Cache;
-use ariadne::ColorGenerator;
+
+
 use ariadne::Fmt;
 use termcolor::Color as TColor;
 
@@ -115,7 +115,7 @@ impl RainbowColorGenerator {
     }
 }
 pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
-    use ariadne::{Config, FileCache, Label, Report, ReportKind};
+    use ariadne::{Config, Label, Report, ReportKind};
 
     let info = rep.info;
     let message = rep.message;
