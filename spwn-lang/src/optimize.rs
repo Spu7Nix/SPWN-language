@@ -11,7 +11,7 @@ pub type Swaps = HashMap<Group, Group>;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum TriggerRole {
-    // Spawn triggers have their own catagory
+    // Spawn triggers have their own category
     // because they can be combined by adding their delays
     Spawn,
 
@@ -135,7 +135,7 @@ pub fn optimize(mut obj_in: Vec<FunctionId>, mut closed_group: u16) -> Vec<Funct
     clean_network(&mut network, &objects, true);
 
     // fix read write order
-    // not an optimization, more like a consistancy fix
+    // not an optimization, more like a consistency fix
     // also, like nothing works without this, so i should probably move
     // this somewhere else if i want to add an option to not have optimization
     network = fix_read_write_order(&mut objects, &network, &mut closed_group);
@@ -361,12 +361,12 @@ fn get_targets<'a>(
                 .enumerate()
                 .collect();
         } else {
-            //dangeling
+            //dangling
 
             return (Some(Vec::new()), swaps);
         }
     } else {
-        //dangeling
+        //dangling
 
         return (Some(Vec::new()), swaps);
     }

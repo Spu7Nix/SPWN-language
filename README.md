@@ -47,7 +47,7 @@ SPWN code can be programmed in any code editor, but the ones that have had SPWN 
 ###### VSCode
 Navigate to [VSCode SPWN language support](https://marketplace.visualstudio.com/items?itemName=Spu7Nix.spwn-language-support) and hit install. In VSCode, hit enable and then create a new file with the extension .spwn
 - Note: Make sure to have the file in the same directory as the libraries folder
-VSCode should automatically change the language syntax to SPWN, but if it dosent, navigate to the bottom right of the screen and click on `select language mode`, then select SPWN.
+VSCode should automatically change the language syntax to SPWN, but if it doesn't, navigate to the bottom right of the screen and click on `select language mode`, then select SPWN.
 
 ###### Sublime Text
 Open Sublime Text and open the Command Palette... by selecting Command Palette from the Tools pull-down menu. In the menu that opens type install which will result in the Install Package Control option being presented. Hit Enter or left click the entry to install Package Control. Open the Command Palette again, and type 'install'. When `Package Control: Install Package` is highlighted press 'Enter' then type 'SPWN Language' and press 'Enter' when `SPWN Language` is highlighted.
@@ -116,7 +116,7 @@ Here is a list of SPWN command line subcommands and flags. This Information can 
 Build a file called addition.spwn and write it to the level named add.
 
 `spwn build subtraction.spwn --no-level`
-Build a file called subtraction.spwn but dont write to a level.
+Build a file called subtraction.spwn but don't write to a level.
 
 `spwn build AI.spwn -c`
 Build a file called AI.spwn and output the level string to the console.
