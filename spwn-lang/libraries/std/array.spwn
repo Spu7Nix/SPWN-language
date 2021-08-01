@@ -215,6 +215,59 @@ assert(arr == arr.copy())
     (self) {
         return self.map(x => x)
     },
+    
+    _partition: #[desc("Private function needed for .sort()")]
+    (self, low: @number, high: @number) {
+        pivot = self[high]
+        let i = low - 1
+
+        for j in low..high {
+            if self[j] <= pivot {
+                i += 1
+                self[i] <=> self[j]
+            }
+        }
+
+        self[i+1] <=> self[high]
+        return i + 1
+    },
+
+    sort: #[desc("Sorts array in-place") example("
+arr = [5, 1, 5, 3, 2]
+arr.sort()
+$.assert(arr == [1, 2, 3, 5, 5])
+    ")]
+    (self, _p: @number = 0, _r: @number = -1) {
+        // -1 is when none is supplied
+        let r = null
+        if _r == -1 {
+            r = self.length - 1
+        } else {
+            r = _r
+        }
+        // uses quick sort
+        if self.all(item => item.type == @number) {
+            if _p < r {
+                let q = self._partition( _p, r)
+
+                self.sort(_p, q-1)
+                self.sort(q+1, r)
+            }
+        } else {
+            throw "Unsupported type in array " + self as @string
+        }
+    },
+
+    sorted: #[desc("Returns a sorted verison of the array") example("
+arr = [5, 1, 5, 3, 2]
+$.assert(arr.sorted() == [1, 2, 3, 5, 5])
+    ")]
+    (self) {
+        let new_arr = self.copy()
+        new_arr.sort()
+
+        return new_arr
+    },
     shift: #[desc("Removes the first index from the array and returns it.") example("
 let arr = [5, 1, 5, 3, 2]
 $.assert(arr.shift() == 5)
