@@ -215,14 +215,14 @@ assert(arr == arr.copy())
     (self) {
         return self.map(x => x)
     },
-    
+
     _partition: #[desc("Private function needed for .sort()")]
-    (self, low: @number, high: @number) {
+    (self, low: @number, high: @number, key: @macro = (a, b) => a <= b) {
         pivot = self[high]
         let i = low - 1
 
         for j in low..high {
-            if self[j] <= pivot {
+            if key(self[j], pivot) {
                 i += 1
                 self[i] <=> self[j]
             }
@@ -236,22 +236,30 @@ assert(arr == arr.copy())
 arr = [5, 1, 5, 3, 2]
 arr.sort()
 $.assert(arr == [1, 2, 3, 5, 5])
+
+arr = [5, 1, 5, 3, 2]
+arr.sort(begin = 2, end = 4)
+$.assert(arr == [5, 1, 2, 3, 5])
+
+arr = [5, 1, 5, 3, 2]
+arr.sort(key = (a, b) => a > b)
+$.assert(arr == [5, 5, 3, 2, 1])
     ")]
-    (self, _p: @number = 0, _r: @number = -1) {
-        // -1 is when none is supplied
-        let r = null
-        if _r == -1 {
-            r = self.length - 1
-        } else {
-            r = _r
+    (self, begin: @number = 0, end: @number = -1, key: @macro = (a, b) => a <= b, ) {
+
+        // when end == -1, that means the end of the array, but comparing to -1 doesnt work so switch it back to legnth - 1
+        let new_end = end
+        if end == -1 {
+            new_end = self.length - 1
         }
+
         // uses quick sort
         if self.all(item => item.type == @number) {
-            if _p < r {
-                let q = self._partition( _p, r)
+            if begin < new_end {
+                let q = self._partition(low = begin, high = new_end, key = key)
 
-                self.sort(_p, q-1)
-                self.sort(q+1, r)
+                self.sort(begin = begin, end = q-1, key = key)
+                self.sort(begin = q+1, end = new_end, key = key)
             }
         } else {
             throw "Unsupported type in array " + self as @string
@@ -261,6 +269,8 @@ $.assert(arr == [1, 2, 3, 5, 5])
     sorted: #[desc("Returns a sorted verison of the array") example("
 arr = [5, 1, 5, 3, 2]
 $.assert(arr.sorted() == [1, 2, 3, 5, 5])
+$.assert(arr.sorted(begin = 2, end = 4) == [5, 1, 2, 3, 5])
+$.assert(arr.sorted(key = (a, b) => a >= b) == [5, 5, 3, 2, 1])
     ")]
     (self) {
         let new_arr = self.copy()
