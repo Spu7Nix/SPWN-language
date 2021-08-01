@@ -8,19 +8,19 @@ extract import "control_flow.spwn"
 extract import "util.spwn"
 
 impl @group {
-    
+
     _range_: #[desc("Implementation of the range operator (`..`) for groups") example("
 for group in 1g..10g {
     -> group.move(10, 0, 0.5)
 }
     ")] create_range_macro(@group),
-    move: #[desc("Implementation of the move trigger") example("10g.move(100, 0, 0.5, easing = EASE_IN_OUT)")] 
+    move: #[desc("Implementation of the move trigger") example("10g.move(100, 0, 0.5, easing = EASE_IN_OUT)")]
     (
-        self, 
-        #[desc("Units to move on the X axis")] x: @number, 
-        #[desc("Units to move on the Y axis")] y: @number, 
-        #[desc("Duration of movement")] duration: @number = 0, 
-        easing: @easing_type = NONE, 
+        self,
+        #[desc("Units to move on the X axis")] x: @number,
+        #[desc("Units to move on the Y axis")] y: @number,
+        #[desc("Duration of movement")] duration: @number = 0,
+        easing: @easing_type = NONE,
         easing_rate: @number = 2
     ) {
         $.add( trigger{
@@ -32,16 +32,16 @@ for group in 1g..10g {
             EASING: easing.id,
             EASING_RATE: easing_rate,
         })
-        
+
         wait(duration)
     },
 
-    lock_to_player: #[desc("Lock group to player position") example("10g.lock_to_player(lock_x = true, duration = 20)")] 
+    lock_to_player: #[desc("Lock group to player position") example("10g.lock_to_player(lock_x = true, duration = 20)")]
     (
         self,
         #[desc("Lock to player X")] lock_x: @bool = true,
         #[desc("Lock to player Y")] lock_y: @bool = true,
-        #[desc("Duration of lock")] duration: @number = 999, 
+        #[desc("Duration of lock")] duration: @number = 999,
     ) {
         $.add( trigger{
             OBJ_ID: 901,
@@ -67,7 +67,7 @@ move.start_group.stop()
         })
     },
 
-    alpha: #[desc("Implementation of the alpha trigger") example("1g.alpha(0)")] 
+    alpha: #[desc("Implementation of the alpha trigger") example("1g.alpha(0)")]
     (self, opacity: @number = 1, duration: @number = 0){
         $.add( trigger {
             OBJ_ID: 1007,
@@ -79,7 +79,7 @@ move.start_group.stop()
     },
 
     toggle_on:
-    #[desc("Toggles the group on") example("10g.toggle_on()")] 
+    #[desc("Toggles the group on") example("10g.toggle_on()")]
     (self){
         $.add( trigger{
             OBJ_ID: 1049,
@@ -88,7 +88,7 @@ move.start_group.stop()
         })
     },
 
-    toggle_off: #[desc("Toggles the group off") example("10g.toggle_off()")] 
+    toggle_off: #[desc("Toggles the group off") example("10g.toggle_off()")]
     (self){
         $.add( trigger{
             OBJ_ID: 1049,
@@ -100,14 +100,14 @@ move.start_group.stop()
     rotate: #[desc("Implementation of the rotate trigger") example("
 center = 3g
 10g.rotate(center, 360, 2, easing = EASE_IN_OUT)
-    ")] 
+    ")]
     (
-        self, 
-        #[desc("Group of object to rotate around")] center: @group, 
-        #[desc("Rotation in degrees")] degrees: @number, 
-        #[desc("Duration of rotation")] duration: @number = 0, 
-        #[desc("Easing type")] easing: @easing_type = NONE, 
-        #[desc("Easing rate")] easing_rate: @number = 2, 
+        self,
+        #[desc("Group of object to rotate around")] center: @group,
+        #[desc("Rotation in degrees")] degrees: @number,
+        #[desc("Duration of rotation")] duration: @number = 0,
+        #[desc("Easing type")] easing: @easing_type = NONE,
+        #[desc("Easing rate")] easing_rate: @number = 2,
         #[desc("Only rotate positions of the objects, not the textures")] lock_object_rotation: @bool = false
     ){
         $.add( trigger{
@@ -123,13 +123,13 @@ center = 3g
         wait(duration)
     },
 
-    follow: 
+    follow:
     #[desc("Implementation of the follow trigger") example("10g.follow(11g)")]
     (
-        self, 
-        #[desc("Group of object to follow")] other: @group, 
-        #[desc("Multiplier for the movement on the X-axis")] x_mod: @number = 1, 
-        #[desc("Multiplier for the movement on the Y-axis")] y_mod: @number = 1, 
+        self,
+        #[desc("Group of object to follow")] other: @group,
+        #[desc("Multiplier for the movement on the X-axis")] x_mod: @number = 1,
+        #[desc("Multiplier for the movement on the Y-axis")] y_mod: @number = 1,
         #[desc("Duration of following")] duration: @number = 999
     ){
         $.add( trigger{
@@ -144,13 +144,13 @@ center = 3g
     },
 
     follow_player_y:
-    #[desc("Implementation of the follow player Y trigger") example("10g.follow_player_y(delay = 0.5)")] 
+    #[desc("Implementation of the follow player Y trigger") example("10g.follow_player_y(delay = 0.5)")]
     (
-        self, 
-        #[desc("Interpolation factor (?)")] speed: @number = 1, 
-        #[desc("Delay of movement")]  delay: @number = 0, 
-        #[desc("Offset on the Y-axis")] offset: @number = 0, 
-        #[desc("Maximum speed")] max_speed: @number = 0, 
+        self,
+        #[desc("Interpolation factor (?)")] speed: @number = 1,
+        #[desc("Delay of movement")]  delay: @number = 0,
+        #[desc("Offset on the Y-axis")] offset: @number = 0,
+        #[desc("Maximum speed")] max_speed: @number = 0,
         #[desc("Duration of following")] duration: @number = 999
     ){
         $.add( trigger{
@@ -165,15 +165,15 @@ center = 3g
         //wouldnt make any sense to wait out the duration here
     },
 
-    move_to: 
+    move_to:
     #[desc("Implementation of the 'Move target' feature of the move trigger. Remember that both groups can only contain one object.") example("10g.move_to(20g)")]
     (
-        self, 
-        #[desc("Group of the object to move to")] target: @group, 
+        self,
+        #[desc("Group of the object to move to")] target: @group,
         #[desc("Duration of movement")] duration: @number = 0,
-        #[desc("Will move to the object only on the X-axis")] x_only: @bool = false, 
-        #[desc("Will move to the object only on the y-axis")] y_only: @bool = false, 
-        #[desc("Easing type")] easing: @easing_type = NONE, 
+        #[desc("Will move to the object only on the X-axis")] x_only: @bool = false,
+        #[desc("Will move to the object only on the y-axis")] y_only: @bool = false,
+        #[desc("Easing type")] easing: @easing_type = NONE,
         #[desc("Easing rate")] easing_rate: @number = 2
     ) {
         $.add( trigger{
@@ -193,7 +193,7 @@ center = 3g
                 }
             }(),
             TARGET_POS: target,
-            
+
             DURATION: duration,
             EASING: easing.id,
             EASING_RATE: easing_rate,
@@ -201,16 +201,16 @@ center = 3g
         wait(duration)
     },
 
-    pulse: 
+    pulse:
     #[desc("Implementation of the pulse trigger for groups") example("10g.pulse(255, 0, 0, fade_out = 0.5)")]
     (
-        self, 
-        #[desc("Red value of pulse color (or hue if HSV is enabled)")] r: @number, 
-        #[desc("Green value of pulse color (or saturation if HSV is enabled)")] g: @number, 
-        #[desc("Blue value of pulse color (or brightness/value if HSV is enabled)")] b: @number, 
-        #[desc("Fade-in duration")] fade_in: @number = 0, 
-        #[desc("Duration to hold the color")] hold: @number = 0, 
-        #[desc("Fade-out duration")] fade_out: @number = 0, 
+        self,
+        #[desc("Red value of pulse color (or hue if HSV is enabled)")] r: @number,
+        #[desc("Green value of pulse color (or saturation if HSV is enabled)")] g: @number,
+        #[desc("Blue value of pulse color (or brightness/value if HSV is enabled)")] b: @number,
+        #[desc("Fade-in duration")] fade_in: @number = 0,
+        #[desc("Duration to hold the color")] hold: @number = 0,
+        #[desc("Fade-out duration")] fade_out: @number = 0,
         #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: @bool = false,
         #[desc("Toggle HSV mode")] hsv: @bool = false,
         #[desc("HSV specific: saturation checked")] s_checked: @bool = false,
@@ -219,7 +219,7 @@ center = 3g
         if hsv {
             $.add( trigger{
                 OBJ_ID: 1006,
-                COPIED_COLOR_HVS: 
+                COPIED_COLOR_HVS:
                     r as @string + "a" + g as @string + "a" + b as @string + "a"
                      + s_checked as @number as @string + "a" + b_checked as @number as @string,
                 EXCLUSIVE: exclusive,

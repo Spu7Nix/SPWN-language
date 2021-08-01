@@ -8,6 +8,7 @@ mod compiler_types;
 mod documentation;
 mod fmt;
 mod globals;
+
 mod levelstring;
 mod parser;
 mod value;
@@ -22,6 +23,9 @@ mod editorlive;
 mod optimize;
 mod value_storage;
 
+use ariadne::{Cache, FileCache};
+use compiler_info::CompilerInfo;
+use globals::Globals;
 use optimize::optimize;
 
 use parser::*;
@@ -39,6 +43,8 @@ const ERROR_EXIT_CODE: i32 = 1;
 
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+
+use crate::compiler::{create_report, ErrorReport};
 
 const HELP: &str = include_str!("../help.txt");
 
@@ -124,12 +130,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         };
                     }
 
+                    let mut cache = FileCache::default();
+                    cache.fetch(script_path.as_path()).unwrap();
+
                     print_with_color("Parsing ...", Color::Green);
                     let unparsed = fs::read_to_string(script_path.clone())?;
 
                     let (statements, notes) = match parse_spwn(unparsed, script_path.clone()) {
                         Err(err) => {
-                            eprint_with_color(&format!("{}\n", err), Color::White);
+                            create_report(ErrorReport::from(err)).eprint(cache).unwrap();
                             std::process::exit(ERROR_EXIT_CODE);
                         }
                         Ok(p) => p,
@@ -173,7 +182,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         notes,
                     ) {
                         Err(err) => {
-                            eprint_with_color(&format!("{}\n", err), Color::White);
+                            create_report(ErrorReport::from(err)).eprint(cache).unwrap();
                             std::process::exit(ERROR_EXIT_CODE);
                         }
                         Ok(p) => p,
@@ -287,11 +296,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             return Err(std::boxed::Box::from("Expected library name argument"))
                         }
                     };
+                    let path = match compiler::get_import_path(
+                        &compiler_types::ImportType::Lib(lib_path.clone()),
+                        &mut Globals::new(PathBuf::new()),
+                        CompilerInfo::new(),
+                    ) {
+                        Ok(a) => a,
+                        Err(e) => {
+                            println!("{}", ErrorReport::from(e).message);
+                            std::process::exit(ERROR_EXIT_CODE);
+                        }
+                    };
+
+                    let mut cache = FileCache::default();
+                    cache.fetch(path.as_path()).unwrap();
 
                     match documentation::document_lib(lib_path) {
                         Ok(_) => (),
                         Err(e) => {
-                            eprint_with_color(&format!("{}\n", e), Color::Red);
+                            create_report(ErrorReport::from(e)).eprint(cache).unwrap();
                             std::process::exit(ERROR_EXIT_CODE);
                         }
                     };

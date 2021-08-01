@@ -1,14 +1,14 @@
-  
-# **@regex**: 
- 
+
+# **@regex**:
+
 ## **match**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, match: @string) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Checks if the regex matches a string argument_
 >## Arguments:
 >
@@ -19,12 +19,12 @@
 
 ## **new**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(re: @string) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Create a new instance of regex_
 >## Arguments:
 >
@@ -35,12 +35,12 @@
 
 ## **replace**:
 
-> **Value:** 
+> **Value:**
 >```spwn
 >(self, to_replace: @string, replacer: @string) { /* code omitted */ }
->``` 
->**Type:** `@macro` 
->## Description: 
+>```
+>**Type:** `@macro`
+>## Description:
 > _Regex replace the contents of a string_
 >## Arguments:
 >

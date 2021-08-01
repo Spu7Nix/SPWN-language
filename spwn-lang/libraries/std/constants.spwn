@@ -19,7 +19,6 @@ ok = (id: @number, pat: @pattern | @type_indicator) {
 }
 
 
-
 return {
     easing_types : {
         NONE : et(0),
@@ -29,7 +28,7 @@ return {
         ELASTIC_IN_OUT : et(4),
         ELASTIC_IN : et(5),
         ELASTIC_OUT : et(6),
-        BOUNCE_IN_OUT : et(7),           
+        BOUNCE_IN_OUT : et(7),
         BOUNCE_IN : et(8),
         BOUNCE_OUT : et(9),
         EXPONENTIAL_IN_OUT : et(10),
@@ -51,15 +50,15 @@ return {
 
     colors: {
         BG: 1000c,
-        GROUND: 1001c,         
-        LINE: 1002c,        
-        _3DLINE: 1003c, 
-        OBJECT: 1004c, 
-        GROUND2: 1009c,         
+        GROUND: 1001c,
+        LINE: 1002c,
+        _3DLINE: 1003c,
+        OBJECT: 1004c,
+        GROUND2: 1009c,
     },
-    
+
     obj_props : {
-        OBJ_ID : ok(1, @number),            
+        OBJ_ID : ok(1, @number),
         X : ok(2, @number),
         Y : ok(3, @number),
         HORIZONTAL_FLIP : ok(4, @bool),

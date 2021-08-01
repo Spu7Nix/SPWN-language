@@ -18,6 +18,37 @@ pub enum ObjParam {
     Epsilon,
 }
 
+impl std::cmp::PartialOrd for GdObj {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        for param in [1, 51, 57].iter() {
+            if let Some(p1) = self.params.get(param) {
+                if let Some(p2) = other.params.get(param) {
+                    match (p1, p2) {
+                        (ObjParam::Number(n1), ObjParam::Number(n2)) => {
+                            return (*n1).partial_cmp(n2)
+                        }
+                        (ObjParam::Group(g1), ObjParam::Group(g2)) => {
+                            let num1 = match g1.id {
+                                Id::Arbitrary(n) => n,
+                                Id::Specific(n) => n,
+                            };
+
+                            let num2 = match g2.id {
+                                Id::Arbitrary(n) => n,
+                                Id::Specific(n) => n,
+                            };
+
+                            return num1.partial_cmp(&num2);
+                        }
+                        (_, _) => (),
+                    }
+                }
+            }
+        }
+        Some(std::cmp::Ordering::Equal)
+    }
+}
+
 use std::fmt;
 
 impl fmt::Display for ObjParam {
@@ -188,7 +219,7 @@ pub fn append_objects(
     mut objects: Vec<GdObj>,
     old_ls: &str,
 ) -> Result<(String, [usize; 4]), String> {
-    let mut closed_ids = get_used_ids(&old_ls);
+    let mut closed_ids = get_used_ids(old_ls);
 
     //collect all specific ids mentioned into closed_[id] lists
     for obj in &objects {
@@ -299,7 +330,8 @@ pub fn append_objects(
             }
         }
     }
-    for (i, list) in closed_ids.iter().enumerate() {
+    for (i, list) in closed_ids.iter_mut().enumerate() {
+        list.remove(&0);
         if list.len() > ID_MAX as usize {
             return Err(format!(
                 "This level exceeds the {} limit! ({}/{})",
@@ -424,8 +456,10 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
 
         //add top layer
         let possible_height = MAX_HEIGHT - (START_HEIGHT + y_offset); //30 is max (TODO: case for if y_offset is more than 30)
+        let mut objectlist = id.obj_list;
+        objectlist.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
 
-        for (i, (obj, _)) in id.obj_list.iter().enumerate() {
+        for (i, (obj, _)) in objectlist.iter().enumerate() {
             match obj.mode {
                 ObjectMode::Object => {
                     objects.push(obj.clone());
@@ -468,8 +502,8 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
                 }
             }
         }
-        if !id.obj_list.is_empty() {
-            current_x += (id.obj_list.len() as f64 / possible_height as f64).floor() as u32 + 1;
+        if !objectlist.is_empty() {
+            current_x += (objectlist.len() as f64 / possible_height as f64).floor() as u32 + 1;
         }
 
         //add all children
@@ -492,7 +526,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
     let mut current_x = 0;
     for (i, func_id) in func_ids.iter().enumerate() {
         if func_id.parent == None {
-            let (objects, new_length) = apply_fn_id(i, &func_ids, current_x, 0);
+            let (objects, new_length) = apply_fn_id(i, func_ids, current_x, 0);
             full_obj_list.extend(objects);
 
             current_x += new_length;
@@ -691,7 +725,7 @@ fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, String> {
         type AesEcb = Ecb<Aes256, Pkcs7>;
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_var(&IOS_KEY, &[]).unwrap();
+        let cipher = AesEcb::new_var(IOS_KEY, &[]).unwrap();
 
         Ok(match cipher.decrypt(&mut sf) {
             Ok(v) => v,
@@ -860,7 +894,7 @@ pub fn encrypt_level_string(
                 if k4_detected && level_detected {
                     let encrypted_ls: String = {
                         let mut ls_encoder = gzip::Encoder::new(Vec::new()).unwrap();
-                        ls_encoder.write_all(&full_ls.as_bytes()).unwrap();
+                        ls_encoder.write_all(full_ls.as_bytes()).unwrap();
                         let b64_encrypted =
                             base64::encode(&ls_encoder.finish().into_result().unwrap());
                         let fin = b64_encrypted.replace("+", "-").replace("/", "_");
@@ -872,24 +906,25 @@ pub fn encrypt_level_string(
                         .is_ok());
                     done = true;
                     k4_detected = false;
-                } else if k4_detected {
-                    k4_detected = false;
                 } else {
-                    assert!(writer.write_event(Event::Text(e)).is_ok())
-                }
+                    if k4_detected {
+                        k4_detected = false;
+                    }
+                    assert!(writer.write_event(Event::Text(e)).is_ok());
 
-                if k2_detected {
-                    if let Some(level_name) = &level_name {
-                        if level_name == &text {
+                    if k2_detected {
+                        if let Some(level_name) = &level_name {
+                            if level_name == &text {
+                                level_detected = true;
+                                println!("Writing to level: {}", text);
+                            }
+                        } else {
                             level_detected = true;
                             println!("Writing to level: {}", text);
                         }
-                    } else {
-                        level_detected = true;
-                        println!("Writing to level: {}", text);
-                    }
 
-                    k2_detected = false;
+                        k2_detected = false;
+                    }
                 }
 
                 if !done && text == "k4" {
@@ -927,7 +962,7 @@ pub fn encrypt_level_string(
         type AesEcb = Ecb<Aes256, Pkcs7>;
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_var(&IOS_KEY, &[]).unwrap();
+        let cipher = AesEcb::new_var(IOS_KEY, &[]).unwrap();
 
         let fin = cipher.encrypt_vec(&bytes);
         assert!(fs::write(path, fin).is_ok());

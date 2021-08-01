@@ -1,5 +1,5 @@
 use crate::builtin::*;
-use crate::compiler_info::CompilerInfo;
+use crate::compiler_info::{CodeArea, CompilerInfo};
 use crate::compiler_types::*;
 use crate::globals::Globals;
 use crate::levelstring::*;
@@ -15,6 +15,7 @@ use crate::compiler::CONTEXT_MAX;
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Context {
     pub start_group: Group,
+    pub fn_context_change_stack: Vec<CodeArea>,
     //pub spawn_triggered: bool,
     pub variables: HashMap<String, StoredValue>,
     //pub self_val: Option<StoredValue>,
@@ -43,6 +44,7 @@ impl Context {
 
             sync_group: 0,
             sync_part: 0,
+            fn_context_change_stack: Vec::new(),
         }
     }
 
@@ -126,9 +128,9 @@ pub fn merge_contexts(
             GdObj {
                 params,
 
-                ..context_trigger(&context, &mut globals.uid_counter)
+                ..context_trigger(context, &mut globals.uid_counter)
             }
-            .context_parameters(&context),
+            .context_parameters(context),
             globals.trigger_order,
         ))
     };

@@ -3,22 +3,24 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
-use crate::builtin::BUILTIN_LIST;
+use crate::builtin::Builtin;
+use crate::compiler::ErrorReport;
+use crate::compiler::RainbowColorGenerator;
+use crate::compiler_info::CodeArea;
 
 //use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 
+use ariadne::Fmt;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
 
-use std::error::Error;
-use std::fmt;
-
-use crate::compiler::print_error_intro;
+use crate::compiler::create_error;
 use crate::compiler_types::ImportType;
 
-pub type FileRange = ((usize, usize), (usize, usize));
+pub type FileRange = (usize, usize);
 
 macro_rules! expected {
     ($expected:expr, $tokens:expr, $notes:expr, $a:expr) => {
@@ -60,7 +62,7 @@ pub enum SyntaxError {
 
 pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Result<(), SyntaxError> {
     if name.starts_with('_') && name.ends_with('_') {
-        if BUILTIN_LIST.contains(&name) {
+        if Builtin::from_str(name).is_ok() {
             Ok(())
         } else {
             Err(SyntaxError::SyntaxError {
@@ -74,36 +76,73 @@ pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Resul
     }
 }
 
-impl fmt::Display for SyntaxError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl From<SyntaxError> for ErrorReport {
+    fn from(err: SyntaxError) -> ErrorReport {
+        use crate::compiler_info::CompilerInfo;
         //write!(f, "SuperErrorSideKick is here!")
-        match self {
+        let mut colors = RainbowColorGenerator::new(60.0, 1.0, 0.8);
+        let a = colors.next();
+        let b = colors.next();
+        match err {
             SyntaxError::ExpectedErr {
                 expected,
                 found,
                 pos,
                 file,
-            } => {
-                print_error_intro(*pos, file);
-                write!(f, "SyntaxError: Expected {}, found {}", expected, found)
-            }
+            } => create_error(
+                CompilerInfo::from_area(CodeArea {
+                    pos,
+                    file: file.clone(),
+                }),
+                "Syntax error",
+                &[(
+                    CodeArea {
+                        pos,
+                        file,
+                    },
+                    &format!(
+                        "{} {}, {} {}",
+                        "Expected".fg(b),
+                        expected,
+                        "found".fg(a),
+                        found
+                    ),
+                )],
+                None,
+            ),
 
-            SyntaxError::UnexpectedErr { found, pos, file } => {
-                print_error_intro(*pos, file);
-                write!(f, "SyntaxError: Unexpected {}", found)
-            }
+            SyntaxError::UnexpectedErr { found, pos, file } => create_error(
+                CompilerInfo::from_area(CodeArea {
+                    pos,
+                    file: file.clone(),
+                }),
+                "Syntax error",
+                &[(
+                    CodeArea {
+                        pos,
+                        file,
+                    },
+                    &format!("Unexpected {}", found),
+                )],
+                None,
+            ),
 
-            SyntaxError::SyntaxError { message, pos, file } => {
-                print_error_intro(*pos, file);
-                write!(f, "SyntaxError: {}", message)
-            }
+            SyntaxError::SyntaxError { message, pos, file } => create_error(
+                CompilerInfo::from_area(CodeArea {
+                    pos,
+                    file: file.clone(),
+                }),
+                "Syntax error",
+                &[(
+                    CodeArea {
+                        pos,
+                        file,
+                    },
+                    &message,
+                )],
+                None,
+            ),
         }
-    }
-}
-
-impl Error for SyntaxError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
     }
 }
 
@@ -506,42 +545,13 @@ impl<'a> Tokens<'a> {
         self.stack[self.stack.len() - self.index - 1].1.clone()
     }
 
-    fn position(&self) -> ((usize, usize), (usize, usize)) {
+    fn position(&self) -> (usize, usize) {
         if self.stack.len() - self.index == 0 {
-            return ((1, 0), (1, 0));
+            return (0, 0);
         }
         let file_pos1 = self.stack[self.stack.len() - self.index - 1].2.start;
         let file_pos2 = self.stack[self.stack.len() - self.index - 1].2.end;
-        /*println!(
-            "file pos: {}, line breaks: {:?}",
-            file_pos, self.line_breaks
-        );*/
-        let mut found_pos_1 = false;
-        let mut found_pos_2 = false;
-        let mut out = ((1, file_pos1), (1, file_pos2));
-
-        for (i, lb) in self.line_breaks.iter().enumerate() {
-            let line_break = *lb as usize;
-            if !found_pos_1 && line_break >= file_pos1 {
-                if i == 0 {
-                    out.0 = (1, file_pos1);
-                } else {
-                    out.0 = (i + 1, file_pos1 - self.line_breaks[i - 1] as usize - 1);
-                }
-                found_pos_1 = true;
-            }
-
-            if !found_pos_2 && line_break >= file_pos2 {
-                if i == 0 {
-                    out.1 = (1, file_pos2);
-                } else {
-                    out.1 = (i + 1, file_pos2 - self.line_breaks[i - 1] as usize - 1);
-                }
-                found_pos_2 = true;
-            }
-        }
-
-        out
+        (file_pos1, file_pos2)
     }
 
     /*fn abs_position(&self) -> usize {
@@ -626,6 +636,7 @@ fn parse_cmp_stmt(
     notes: &mut ParseNotes,
 ) -> Result<Vec<ast::Statement>, SyntaxError> {
     let mut statements = Vec::<ast::Statement>::new();
+    let opening_bracket = tokens.position();
     loop {
         match tokens.next(false) {
             Some(Token::ClosingCurlyBracket) => break,
@@ -643,8 +654,8 @@ fn parse_cmp_stmt(
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing a closure".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching '}' for this '{'".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }
@@ -1249,7 +1260,7 @@ fn parse_expr(
 
             // iterate though the operators until we get one like =
             while !old_operators.is_empty() {
-                if operator_precedence(&old_operators.last().unwrap()) == 0 {
+                if operator_precedence(old_operators.last().unwrap()) == 0 {
                     break;
                 }
 
@@ -1489,7 +1500,7 @@ fn parse_args(
     notes: &mut ParseNotes,
 ) -> Result<Vec<ast::Argument>, SyntaxError> {
     let mut args = Vec::<ast::Argument>::new();
-
+    let opening_bracket = tokens.position();
     loop {
         if tokens.next(false) == Some(Token::ClosingBracket) {
             break;
@@ -1511,12 +1522,18 @@ fn parse_args(
 
                     None => unreachable!(),
                 };
+                let start = tokens.position().0;
                 let symbol = Some(tokens.slice());
                 tokens.next(false);
                 let value = parse_expr(tokens, notes, true, true)?;
+                let end = tokens.position().1;
                 //tokens.previous();
 
-                ast::Argument { symbol, value }
+                ast::Argument {
+                    symbol,
+                    value,
+                    pos: (start, end),
+                }
             }
 
             Some(_) => {
@@ -1528,13 +1545,14 @@ fn parse_args(
 
                 ast::Argument {
                     symbol: None,
+                    pos: value.get_pos(),
                     value,
                 }
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing macro arguments".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching ')' for this '('".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }
@@ -1557,8 +1575,8 @@ fn parse_args(
 
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing macro arguments".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching ')' for this '('".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }
@@ -1574,7 +1592,7 @@ fn parse_arg_def(
     notes: &mut ParseNotes,
 ) -> Result<Vec<ast::ArgDef>, SyntaxError> {
     let mut args = Vec::<ast::ArgDef>::new();
-
+    let opening_bracket = tokens.position();
     loop {
         let properties = check_for_tag(tokens, notes)?;
         if tokens.next(false) == Some(Token::ClosingBracket) {
@@ -1589,12 +1607,14 @@ fn parse_arg_def(
                         file: notes.file.clone(),
                     });
                 }
+                let start = tokens.position().0;
                 let symbol = tokens.slice();
                 tokens.next(false);
                 let value = Some(parse_expr(tokens, notes, true, true)?);
+                let end = tokens.position().1;
                 //tokens.previous();
 
-                (symbol, value, properties, None)
+                (symbol, value, properties, None, (start, end))
             }
 
             Some(Token::Colon) => {
@@ -1605,6 +1625,7 @@ fn parse_arg_def(
                         file: notes.file.clone(),
                     });
                 }
+                let start = tokens.position().0;
                 let symbol = tokens.slice();
                 tokens.next(false);
                 let type_value = Some(parse_expr(tokens, notes, false, true)?);
@@ -1613,20 +1634,20 @@ fn parse_arg_def(
                 match tokens.next(false) {
                     Some(Token::Assign) => {
                         let value = Some(parse_expr(tokens, notes, true, true)?);
-
+                        let end = tokens.position().1;
                         //tokens.previous();
 
-                        (symbol, value, properties, type_value)
+                        (symbol, value, properties, type_value, (start, end))
                     }
                     Some(_) => {
                         tokens.previous();
-
-                        (symbol, None, properties, type_value)
+                        let end = tokens.position().1;
+                        (symbol, None, properties, type_value, (start, end))
                     }
                     None => {
                         return Err(SyntaxError::SyntaxError {
-                            message: "File ended while parsing macro signature".to_string(),
-                            pos: tokens.position(),
+                            message: "Couldn't find matching ')' for this '('".to_string(),
+                            pos: opening_bracket,
                             file: notes.file.clone(),
                         })
                     }
@@ -1642,12 +1663,12 @@ fn parse_arg_def(
                     });
                 }
 
-                (tokens.slice(), None, properties, None)
+                (tokens.slice(), None, properties, None, tokens.position())
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing macro signature".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching ')' for this '('".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }
@@ -1668,8 +1689,8 @@ fn parse_arg_def(
 
             None => {
                 return Err(SyntaxError::SyntaxError {
-                    message: "File ended while parsing macro signature".to_string(),
-                    pos: tokens.position(),
+                    message: "Couldn't find matching ')' for this '('".to_string(),
+                    pos: opening_bracket,
                     file: notes.file.clone(),
                 })
             }
@@ -1904,7 +1925,7 @@ fn parse_variable(
                     // Woo macro shorthand
                     let arg = if symbol != "_" {
                         is_valid_symbol(&symbol, tokens, notes)?;
-                        vec![(symbol, None, properties.clone(), None)]
+                        vec![(symbol, None, properties.clone(), None, tokens.position())]
                     } else {
                         Vec::new()
                     };

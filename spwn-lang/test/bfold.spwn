@@ -1,0 +1,187 @@
+INCR = 3b
+OPEN = 6b //opening bracket
+CLOSE = 7b //closing bracket
+
+spacing = 10
+
+insert_bf_script = (str: @string, offset: [@number]) {
+    let index = 0
+    for ch in str {
+        blockid = switch ch {
+            case ">": RIGHT,//increment the data pointer (to point to the next cell to the right).
+            case "<": LEFT,	//decrement the data pointer (to point to the next cell to the left).
+            case "+": INCR,	//increment (increase by one) the byte at the data pointer.
+            case "-": DECR,	//decrement (decrease by one) the byte at the data pointer.
+            case ".": DOT	//output the byte at the data pointer.
+            //case ",": 	//accept one byte of input, storing its value in the byte at the data pointer.
+            case "[": OPEN,	
+            case "]": CLOSE,
+            else: null 
+        }
+        if blockid != null {
+            extract obj_props
+            $.add(obj {
+                OBJ_ID: 1816,
+                X: offset[0] + index * spacing * 3,
+                Y: offset[1],
+                BLOCK_A: blockid,
+                SCALING: 0.2,
+            })
+            $.add(obj {
+                OBJ_ID: 914,
+                X: offset[0] + index * spacing * 3,
+                Y: offset[1] - 30,
+                TEXT: $.b64encode(ch),
+                COLOR: 1c,
+            })
+            index++
+        }
+    }
+}
+
+
+type @bfreader
+layers = counter(0)
+//layers.display(150, 300)
+
+impl @bfreader {
+    new: (script_offset: [@number], cell_count: @number) {
+        
+        extract obj_props
+        block = ?b
+        group = ?g
+        $.add(obj {
+            OBJ_ID: 1816,
+            X: script_offset[0] - spacing * 6,
+            Y: script_offset[1],
+            GROUPS: group,
+            BLOCK_A: block,
+            SCALING: 0.5,
+            DYNAMIC_BLOCK: true,
+        })
+        for b in [INCR,OPEN,CLOSE] {
+            $.add(obj {
+                OBJ_ID: 1816,
+                X: script_offset[0] - spacing * 3,
+                Y: script_offset[1],
+                SCALING: 0.5,
+                BLOCK_A: b,
+            })
+        }
+        
+
+        // CREATE CELLS
+        let cells = []
+        for i in ..cell_count {
+            c = counter()
+            cells.push(c)
+            c.display(script_offset[0] + i * 45, script_offset[1] + 90)
+        }
+        ptr = counter(0)
+        ptr.display(script_offset[0], script_offset[1] + 60)
+        
+
+        
+        out = @bfreader::{
+            group: group,
+            
+            incr:  counter(block.create_tracker_item(INCR)),
+            
+            
+            open:  counter(block.create_tracker_item(OPEN)),
+            close: counter(block.create_tracker_item(CLOSE)),
+            ptr: ptr,
+            cells: cells,
+        }
+        group.move(spacing * 2, 0, 0.3)
+
+        return out
+    },
+    currently_on: (self) {
+        if self.incr == 1 {
+            return INCR
+        } else if self.open == 1 {
+            return OPEN
+        } else if self.close == 1 {
+            return CLOSE
+        }
+    },
+    current_cell: (self) => self.cells[self.ptr.to_const(..self.cells.length)],
+    interpret: (self) {
+        
+        ret = !{
+            self.group.move(spacing, 0, 0)
+            -> return
+        }
+        current = self.currently_on()
+        
+        if current == INCR {
+            -> self.current_cell() += 1
+            ret!
+        }
+        else if current == OPEN {
+            move_to = !{
+                condition = () => !(layers == 0 && self.close == 1)
+                
+                while_loop(condition, delay = 0.03, (){
+                    
+                    wait(0.02)
+                    -> if self.open == 1{
+                        layers += 1
+                    }
+                    
+                    -> if self.close == 1 {
+                        layers -= 1
+                    }
+
+                    wait(0.01)
+                    self.group.move(spacing, 0) 
+                })
+                ret!
+            }
+            if self.current_cell() == 0 {
+                layers -= 1
+                call_with_delay(0.05, move_to)
+            } else {
+                ret!
+            }
+        }
+        else if current == CLOSE {
+            move_back = !{
+                condition = ()=> !(layers == 0 && self.open == 1)
+                while_loop(condition, delay = 0.03, (){
+                    wait(0.02)
+                    -> if self.close == 1 {
+                        layers += 1
+                    }
+                    
+                    -> if self.open == 1 {
+                        layers -= 1
+                    }
+                    
+                    wait(0.01)
+                    self.group.move(-spacing, 0)
+                        
+                })
+                
+                ret!
+            }
+            if self.current_cell() != 0 {
+                layers -= 1
+                call_with_delay(0.05, move_back)
+            } else {
+                ret!
+            }
+        }
+        
+        
+    }
+}
+
+offset = [300, 300]
+insert_bf_script("+[+]", offset)
+
+reader = @bfreader::new(offset, 1)
+while_loop(()=>true, (){
+    reader.interpret()
+})

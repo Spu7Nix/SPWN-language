@@ -32,7 +32,7 @@ abs = (num) {
     } else {
         return num
     }
-    
+
 }
 import "text_display_pro.spwn"
 
@@ -52,9 +52,9 @@ right_buttons = [192c, 194c,  802c, 212c]
 activate_button = (activate, deactivate) {
 
     let colors = []
-    
-    
-    
+
+
+
     if activate != null {
         if left_buttons.contains(activate) {
             colors = left_buttons
@@ -76,9 +76,9 @@ activate_button = (activate, deactivate) {
         }
         for col in colors {
             -> col.set(0, 0, 0, 0, blending = true)
-        } 
+        }
     }
-    
+
 }
 
 
@@ -98,16 +98,16 @@ force_stop_layer.alpha(0)
 message_board = 931g
 
 
-bottom_msg_board_up = (){  
+bottom_msg_board_up = (){
     -> message_board.move(0, 10, 1, easing = EXPONENTIAL_OUT)
     -> 216c.set(255, 255, 255, 1)
     -> 942g.move(0, 30, 0.5, easing = EXPONENTIAL_OUT)
 }
 
-bottom_msg_board_down = (){  
+bottom_msg_board_down = (){
     -> message_board.move(0, -10, 1, easing = EXPONENTIAL_IN)
     -> 216c.set(0, 0, 0, 1)
-    -> 942g.move(0, -30, 0.5, easing = EXPONENTIAL_IN)     
+    -> 942g.move(0, -30, 0.5, easing = EXPONENTIAL_IN)
 }
 
 input_char = 26g
@@ -134,7 +134,7 @@ pulse_ptr = (){
     -> 972g.move(0, -1, 0.2, easing = EASE_IN_OUT)
     -> 973g.move(0, 1, 0.2, easing = EASE_IN_OUT)
     -> 974g.move(-1, 0, 0.2, easing = EASE_IN_OUT)
-    -> 975g.move(1, 0, 0.2, easing = EASE_IN_OUT)  
+    -> 975g.move(1, 0, 0.2, easing = EASE_IN_OUT)
 }
 
 // win_condition = "win"
@@ -146,7 +146,7 @@ mem_items = [62i, 54i, 63i, 64i, 58i, 55i, 65i, 60i, 59i, 66i]
 force_stop = !{
     -> 45c.set(prog_ptr_color[0], prog_ptr_color[1], prog_ptr_color[2], blending = true)
     bottom_msg_board_up()
-    
+
     //-> finished_color.set(255, 255, 255, 0)
     ended += 1
 }
@@ -158,9 +158,9 @@ impl @bfreader {
         //$.print("hello")
         //-> BG.pulse(255, 0, 0, fade_out = 0.5)
         //-> std_out.write(counter(5))
-            
-        
-        
+
+
+
         block = ?b
         group = ?g
         $.add(obj {
@@ -190,7 +190,7 @@ impl @bfreader {
             Y: script_offset[1],
             GROUPS: start_point
         })
-        
+
 
         // CREATE CELLS
         let cells = []
@@ -203,9 +203,9 @@ impl @bfreader {
         //ptr.display(script_offset[0], script_offset[1] + 60)
         std_in = counter(85i)
         //std_in.display(script_offset[0], script_offset[1] - 90)
-        
-        
-        
+
+
+
         num_out = counter(61i)
         num_out.display(script_offset[0], script_offset[1] + 210)
         out = @bfreader::{
@@ -227,7 +227,7 @@ impl @bfreader {
             cells: cells,
             start_point: start_point
         }
-        
+
 
         return out
     },
@@ -254,7 +254,7 @@ impl @bfreader {
     },
     current_cell: (self) => self.cells[self.ptr.to_const(..self.cells.length)],
     interpret: (self) {
-        
+
         ret = !{
             supress_signal(0.05)
             -> self.group.move(spacing, 0, 0)
@@ -277,11 +277,11 @@ impl @bfreader {
         //     supress_signal(0.06)
         //     ret!
         // }
-        
+
         current = self.currently_on()
-        
+
         -> if current == RIGHT {
-            
+
             if self.ptr == self.cells.length - 1 {
                 wait()
                 self.ptr -= self.cells.length - 1
@@ -293,8 +293,8 @@ impl @bfreader {
                 -> cell_pointer.move(10,0, 0.1)
                 ret!
             }
-            
-            
+
+
         }
         -> if current == LEFT {
             if self.ptr == 0 {
@@ -308,7 +308,7 @@ impl @bfreader {
                 -> cell_pointer.move(-10,0, 0.1)
                 ret!
             }
-            
+
         }
         -> if current == INCR {
             -> self.current_cell() += 1
@@ -327,7 +327,7 @@ impl @bfreader {
             fast_ret!
         }
         -> if current == DOT {
-            
+
             () {
                 self.num_out.reset(speed = 3)
                 cell = self.current_cell()
@@ -336,9 +336,9 @@ impl @bfreader {
             } ()
             supress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APARENTLY
             // REQUIRED FOR TEXT TO WORK ON MOBILE FOR SOME REASON
-            
+
             self.std_out.write(self.num_out, speed = 1)
-            
+
             slow_ret!
         }
         -> if current == INPUT {
@@ -346,23 +346,23 @@ impl @bfreader {
             std_in = self.std_in
             -> input_layer.alpha(1, 0.5)
 
-            
+
 
             done = !{
-                
+
                 activate_button(null, 802c)
                 activate_button(null, 803c)
-                
+
                 -> input_done_button.pulse(52, 247, 68, fade_out = 0.3)
                 -> input_layer.alpha(0, 0.5)
                 cell = self.current_cell()
                 cell.reset(speed = 1)
                 std_in.add_to([cell], speed = 1, for_each = (n){ input_char.move(100 * n, 0, 0) })
-                
+
                 slow_ret!
             }
 
-            
+
 
             activate_button(802c, null)
             activate_button(803c, null)
@@ -382,7 +382,7 @@ impl @bfreader {
                     done!
                 }
             })
-            
+
         }
         -> if current == OPEN {
             move_to = !{
@@ -391,20 +391,20 @@ impl @bfreader {
                 //layers = counter(0)
                 condition = () => !(layers == 0 && self.close == 1)
                 //self.group.move(spacing, 0)
-                
+
                 while_loop(condition, delay = 0.03, (){
-                    
+
                     wait(0.02)
                     -> if self.open == 1{
                         layers += 1
                     }
-                    
+
                     -> if self.close == 1 {
                         layers -= 1
                     }
 
                     -> if self.end == 1 {
-                        
+
                         force_stop!
                     } else {
                         wait(0.01)
@@ -412,7 +412,7 @@ impl @bfreader {
                         return
                     }
 
-                    
+
                 })
                 -> 45c.set(prog_ptr_color[0], prog_ptr_color[1], prog_ptr_color[2], blending = true)
                 ret!
@@ -438,12 +438,12 @@ impl @bfreader {
                     -> if self.close == 1 {
                         layers += 1
                     }
-                    
+
                     -> if self.open == 1 {
                         layers -= 1
                     }
                     -> if self.end == 1 {
-                        
+
                         force_stop!
                     } else {
                         wait(0.01)
@@ -464,8 +464,8 @@ impl @bfreader {
         -> if current == NOOP {
             fast_ret!
         }
-        
-        
+
+
     }
 }
 
@@ -474,7 +474,7 @@ roll_groups = 70g..170g
 
 
 insert_bf_cmd = (ch: @string, offset: [@number], group: @group) {
-    
+
     blockid = switch ch {
         case ">": RIGHT,//increment the data pointer (to point to the next cell to the right).
         case "<": LEFT,	//decrement the data pointer (to point to the next cell to the left).
@@ -482,14 +482,14 @@ insert_bf_cmd = (ch: @string, offset: [@number], group: @group) {
         case "-": DECR,	//decrement (decrease by one) the byte at the data pointer.
         case ".": DOT,	//output the byte at the data pointer.
         case ",": INPUT,//accept one byte of input, storing its value in the byte at the data pointer.
-        case "[": OPEN,	
+        case "[": OPEN,
         case "]": CLOSE,
         case "end": END,
         case "no\nop": NOOP,
-        
+
     }
-    
-    
+
+
     $.add(obj {
         OBJ_ID: 1816,
         X: offset[0],
@@ -579,10 +579,10 @@ reset_selector_func = !{
     prog_selector.move(-5, 0, 0.1, easing = EASE_IN_OUT)
     block_input -= 1
 
-    
-    
+
+
     activate_button(195c, 196c)
-                
+
 }
 
 y_spacing = 20
@@ -656,7 +656,7 @@ for i in ..commands {
         off = [offset[0] + i * spacing * 3, offset[1] + c * y_spacing * 3]
         insert_bf_cmd(order[c], off, sg)
     }
-    // block that increments the selector 
+    // block that increments the selector
     inc_block = ?b
     $.add(obj {
         OBJ_ID: 1816,
@@ -701,7 +701,7 @@ for i in ..commands {
         sg.move(0, y_spacing * order.length, 0)
         c -= order.length
     })
-    
+
 }
 
 collision(130b, 131b).on_triggered(!{
@@ -765,13 +765,13 @@ reset_env = !{
 start = (){
 
     collision(reset_selector, selector.block).on_triggered(reset_selector_func)
-    
+
 
     touch().on_triggered(!{
-        
+
         if ended == 1 {
             reset_env!
-            
+
             bottom_msg_board_down()
             wait(0.2)
             activate_button(195c, null)
@@ -781,20 +781,20 @@ start = (){
             is_running -= 1
             block_input -= 1
             ended -= 1
-            
+
         } else if is_running == 1 && reader.input != 1 {
             force_quit_taps.item.if_is(SMALLER_THAN, 3, !{
                 force_quit_taps += 1
             })
             force_stop_layer.alpha(1, 0.5)
             force_stop_layer.alpha(0, 2)
-            
+
         }
     })
 
     force_quit_taps.item.count(3).on_triggered(force_stop)
 
-   
+
 
     collision(run_block, selector.block).on_triggered(!{
         is_running += 1
@@ -805,18 +805,18 @@ start = (){
         // wait(0.1)
         // reader.std_out.write(reader.num_out)
         // wait(0.1)
-        
+
         activate_button(null, 195c)
         activate_button(null, 192c)
         run = !{
             wait(0.1)
             reader.group.move(10, 0, 0.05)
             //-> BG.pulse(255, 0, 0, fade_out = 1)
-            
+
             while_loop(()=> reader.end == 0 && force_quit_taps < 3, delay = 0.1, (){
                 reader.interpret()
             })
-            
+
             if force_quit_taps < 3 && ended == 0 {
                 //-> finished_color.set(255, 255, 255, 0)
                 bottom_msg_board_up()
@@ -826,8 +826,8 @@ start = (){
 
         run!
         //call_with_delay(999, run)
-        
-        
+
+
     })
 }
 8c.set(0, 0, 0)
@@ -844,16 +844,16 @@ gs.button_a().on_triggered(!{
     -> right_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
     -> right_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> right_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
-    
-        
-        
+
+
+
     if block_input == 0 {
         -> select_button.pulse(59, 144, 247, fade_out = 0.3)
         -> selector.group.move(0, 30, 0.05, easing = EASE_OUT, easing_rate = 10)
         -> selector.group.move(0, -30, 0.05, easing = EASE_IN, easing_rate = 10)
     }
-        
-    
+
+
 })
 
 gs.button_b().on_triggered(!{
@@ -862,18 +862,18 @@ gs.button_b().on_triggered(!{
     -> left_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
 
     supress_signal(0.1)
-    
-    
-            
+
+
+
     if block_input == 0 {
         -> move_button.pulse(59, 144, 247, fade_out = 0.3)
-        selector.group.move(20, 0, 0.1) 
+        selector.group.move(20, 0, 0.1)
         prog_selector.move(10, 0, 0.1)
-        
+
         //-> 905g.move(0, -150, 0)
         activate_button(196c, 195c)
     }
-        
+
 
 })
 
@@ -881,5 +881,3 @@ gs.button_b().on_triggered(!{
 
 // +++.[->+++++>+++<<]>.>.<-.
 // +++.++++++++++++.------.+++++.
-
-

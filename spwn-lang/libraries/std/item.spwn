@@ -5,7 +5,7 @@ extract constants.obj_props
 extract import "util.spwn"
 
 impl @item {
-    
+
     add:
     #[desc("Implementation of the pickup trigger") example("10i.add(5)")]
     (self, #[desc("Amount to add")] amount: @number) {
@@ -23,17 +23,17 @@ impl @item {
 })
     ")]
     (
-        self, 
-        #[desc("Comparison mode")] comparison: @comparison, 
-        #[desc("Number to compare with")] other: @number, 
+        self,
+        #[desc("Comparison mode")] comparison: @comparison,
+        #[desc("Number to compare with")] other: @number,
         #[desc("Target function if comparison is 'true'")] function: @trigger_function
     ) {
         $.add( trigger{
             OBJ_ID: 1811,
             TARGET: function,
             COUNT: other,
-            ACTIVATE_GROUP: true, 
-            COMPARISON: comparison.id, 
+            ACTIVATE_GROUP: true,
+            COMPARISON: comparison.id,
             ITEM: self,
         })
     },
@@ -45,7 +45,7 @@ on(10i.count(100), !{
 })
     ")]
     (
-        self, 
+        self,
         #[desc("Number to check against")] number: @number = 0
     ) {
         -> return @event::{
@@ -53,13 +53,13 @@ on(10i.count(100), !{
                 OBJ_ID: 1611,
                 TARGET: function,
                 COUNT: number,
-                ACTIVATE_GROUP: true, 
+                ACTIVATE_GROUP: true,
                 ITEM: self,
                 COUNT_MULTI_ACTIVATE: true,
-                
+
             })
         }
-        
+
     },
     _range_: #[desc("Implementation of the range operator (`..`) for item IDs") example("
 for item in 1i..10i {

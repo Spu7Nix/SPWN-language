@@ -1,4 +1,4 @@
-type @textdisplay 
+type @textdisplay
 spacing = 0.6 * 30
 y_spacing = 20
 impl @textdisplay {
@@ -13,7 +13,7 @@ impl @textdisplay {
         let checkers = []
         //WINCO
         for i in ..letters {
-           
+
             group = ?g
             block = ?b
 
@@ -35,7 +35,7 @@ impl @textdisplay {
 
             check_block = ?b
             checkers.push(check_block)
-            
+
             $.add(obj {
                 OBJ_ID: 1816,
                 X: offset[0] + i * spacing - 12,
@@ -57,16 +57,16 @@ impl @textdisplay {
                 })
 
                 cblock = switch order[ch] {
-                    case "I": wincon[0], 
-                    case "N": wincon[1], 
-                    case "C": wincon[2], 
-                    case "O": wincon[3], 
+                    case "I": wincon[0],
+                    case "N": wincon[1],
+                    case "C": wincon[2],
+                    case "O": wincon[3],
                     else: null
                 }
                 //$.print(order[ch], cblock)
                 if cblock != null {
-                    
-                    
+
+
                     $.add(obj {
                         OBJ_ID: 1816,
                         X: offset[0] + i * spacing + (ch + 1) * spacing * letters,
@@ -115,7 +115,7 @@ impl @textdisplay {
                 lock,
                 follow_group,
             })
-            
+
         }
 
         //writer
@@ -174,7 +174,7 @@ impl @textdisplay {
         //     }
         //     read!
         // }
-        
+
         self.writer.move(0, y_spacing, 0)
         -> if letter < 27 {
             -> self.writer.move(-5, 0, 0.2, easing = EXPONENTIAL_OUT)
@@ -189,7 +189,7 @@ impl @textdisplay {
             wait(0.05)
             self.writer.move_to(self.writer_default, x_only = true)
         }
-        
+
     },
 
     reset: (self) {

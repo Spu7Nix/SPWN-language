@@ -81,7 +81,7 @@ impl ValueBody {
         Variable {
             value: ValueLiteral { body: self.clone() },
             operator: None,
-            pos: ((0, 0), (0, 0)),
+            pos: (0, 0),
             //comment: (None, None),
             path: Vec::new(),
             tag: Attribute::new(),
@@ -228,6 +228,7 @@ pub struct Definition {
 pub struct Argument {
     pub symbol: Option<String>,
     pub value: Expression,
+    pub pos: FileRange,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -238,7 +239,7 @@ pub struct Slice {
 }
 
 impl Argument {
-    pub fn from(val: StoredValue) -> Self {
+    pub fn from(val: StoredValue, pos: FileRange) -> Self {
         Argument {
             symbol: None,
             value: Expression {
@@ -246,12 +247,13 @@ impl Argument {
                     value: ValueLiteral::new(ValueBody::Resolved(val)),
                     path: Vec::new(),
                     operator: None,
-                    pos: ((0, 0), (0, 0)),
+                    pos,
                     //comment: (None, None),
                     tag: Attribute::new(),
                 }],
                 operators: Vec::new(),
             },
+            pos,
         }
     }
 }
@@ -274,7 +276,13 @@ pub struct Native {
     pub args: Vec<Argument>,
 }*/
 //                 name         def value     props       type ind.
-pub type ArgDef = (String, Option<Expression>, Attribute, Option<Expression>);
+pub type ArgDef = (
+    String,
+    Option<Expression>,
+    Attribute,
+    Option<Expression>,
+    FileRange,
+);
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
     pub args: Vec<ArgDef>,
@@ -354,11 +362,17 @@ impl Expression {
         Variable {
             operator: None,
             value: ValueLiteral::new(ValueBody::Expression(self.clone())),
-            pos: ((0, 0), (0, 0)),
+            pos: (0, 0),
             path: Vec::new(),
             //comment: (None, None),
             tag: Attribute::new(),
         }
+    }
+
+    pub fn get_pos(&self) -> FileRange {
+        let start = self.values.first().unwrap().pos.0;
+        let end = self.values.last().unwrap().pos.1;
+        (start, end)
     }
 }
 

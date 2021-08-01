@@ -51,11 +51,12 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     )?;
 
     if module.len() > 1 {
-        return Err(RuntimeError::RuntimeError {
-            message: "Documentation of context-splitting libraries is not yet supported!"
-                .to_string(),
-            info: CompilerInfo::new(),
-        });
+        return Err(RuntimeError::CustomError(crate::compiler::create_error(
+            CompilerInfo::new(),
+            "Documentation of context-splitting libraries is not yet supported!",
+            &[],
+            None,
+        )));
     }
 
     let mut doc = format!("# Documentation for `{}` \n", path);
@@ -136,13 +137,13 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
         .iter()
         .filter(|x| matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
-    macro_list.sort_by(|a, b| a.0.cmp(&b.0));
+    macro_list.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut val_list: Vec<(&String, &usize)> = dict
         .iter()
         .filter(|x| !matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
-    val_list.sort_by(|a, b| a.0.cmp(&b.0));
+    val_list.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut document_member = |key: &String, val: &usize| -> String {
         let mut member_doc = String::new();
@@ -255,7 +256,12 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
 fn document_val(val: &Value, globals: &mut Globals) -> String {
     let mut doc = String::new();
     let typ_index = val
-        .member(TYPE_MEMBER_NAME.to_string(), &Context::new(), globals)
+        .member(
+            TYPE_MEMBER_NAME.to_string(),
+            &Context::new(),
+            globals,
+            CompilerInfo::new(),
+        )
         .unwrap();
     let type_id = match globals.stored_values[typ_index] {
         Value::TypeIndicator(t) => t,

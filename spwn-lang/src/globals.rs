@@ -1,5 +1,6 @@
 ///types and functions used by the compiler
 use crate::builtin::*;
+use crate::compiler_info::CodeArea;
 use crate::levelstring::GdObj;
 
 use crate::compiler_types::*;
@@ -9,6 +10,7 @@ use crate::value::*;
 use crate::compiler_info::CompilerInfo;
 use crate::value_storage::*;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::compiler::RuntimeError;
@@ -50,10 +52,12 @@ impl Globals {
     ) -> Result<Group, RuntimeError> {
         match self.stored_values.map.get(&p) {
             Some(val) => Ok(val.fn_context),
-            None => Err(RuntimeError::RuntimeError {
-                message: "Pointer points to no data!".to_string(),
+            None => Err(RuntimeError::CustomError(crate::compiler::create_error(
                 info,
-            }),
+                "Pointer points to no data! (this is probably a bug, please contact a developer)",
+                &[],
+                None,
+            ))),
         }
     }
     pub fn is_mutable(&self, p: StoredValue) -> bool {
@@ -67,6 +71,16 @@ impl Globals {
         self.is_mutable(p)
     }
 
+    pub fn increment_implementations(&mut self) {
+        let mut incremented = HashSet::new();
+        for imp in self.implementations.values() {
+            for (val, _) in imp.values() {
+                self.stored_values
+                    .increment_single_lifetime(*val, 1, &mut incremented);
+            }
+        }
+    }
+
     // pub fn get_fn_context(&self, p: StoredValue) -> Group {
     //     match self.stored_values.map.get(&p) {
     //         Some(val) => val.fn_context,
@@ -77,6 +91,13 @@ impl Globals {
     pub fn get_lifetime(&self, p: StoredValue) -> u16 {
         match self.stored_values.map.get(&p) {
             Some(val) => val.lifetime,
+            None => unreachable!(),
+        }
+    }
+
+    pub fn get_area(&self, p: StoredValue) -> CodeArea {
+        match self.stored_values.map.get(&p) {
+            Some(val) => val.def_area.clone(),
             None => unreachable!(),
         }
     }

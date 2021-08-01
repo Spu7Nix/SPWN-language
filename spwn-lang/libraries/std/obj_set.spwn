@@ -7,12 +7,9 @@ impl @obj_set {
 my_objects = @obj_set::new()
     ")]
     (
-        objects: @array = [], 
+        objects: [@object] = [],
         #[desc("The center group to use for rotation")] group: @group = ?g
     ) {
-        if objects.any(elem => elem.type != @object) {
-            throw "Unsupported type while creating obj_set" 
-        }
 
         return {
             type: @obj_set,
@@ -24,7 +21,7 @@ my_objects = @obj_set::new()
     (self) {
         return self.objects.is_empty();
     },
-    // ! The append builtin is broken at the moment, mutability is not preserved 
+    // ! The append builtin is broken at the moment, mutability is not preserved
     push: #[desc("Add new objects to the set")]
     (self, object: @object) {
         let to_push = object;

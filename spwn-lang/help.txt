@@ -3,23 +3,23 @@ Usage: spwn [subcommand] [flags]
 Subcommands:
     build [script file], b [script file]
     Runs/builds a given file
-    
+
     doc [library path]
     Generates documentation for a SPWN library, in the form of a markdown file
 
     version, -v, --version
-    Gets the version of spwn you are using.
+    Gets the version of spwn
 
 Flags:
     --console-output, -c
-    Makes the script print the created level into the console instead of 
+    Makes the script print the created level into the console instead of
     writing it to your save file
 
     --no-level, -l
     Only compiles the script, no level creation at all
-    
+
     --no-optimize, -o
-    Removes post-optimization of triggers, making the output more readable, 
+    Removes post-optimization of triggers, making the output more readable,
     while also using a lot more objects and groups
 
     --level-name [name], -n [name]

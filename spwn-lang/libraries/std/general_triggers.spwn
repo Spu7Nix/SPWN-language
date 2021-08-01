@@ -6,7 +6,7 @@ extract constants.comparisons
 extract import "control_flow.spwn"
 
 return {
-    
+
     shake: #[desc("Implementation of the shake trigger") example("shake()")]
     (
         #[desc("Strength value")] strength: @number = 1,
@@ -39,7 +39,7 @@ return {
             OBJ_ID: 1613,
         })
     },
-    
+
     hide_player: #[desc("Hides the player") example("hide_player()")] (){
         $.add( trigger{
             OBJ_ID: 1612,
@@ -60,6 +60,6 @@ return {
         }
     },
 
-    
-        
+
+
 }

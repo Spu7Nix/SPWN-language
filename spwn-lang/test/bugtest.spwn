@@ -1,7 +1,11 @@
-let move_funcs = []
-dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]]
-for d in dirs {
-    move_funcs.push(!{ 10g.move(d[0] * 300, d[1] * 300, 10) })
+#[no_std]
+
+@array::depth = (arr: @array) {
+    $.print("Hi")
+    if arr[0].type == @number {
+        return 1
+    } else {
+        return 1 + @array::depth(arr[0])
+    }
 }
-dir = counter(0)
-on(touch(), !{ move_funcs[dir.to_const(..4)]! })
+
