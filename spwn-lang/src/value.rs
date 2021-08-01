@@ -8,6 +8,7 @@ use crate::compiler_info::CompilerInfo;
 use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};
 //use std::boxed::Box;
 
+use internment::Intern;
 use smallvec::smallvec;
 
 use std::collections::HashMap;
@@ -50,15 +51,15 @@ pub struct Macro {
         CodeArea,
     )>,
     pub def_context: Context,
-    pub def_file: PathBuf,
+    pub def_file: Intern<PathBuf>,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Attribute,
 }
 impl Macro {
     pub fn get_arg_area(&self) -> CodeArea {
         assert!(!self.args.is_empty());
-        let first = self.args.first().unwrap().4.clone();
-        let last = self.args.last().unwrap().4.clone();
+        let first = self.args.first().unwrap().4;
+        let last = self.args.last().unwrap().4;
         assert_eq!(first.file, last.file);
         CodeArea {
             pos: (first.pos.0, last.pos.1),
@@ -447,10 +448,10 @@ pub fn convert_type(
         (Value::Range(start, end, step), 10) => {
             Value::Array(if start < end {
                 (*start..*end).step_by(*step).map(|x|
-                    store_value(Value::Number(x as f64), 1, globals, context, info.position.clone())).collect::<Vec<StoredValue>>()
+                    store_value(Value::Number(x as f64), 1, globals, context, info.position)).collect::<Vec<StoredValue>>()
             } else {
                 (*end..*start).step_by(*step).rev().map(|x|
-                    store_value(Value::Number(x as f64), 1, globals, context, info.position.clone())).collect::<Vec<StoredValue>>()
+                    store_value(Value::Number(x as f64), 1, globals, context, info.position)).collect::<Vec<StoredValue>>()
             })
         },
 
@@ -471,7 +472,7 @@ pub fn convert_type(
             }
         },
         (Value::Str(s), 1) => {
-            Value::Array(s.chars().map(|x| store_value(Value::Str(x.to_string()), 1, globals, context, info.position.clone())).collect::<Vec<StoredValue>>())
+            Value::Array(s.chars().map(|x| store_value(Value::Str(x.to_string()), 1, globals, context, info.position)).collect::<Vec<StoredValue>>())
         },
         
 
@@ -519,7 +520,7 @@ pub fn convert_type(
 
 //copied from https://stackoverflow.com/questions/59401720/how-do-i-find-the-key-for-a-value-in-a-hashmap
 pub fn find_key_for_value(
-    map: &HashMap<String, (u16, PathBuf, (usize, usize))>,
+    map: &HashMap<String, (u16, CodeArea)>,
     value: u16,
 ) -> Option<&String> {
     map.iter()
@@ -570,7 +571,7 @@ pub fn macro_to_value(
                         globals,
                         defaults.1.start_group,
                         true,
-                        info.position.clone(),
+                        info.position,
                     ))
                 }
                 None => None,
@@ -589,7 +590,7 @@ pub fn macro_to_value(
                 pat,
                 CodeArea {
                     pos: *pos,
-                    ..info.position.clone()
+                    ..info.position
                 },
             ));
         }
@@ -600,13 +601,13 @@ pub fn macro_to_value(
                     args,
                     body: m.body.statements.clone(),
                     def_context: defaults.1.clone(),
-                    def_file: info.position.file.clone(),
+                    def_file: info.position.file,
                     tag: m.properties.clone(),
                 })),
                 1,
                 globals,
                 context,
-                info.position.clone(),
+                info.position,
             ),
             defaults.1,
         ))
@@ -685,7 +686,7 @@ impl ast::Variable {
                     1,
                     globals,
                     &context,
-                    info.position.clone(),
+                    info.position,
                 ),
                 context.clone(),
             )),
@@ -695,7 +696,7 @@ impl ast::Variable {
                     1,
                     globals,
                     &context,
-                    info.position.clone(),
+                    info.position,
                 ),
                 context.clone(),
             )),
@@ -715,7 +716,7 @@ impl ast::Variable {
                         1,
                         globals,
                         &context,
-                        info.position.clone(),
+                        info.position,
                     ),
                     context.clone(),
                 ));
@@ -728,7 +729,7 @@ impl ast::Variable {
             }
 
             ast::ValueBody::Bool(b) => start_val.push((
-                store_const_value(Value::Bool(*b), 1, globals, &context, info.position.clone()),
+                store_const_value(Value::Bool(*b), 1, globals, &context, info.position),
                 context.clone(),
             )),
             ast::ValueBody::Symbol(string) => {
@@ -753,7 +754,7 @@ impl ast::Variable {
                     1,
                     globals,
                     &context,
-                    info.position.clone(),
+                    info.position,
                 ),
                 context.clone(),
             )),
@@ -778,7 +779,7 @@ impl ast::Variable {
                                                 true, // will be changed
                                                 CodeArea {
                                                     pos: a[i].get_pos(),
-                                                    ..info.position.clone()
+                                                    ..info.position
                                                 },
                                             )
                                         })
@@ -787,7 +788,7 @@ impl ast::Variable {
                                 1,
                                 globals,
                                 &context,
-                                info.position.clone(),
+                                info.position,
                             ),
                             x.1.clone(),
                         )
@@ -807,7 +808,7 @@ impl ast::Variable {
                             1,
                             globals,
                             &context,
-                            info.position.clone(),
+                            info.position,
                         ),
                         None => {
                             return Err(RuntimeError::UndefinedErr {
@@ -1076,7 +1077,7 @@ impl ast::Variable {
                                         val_def: globals.get_area(*id.unwrap()),
                                         info,
                                     })
-                                }, Some(globals.stored_values[*pattern.unwrap()].clone()))
+                                }, Some((globals.stored_values[*pattern.unwrap()].clone(), *pattern.unwrap())))
 
                             }
                             a => {
@@ -1095,14 +1096,15 @@ impl ast::Variable {
                                 let val = globals.stored_values[o_val].clone();
 
                                 if let Some(pat) = pattern { // check if pattern is actually enforced (not null)
-                                    if !val.matches_pat(&pat, &info, globals, &context)? {
-                                       
-                                        return Err(RuntimeError::TypeError {
-                                            expected: pat.to_str(globals),
-                                            found: val.get_type_str(globals),
+                                    if !val.matches_pat(&pat.0, &info, globals, &context)? {
+                                        return Err(RuntimeError::PatternMismatchError {
+                                            pattern: pat.0.to_str(globals),
+                                            val: val.get_type_str(globals),
                                             val_def: globals.get_area(o_val),
-                                            info,
-                                        })
+                                            pat_def: globals.get_area(pat.1),
+                                            info
+                                        });
+                                        
                                     }
                                 }
                                 let err = Err(RuntimeError::CustomError(create_error(
@@ -1176,7 +1178,7 @@ impl ast::Variable {
                             1,
                             globals,
                             &context,
-                            info.position.clone(),
+                            info.position,
                         ),
                         context,
                     ));
@@ -1423,7 +1425,7 @@ impl ast::Variable {
                                                         ObjParam::GroupList(g) => {
                                                             let mut out = Vec::new();
                                                             for s in g {
-                                                                let stored = store_const_value(Value::Group(*s), 1, globals, &index.1, info.position.clone());
+                                                                let stored = store_const_value(Value::Group(*s), 1, globals, &index.1, info.position);
                                                                 out.push(stored);
                                                             }
                                                             Value::Array(out)
@@ -1431,12 +1433,12 @@ impl ast::Variable {
 
                                                         ObjParam::Epsilon => {
                                                             let mut map = HashMap::<String, StoredValue>::new();
-                                                            let stored = store_const_value(Value::TypeIndicator(20), 1, globals, &index.1,info.position.clone());
+                                                            let stored = store_const_value(Value::TypeIndicator(20), 1, globals, &index.1,info.position);
                                                             map.insert(TYPE_MEMBER_NAME.to_string(), stored);
                                                             Value::Dict(map)
                                                         }
                                                     };
-                                                    let stored = store_const_value(out_val, globals.stored_values.map.get(&prev_v).unwrap().lifetime, globals, &index.1,info.position.clone());
+                                                    let stored = store_const_value(out_val, globals.stored_values.map.get(&prev_v).unwrap().lifetime, globals, &index.1,info.position);
                                                     new_out.push((stored, index.1, prev_v));
                                                     break;
                                                 }
@@ -1507,7 +1509,7 @@ impl ast::Variable {
                                                 1,
                                                 globals,
                                                 &index.1,
-                                                info.position.clone(),
+                                                info.position,
                                             );
 
                                             new_out.push((stored, index.1, prev_v));
@@ -1580,7 +1582,7 @@ impl ast::Variable {
                         match globals.stored_values[*prev_v].clone() {
                             Value::TypeIndicator(t) => {
                                 let (dicts, returns) = ast::ValueBody::Dictionary(defs.clone())
-                                    .to_variable()
+                                    .to_variable(info.position.pos)
                                     .to_value(prev_c.clone(), globals, info.clone(), constant)?;
                                 inner_returns.extend(returns);
                                 for dict in &dicts {
@@ -1589,7 +1591,7 @@ impl ast::Variable {
                                         1,
                                         globals,
                                         &context,
-                                        info.position.clone(),
+                                        info.position,
                                     );
                                     if let Value::Dict(map) = &mut globals.stored_values[dict.0] {
                                         (*map).insert(TYPE_MEMBER_NAME.to_string(), stored_type);
@@ -1698,7 +1700,7 @@ impl ast::Variable {
                                             1,
                                             globals,
                                             &context,
-                                            info.position.clone(),
+                                            info.position,
                                         ),
                                         context,
                                     ))
@@ -1924,9 +1926,9 @@ impl ast::Variable {
 
         let value = match &self.operator {
             Some(ast::UnaryOperator::Let) => {
-                store_value(Value::Null, 1, globals, context, info.position.clone())
+                store_value(Value::Null, 1, globals, context, info.position)
             }
-            None => store_const_value(Value::Null, 1, globals, context, info.position.clone()),
+            None => store_const_value(Value::Null, 1, globals, context, info.position),
             a => {
                 
 
@@ -1963,7 +1965,7 @@ impl ast::Variable {
                         1,
                         globals,
                         context,
-                        info.position.clone(),
+                        info.position,
                     )
                 } else {
                     return Err(RuntimeError::CustomError(create_error(
@@ -2067,14 +2069,14 @@ impl ast::Variable {
                                             .unwrap();
                                         if !stored.mutable {
                                             return Err(RuntimeError::MutabilityError {
-                                                val_def: stored.def_area.clone(),
+                                                val_def: stored.def_area,
                                                 info: info.clone(),
                                             });
                                         }
                                         let fn_context = context.start_group;
                                         if stored.fn_context != fn_context {
                                             return Err(RuntimeError::ContextChangeMutateError {
-                                                val_def: stored.def_area.clone(),
+                                                val_def: stored.def_area,
                                                 info: info.clone(),
                                                 context_changes: context.fn_context_change_stack.clone()
                                             });

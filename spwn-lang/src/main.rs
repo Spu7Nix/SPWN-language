@@ -31,8 +31,8 @@ use optimize::optimize;
 
 use parser::*;
 
-use std::env;
 use std::path::PathBuf;
+use std::{collections::HashSet, env};
 
 use std::fs;
 
@@ -217,10 +217,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         } else {
                             String::new()
                         };
+                        let mut reserved_groups = HashSet::new();
+                        for obj in &compiled.objects {
+                            for param in obj.params.values() {
+                                match &param {
+                                    levelstring::ObjParam::Group(g) => {
+                                        reserved_groups.insert(*g);
+                                    }
+                                    levelstring::ObjParam::GroupList(g) => {
+                                        reserved_groups.extend(g);
+                                    }
+                                    _ => (),
+                                }
+                            }
+                        }
+
                         let has_stuff = compiled.func_ids.iter().any(|x| !x.obj_list.is_empty());
                         if opti_enabled && has_stuff {
                             print_with_color("Optimizing triggers...", Color::Cyan);
-                            compiled.func_ids = optimize(compiled.func_ids, compiled.closed_groups);
+                            compiled.func_ids = optimize(
+                                compiled.func_ids,
+                                compiled.closed_groups,
+                                &reserved_groups,
+                            );
                         }
 
                         let mut objects = levelstring::apply_fn_ids(&compiled.func_ids);

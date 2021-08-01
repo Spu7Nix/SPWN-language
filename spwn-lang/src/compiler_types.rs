@@ -98,7 +98,7 @@ pub fn handle_operator(
                                 1,
                                 globals,
                                 context,
-                                info.position.clone()
+                                info.position
                             ),
                             context.clone(),
                         )]);
@@ -117,7 +117,7 @@ pub fn handle_operator(
                                 globals,
                                 context.start_group,
                                 false,
-                                info.position.clone(),
+                                info.position,
                             ),
                             info.position.pos,
                         )],
@@ -141,7 +141,7 @@ pub fn handle_operator(
                         1,
                         globals,
                         context,
-                        info.position.clone()
+                        info.position
                     ),
                     context.clone(),
                 )]
@@ -159,7 +159,7 @@ pub fn handle_operator(
                     1,
                     globals,
                     context,
-                    info.position.clone()
+                    info.position
                 ),
                 context.clone(),
             )]
@@ -201,7 +201,7 @@ pub fn handle_unary_operator(
                         1,
                         globals,
                         context,
-                        info.position.clone()
+                        info.position
                     ),
                     context.clone(),
                 )]
@@ -213,7 +213,7 @@ pub fn handle_unary_operator(
                     1,
                     globals,
                     context,
-                    info.position.clone()
+                    info.position
                 ),
                 context.clone(),
             )]
@@ -411,10 +411,11 @@ pub fn execute_macro(
                                 let pat = globals.stored_values[t].clone();
 
                                 if !val.matches_pat(&pat, &info, globals, context)? {
-                                    return Err(RuntimeError::TypeError {
-                                        expected: pat.to_str(globals),
-                                        found: val.get_type_str(globals),
+                                    return Err(RuntimeError::PatternMismatchError {
+                                        pattern: pat.to_str(globals),
+                                        val: val.get_type_str(globals),
                                         val_def: globals.get_area(arg_values[i]),
+                                        pat_def: globals.get_area(t),
                                         info: info.clone().with_area(CodeArea {
                                             pos: arg.pos,
                                             ..info.position
@@ -461,12 +462,13 @@ pub fn execute_macro(
                             let pat = globals.stored_values[t].clone();
 
                             if !val.matches_pat(&pat, &info, globals, context)? {
-                                return Err(RuntimeError::TypeError {
-                                    expected: pat.to_str(globals),
+                                return Err(RuntimeError::PatternMismatchError {
+                                    pattern: pat.to_str(globals),
+                                    val: val.get_type_str(globals),
                                     val_def: globals.get_area(arg_values[i]),
-                                    found: val.get_type_str(globals),
+                                    pat_def: globals.get_area(t),
                                     info: info.clone().with_area(CodeArea {
-                                        pos: arg.value.get_pos(),
+                                        pos: arg.pos,
                                         ..info.position
                                     }),
                                 });
@@ -481,7 +483,7 @@ pub fn execute_macro(
                                 globals,
                                 context.start_group,
                                 true,
-                                m.args[def_index].4.clone(),
+                                m.args[def_index].4,
                             ),
                         );
                         def_index += 1;
@@ -497,7 +499,7 @@ pub fn execute_macro(
                         "
 This macro requires a parent (a \"self\" value), but it seems to have been called alone (or on a null value).
 Should be used like this: value.macro(arguments)",
-                        &[(m.args[0].4.clone(), "Macro defined as taking a 'self' argument here"), (info.position, "Called alone here")],
+                        &[(m.args[0].4, "Macro defined as taking a 'self' argument here"), (info.position, "Called alone here")],
                         None,
                     )));
                 }
@@ -511,14 +513,7 @@ Should be used like this: value.macro(arguments)",
                         Some(default) => {
                             new_variables.insert(
                                 arg.0.clone(),
-                                clone_value(
-                                    *default,
-                                    1,
-                                    globals,
-                                    context.start_group,
-                                    true,
-                                    arg.4.clone(),
-                                ),
+                                clone_value(*default, 1, globals, context.start_group, true, arg.4),
                             );
                         }
 
@@ -527,7 +522,7 @@ Should be used like this: value.macro(arguments)",
                                 info.clone(),
                                 &format!("Non-optional argument '{}' not satisfied!", arg.0),
                                 &[
-                                    (arg.4.clone(), "Value defined as mandatory here (because no default was given)"),
+                                    (arg.4, "Value defined as mandatory here (because no default was given)"),
                                     (info.position, "Argument not provided here")
                                 ],
                                 None,
@@ -583,7 +578,7 @@ Should be used like this: value.macro(arguments)",
                 return Err(RuntimeError::BreakNeverUsedError {
                     breaktype: *r,
                     info: i.clone(),
-                    broke: i.position.clone(),
+                    broke: i.position,
                     dropped: info.position,
                     reason: "the macro ended".to_string(),
                 });
@@ -600,7 +595,7 @@ Should be used like this: value.macro(arguments)",
 
     for (_, c) in &mut returns {
         if c.start_group != fn_context {
-            c.fn_context_change_stack.push(info.position.clone());
+            c.fn_context_change_stack.push(info.position);
         }
     }
 
@@ -707,7 +702,7 @@ pub fn eval_dict(
                             globals,
                             expressions.1.start_group,
                             !globals.is_mutable(expressions.0[expr_index]),
-                            info.position.clone(),
+                            info.position,
                         ),
                     );
                 }
@@ -718,7 +713,6 @@ pub fn eval_dict(
                         globals,
                         expressions.1.start_group,
                         !globals.is_mutable(expressions.0[expr_index]),
-                        info.position.clone(),
                     );
                     dict_out.extend(match val.clone() {
                         Value::Dict(d) => d.clone(),
@@ -735,13 +729,7 @@ pub fn eval_dict(
             };
         }
         out.push((
-            store_value(
-                Value::Dict(dict_out),
-                1,
-                globals,
-                context,
-                info.position.clone(),
-            ),
+            store_value(Value::Dict(dict_out), 1, globals, context, info.position),
             expressions.1,
         ));
     }
@@ -769,7 +757,7 @@ impl ast::CompoundStatement {
         new_context.start_group = start_group;
 
         let new_info = info.clone();
-        new_context.fn_context_change_stack = vec![info.position.clone()];
+        new_context.fn_context_change_stack = vec![info.position];
         let (contexts, inner_returns) =
             compile_scope(&self.statements, smallvec![new_context], globals, new_info)?;
 

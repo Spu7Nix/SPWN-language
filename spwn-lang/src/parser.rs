@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use ariadne::Fmt;
+use internment::Intern;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
@@ -92,13 +93,13 @@ impl From<SyntaxError> for ErrorReport {
             } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: file.clone(),
+                    file: Intern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file,
+                        file: Intern::new(file),
                     },
                     &format!(
                         "{} {}, {} {}",
@@ -114,13 +115,13 @@ impl From<SyntaxError> for ErrorReport {
             SyntaxError::UnexpectedErr { found, pos, file } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: file.clone(),
+                    file: Intern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file,
+                        file: Intern::new(file),
                     },
                     &format!("Unexpected {}", found),
                 )],
@@ -130,13 +131,13 @@ impl From<SyntaxError> for ErrorReport {
             SyntaxError::SyntaxError { message, pos, file } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: file.clone(),
+                    file: Intern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file,
+                        file: Intern::new(file),
                     },
                     &message,
                 )],
@@ -1394,7 +1395,9 @@ fn parse_dict(
                         tokens.previous();
                         defs.push(ast::DictDef::Def((
                             symbol.clone(),
-                            ast::ValueBody::Symbol(symbol).to_variable().to_expression(),
+                            ast::ValueBody::Symbol(symbol)
+                                .to_variable(tokens.position())
+                                .to_expression(),
                         )));
                     }
 
@@ -1409,7 +1412,9 @@ fn parse_dict(
                         }
                         defs.push(ast::DictDef::Def((
                             symbol.clone(),
-                            ast::ValueBody::Symbol(symbol).to_variable().to_expression(),
+                            ast::ValueBody::Symbol(symbol)
+                                .to_variable(tokens.position())
+                                .to_expression(),
                         )));
                         //tokens.previous();
                         break;
