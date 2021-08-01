@@ -208,6 +208,13 @@ $.assert(arr.sort() == [1, 2, 3, 5, 5])
             throw "Unsupported type in array " + self as @string
         }
     },
+    copy: #[desc("Returns a shallow copy of the array") example("
+arr = [5, 6, 7]
+assert(arr == arr.copy())
+    ")]
+    (self) {
+        return self.map(x => x)
+    },
     shift: #[desc("Removes the first index from the array and returns it.") example("
 let arr = [5, 1, 5, 3, 2]
 $.assert(arr.shift() == 5)
