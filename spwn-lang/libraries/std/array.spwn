@@ -12,24 +12,33 @@ $.assert(!arr2.is_empty())
     max: #[desc("Gets the highest number in the array.") example("
 arr = [3, 1, 4, 1]
 $.assert(arr.max() == 4)
+
+arr = ['abc', 'b', 'abdc']
+$.assert(arr.max(key = (el: @string) => el.length) == 'abdc')
     ")]
-    (self, minval = -999999999999) {
-        let highest = minval
+    (self, key: @macro = (el) => el) {
+        let highest = self[0]
+
         for el in self {
-            if el > highest {
+            if key(el) > key(highest) {
                 highest = el
             }
         }
+        
         return highest
     },
     min: #[desc("Gets the lowest number in the array.") example("
 arr = [3, 1, 4, 1]
 $.assert(arr.min() == 1)
+
+arr = ['abc', 'b', 'abdc']
+$.assert(arr.max(key = (el: @string) => el.length) == 'b')
     ")]
-    (self, max_val = 999999999999) {
-        let lowest = max_val
+    (self, key: @macro = (el) => el) {
+        let lowest = self[0]
+
         for el in self {
-            if el < lowest {
+            if key(el) < key(lowest) {
                 lowest = el
             }
         }
