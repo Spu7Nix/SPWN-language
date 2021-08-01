@@ -1271,7 +1271,7 @@ pub fn build_instant_count_network<'a>(
 //                 .enumerate()
 //                 .collect();
 //         } else {
-//             //dangeling
+//             //dangling
 
 //             return Some(Vec::new());
 //         }
@@ -1946,7 +1946,7 @@ pub fn get_all_ic_connections(
                     we can't simplify the three expressions together, because we need the result of the 2nd one to happen before it's result
                     therefore, the chain is split before the third expression
 
-                    it cannot add the new inputs to the set because it's used in the current loop, but it doens't matter since the set is not used after this.
+                    it cannot add the new inputs to the set because it's used in the current loop, but it doesn't matter since the set is not used after this.
                     */
 
                     out.extend(traverse(
