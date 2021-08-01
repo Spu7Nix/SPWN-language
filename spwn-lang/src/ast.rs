@@ -210,6 +210,7 @@ pub enum Path {
     Member(String),
     Associated(String),
     Index(Expression),
+    NSlice(Vec<Slice>),
     Call(Vec<Argument>),
     Constructor(Vec<DictDef>),
     Increment,
@@ -227,6 +228,13 @@ pub struct Definition {
 pub struct Argument {
     pub symbol: Option<String>,
     pub value: Expression,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Slice {
+    pub left: Option<Expression>,
+    pub right: Option<Expression>,
+    pub step: Option<Expression>
 }
 
 impl Argument {

@@ -1258,6 +1258,26 @@ impl ast::Variable {
                     }
                 }
 
+                ast::Path::NSlice(slices) => {
+                    //TODO: nslice
+                    let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
+                    for (prev_v, prev_c, _) in with_parent.clone() {
+                        match globals.stored_values[prev_v].clone() {
+                            Value::Array(arr) => (),
+                            Value::Str(st) => (),
+                            a => {
+                                return Err(RuntimeError::RuntimeError {
+                                    message: format!(
+                                        "Cannot slice this type: {}",
+                                        a.to_str(globals)
+                                    ),
+                                    info,
+                                })
+                            }
+                        }
+                    }
+                }
+
                 ast::Path::Index(i) => {
                     let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
 

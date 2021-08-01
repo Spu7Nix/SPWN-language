@@ -3,13 +3,24 @@
 mod ast;
 mod builtin;
 mod compiler;
+mod compiler_info;
 mod compiler_types;
 mod documentation;
 mod fmt;
+mod globals;
 mod levelstring;
 mod parser;
-
+mod value;
 mod optimize;
+mod context;
+#[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
+#[cfg_attr(windows, path = "editorlive_win.rs")]
+#[cfg_attr(
+    not(any(target_os = "macos", windows)),
+    path = "editorlive_unavailable.rs"
+)]
+mod editorlive;
+mod value_storage;
 
 //#[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
 //#[cfg_attr(windows, path = "editorlive_win.rs")]

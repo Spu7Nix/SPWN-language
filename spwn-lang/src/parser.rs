@@ -455,6 +455,7 @@ impl<'a> Tokens<'a> {
             next_element
         }
     }
+
     fn previous(&mut self) -> Option<Token> {
         /*self.index += 1;
         let len = self.stack.len();
@@ -1765,6 +1766,26 @@ pub fn str_content(
     Ok(out)
 }
 
+fn check_if_slice(
+    mut tokens: Tokens,
+    notes: &mut ParseNotes
+) -> Result<bool, SyntaxError> {
+    loop {
+        match tokens.next(false) {
+            Some(Token::Colon) => {
+                return Ok(true);
+            },
+            Some(Token::ClosingSquareBracket) => {
+                return Ok(false);
+            },
+            _ => {
+                tokens.previous_no_ignore(false);
+                parse_expr(&mut tokens, notes, true, true)?;
+            }
+        };
+    }
+}
+
 fn parse_variable(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
@@ -2077,23 +2098,73 @@ fn parse_variable(
     loop {
         match tokens.next(true) {
             Some(Token::OpenSquareBracket) => {
-                let index = parse_expr(tokens, notes, true, true)?;
-                match tokens.next(false) {
-                    Some(Token::ClosingSquareBracket) => path.push(ast::Path::Index(index)),
-                    a => {
-                        return Err(SyntaxError::ExpectedErr {
-                            expected: "]".to_string(),
-                            found: format!(
-                                "{}: \"{}\"",
-                                match a {
-                                    Some(t) => t.typ(),
-                                    None => "EOF",
+                if check_if_slice(tokens.clone(), notes)? {
+                    println!("slice me uwu");
+                    let mut slices = Vec::<ast::Slice>::new();
+                    'main: loop {
+                        let mut curr_slice = ast::Slice {
+                            left: None,
+                            right: None,
+                            step: None
+                        };
+                        let mut colon_pos = tokens.position();
+                        let mut i: i32 = 0;
+                        loop { 
+                            match tokens.next(false) {
+                                Some(Token::Colon) => colon_pos = tokens.position(),
+
+                                Some(Token::ClosingSquareBracket) => {
+                                    slices.push(curr_slice);
+                                    break 'main;
                                 },
-                                tokens.slice()
-                            ),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        })
+                                Some(Token::Comma) => {
+                                    slices.push(curr_slice);
+                                    continue 'main;
+                                },
+                                _ => {
+                                    tokens.previous_no_ignore(false);
+                                    let result = parse_expr(tokens, notes, true, true)?;
+                                    match i {
+                                        0 => curr_slice.left = Some(result),
+                                        1 => curr_slice.right = Some(result),
+                                        2 => curr_slice.step = Some(result),
+                                        _ => {
+                                            return Err(SyntaxError::ExpectedErr {
+                                                expected: "]".to_string(),
+                                                found: ":".to_string(),
+                                                pos: colon_pos,
+                                                file: notes.file.clone(),
+                                            })
+                                        }
+                                    };
+                                    i+=1;
+                                }
+
+                            };
+                        }
+                    }
+                    println!("we have {} slices", slices.len());
+                    path.push(ast::Path::NSlice(slices));
+                } else {
+                    let index = parse_expr(tokens, notes, true, true)?;
+                    match tokens.next(false) {
+                        Some(Token::ClosingSquareBracket) => path.push(ast::Path::Index(index)),
+
+                        a => {
+                            return Err(SyntaxError::ExpectedErr {
+                                expected: "]".to_string(),
+                                found: format!(
+                                    "{}: \"{}\"",
+                                    match a {
+                                        Some(t) => t.typ(),
+                                        None => "EOF",
+                                    },
+                                    tokens.slice()
+                                ),
+                                pos: tokens.position(),
+                                file: notes.file.clone(),
+                            })
+                        }
                     }
                 }
             }

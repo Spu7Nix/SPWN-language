@@ -10,10 +10,6 @@ edition = "2018"
 name = "spwn"
 path = "src/main.rs"
 
-[lib]
-name = "spwn"
-path = "src/lib.rs"
-
 [dependencies]
 quick-xml = "0.17.2"
 base64 = "0.2.1"
