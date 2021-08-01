@@ -4,6 +4,7 @@ use crate::compiler::create_error;
 use crate::compiler::import_module;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
+use crate::parser::FileRange;
 use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};
 //use std::boxed::Box;
 
@@ -52,6 +53,18 @@ pub struct Macro {
     pub def_file: PathBuf,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Attribute,
+}
+impl Macro {
+    pub fn get_arg_area(&self) -> CodeArea {
+        assert!(!self.args.is_empty());
+        let first = self.args.first().unwrap().4.clone();
+        let last = self.args.last().unwrap().4.clone();
+        assert_eq!(first.file, last.file);
+        CodeArea {
+            pos: (first.pos.0, last.pos.1),
+            file: first.file,
+        }
+    }
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct TriggerFunction {
@@ -2054,14 +2067,14 @@ impl ast::Variable {
                                             .unwrap();
                                         if !stored.mutable {
                                             return Err(RuntimeError::MutabilityError {
-                                                val_def: stored.area.clone(),
+                                                val_def: stored.def_area.clone(),
                                                 info: info.clone(),
                                             });
                                         }
                                         let fn_context = context.start_group;
                                         if stored.fn_context != fn_context {
                                             return Err(RuntimeError::ContextChangeMutateError {
-                                                val_def: stored.area.clone(),
+                                                val_def: stored.def_area.clone(),
                                                 info: info.clone(),
                                                 context_changes: context.fn_context_change_stack.clone()
                                             });

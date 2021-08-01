@@ -97,7 +97,7 @@ impl Globals {
 
     pub fn get_area(&self, p: StoredValue) -> CodeArea {
         match self.stored_values.map.get(&p) {
-            Some(val) => val.area.clone(),
+            Some(val) => val.def_area.clone(),
             None => unreachable!(),
         }
     }

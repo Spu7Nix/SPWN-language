@@ -22,7 +22,7 @@ pub struct StoredValData {
     pub fn_context: Group,
     pub mutable: bool,
     pub lifetime: u16,
-    pub area: CodeArea,
+    pub def_area: CodeArea,
 }
 /*
 LIFETIME:
@@ -62,7 +62,7 @@ impl ValStorage {
                         fn_context: Group::new(0),
                         mutable: false,
                         lifetime: 1,
-                        area: CodeArea::new(),
+                        def_area: CodeArea::new(),
                     },
                 ),
                 (
@@ -72,7 +72,7 @@ impl ValStorage {
                         fn_context: Group::new(0),
                         mutable: false,
                         lifetime: 1,
-                        area: CodeArea::new(),
+                        def_area: CodeArea::new(),
                     },
                 ),
             ]
@@ -200,7 +200,7 @@ pub fn store_value(
             fn_context: context.start_group,
             mutable,
             lifetime,
-            area,
+            def_area: area,
         },
     );
     (*globals).val_id += 1;
@@ -297,7 +297,7 @@ pub fn clone_value(
             fn_context,
             mutable: !constant,
             lifetime,
-            area,
+            def_area: area,
         },
     );
     (*globals).val_id += 1;
@@ -329,7 +329,7 @@ pub fn clone_value_to(
             fn_context,
             mutable: !constant,
             lifetime,
-            area,
+            def_area: area,
         },
     );
 }
@@ -356,7 +356,7 @@ pub fn store_const_value(
             fn_context: context.start_group,
             mutable: false,
             lifetime,
-            area,
+            def_area: area,
         },
     );
     (*globals).val_id += 1;
@@ -380,7 +380,7 @@ pub fn store_val_m(
             fn_context: context.start_group,
             mutable: !constant,
             lifetime,
-            area,
+            def_area: area,
         },
     );
     (*globals).val_id += 1;

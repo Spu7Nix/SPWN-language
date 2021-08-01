@@ -110,14 +110,17 @@ pub fn handle_operator(
                         *m,
                         //copies argument so the original value can't be mutated
                         //prevents side effects and shit
-                        vec![ast::Argument::from(clone_value(
-                            value2,
-                            1,
-                            globals,
-                            context.start_group,
-                            false,
-                            info.position.clone(),
-                        ))],
+                        vec![ast::Argument::from(
+                            clone_value(
+                                value2,
+                                1,
+                                globals,
+                                context.start_group,
+                                false,
+                                info.position.clone(),
+                            ),
+                            info.position.pos,
+                        )],
                     ),
                     context,
                     globals,
@@ -418,7 +421,10 @@ pub fn execute_macro(
                                         expected: pat.to_str(globals),
                                         found: val.get_type_str(globals),
                                         val_def: globals.get_area(arg_values[i]),
-                                        info,
+                                        info: info.clone().with_area(CodeArea {
+                                            pos: arg.pos,
+                                            ..info.position
+                                        }),
                                     });
                                 }
                             };
@@ -427,7 +433,10 @@ pub fn execute_macro(
                         } else {
                             return Err(RuntimeError::UndefinedErr {
                                 undefined: name.clone(),
-                                info,
+                                info: info.clone().with_area(CodeArea {
+                                    pos: arg.pos,
+                                    ..info.position
+                                }),
                                 desc: "macro argument".to_string(),
                             });
                         }
@@ -435,9 +444,19 @@ pub fn execute_macro(
                     None => {
                         if (def_index) > m.args.len() - 1 {
                             return Err(RuntimeError::CustomError(create_error(
-                                info,
+                                info.clone(),
                                 "Too many arguments!",
-                                &[],
+                                &[
+                                    (
+                                        m.get_arg_area(),
+                                        &format!(
+                                            "Macro was defined to take {} argument{} here",
+                                            m.args.len(),
+                                            if m.args.len() == 1 { "" } else { "s" }
+                                        ),
+                                    ),
+                                    (info.position, "Recieved too many arguments here"),
+                                ],
                                 None,
                             )));
                         }
@@ -452,7 +471,10 @@ pub fn execute_macro(
                                     expected: pat.to_str(globals),
                                     val_def: globals.get_area(arg_values[i]),
                                     found: val.get_type_str(globals),
-                                    info,
+                                    info: info.clone().with_area(CodeArea {
+                                        pos: arg.value.get_pos(),
+                                        ..info.position
+                                    }),
                                 });
                             }
                         };
@@ -477,11 +499,11 @@ pub fn execute_macro(
             if m.args[0].0 == "self" {
                 if globals.stored_values[parent] == Value::Null {
                     return Err(RuntimeError::CustomError(create_error(
-                        info,
+                        info.clone(),
                         "
 This macro requires a parent (a \"self\" value), but it seems to have been called alone (or on a null value).
 Should be used like this: value.macro(arguments)",
-                        &[],
+                        &[(m.args[0].4.clone(), "Macro defined as taking a 'self' argument here"), (info.position, "Called alone here")],
                         None,
                     )));
                 }
@@ -508,9 +530,12 @@ Should be used like this: value.macro(arguments)",
 
                         None => {
                             return Err(RuntimeError::CustomError(create_error(
-                                info,
+                                info.clone(),
                                 &format!("Non-optional argument '{}' not satisfied!", arg.0),
-                                &[],
+                                &[
+                                    (arg.4.clone(), "Value defined as mandatory here (because no default was given)"),
+                                    (info.position, "Argument not provided here")
+                                ],
                                 None,
                             )));
                         }
@@ -525,9 +550,15 @@ Should be used like this: value.macro(arguments)",
     } else {
         if !args.is_empty() {
             return Err(RuntimeError::CustomError(create_error(
-                info,
+                info.clone(),
                 "This macro takes no arguments!",
-                &[],
+                &[
+                    (
+                        m.get_arg_area(),
+                        "Macro was defined as taking no arguments here",
+                    ),
+                    (info.position, "Recieved too many arguments here"),
+                ],
                 None,
             )));
         }
@@ -754,7 +785,7 @@ impl ast::CompoundStatement {
                     breaktype: r,
                     info: i.clone(),
                     broke: i.position,
-                    dropped: info.position.clone(),
+                    dropped: info.position,
                     reason: "it's inside a trigger function".to_string(),
                 });
             }

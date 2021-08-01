@@ -227,10 +227,11 @@ pub struct Definition {
 pub struct Argument {
     pub symbol: Option<String>,
     pub value: Expression,
+    pub pos: FileRange,
 }
 
 impl Argument {
-    pub fn from(val: StoredValue) -> Self {
+    pub fn from(val: StoredValue, pos: FileRange) -> Self {
         Argument {
             symbol: None,
             value: Expression {
@@ -238,12 +239,13 @@ impl Argument {
                     value: ValueLiteral::new(ValueBody::Resolved(val)),
                     path: Vec::new(),
                     operator: None,
-                    pos: (0, 0),
+                    pos,
                     //comment: (None, None),
                     tag: Attribute::new(),
                 }],
                 operators: Vec::new(),
             },
+            pos,
         }
     }
 }

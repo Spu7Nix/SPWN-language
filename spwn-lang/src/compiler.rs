@@ -134,8 +134,9 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
     let mut colors = RainbowColorGenerator::new(0.0, 1.5, 0.8);
 
     let mut report = Report::build(ReportKind::Error, position.file.clone(), position.pos.0)
-        .with_message(message)
-        .with_config(Config::default().with_cross_gap(true));
+        .with_config(Config::default().with_cross_gap(true))
+        .with_message(message.clone());
+
     let mut i = 1;
     for area in info.call_stack {
         let color = colors.next();
@@ -150,6 +151,15 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
         );
         i += 1;
     }
+    if labels.is_empty() || !labels.iter().any(|(a, _)| a == &position) {
+        let color = colors.next();
+        report = report.with_label(
+            Label::new(position)
+                .with_order(i)
+                .with_color(color)
+                .with_message(message),
+        );
+    }
     if i == 1 && labels.len() == 1 {
         let color = colors.next();
         report = report.with_label(
@@ -158,7 +168,7 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
                 .with_order(i)
                 .with_color(color),
         );
-    } else {
+    } else if labels.len() > 1 {
         for (area, label) in labels {
             let color = colors.next();
             report = report.with_label(

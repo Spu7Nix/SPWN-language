@@ -12,14 +12,10 @@ use crate::compiler_info::CodeArea;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-
 use ariadne::Fmt;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
-
-
-
 
 use crate::compiler::create_error;
 use crate::compiler_types::ImportType;
@@ -1525,12 +1521,18 @@ fn parse_args(
 
                     None => unreachable!(),
                 };
+                let start = tokens.position().0;
                 let symbol = Some(tokens.slice());
                 tokens.next(false);
                 let value = parse_expr(tokens, notes, true, true)?;
+                let end = tokens.position().1;
                 //tokens.previous();
 
-                ast::Argument { symbol, value }
+                ast::Argument {
+                    symbol,
+                    value,
+                    pos: (start, end),
+                }
             }
 
             Some(_) => {
@@ -1542,6 +1544,7 @@ fn parse_args(
 
                 ast::Argument {
                     symbol: None,
+                    pos: value.get_pos(),
                     value,
                 }
             }

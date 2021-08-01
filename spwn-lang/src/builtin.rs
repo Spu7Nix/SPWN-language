@@ -728,7 +728,7 @@ builtins! {
                     let id = d.get("id");
                     if id == None {
                         return Err(RuntimeError::CustomError(create_error(
-                            info.clone(),
+                            info,
                             "object key has no 'id' member",
                             &[],
                             None,
@@ -737,7 +737,7 @@ builtins! {
                     let pattern = d.get("pattern");
                     if pattern == None {
                         return Err(RuntimeError::CustomError(create_error(
-                            info.clone(),
+                            info,
                             "object key has no 'pattern' member",
                             &[],
                             None,
@@ -1196,14 +1196,14 @@ builtins! {
 
     [AssignOp]           fn _assign_(mut (a), (b))                      {
         a = b;
-        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).area = info.position;
+        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
         Value::Null
     }
     [SwapOp]           fn _swap_(mut (a), mut (b))                      {
 
         std::mem::swap(&mut a, &mut b);
-        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).area = info.position.clone();
-        (*globals.stored_values.map.get_mut(&arguments[1]).unwrap()).area = info.position;
+        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position.clone();
+        (*globals.stored_values.map.get_mut(&arguments[1]).unwrap()).def_area = info.position;
         Value::Null
     }
 
