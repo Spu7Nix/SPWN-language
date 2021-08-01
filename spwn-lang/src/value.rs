@@ -1731,7 +1731,7 @@ impl ast::Variable {
                     UnaryOperator::Minus => new_out.extend(handle_unary_operator(
                         final_value.0,
                         Builtin::NegOp,
-                        &context,
+                        &final_value.1,
                         globals,
                         &info,
                     )?),
@@ -1739,7 +1739,7 @@ impl ast::Variable {
                     UnaryOperator::Increment => new_out.extend(handle_unary_operator(
                         final_value.0,
                         Builtin::PreIncrOp,
-                        &context,
+                        &final_value.1,
                         globals,
                         &info,
                     )?),
@@ -1747,7 +1747,7 @@ impl ast::Variable {
                     UnaryOperator::Decrement => new_out.extend(handle_unary_operator(
                         final_value.0,
                         Builtin::PreDecrOp,
-                        &context,
+                        &final_value.1,
                         globals,
                         &info,
                     )?),
@@ -1755,7 +1755,7 @@ impl ast::Variable {
                     UnaryOperator::Not => new_out.extend(handle_unary_operator(
                         final_value.0,
                         Builtin::NotOp,
-                        &context,
+                        &final_value.1,
                         globals,
                         &info,
                     )?),
@@ -1765,7 +1765,7 @@ impl ast::Variable {
                     UnaryOperator::Range => new_out.extend(handle_unary_operator(
                         final_value.0,
                         Builtin::UnaryRangeOp,
-                        &context,
+                        &final_value.1,
                         globals,
                         &info,
                     )?),

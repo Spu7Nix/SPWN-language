@@ -1,2 +1,5 @@
-move = 10g.move
-move(1, 1)
+
+
+if !(counter(1i) == 0) {
+    10g.move(10, 0) 
+}

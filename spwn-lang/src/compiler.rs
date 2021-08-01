@@ -151,6 +151,7 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
         );
         i += 1;
     }
+
     if labels.is_empty() || !labels.iter().any(|(a, _)| a == &position) {
         let color = colors.next();
         report = report.with_label(
@@ -168,7 +169,7 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
                 .with_order(i)
                 .with_color(color),
         );
-    } else if labels.len() > 1 {
+    } else if !labels.is_empty() {
         for (area, label) in labels {
             let color = colors.next();
             report = report.with_label(
@@ -574,6 +575,12 @@ pub fn compile_scope(
         //     contexts.len()
         // );
         info.position.pos = statement.pos;
+
+        // println!(
+        //     "{}:0:{}",
+        //     info.position.file.to_string_lossy(),
+        //     info.position.pos.0
+        // );
         if contexts.is_empty() {
             return Err(RuntimeError::CustomError(create_error(
                 info,

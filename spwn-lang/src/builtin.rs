@@ -289,7 +289,7 @@ macro_rules! typed_argument_check {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
-        let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], 1, $globals, $context.start_group, true, $info.position.clone());
+        let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], $globals.get_lifetime($arguments[$arg_index]), $globals, $context.start_group, true, $info.position.clone());
     };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) mut ($($arg_name:ident),*)) => {
@@ -304,7 +304,7 @@ macro_rules! typed_argument_check {
         #[allow(unused_mut)]
         #[allow(unused_parens)]
 
-        let  ( $($arg_name),*) = match clone_and_get_value($arguments[$arg_index], 1, $globals, $context.start_group, true, $info.position.clone()) {
+        let  ( $($arg_name),*) = match clone_and_get_value($arguments[$arg_index], $globals.get_lifetime($arguments[$arg_index]), $globals, $context.start_group, true, $info.position.clone()) {
             Value::$arg_type($($arg_name),*) => ($($arg_name),*),
 
             a => {
