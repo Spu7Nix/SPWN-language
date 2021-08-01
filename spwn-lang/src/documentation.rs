@@ -51,11 +51,12 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     )?;
 
     if module.len() > 1 {
-        return Err(RuntimeError::RuntimeError {
-            message: "Documentation of context-splitting libraries is not yet supported!"
-                .to_string(),
-            info: CompilerInfo::new(),
-        });
+        return Err(RuntimeError::CustomError(crate::compiler::create_error(
+            CompilerInfo::new(),
+            "Documentation of context-splitting libraries is not yet supported!",
+            &[],
+            None,
+        )));
     }
 
     let mut doc = format!("# Documentation for `{}` \n", path);

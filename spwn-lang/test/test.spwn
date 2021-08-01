@@ -1,5 +1,14 @@
 
-c = counter(10)
+let a = 1
+let arr = [1, 2, 3]
+
+$.print(a, arr)
+
+a <=> arr
+
+c = counter(a)
+
+$.print(a, arr)
 
 
 for i in ..10 {

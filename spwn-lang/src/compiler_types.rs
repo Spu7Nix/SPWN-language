@@ -1,6 +1,7 @@
 ///types and functions used by the compiler
 use crate::ast;
 use crate::builtin::*;
+use crate::compiler::create_error;
 use crate::compiler_info::CodeArea;
 use crate::context::*;
 use crate::globals::Globals;
@@ -32,7 +33,7 @@ pub enum ImportType {
     Lib(String),
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum BreakType {
     Macro,
     Loop,
@@ -70,10 +71,12 @@ pub fn handle_operator(
         ) {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
                 if m.args.is_empty() {
-                    return Err(RuntimeError::RuntimeError {
-                        message: String::from("Expected at least one argument in operator macro"),
-                        info: info.clone(),
-                    });
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        "Expected at least one argument in operator macro",
+                        &[],
+                        None,
+                    )));
                 }
                 let val2 = globals.stored_values[value2].clone();
 
@@ -177,10 +180,12 @@ pub fn handle_unary_operator(
         ) {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
                 if m.args.is_empty() {
-                    return Err(RuntimeError::RuntimeError {
-                        message: String::from("Expected at least one argument in operator macro"),
-                        info: info.clone(),
-                    });
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        "Expected at least one argument in operator macro",
+                        &[],
+                        None,
+                    )));
                 }
 
                 let (values, _) =
@@ -222,10 +227,12 @@ pub fn handle_unary_operator(
 pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError> {
     let rounded = num.round();
     if (num - rounded).abs() > 0.000000001 {
-        return Err(RuntimeError::RuntimeError {
-            message: format!("expected integer, found {}", num),
-            info: info.clone(),
-        });
+        return Err(RuntimeError::CustomError(create_error(
+            info.clone(),
+            &format!("expected integer, found {}", num),
+            &[],
+            None,
+        )));
     }
     Ok(rounded as i32)
 }
@@ -409,7 +416,8 @@ pub fn execute_macro(
                                 if !val.matches_pat(&pat, &info, globals, context)? {
                                     return Err(RuntimeError::TypeError {
                                         expected: pat.to_str(globals),
-                                        found: val.to_str(globals),
+                                        found: val.get_type_str(globals),
+                                        val_def: globals.get_area(arg_values[i]),
                                         info,
                                     });
                                 }
@@ -426,10 +434,12 @@ pub fn execute_macro(
                     }
                     None => {
                         if (def_index) > m.args.len() - 1 {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "Too many arguments!".to_string(),
+                            return Err(RuntimeError::CustomError(create_error(
                                 info,
-                            });
+                                "Too many arguments!",
+                                &[],
+                                None,
+                            )));
                         }
 
                         //type check!!
@@ -440,7 +450,8 @@ pub fn execute_macro(
                             if !val.matches_pat(&pat, &info, globals, context)? {
                                 return Err(RuntimeError::TypeError {
                                     expected: pat.to_str(globals),
-                                    found: val.to_str(globals),
+                                    val_def: globals.get_area(arg_values[i]),
+                                    found: val.get_type_str(globals),
                                     info,
                                 });
                             }
@@ -465,11 +476,14 @@ pub fn execute_macro(
             let mut m_args_iter = m.args.iter();
             if m.args[0].0 == "self" {
                 if globals.stored_values[parent] == Value::Null {
-                    return Err(RuntimeError::RuntimeError {
-                        message: "
+                    return Err(RuntimeError::CustomError(create_error(
+                        info,
+                        "
 This macro requires a parent (a \"self\" value), but it seems to have been called alone (or on a null value).
-Should be used like this: value.macro(arguments)".to_string(), info
-                    });
+Should be used like this: value.macro(arguments)",
+                        &[],
+                        None,
+                    )));
                 }
                 //self doesn't need to be cloned, as it is a reference (kinda)
                 new_context.variables.insert("self".to_string(), parent);
@@ -493,13 +507,12 @@ Should be used like this: value.macro(arguments)".to_string(), info
                         }
 
                         None => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "Non-optional argument '{}' not satisfied!",
-                                    arg.0
-                                ),
+                            return Err(RuntimeError::CustomError(create_error(
                                 info,
-                            })
+                                &format!("Non-optional argument '{}' not satisfied!", arg.0),
+                                &[],
+                                None,
+                            )));
                         }
                     }
                 }
@@ -511,10 +524,12 @@ Should be used like this: value.macro(arguments)".to_string(), info
         }
     } else {
         if !args.is_empty() {
-            return Err(RuntimeError::RuntimeError {
-                message: "This macro takes no arguments!".to_string(),
+            return Err(RuntimeError::CustomError(create_error(
                 info,
-            });
+                "This macro takes no arguments!",
+                &[],
+                None,
+            )));
         }
         let mut new_context = context.clone();
         new_context.variables = m.def_context.variables.clone();
@@ -538,11 +553,16 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
     // stop break chain
     for c in &mut compiled.0 {
-        if let Some((i, BreakType::Loop)) = &(*c).broken {
-            return Err(RuntimeError::RuntimeError {
-                message: "break statement is never used".to_string(),
-                info: i.clone(),
-            });
+        if let Some((i, r)) = &(*c).broken {
+            if *r != BreakType::Macro {
+                return Err(RuntimeError::BreakNeverUsedError {
+                    breaktype: *r,
+                    info: i.clone(),
+                    broke: i.position.clone(),
+                    dropped: info.position,
+                    reason: "the macro ended".to_string(),
+                });
+            }
         }
         (*c).broken = None;
     }
@@ -678,11 +698,10 @@ pub fn eval_dict(
                     dict_out.extend(match val.clone() {
                         Value::Dict(d) => d.clone(),
                         a => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "Cannot extract from this value: {}",
-                                    a.to_str(globals)
-                                ),
+                            return Err(RuntimeError::TypeError {
+                                expected: "dictionary or $".to_string(),
+                                found: a.get_type_str(globals),
+                                val_def: globals.get_area(expressions.0[expr_index]),
                                 info,
                             })
                         }
@@ -725,37 +744,19 @@ impl ast::CompoundStatement {
         new_context.start_group = start_group;
 
         let new_info = info.clone();
-        new_context.fn_context_change_stack = vec![info.position];
+        new_context.fn_context_change_stack = vec![info.position.clone()];
         let (contexts, inner_returns) =
             compile_scope(&self.statements, smallvec![new_context], globals, new_info)?;
 
         for c in contexts {
-            if let Some((i, t)) = c.broken {
-                match t {
-                    BreakType::Loop => {
-                        return Err(RuntimeError::RuntimeError {
-                            message: "break statement is never used because it's inside a trigger function"
-                                .to_string(),
-                            info: i,
-                        });
-                    }
-
-                    BreakType::ContinueLoop => {
-                        return Err(RuntimeError::RuntimeError {
-                            message: "continue statement is never used because it's inside a trigger function"
-                                .to_string(),
-                            info: i,
-                        });
-                    }
-
-                    BreakType::Macro => {
-                        return Err(RuntimeError::RuntimeError {
-                            message: "return statement is never used because it's inside a trigger function (consider putting the return statement in an arrow statement)"
-                                .to_string(),
-                            info: i,
-                        });
-                    }
-                }
+            if let Some((i, r)) = c.broken {
+                return Err(RuntimeError::BreakNeverUsedError {
+                    breaktype: r,
+                    info: i.clone(),
+                    broke: i.position,
+                    dropped: info.position.clone(),
+                    reason: "it's inside a trigger function".to_string(),
+                });
             }
         }
 

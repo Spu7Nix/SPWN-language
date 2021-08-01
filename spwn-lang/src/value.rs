@@ -1,5 +1,6 @@
 use crate::ast;
 use crate::builtin::*;
+use crate::compiler::create_error;
 use crate::compiler::import_module;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
@@ -137,6 +138,11 @@ impl Value {
         }
     }
 
+    pub fn get_type_str(&self, globals: &Globals) -> String {
+        let t = self.to_num(globals);
+        find_key_for_value(&globals.type_ids, t).unwrap().clone()
+    }
+
     pub fn matches_pat(
         &self,
         pat_val: &Value,
@@ -177,12 +183,12 @@ impl Value {
                             Ok(true)
                         }
 
-                        _ => Err(RuntimeError::RuntimeError {
-                            message: String::from(
-                                "arrays with multiple elements cannot be used as patterns (yet)",
-                            ),
-                            info: info.clone(),
-                        }),
+                        _ => Err(RuntimeError::CustomError(create_error(
+                            info.clone(),
+                            "arrays with multiple elements cannot be used as patterns (yet)",
+                            &[],
+                            None,
+                        ))),
                     }
                 } else {
                     Ok(false)
@@ -356,235 +362,144 @@ pub fn convert_type(
         return Ok(Value::Str(val.to_str(globals)));
     }
 
-    Ok(match val {
-        Value::Number(n) => match typ {
-            0 => Value::Group(Group::new(*n as u16)),
-            1 => Value::Color(Color::new(*n as u16)),
-            2 => Value::Block(Block::new(*n as u16)),
-            3 => Value::Item(Item::new(*n as u16)),
-            4 => Value::Number(*n),
-            5 => Value::Bool(*n != 0.0),
+    Ok(match (val, typ) {
+        
+        (Value::Number(n), 0) => Value::Group(Group::new(*n as u16)),
+        (Value::Number(n), 1) => Value::Color(Color::new(*n as u16)),
+        (Value::Number(n), 2) => Value::Block(Block::new(*n as u16)),
+        (Value::Number(n), 3) => Value::Item(Item::new(*n as u16)),
+        (Value::Number(n), 4) => Value::Number(*n),
+        (Value::Number(n), 5) => Value::Bool(*n != 0.0),
 
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Number can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
-            }
+            
+        
+
+        
+
+        (Value::Group(g), 4) => Value::Number(match g.id {
+            Id::Specific(n) => n as f64,
+            _ => return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                "This group isn't known at this time, and can therefore not be converted to a number!",
+                &[],
+                None,
+            ))) 
+            
+        }),
+        
+
+        (Value::Color(g), 4) => Value::Number(match g.id {
+            Id::Specific(n) => n as f64,
+            _ => return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                "This color isn't known at this time, and can therefore not be converted to a number!",
+                &[],
+                None,
+            ))) 
+            
+        }),
+
+        (Value::Block(g), 4) => Value::Number(match g.id {
+            Id::Specific(n) => n as f64,
+            _ => return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                "This block ID isn't known at this time, and can therefore not be converted to a number!",
+                &[],
+                None,
+            ))) 
+            
+        }),
+
+        (Value::Item(g), 4) => Value::Number(match g.id {
+            Id::Specific(n) => n as f64,
+            _ => return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                "This item ID isn't known at this time, and can therefore not be converted to a number!",
+                &[],
+                None,
+            ))) 
+            
+        }),
+
+    
+
+        (Value::Bool(b),4) => Value::Number(if *b { 1.0 } else { 0.0 }),
+        
+
+    
+
+        (Value::TriggerFunc(f),0) => Value::Group(f.start_group),
+            
+
+        (Value::Range(start, end, step), 10) => {
+            Value::Array(if start < end {
+                (*start..*end).step_by(*step).map(|x|
+                    store_value(Value::Number(x as f64), 1, globals, &context, info.position.clone())).collect::<Vec<StoredValue>>()
+            } else {
+                (*end..*start).step_by(*step).rev().map(|x|
+                    store_value(Value::Number(x as f64), 1, globals, &context, info.position.clone())).collect::<Vec<StoredValue>>()
+            })
         },
 
-        Value::Group(g) => match typ {
-
-            4 => Value::Number(match g.id {
-                Id::Specific(n) => n as f64,
-                _ => return Err(RuntimeError::RuntimeError {
-                    message: "This group isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
-                    info: info.clone(),
-                })
-            }),
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Group can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
-            }
-        },
-
-        Value::Color(c) => match typ {
-
-            4 => Value::Number(match c.id {
-                Id::Specific(n) => n as f64,
-                _ => return Err(RuntimeError::RuntimeError {
-                    message: "This color isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
-                    info: info.clone(),
-                })
-            }),
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Color can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
-            }
-        },
-
-        Value::Block(b) => match typ {
-
-            4 => Value::Number(match b.id {
-                Id::Specific(n) => n as f64,
-                _ => return Err(RuntimeError::RuntimeError {
-                    message: "This block ID isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
-                    info: info.clone(),
-                })
-            }),
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Block ID can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
-            }
-        },
-
-        Value::Item(i) => match typ {
-
-            4 => Value::Number(match i.id {
-                Id::Specific(n) => n as f64,
-                _ => return Err(RuntimeError::RuntimeError {
-                    message: "This item ID isn\'t known at this time, and can therefore not be converted to a number!".to_string(),
-                    info: info.clone(),
-                })
-            }),
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Item ID can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
-            }
-        },
-
-        Value::Bool(b) => match typ {
-
-            4 => Value::Number(if *b { 1.0 } else { 0.0 }),
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Boolean can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
-            }
-        },
-
-        Value::TriggerFunc(f) => match typ {
-
-            0 => Value::Group(f.start_group),
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Trigger function can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
-            }
-        },
-
-        Value::Range(start, end, step) => match typ {
-            10 => {
-                Value::Array(if start < end {
-                    (*start..*end).step_by(*step).map(|x|
-                        store_value(Value::Number(x as f64), 1, globals, &context, info.position.clone())).collect::<Vec<StoredValue>>()
-                } else {
-                    (*end..*start).step_by(*step).rev().map(|x|
-                        store_value(Value::Number(x as f64), 1, globals, &context, info.position.clone())).collect::<Vec<StoredValue>>()
-                })
-            },
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Range can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
-            }
-        },
-
-        Value::Str(s) => match typ {
-            4 => {
-                let out: std::result::Result<f64, _> = s.parse();
-                match out {
-                    Ok(n) => Value::Number(n),
-                    _ => {
-                        return Err(RuntimeError::RuntimeError {
-                            message: format!("Cannot convert '{}' to @number", s),
-                            info: info.clone()
-                        })
-                    }
+    
+        (Value::Str(s), 4) => {
+            let out: std::result::Result<f64, _> = s.parse();
+            match out {
+                Ok(n) => Value::Number(n),
+                _ => {
+                    
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        &format!("Cannot convert string '{}' to @number", s),
+                        &[],
+                        None,
+                    ))) 
                 }
-            },
-            10 => {
-                Value::Array(s.chars().map(|x| store_value(Value::Str(x.to_string()), 1, globals, &context, info.position.clone())).collect::<Vec<StoredValue>>())
-            },
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "String can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
             }
         },
+        (Value::Str(s), 1) => {
+            Value::Array(s.chars().map(|x| store_value(Value::Str(x.to_string()), 1, globals, &context, info.position.clone())).collect::<Vec<StoredValue>>())
+        },
+        
 
-        Value::Array(arr) => match typ {
-            18 => {
-                // pattern
-                let mut new_vec = Vec::new();
-                for el in arr {
-                    new_vec.push(match globals.stored_values[*el].clone() {
-                        Value::Pattern(p) => p,
-                        a => if let Value::Pattern(p) = convert_type(&a, 18, info, globals, context)? {
-                            p
-                        } else {
-                            unreachable!()
-                        },
-                    })
-                }
-                Value::Pattern(Pattern::Array(new_vec))
-            }
-
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Array can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
+    
+        (Value::Array(arr), 18) => {
+            // pattern
+            let mut new_vec = Vec::new();
+            for el in arr {
+                new_vec.push(match globals.stored_values[*el].clone() {
+                    Value::Pattern(p) => p,
+                    a => if let Value::Pattern(p) = convert_type(&a, 18, info, globals, context)? {
+                        p
+                    } else {
+                        unreachable!()
+                    },
                 })
             }
-
+            Value::Pattern(Pattern::Array(new_vec))
         }
-        Value::TypeIndicator(t) =>  match typ {
-            18 => {
 
-                Value::Pattern(Pattern::Type(*t))
-            }
+        
+    
+        (Value::TypeIndicator(t),18) => {
 
-            _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "Type-Indicator can't be converted to '{}'!",
-                        find_key_for_value(&globals.type_ids, typ).unwrap()
-                    ),
-                    info: info.clone(),
-                })
-            }
+            Value::Pattern(Pattern::Type(*t))
         }
+
+            
 
         _ => {
-            return Err(RuntimeError::RuntimeError {
-                message: format!(
+            
+
+            return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                &format!(
                     "'{}' can't be converted to '{}'!",
                      find_key_for_value(&globals.type_ids, val.to_num(globals)).unwrap(), find_key_for_value(&globals.type_ids, typ).unwrap(),
                 ),
-                info: info.clone(),
-            })
+                &[],
+                None,
+            ))) 
         }
     })
 }
@@ -715,9 +630,10 @@ impl ast::Variable {
                 if let Some(val) = context.variables.get("self") {
                     start_val.push((*val, context.clone()))
                 } else {
-                    return Err(RuntimeError::RuntimeError {
-                        message: "\"self\" is not defined!".to_string(),
-                        info,
+                    return Err(RuntimeError::UndefinedErr {
+                        undefined: "self".to_string(),
+                        desc: "variable".to_string(),
+                        info: info.clone()
                     });
                 }
             }
@@ -912,11 +828,10 @@ impl ast::Variable {
                             start_val.extend(evaled);
                         }
                         a => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "Expected boolean condition in ternary statement, found {}",
-                                    a.to_str(globals)
-                                ),
+                            return Err(RuntimeError::TypeError {
+                                expected: "boolean".to_string(),
+                                found: a.get_type_str(globals),
+                                val_def: globals.get_area(condition),
                                 info,
                             })
                         }
@@ -979,32 +894,37 @@ impl ast::Variable {
 
                                     // lets loop through all those result values
                                     for (r, c) in results {
-                                        if let Value::Bool(b) = globals.stored_values[r] {
-                                            if b {
-                                                // if the two values match, we output this value to the output "start val"
-                                                // we can't break here, because the two values might only match in this one context,
-                                                // and there may be more contexts left to check
-                                                let (evaled, returns) = case.body.eval(
-                                                    &c,
-                                                    globals,
-                                                    info.clone(),
-                                                    constant,
-                                                )?;
-                                                inner_returns.extend(returns);
-                                                start_val.extend(evaled);
-                                            } else {
-                                                // if they dont match, we keep going through the cases in this context
-                                                contexts.push(c)
+                                        
+                                        match &globals.stored_values[r] { 
+                                             Value::Bool(b) => {
+                                                if *b {
+                                                    // if the two values match, we output this value to the output "start val"
+                                                    // we can't break here, because the two values might only match in this one context,
+                                                    // and there may be more contexts left to check
+                                                    let (evaled, returns) = case.body.eval(
+                                                        &c,
+                                                        globals,
+                                                        info.clone(),
+                                                        constant,
+                                                    )?;
+                                                    inner_returns.extend(returns);
+                                                    start_val.extend(evaled);
+                                                } else {
+                                                    // if they dont match, we keep going through the cases in this context
+                                                    contexts.push(c)
+                                                }
+                                            }, 
+                                            a => {
+                                                // if the == operator for that type doesn't output a boolean, it can't be
+                                                // used in a switch statement
+                                                return Err(RuntimeError::TypeError {
+                                                    expected: "boolean".to_string(),
+                                                    found: a.get_type_str(globals),
+                                                    val_def: globals.get_area(r),
+                                                    info,
+                                                })
                                             }
-                                        } else {
-                                            // if the == operator for that type doesn't output a boolean, it can't be
-                                            // used in a switch statement
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: "== operator returned non-boolean value"
-                                                    .to_string(),
-                                                info,
-                                            });
-                                        }
+                                        };
                                     }
                                 }
                             }
@@ -1073,6 +993,8 @@ impl ast::Variable {
                         let o_val = expressions[i * 2 + 1];
                         // hopefully self explanatory
 
+                        let disallowed_message = "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead";
+
                         let (key, pattern) = match &globals.stored_values[o_key] {
                         // key = int of the id, pattern = what type should be expected from the value
 
@@ -1080,10 +1002,13 @@ impl ast::Variable {
                                 let out = *n as u16;
 
                                 if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
-                                        info,
-                                    })
+                                    
+                                    return Err(RuntimeError::CustomError(create_error(
+                                        info.clone(),
+                                        disallowed_message,
+                                        &[],
+                                        None,
+                                    )))
                                 }
 
                                 (out, None)
@@ -1091,24 +1016,31 @@ impl ast::Variable {
                             Value::Dict(d) => { // this is specifically for object_key dicts
                                 let gotten_type = d.get(TYPE_MEMBER_NAME);
                                 if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: "expected either @number or @object_key as object key".to_string(),
+                                    return Err(RuntimeError::TypeError {
+                                        expected: "number or @object_key".to_string(),
+                                        found: globals.get_type_str(o_key),
+                                        val_def: globals.get_area(o_key),
                                         info,
                                     })
                                 }
                                 let id = d.get("id");
                                 if id == None {
-                                    return Err(RuntimeError::RuntimeError { // object_key has an ID member for the key basically
-                                        message: "object key has no 'id' member".to_string(),
-                                        info,
-                                    })
+                                    
+                                    return Err(RuntimeError::CustomError(create_error(
+                                        info.clone(),
+                                        "object key has no 'id' member",
+                                        &[],
+                                        None,
+                                    )))
                                 }
                                 let pattern = d.get("pattern");
                                 if pattern == None {
-                                    return Err(RuntimeError::RuntimeError { // same with pattern, for the expected type
-                                        message: "object key has no 'pattern' member".to_string(),
-                                        info,
-                                    })
+                                    return Err(RuntimeError::CustomError(create_error(
+                                        info.clone(),
+                                        "object key has no 'pattern' member",
+                                        &[],
+                                        None,
+                                    )))
                                 }
 
                                 (match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
@@ -1116,26 +1048,29 @@ impl ast::Variable {
                                         let out = *n as u16;
 
                                         if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) { // group ids and stuff on triggers
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
-                                                info,
-                                            })
+                                            return Err(RuntimeError::CustomError(create_error(
+                                                info.clone(),
+                                                disallowed_message,
+                                                &[],
+                                                None,
+                                            )))
                                         }
                                         out
                                     }
-                                    _ => return Err(RuntimeError::RuntimeError {
-                                        message: format!("object key's id has to be @number, found {}", globals.get_type_str(*id.unwrap())),
+                                    _ => return Err(RuntimeError::TypeError {
+                                        expected: "number".to_string(),
+                                        found: globals.get_type_str(*id.unwrap()),
+                                        val_def: globals.get_area(*id.unwrap()),
                                         info,
                                     })
                                 }, Some(globals.stored_values[*pattern.unwrap()].clone()))
 
                             }
                             a => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: format!(
-                                        "expected either @number or @object_key as object key, found: {}",
-                                        a.to_str(globals)
-                                    ),
+                                return Err(RuntimeError::TypeError {
+                                    expected: "number or @object_key".to_string(),
+                                    found: a.get_type_str(globals),
+                                    val_def: globals.get_area(o_key),
                                     info,
                                 })
                             }
@@ -1148,22 +1083,24 @@ impl ast::Variable {
 
                                 if let Some(pat) = pattern { // check if pattern is actually enforced (not null)
                                     if !val.matches_pat(&pat, &info, globals, &context)? {
-                                        return Err(RuntimeError::RuntimeError {
-                                            message: format!(
-                                                "key required value to match {}, found {}",
-                                                pat.to_str(globals), val.to_str(globals)
-                                            ),
+                                       
+                                        return Err(RuntimeError::TypeError {
+                                            expected: pat.to_str(globals),
+                                            found: val.get_type_str(globals),
+                                            val_def: globals.get_area(o_val),
                                             info,
                                         })
                                     }
                                 }
-                                let err = Err(RuntimeError::RuntimeError {
-                                    message: format!(
+                                let err = Err(RuntimeError::CustomError(create_error(
+                                    info.clone(),
+                                    &format!(
                                         "{} is not a valid object value",
                                         val.to_str(globals)
                                     ),
-                                    info: info.clone(),
-                                });
+                                    &[],
+                                    None,
+                                )));
 
                                 match &val { // its just converting value to objparam basic level stuff
                                     Value::Number(n) => {
@@ -1185,10 +1122,12 @@ impl ast::Variable {
                                         for s in a {
                                             out.push(match globals.stored_values[*s] {
                                                 Value::Group(g) => g,
-                                                _ => return Err(RuntimeError::RuntimeError {
-                                                    message: "Arrays in object parameters can only contain groups".to_string(),
-                                                    info,
-                                                })
+                                                _ => return Err(RuntimeError::CustomError(create_error(
+                                                    info.clone(),
+                                                    "Arrays in object parameters can only contain groups",
+                                                    &[],
+                                                    None,
+                                                )))
                                             })
                                         }
 
@@ -1282,10 +1221,13 @@ impl ast::Variable {
                                         Some((val, _)) => {
                                             if let Value::Macro(m) = &globals.stored_values[*val] {
                                                 if !m.args.is_empty() && m.args[0].0 == "self" {
-                                                    return Err(RuntimeError::RuntimeError {
-                                                        message: "Cannot access method (macro with a \"self\" argument) using \"::\"".to_string(),
-                                                        info,
-                                                    });
+                                                    
+                                                    return Err(RuntimeError::CustomError(create_error(
+                                                        info.clone(),
+                                                        "Cannot access method (macro with a \"self\" argument) using \"::\"",
+                                                        &[],
+                                                        None,
+                                                    )))
                                                 }
                                             }
                                             *val
@@ -1293,33 +1235,28 @@ impl ast::Variable {
                                         None => {
                                             let type_name =
                                                 find_key_for_value(&globals.type_ids, *t).unwrap();
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: format!(
-                                                    "No {} property on type @{}",
-                                                    a, type_name
-                                                ),
+                                            return Err(RuntimeError::UndefinedErr {
+                                                undefined: a.clone(),
                                                 info,
+                                                desc: format!("associated member of @{}", type_name),
                                             });
                                         }
                                     },
                                     None => {
                                         let type_name =
                                             find_key_for_value(&globals.type_ids, *t).unwrap();
-                                        return Err(RuntimeError::RuntimeError {
-                                            message: format!(
-                                                "No values are implemented on @{}",
-                                                type_name
-                                            ),
-                                            info,
-                                        });
+                                            return Err(RuntimeError::UndefinedErr {
+                                                undefined: a.clone(),
+                                                info,
+                                                desc: format!("associated member of @{}", type_name),
+                                            });
                                     }
                                 },
                                 a => {
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: format!(
-                                            "Expected type indicator, found: {}",
-                                            a.to_str(globals)
-                                        ),
+                                    return Err(RuntimeError::TypeError {
+                                        expected: "type indicator".to_string(),
+                                        found: a.get_type_str(globals),
+                                        val_def: globals.get_area(x.0),
                                         info,
                                     })
                                 }
@@ -1344,17 +1281,25 @@ impl ast::Variable {
                                         Value::Number(n) => {
                                             let len = arr.len();
                                             if (*n) < 0.0 && (-*n) as usize >= len {
-                                                return Err(RuntimeError::RuntimeError {
-                                                    message: format!("Index too low! Index is {}, but length is {}.", n, len),
-                                                    info,
-                                                });
+                                                
+                                                return Err(RuntimeError::CustomError(create_error(
+                                                    info.clone(),
+                                                    &format!("Index too low! Index is {}, but length is {}.", n, len),
+                                                    &[],
+                                                    None,
+                                                )))
+
+                                                
                                             }
 
                                             if *n as usize >= len {
-                                                return Err(RuntimeError::RuntimeError {
-                                                    message: format!("Index too high! Index is {}, but length is {}.", n, len),
-                                                    info,
-                                                });
+                                                
+                                                return Err(RuntimeError::CustomError(create_error(
+                                                    info.clone(),
+                                                    &format!("Index too high! Index is {}, but length is {}.", n, len),
+                                                    &[],
+                                                    None,
+                                                )))
                                             }
 
                                             if *n < 0.0 {
@@ -1368,11 +1313,10 @@ impl ast::Variable {
                                             }
                                         }
                                         _ => {
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: format!(
-                                                    "expected @number in index, found @{}",
-                                                    globals.get_type_str(index.0)
-                                                ),
+                                            return Err(RuntimeError::TypeError {
+                                                expected: "number".to_string(),
+                                                found: globals.get_type_str(index.0),
+                                                val_def: globals.get_area(index.0),
                                                 info,
                                             })
                                         }
@@ -1387,22 +1331,20 @@ impl ast::Variable {
                                     match &globals.stored_values[index.0] {
                                         Value::Str(s) => {
                                             if !d.contains_key(s) {
-                                                return Err(RuntimeError::RuntimeError {
-                                                    message: format!(
-                                                        "Cannot find key '{}' in dictionary",
-                                                        s
-                                                    ),
+                                                
+                                                return Err(RuntimeError::UndefinedErr {
+                                                    undefined: s.to_string(),
                                                     info,
+                                                    desc: "dictionary key".to_string(),
                                                 });
                                             }
                                             new_out.push((d[s], index.1, prev_v));
                                         }
                                         _ => {
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: format!(
-                                                    "expected @string in index, found @{}",
-                                                    globals.get_type_str(index.0)
-                                                ),
+                                            return Err(RuntimeError::TypeError {
+                                                expected: "string".to_string(),
+                                                found: globals.get_type_str(index.0),
+                                                val_def: globals.get_area(index.0),
                                                 info,
                                             })
                                         }
@@ -1419,25 +1361,32 @@ impl ast::Variable {
                                         Value::Dict(d) => {
                                             let gotten_type = d.get(TYPE_MEMBER_NAME);
                                             if gotten_type == None ||  globals.stored_values[*gotten_type.unwrap()] != Value::TypeIndicator(19) { // 19 = object_key??
-                                                return Err(RuntimeError::RuntimeError {
-                                                    message: "expected either @number or @object_key in index".to_string(),
+                                                return Err(RuntimeError::TypeError {
+                                                    expected: "number or @object_key".to_string(),
+                                                    found: globals.get_type_str(index.0),
+                                                    val_def: globals.get_area(index.0),
                                                     info,
                                                 })
                                             }
 
                                             let id = d.get("id");
                                             if id == None {
-                                                return Err(RuntimeError::RuntimeError { // object_key has an ID member for the key basically
-                                                    message: "object key has no 'id' member".to_string(),
-                                                    info,
-                                                })
+                                                
+                                                return Err(RuntimeError::CustomError(create_error(
+                                                    info.clone(),
+                                                    "object key has no 'id' member",
+                                                    &[],
+                                                    None,
+                                                )))
                                             }
                                             let okey = match &globals.stored_values[*id.unwrap()] { // check if the ID is actually an int. it should be
                                                 Value::Number(n) => {
                                                     *n as u16
                                                 }
-                                                _ => return Err(RuntimeError::RuntimeError {
-                                                    message: format!("object key's id has to be @number, found {}", globals.get_type_str(*id.unwrap())),
+                                                _ => return Err(RuntimeError::TypeError {
+                                                    expected: "number".to_string(),
+                                                    found: globals.get_type_str(*id.unwrap()),
+                                                    val_def: globals.get_area(*id.unwrap()),
                                                     info,
                                                 })
                                             };
@@ -1481,19 +1430,22 @@ impl ast::Variable {
                                             }
 
                                             if !contains {
-                                                return Err(RuntimeError::RuntimeError {
-                                                    message: "Cannot find key in object".to_string(),
-                                                    info,
-                                                });
+                                                
+                                                return Err(RuntimeError::CustomError(create_error(
+                                                    info.clone(),
+                                                    "Cannot find key in object",
+                                                    &[],
+                                                    None,
+                                                )))
+                                                ;
                                             }
 
                                         }
                                         _ => {
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: format!(
-                                                    "expected @object_key or @number in index, found @{}",
-                                                    globals.get_type_str(index.0)
-                                                ),
+                                            return Err(RuntimeError::TypeError {
+                                                expected: "number or @object_key".to_string(),
+                                                found: globals.get_type_str(index.0),
+                                                val_def: globals.get_area(index.0),
                                                 info,
                                             })
                                         }
@@ -1511,17 +1463,25 @@ impl ast::Variable {
                                         Value::Number(n) => {
                                             let len = arr.len();
                                             if (*n) < 0.0 && (-*n) as usize >= len {
-                                                return Err(RuntimeError::RuntimeError {
-                                                    message: format!("Index too low! Index is {}, but length is {}.", n, len),
-                                                    info,
-                                                });
+                                                
+                                                return Err(RuntimeError::CustomError(create_error(
+                                                    info.clone(),
+                                                    &format!("Index too low! Index is {}, but length is {}.", n, len),
+                                                    &[],
+                                                    None,
+                                                )))
+
+                                                
                                             }
 
                                             if *n as usize >= len {
-                                                return Err(RuntimeError::RuntimeError {
-                                                    message: format!("Index too high! Index is {}, but length is {}.", n, len),
-                                                    info,
-                                                });
+                                                
+                                                return Err(RuntimeError::CustomError(create_error(
+                                                    info.clone(),
+                                                    &format!("Index too high! Index is {}, but length is {}.", n, len),
+                                                    &[],
+                                                    None,
+                                                )))
                                             }
 
                                             let val = if *n < 0.0 {
@@ -1540,11 +1500,10 @@ impl ast::Variable {
                                             new_out.push((stored, index.1, prev_v));
                                         }
                                         _ => {
-                                            return Err(RuntimeError::RuntimeError {
-                                                message: format!(
-                                                    "expected @number in index, found @{}",
-                                                    globals.get_type_str(index.0)
-                                                ),
+                                            return Err(RuntimeError::TypeError {
+                                                expected: "number".to_string(),
+                                                found: globals.get_type_str(index.0),
+                                                val_def: globals.get_area(index.0),
                                                 info,
                                             })
                                         }
@@ -1552,11 +1511,10 @@ impl ast::Variable {
                                 }
                             }
                             a => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: format!(
-                                        "Cannot index this type: {}",
-                                        a.to_str(globals)
-                                    ),
+                                return Err(RuntimeError::TypeError {
+                                    expected: "indexable type".to_string(),
+                                    found: globals.get_type_str(prev_v),
+                                    val_def: globals.get_area(prev_v),
                                     info,
                                 })
                             }
@@ -1630,13 +1588,12 @@ impl ast::Variable {
                                 }
                             }
                             a => {
-                                return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "Attempted to construct on a value that is not a type indicator: {}",
-                                    a.to_str(globals)
-                                ),
-                                info,
-                            });
+                                return Err(RuntimeError::TypeError {
+                                    expected: "type indicator".to_string(),
+                                    found: globals.get_type_str(*prev_v),
+                                    val_def: globals.get_area(*prev_v),
+                                    info,
+                                })
                             }
                         }
                     }
@@ -1662,13 +1619,16 @@ impl ast::Variable {
                             Value::TypeIndicator(_) => {
                                 if args.len() != 1 {
                                     // cast takes 1 argument only
-                                    return Err(RuntimeError::RuntimeError {
-                                        message: format!(
+
+                                    return Err(RuntimeError::CustomError(create_error(
+                                        info.clone(),
+                                        &format!(
                                             "casting takes one argument, but {} were provided",
                                             args.len()
                                         ),
-                                        info,
-                                    });
+                                        &[],
+                                        None,
+                                    )))
                                 }
 
                                 // one value for each context
@@ -1735,11 +1695,10 @@ impl ast::Variable {
                                     all_values.iter().map(|x| (x.0, x.1.clone(), *v)).collect();
                             }
                             a => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: format!(
-                                        "Cannot call ( ... ) on '{}'",
-                                        a.to_str(globals)
-                                    ),
+                                return Err(RuntimeError::TypeError {
+                                    expected: "macro, built-in function or type indicator".to_string(),
+                                    found: globals.get_type_str(*v),
+                                    val_def: globals.get_area(*v),
                                     info,
                                 })
                             }
@@ -1956,10 +1915,15 @@ impl ast::Variable {
             }
             None => store_const_value(Value::Null, 1, globals, context, info.position.clone()),
             a => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!("Cannot use operator {:?} when defining a variable", a),
-                    info: info.clone(),
-                })
+                
+
+                return Err(RuntimeError::CustomError(create_error(
+                    info.clone(),
+                    &format!("Cannot use operator {:?} when defining a variable", a),
+                    &[],
+                    None,
+                )))
+                
             }
         };
 
@@ -1989,10 +1953,12 @@ impl ast::Variable {
                         info.position.clone(),
                     )
                 } else {
-                    return Err(RuntimeError::RuntimeError {
-                        message: format!("Use a type statement to define a new type: type {}", t),
-                        info: info.clone(),
-                    });
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        & format!("Use a type statement to define a new type: type @{}", t),
+                        &[],
+                        None,
+                    )))
                 }
             }
 
@@ -2000,18 +1966,23 @@ impl ast::Variable {
                 if let Some(ptr) = context.variables.get("self") {
                     *ptr
                 } else {
-                    return Err(RuntimeError::RuntimeError {
-                        message: String::from("\"self\" is not defined!"),
+                    return Err(RuntimeError::UndefinedErr {
+                        undefined: "self".to_string(),
+                        desc: "variable".to_string(),
                         info: info.clone(),
                     });
                 }
             }
 
             a => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!("Expected symbol or type-indicator, found {}", a.fmt(0)),
-                    info: info.clone(),
-                })
+                
+                return Err(RuntimeError::CustomError(create_error(
+                    info.clone(),
+                    &format!("Expected symbol or type-indicator, found {}", a.fmt(0)),
+                    &[],
+                    None,
+                )))
+                
             }
         };
 
@@ -2019,10 +1990,12 @@ impl ast::Variable {
             (*globals.stored_values.map.get_mut(&value).unwrap()).lifetime =
                 globals.get_lifetime(current_ptr);
             if !defined {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!("Cannot run {} on an undefined value", p.fmt(0)),
-                    info: info.clone(),
-                });
+                return Err(RuntimeError::CustomError(create_error(
+                    info.clone(),
+                    &format!("Cannot run {} on an undefined value", p.fmt(0)),
+                    &[],
+                    None,
+                )))
             }
 
             match p {
@@ -2031,23 +2004,26 @@ impl ast::Variable {
                     match val.member(m.clone(), &context, globals, info.clone()) {
                         Some(s) => current_ptr = s,
                         None => {
-                            let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
-                            if !stored.mutable {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: "Cannot edit members of a constant value".to_string(),
+                            
+                            if !globals.is_mutable(current_ptr) {
+                                return Err(RuntimeError::MutabilityError {
+                                    val_def: globals.get_area(current_ptr),
                                     info: info.clone(),
                                 });
                             }
+                            let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
                             if let Value::Dict(d) = &mut stored.val {
                                 (*d).insert(m.clone(), value);
                                 defined = false;
                                 current_ptr = value;
                             } else {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: "Cannot edit members of a non-dictionary value"
-                                        .to_string(),
-                                    info: info.clone(),
-                                });
+                                
+                                return Err(RuntimeError::CustomError(create_error(
+                                    info.clone(),
+                                    "Cannot edit members of a non-dictionary value",
+                                    &[],
+                                    None,
+                                )))
                             }
                         }
                     };
@@ -2058,7 +2034,12 @@ impl ast::Variable {
                     match &globals.stored_values[current_ptr] {
                         Value::Dict(d) => {
                             if evaled.len() > 1 {
-                                println!("Warning: context splitting inside of an index definition. Use $.dict_add for better results");
+                                return Err(RuntimeError::CustomError(create_error(
+                                    info.clone(),
+                                    "Index values that split the context are not supported",
+                                    &[],
+                                    None,
+                                )))
                             }
                             if let Value::Str(st) =
                                 globals.stored_values[first_context_eval].clone()
@@ -2095,24 +2076,32 @@ impl ast::Variable {
                                     }
                                 };
                             } else {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: "Only string indexes are supported for dicts"
-                                        .to_string(),
+                                return Err(RuntimeError::TypeError {
+                                    expected: "string".to_string(),
+                                    found: globals.get_type_str(current_ptr),
+                                    val_def: globals.get_area(current_ptr),
                                     info: info.clone(),
                                 });
+                                
                             }
                         }
                         Value::Array(_) => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "Only dictionaries can define new elements with [...] (consider using `array.push(value)`)".to_string(),
-                                info: info.clone(),
-                            })
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                "Only dictionaries can define new elements with [...] (consider using `array.push(value)`)",
+                                &[],
+                                None,
+                            )));
+                            
                         }
                         _ => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "Only dictionaries can define new elements with [...]".to_string(),
-                                info: info.clone(),
-                            })
+                            
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                "Only dictionaries can define new elements with [...]",
+                                &[],
+                                None,
+                            )));
                         }
                     }
                 }
@@ -2142,30 +2131,36 @@ impl ast::Variable {
                             }
                         },
                         a => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "Expected a type-indicator to define an implementation on, found {}",
-                                    a.to_str(globals)
-                                ),
+                            return Err(RuntimeError::TypeError {
+                                expected: "type indicator".to_string(),
+                                found: globals.get_type_str(current_ptr),
+                                val_def: globals.get_area(current_ptr),
                                 info: info.clone(),
                             });
+                            
                         }
                     };
                 }
                 _ => {
-                    return Err(RuntimeError::RuntimeError {
-                        message: format!("Cannot run {} in a definition expression", p.fmt(0)),
-                        info: info.clone(),
-                    })
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        &format!("Cannot run {} in a definition expression", p.fmt(0)),
+                        &[],
+                        None,
+                    )));
+                    
                 }
             }
         }
 
         if defined {
-            Err(RuntimeError::RuntimeError {
-                message: format!("{} is already defined!", self.fmt(0)),
-                info: info.clone(),
-            })
+            
+            return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                &format!("{} is already defined!", self.fmt(0)),
+                &[],
+                None,
+            )));
         } else {
             Ok(current_ptr)
         }

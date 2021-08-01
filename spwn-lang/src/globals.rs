@@ -52,10 +52,12 @@ impl Globals {
     ) -> Result<Group, RuntimeError> {
         match self.stored_values.map.get(&p) {
             Some(val) => Ok(val.fn_context),
-            None => Err(RuntimeError::RuntimeError {
-                message: "Pointer points to no data!".to_string(),
+            None => Err(RuntimeError::CustomError(crate::compiler::create_error(
                 info,
-            }),
+                "Pointer points to no data! (this is probably a bug, please contact a developer)",
+                &[],
+                None,
+            ))),
         }
     }
     pub fn is_mutable(&self, p: StoredValue) -> bool {

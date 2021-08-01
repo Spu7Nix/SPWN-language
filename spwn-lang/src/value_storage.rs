@@ -304,6 +304,36 @@ pub fn clone_value(
     new_index
 }
 
+pub fn clone_value_to(
+    index: usize,
+    to: usize,
+    lifetime: u16,
+    globals: &mut Globals,
+    fn_context: Group,
+    constant: bool,
+    area: CodeArea,
+) {
+    let old_val = clone_and_get_value(index, lifetime, globals, fn_context, constant, area.clone());
+
+    //clone all inner values
+    //do the thing
+    //bing bang
+    //profit
+    let new_index = to;
+    //println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
+
+    (*globals).stored_values.map.insert(
+        new_index,
+        StoredValData {
+            val: old_val,
+            fn_context,
+            mutable: !constant,
+            lifetime,
+            area,
+        },
+    );
+}
+
 pub fn store_const_value(
     val: Value,
     lifetime: u16,
