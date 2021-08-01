@@ -21,6 +21,7 @@ use crate::print_with_color;
 pub const CONTEXT_MAX: usize = 2;
 
 use ariadne::Fmt;
+use internment::Intern;
 use termcolor::Color as TColor;
 
 pub enum RuntimeError {
@@ -43,6 +44,14 @@ pub enum RuntimeError {
     TypeError {
         expected: String,
         found: String,
+        val_def: CodeArea,
+        info: CompilerInfo,
+    },
+
+    PatternMismatchError {
+        pattern: String,
+        val: String,
+        pat_def: CodeArea,
         val_def: CodeArea,
         info: CompilerInfo,
     },
@@ -133,7 +142,7 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
 
     let mut colors = RainbowColorGenerator::new(0.0, 1.5, 0.8);
 
-    let mut report = Report::build(ReportKind::Error, position.file.clone(), position.pos.0)
+    let mut report = Report::build(ReportKind::Error, position.file.as_ref(), position.pos.0)
         .with_config(Config::default().with_cross_gap(true))
         .with_message(message.clone());
 
@@ -141,13 +150,14 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
     for area in info.call_stack {
         let color = colors.next();
         report = report.with_label(
-            Label::new(area.clone())
+            Label::new(area)
                 .with_order(i)
                 .with_message(&format!(
                     "{}: Error comes from this macro call",
                     i.to_string().fg(color)
                 ))
-                .with_color(color),
+                .with_color(color)
+                .with_priority(1),
         );
         i += 1;
     }
@@ -158,25 +168,28 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
             Label::new(position)
                 .with_order(i)
                 .with_color(color)
-                .with_message(message),
+                .with_message(message)
+                .with_priority(2),
         );
     }
     if i == 1 && labels.len() == 1 {
         let color = colors.next();
         report = report.with_label(
-            Label::new(labels[0].0.clone())
+            Label::new(labels[0].0)
                 .with_message(labels[0].1.clone())
                 .with_order(i)
-                .with_color(color),
+                .with_color(color)
+                .with_priority(2),
         );
     } else if !labels.is_empty() {
         for (area, label) in labels {
             let color = colors.next();
             report = report.with_label(
-                Label::new(area.clone())
+                Label::new(area)
                     .with_message(&format!("{}: {}", i.to_string().fg(color), label))
                     .with_order(i)
-                    .with_color(color),
+                    .with_color(color)
+                    .with_priority(2),
             );
             i += 1;
         }
@@ -194,11 +207,23 @@ pub fn create_error(
     note: Option<&str>,
 ) -> ErrorReport {
     ErrorReport {
-        info,
+        info: info.clone(),
         message: message.to_string(),
         labels: labels
             .iter()
-            .map(|(a, s)| (a.clone(), s.to_string()))
+            .map(|(a, s)| {
+                if !a.file.as_ref().exists() {
+                    (
+                        CodeArea {
+                            pos: (0, 0),
+                            ..info.position
+                        },
+                        s.to_string(),
+                    )
+                } else {
+                    (*a, s.to_string())
+                }
+            })
             .collect(),
         note: note.map(|s| s.to_string()),
     }
@@ -233,31 +258,15 @@ impl From<RuntimeError> for ErrorReport {
             ),
             RuntimeError::PackageSyntaxError { err, info } => {
                 let syntax_error = ErrorReport::from(err);
-                let mut labels = vec![(
-                    info.position.clone(),
-                    "Error when parsing this library/module",
-                )];
-                labels.extend(
-                    syntax_error
-                        .labels
-                        .iter()
-                        .map(|(a, b)| (a.clone(), b.as_str())),
-                );
+                let mut labels = vec![(info.position, "Error when parsing this library/module")];
+                labels.extend(syntax_error.labels.iter().map(|(a, b)| (*a, b.as_str())));
                 create_error(info, &syntax_error.message, &labels, None)
             }
 
             RuntimeError::PackageError { err, info } => {
                 let syntax_error = ErrorReport::from(*err);
-                let mut labels = vec![(
-                    info.position.clone(),
-                    "Error when running this library/module",
-                )];
-                labels.extend(
-                    syntax_error
-                        .labels
-                        .iter()
-                        .map(|(a, b)| (a.clone(), b.as_str())),
-                );
+                let mut labels = vec![(info.position, "Error when running this library/module")];
+                labels.extend(syntax_error.labels.iter().map(|(a, b)| (*a, b.as_str())));
                 create_error(info, &syntax_error.message, &labels, None)
             }
 
@@ -277,6 +286,32 @@ impl From<RuntimeError> for ErrorReport {
                     (
                         info.position,
                         &format!("Expected {}, found {}", expected.fg(a), found.fg(b)),
+                    ),
+                ],
+                None,
+            ),
+
+            RuntimeError::PatternMismatchError {
+                pattern,
+                val,
+                info,
+                val_def,
+                pat_def,
+            } => create_error(
+                info.clone(),
+                "Pattern mismatch",
+                &[
+                    (
+                        val_def,
+                        &format!("Value defined as {} here", val.clone().fg(b)),
+                    ),
+                    (
+                        pat_def,
+                        &format!("Pattern defined as {} here", pattern.clone().fg(b)),
+                    ),
+                    (
+                        info.position,
+                        &format!("Expected {}, found {}", pattern.fg(a), val.fg(b)),
                     ),
                 ],
                 None,
@@ -311,26 +346,23 @@ impl From<RuntimeError> for ErrorReport {
                 #[allow(clippy::comparison_chain)]
                 if context_changes.len() == 1 {
                     labels.push((
-                        context_changes[0].clone(),
+                        context_changes[0],
                         "New trigger function context was defined here",
                     ));
                 } else if context_changes.len() > 1 {
-                    labels.push((
-                        context_changes.last().unwrap().clone(),
-                        "Context was changed here",
-                    ));
+                    labels.push((*context_changes.last().unwrap(), "Context was changed here"));
 
                     for change in context_changes[1..(context_changes.len() - 1)].iter().rev() {
-                        labels.push((change.clone(), "This changes the context inside the macro"));
+                        labels.push((*change, "This changes the context inside the macro"));
                     }
 
                     labels.push((
-                        context_changes[0].clone(),
+                        context_changes[0],
                         "New trigger function context was defined here",
                     ));
                 }
 
-                labels.push((info.position.clone(), "Attempted to change value here"));
+                labels.push((info.position, "Attempted to change value here"));
 
                 create_error(
                     info,
@@ -350,21 +382,18 @@ impl From<RuntimeError> for ErrorReport {
                 #[allow(clippy::comparison_chain)]
                 if context_changes.len() == 1 {
                     labels.push((
-                        context_changes[0].clone(),
+                        context_changes[0],
                         "New trigger function context was defined here",
                     ));
                 } else if context_changes.len() > 1 {
-                    labels.push((
-                        context_changes.last().unwrap().clone(),
-                        "Context was changed here",
-                    ));
+                    labels.push((*context_changes.last().unwrap(), "Context was changed here"));
 
                     for change in context_changes[1..(context_changes.len() - 1)].iter().rev() {
-                        labels.push((change.clone(), "This changes the context inside the macro"));
+                        labels.push((*change, "This changes the context inside the macro"));
                     }
 
                     labels.push((
-                        context_changes[0].clone(),
+                        context_changes[0],
                         "New trigger function context was defined here",
                     ));
                 }
@@ -412,10 +441,11 @@ pub fn compile_spwn(
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
     let mut globals = Globals::new(path.clone());
+    globals.includes = included_paths;
     if statements.is_empty() {
         return Err(RuntimeError::CustomError(create_error(
             CompilerInfo::from_area(crate::compiler_info::CodeArea {
-                file: path,
+                file: Intern::new(path),
                 pos: (0, 0),
             }),
             "this script is empty",
@@ -429,9 +459,8 @@ pub fn compile_spwn(
     // store_value(Value::Null, 1, &mut globals, &start_context);
 
     let start_info = CompilerInfo {
-        includes: included_paths,
         ..CompilerInfo::from_area(crate::compiler_info::CodeArea {
-            file: path.clone(),
+            file: Intern::new(path.clone()),
             pos: statements[0].pos,
         })
     };
@@ -490,7 +519,7 @@ pub fn compile_spwn(
                 broke: i.position,
                 dropped: CodeArea {
                     pos: (end_pos, end_pos),
-                    file: path,
+                    file: Intern::new(path),
                 },
                 reason: "the program ended".to_string(),
             });
@@ -640,7 +669,7 @@ pub fn compile_scope(
                                 new_context.start_group = start_group;
 
                                 let new_info = info.clone();
-                                new_context.fn_context_change_stack = vec![info.position.clone()];
+                                new_context.fn_context_change_stack = vec![info.position];
                                 //new_info.last_context_change_stack = vec![info.position.clone()];
                                 let (_, inner_returns) = compile_scope(
                                     &f.statements,
@@ -698,7 +727,7 @@ pub fn compile_scope(
                                         globals,
                                         new_context.start_group,
                                         !mutable,
-                                        info.position.clone(),
+                                        info.position,
                                     );
 
                                     globals.stored_values[storage] =
@@ -744,7 +773,7 @@ pub fn compile_scope(
                                                 globals,
                                                 context.start_group,
                                                 !globals.is_mutable(*v),
-                                                info.position.clone(),
+                                                globals.get_area(*v),
                                             ),
                                         )
                                     })
@@ -758,7 +787,7 @@ pub fn compile_scope(
                                     1,
                                     globals,
                                     &context,
-                                    info.position.clone(),
+                                    info.position,
                                 );
 
                                 context.variables.insert(String::from(*name), p);
@@ -782,24 +811,22 @@ pub fn compile_scope(
                 //initialize type
                 let already = globals.type_ids.get(name);
                 if let Some(t) = already {
-                    if !(t.1 == info.position.file && t.2 == info.position.pos) {
+                    if t.1 != info.position {
                         return Err(RuntimeError::CustomError(create_error(
-                            info,
+                            info.clone(),
                             &format!("the type '{}' is already defined", name),
-                            &[],
+                            &[
+                                (t.1, "The type was first defined here"),
+                                (info.position, "Attempted to redefine here"),
+                            ],
                             None,
                         )));
                     }
                 } else {
                     (*globals).type_id_count += 1;
-                    (*globals).type_ids.insert(
-                        name.clone(),
-                        (
-                            globals.type_id_count,
-                            info.position.file.clone(),
-                            info.position.pos,
-                        ),
-                    );
+                    (*globals)
+                        .type_ids
+                        .insert(name.clone(), (globals.type_id_count, info.position));
                 }
                 //Value::TypeIndicator(globals.type_id_count)
             }
@@ -1108,7 +1135,7 @@ pub fn compile_scope(
                                         1,
                                         globals,
                                         c,
-                                        info.position.clone(),
+                                        info.position,
                                     );
                                     let stored = store_const_value(
                                         // store the val key
@@ -1116,7 +1143,7 @@ pub fn compile_scope(
                                         1,
                                         globals,
                                         c,
-                                        info.position.clone(),
+                                        info.position,
                                     );
                                     (*c).variables.insert(f.symbol.clone(), stored);
                                 }
@@ -1174,7 +1201,7 @@ pub fn compile_scope(
                                         1,
                                         globals,
                                         c,
-                                        info.position.clone(),
+                                        info.position,
                                     );
                                     (*c).variables.insert(f.symbol.clone(), stored);
                                 }
@@ -1232,7 +1259,7 @@ pub fn compile_scope(
                                     0,
                                     globals,
                                     &context,
-                                    info.position.clone(),
+                                    info.position,
                                 );
                                 for c in &mut new_contexts {
                                     (*c).variables = context.variables.clone();
@@ -1321,13 +1348,7 @@ pub fn compile_scope(
                         let mut all_values: Returns = SmallVec::new();
                         for context in &contexts {
                             all_values.push((
-                                store_value(
-                                    Value::Null,
-                                    1,
-                                    globals,
-                                    context,
-                                    info.position.clone(),
-                                ),
+                                store_value(Value::Null, 1, globals, context, info.position),
                                 context.clone(),
                             ));
                         }
@@ -1349,13 +1370,13 @@ pub fn compile_scope(
                     let (evaled, _) = e.message.eval(context, globals, info.clone(), true)?;
                     for (msg, _) in evaled {
                         let err = globals.stored_values[msg].to_str(globals);
-                        errors.push((info.position.clone(), err))
+                        errors.push((info.position, err))
                     }
                 }
 
                 let mut new_errors = Vec::new();
                 for (area, msg) in errors.iter() {
-                    new_errors.push((area.clone(), msg.as_str()))
+                    new_errors.push((*area, msg.as_str()))
                 }
 
                 let err = create_error(info, "Runtime Error", &new_errors, None);
@@ -1460,9 +1481,9 @@ pub fn get_import_path(
             .join(&p),
 
         ImportType::Lib(name) => {
-            let mut outpath = info.includes[0].clone();
+            let mut outpath = globals.includes[0].clone();
             let mut found = false;
-            for path in &info.includes {
+            for path in &globals.includes {
                 if path.join("libraries").join(name).exists() {
                     outpath = path.to_path_buf();
                     found = true;
@@ -1472,12 +1493,12 @@ pub fn get_import_path(
             if found {
                 outpath
             } else {
-                let labels = info
+                let labels = globals
                     .includes
                     .iter()
                     .map(|p| {
                         (
-                            info.position.clone(),
+                            info.position,
                             format!("Not found in {}", p.to_string_lossy()),
                         )
                     })
@@ -1485,7 +1506,7 @@ pub fn get_import_path(
                 let mut new_labels = Vec::new();
 
                 for (area, text) in labels.iter() {
-                    new_labels.push((area.clone(), text.as_str()));
+                    new_labels.push((*area, text.as_str()));
                 }
                 return Err(RuntimeError::CustomError(create_error(
                     info,
@@ -1601,7 +1622,7 @@ pub fn import_module(
 
     let mut new_info = info.clone();
 
-    new_info.position.file = module_path;
+    new_info.position.file = Intern::new(module_path);
     new_info.position.pos = (0, 0);
 
     if let ImportType::Lib(l) = path {
@@ -1625,7 +1646,7 @@ pub fn import_module(
                 return Err(RuntimeError::BreakNeverUsedError {
                     breaktype: *r,
                     info: i.clone(),
-                    broke: i.position.clone(),
+                    broke: i.position,
                     dropped: info.position,
                     reason: "the file ended".to_string(),
                 });
@@ -1675,14 +1696,7 @@ pub fn import_module(
     };
 
     if out.len() == 1 && &out[0].1 == context {
-        let cloned = clone_and_get_value(
-            out[0].0,
-            9999,
-            globals,
-            context.start_group,
-            true,
-            info.position,
-        );
+        let cloned = clone_and_get_value(out[0].0, 9999, globals, context.start_group, true);
         let s_impl = globals.implementations.clone();
 
         globals.prev_imports.insert(path.clone(), (cloned, s_impl));

@@ -90,7 +90,11 @@ const NO_GROUP: Group = Group {
     id: Id::Specific(0),
 };
 
-pub fn optimize(mut obj_in: Vec<FunctionId>, mut closed_group: u16) -> Vec<FunctionId> {
+pub fn optimize(
+    mut obj_in: Vec<FunctionId>,
+    mut closed_group: u16,
+    reserved_groups: &HashSet<Group>,
+) -> Vec<FunctionId> {
     let mut network = TriggerNetwork::new();
 
     // sort all triggers by their group
@@ -141,7 +145,12 @@ pub fn optimize(mut obj_in: Vec<FunctionId>, mut closed_group: u16) -> Vec<Funct
     network = fix_read_write_order(&mut objects, &network, &mut closed_group);
 
     // round 1
-    spawn_and_dead_code_optimization(&mut network, &mut objects, &mut closed_group);
+    spawn_and_dead_code_optimization(
+        &mut network,
+        &mut objects,
+        &mut closed_group,
+        reserved_groups,
+    );
 
     // clean_network(&mut network, &objects, false);
 
@@ -166,13 +175,15 @@ fn spawn_and_dead_code_optimization(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
     closed_group: &mut u16,
+    reserved_groups: &HashSet<Group>,
 ) {
     let mut swaps = HashMap::new();
     for (group, gang) in network.clone() {
-        if let Id::Specific(_) = group.id {
+        if matches!(group.id, Id::Specific(_)) || reserved_groups.contains(&group) {
             for (i, trigger) in gang.triggers.iter().enumerate() {
                 if trigger.role != TriggerRole::Output {
-                    let (_, new_swaps) = optimize_from(network, objects, (group, i), closed_group);
+                    let (_, new_swaps) =
+                        optimize_from(network, objects, (group, i), closed_group, reserved_groups);
                     swaps.extend(new_swaps);
                 } else {
                     (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
@@ -322,6 +333,7 @@ fn get_targets<'a>(
     delay: u32,
     ignore_optimized: bool,
     closed_group: &mut u16,
+    reserved_groups: &HashSet<Group>,
 ) -> (Option<Vec<(Group, u32)>>, Swaps) {
     //u32: delay in millis
 
@@ -346,7 +358,7 @@ fn get_targets<'a>(
     let list: Vec<(usize, Group)>;
 
     if let Some(ObjParam::Group(g)) = start_obj.get(&51) {
-        if let Id::Specific(_) = g.id {
+        if matches!(g.id, Id::Specific(_)) || reserved_groups.contains(g) {
             //(*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
             return (Some(vec![(*g, delay)]), swaps);
         }
@@ -400,7 +412,8 @@ fn get_targets<'a>(
             }
         } else if network[&trigger_ptr.0].connections_in > 1 {
             (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
-            let (keep, new_swaps) = optimize_from(network, objects, trigger_ptr, closed_group);
+            let (keep, new_swaps) =
+                optimize_from(network, objects, trigger_ptr, closed_group, reserved_groups);
 
             swaps.extend(new_swaps);
             if keep {
@@ -418,7 +431,7 @@ fn get_targets<'a>(
                 }
                 TriggerRole::Func => {
                     let (keep, new_swaps) =
-                        optimize_from(network, objects, trigger_ptr, closed_group);
+                        optimize_from(network, objects, trigger_ptr, closed_group, reserved_groups);
                     swaps.extend(new_swaps);
                     if keep {
                         (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1]
@@ -434,6 +447,7 @@ fn get_targets<'a>(
                         delay + added_delay,
                         ignore_optimized,
                         closed_group,
+                        reserved_groups,
                     );
                     swaps.extend(new_swaps);
                     match result {
@@ -519,6 +533,7 @@ fn optimize_from<'a>(
     objects: &mut Triggerlist,
     start: (Group, usize),
     closed_group: &mut u16,
+    reserved_groups: &HashSet<Group>,
 ) -> (bool, Swaps) {
     //returns weather to keep or delete the trigger
     let mut swaps = HashMap::new();
@@ -535,7 +550,15 @@ fn optimize_from<'a>(
 
     //let role = trigger.role;
 
-    let (targets, new_swaps) = get_targets(network, objects, start, 0, false, closed_group);
+    let (targets, new_swaps) = get_targets(
+        network,
+        objects,
+        start,
+        0,
+        false,
+        closed_group,
+        reserved_groups,
+    );
     let trigger = network[&start.0].triggers[start.1];
 
     swaps.extend(new_swaps);
@@ -633,7 +656,10 @@ fn optimize_from<'a>(
             // .collect::<Vec<_>>()
             // .iter()
             {
-                if network[&g].connections_in == 1 && delay == 0 {
+                if !(matches!(g.id, Id::Specific(_)) || reserved_groups.contains(&g))
+                    && network[&g].connections_in == 1
+                    && delay == 0
+                {
                     swaps.insert(g, spawn_group);
                 } else {
                     create_spawn_trigger(

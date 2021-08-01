@@ -1,62 +1,50 @@
 extract obj_props;
 
-type @binaryCalculator;
+decimalMemory = 10i;
+decimalCounter = counter(decimalMemory);
+binaryMemory = [11i, 12i, 13i, 14i, 15i, 16i, 17i, 18i];
+let binaryCounters = [];
 
-impl @binaryCalculator {
+$.add(obj {
+    OBJ_ID: 1615,
+    X: 300,
+    Y: 300,
+    ITEM: decimalMemory,
+    GROUPS: 999g
+});
 
-    new: (bits: @number, x: @number, y: @number) {
-        let bitCounters = [];
+for i in 0..binaryMemory.length {
+    $.add(obj {
+        OBJ_ID: 1615,
+        X: 300 + i * 30,
+        Y: 270,
+        ITEM: binaryMemory[i],
+        GROUPS: 999g
+    });
+    binaryCounters.push(counter(binaryMemory[i]));
+}
 
-        for i in ..bits {
-            item = ?i;
+binaryToNumeric = !{
+    decimalCounter = 0;
+    wait(1);
 
-            $.add(obj {
-                OBJ_ID: 1615,
-                X: x + i * 30,
-                Y: y,
-                ITEM: item,
-                GROUPS: 999g
-            });
-
-            bitCounters.push(counter(item));
+    for i in 0..binaryCounters.length {
+        if binaryCounters[binaryCounters.length - 1 - i] as @bool {
+            decimalCounter += 2 ^ i;
         }
-
-        return {
-            bitCounters: bitCounters,
-            type: @binaryCalculator
-        }
-    },
-    binaryToDecimal: (self, target: @counter) {
-        target = 0;
-        wait(1);
-
-        for i in ..self.bitCounters.length {
-            if self.bitCounters[self.bitCounters.length - 1 - i] as @bool {
-                target += 2 ^ i;
-            }
-        }
-    },
-    decimalToBinary: (self, source: @counter, calcSpeed: @number = 5) {
-        let tempcounters = [];
-
-        for i in ..self.bitCounters.length {
-            tempcounters.push(counter());
-        }
-
-        source.copy_to(tempcounters, speed = 10);
-
-        for i in ..self.bitCounters.length {
-            -> () {
-                tempcounters[i].divide(2 ^ i, speed = calcSpeed);
-                tempcounters[i].divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i], speed = calcSpeed);
-            }();
-        }
-    },
-    prettyDecimalToBinary: (self, source: @counter, calcSpeed: @number = 10) {
-        for i in ..self.bitCounters.length {
-            source.divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i], speed = calcSpeed);
-        }
-
-        self.binaryToDecimal(source);
     }
 }
+
+decimalToBinary = !{
+    tempLength = binaryCounters.length + 1;
+
+    for i in 1..tempLength {
+        decimalCounter.divide(2, remainder = binaryCounters[binaryCounters.length - i], speed = 4);
+    }
+
+    binaryToNumeric!;
+}
+
+decimalCounter = 213; // Edit this
+wait(1);
+decimalToBinary!;

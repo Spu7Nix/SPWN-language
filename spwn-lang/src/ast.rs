@@ -77,11 +77,11 @@ pub enum ValueBody {
 }
 
 impl ValueBody {
-    pub fn to_variable(&self) -> Variable {
+    pub fn to_variable(&self, pos: FileRange) -> Variable {
         Variable {
             value: ValueLiteral { body: self.clone() },
             operator: None,
-            pos: (0, 0),
+            pos,
             //comment: (None, None),
             path: Vec::new(),
             tag: Attribute::new(),
@@ -354,7 +354,7 @@ impl Expression {
         Variable {
             operator: None,
             value: ValueLiteral::new(ValueBody::Expression(self.clone())),
-            pos: (0, 0),
+            pos: self.get_pos(),
             path: Vec::new(),
             //comment: (None, None),
             tag: Attribute::new(),
