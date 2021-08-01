@@ -770,7 +770,7 @@ builtins! {
             if m == ObjectMode::Trigger && (key == 57 || key == 62) {
                 // group ids and stuff on triggers
                 return Err(RuntimeError::CustomError(create_error(
-                    info.clone(),
+                    info,
                     "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead",
                     &[],
                     None,
@@ -817,7 +817,7 @@ builtins! {
                             out.push(match globals.stored_values[*s] {
                             Value::Group(g) => g,
                             _ => return Err(RuntimeError::CustomError(create_error(
-                                info.clone(),
+                                info,
                                 "Arrays in object parameters can only contain groups",
                                 &[],
                                 None,
@@ -1093,7 +1093,7 @@ builtins! {
                 if old_step != 1 {
 
                     return Err(RuntimeError::CustomError(create_error(
-                        info.clone(),
+                        info,
                         "Range operator cannot be used on a range that already has a non-default stepsize",
                         &[],
                         None,
@@ -1107,7 +1107,7 @@ builtins! {
                     if step <= 0 {
 
                         return Err(RuntimeError::CustomError(create_error(
-                            info.clone(),
+                            info,
                             "range cannot have a stepsize less than or 0",
                             &[],
                             None,

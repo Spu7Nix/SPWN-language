@@ -646,7 +646,7 @@ impl ast::Variable {
                     return Err(RuntimeError::UndefinedErr {
                         undefined: "self".to_string(),
                         desc: "variable".to_string(),
-                        info: info.clone()
+                        info
                     });
                 }
             }
@@ -1017,7 +1017,7 @@ impl ast::Variable {
                                 if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) {
                                     
                                     return Err(RuntimeError::CustomError(create_error(
-                                        info.clone(),
+                                        info,
                                         disallowed_message,
                                         &[],
                                         None,
@@ -1040,7 +1040,7 @@ impl ast::Variable {
                                 if id == None {
                                     
                                     return Err(RuntimeError::CustomError(create_error(
-                                        info.clone(),
+                                        info,
                                         "object key has no 'id' member",
                                         &[],
                                         None,
@@ -1049,7 +1049,7 @@ impl ast::Variable {
                                 let pattern = d.get("pattern");
                                 if pattern == None {
                                     return Err(RuntimeError::CustomError(create_error(
-                                        info.clone(),
+                                        info,
                                         "object key has no 'pattern' member",
                                         &[],
                                         None,
@@ -1062,7 +1062,7 @@ impl ast::Variable {
 
                                         if o.mode == ast::ObjectMode::Trigger && (out == 57 || out == 62) { // group ids and stuff on triggers
                                             return Err(RuntimeError::CustomError(create_error(
-                                                info.clone(),
+                                                info,
                                                 disallowed_message,
                                                 &[],
                                                 None,
@@ -1136,7 +1136,7 @@ impl ast::Variable {
                                             out.push(match globals.stored_values[*s] {
                                                 Value::Group(g) => g,
                                                 _ => return Err(RuntimeError::CustomError(create_error(
-                                                    info.clone(),
+                                                    info,
                                                     "Arrays in object parameters can only contain groups",
                                                     &[],
                                                     None,
@@ -1236,7 +1236,7 @@ impl ast::Variable {
                                                 if !m.args.is_empty() && m.args[0].0 == "self" {
                                                     
                                                     return Err(RuntimeError::CustomError(create_error(
-                                                        info.clone(),
+                                                        info,
                                                         "Cannot access method (macro with a \"self\" argument) using \"::\"",
                                                         &[],
                                                         None,
@@ -1296,7 +1296,7 @@ impl ast::Variable {
                                             if (*n) < 0.0 && (-*n) as usize >= len {
                                                 
                                                 return Err(RuntimeError::CustomError(create_error(
-                                                    info.clone(),
+                                                    info,
                                                     &format!("Index too low! Index is {}, but length is {}.", n, len),
                                                     &[],
                                                     None,
@@ -1308,7 +1308,7 @@ impl ast::Variable {
                                             if *n as usize >= len {
                                                 
                                                 return Err(RuntimeError::CustomError(create_error(
-                                                    info.clone(),
+                                                    info,
                                                     &format!("Index too high! Index is {}, but length is {}.", n, len),
                                                     &[],
                                                     None,
@@ -1386,7 +1386,7 @@ impl ast::Variable {
                                             if id == None {
                                                 
                                                 return Err(RuntimeError::CustomError(create_error(
-                                                    info.clone(),
+                                                    info,
                                                     "object key has no 'id' member",
                                                     &[],
                                                     None,
@@ -1445,7 +1445,7 @@ impl ast::Variable {
                                             if !contains {
                                                 
                                                 return Err(RuntimeError::CustomError(create_error(
-                                                    info.clone(),
+                                                    info,
                                                     "Cannot find key in object",
                                                     &[],
                                                     None,
@@ -1478,7 +1478,7 @@ impl ast::Variable {
                                             if (*n) < 0.0 && (-*n) as usize >= len {
                                                 
                                                 return Err(RuntimeError::CustomError(create_error(
-                                                    info.clone(),
+                                                    info,
                                                     &format!("Index too low! Index is {}, but length is {}.", n, len),
                                                     &[],
                                                     None,
@@ -1490,7 +1490,7 @@ impl ast::Variable {
                                             if *n as usize >= len {
                                                 
                                                 return Err(RuntimeError::CustomError(create_error(
-                                                    info.clone(),
+                                                    info,
                                                     &format!("Index too high! Index is {}, but length is {}.", n, len),
                                                     &[],
                                                     None,
@@ -1634,7 +1634,7 @@ impl ast::Variable {
                                     // cast takes 1 argument only
 
                                     return Err(RuntimeError::CustomError(create_error(
-                                        info.clone(),
+                                        info,
                                         &format!(
                                             "casting takes one argument, but {} were provided",
                                             args.len()

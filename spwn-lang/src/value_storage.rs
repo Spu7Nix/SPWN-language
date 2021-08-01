@@ -103,9 +103,9 @@ impl ValStorage {
         };
     }
 
-    pub fn get_lifetime(&self, index: usize) -> u16 {
-        self.map.get(&index).unwrap().lifetime
-    }
+    // pub fn get_lifetime(&self, index: usize) -> u16 {
+    //     self.map.get(&index).unwrap().lifetime
+    // }
 
     pub fn increment_lifetimes(&mut self) {
         for (_, val) in self.map.iter_mut() {
@@ -304,35 +304,35 @@ pub fn clone_value(
     new_index
 }
 
-pub fn clone_value_to(
-    index: usize,
-    to: usize,
-    lifetime: u16,
-    globals: &mut Globals,
-    fn_context: Group,
-    constant: bool,
-    area: CodeArea,
-) {
-    let old_val = clone_and_get_value(index, lifetime, globals, fn_context, constant, area.clone());
+// pub fn clone_value_to(
+//     index: usize,
+//     to: usize,
+//     lifetime: u16,
+//     globals: &mut Globals,
+//     fn_context: Group,
+//     constant: bool,
+//     area: CodeArea,
+// ) {
+//     let old_val = clone_and_get_value(index, lifetime, globals, fn_context, constant, area.clone());
 
-    //clone all inner values
-    //do the thing
-    //bing bang
-    //profit
-    let new_index = to;
-    //println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
+//     //clone all inner values
+//     //do the thing
+//     //bing bang
+//     //profit
+//     let new_index = to;
+//     //println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
 
-    (*globals).stored_values.map.insert(
-        new_index,
-        StoredValData {
-            val: old_val,
-            fn_context,
-            mutable: !constant,
-            lifetime,
-            def_area: area,
-        },
-    );
-}
+//     (*globals).stored_values.map.insert(
+//         new_index,
+//         StoredValData {
+//             val: old_val,
+//             fn_context,
+//             mutable: !constant,
+//             lifetime,
+//             def_area: area,
+//         },
+//     );
+// }
 
 pub fn store_const_value(
     val: Value,
@@ -363,26 +363,26 @@ pub fn store_const_value(
     index
 }
 
-pub fn store_val_m(
-    val: Value,
-    lifetime: u16,
-    globals: &mut Globals,
-    context: &Context,
-    constant: bool,
-    area: CodeArea,
-) -> StoredValue {
-    let index = globals.val_id;
+// pub fn store_val_m(
+//     val: Value,
+//     lifetime: u16,
+//     globals: &mut Globals,
+//     context: &Context,
+//     constant: bool,
+//     area: CodeArea,
+// ) -> StoredValue {
+//     let index = globals.val_id;
 
-    (*globals).stored_values.map.insert(
-        index,
-        StoredValData {
-            val,
-            fn_context: context.start_group,
-            mutable: !constant,
-            lifetime,
-            def_area: area,
-        },
-    );
-    (*globals).val_id += 1;
-    index
-}
+//     (*globals).stored_values.map.insert(
+//         index,
+//         StoredValData {
+//             val,
+//             fn_context: context.start_group,
+//             mutable: !constant,
+//             lifetime,
+//             def_area: area,
+//         },
+//     );
+//     (*globals).val_id += 1;
+//     index
+// }
