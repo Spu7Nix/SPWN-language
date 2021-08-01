@@ -4,7 +4,7 @@ use crate::compiler::create_error;
 use crate::compiler::import_module;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
-use crate::parser::FileRange;
+
 use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};
 //use std::boxed::Box;
 
@@ -447,10 +447,10 @@ pub fn convert_type(
         (Value::Range(start, end, step), 10) => {
             Value::Array(if start < end {
                 (*start..*end).step_by(*step).map(|x|
-                    store_value(Value::Number(x as f64), 1, globals, &context, info.position.clone())).collect::<Vec<StoredValue>>()
+                    store_value(Value::Number(x as f64), 1, globals, context, info.position.clone())).collect::<Vec<StoredValue>>()
             } else {
                 (*end..*start).step_by(*step).rev().map(|x|
-                    store_value(Value::Number(x as f64), 1, globals, &context, info.position.clone())).collect::<Vec<StoredValue>>()
+                    store_value(Value::Number(x as f64), 1, globals, context, info.position.clone())).collect::<Vec<StoredValue>>()
             })
         },
 
@@ -471,7 +471,7 @@ pub fn convert_type(
             }
         },
         (Value::Str(s), 1) => {
-            Value::Array(s.chars().map(|x| store_value(Value::Str(x.to_string()), 1, globals, &context, info.position.clone())).collect::<Vec<StoredValue>>())
+            Value::Array(s.chars().map(|x| store_value(Value::Str(x.to_string()), 1, globals, context, info.position.clone())).collect::<Vec<StoredValue>>())
         },
         
 
@@ -548,7 +548,7 @@ pub fn macro_to_value(
     }
     let new_info = info.clone();
     let (argument_possibilities, returns) =
-        all_combinations(all_expr, &context, globals, new_info, constant)?;
+        all_combinations(all_expr, context, globals, new_info, constant)?;
     inner_returns.extend(returns);
     for defaults in argument_possibilities {
         let mut args: Vec<(
@@ -605,7 +605,7 @@ pub fn macro_to_value(
                 })),
                 1,
                 globals,
-                &context,
+                context,
                 info.position.clone(),
             ),
             defaults.1,
@@ -974,7 +974,7 @@ impl ast::Variable {
                                 //this should be the last case, so we just return the body
                                 for c in &contexts {
                                     let (evaled, returns) =
-                                        case.body.eval(&c, globals, info.clone(), constant)?;
+                                        case.body.eval(c, globals, info.clone(), constant)?;
                                     inner_returns.extend(returns);
                                     start_val.extend(evaled);
                                 }
@@ -1229,7 +1229,7 @@ impl ast::Variable {
                     for x in &mut with_parent {
                         *x = (
                             match &globals.stored_values[x.0] {
-                                Value::TypeIndicator(t) => match globals.implementations.get(&t) {
+                                Value::TypeIndicator(t) => match globals.implementations.get(t) {
                                     Some(imp) => match imp.get(a) {
                                         Some((val, _)) => {
                                             if let Value::Macro(m) = &globals.stored_values[*val] {
@@ -1523,7 +1523,7 @@ impl ast::Variable {
                                     }
                                 }
                             }
-                            a => {
+                            _a => {
                                 return Err(RuntimeError::TypeError {
                                     expected: "indexable type".to_string(),
                                     found: globals.get_type_str(prev_v),
@@ -1600,7 +1600,7 @@ impl ast::Variable {
                                     new_out.push((dict.0, dict.1.clone(), *prev_v));
                                 }
                             }
-                            a => {
+                            _a => {
                                 return Err(RuntimeError::TypeError {
                                     expected: "type indicator".to_string(),
                                     found: globals.get_type_str(*prev_v),
@@ -1707,7 +1707,7 @@ impl ast::Variable {
                                 with_parent =
                                     all_values.iter().map(|x| (x.0, x.1.clone(), *v)).collect();
                             }
-                            a => {
+                            _a => {
                                 return Err(RuntimeError::TypeError {
                                     expected: "macro, built-in function or type indicator".to_string(),
                                     found: globals.get_type_str(*v),
@@ -1821,7 +1821,7 @@ impl ast::Variable {
                             .clone()
                             .member(
                                 String::from("_assign_"),
-                                &context,
+                                context,
                                 globals,
                                 CompilerInfo::new(),
                             )
@@ -2014,7 +2014,7 @@ impl ast::Variable {
             match p {
                 ast::Path::Member(m) => {
                     let val = globals.stored_values[current_ptr].clone();
-                    match val.member(m.clone(), &context, globals, info.clone()) {
+                    match val.member(m.clone(), context, globals, info.clone()) {
                         Some(s) => current_ptr = s,
                         None => {
                             
@@ -2042,7 +2042,7 @@ impl ast::Variable {
                     };
                 }
                 ast::Path::Index(i) => {
-                    let (evaled, _) = i.eval(&context, globals, info.clone(), true)?;
+                    let (evaled, _) = i.eval(context, globals, info.clone(), true)?;
                     let first_context_eval = evaled[0].0;
                     match &globals.stored_values[current_ptr] {
                         Value::Dict(d) => {
@@ -2143,7 +2143,7 @@ impl ast::Variable {
                                 current_ptr = value;
                             }
                         },
-                        a => {
+                        _a => {
                             return Err(RuntimeError::TypeError {
                                 expected: "type indicator".to_string(),
                                 found: globals.get_type_str(current_ptr),

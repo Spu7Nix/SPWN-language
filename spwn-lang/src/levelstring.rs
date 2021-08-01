@@ -219,7 +219,7 @@ pub fn append_objects(
     mut objects: Vec<GdObj>,
     old_ls: &str,
 ) -> Result<(String, [usize; 4]), String> {
-    let mut closed_ids = get_used_ids(&old_ls);
+    let mut closed_ids = get_used_ids(old_ls);
 
     //collect all specific ids mentioned into closed_[id] lists
     for obj in &objects {
@@ -526,7 +526,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
     let mut current_x = 0;
     for (i, func_id) in func_ids.iter().enumerate() {
         if func_id.parent == None {
-            let (objects, new_length) = apply_fn_id(i, &func_ids, current_x, 0);
+            let (objects, new_length) = apply_fn_id(i, func_ids, current_x, 0);
             full_obj_list.extend(objects);
 
             current_x += new_length;
@@ -725,7 +725,7 @@ fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, String> {
         type AesEcb = Ecb<Aes256, Pkcs7>;
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_var(&IOS_KEY, &[]).unwrap();
+        let cipher = AesEcb::new_var(IOS_KEY, &[]).unwrap();
 
         Ok(match cipher.decrypt(&mut sf) {
             Ok(v) => v,
@@ -894,7 +894,7 @@ pub fn encrypt_level_string(
                 if k4_detected && level_detected {
                     let encrypted_ls: String = {
                         let mut ls_encoder = gzip::Encoder::new(Vec::new()).unwrap();
-                        ls_encoder.write_all(&full_ls.as_bytes()).unwrap();
+                        ls_encoder.write_all(full_ls.as_bytes()).unwrap();
                         let b64_encrypted =
                             base64::encode(&ls_encoder.finish().into_result().unwrap());
                         let fin = b64_encrypted.replace("+", "-").replace("/", "_");
@@ -962,7 +962,7 @@ pub fn encrypt_level_string(
         type AesEcb = Ecb<Aes256, Pkcs7>;
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_var(&IOS_KEY, &[]).unwrap();
+        let cipher = AesEcb::new_var(IOS_KEY, &[]).unwrap();
 
         let fin = cipher.encrypt_vec(&bytes);
         assert!(fs::write(path, fin).is_ok());

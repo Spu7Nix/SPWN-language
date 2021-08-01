@@ -154,10 +154,7 @@ impl Value {
         info: CompilerInfo,
     ) -> Option<StoredValue> {
         let get_impl = |t: u16, m: String| match globals.implementations.get(&t) {
-            Some(imp) => match imp.get(&m) {
-                Some(mem) => Some(mem.0),
-                None => None,
-            },
+            Some(imp) => imp.get(&m).map(|mem| mem.0),
             None => None,
         };
         if member == TYPE_MEMBER_NAME {
@@ -572,7 +569,7 @@ builtins! {
 
     [B64Encode]
     fn b64encode((s): Str) {
-        let encrypted = base64::encode(&s.as_bytes());
+        let encrypted = base64::encode(s.as_bytes());
         Value::Str(encrypted)
     }
 
@@ -781,7 +778,7 @@ builtins! {
             }
 
             if let Some(ref pat) = pattern {
-                if !value.matches_pat(&pat, &info, globals, &context)? {
+                if !value.matches_pat(pat, &info, globals, context)? {
                     return Err(RuntimeError::TypeError {
                         expected: pat.to_str(globals),
                         found: value.get_type_str(globals),
@@ -1317,7 +1314,7 @@ builtins! {
         }
     }
 
-    [AsOp]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,&context)? }
+    [AsOp]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,context)? }
 
     [SubtractOp]        fn _subtract_(mut (a): Number, (b): Number)         { a -= b; Value::Null }
     [AddOp]
@@ -1355,12 +1352,12 @@ builtins! {
     [EitherOp]
     fn _either_((a), (b)) {
         Value::Pattern(Pattern::Either(
-            if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, &context)? {
+            if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()
             },
-            if let Value::Pattern(p) = convert_type(&b, 18, &info, globals, &context)? {
+            if let Value::Pattern(p) = convert_type(&b, 18, &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()

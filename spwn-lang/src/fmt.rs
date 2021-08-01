@@ -87,7 +87,7 @@ fn element_list(elements: &[impl SpwnFmt], open: char, closing: char, ind: Inden
         }
 
         let mut last_elem_lines = last_elem.lines();
-        out += &last_elem_lines.next().unwrap();
+        out += last_elem_lines.next().unwrap();
 
         for line in last_elem_lines {
             out += &format!("\n{}{}", tabs(ind), line);

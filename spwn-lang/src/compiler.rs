@@ -199,10 +199,7 @@ pub fn create_error(
             .iter()
             .map(|(a, s)| (a.clone(), s.to_string()))
             .collect(),
-        note: match note {
-            Some(s) => Some(s.to_string()),
-            _ => None,
-        },
+        note: note.map(|s| s.to_string()),
     }
 }
 
@@ -601,7 +598,7 @@ pub fn compile_scope(
                 for context in &contexts {
                     let is_assign = !expr.operators.is_empty()
                         && expr.operators[0] == ast::Operator::Assign
-                        && !expr.values[0].is_undefinable(&context, globals);
+                        && !expr.values[0].is_undefinable(context, globals);
 
                     //println!("{:?}, {}", expr, is_assign);
 
@@ -1484,7 +1481,7 @@ pub fn get_import_path(
                     new_labels.push((area.clone(), text.as_str()));
                 }
                 return Err(RuntimeError::CustomError(create_error(
-                    info.clone(),
+                    info,
                     "Unable to find library folder",
                     &new_labels,
                     None,

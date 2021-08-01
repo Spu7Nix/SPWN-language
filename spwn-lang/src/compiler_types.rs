@@ -65,7 +65,7 @@ pub fn handle_operator(
     Ok(
         if let Some(val) = globals.stored_values[value1].clone().member(
             String::from(macro_name),
-            &context,
+            context,
             globals,
             info.clone(),
         ) {
@@ -83,7 +83,7 @@ pub fn handle_operator(
                 if let Some(target_typ) = m.args[0].3 {
                     let pat = &globals.stored_values[target_typ].clone();
 
-                    if !val2.matches_pat(pat, &info, globals, context)? {
+                    if !val2.matches_pat(pat, info, globals, context)? {
                         //if types dont match, act as if there is no macro at all
 
                         return Ok(smallvec![(
@@ -93,11 +93,11 @@ pub fn handle_operator(
                                     vec![value1, value2],
                                     info.clone(),
                                     globals,
-                                    &context,
+                                    context,
                                 )?,
                                 1,
                                 globals,
-                                &context,
+                                context,
                                 info.position.clone()
                             ),
                             context.clone(),
@@ -136,11 +136,11 @@ pub fn handle_operator(
                             vec![value1, value2],
                             info.clone(),
                             globals,
-                            &context
+                            context
                         )?,
                         1,
                         globals,
-                        &context,
+                        context,
                         info.position.clone()
                     ),
                     context.clone(),
@@ -154,11 +154,11 @@ pub fn handle_operator(
                         vec![value1, value2],
                         info.clone(),
                         globals,
-                        &context
+                        context
                     )?,
                     1,
                     globals,
-                    &context,
+                    context,
                     info.position.clone()
                 ),
                 context.clone(),
@@ -177,7 +177,7 @@ pub fn handle_unary_operator(
     Ok(
         if let Some(val) = globals.stored_values[value].clone().member(
             String::from(macro_name),
-            &context,
+            context,
             globals,
             info.clone(),
         ) {
@@ -197,16 +197,10 @@ pub fn handle_unary_operator(
             } else {
                 smallvec![(
                     store_value(
-                        built_in_function(
-                            macro_name,
-                            vec![value],
-                            info.clone(),
-                            globals,
-                            &context
-                        )?,
+                        built_in_function(macro_name, vec![value], info.clone(), globals, context)?,
                         1,
                         globals,
-                        &context,
+                        context,
                         info.position.clone()
                     ),
                     context.clone(),
@@ -215,10 +209,10 @@ pub fn handle_unary_operator(
         } else {
             smallvec![(
                 store_value(
-                    built_in_function(macro_name, vec![value], info.clone(), globals, &context)?,
+                    built_in_function(macro_name, vec![value], info.clone(), globals, context)?,
                     1,
                     globals,
-                    &context,
+                    context,
                     info.position.clone()
                 ),
                 context.clone(),
@@ -745,7 +739,7 @@ pub fn eval_dict(
                 Value::Dict(dict_out),
                 1,
                 globals,
-                &context,
+                context,
                 info.position.clone(),
             ),
             expressions.1,

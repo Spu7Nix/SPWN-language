@@ -137,13 +137,13 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
         .iter()
         .filter(|x| matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
-    macro_list.sort_by(|a, b| a.0.cmp(&b.0));
+    macro_list.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut val_list: Vec<(&String, &usize)> = dict
         .iter()
         .filter(|x| !matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
-    val_list.sort_by(|a, b| a.0.cmp(&b.0));
+    val_list.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut document_member = |key: &String, val: &usize| -> String {
         let mut member_doc = String::new();

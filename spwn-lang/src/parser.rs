@@ -62,7 +62,7 @@ pub enum SyntaxError {
 
 pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Result<(), SyntaxError> {
     if name.starts_with('_') && name.ends_with('_') {
-        if Builtin::from_str(&name).is_ok() {
+        if Builtin::from_str(name).is_ok() {
             Ok(())
         } else {
             Err(SyntaxError::SyntaxError {
@@ -98,7 +98,7 @@ impl From<SyntaxError> for ErrorReport {
                 &[(
                     CodeArea {
                         pos,
-                        file: file.clone(),
+                        file,
                     },
                     &format!(
                         "{} {}, {} {}",
@@ -120,7 +120,7 @@ impl From<SyntaxError> for ErrorReport {
                 &[(
                     CodeArea {
                         pos,
-                        file: file.clone(),
+                        file,
                     },
                     &format!("Unexpected {}", found),
                 )],
@@ -136,7 +136,7 @@ impl From<SyntaxError> for ErrorReport {
                 &[(
                     CodeArea {
                         pos,
-                        file: file.clone(),
+                        file,
                     },
                     &message,
                 )],
@@ -1259,7 +1259,7 @@ fn parse_expr(
 
             // iterate though the operators until we get one like =
             while !old_operators.is_empty() {
-                if operator_precedence(&old_operators.last().unwrap()) == 0 {
+                if operator_precedence(old_operators.last().unwrap()) == 0 {
                     break;
                 }
 
