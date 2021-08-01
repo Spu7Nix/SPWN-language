@@ -1,1 +1,1 @@
-"hello".hi
+$.print($.spwn_version())

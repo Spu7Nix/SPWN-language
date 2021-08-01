@@ -1,6 +1,6 @@
 [package]
 name = "spwn"
-version = "0.0.4"
+version = "0.0.5"
 authors = ["Spu7Nix <spu7nix@outlook.com>"]
 edition = "2018"
 
