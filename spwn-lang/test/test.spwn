@@ -1,7 +1,4 @@
 
+s = 'a' * 20
+$.print(s, s.length)
 
-a = @regex::new("\\d")
-
-$.print(a.match("addih"))
-
-$.print(a.replace("ad1di2h3", "#"))
