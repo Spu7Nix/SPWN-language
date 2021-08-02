@@ -56,7 +56,11 @@ impl @string {
 	},
 	reverse: #[desc("Reverses the string.")]
 	(self) {
-		return ''.join(self.split('').reverse())
+		let ret_str = ""
+        for i in ..self.length {
+            ret_str += self[-i]
+        }
+        return ret_str
 	},
 	lowercase: #[desc("Makes whole string lowercase.")]
 	(self) {
@@ -76,12 +80,67 @@ impl @string {
 	(self) {
 		return self.lowercase() == self
 	},
-    pad_left: #[desc("Returns a left-padded version of the string")]
+    l_pad: #[desc("Returns a left-padded version of the string")]
     (self, times: @number, seq: @string = ' ') {
         return seq * times + self
     },
-    pad_right: #[desc("Returns a right-padded version of the string")]
+    r_pad: #[desc("Returns a right-padded version of the string")]
     (self, times: @number, seq: @string = ' ') {
         return self + seq * times
+    },
+    l_trim: #[desc("Returns a left-trimmed verison of the string") example("
+str1 = '      abcd g    '
+str2 = '   pog  __'
+$.assert(str1.l_trim() == 'abcd g    ')
+$.assert(str2.l_trim() == 'pog  __')
+    ")]
+    (self, tokens: @string | [@string] = [' ', '\n']) {
+        // check for tokens
+        for token in tokens {
+            if token.length != 1 {
+                throw "Trim tokens must all be 1-character long"
+            }
+        }
+
+        let tokenlist = tokens
+        if tokens.type == @string {
+            tokenlist = [tokens]
+        }
+
+        // scan left
+        let begin = 0
+
+        for i in ..self.length {
+            if tokenlist has self[i] {
+                continue
+            } else {
+                stop_ind = i
+                break
+            }
+        }
+
+        return $.substr(self, begin, self.length)
+    },
+    r_trim: #[desc("Returns a right-trimmed version of the string") example("
+str = 'abcd      '
+str2 = '      abcd g    '
+str3 = '   pog  __'
+$.assert(str.r_trim() == 'abcd')
+$.assert(str2.r_trim() == '      abcd g')
+$.assert(str3.r_trim(tokens = [' ', '_']) == '   pog')    
+    ")]
+    (self, tokens: @string | [@string] = [' ', '\n']) {
+        return self.reverse().l_trim(tokens).reverse() // lol
+    },
+    trim: #[desc("Returns a trimmed version of the string") example("
+str = 'abcd      '
+str2 = '      abcd g    '
+str3 = '   pog  __'
+$.assert(str.trim() == 'abcd')
+$.assert(str2.trim() == 'abcd g')
+$.assert(str3.trim(tokens = [' ', '_']))
+    ")]
+    (self, tokens: @string | [@string] = [' ', '\n']){
+        return self.l_trim(tokens).r_trim(tokens)
     }
 }
