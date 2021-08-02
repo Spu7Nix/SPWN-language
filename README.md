@@ -1,5 +1,4 @@
-![spwn_logo_name_large](https://user-images.githubusercontent.com/43052612/125992826-9e9b0d58-f47e-4016-8c2d-dd990881d3ca.png)
-
+![spwnnew](https://user-images.githubusercontent.com/85206419/127884996-92251ba7-4c28-4bf0-bb40-d363d5e31ccb.png)
 
 
 
