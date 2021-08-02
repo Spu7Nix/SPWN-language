@@ -1,22 +1,22 @@
-
-# **@object**:
-
+  
+# **@object**: 
+ 
 ## **add**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
+>``` 
+>**Type:** `@macro` 
 >
 
 ## **add\_groups**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, groups: @group | [@group]) { /* code omitted */ }
->```
->**Type:** `@macro`
+>``` 
+>**Type:** `@macro` 
 >## Arguments:
 >
 >| # | name | type | default value | description |
@@ -26,11 +26,11 @@
 
 ## **set**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, key: @object_key, value) { /* code omitted */ }
->```
->**Type:** `@macro`
+>``` 
+>**Type:** `@macro` 
 >## Arguments:
 >
 >| # | name | type | default value | description |

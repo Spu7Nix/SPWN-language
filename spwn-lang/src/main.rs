@@ -24,7 +24,7 @@ mod editorlive;
 mod optimize;
 mod value_storage;
 
-use ariadne::{Cache, FileCache};
+use ariadne::{Cache, FileCache, Fmt};
 use compiler_info::CompilerInfo;
 use globals::Globals;
 use optimize::optimize;
@@ -58,7 +58,7 @@ fn print_with_color(text: &str, color: Color) {
     stdout.set_color(&ColorSpec::new()).unwrap();
 }
 
-fn eprint_with_color(text: &str, color: Color) {
+fn eprint_with_color(text: &str, color: termcolor::Color) {
     let mut stdout = StandardStream::stderr(ColorChoice::Always);
     stdout
         .set_color(ColorSpec::new().set_fg(Some(color)))
@@ -316,25 +316,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             return Err(std::boxed::Box::from("Expected library name argument"))
                         }
                     };
-                    let path = match compiler::get_import_path(
-                        &compiler_types::ImportType::Lib(lib_path.clone()),
-                        &mut Globals::new(PathBuf::new()),
-                        CompilerInfo::new(),
-                    ) {
-                        Ok(a) => a,
-                        Err(e) => {
-                            println!("{}", ErrorReport::from(e).message);
-                            std::process::exit(ERROR_EXIT_CODE);
-                        }
-                    };
-
-                    let mut cache = FileCache::default();
-                    cache.fetch(path.as_path()).unwrap();
 
                     match documentation::document_lib(lib_path) {
                         Ok(_) => (),
                         Err(e) => {
-                            create_report(ErrorReport::from(e)).eprint(cache).unwrap();
+                            eprintln!(
+                                "{}",
+                                "Error when compiling library!".fg(ariadne::Color::Red)
+                            );
                             std::process::exit(ERROR_EXIT_CODE);
                         }
                     };
