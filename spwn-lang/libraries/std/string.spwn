@@ -75,5 +75,13 @@ impl @string {
 	is_lower: #[desc("Checks if whole string is lowercase, ignores characters that is not in the alphabet.")]
 	(self) {
 		return self.lowercase() == self
-	}
+	},
+    pad_left: #[desc("Returns a left-padded version of the string")]
+    (self, times: @number, seq: @string = ' ') {
+        return seq * times + self
+    },
+    pad_right: #[desc("Returns a right-padded version of the string")]
+    (self, times: @number, seq: @string = ' ') {
+        return self + seq * times
+    }
 }
