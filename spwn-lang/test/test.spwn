@@ -1,10 +1,7 @@
-// arr is an array
-#[no_std]
-let arr = []
 
-for i in 0..10 {
-    
-    
-    arr += [5,6]
-}
-$.print(arr)
+
+a = @regex::new("\\d")
+
+$.print(a.match("addih"))
+
+$.print(a.replace("ad1di2h3", "#"))

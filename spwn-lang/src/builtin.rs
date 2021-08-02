@@ -1039,7 +1039,7 @@ builtins! {
         }
     }
 
-    [Regex] fn regex((regex): Str, (s): Str, (mode): Str, (replace): Str) {
+    [Regex] fn regex((regex): Str, (s): Str, (mode): Str, (replace)) {
         use regex::Regex;
 
 
