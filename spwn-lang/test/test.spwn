@@ -1,9 +1,2 @@
-
-s = 'a' * 20
-$.print(s, s.length)
-
-let s = 'ab'
-s *= 3
-$.print(s, s.length)
-
-s *= 'aa'
+$.print({a:0,d:0})
+$.print([1,2,3,4])

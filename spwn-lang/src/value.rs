@@ -274,9 +274,10 @@ impl Value {
                     }
 
                     let stored_val = (*globals).stored_values[*val as usize].to_str(globals);
-                    out += &format!("{}: {},", key, stored_val);
+                    out += &format!("{}: {}, ", key, stored_val);
                 }
                 if !d.is_empty() {
+                    out.pop();
                     out.pop();
                 }
 
@@ -310,8 +311,9 @@ impl Value {
                     let mut out = String::from("[");
                     for val in a {
                         out += &globals.stored_values[*val].to_str(globals);
-                        out += ",";
+                        out += ", ";
                     }
+                    out.pop();
                     out.pop();
                     out += "]";
 
@@ -350,8 +352,9 @@ impl Value {
                         let mut out = String::from("[");
                         for p in a {
                             out += &Value::Pattern(p.clone()).to_str(globals);
-                            out += ",";
+                            out += ", ";
                         }
+                        out.pop();
                         out.pop();
                         out += "]";
 
