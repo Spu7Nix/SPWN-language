@@ -267,19 +267,23 @@ $.assert(arr == [5, 1, 5, 3, 2])
         self = [value] + self
         return value
     },
-    flat_map: #[desc("Works the same way as map but flattens any sub-arrays into one big array.") example("
+    flatten: #[desc("Flattens any sub-arrays into one big array.") example("
 arr = [1, 2, [3, 4], 5, [6, 7, [8]]]
-$.assert(arr.flat_map(el => el > 4) == [5, 6, 7, 8])
+$.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
     ")]
-    (self, cb: @macro = () => true) {
+    (self) {
         let output = [];
-        for iter in self {
-            if iter.type == @array {
-                output += iter.map(elem => cb(elem))
+
+        for elem in self {
+            if elem.type == @number {
+                output.push(elem)
             } else {
-                output.push(cb(iter));
+                for i in elem.flatten() {
+                    output.push(i)
+                }
             }
         }
-        return output;
-    },
+
+        return output
+    }
 }
