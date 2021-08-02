@@ -31,10 +31,11 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     if !output_path.exists() {
         std::fs::create_dir(output_path.clone()).unwrap();
     }
-    let mut info = CompilerInfo::new();
-    info.includes
+    let info: CompilerInfo = CompilerInfo::new();
+    globals
+        .includes
         .push(std::env::current_dir().expect("Cannot access current directory"));
-    info.includes.push(
+    globals.includes.push(
         std::env::current_exe()
             .expect("Cannot access directory of executable")
             .parent()
@@ -51,11 +52,12 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     )?;
 
     if module.len() > 1 {
-        return Err(RuntimeError::RuntimeError {
-            message: "Documentation of context-splitting libraries is not yet supported!"
-                .to_string(),
-            info: CompilerInfo::new(),
-        });
+        return Err(RuntimeError::CustomError(crate::compiler::create_error(
+            CompilerInfo::new(),
+            "Documentation of context-splitting libraries is not yet supported!",
+            &[],
+            None,
+        )));
     }
 
     let mut doc = format!("# Documentation for `{}` \n", path);
@@ -136,13 +138,13 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
         .iter()
         .filter(|x| matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
-    macro_list.sort_by(|a, b| a.0.cmp(&b.0));
+    macro_list.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut val_list: Vec<(&String, &usize)> = dict
         .iter()
         .filter(|x| !matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
-    val_list.sort_by(|a, b| a.0.cmp(&b.0));
+    val_list.sort_by(|a, b| a.0.cmp(b.0));
 
     let mut document_member = |key: &String, val: &usize| -> String {
         let mut member_doc = String::new();

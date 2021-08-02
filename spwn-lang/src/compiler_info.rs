@@ -1,5 +1,5 @@
 use crate::parser::FileRange;
-
+use internment::Intern;
 use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerInfo {
@@ -7,7 +7,6 @@ pub struct CompilerInfo {
     pub call_stack: Vec<CodeArea>,
     pub current_module: String, // empty string means script
     pub position: CodeArea,
-    pub includes: Vec<PathBuf>,
 }
 
 impl CompilerInfo {
@@ -18,7 +17,6 @@ impl CompilerInfo {
 
             current_module: String::new(),
             position: CodeArea::new(),
-            includes: vec![],
         }
     }
 
@@ -37,21 +35,21 @@ impl CompilerInfo {
     }
 
     pub fn add_to_call_stack(&mut self, new: CodeArea) {
-        self.call_stack.push(self.position.clone());
+        self.call_stack.push(self.position);
         self.position = new;
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CodeArea {
-    pub file: PathBuf,
+    pub file: Intern<PathBuf>,
     pub pos: FileRange,
 }
 
 impl CodeArea {
     pub fn new() -> Self {
         CodeArea {
-            file: PathBuf::new(),
+            file: Intern::new(PathBuf::new()),
             pos: (0, 0),
         }
     }

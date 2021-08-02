@@ -128,9 +128,9 @@ pub fn merge_contexts(
             GdObj {
                 params,
 
-                ..context_trigger(&context, &mut globals.uid_counter)
+                ..context_trigger(context, &mut globals.uid_counter)
             }
-            .context_parameters(&context),
+            .context_parameters(context),
             globals.trigger_order,
         ))
     };

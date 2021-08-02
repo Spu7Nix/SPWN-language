@@ -1,3 +1,2 @@
-s = true * 20
-
+s = 'a' * 20
 $.print(s, s.length)

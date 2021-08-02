@@ -1,6 +1,6 @@
 //! Defining all native types (and functions?)
 use crate::ast::ObjectMode;
-use crate::compiler::{RuntimeError, NULL_STORAGE};
+use crate::compiler::{create_error, RuntimeError, NULL_STORAGE};
 use crate::compiler_types::*;
 use crate::context::*;
 use crate::globals::Globals;
@@ -154,10 +154,7 @@ impl Value {
         info: CompilerInfo,
     ) -> Option<StoredValue> {
         let get_impl = |t: u16, m: String| match globals.implementations.get(&t) {
-            Some(imp) => match imp.get(&m) {
-                Some(mem) => Some(mem.0),
-                None => None,
-            },
+            Some(imp) => imp.get(&m).map(|mem| mem.0),
             None => None,
         };
         if member == TYPE_MEMBER_NAME {
@@ -288,25 +285,26 @@ use std::str::FromStr;
 
 macro_rules! typed_argument_check {
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident)  ($($arg_name:ident),*)) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident)  ($($arg_name:ident),*)) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
-        let ( $($arg_name),*) = $globals.stored_values[$arguments[$arg_index]].clone();
+        let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], $globals.get_lifetime($arguments[$arg_index]), $globals, $context.start_group, true);
     };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) mut ($($arg_name:ident),*)) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) mut ($($arg_name:ident),*)) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
         let ( $(mut $arg_name),*) = $globals.stored_values[$arguments[$arg_index]].clone();
     };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) ($($arg_name:ident),*): $arg_type:ident) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) ($($arg_name:ident),*): $arg_type:ident) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
-        let  ( $($arg_name),*) = match $globals.stored_values[$arguments[$arg_index]].clone() {
+
+        let  ( $($arg_name),*) = match clone_and_get_value($arguments[$arg_index], $globals.get_lifetime($arguments[$arg_index]), $globals, $context.start_group, true) {
             Value::$arg_type($($arg_name),*) => ($($arg_name),*),
 
             a => {
@@ -323,7 +321,7 @@ macro_rules! typed_argument_check {
         };
     };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
@@ -350,11 +348,14 @@ macro_rules! typed_argument_check {
 macro_rules! reassign_variable {
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) mut ($($arg_name:ident),*)) => {
+
         $globals.stored_values[$arguments[$arg_index]] = ($($arg_name)*);
+        $globals.stored_values.set_mutability($arguments[$arg_index], true);
     };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
         $globals.stored_values[$arguments[$arg_index]] = Value::$arg_type($($arg_name),*);
+        $globals.stored_values.set_mutability($arguments[$arg_index], true);
     };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) ($($arg_name:ident),*)) => {};
@@ -440,7 +441,7 @@ macro_rules! builtins {
                                     ($($arg_name),*)$(: $arg_type)?
                                 );
                                 typed_argument_check!(
-                                    ($globals, arg_index, $arguments, $info) $($mut)?
+                                    ($globals, arg_index, $arguments, $info, $context) $($mut)?
                                     ($($arg_name),*)$(: $arg_type)?
                                 );
 
@@ -568,7 +569,7 @@ builtins! {
 
     [B64Encode]
     fn b64encode((s): Str) {
-        let encrypted = base64::encode(&s.as_bytes());
+        let encrypted = base64::encode(s.as_bytes());
         Value::Str(encrypted)
     }
 
@@ -713,28 +714,31 @@ builtins! {
                             != Value::TypeIndicator(19)
                     {
                         // 19 = object_key??
-                        return Err(RuntimeError::RuntimeError {
-                            message: "expected either @number or @object_key as object key"
-                                .to_string(),
+                        return Err(RuntimeError::TypeError {
+                            expected: "number or @object_key".to_string(),
+                            found: globals.get_type_str(arguments[1]),
+                            val_def: globals.get_area(arguments[1]),
                             info,
-                        });
+                        })
                     }
 
                     let id = d.get("id");
                     if id == None {
-                        return Err(RuntimeError::RuntimeError {
-                            // object_key has an ID member for the key basically
-                            message: "object key has no 'id' member".to_string(),
+                        return Err(RuntimeError::CustomError(create_error(
                             info,
-                        });
+                            "object key has no 'id' member",
+                            &[],
+                            None,
+                        )));
                     }
                     let pattern = d.get("pattern");
                     if pattern == None {
-                        return Err(RuntimeError::RuntimeError {
-                            // same with pattern, for the expected type
-                            message: "object key has no 'pattern' member".to_string(),
+                        return Err(RuntimeError::CustomError(create_error(
                             info,
-                        });
+                            "object key has no 'pattern' member",
+                            &[],
+                            None,
+                        )));
                     }
 
                     (
@@ -742,11 +746,10 @@ builtins! {
                             // check if the ID is actually an int. it should be
                             Value::Number(n) => *n as u16,
                             _ => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: format!(
-                                        "object key's id has to be @number, found {}",
-                                        globals.get_type_str(*id.unwrap())
-                                    ),
+                                return Err(RuntimeError::TypeError {
+                                    expected: "number".to_string(),
+                                    found: globals.get_type_str(*id.unwrap()),
+                                    val_def: globals.get_area(*id.unwrap()),
                                     info,
                                 })
                             }
@@ -755,11 +758,10 @@ builtins! {
                     )
                 }
                 a => {
-                    return Err(RuntimeError::RuntimeError {
-                        message: format!(
-                        "expected either @number or @object_key as object key, found: {}",
-                        a.to_str(globals)
-                    ),
+                    return Err(RuntimeError::TypeError {
+                        expected: "number or @object_key".to_string(),
+                        found: a.get_type_str(globals),
+                        val_def: globals.get_area(arguments[1]),
                         info,
                     })
                 }
@@ -767,28 +769,33 @@ builtins! {
 
             if m == ObjectMode::Trigger && (key == 57 || key == 62) {
                 // group ids and stuff on triggers
-                return Err(RuntimeError::RuntimeError {
-                    message: "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead".to_string(),
+                return Err(RuntimeError::CustomError(create_error(
                     info,
-                });
+                    "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead",
+                    &[],
+                    None,
+                )))
             }
 
             if let Some(ref pat) = pattern {
-                if !value.matches_pat(&pat, &info, globals, &context)? {
-                    return Err(RuntimeError::RuntimeError {
-                        message: format!(
-                            "key required value to match {}, found {}",
-                            pat.to_str(globals),
-                            value.to_str(globals)
-                        ),
+                if !value.matches_pat(pat, &info, globals, context)? {
+                    return Err(RuntimeError::TypeError {
+                        expected: pat.to_str(globals),
+                        found: value.get_type_str(globals),
+                        val_def: globals.get_area(arguments[2]),
                         info,
                     });
                 }
             }
-            let err = Err(RuntimeError::RuntimeError {
-                message: format!("{} is not a valid object value", value.to_str(globals)),
-                info: info.clone(),
-            });
+            let err = Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                &format!(
+                    "{} is not a valid object value",
+                    value.to_str(globals)
+                ),
+                &[],
+                None,
+            )));
 
             let out_val = match &value {
                 // its just converting value to objparam basic level stuff
@@ -809,10 +816,12 @@ builtins! {
                         for s in a {
                             out.push(match globals.stored_values[*s] {
                             Value::Group(g) => g,
-                            _ => return Err(RuntimeError::RuntimeError {
-                                message: "Arrays in object parameters can only contain groups".to_string(),
+                            _ => return Err(RuntimeError::CustomError(create_error(
                                 info,
-                            })
+                                "Arrays in object parameters can only contain groups",
+                                &[],
+                                None,
+                            )))
                         })
                         }
 
@@ -1082,34 +1091,40 @@ builtins! {
             }
             Value::Range(start, step, old_step) => {
                 if old_step != 1 {
-                    return Err(RuntimeError::RuntimeError {
-                    message: "Range operator cannot be used on a range that already has a non-default stepsize"
-                        .to_string(),
-                    info,
-                });
+
+                    return Err(RuntimeError::CustomError(create_error(
+                        info,
+                        "Range operator cannot be used on a range that already has a non-default stepsize",
+                        &[],
+                        None,
+                    )));
+
+
                 }
                 Value::Range(
                     start,
                     end,
                     if step <= 0 {
-                        return Err(RuntimeError::RuntimeError {
-                            message: "range cannot have a stepsize less than or 0"
-                                .to_string(),
+
+                        return Err(RuntimeError::CustomError(create_error(
                             info,
-                        });
+                            "range cannot have a stepsize less than or 0",
+                            &[],
+                            None,
+                        )));
                     } else {
                         step as usize
                     },
                 )
             }
             _ => {
-                return Err(RuntimeError::RuntimeError {
-                    message: format!(
-                        "range start: expected @number, found @{}",
-                        globals.get_type_str(arguments[0])
-                    ),
+                return Err(RuntimeError::TypeError {
+                    expected: "number".to_string(),
+                    found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[0]),
                     info,
                 });
+
             }
         }
     }
@@ -1170,17 +1185,40 @@ builtins! {
                 new_arr
 
             }),
-            _ => return Err(RuntimeError::TypeError {
-                expected: "@number and @number, @string and @string or @array and @array".to_string(),
-                found: format!("@{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
-                info,
-            })
+            _ => {
+
+
+
+                return Err(RuntimeError::CustomError(create_error(
+                    info.clone(),
+                    "Type mismatch",
+                    &[
+                        (globals.get_area(arguments[0]), &format!("Value defined as {} here", globals.get_type_str(arguments[0]))),
+                        (globals.get_area(arguments[1]), &format!("Value defined as {} here", globals.get_type_str(arguments[1]))),
+                        (
+                            info.position,
+                            &format!("Expected @number and @number, @string and @string or @array and @array, found @{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
+                        ),
+                    ],
+                    None,
+                )));
+            }
         }
     }
     [MinusOp]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
 
-    [AssignOp]           fn _assign_(mut (a), (b))                      { a = b; Value::Null }
-    [SwapOp]           fn _swap_(mut (a), mut (b))                      { std::mem::swap(&mut a, &mut b); Value::Null }
+    [AssignOp]           fn _assign_(mut (a), (b))                      {
+        a = b;
+        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
+        Value::Null
+    }
+    [SwapOp]           fn _swap_(mut (a), mut (b))                      {
+
+        std::mem::swap(&mut a, &mut b);
+        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position.clone();
+        (*globals.stored_values.map.get_mut(&arguments[1]).unwrap()).def_area = info.position;
+        Value::Null
+    }
 
     [HasOp]
     fn _has_((a), (b)) {
@@ -1225,6 +1263,7 @@ builtins! {
                     return Err(RuntimeError::TypeError {
                         expected: "either @number or @object_key".to_string(),
                         found: globals.get_type_str(arguments[1]),
+                        val_def: globals.get_area(arguments[1]),
                         info,
                     });
                 }
@@ -1242,7 +1281,8 @@ builtins! {
                     Value::Number(n) => *n as u16,
                     _ => {
                         return Err(RuntimeError::TypeError {
-                            expected: "@number as object key".to_string(),
+                            expected: "number".to_string(),
+                            val_def: globals.get_area(*id.unwrap()),
                             found: globals.get_type_str(*id.unwrap()),
                             info,
                         })
@@ -1256,6 +1296,7 @@ builtins! {
                 return Err(RuntimeError::TypeError {
                     expected: "@number or @object_key".to_string(),
                     found: globals.get_type_str(arguments[1]),
+                    val_def: globals.get_area(arguments[1]),
                     info,
                 })
             }
@@ -1264,6 +1305,7 @@ builtins! {
                 return Err(RuntimeError::TypeError {
                     expected: "string to compare".to_string(),
                     found: globals.get_type_str(arguments[1]),
+                    val_def: globals.get_area(arguments[1]),
                     info,
                 })
             }
@@ -1272,6 +1314,7 @@ builtins! {
                 return Err(RuntimeError::TypeError {
                     expected: "string as key".to_string(),
                     found: globals.get_type_str(arguments[1]),
+                    val_def: globals.get_area(arguments[1]),
                     info,
                 })
             }
@@ -1280,13 +1323,14 @@ builtins! {
                 return Err(RuntimeError::TypeError {
                     expected: "array, dictionary, object, or string".to_string(),
                     found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[1]),
                     info,
                 })
             }
         }
     }
 
-    [AsOp]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,&context)? }
+    [AsOp]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,context)? }
 
     [SubtractOp]        fn _subtract_(mut (a): Number, (b): Number)         { a -= b; Value::Null }
     [AddOp]
@@ -1299,11 +1343,19 @@ builtins! {
                     a.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position.clone()));
                 }
             },
-            _ => return Err(RuntimeError::TypeError {
-                expected: "@number and @number, @string and @string or @array and @array".to_string(),
-                found: format!("@{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
-                info,
-            })
+            _ => return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                "Type mismatch",
+                &[
+                    (globals.get_area(arguments[0]), &format!("Value defined as {} here", globals.get_type_str(arguments[0]))),
+                    (globals.get_area(arguments[1]), &format!("Value defined as {} here", globals.get_type_str(arguments[1]))),
+                    (
+                        info.position,
+                        &format!("Expected @number and @number, @string and @string or @array and @array, found @{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
+                    ),
+                ],
+                None,
+            )))
         }
         Value::Null
     }
@@ -1316,12 +1368,12 @@ builtins! {
     [EitherOp]
     fn _either_((a), (b)) {
         Value::Pattern(Pattern::Either(
-            if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, &context)? {
+            if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()
             },
-            if let Value::Pattern(p) = convert_type(&b, 18, &info, globals, &context)? {
+            if let Value::Pattern(p) = convert_type(&b, 18, &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()

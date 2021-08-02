@@ -1,4 +1,5 @@
 //! Tools for compiling SPWN into GD object strings
+
 use crate::ast;
 use crate::builtin::*;
 use crate::compiler_info::CodeArea;
@@ -20,9 +21,9 @@ use crate::print_with_color;
 pub const CONTEXT_MAX: usize = 2;
 
 use ariadne::Fmt;
+use internment::Intern;
 use termcolor::Color as TColor;
 
-#[derive(Debug)]
 pub enum RuntimeError {
     UndefinedErr {
         undefined: String,
@@ -43,13 +44,19 @@ pub enum RuntimeError {
     TypeError {
         expected: String,
         found: String,
+        val_def: CodeArea,
         info: CompilerInfo,
     },
 
-    RuntimeError {
-        message: String,
+    PatternMismatchError {
+        pattern: String,
+        val: String,
+        pat_def: CodeArea,
+        val_def: CodeArea,
         info: CompilerInfo,
     },
+
+    CustomError(ErrorReport),
 
     BuiltinError {
         message: String,
@@ -64,6 +71,19 @@ pub enum RuntimeError {
         val_def: CodeArea,
         info: CompilerInfo,
         context_changes: Vec<CodeArea>,
+    },
+    ContextChangeError {
+        message: String,
+        info: CompilerInfo,
+        context_changes: Vec<CodeArea>,
+    },
+
+    BreakNeverUsedError {
+        breaktype: BreakType,
+        info: CompilerInfo,
+        broke: CodeArea,
+        dropped: CodeArea,
+        reason: String,
     },
 }
 
@@ -122,39 +142,54 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
 
     let mut colors = RainbowColorGenerator::new(0.0, 1.5, 0.8);
 
-    let mut report = Report::build(ReportKind::Error, position.file.clone(), position.pos.0)
-        .with_message(message)
-        .with_config(Config::default().with_cross_gap(true));
+    let mut report = Report::build(ReportKind::Error, position.file.as_ref(), position.pos.0)
+        .with_config(Config::default().with_cross_gap(true))
+        .with_message(message.clone());
+
     let mut i = 1;
     for area in info.call_stack {
         let color = colors.next();
         report = report.with_label(
-            Label::new(area.clone())
+            Label::new(area)
                 .with_order(i)
                 .with_message(&format!(
                     "{}: Error comes from this macro call",
                     i.to_string().fg(color)
                 ))
-                .with_color(color),
+                .with_color(color)
+                .with_priority(1),
         );
         i += 1;
+    }
+
+    if labels.is_empty() || !labels.iter().any(|(a, _)| a == &position) {
+        let color = colors.next();
+        report = report.with_label(
+            Label::new(position)
+                .with_order(i)
+                .with_color(color)
+                .with_message(message)
+                .with_priority(2),
+        );
     }
     if i == 1 && labels.len() == 1 {
         let color = colors.next();
         report = report.with_label(
-            Label::new(labels[0].0.clone())
+            Label::new(labels[0].0)
                 .with_message(labels[0].1.clone())
                 .with_order(i)
-                .with_color(color),
+                .with_color(color)
+                .with_priority(2),
         );
-    } else {
+    } else if !labels.is_empty() {
         for (area, label) in labels {
             let color = colors.next();
             report = report.with_label(
-                Label::new(area.clone())
+                Label::new(area)
                     .with_message(&format!("{}: {}", i.to_string().fg(color), label))
                     .with_order(i)
-                    .with_color(color),
+                    .with_color(color)
+                    .with_priority(2),
             );
             i += 1;
         }
@@ -172,16 +207,25 @@ pub fn create_error(
     note: Option<&str>,
 ) -> ErrorReport {
     ErrorReport {
-        info,
+        info: info.clone(),
         message: message.to_string(),
         labels: labels
             .iter()
-            .map(|(a, s)| (a.clone(), s.to_string()))
+            .map(|(a, s)| {
+                if !a.file.as_ref().exists() {
+                    (
+                        CodeArea {
+                            pos: (0, 0),
+                            ..info.position
+                        },
+                        s.to_string(),
+                    )
+                } else {
+                    (*a, s.to_string())
+                }
+            })
             .collect(),
-        note: match note {
-            Some(s) => Some(s.to_string()),
-            _ => None,
-        },
+        note: note.map(|s| s.to_string()),
     }
 }
 
@@ -214,31 +258,15 @@ impl From<RuntimeError> for ErrorReport {
             ),
             RuntimeError::PackageSyntaxError { err, info } => {
                 let syntax_error = ErrorReport::from(err);
-                let mut labels = vec![(
-                    info.position.clone(),
-                    "Error when parsing this library/module",
-                )];
-                labels.extend(
-                    syntax_error
-                        .labels
-                        .iter()
-                        .map(|(a, b)| (a.clone(), b.as_str())),
-                );
+                let mut labels = vec![(info.position, "Error when parsing this library/module")];
+                labels.extend(syntax_error.labels.iter().map(|(a, b)| (*a, b.as_str())));
                 create_error(info, &syntax_error.message, &labels, None)
             }
 
             RuntimeError::PackageError { err, info } => {
                 let syntax_error = ErrorReport::from(*err);
-                let mut labels = vec![(
-                    info.position.clone(),
-                    "Error when running this library/module",
-                )];
-                labels.extend(
-                    syntax_error
-                        .labels
-                        .iter()
-                        .map(|(a, b)| (a.clone(), b.as_str())),
-                );
+                let mut labels = vec![(info.position, "Error when running this library/module")];
+                labels.extend(syntax_error.labels.iter().map(|(a, b)| (*a, b.as_str())));
                 create_error(info, &syntax_error.message, &labels, None)
             }
 
@@ -246,27 +274,55 @@ impl From<RuntimeError> for ErrorReport {
                 expected,
                 found,
                 info,
+                val_def,
             } => create_error(
                 info.clone(),
                 "Type mismatch",
-                &[(
-                    info.position,
-                    &format!("Expected {}, found {}", expected.fg(a), found.fg(b)),
-                )],
+                &[
+                    (
+                        val_def,
+                        &format!("Value defined as {} here", found.clone().fg(b)),
+                    ),
+                    (
+                        info.position,
+                        &format!("Expected {}, found {}", expected.fg(a), found.fg(b)),
+                    ),
+                ],
                 None,
             ),
 
-            RuntimeError::RuntimeError { message, info } => create_error(
+            RuntimeError::PatternMismatchError {
+                pattern,
+                val,
+                info,
+                val_def,
+                pat_def,
+            } => create_error(
                 info.clone(),
-                &message,
-                &[(info.position.clone(), "Error here")],
+                "Pattern mismatch",
+                &[
+                    (
+                        val_def,
+                        &format!("Value defined as {} here", val.clone().fg(b)),
+                    ),
+                    (
+                        pat_def,
+                        &format!("Pattern defined as {} here", pattern.clone().fg(b)),
+                    ),
+                    (
+                        info.position,
+                        &format!("Expected {}, found {}", pattern.fg(a), val.fg(b)),
+                    ),
+                ],
                 None,
             ),
+
+            RuntimeError::CustomError(report) => report,
 
             RuntimeError::BuiltinError { message, info } => create_error(
                 info.clone(),
                 "Error when using built-in function",
-                &[(info.position.clone(), &message)],
+                &[(info.position, &message)],
                 None,
             ),
 
@@ -274,8 +330,8 @@ impl From<RuntimeError> for ErrorReport {
                 info.clone(),
                 "Attempted to change immutable variable",
                 &[
-                    (val_def.clone(), "Value was defined as immutable here"),
-                    (info.position.clone(), "This tries to change the value"),
+                    (val_def, "Value was defined as immutable here"),
+                    (info.position, "This tries to change the value"),
                 ],
                 None,
             ),
@@ -287,28 +343,26 @@ impl From<RuntimeError> for ErrorReport {
             } => {
                 let mut labels = vec![(val_def, "Value was defined here")];
 
+                #[allow(clippy::comparison_chain)]
                 if context_changes.len() == 1 {
                     labels.push((
-                        context_changes[0].clone(),
+                        context_changes[0],
                         "New trigger function context was defined here",
                     ));
                 } else if context_changes.len() > 1 {
-                    labels.push((
-                        context_changes.last().unwrap().clone(),
-                        "Context was changed here",
-                    ));
+                    labels.push((*context_changes.last().unwrap(), "Context was changed here"));
 
                     for change in context_changes[1..(context_changes.len() - 1)].iter().rev() {
-                        labels.push((change.clone(), "This changes the context inside the macro"));
+                        labels.push((*change, "This changes the context inside the macro"));
                     }
 
                     labels.push((
-                        context_changes[0].clone(),
+                        context_changes[0],
                         "New trigger function context was defined here",
                     ));
                 }
 
-                labels.push((info.position.clone(), "Attempted to change value here"));
+                labels.push((info.position, "Attempted to change value here"));
 
                 create_error(
                     info,
@@ -317,6 +371,61 @@ impl From<RuntimeError> for ErrorReport {
                     Some("Consider using a counter"),
                 )
             }
+
+            RuntimeError::ContextChangeError {
+                message,
+                info,
+                context_changes,
+            } => {
+                let mut labels = Vec::new();
+
+                #[allow(clippy::comparison_chain)]
+                if context_changes.len() == 1 {
+                    labels.push((
+                        context_changes[0],
+                        "New trigger function context was defined here",
+                    ));
+                } else if context_changes.len() > 1 {
+                    labels.push((*context_changes.last().unwrap(), "Context was changed here"));
+
+                    for change in context_changes[1..(context_changes.len() - 1)].iter().rev() {
+                        labels.push((*change, "This changes the context inside the macro"));
+                    }
+
+                    labels.push((
+                        context_changes[0],
+                        "New trigger function context was defined here",
+                    ));
+                }
+
+                create_error(info, &message, &labels, None)
+            }
+
+            RuntimeError::BreakNeverUsedError {
+                info,
+                breaktype,
+                broke,
+                dropped,
+                reason,
+            } => create_error(
+                info,
+                &format!(
+                    "{} statement never used",
+                    match breaktype {
+                        BreakType::ContinueLoop => "Continue",
+                        BreakType::Loop => "Break",
+                        BreakType::Macro => "Return",
+                    }
+                ),
+                &[
+                    (broke, "Decleared here"),
+                    (
+                        dropped,
+                        &format!("Can't reach past here because {}", reason),
+                    ),
+                ],
+                None,
+            ),
         }
     }
 }
@@ -332,14 +441,17 @@ pub fn compile_spwn(
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
     let mut globals = Globals::new(path.clone());
+    globals.includes = included_paths;
     if statements.is_empty() {
-        return Err(RuntimeError::RuntimeError {
-            message: "this script is empty".to_string(),
-            info: CompilerInfo::from_area(crate::compiler_info::CodeArea {
-                file: path,
+        return Err(RuntimeError::CustomError(create_error(
+            CompilerInfo::from_area(crate::compiler_info::CodeArea {
+                file: Intern::new(path),
                 pos: (0, 0),
             }),
-        });
+            "this script is empty",
+            &[],
+            None,
+        )));
     }
     let mut start_context = Context::new();
     //store at pos 0
@@ -347,9 +459,8 @@ pub fn compile_spwn(
     // store_value(Value::Null, 1, &mut globals, &start_context);
 
     let start_info = CompilerInfo {
-        includes: included_paths,
         ..CompilerInfo::from_area(crate::compiler_info::CodeArea {
-            file: path,
+            file: Intern::new(path.clone()),
             pos: statements[0].pos,
         })
     };
@@ -370,10 +481,12 @@ pub fn compile_spwn(
         )?;
 
         if standard_lib.len() != 1 {
-            return Err(RuntimeError::RuntimeError {
-                message: "The standard library can not split the context".to_string(),
-                info: start_info,
-            });
+            return Err(RuntimeError::CustomError(create_error(
+                start_info,
+                "The standard library can not split the context",
+                &[],
+                None,
+            )));
         }
 
         start_context = standard_lib[0].1.clone();
@@ -381,10 +494,12 @@ pub fn compile_spwn(
         if let Value::Dict(d) = &globals.stored_values[standard_lib[0].0] {
             start_context.variables.extend(d.clone());
         } else {
-            return Err(RuntimeError::RuntimeError {
-                message: "The standard library must return a dictionary".to_string(),
-                info: start_info,
-            });
+            return Err(RuntimeError::CustomError(create_error(
+                start_info,
+                "The standard library must return a dictionary",
+                &[],
+                None,
+            )));
         }
     }
 
@@ -396,10 +511,17 @@ pub fn compile_spwn(
     )?;
 
     for c in contexts {
-        if let Some((i, _)) = c.broken {
-            return Err(RuntimeError::RuntimeError {
-                message: "break statement is never used".to_string(),
-                info: i,
+        let end_pos = statements.last().unwrap().pos.1;
+        if let Some((i, r)) = c.broken {
+            return Err(RuntimeError::BreakNeverUsedError {
+                breaktype: r,
+                info: i.clone(),
+                broke: i.position,
+                dropped: CodeArea {
+                    pos: (end_pos, end_pos),
+                    file: Intern::new(path),
+                },
+                reason: "the program ended".to_string(),
             });
         }
     }
@@ -482,11 +604,19 @@ pub fn compile_scope(
         //     contexts.len()
         // );
         info.position.pos = statement.pos;
+
+        // println!(
+        //     "{}:0:{}",
+        //     info.position.file.to_string_lossy(),
+        //     info.position.pos.0
+        // );
         if contexts.is_empty() {
-            return Err(RuntimeError::RuntimeError {
-                message: "No context! This is probably a bug, please contact sputnix".to_string(),
+            return Err(RuntimeError::CustomError(create_error(
                 info,
-            });
+                "No context! This is probably a bug, please contact sputnix",
+                &[],
+                None,
+            )));
         }
         use ast::StatementBody::*;
 
@@ -504,7 +634,7 @@ pub fn compile_scope(
                 for context in &contexts {
                     let is_assign = !expr.operators.is_empty()
                         && expr.operators[0] == ast::Operator::Assign
-                        && !expr.values[0].is_undefinable(&context, globals);
+                        && !expr.values[0].is_undefinable(context, globals);
 
                     //println!("{:?}, {}", expr, is_assign);
 
@@ -539,7 +669,7 @@ pub fn compile_scope(
                                 new_context.start_group = start_group;
 
                                 let new_info = info.clone();
-                                new_context.fn_context_change_stack = vec![info.position.clone()];
+                                new_context.fn_context_change_stack = vec![info.position];
                                 //new_info.last_context_change_stack = vec![info.position.clone()];
                                 let (_, inner_returns) = compile_scope(
                                     &f.statements,
@@ -597,7 +727,7 @@ pub fn compile_scope(
                                         globals,
                                         new_context.start_group,
                                         !mutable,
-                                        info.position.clone(),
+                                        info.position,
                                     );
 
                                     globals.stored_values[storage] =
@@ -643,7 +773,7 @@ pub fn compile_scope(
                                                 globals,
                                                 context.start_group,
                                                 !globals.is_mutable(*v),
-                                                info.position.clone(),
+                                                globals.get_area(*v),
                                             ),
                                         )
                                     })
@@ -657,18 +787,17 @@ pub fn compile_scope(
                                     1,
                                     globals,
                                     &context,
-                                    info.position.clone(),
+                                    info.position,
                                 );
 
                                 context.variables.insert(String::from(*name), p);
                             }
                         }
                         a => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "This type ({}) can not be extracted!",
-                                    a.to_str(globals)
-                                ),
+                            return Err(RuntimeError::TypeError {
+                                expected: "dictionary or $".to_string(),
+                                found: a.get_type_str(globals),
+                                val_def: globals.get_area(val),
                                 info,
                             })
                         }
@@ -682,22 +811,22 @@ pub fn compile_scope(
                 //initialize type
                 let already = globals.type_ids.get(name);
                 if let Some(t) = already {
-                    if !(t.1 == info.position.file && t.2 == info.position.pos) {
-                        return Err(RuntimeError::RuntimeError {
-                            message: format!("the type '{}' is already defined", name),
-                            info,
-                        });
+                    if t.1 != info.position {
+                        return Err(RuntimeError::CustomError(create_error(
+                            info.clone(),
+                            &format!("the type '{}' is already defined", name),
+                            &[
+                                (t.1, "The type was first defined here"),
+                                (info.position, "Attempted to redefine here"),
+                            ],
+                            None,
+                        )));
                     }
                 } else {
                     (*globals).type_id_count += 1;
-                    (*globals).type_ids.insert(
-                        name.clone(),
-                        (
-                            globals.type_id_count,
-                            info.position.file.clone(),
-                            info.position.pos,
-                        ),
-                    );
+                    (*globals)
+                        .type_ids
+                        .insert(name.clone(), (globals.type_id_count, info.position));
                 }
                 //Value::TypeIndicator(globals.type_id_count)
             }
@@ -753,11 +882,10 @@ pub fn compile_scope(
                             }
                         }
                         a => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "Expected boolean condition in if statement, found {}",
-                                    a.to_str(globals)
-                                ),
+                            return Err(RuntimeError::TypeError {
+                                expected: "boolean".to_string(),
+                                found: a.get_type_str(globals),
+                                val_def: globals.get_area(val),
                                 info,
                             })
                         }
@@ -768,7 +896,11 @@ pub fn compile_scope(
             Impl(imp) => {
                 let message = "cannot run impl statement in a trigger function context, consider moving it to the start of your script.".to_string();
                 if contexts.len() > 1 || contexts[0].start_group.id != Id::Specific(0) {
-                    return Err(RuntimeError::RuntimeError { message, info });
+                    return Err(RuntimeError::ContextChangeError {
+                        message,
+                        info,
+                        context_changes: contexts[0].fn_context_change_stack.clone(),
+                    });
                 }
 
                 let new_info = info.clone();
@@ -777,17 +909,22 @@ pub fn compile_scope(
                         .to_value(contexts[0].clone(), globals, new_info, true)?;
 
                 if evaled.len() > 1 {
-                    return Err(RuntimeError::RuntimeError {
-                        message: "impl statements with context-splitting values are not allowed"
-                            .to_string(),
+                    return Err(RuntimeError::CustomError(create_error(
                         info,
-                    });
+                        "impl statements with context-splitting values are not allowed",
+                        &[],
+                        None,
+                    )));
                 }
                 returns.extend(inner_returns);
                 let (typ, c) = evaled[0].clone();
 
                 if c.start_group.id != Id::Specific(0) {
-                    return Err(RuntimeError::RuntimeError { message, info });
+                    return Err(RuntimeError::ContextChangeError {
+                        message,
+                        info,
+                        context_changes: contexts[0].fn_context_change_stack.clone(),
+                    });
                 }
                 match globals.stored_values[typ].clone() {
                     Value::TypeIndicator(s) => {
@@ -795,20 +932,21 @@ pub fn compile_scope(
                         let (evaled, inner_returns) =
                             eval_dict(imp.members.clone(), &c, globals, new_info, true)?;
                         if evaled.len() > 1 {
-                            return Err(RuntimeError::RuntimeError {
-                                message:
-                                    "impl statements with context-splitting values are not allowed"
-                                        .to_string(),
+                            return Err(RuntimeError::CustomError(create_error(
                                 info,
-                            });
+                                "impl statements with context-splitting values are not allowed",
+                                &[],
+                                None,
+                            )));
                         }
                         //Returns inside impl values dont really make sense do they
                         if !inner_returns.is_empty() {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "you can't use return from inside an impl statement"
-                                    .to_string(),
+                            return Err(RuntimeError::CustomError(create_error(
                                 info,
-                            });
+                                "you can't use return from inside an impl statement",
+                                &[],
+                                None,
+                            )));
                         }
                         let (val, _) = evaled[0];
                         // make this not ugly, future me
@@ -839,11 +977,10 @@ pub fn compile_scope(
                         }
                     }
                     a => {
-                        return Err(RuntimeError::RuntimeError {
-                            message: format!(
-                                "Expected type-indicator, found {}",
-                                a.to_str(globals)
-                            ),
+                        return Err(RuntimeError::TypeError {
+                            expected: "type indicator".to_string(),
+                            found: a.get_type_str(globals),
+                            val_def: globals.get_area(typ),
                             info,
                         })
                     }
@@ -874,11 +1011,10 @@ pub fn compile_scope(
                             Value::TriggerFunc(g) => ObjParam::Group(g.start_group),
                             Value::Group(g) => ObjParam::Group(*g),
                             a => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: format!(
-                                        "Expected trigger function or group, found: {}",
-                                        a.to_str(globals)
-                                    ),
+                                return Err(RuntimeError::TypeError {
+                                    expected: "trigger function or group".to_string(),
+                                    found: a.get_type_str(globals),
+                                    val_def: globals.get_area(func),
                                     info,
                                 })
                             }
@@ -999,7 +1135,7 @@ pub fn compile_scope(
                                         1,
                                         globals,
                                         c,
-                                        info.position.clone(),
+                                        info.position,
                                     );
                                     let stored = store_const_value(
                                         // store the val key
@@ -1007,7 +1143,7 @@ pub fn compile_scope(
                                         1,
                                         globals,
                                         c,
-                                        info.position.clone(),
+                                        info.position,
                                     );
                                     (*c).variables.insert(f.symbol.clone(), stored);
                                 }
@@ -1065,7 +1201,7 @@ pub fn compile_scope(
                                         1,
                                         globals,
                                         c,
-                                        info.position.clone(),
+                                        info.position,
                                     );
                                     (*c).variables.insert(f.symbol.clone(), stored);
                                 }
@@ -1123,7 +1259,7 @@ pub fn compile_scope(
                                     0,
                                     globals,
                                     &context,
-                                    info.position.clone(),
+                                    info.position,
                                 );
                                 for c in &mut new_contexts {
                                     (*c).variables = context.variables.clone();
@@ -1168,8 +1304,10 @@ pub fn compile_scope(
                         }
 
                         a => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!("{} is not iteratable!", a.to_str(globals)),
+                            return Err(RuntimeError::TypeError {
+                                expected: "array, dictionary, string or range".to_string(),
+                                found: a.get_type_str(globals),
+                                val_def: globals.get_area(val),
                                 info,
                             })
                         }
@@ -1210,13 +1348,7 @@ pub fn compile_scope(
                         let mut all_values: Returns = SmallVec::new();
                         for context in &contexts {
                             all_values.push((
-                                store_value(
-                                    Value::Null,
-                                    1,
-                                    globals,
-                                    context,
-                                    info.position.clone(),
-                                ),
+                                store_value(Value::Null, 1, globals, context, info.position),
                                 context.clone(),
                             ));
                         }
@@ -1233,20 +1365,23 @@ pub fn compile_scope(
             }
 
             Error(e) => {
+                let mut errors = Vec::new();
                 for context in &contexts {
                     let (evaled, _) = e.message.eval(context, globals, info.clone(), true)?;
                     for (msg, _) in evaled {
-                        eprintln!(
-                            "{}: {}",
-                            "Error".fg(ariadne::Color::Red),
-                            &globals.stored_values[msg].to_str(globals)
-                        );
+                        let err = globals.stored_values[msg].to_str(globals);
+                        errors.push((info.position, err))
                     }
                 }
-                return Err(RuntimeError::RuntimeError {
-                    message: "Error statement, see message(s) above.".to_string(),
-                    info,
-                });
+
+                let mut new_errors = Vec::new();
+                for (area, msg) in errors.iter() {
+                    new_errors.push((*area, msg.as_str()))
+                }
+
+                let err = create_error(info, "Runtime Error", &new_errors, None);
+
+                return Err(RuntimeError::CustomError(err));
             }
         }
 
@@ -1271,12 +1406,13 @@ pub fn compile_scope(
         if let Some(c) = stored_context {
             //resetting the context if async
             for c in contexts {
-                if let Some((i, _)) = c.broken {
-                    return Err(RuntimeError::RuntimeError {
-                        message:
-                            "break statement is never used because it's inside an arrow statement"
-                                .to_string(),
-                        info: i,
+                if let Some((i, r)) = c.broken {
+                    return Err(RuntimeError::BreakNeverUsedError {
+                        breaktype: r,
+                        info: i.clone(),
+                        broke: i.position,
+                        dropped: info.position,
+                        reason: "it's inside an arrow statement".to_string(),
                     });
                 }
             }
@@ -1345,9 +1481,9 @@ pub fn get_import_path(
             .join(&p),
 
         ImportType::Lib(name) => {
-            let mut outpath = info.includes[0].clone();
+            let mut outpath = globals.includes[0].clone();
             let mut found = false;
-            for path in &info.includes {
+            for path in &globals.includes {
                 if path.join("libraries").join(name).exists() {
                     outpath = path.to_path_buf();
                     found = true;
@@ -1357,10 +1493,27 @@ pub fn get_import_path(
             if found {
                 outpath
             } else {
-                return Err(RuntimeError::RuntimeError {
-                    message: "Unable to find library folder in given search paths".to_string(),
+                let labels = globals
+                    .includes
+                    .iter()
+                    .map(|p| {
+                        (
+                            info.position,
+                            format!("Not found in {}", p.to_string_lossy()),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let mut new_labels = Vec::new();
+
+                for (area, text) in labels.iter() {
+                    new_labels.push((*area, text.as_str()));
+                }
+                return Err(RuntimeError::CustomError(create_error(
                     info,
-                });
+                    "Unable to find library folder",
+                    &new_labels,
+                    None,
+                )));
             }
         }
         // .parent()
@@ -1394,26 +1547,29 @@ pub fn import_module(
     } else if module_path.is_file() && module_path.extension().is_none() {
         module_path.set_extension("spwn");
     } else if !module_path.is_file() {
-        return Err(RuntimeError::RuntimeError {
-            message: format!(
+        return Err(RuntimeError::CustomError(create_error(
+            info,
+            &format!(
                 "Couldn't find library file ({})",
                 module_path.to_string_lossy()
             ),
-            info,
-        });
+            &[],
+            None,
+        )));
     }
 
     let unparsed = match fs::read_to_string(&module_path) {
         Ok(content) => content,
         Err(e) => {
-            return Err(RuntimeError::RuntimeError {
-                message: format!(
-                    "Something went wrong when opening library file ({}): {}",
+            return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                &format!(
+                    "Something went wrong when opening library file ({})",
                     module_path.to_string_lossy(),
-                    e
                 ),
-                info,
-            })
+                &[(info.position, &format!("{}", e))],
+                None,
+            )));
         }
     };
     let (parsed, notes) = match crate::parse_spwn(unparsed, module_path.clone()) {
@@ -1439,10 +1595,12 @@ pub fn import_module(
         )?;
 
         if standard_lib.len() != 1 {
-            return Err(RuntimeError::RuntimeError {
-                message: "The standard library can not split the context".to_string(),
+            return Err(RuntimeError::CustomError(create_error(
                 info,
-            });
+                "The standard library can not split the context",
+                &[],
+                None,
+            )));
         }
 
         start_context = standard_lib[0].1.clone();
@@ -1450,10 +1608,12 @@ pub fn import_module(
         if let Value::Dict(d) = &globals.stored_values[standard_lib[0].0] {
             start_context.variables.extend(d.clone());
         } else {
-            return Err(RuntimeError::RuntimeError {
-                message: "The standard library must return a dictionary".to_string(),
+            return Err(RuntimeError::CustomError(create_error(
                 info,
-            });
+                "The standard library must return a dictionary",
+                &[],
+                None,
+            )));
         }
     }
 
@@ -1462,7 +1622,7 @@ pub fn import_module(
 
     let mut new_info = info.clone();
 
-    new_info.position.file = module_path;
+    new_info.position.file = Intern::new(module_path);
     new_info.position.pos = (0, 0);
 
     if let ImportType::Lib(l) = path {
@@ -1481,11 +1641,16 @@ pub fn import_module(
         };
 
     for c in &contexts {
-        if let Some((i, BreakType::Loop)) = &c.broken {
-            return Err(RuntimeError::RuntimeError {
-                message: "break statement is never used".to_string(),
-                info: i.clone(),
-            });
+        if let Some((i, r)) = &c.broken {
+            if *r != BreakType::Macro {
+                return Err(RuntimeError::BreakNeverUsedError {
+                    breaktype: *r,
+                    info: i.clone(),
+                    broke: i.position,
+                    dropped: info.position,
+                    reason: "the file ended".to_string(),
+                });
+            }
         }
     }
     (*globals).path = stored_path;
@@ -1531,14 +1696,7 @@ pub fn import_module(
     };
 
     if out.len() == 1 && &out[0].1 == context {
-        let cloned = clone_and_get_value(
-            out[0].0,
-            9999,
-            globals,
-            context.start_group,
-            true,
-            info.position,
-        );
+        let cloned = clone_and_get_value(out[0].0, 9999, globals, context.start_group, true);
         let s_impl = globals.implementations.clone();
 
         globals.prev_imports.insert(path.clone(), (cloned, s_impl));

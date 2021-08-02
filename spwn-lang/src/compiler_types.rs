@@ -1,6 +1,7 @@
 ///types and functions used by the compiler
 use crate::ast;
 use crate::builtin::*;
+use crate::compiler::create_error;
 use crate::compiler_info::CodeArea;
 use crate::context::*;
 use crate::globals::Globals;
@@ -32,7 +33,7 @@ pub enum ImportType {
     Lib(String),
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum BreakType {
     Macro,
     Loop,
@@ -64,23 +65,25 @@ pub fn handle_operator(
     Ok(
         if let Some(val) = globals.stored_values[value1].clone().member(
             String::from(macro_name),
-            &context,
+            context,
             globals,
             info.clone(),
         ) {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
                 if m.args.is_empty() {
-                    return Err(RuntimeError::RuntimeError {
-                        message: String::from("Expected at least one argument in operator macro"),
-                        info: info.clone(),
-                    });
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        "Expected at least one argument in operator macro",
+                        &[],
+                        None,
+                    )));
                 }
                 let val2 = globals.stored_values[value2].clone();
 
                 if let Some(target_typ) = m.args[0].3 {
                     let pat = &globals.stored_values[target_typ].clone();
 
-                    if !val2.matches_pat(pat, &info, globals, context)? {
+                    if !val2.matches_pat(pat, info, globals, context)? {
                         //if types dont match, act as if there is no macro at all
 
                         return Ok(smallvec![(
@@ -90,12 +93,12 @@ pub fn handle_operator(
                                     vec![value1, value2],
                                     info.clone(),
                                     globals,
-                                    &context,
+                                    context,
                                 )?,
                                 1,
                                 globals,
-                                &context,
-                                info.position.clone()
+                                context,
+                                info.position
                             ),
                             context.clone(),
                         )]);
@@ -107,14 +110,17 @@ pub fn handle_operator(
                         *m,
                         //copies argument so the original value can't be mutated
                         //prevents side effects and shit
-                        vec![ast::Argument::from(clone_value(
-                            value2,
-                            1,
-                            globals,
-                            context.start_group,
-                            false,
-                            info.position.clone(),
-                        ))],
+                        vec![ast::Argument::from(
+                            clone_value(
+                                value2,
+                                1,
+                                globals,
+                                context.start_group,
+                                false,
+                                info.position,
+                            ),
+                            info.position.pos,
+                        )],
                     ),
                     context,
                     globals,
@@ -130,12 +136,12 @@ pub fn handle_operator(
                             vec![value1, value2],
                             info.clone(),
                             globals,
-                            &context
+                            context
                         )?,
                         1,
                         globals,
-                        &context,
-                        info.position.clone()
+                        context,
+                        info.position
                     ),
                     context.clone(),
                 )]
@@ -148,12 +154,12 @@ pub fn handle_operator(
                         vec![value1, value2],
                         info.clone(),
                         globals,
-                        &context
+                        context
                     )?,
                     1,
                     globals,
-                    &context,
-                    info.position.clone()
+                    context,
+                    info.position
                 ),
                 context.clone(),
             )]
@@ -171,16 +177,18 @@ pub fn handle_unary_operator(
     Ok(
         if let Some(val) = globals.stored_values[value].clone().member(
             String::from(macro_name),
-            &context,
+            context,
             globals,
             info.clone(),
         ) {
             if let Value::Macro(m) = globals.stored_values[val].clone() {
                 if m.args.is_empty() {
-                    return Err(RuntimeError::RuntimeError {
-                        message: String::from("Expected at least one argument in operator macro"),
-                        info: info.clone(),
-                    });
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        "Expected at least one argument in operator macro",
+                        &[],
+                        None,
+                    )));
                 }
 
                 let (values, _) =
@@ -189,17 +197,11 @@ pub fn handle_unary_operator(
             } else {
                 smallvec![(
                     store_value(
-                        built_in_function(
-                            macro_name,
-                            vec![value],
-                            info.clone(),
-                            globals,
-                            &context
-                        )?,
+                        built_in_function(macro_name, vec![value], info.clone(), globals, context)?,
                         1,
                         globals,
-                        &context,
-                        info.position.clone()
+                        context,
+                        info.position
                     ),
                     context.clone(),
                 )]
@@ -207,11 +209,11 @@ pub fn handle_unary_operator(
         } else {
             smallvec![(
                 store_value(
-                    built_in_function(macro_name, vec![value], info.clone(), globals, &context)?,
+                    built_in_function(macro_name, vec![value], info.clone(), globals, context)?,
                     1,
                     globals,
-                    &context,
-                    info.position.clone()
+                    context,
+                    info.position
                 ),
                 context.clone(),
             )]
@@ -222,10 +224,12 @@ pub fn handle_unary_operator(
 pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError> {
     let rounded = num.round();
     if (num - rounded).abs() > 0.000000001 {
-        return Err(RuntimeError::RuntimeError {
-            message: format!("expected integer, found {}", num),
-            info: info.clone(),
-        });
+        return Err(RuntimeError::CustomError(create_error(
+            info.clone(),
+            &format!("expected integer, found {}", num),
+            &[],
+            None,
+        )));
     }
     Ok(rounded as i32)
 }
@@ -407,10 +411,15 @@ pub fn execute_macro(
                                 let pat = globals.stored_values[t].clone();
 
                                 if !val.matches_pat(&pat, &info, globals, context)? {
-                                    return Err(RuntimeError::TypeError {
-                                        expected: pat.to_str(globals),
-                                        found: val.to_str(globals),
-                                        info,
+                                    return Err(RuntimeError::PatternMismatchError {
+                                        pattern: pat.to_str(globals),
+                                        val: val.get_type_str(globals),
+                                        val_def: globals.get_area(arg_values[i]),
+                                        pat_def: globals.get_area(t),
+                                        info: info.clone().with_area(CodeArea {
+                                            pos: arg.pos,
+                                            ..info.position
+                                        }),
                                     });
                                 }
                             };
@@ -419,17 +428,32 @@ pub fn execute_macro(
                         } else {
                             return Err(RuntimeError::UndefinedErr {
                                 undefined: name.clone(),
-                                info,
+                                info: info.clone().with_area(CodeArea {
+                                    pos: arg.pos,
+                                    ..info.position
+                                }),
                                 desc: "macro argument".to_string(),
                             });
                         }
                     }
                     None => {
                         if (def_index) > m.args.len() - 1 {
-                            return Err(RuntimeError::RuntimeError {
-                                message: "Too many arguments!".to_string(),
-                                info,
-                            });
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                "Too many arguments!",
+                                &[
+                                    (
+                                        m.get_arg_area(),
+                                        &format!(
+                                            "Macro was defined to take {} argument{} here",
+                                            m.args.len(),
+                                            if m.args.len() == 1 { "" } else { "s" }
+                                        ),
+                                    ),
+                                    (info.position, "Recieved too many arguments here"),
+                                ],
+                                None,
+                            )));
                         }
 
                         //type check!!
@@ -438,10 +462,15 @@ pub fn execute_macro(
                             let pat = globals.stored_values[t].clone();
 
                             if !val.matches_pat(&pat, &info, globals, context)? {
-                                return Err(RuntimeError::TypeError {
-                                    expected: pat.to_str(globals),
-                                    found: val.to_str(globals),
-                                    info,
+                                return Err(RuntimeError::PatternMismatchError {
+                                    pattern: pat.to_str(globals),
+                                    val: val.get_type_str(globals),
+                                    val_def: globals.get_area(arg_values[i]),
+                                    pat_def: globals.get_area(t),
+                                    info: info.clone().with_area(CodeArea {
+                                        pos: arg.pos,
+                                        ..info.position
+                                    }),
                                 });
                             }
                         };
@@ -454,7 +483,7 @@ pub fn execute_macro(
                                 globals,
                                 context.start_group,
                                 true,
-                                m.args[def_index].4.clone(),
+                                m.args[def_index].4,
                             ),
                         );
                         def_index += 1;
@@ -465,11 +494,14 @@ pub fn execute_macro(
             let mut m_args_iter = m.args.iter();
             if m.args[0].0 == "self" {
                 if globals.stored_values[parent] == Value::Null {
-                    return Err(RuntimeError::RuntimeError {
-                        message: "
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        "
 This macro requires a parent (a \"self\" value), but it seems to have been called alone (or on a null value).
-Should be used like this: value.macro(arguments)".to_string(), info
-                    });
+Should be used like this: value.macro(arguments)",
+                        &[(m.args[0].4, "Macro defined as taking a 'self' argument here"), (info.position, "Called alone here")],
+                        None,
+                    )));
                 }
                 //self doesn't need to be cloned, as it is a reference (kinda)
                 new_context.variables.insert("self".to_string(), parent);
@@ -481,25 +513,20 @@ Should be used like this: value.macro(arguments)".to_string(), info
                         Some(default) => {
                             new_variables.insert(
                                 arg.0.clone(),
-                                clone_value(
-                                    *default,
-                                    1,
-                                    globals,
-                                    context.start_group,
-                                    true,
-                                    arg.4.clone(),
-                                ),
+                                clone_value(*default, 1, globals, context.start_group, true, arg.4),
                             );
                         }
 
                         None => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "Non-optional argument '{}' not satisfied!",
-                                    arg.0
-                                ),
-                                info,
-                            })
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                &format!("Non-optional argument '{}' not satisfied!", arg.0),
+                                &[
+                                    (arg.4, "Value defined as mandatory here (because no default was given)"),
+                                    (info.position, "Argument not provided here")
+                                ],
+                                None,
+                            )));
                         }
                     }
                 }
@@ -511,10 +538,18 @@ Should be used like this: value.macro(arguments)".to_string(), info
         }
     } else {
         if !args.is_empty() {
-            return Err(RuntimeError::RuntimeError {
-                message: "This macro takes no arguments!".to_string(),
-                info,
-            });
+            return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                "This macro takes no arguments!",
+                &[
+                    (
+                        m.get_arg_area(),
+                        "Macro was defined as taking no arguments here",
+                    ),
+                    (info.position, "Recieved too many arguments here"),
+                ],
+                None,
+            )));
         }
         let mut new_context = context.clone();
         new_context.variables = m.def_context.variables.clone();
@@ -538,11 +573,16 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
     // stop break chain
     for c in &mut compiled.0 {
-        if let Some((i, BreakType::Loop)) = &(*c).broken {
-            return Err(RuntimeError::RuntimeError {
-                message: "break statement is never used".to_string(),
-                info: i.clone(),
-            });
+        if let Some((i, r)) = &(*c).broken {
+            if *r != BreakType::Macro {
+                return Err(RuntimeError::BreakNeverUsedError {
+                    breaktype: *r,
+                    info: i.clone(),
+                    broke: i.position,
+                    dropped: info.position,
+                    reason: "the macro ended".to_string(),
+                });
+            }
         }
         (*c).broken = None;
     }
@@ -555,7 +595,7 @@ Should be used like this: value.macro(arguments)".to_string(), info
 
     for (_, c) in &mut returns {
         if c.start_group != fn_context {
-            c.fn_context_change_stack.push(info.position.clone());
+            c.fn_context_change_stack.push(info.position);
         }
     }
 
@@ -662,7 +702,7 @@ pub fn eval_dict(
                             globals,
                             expressions.1.start_group,
                             !globals.is_mutable(expressions.0[expr_index]),
-                            info.position.clone(),
+                            info.position,
                         ),
                     );
                 }
@@ -673,16 +713,14 @@ pub fn eval_dict(
                         globals,
                         expressions.1.start_group,
                         !globals.is_mutable(expressions.0[expr_index]),
-                        info.position.clone(),
                     );
                     dict_out.extend(match val.clone() {
                         Value::Dict(d) => d.clone(),
                         a => {
-                            return Err(RuntimeError::RuntimeError {
-                                message: format!(
-                                    "Cannot extract from this value: {}",
-                                    a.to_str(globals)
-                                ),
+                            return Err(RuntimeError::TypeError {
+                                expected: "dictionary or $".to_string(),
+                                found: a.get_type_str(globals),
+                                val_def: globals.get_area(expressions.0[expr_index]),
                                 info,
                             })
                         }
@@ -691,13 +729,7 @@ pub fn eval_dict(
             };
         }
         out.push((
-            store_value(
-                Value::Dict(dict_out),
-                1,
-                globals,
-                &context,
-                info.position.clone(),
-            ),
+            store_value(Value::Dict(dict_out), 1, globals, context, info.position),
             expressions.1,
         ));
     }
@@ -730,32 +762,14 @@ impl ast::CompoundStatement {
             compile_scope(&self.statements, smallvec![new_context], globals, new_info)?;
 
         for c in contexts {
-            if let Some((i, t)) = c.broken {
-                match t {
-                    BreakType::Loop => {
-                        return Err(RuntimeError::RuntimeError {
-                            message: "break statement is never used because it's inside a trigger function"
-                                .to_string(),
-                            info: i,
-                        });
-                    }
-
-                    BreakType::ContinueLoop => {
-                        return Err(RuntimeError::RuntimeError {
-                            message: "continue statement is never used because it's inside a trigger function"
-                                .to_string(),
-                            info: i,
-                        });
-                    }
-
-                    BreakType::Macro => {
-                        return Err(RuntimeError::RuntimeError {
-                            message: "return statement is never used because it's inside a trigger function (consider putting the return statement in an arrow statement)"
-                                .to_string(),
-                            info: i,
-                        });
-                    }
-                }
+            if let Some((i, r)) = c.broken {
+                return Err(RuntimeError::BreakNeverUsedError {
+                    breaktype: r,
+                    info: i.clone(),
+                    broke: i.position,
+                    dropped: info.position,
+                    reason: "it's inside a trigger function".to_string(),
+                });
             }
         }
 

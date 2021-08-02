@@ -12,14 +12,11 @@ use crate::compiler_info::CodeArea;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-
 use ariadne::Fmt;
+use internment::Intern;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
-
-
-
 
 use crate::compiler::create_error;
 use crate::compiler_types::ImportType;
@@ -66,7 +63,7 @@ pub enum SyntaxError {
 
 pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Result<(), SyntaxError> {
     if name.starts_with('_') && name.ends_with('_') {
-        if Builtin::from_str(&name).is_ok() {
+        if Builtin::from_str(name).is_ok() {
             Ok(())
         } else {
             Err(SyntaxError::SyntaxError {
@@ -96,13 +93,13 @@ impl From<SyntaxError> for ErrorReport {
             } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: file.clone(),
+                    file: Intern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file: file.clone(),
+                        file: Intern::new(file),
                     },
                     &format!(
                         "{} {}, {} {}",
@@ -118,13 +115,13 @@ impl From<SyntaxError> for ErrorReport {
             SyntaxError::UnexpectedErr { found, pos, file } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: file.clone(),
+                    file: Intern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file: file.clone(),
+                        file: Intern::new(file),
                     },
                     &format!("Unexpected {}", found),
                 )],
@@ -134,13 +131,13 @@ impl From<SyntaxError> for ErrorReport {
             SyntaxError::SyntaxError { message, pos, file } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: file.clone(),
+                    file: Intern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file: file.clone(),
+                        file: Intern::new(file),
                     },
                     &message,
                 )],
@@ -1263,7 +1260,7 @@ fn parse_expr(
 
             // iterate though the operators until we get one like =
             while !old_operators.is_empty() {
-                if operator_precedence(&old_operators.last().unwrap()) == 0 {
+                if operator_precedence(old_operators.last().unwrap()) == 0 {
                     break;
                 }
 
@@ -1398,7 +1395,9 @@ fn parse_dict(
                         tokens.previous();
                         defs.push(ast::DictDef::Def((
                             symbol.clone(),
-                            ast::ValueBody::Symbol(symbol).to_variable().to_expression(),
+                            ast::ValueBody::Symbol(symbol)
+                                .to_variable(tokens.position())
+                                .to_expression(),
                         )));
                     }
 
@@ -1413,7 +1412,9 @@ fn parse_dict(
                         }
                         defs.push(ast::DictDef::Def((
                             symbol.clone(),
-                            ast::ValueBody::Symbol(symbol).to_variable().to_expression(),
+                            ast::ValueBody::Symbol(symbol)
+                                .to_variable(tokens.position())
+                                .to_expression(),
                         )));
                         //tokens.previous();
                         break;
@@ -1525,12 +1526,18 @@ fn parse_args(
 
                     None => unreachable!(),
                 };
+                let start = tokens.position().0;
                 let symbol = Some(tokens.slice());
                 tokens.next(false);
                 let value = parse_expr(tokens, notes, true, true)?;
+                let end = tokens.position().1;
                 //tokens.previous();
 
-                ast::Argument { symbol, value }
+                ast::Argument {
+                    symbol,
+                    value,
+                    pos: (start, end),
+                }
             }
 
             Some(_) => {
@@ -1542,6 +1549,7 @@ fn parse_args(
 
                 ast::Argument {
                     symbol: None,
+                    pos: value.get_pos(),
                     value,
                 }
             }

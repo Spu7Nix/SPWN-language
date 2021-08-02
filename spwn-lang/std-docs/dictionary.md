@@ -1,16 +1,16 @@
-
-# **@dictionary**:
-
+  
+# **@dictionary**: 
+ 
 ## **clear**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Clears the dictionary._
->### Example:
+>### Example: 
 >```spwn
 > let wares = {
 >	apple: 10,
@@ -25,14 +25,14 @@
 
 ## **contains\_value**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, value) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Checks if the dictionary contains a value._
->### Example:
+>### Example: 
 >```spwn
 > let wares = {
 >	apple: 10,
@@ -51,14 +51,14 @@
 
 ## **get**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, key: @string, default = @dict_not_found::{}) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Gets an item from the dictionary._
->### Example:
+>### Example: 
 >```spwn
 > let wares = {
 >	apple: 10,
@@ -79,14 +79,14 @@
 
 ## **is\_empty**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Returns true if there are no entries in the dictionary, false otherwise._
->### Example:
+>### Example: 
 >```spwn
 > dict = {}
 >$.assert(dict.is_empty())
@@ -95,14 +95,14 @@
 
 ## **items**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Gets the dictionary's items._
->### Example:
+>### Example: 
 >```spwn
 > wares = {
 >	apple: 10,
@@ -119,14 +119,14 @@
 
 ## **keys**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Gets the dictionary's keys._
->### Example:
+>### Example: 
 >```spwn
 > wares = {
 >	apple: 10,
@@ -139,14 +139,14 @@
 
 ## **set**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, key: @string, val) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Sets an item in the dictionary._
->### Example:
+>### Example: 
 >```spwn
 > let wares = {
 >	apple: 10,
@@ -169,14 +169,14 @@
 
 ## **values**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Gets the dictionary's values._
->### Example:
+>### Example: 
 >```spwn
 > wares = {
 >	apple: 10,

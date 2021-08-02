@@ -1,14 +1,14 @@
-
-# **@string**:
-
+  
+# **@string**: 
+ 
 ## **contains**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, substr: @string) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Checks if the string contains a string._
 >## Arguments:
 >
@@ -19,12 +19,12 @@
 
 ## **ends\_with**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, substr: @string) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Checks does the string starts with a string._
 >## Arguments:
 >
@@ -35,12 +35,12 @@
 
 ## **index**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, substr: @string) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Gets the index of a string, if it doesn't exists returns null._
 >## Arguments:
 >
@@ -51,45 +51,45 @@
 
 ## **is\_empty**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Returns true if the string has a length of 0, false otherwise_
 >
 
 ## **is\_lower**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Checks if whole string is lowercase, ignores characters that is not in the alphabet._
 >
 
 ## **is\_upper**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Checks if whole string is uppercase, ignores characters that is not in the alphabet._
 >
 
 ## **join**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, list: @array) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Joins a list using the string._
 >## Arguments:
 >
@@ -100,34 +100,34 @@
 
 ## **lowercase**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Makes whole string lowercase._
 >
 
 ## **reverse**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Reverses the string._
 >
 
 ## **split**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, spstr: @string) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Splits the string by the specified seperator._
 >## Arguments:
 >
@@ -138,12 +138,12 @@
 
 ## **starts\_with**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, substr: @string) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Checks does the string starts with a string._
 >## Arguments:
 >
@@ -154,12 +154,12 @@
 
 ## **substr**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, start: @number, end: @number) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Gets a substring beginning at the specified start and ending at the specified end._
 >## Arguments:
 >
@@ -171,11 +171,11 @@
 
 ## **uppercase**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Makes whole string uppercase._
 >

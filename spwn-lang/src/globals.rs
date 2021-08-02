@@ -1,3 +1,5 @@
+use internment::Intern;
+
 ///types and functions used by the compiler
 use crate::builtin::*;
 use crate::compiler_info::CodeArea;
@@ -28,7 +30,7 @@ pub struct Globals {
     pub stored_values: ValStorage,
     pub val_id: usize,
 
-    pub type_ids: HashMap<String, (u16, PathBuf, (usize, usize))>,
+    pub type_ids: HashMap<String, (u16, CodeArea)>,
     pub type_id_count: u16,
 
     pub func_ids: Vec<FunctionId>,
@@ -42,6 +44,7 @@ pub struct Globals {
     pub implementations: Implementations,
 
     pub sync_groups: Vec<SyncGroup>,
+    pub includes: Vec<PathBuf>,
 }
 
 impl Globals {
@@ -52,10 +55,12 @@ impl Globals {
     ) -> Result<Group, RuntimeError> {
         match self.stored_values.map.get(&p) {
             Some(val) => Ok(val.fn_context),
-            None => Err(RuntimeError::RuntimeError {
-                message: "Pointer points to no data!".to_string(),
+            None => Err(RuntimeError::CustomError(crate::compiler::create_error(
                 info,
-            }),
+                "Pointer points to no data! (this is probably a bug, please contact a developer)",
+                &[],
+                None,
+            ))),
         }
     }
     pub fn is_mutable(&self, p: StoredValue) -> bool {
@@ -95,7 +100,7 @@ impl Globals {
 
     pub fn get_area(&self, p: StoredValue) -> CodeArea {
         match self.stored_values.map.get(&p) {
-            Some(val) => val.area.clone(),
+            Some(val) => val.def_area,
             None => unreachable!(),
         }
     }
@@ -149,12 +154,13 @@ impl Globals {
                 parts: vec![0],
                 groups_used: Vec::new(),
             }],
+            includes: Vec::new(),
         };
 
         let mut add_type = |name: &str, id: u16| {
             globals
                 .type_ids
-                .insert(String::from(name), (id, PathBuf::new(), (0, 0)))
+                .insert(String::from(name), (id, CodeArea::new()))
         };
 
         add_type("group", 0);

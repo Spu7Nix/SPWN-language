@@ -1,16 +1,16 @@
-
-# **@group**:
-
+  
+# **@group**: 
+ 
 ## **\_range\_**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, other: @group) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Implementation of the range operator (`..`) for groups_
->### Example:
+>### Example: 
 >```spwn
 > for group in 1g..10g {
 >    -> group.move(10, 0, 0.5)
@@ -25,14 +25,14 @@
 
 ## **alpha**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, opacity: @number = 1, duration: @number = 0) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Implementation of the alpha trigger_
->### Example:
+>### Example: 
 >```spwn
 > 1g.alpha(0)
 >```
@@ -46,14 +46,14 @@
 
 ## **follow**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, other: @group, x_mod: @number = 1, y_mod: @number = 1, duration: @number = 999) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Implementation of the follow trigger_
->### Example:
+>### Example: 
 >```spwn
 > 10g.follow(11g)
 >```
@@ -69,14 +69,14 @@
 
 ## **follow\_player\_y**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, speed: @number = 1, delay: @number = 0, offset: @number = 0, max_speed: @number = 0, duration: @number = 999) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Implementation of the follow player Y trigger_
->### Example:
+>### Example: 
 >```spwn
 > 10g.follow_player_y(delay = 0.5)
 >```
@@ -93,14 +93,14 @@
 
 ## **lock\_to\_player**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, lock_x: @bool = true, lock_y: @bool = true, duration: @number = 999) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Lock group to player position_
->### Example:
+>### Example: 
 >```spwn
 > 10g.lock_to_player(lock_x = true, duration = 20)
 >```
@@ -115,14 +115,14 @@
 
 ## **move**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, x: @number, y: @number, duration: @number = 0, easing: @easing_type = @easing_type::{id: 0}, easing_rate: @number = 2) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Implementation of the move trigger_
->### Example:
+>### Example: 
 >```spwn
 > 10g.move(100, 0, 0.5, easing = EASE_IN_OUT)
 >```
@@ -139,14 +139,14 @@
 
 ## **move\_to**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, target: @group, duration: @number = 0, x_only: @bool = false, y_only: @bool = false, easing: @easing_type = @easing_type::{id: 0}, easing_rate: @number = 2) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Implementation of the 'Move target' feature of the move trigger. Remember that both groups can only contain one object._
->### Example:
+>### Example: 
 >```spwn
 > 10g.move_to(20g)
 >```
@@ -164,14 +164,14 @@
 
 ## **pulse**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, r: @number, g: @number, b: @number, fade_in: @number = 0, hold: @number = 0, fade_out: @number = 0, exclusive: @bool = false, hsv: @bool = false, s_checked: @bool = false, b_checked: @bool = false) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Implementation of the pulse trigger for groups_
->### Example:
+>### Example: 
 >```spwn
 > 10g.pulse(255, 0, 0, fade_out = 0.5)
 >```
@@ -193,14 +193,14 @@
 
 ## **rotate**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, center: @group, degrees: @number, duration: @number = 0, easing: @easing_type = @easing_type::{id: 0}, easing_rate: @number = 2, lock_object_rotation: @bool = false) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Implementation of the rotate trigger_
->### Example:
+>### Example: 
 >```spwn
 > center = 3g
 >10g.rotate(center, 360, 2, easing = EASE_IN_OUT)
@@ -219,14 +219,14 @@
 
 ## **stop**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Implementation of the stop trigger_
->### Example:
+>### Example: 
 >```spwn
 > move = !{
 >    10g.move(1000, 0, 10)
@@ -239,14 +239,14 @@
 
 ## **toggle\_off**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Toggles the group off_
->### Example:
+>### Example: 
 >```spwn
 > 10g.toggle_off()
 >```
@@ -254,14 +254,14 @@
 
 ## **toggle\_on**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Toggles the group on_
->### Example:
+>### Example: 
 >```spwn
 > 10g.toggle_on()
 >```

@@ -77,11 +77,11 @@ pub enum ValueBody {
 }
 
 impl ValueBody {
-    pub fn to_variable(&self) -> Variable {
+    pub fn to_variable(&self, pos: FileRange) -> Variable {
         Variable {
             value: ValueLiteral { body: self.clone() },
             operator: None,
-            pos: (0, 0),
+            pos,
             //comment: (None, None),
             path: Vec::new(),
             tag: Attribute::new(),
@@ -227,10 +227,11 @@ pub struct Definition {
 pub struct Argument {
     pub symbol: Option<String>,
     pub value: Expression,
+    pub pos: FileRange,
 }
 
 impl Argument {
-    pub fn from(val: StoredValue) -> Self {
+    pub fn from(val: StoredValue, pos: FileRange) -> Self {
         Argument {
             symbol: None,
             value: Expression {
@@ -238,12 +239,13 @@ impl Argument {
                     value: ValueLiteral::new(ValueBody::Resolved(val)),
                     path: Vec::new(),
                     operator: None,
-                    pos: (0, 0),
+                    pos,
                     //comment: (None, None),
                     tag: Attribute::new(),
                 }],
                 operators: Vec::new(),
             },
+            pos,
         }
     }
 }
@@ -352,7 +354,7 @@ impl Expression {
         Variable {
             operator: None,
             value: ValueLiteral::new(ValueBody::Expression(self.clone())),
-            pos: (0, 0),
+            pos: self.get_pos(),
             path: Vec::new(),
             //comment: (None, None),
             tag: Attribute::new(),
