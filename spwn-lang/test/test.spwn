@@ -1,1 +1,5 @@
-$.print(2.map(1, 4, 5, 11))
+m = (text) {
+    $.println(text)
+}
+
+m("hello", 1)
