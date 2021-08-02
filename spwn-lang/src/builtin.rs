@@ -1039,7 +1039,7 @@ builtins! {
         }
     }
 
-    [Regex] fn regex((regex): Str, (s): Str, (mode): Str, (replace): Str) {
+    [Regex] fn regex((regex): Str, (s): Str, (mode): Str, (replace)) {
         use regex::Regex;
 
 
@@ -1180,7 +1180,7 @@ builtins! {
             (Value::Array(a), Value::Array(b)) => Value::Array({
                 let mut new_arr = Vec::new();
                 for el in a.iter().chain(b.iter()) {
-                    new_arr.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position.clone()));
+                    new_arr.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position));
                 }
                 new_arr
 
@@ -1215,7 +1215,7 @@ builtins! {
     [SwapOp]           fn _swap_(mut (a), mut (b))                      {
 
         std::mem::swap(&mut a, &mut b);
-        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position.clone();
+        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
         (*globals.stored_values.map.get_mut(&arguments[1]).unwrap()).def_area = info.position;
         Value::Null
     }
@@ -1340,7 +1340,7 @@ builtins! {
             (Value::Str(a), Value::Str(b)) => *a += &b,
             (Value::Array(a), Value::Array(b)) => {
                 for el in b.iter() {
-                    a.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position.clone()));
+                    a.push(clone_value(*el, globals.get_lifetime(arguments[0]), globals, context.start_group, !globals.is_mutable(*el), info.position));
                 }
             },
             _ => return Err(RuntimeError::CustomError(create_error(

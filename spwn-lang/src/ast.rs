@@ -280,6 +280,7 @@ pub struct Macro {
     pub args: Vec<ArgDef>,
     pub body: CompoundStatement,
     pub properties: Attribute,
+    pub arg_pos: FileRange,
 }
 
 #[derive(Clone, PartialEq, Debug)]

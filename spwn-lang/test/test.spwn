@@ -1,2 +1,4 @@
+
 s = 'a' * 20
 $.print(s, s.length)
+
