@@ -1,5 +1,10 @@
-m = (text) {
-    $.println(text)
-}
+// arr is an array
+#[no_std]
+let arr = []
 
-m("hello", 1)
+for i in 0..10 {
+    
+    
+    arr += [5,6]
+}
+$.print(arr)
