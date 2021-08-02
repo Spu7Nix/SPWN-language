@@ -1139,7 +1139,23 @@ builtins! {
 
     [DividedByOp]       fn _divided_by_((a): Number, (b): Number)       { Value::Number(a / b) }
     [IntdividedByOp]    fn _intdivided_by_((a): Number, (b): Number)    { Value::Number((a / b).floor()) }
-    [TimesOp]           fn _times_((a): Number, (b): Number)            { Value::Number(a * b) }
+    [TimesOp]
+    fn _times_((a), (b): Number) {
+        match a {
+            Value::Number(a) => Value::Number(a * b),
+            Value::Str(a) => Value::Str(a.repeat(b as usize)),
+            _ => {
+                return Err(RuntimeError::TypeError {
+                    expected: "@number and @number or @string and @number".to_string(),
+                    found: format!("@{} and @{}",
+                        globals.get_type_str(arguments[0]),
+                        globals.get_type_str(arguments[1])
+                    ),
+                    info,
+                })
+            }
+        }
+    }
     [ModOp]             fn _mod_((a): Number, (b): Number)              { Value::Number(a % b) }
     [PowOp]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
     [PlusOp] fn _plus_((a), (b)) {

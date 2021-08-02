@@ -1,7 +1,3 @@
+s = true * 20
 
-c = counter(10)
-
-
-for i in ..10 {
-    c++
-}
+$.print(s, s.length)
