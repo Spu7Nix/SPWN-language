@@ -2,3 +2,8 @@
 s = 'a' * 20
 $.print(s, s.length)
 
+let s = 'ab'
+s *= 3
+$.print(s, s.length)
+
+s *= 'aa'

@@ -1158,16 +1158,22 @@ builtins! {
     fn _times_((a), (b): Number) {
         match a {
             Value::Number(a) => Value::Number(a * b),
-            Value::Str(a) => Value::Str(a.repeat(b as usize)),
+            Value::Str(a) => Value::Str(a.repeat(convert_to_int(b, &info)? as usize)),
             _ => {
-                return Err(RuntimeError::TypeError {
-                    expected: "@number and @number or @string and @number".to_string(),
-                    found: format!("@{} and @{}",
-                        globals.get_type_str(arguments[0]),
-                        globals.get_type_str(arguments[1])
-                    ),
-                    info,
-                })
+                return Err(RuntimeError::CustomError(create_error(
+                    info.clone(),
+                    "Type mismatch",
+                    &[
+                        (globals.get_area(arguments[0]), &format!("Value defined as {} here", globals.get_type_str(arguments[0]))),
+                        (globals.get_area(arguments[1]), &format!("Value defined as {} here", globals.get_type_str(arguments[1]))),
+                        (
+                            info.position,
+                            &format!("Expected @number and @number or @string and @number, found @{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
+                        ),
+                    ],
+                    None,
+                )))
+
             }
         }
     }
@@ -1359,7 +1365,29 @@ builtins! {
         }
         Value::Null
     }
-    [MultiplyOp]        fn _multiply_(mut (a): Number, (b): Number)         { a *= b; Value::Null }
+    [MultiplyOp]        fn _multiply_(mut (a), (b): Number)         {
+        match &mut a {
+            Value::Number(a) => *a *= b,
+            Value::Str(a) => *a = a.repeat(convert_to_int(b, &info)? as usize),
+            _ => {
+                return Err(RuntimeError::CustomError(create_error(
+                    info.clone(),
+                    "Type mismatch",
+                    &[
+                        (globals.get_area(arguments[0]), &format!("Value defined as {} here", globals.get_type_str(arguments[0]))),
+                        (globals.get_area(arguments[1]), &format!("Value defined as {} here", globals.get_type_str(arguments[1]))),
+                        (
+                            info.position,
+                            &format!("Expected @number and @number or @string and @number, found @{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
+                        ),
+                    ],
+                    None,
+                )))
+
+            }
+        };
+        Value::Null
+    }
     [DivideOp]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
     [IntdivideOp]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
     [ExponateOp]        fn _exponate_(mut (a): Number, (b): Number)         { a = a.powf(b); Value::Null }
