@@ -1,9 +1,3 @@
-
-s = 'a' * 20
-$.print(s, s.length)
-
-let s = 'ab'
-s *= 3
-$.print(s, s.length)
-
-s *= 'aa'
+let arr = [1, 5, 3, 4, 2]
+arr.swap(1, 4)
+$.assert(arr == [1, 2, 3, 4, 5])

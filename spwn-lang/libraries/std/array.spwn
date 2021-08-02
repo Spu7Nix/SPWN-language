@@ -282,4 +282,13 @@ $.assert(arr.flat_map(el => el > 4) == [5, 6, 7, 8])
         }
         return output;
     },
+    swap: #[desc("Swaps two elements.") example("
+let arr = [1, 5, 3, 4, 2]
+arr.swap(1, 4)
+$.assert(arr == [1, 2, 3, 4, 5])")]
+    (self, i1: @number, i2: @number) {
+        v = self[i1]
+        self[i1] = self[i2]
+        self[i2] = v
+    }
 }
