@@ -11,11 +11,15 @@ impl @regex {
     },
     match: #[desc("Checks if the regex matches a string argument")]
     (self, match: @string) {
-        return $.regex(self.regex, match, "match", "UNUSED")
+        return $.regex(self.regex, match, "match", null)
     },
     replace: #[desc("Regex replace the contents of a string")]
     (self, to_replace: @string, replacer: @string) {
         let t_rep = to_replace;
         return $.regex(self.regex, t_rep, "replace", replacer)
+    },
+    findall: #[desc("Regex find all matches of the stirng argument")]
+    (self, match: @string) {
+        return $.regex(self.regex, match, "findall", null)
     }
 }
