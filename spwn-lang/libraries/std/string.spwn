@@ -58,7 +58,7 @@ impl @string {
 	(self) {
 		let ret_str = ""
         for i in ..self.length {
-            ret_str += self[-i]
+            ret_str += self[self.length - 1 - i]
         }
         return ret_str
 	},
@@ -111,10 +111,10 @@ $.assert(str2.l_trim() == 'pog  __')
         let begin = 0
 
         for i in ..self.length {
-            if tokenlist has self[i] {
+            if tokenlist.contains(self[i]) {
                 continue
             } else {
-                stop_ind = i
+                begin = i
                 break
             }
         }
