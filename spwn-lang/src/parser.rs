@@ -2120,7 +2120,6 @@ fn parse_variable(
         match tokens.next(true) {
             Some(Token::OpenSquareBracket) => {
                 if check_if_slice(tokens.clone(), notes)? {
-                    println!("slice me uwu");
                     let mut slices = Vec::<ast::Slice>::new();
                     'main: loop {
                         let mut curr_slice = ast::Slice {
@@ -2164,7 +2163,6 @@ fn parse_variable(
                             };
                         }
                     }
-                    println!("we have {} slices", slices.len());
                     path.push(ast::Path::NSlice(slices));
                 } else {
                     let index = parse_expr(tokens, notes, true, true)?;

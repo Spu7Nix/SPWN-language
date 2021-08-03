@@ -1,11 +1,6 @@
-<<<<<<< HEAD
 #[no_level]
-let arr = 4
-arr[0:0, 1:3]
-=======
 
+let a = [[1,2,3,4,5],[5,4,3,2,1]]
 
-if !(counter(1i) == 0) {
-    10g.move(10, 0) 
-}
->>>>>>> 15ed315ed16e346b13b43a39f1ace2b23ea42d1f
+let b = a[:, 2:4];
+$.print(b)

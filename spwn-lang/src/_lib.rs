@@ -76,7 +76,7 @@ impl Compiler {
     pub fn set_code(&mut self, code: String) {
         self.unparsed_code = code;
     }
-    pub fn _run(code: String, included_paths: Vec<PathBuf>, opti_enabled: bool) -> Result<String, Box<dyn std::error::Error>> {
+    /*pub fn _run(code: String, included_paths: Vec<PathBuf>, opti_enabled: bool) -> Result<String, Box<dyn std::error::Error>> {
         let file = NamedTempFile::new()?;
         let mut pbuf = PathBuf::new();
         pbuf.push(file.path());
@@ -101,5 +101,5 @@ impl Compiler {
         let (new_ls, _) = levelstring::append_objects(objects, &String::new())?;
 
         Ok(new_ls)
-    }
+    }*/
 }

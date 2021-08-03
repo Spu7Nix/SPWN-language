@@ -4,6 +4,7 @@ use crate::compiler::create_error;
 use crate::compiler::import_module;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
+use slyce::{Slice as Slyce};
 
 use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};
 //use std::boxed::Box;
@@ -36,6 +37,8 @@ pub enum Value {
     Pattern(Pattern),
     Null,
 }
+
+pub type Slice = (Option<isize>, Option<isize>, Option<isize>);
 
 const MAX_DICT_EL_DISPLAY: usize = 10;
 
@@ -524,6 +527,54 @@ pub fn find_key_for_value(
 ) -> Option<&String> {
     map.iter()
         .find_map(|(key, val)| if val.0 == value { Some(key) } else { None })
+}
+
+pub fn slice_array(
+    input: &Vec<StoredValue>,
+    slices_: Vec<Slice>, //note: slices are in *reverse order*
+    globals: &mut Globals,
+    info: CompilerInfo,
+    context: &Context
+) -> Result<Vec<StoredValue>, RuntimeError> {
+    let mut slices = slices_;
+
+    let current_slice = slices.pop().unwrap();
+    let s = Slyce {start: current_slice.0.into(), end: current_slice.1.into(), step: current_slice.2.into()};
+
+    let sliced = s.apply(input).map(|x| *x).collect::<Vec<_>>();
+
+    let mut result = Vec::<StoredValue>::new();
+
+    for i in &sliced {
+        if slices.len() > 0 {
+            let val = match globals.stored_values[*i].clone() {
+                Value::Array(arr) => {
+                     slice_array(&arr, slices.clone(), globals, info.clone(), context)?
+                },
+                _ => {
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        "Cannot slice noncomforming multidimensional array",
+                        &[],
+                        None,
+                    )));
+                }
+            };
+
+            let stored_arr = store_const_value(
+                Value::Array(val),
+                1,
+                globals,
+                context,
+                info.position.clone(),
+            );
+            result.push(stored_arr);
+        } else {
+            return Ok(sliced);
+        }
+    }
+    Ok(result)
+
 }
 
 pub fn macro_to_value(
@@ -1282,22 +1333,150 @@ impl ast::Variable {
 
                 ast::Path::NSlice(slices) => {
                     //TODO: nslice
+
                     let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
                     for (prev_v, prev_c, _) in with_parent.clone() {
+
+                        let mut expr_vec = Vec::<ast::Expression>::new();
+
+                        for slice in slices {
+                            expr_vec.push(slice.left.clone().unwrap_or_else(|| {
+                                ast::Expression {
+                                    operators: Vec::new(), 
+                                    values: vec![
+                                            ast::Variable {
+                                                value: ast::ValueLiteral { body: ast::ValueBody::Null },
+                                                operator: None,
+                                                pos: (0, 0),
+                                                //comment: (None, None),
+                                                path: Vec::new(),
+                                                tag: ast::Attribute::new(),
+                                            }
+                                    ]
+                                }
+                            }));
+                            expr_vec.push(slice.right.clone().unwrap_or_else(|| {
+                                ast::Expression {
+                                    operators: Vec::new(), 
+                                    values: vec![
+                                            ast::Variable {
+                                                value: ast::ValueLiteral { body: ast::ValueBody::Null },
+                                                operator: None,
+                                                pos: (0, 0),
+                                                //comment: (None, None),
+                                                path: Vec::new(),
+                                                tag: ast::Attribute::new(),
+                                            }
+                                    ]
+                                }
+                            }));
+                            expr_vec.push(slice.step.clone().unwrap_or_else(|| {
+                                ast::Expression {
+                                    operators: Vec::new(), 
+                                    values: vec![
+                                            ast::Variable {
+                                                value: ast::ValueLiteral { body: ast::ValueBody::Null },
+                                                operator: None,
+                                                pos: (0, 0),
+                                                //comment: (None, None),
+                                                path: Vec::new(),
+                                                tag: ast::Attribute::new(),
+                                            }
+                                    ]
+                                }
+                            }));
+                        }
+
+                        let (evaled, returns) = all_combinations(
+                            expr_vec,
+                            &prev_c,
+                            globals,
+                            info.clone(),
+                            true,
+                        )?;
+
+                        let mut sorted_nslices = Vec::<(Vec<Slice>, Context)>::new();
+                        let conv_slice = |v| -> Result<Option<isize>, RuntimeError> {
+                            return match &globals.stored_values[v] {
+                                Value::Number(n) => {
+                                    if n.floor() != *n {
+                                        return Err(RuntimeError::CustomError(create_error(
+                                            info.clone(),
+                                            &format!("Cannot slice with non-integer number {}.", n),
+                                            &[],
+                                            None,
+                                        )));
+                                    }
+                                    Ok(Some(*n as isize))
+                                },
+                                Value::Null => {
+                                    Ok(None)
+                                },
+                                _ => {
+                                    return Err(RuntimeError::TypeError {
+                                        expected: "@number".to_string(),
+                                        found: globals.get_type_str(v),
+                                        val_def: globals.get_area(v),
+                                        info: info.clone()
+                                    });
+                                }
+                            };
+                        };
+
+                        for (parsed_slices, context) in evaled {
+                            let mut sorted_nslice = Vec::<Slice>::new();
+                            let mut count: usize = 0;
+                            loop {
+                                if count >= parsed_slices.len() {
+                                    break;
+                                } else if count+2 >= parsed_slices.len() {
+                                    panic!("this is not very bueno {}", parsed_slices.len());
+                                }
+                                let mut sorted_slice: Slice = (None, None, None);
+                                sorted_slice.0 = conv_slice(parsed_slices[count])?;
+                                count+=1;
+                                sorted_slice.1 = conv_slice(parsed_slices[count])?;
+                                count+=1;
+                                sorted_slice.2 = conv_slice(parsed_slices[count])?;
+                                count+=1;
+
+                                sorted_nslice.push(sorted_slice);
+                            }
+                            sorted_nslices.push((sorted_nslice, context));
+                        }
+                        inner_returns.extend(returns);
+
                         match globals.stored_values[prev_v].clone() {
-                            Value::Array(arr) => (),
-                            Value::Str(st) => (),
-                            a => {
-                                return Err(RuntimeError::RuntimeError {
-                                    message: format!(
-                                        "Cannot slice this type: {}",
-                                        a.to_str(globals)
-                                    ),
+                            Value::Array(arr) => {
+                                for nslice in sorted_nslices {
+                                    //println!("slices {:?}", nslice);
+                                    let mut nslice_0 = nslice.0;
+                                    nslice_0.reverse();
+                                    let sliced = slice_array(&arr, nslice_0, globals, info.clone(), &nslice.1)?;
+
+                                    let stored_arr = store_const_value(
+                                        Value::Array(sliced),
+                                        1,
+                                        globals,
+                                        &nslice.1,
+                                        info.position.clone(),
+                                    );
+                                    new_out.push((stored_arr, nslice.1, prev_v));
+                                }
+
+                            },
+                            //Value::Str(st) => (),
+                            _ => {
+                                return Err(RuntimeError::TypeError {
+                                    expected: "slicable type (@array or @string)".to_string(),
+                                    found: globals.get_type_str(prev_v),
+                                    val_def: globals.get_area(prev_v),
                                     info,
                                 })
                             }
                         }
                     }
+                    with_parent = new_out;
                 }
 
                 ast::Path::Index(i) => {
