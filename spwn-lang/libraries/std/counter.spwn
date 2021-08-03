@@ -43,8 +43,6 @@ impl @counter {
                 type: @counter,
                 item: id
             }
-        } else {
-            throw "Can not make counter from this type"
         }
 
     },
@@ -55,8 +53,8 @@ points.display(75, 75)
     ")]
     (
         self,
-        #[desc("X pos of display in units (1 grid square = 30 units)")] x,
-        #[desc("Y pos of display in units")] y
+        #[desc("X pos of display in units (1 grid square = 30 units)")] x: @number,
+        #[desc("Y pos of display in units")] y: @number
     ) {
         extract import "constants.spwn".obj_props
         $.add(obj {
@@ -81,7 +79,7 @@ a.add_to(b)
         self,
         #[desc("Counter(s) to add to")] items: [@counter | @item] | @counter | @item,
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
-        #[desc("Multiplyer for the value added")] factor: @number = 1,
+        #[desc("Multiplier for the value added")] factor: @number = 1,
         #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
     ) {
         wait()
@@ -218,8 +216,6 @@ c.multiply(10)
             wait()
             temp.add_to([self.item], speed)
 
-        } else {
-            throw "Cannot multiply counter by " + factor.type as @string
         }
     },
 
@@ -332,11 +328,7 @@ c.divide(2, remainder = r)
 
 
 
-        } else {
-            throw "Cannot divide counter by " + divisor.type as @string
         }
-
-
     },
 
     //will consume both numbers
@@ -472,10 +464,8 @@ c2 = c1 + 10
             -> return new_counter
         } else if other.type == @counter {
             new_counter = self.clone()
-            other.clone().add_to([new_counter.item])
+            other.copy_to([new_counter.item], factor = 1)
             -> return new_counter
-        } else {
-            throw "Cannot add counter with " + num.type as @string
         }
     },
 
@@ -489,8 +479,10 @@ c2 = c1 - 3
             new_counter = self.clone()
             new_counter.add(-other)
             -> return new_counter
-        } else {
-            throw "Cannot subtract counter with " + num.type as @string
+        } else if other.type == @counter {
+            new_counter = self.clone()
+            other.copy_to([new_counter.item], factor = -1)
+            -> return new_counter
         }
     },
 
@@ -562,8 +554,6 @@ more = c > 10
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             -> return cmp == 1
-        } else {
-            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -588,8 +578,6 @@ less = c < 42
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             -> return cmp == -1
-        } else {
-            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -614,8 +602,6 @@ more_or_eq = c >= 10
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             -> return cmp == 1 || cmp == 0
-        } else {
-            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -640,8 +626,6 @@ less_or_eq = c <= 42
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             -> return cmp == -1 || cmp == 0
-        } else {
-            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -668,8 +652,6 @@ eq = c == 42
             other_clone = other.clone()
             cmp = self_clone.compare(other_clone)
             -> return cmp == 0
-        } else {
-            throw "Cannot compare counter with " + other.type as @string
         }
     },
 
@@ -700,8 +682,6 @@ c += 10
             self.add(num)
         } else if num.type == @counter {
             num.clone().add_to([self])
-        } else {
-            throw "Cannot add " + num.type as @string + " to counter"
         }
     },
 
@@ -732,8 +712,6 @@ c -= 5
 
         } else if num.type == @counter {
             num.clone().subtract_from([self])
-        } else {
-            throw "Cannot subtract " + num.type as @string + " from counter"
         }
     },
 
@@ -747,8 +725,6 @@ c *= 6
             self.multiply(num)
         } else if num.type == @counter {
             self.multiply(num)
-        } else {
-            throw "Cannot multiply counter by " + num.type as @string
         }
     },
 
@@ -761,8 +737,6 @@ c /= 6
             self.divide(num)
         } else if num.type == @counter {
             self.divide(num)
-        } else {
-            throw "Cannot divide counter by " + num.type as @string
         }
     },
 
@@ -778,8 +752,6 @@ c = 42
             }
         } else if num.type == @counter {
             num.copy_to([self])
-        } else {
-            throw "Cannot assign" + num.type as @string + " to counter"
         }
     },
 
@@ -791,14 +763,10 @@ c <=> c2
 // c is now 42, c2 is now 23
     ")]
     (self, num: @counter) {
-        if num.type == @counter {
-            swap_tmp = @counter::new();
-            self.add_to(swap_tmp)
-            num.add_to(self)
-            swap_tmp.add_to(num)
-        }else {
-            throw "Cannot swap counter with " + num.type as @string
-        }
+        swap_tmp = @counter::new();
+        self.add_to(swap_tmp)
+        num.add_to(self)
+        swap_tmp.add_to(num)
     },
 
     to_const: #[desc("Converts the counter into a normal number (very context-splitting, be careful)") example("

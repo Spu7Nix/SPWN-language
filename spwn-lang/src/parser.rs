@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use ariadne::Fmt;
+use internment::Intern;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
@@ -92,13 +93,13 @@ impl From<SyntaxError> for ErrorReport {
             } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: file.clone(),
+                    file: Intern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file,
+                        file: Intern::new(file),
                     },
                     &format!(
                         "{} {}, {} {}",
@@ -114,13 +115,13 @@ impl From<SyntaxError> for ErrorReport {
             SyntaxError::UnexpectedErr { found, pos, file } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: file.clone(),
+                    file: Intern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file,
+                        file: Intern::new(file),
                     },
                     &format!("Unexpected {}", found),
                 )],
@@ -130,13 +131,13 @@ impl From<SyntaxError> for ErrorReport {
             SyntaxError::SyntaxError { message, pos, file } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: file.clone(),
+                    file: Intern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file,
+                        file: Intern::new(file),
                     },
                     &message,
                 )],
@@ -1395,7 +1396,9 @@ fn parse_dict(
                         tokens.previous();
                         defs.push(ast::DictDef::Def((
                             symbol.clone(),
-                            ast::ValueBody::Symbol(symbol).to_variable().to_expression(),
+                            ast::ValueBody::Symbol(symbol)
+                                .to_variable(tokens.position())
+                                .to_expression(),
                         )));
                     }
 
@@ -1410,7 +1413,9 @@ fn parse_dict(
                         }
                         defs.push(ast::DictDef::Def((
                             symbol.clone(),
-                            ast::ValueBody::Symbol(symbol).to_variable().to_expression(),
+                            ast::ValueBody::Symbol(symbol)
+                                .to_variable(tokens.position())
+                                .to_expression(),
                         )));
                         //tokens.previous();
                         break;
@@ -1930,14 +1935,14 @@ fn parse_variable(
                         Vec::new()
                     };
 
-                    let start = tokens.position().0;
+                    let start = tokens.position();
                     let expr = parse_expr(tokens, notes, true, true)?;
                     let end = tokens.position().1;
                     let macro_body = vec![ast::Statement {
                         body: ast::StatementBody::Return(Some(expr)),
                         arrow: false,
                         //comment: (None, None),
-                        pos: (start, end),
+                        pos: (start.0, end),
                     }];
 
                     ast::ValueBody::Macro(ast::Macro {
@@ -1945,6 +1950,7 @@ fn parse_variable(
                         body: ast::CompoundStatement {
                             statements: macro_body,
                         },
+                        arg_pos: start,
                         properties: properties.clone(),
                     })
                 }
@@ -2026,8 +2032,9 @@ fn parse_variable(
                 let parse_macro_def = |tokens: &mut Tokens,
                                        notes: &mut ParseNotes|
                  -> Result<ast::ValueBody, SyntaxError> {
+                    let arg_start = tokens.position().0;
                     let args = parse_arg_def(tokens, notes)?;
-
+                    let arg_end = tokens.position().1;
                     let body = match tokens.next(false) {
                         Some(Token::OpenCurlyBracket) => parse_cmp_stmt(tokens, notes)?,
                         Some(Token::ThickArrow) => {
@@ -2048,6 +2055,7 @@ fn parse_variable(
                         args,
                         body: ast::CompoundStatement { statements: body },
                         properties: properties.clone(),
+                        arg_pos: (arg_start, arg_end),
                     }))
                 };
 

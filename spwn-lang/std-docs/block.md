@@ -1,13 +1,13 @@
-
-# **@block**:
-
+  
+# **@block**: 
+ 
 ## **\_range\_**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, other: @block) { /* code omitted */ }
->```
->**Type:** `@macro`
+>``` 
+>**Type:** `@macro` 
 >## Arguments:
 >
 >| # | name | type | default value | description |
@@ -17,14 +17,14 @@
 
 ## **create\_tracker\_item**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, other: @block) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Returns an item ID that is 1 when the blocks are colliding and 0 when they are not_
->### Example:
+>### Example: 
 >```spwn
 > // in some minigame
 >player = @player::{ block: 1b, group: 1g}

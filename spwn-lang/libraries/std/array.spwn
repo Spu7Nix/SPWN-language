@@ -12,24 +12,33 @@ $.assert(!arr2.is_empty())
     max: #[desc("Gets the highest number in the array.") example("
 arr = [3, 1, 4, 1]
 $.assert(arr.max() == 4)
+
+arr = ['abc', 'b', 'abdc']
+$.assert(arr.max(key = (el: @string) => el.length) == 'abdc')
     ")]
-    (self, minval = -999999999999) {
-        let highest = minval
+    (self, key: @macro = (el) => el) {
+        let highest = self[0]
+
         for el in self {
-            if el > highest {
+            if key(el) > key(highest) {
                 highest = el
             }
         }
+        
         return highest
     },
     min: #[desc("Gets the lowest number in the array.") example("
 arr = [3, 1, 4, 1]
 $.assert(arr.min() == 1)
+
+arr = ['abc', 'b', 'abdc']
+$.assert(arr.max(key = (el: @string) => el.length) == 'b')
     ")]
-    (self, max_val = 999999999999) {
-        let lowest = max_val
+    (self, key: @macro = (el) => el) {
+        let lowest = self[0]
+
         for el in self {
-            if el < lowest {
+            if key(el) < key(lowest) {
                 lowest = el
             }
         }
@@ -180,49 +189,14 @@ $.assert(arr.sum() == 15)
     (self) {
         return self.reduce((acum, el) => acum + el)
     },
-    sort: #[desc("Returns a sorted version of the array.") example("
-arr = [5, 1, 5, 3, 2]
-$.assert(arr.sort() == [1, 2, 3, 5, 5])
-    ")]
-    (self) {
-        // uses selection sort
-        if self.all(item => item.type == @number) {
-            min = (array, maxval = 999999999999) {
-                let lowest = [maxval, 0]
-                for i in 0..array.length {
-                    if array[i] < lowest[0] {
-                        lowest = [array[i], i]
-                    }
-                }
-                return lowest
-            }
-            let res = []
-            let copy = self
-            for i in self {
-                i = min(copy)
-                res.push(i[0])
-                copy.remove(i[1])
-            }
-            return res
-        } else {
-            throw "Unsupported type in array " + self as @string
-        }
-    },
-    copy: #[desc("Returns a shallow copy of the array") example("
-arr = [5, 6, 7]
-assert(arr == arr.copy())
-    ")]
-    (self) {
-        return self.map(x => x)
-    },
 
     _partition: #[desc("Private function needed for .sort()")]
-    (self, low: @number, high: @number, key: @macro = (a, b) => a <= b) {
+    (self, low: @number, high: @number, comp: @macro = (a, b) => a <= b) {
         pivot = self[high]
         let i = low - 1
 
         for j in low..high {
-            if key(self[j], pivot) {
+            if comp(self[j], pivot) {
                 i += 1
                 self[i] <=> self[j]
             }
@@ -245,7 +219,7 @@ arr = [5, 1, 5, 3, 2]
 arr.sort(key = (a, b) => a > b)
 $.assert(arr == [5, 5, 3, 2, 1])
     ")]
-    (self, begin: @number = 0, end: @number = -1, key: @macro = (a, b) => a <= b, ) {
+    (self, begin: @number = 0, end: @number = -1, comp: @macro = (a, b) => a <= b) {
 
         // when end == -1, that means the end of the array, but comparing to -1 doesnt work so switch it back to legnth - 1
         let new_end = end
@@ -257,10 +231,10 @@ $.assert(arr == [5, 5, 3, 2, 1])
         // no type checking becuase theoretically this can sort anything if it hasthe right comparator
         // if sort was overloaded we could have two seperate implementations
         if begin < new_end {
-            let q = self._partition(low = begin, high = new_end, key = key)
+            let q = self._partition(low = begin, high = new_end, comp = comp)
 
-            self.sort(begin = begin, end = q-1, key = key)
-            self.sort(begin = q+1, end = new_end, key = key)
+            self.sort(begin = begin, end = q-1, comp = comp)
+            self.sort(begin = q+1, end = new_end, comp = comp)
         }
     },
 
@@ -271,7 +245,7 @@ $.assert(arr.sorted(begin = 2, end = 4) == [5, 1, 2, 3, 5])
 $.assert(arr.sorted(key = (a, b) => a >= b) == [5, 5, 3, 2, 1])
     ")]
     (self) {
-        let new_arr = self.copy()
+        let new_arr = self
         new_arr.sort()
 
         return new_arr
@@ -293,19 +267,23 @@ $.assert(arr == [5, 1, 5, 3, 2])
         self = [value] + self
         return value
     },
-    flat_map: #[desc("Works the same way as map but flattens any sub-arrays into one big array.") example("
+    flatten: #[desc("Flattens any sub-arrays into one big array.") example("
 arr = [1, 2, [3, 4], 5, [6, 7, [8]]]
-$.assert(arr.flat_map(el => el > 4) == [5, 6, 7, 8])
+$.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
     ")]
-    (self, cb: @macro = () => true) {
+    (self) {
         let output = [];
-        for iter in self {
-            if iter.type == @array {
-                output += iter.map(elem => cb(elem))
+
+        for elem in self {
+            if elem.type == @number {
+                output.push(elem)
             } else {
-                output.push(cb(iter));
+                for i in elem.flatten() {
+                    output.push(i)
+                }
             }
         }
-        return output;
-    },
+
+        return output
+    }
 }

@@ -1,16 +1,16 @@
-
-# **@file**:
-
+  
+# **@file**: 
+ 
 ## **new**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(path: @string) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Creates a new file IO object_
->### Example:
+>### Example: 
 >```spwn
 > @file::new('C:/path/to/file.txt')
 >```
@@ -23,14 +23,14 @@
 
 ## **read**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, s = -1) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Reads the data in the file from the seek position to the end (or for a specified amount of characters)_
->### Example:
+>### Example: 
 >```spwn
 > data = @file::new('data.txt').read()
 >```
@@ -43,14 +43,14 @@
 
 ## **seek**:
 
-> **Value:**
+> **Value:** 
 >```spwn
 >(self, s: @number) { /* code omitted */ }
->```
->**Type:** `@macro`
->## Description:
+>``` 
+>**Type:** `@macro` 
+>## Description: 
 > _Sets a position in the file to read from_
->### Example:
+>### Example: 
 >```spwn
 > f = @file::new('data.txt')
 >f.seek(10)
