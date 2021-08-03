@@ -1039,7 +1039,7 @@ builtins! {
         }
     }
 
-    [Regex] fn regex((regex): Str, (s): Str, (mode): Str, (replace): Str) {
+    [Regex] fn regex((regex): Str, (s): Str, (mode): Str, (replace)) {
         use regex::Regex;
 
 
@@ -1154,7 +1154,29 @@ builtins! {
 
     [DividedByOp]       fn _divided_by_((a): Number, (b): Number)       { Value::Number(a / b) }
     [IntdividedByOp]    fn _intdivided_by_((a): Number, (b): Number)    { Value::Number((a / b).floor()) }
-    [TimesOp]           fn _times_((a): Number, (b): Number)            { Value::Number(a * b) }
+    [TimesOp]
+    fn _times_((a), (b): Number) {
+        match a {
+            Value::Number(a) => Value::Number(a * b),
+            Value::Str(a) => Value::Str(a.repeat(convert_to_int(b, &info)? as usize)),
+            _ => {
+                return Err(RuntimeError::CustomError(create_error(
+                    info.clone(),
+                    "Type mismatch",
+                    &[
+                        (globals.get_area(arguments[0]), &format!("Value defined as {} here", globals.get_type_str(arguments[0]))),
+                        (globals.get_area(arguments[1]), &format!("Value defined as {} here", globals.get_type_str(arguments[1]))),
+                        (
+                            info.position,
+                            &format!("Expected @number and @number or @string and @number, found @{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
+                        ),
+                    ],
+                    None,
+                )))
+
+            }
+        }
+    }
     [ModOp]             fn _mod_((a): Number, (b): Number)              { Value::Number(a % b) }
     [PowOp]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
     [PlusOp] fn _plus_((a), (b)) {
