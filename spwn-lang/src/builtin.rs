@@ -1060,7 +1060,17 @@ builtins! {
                                 )
                             }
                         }
-                    }
+                    },
+                    "findall" => {
+                        let mut output = Vec::<StoredValue>::new();
+
+                        for i in r.find_iter(&s){
+                            let entry = store_const_value(Value::Str(s[i.start()..i.end()].to_string()), 1, globals, context, CodeArea::new());
+                            output.push(entry);
+                        }
+
+                        Value::Array(output)
+                    },
                     _ => {
                         return Err(RuntimeError::BuiltinError {
                             message: format!(
@@ -1079,8 +1089,6 @@ builtins! {
             }
 
     }
-
-
 
     [RangeOp]
     fn _range_((val_a), (b): Number) {
