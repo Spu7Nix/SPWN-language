@@ -1171,7 +1171,7 @@ builtins! {
             (Value::Array(a), Value::Array(b)) => Value::Array({
                 let mut new_arr = Vec::new();
                 for el in a.iter().chain(b.iter()) {
-                    new_arr.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position.clone()));
+                    new_arr.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position));
                 }
                 new_arr
 
@@ -1237,7 +1237,7 @@ builtins! {
     [SwapOp]           fn _swap_(mut (a), mut (b))                      {
 
         std::mem::swap(&mut a, &mut b);
-        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position.clone();
+        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
         (*globals.stored_values.map.get_mut(&arguments[1]).unwrap()).def_area = info.position;
         Value::Null
     }
@@ -1362,7 +1362,7 @@ builtins! {
             (Value::Str(a), Value::Str(b)) => *a += &b,
             (Value::Array(a), Value::Array(b)) => {
                 for el in b.iter() {
-                    a.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position.clone()));
+                    a.push(clone_value(*el, globals.get_lifetime(arguments[0]), globals, context.start_group, !globals.is_mutable(*el), info.position));
                 }
             },
             _ => return Err(RuntimeError::CustomError(create_error(
@@ -1381,7 +1381,29 @@ builtins! {
         }
         Value::Null
     }
-    [MultiplyOp]        fn _multiply_(mut (a): Number, (b): Number)         { a *= b; Value::Null }
+    [MultiplyOp]        fn _multiply_(mut (a), (b): Number)         {
+        match &mut a {
+            Value::Number(a) => *a *= b,
+            Value::Str(a) => *a = a.repeat(convert_to_int(b, &info)? as usize),
+            _ => {
+                return Err(RuntimeError::CustomError(create_error(
+                    info.clone(),
+                    "Type mismatch",
+                    &[
+                        (globals.get_area(arguments[0]), &format!("Value defined as {} here", globals.get_type_str(arguments[0]))),
+                        (globals.get_area(arguments[1]), &format!("Value defined as {} here", globals.get_type_str(arguments[1]))),
+                        (
+                            info.position,
+                            &format!("Expected @number and @number or @string and @number, found @{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
+                        ),
+                    ],
+                    None,
+                )))
+
+            }
+        };
+        Value::Null
+    }
     [DivideOp]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
     [IntdivideOp]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
     [ExponateOp]        fn _exponate_(mut (a): Number, (b): Number)         { a = a.powf(b); Value::Null }

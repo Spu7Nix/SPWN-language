@@ -1,1 +1,9 @@
-$.print(2.map(1, 4, 5, 11))
+
+s = 'a' * 20
+$.print(s, s.length)
+
+let s = 'ab'
+s *= 3
+$.print(s, s.length)
+
+s *= 'aa'

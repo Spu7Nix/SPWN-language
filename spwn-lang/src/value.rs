@@ -5,6 +5,7 @@ use crate::compiler::import_module;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
 
+use crate::parser::FileRange;
 use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};
 //use std::boxed::Box;
 
@@ -48,25 +49,26 @@ pub struct Macro {
         Option<StoredValue>,
         ast::Attribute,
         Option<StoredValue>,
-        CodeArea,
+        FileRange,
     )>,
     pub def_context: Context,
     pub def_file: Intern<PathBuf>,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Attribute,
+    pub arg_pos: FileRange,
 }
-impl Macro {
-    pub fn get_arg_area(&self) -> CodeArea {
-        assert!(!self.args.is_empty());
-        let first = self.args.first().unwrap().4;
-        let last = self.args.last().unwrap().4;
-        assert_eq!(first.file, last.file);
-        CodeArea {
-            pos: (first.pos.0, last.pos.1),
-            file: first.file,
-        }
-    }
-}
+// impl Macro {
+//     pub fn get_arg_area(&self) -> CodeArea {
+//         assert!(!self.args.is_empty());
+//         let first = self.args.first().unwrap().4;
+//         let last = self.args.last().unwrap().4;
+//         assert_eq!(first.file, last.file);
+//         CodeArea {
+//             pos: (first.pos.0, last.pos.1),
+//             file: first.file,
+//         }
+//     }
+// }
 #[derive(Clone, Debug, PartialEq)]
 pub struct TriggerFunction {
     pub start_group: Group,
@@ -557,7 +559,7 @@ pub fn macro_to_value(
             Option<StoredValue>,
             ast::Attribute,
             Option<StoredValue>,
-            CodeArea,
+            FileRange,
         )> = Vec::new();
         let mut expr_index = 0;
 
@@ -588,10 +590,7 @@ pub fn macro_to_value(
                 def_val,
                 attr.clone(),
                 pat,
-                CodeArea {
-                    pos: *pos,
-                    ..info.position
-                },
+                *pos,
             ));
         }
 
@@ -602,6 +601,7 @@ pub fn macro_to_value(
                     body: m.body.statements.clone(),
                     def_context: defaults.1.clone(),
                     def_file: info.position.file,
+                    arg_pos: m.arg_pos,
                     tag: m.properties.clone(),
                 })),
                 1,

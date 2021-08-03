@@ -443,7 +443,10 @@ pub fn execute_macro(
                                 "Too many arguments!",
                                 &[
                                     (
-                                        m.get_arg_area(),
+                                        CodeArea {
+                                            pos: m.arg_pos,
+                                            file: m.def_file,
+                                        },
                                         &format!(
                                             "Macro was defined to take {} argument{} here",
                                             m.args.len(),
@@ -483,7 +486,10 @@ pub fn execute_macro(
                                 globals,
                                 context.start_group,
                                 true,
-                                m.args[def_index].4,
+                                CodeArea {
+                                    pos: m.args[def_index].4,
+                                    file: m.def_file,
+                                },
                             ),
                         );
                         def_index += 1;
@@ -499,7 +505,7 @@ pub fn execute_macro(
                         "
 This macro requires a parent (a \"self\" value), but it seems to have been called alone (or on a null value).
 Should be used like this: value.macro(arguments)",
-                        &[(m.args[0].4, "Macro defined as taking a 'self' argument here"), (info.position, "Called alone here")],
+                        &[(CodeArea {pos: m.args[0].4, file: m.def_file }, "Macro defined as taking a 'self' argument here"), (info.position, "Called alone here")],
                         None,
                     )));
                 }
@@ -513,7 +519,17 @@ Should be used like this: value.macro(arguments)",
                         Some(default) => {
                             new_variables.insert(
                                 arg.0.clone(),
-                                clone_value(*default, 1, globals, context.start_group, true, arg.4),
+                                clone_value(
+                                    *default,
+                                    1,
+                                    globals,
+                                    context.start_group,
+                                    true,
+                                    CodeArea {
+                                        pos: arg.4,
+                                        file: m.def_file,
+                                    },
+                                ),
                             );
                         }
 
@@ -522,7 +538,7 @@ Should be used like this: value.macro(arguments)",
                                 info.clone(),
                                 &format!("Non-optional argument '{}' not satisfied!", arg.0),
                                 &[
-                                    (arg.4, "Value defined as mandatory here (because no default was given)"),
+                                    (CodeArea {pos: arg.4, file: m.def_file}, "Value defined as mandatory here (because no default was given)"),
                                     (info.position, "Argument not provided here")
                                 ],
                                 None,
@@ -543,7 +559,10 @@ Should be used like this: value.macro(arguments)",
                 "This macro takes no arguments!",
                 &[
                     (
-                        m.get_arg_area(),
+                        CodeArea {
+                            pos: m.arg_pos,
+                            file: m.def_file,
+                        },
                         "Macro was defined as taking no arguments here",
                     ),
                     (info.position, "Recieved too many arguments here"),
