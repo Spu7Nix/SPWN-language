@@ -1465,7 +1465,9 @@ impl ast::Variable {
                                 }
 
                             },
-                            //Value::Str(st) => (),
+                            Value::Str(st) => {
+                                
+                            },
                             _ => {
                                 return Err(RuntimeError::TypeError {
                                     expected: "slicable type (@array or @string)".to_string(),

@@ -2131,7 +2131,14 @@ fn parse_variable(
                         let mut i: i32 = 0;
                         loop { 
                             match tokens.next(false) {
-                                Some(Token::Colon) => colon_pos = tokens.position(),
+                                Some(Token::Colon) => {
+                                    colon_pos = tokens.position();
+                                    if i==1 {
+                                        curr_slice.step = curr_slice.right.clone();
+                                        curr_slice.right = None;
+                                    }
+                                    i+=1;
+                                },
 
                                 Some(Token::ClosingSquareBracket) => {
                                     slices.push(curr_slice);
@@ -2146,8 +2153,7 @@ fn parse_variable(
                                     let result = parse_expr(tokens, notes, true, true)?;
                                     match i {
                                         0 => curr_slice.left = Some(result),
-                                        1 => curr_slice.right = Some(result),
-                                        2 => curr_slice.step = Some(result),
+                                        1 | 2 => curr_slice.right = Some(result),
                                         _ => {
                                             return Err(SyntaxError::ExpectedErr {
                                                 expected: "]".to_string(),
@@ -2157,7 +2163,6 @@ fn parse_variable(
                                             })
                                         }
                                     };
-                                    i+=1;
                                 }
 
                             };
