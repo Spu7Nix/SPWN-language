@@ -39,7 +39,7 @@ You can either use the installers for your operating system, or build SPWN from 
 
 ## Using SPWN - Setup
 
-Alright, enough talk, how do we actually use spwn?
+Alright, enough talk, how do we actually use SPWN?
 
 SPWN code can be programmed in any code editor, but the ones that have had SPWN extensions or plugins written for them are [Visual Studio Code](https://code.visualstudio.com/), [Sublime Text](https://www.sublimetext.com/) and [Vim](https://www.vim.org/).
 
