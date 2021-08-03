@@ -10,12 +10,15 @@ A language for Geometry Dash triggers. An easy way to create levels using code.
 
 SPWN is a programming language that compiles to Geometry Dash levels. What that means is that you can create levels by using not only the visual representation in the GD-editor, but using a "verbal" and abstracted representation as well. This is especially useful for using GD triggers, which (if you want to make complicated stuff) are not really suited for the graphical workflow of the in-game editor.
 
+###### Useful links
 
- The documentation for the SPWN language is located [here](https://spu7nix.net/spwn/#/). You can also contribute to the docs [here](https://github.com/Spu7Nix/spwn_docs). If you have questions, comments, need help, or want to share your work, join the discord server [here](https://discord.gg/qKZAhKXqgw).
+ - Official SPWN documentation - [link](https://spu7nix.net/spwn/#/)
+ - Documentation Repository - [link](https://github.com/Spu7Nix/spwn_docs)
+ - Official SPWN Discord server - [link](https://discord.gg/qKZAhKXqgw)
 
 ## Installing - How To Install
 
-You can either use the installers for your operating system, or build SPWN from source. Please note that building from source will give you access to newer features and bug fixes, but may be unstable.
+You can either use the installers for your operating system, or build SPWN from source. Please note that building from source will give you access to newer features and bug fixes, but **may be unstable**.
 
 ###### Windows
 1. Download the .msi file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
@@ -137,5 +140,7 @@ Build a file called AI.spwn and output the level string to the console.
 - [ ] make it work on linux
 - [x] nested comments
 - [x] get and edit obj and trigger properties
+
+
 
 # Enjoy SPWN!
