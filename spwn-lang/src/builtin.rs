@@ -1154,6 +1154,7 @@ builtins! {
 
     [DividedByOp]       fn _divided_by_((a): Number, (b): Number)       { Value::Number(a / b) }
     [IntdividedByOp]    fn _intdivided_by_((a): Number, (b): Number)    { Value::Number((a / b).floor()) }
+    [TimesOp]           fn _times_((a): Number, (b): Number)            { Value::Number(a * b) }
     [ModOp]             fn _mod_((a): Number, (b): Number)              { Value::Number(a % b) }
     [PowOp]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
     [PlusOp] fn _plus_((a), (b)) {
@@ -1189,38 +1190,7 @@ builtins! {
         }
     }
     [MinusOp]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
-    [TimesOp]           fn _times_((a), (b)) {
-        match (a, b) {
-            (Value::Number(a), Value::Number(b)) => {
-                Value::Number(a + b)
-            }
 
-            (Value::Str(a), Value::Number(b)) => {
-                if b.fract() == 0.0 && b > 0.0 {
-                    Value::Str(a.repeat(b as usize))
-                } else {
-                    return Err(RuntimeError::TypeError {
-                        expected: "number and number, or string and number. Strings can only be multiplied by whole numbers".to_string(),
-                        found: format!("{} and {}",
-                            globals.get_type_str(arguments[0]),
-                            globals.get_type_str(arguments[1])
-                        ),
-                        val_def: globals.get_area(arguments[1]),
-                        info,
-                    })
-                }
-            }
-
-            _ => {
-                return Err(RuntimeError::TypeError {
-                    expected: "number and number, or string and number".to_string(),
-                    found: globals.get_type_str(arguments[0]),
-                    val_def: globals.get_area(arguments[1]),
-                    info,
-                })
-            }
-        }
-    }
     [AssignOp]           fn _assign_(mut (a), (b))                      {
         a = b;
         (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
