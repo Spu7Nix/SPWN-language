@@ -4,6 +4,7 @@ use pest::Parser;
 use pest_derive::Parser;*/
 
 use crate::builtin::Builtin;
+
 use crate::compiler::ErrorReport;
 use crate::compiler::RainbowColorGenerator;
 use crate::compiler_info::CodeArea;
@@ -855,7 +856,7 @@ pub fn parse_statement(
             let body = parse_cmp_stmt(tokens, notes)?; // parse whats in the for loop
 
             ast::StatementBody::For(ast::For {
-                symbol,
+                symbol: Intern::new(symbol),
                 array,
                 body,
             })
@@ -1378,13 +1379,15 @@ fn parse_dict(
 
                 is_valid_symbol(&symbol, tokens, notes)?;
 
+                let symbol = Intern::new(symbol);
+
                 match tokens.next(false) {
                     Some(Token::Colon) => {
                         let expr = parse_expr(tokens, notes, true, true)?;
                         defs.push(ast::DictDef::Def((symbol, expr)));
                     }
                     Some(Token::Comma) => {
-                        if symbol == "type" {
+                        if symbol.as_ref() == "type" {
                             return Err(SyntaxError::ExpectedErr {
                                 expected: "':'".to_string(),
                                 found: String::from("comma (',')"),
@@ -1394,7 +1397,7 @@ fn parse_dict(
                         }
                         tokens.previous();
                         defs.push(ast::DictDef::Def((
-                            symbol.clone(),
+                            symbol,
                             ast::ValueBody::Symbol(symbol)
                                 .to_variable(tokens.position())
                                 .to_expression(),
@@ -1402,7 +1405,7 @@ fn parse_dict(
                     }
 
                     Some(Token::ClosingCurlyBracket) => {
-                        if symbol == "type" {
+                        if symbol.as_ref() == "type" {
                             return Err(SyntaxError::ExpectedErr {
                                 expected: "':'".to_string(),
                                 found: String::from("}"),
@@ -1527,7 +1530,7 @@ fn parse_args(
                     None => unreachable!(),
                 };
                 let start = tokens.position().0;
-                let symbol = Some(tokens.slice());
+                let symbol = Some(Intern::new(tokens.slice()));
                 tokens.next(false);
                 let value = parse_expr(tokens, notes, true, true)?;
                 let end = tokens.position().1;
@@ -1612,7 +1615,7 @@ fn parse_arg_def(
                     });
                 }
                 let start = tokens.position().0;
-                let symbol = tokens.slice();
+                let symbol = Intern::new(tokens.slice());
                 tokens.next(false);
                 let value = Some(parse_expr(tokens, notes, true, true)?);
                 let end = tokens.position().1;
@@ -1630,7 +1633,7 @@ fn parse_arg_def(
                     });
                 }
                 let start = tokens.position().0;
-                let symbol = tokens.slice();
+                let symbol = Intern::new(tokens.slice());
                 tokens.next(false);
                 let type_value = Some(parse_expr(tokens, notes, false, true)?);
                 //tokens.previous();
@@ -1667,7 +1670,13 @@ fn parse_arg_def(
                     });
                 }
 
-                (tokens.slice(), None, properties, None, tokens.position())
+                (
+                    Intern::new(tokens.slice()),
+                    None,
+                    properties,
+                    None,
+                    tokens.position(),
+                )
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
@@ -1902,12 +1911,12 @@ fn parse_variable(
         Some(Token::Null) => ast::ValueBody::Null,
         Some(Token::SelfVal) => ast::ValueBody::SelfVal,
         Some(Token::Symbol) => {
-            let symbol = tokens.slice();
+            let symbol = Intern::new(tokens.slice());
 
             match tokens.next(false) {
                 Some(Token::ThickArrow) => {
                     // Woo macro shorthand
-                    let arg = if symbol != "_" {
+                    let arg = if symbol.as_ref() != "_" {
                         is_valid_symbol(&symbol, tokens, notes)?;
                         vec![(symbol, None, properties.clone(), None, tokens.position())]
                     } else {
@@ -2129,14 +2138,14 @@ fn parse_variable(
             Some(Token::OpenBracket) => path.push(ast::Path::Call(parse_args(tokens, notes)?)),
             Some(Token::Period) => match tokens.next(false) {
                 Some(Token::Symbol) | Some(Token::Type) => {
-                    path.push(ast::Path::Member(tokens.slice()))
+                    path.push(ast::Path::Member(Intern::new(tokens.slice())))
                 }
                 a => expected!("member name".to_string(), tokens, notes, a),
             },
 
             Some(Token::DoubleColon) => match tokens.next(false) {
                 Some(Token::Symbol) | Some(Token::Type) => {
-                    path.push(ast::Path::Associated(tokens.slice()))
+                    path.push(ast::Path::Associated(Intern::new(tokens.slice())))
                 }
                 Some(Token::OpenCurlyBracket) => {
                     path.push(ast::Path::Constructor(parse_dict(tokens, notes)?))

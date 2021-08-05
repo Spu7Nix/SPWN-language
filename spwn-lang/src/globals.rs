@@ -12,11 +12,12 @@ use crate::value::*;
 use crate::compiler_info::CompilerInfo;
 use crate::value_storage::*;
 use std::collections::HashMap;
-use std::collections::HashSet;
+
 use std::path::PathBuf;
 
 use crate::compiler::RuntimeError;
 
+#[allow(non_snake_case)]
 pub struct Globals {
     //counters for arbitrary groups
     pub closed_groups: u16,
@@ -45,6 +46,14 @@ pub struct Globals {
 
     pub sync_groups: Vec<SyncGroup>,
     pub includes: Vec<PathBuf>,
+
+    pub TYPE_MEMBER_NAME: Intern<String>,
+    pub SELF_MEMBER_NAME: Intern<String>,
+    pub OR_BUILTIN: Intern<String>,
+    pub AND_BUILTIN: Intern<String>,
+    pub ASSIGN_BULTIN: Intern<String>,
+    pub OBJ_KEY_ID: Intern<String>,
+    pub OBJ_KEY_PATTERN: Intern<String>,
 }
 
 impl Globals {
@@ -74,29 +83,12 @@ impl Globals {
         self.is_mutable(p)
     }
 
-    pub fn increment_implementations(&mut self) {
-        let mut incremented = HashSet::new();
-        for imp in self.implementations.values() {
-            for (val, _) in imp.values() {
-                self.stored_values
-                    .increment_single_lifetime(*val, 1, &mut incremented);
-            }
-        }
-    }
-
     // pub fn get_fn_context(&self, p: StoredValue) -> Group {
     //     match self.stored_values.map.get(&p) {
     //         Some(val) => val.fn_context,
     //         None => unreachable!(),
     //     }
     // }
-
-    pub fn get_lifetime(&self, p: StoredValue) -> u16 {
-        match self.stored_values.map.get(&p) {
-            Some(val) => val.lifetime,
-            None => unreachable!(),
-        }
-    }
 
     pub fn get_area(&self, p: StoredValue) -> CodeArea {
         match self.stored_values.map.get(&p) {
@@ -109,7 +101,7 @@ impl Globals {
         let val = &self.stored_values[p];
         let typ = match val {
             Value::Dict(d) => {
-                if let Some(s) = d.get(TYPE_MEMBER_NAME) {
+                if let Some(s) = d.get(&self.TYPE_MEMBER_NAME) {
                     match self.stored_values[*s] {
                         Value::TypeIndicator(t) => t,
                         _ => unreachable!(),
@@ -155,6 +147,13 @@ impl Globals {
                 groups_used: Vec::new(),
             }],
             includes: Vec::new(),
+            TYPE_MEMBER_NAME: Intern::new(String::from("type")),
+            SELF_MEMBER_NAME: Intern::new(String::from("self")),
+            OR_BUILTIN: Intern::new(String::from("_or_")),
+            AND_BUILTIN: Intern::new(String::from("_and_")),
+            ASSIGN_BULTIN: Intern::new(String::from("_assign_")),
+            OBJ_KEY_ID: Intern::new(String::from("id")),
+            OBJ_KEY_PATTERN: Intern::new(String::from("pattern")),
         };
 
         let mut add_type = |name: &str, id: u16| {

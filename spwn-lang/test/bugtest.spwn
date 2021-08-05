@@ -1,11 +1,6 @@
 #[no_std]
 
-@array::depth = (arr: @array) {
-    $.print("Hi")
-    if arr[0].type == @number {
-        return 1
-    } else {
-        return 1 + @array::depth(arr[0])
-    }
+return {
+    message: "hello"
 }
 

@@ -617,7 +617,6 @@ dependencies = [
  "named_pipe",
  "quick-xml",
  "regex",
- "smallvec",
  "termcolor",
  "text_io",
 ]

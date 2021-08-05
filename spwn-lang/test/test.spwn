@@ -1,9 +1,12 @@
 
-s = 'a' * 20
-$.print(s, s.length)
 
-let s = 'ab'
-s *= 3
-$.print(s, s.length)
+let a = 10
 
-s *= 'aa'
+for i in ..100 {
+    if a > 100 {
+        continue
+    }
+    a += 10
+}
+
+$.print(a)

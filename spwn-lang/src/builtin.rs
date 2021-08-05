@@ -1,4 +1,6 @@
 //! Defining all native types (and functions?)
+use internment::Intern;
+
 use crate::ast::ObjectMode;
 use crate::compiler::{create_error, RuntimeError, NULL_STORAGE};
 use crate::compiler_types::*;
@@ -139,104 +141,91 @@ pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GdObj {
         func_id: context.func_id,
         mode: ObjectMode::Trigger,
         unique_id: *uid_counter,
-        sync_group: context.sync_group,
-        sync_part: context.sync_part,
     }
 }
 
-pub const TYPE_MEMBER_NAME: &str = "type";
+#[test]
+fn test_intern() {
+    let str2 = Intern::new(String::from("hello"));
+
+    dbg!(str2.as_ref() == "hello");
+}
+
 impl Value {
     pub fn member(
         &self,
-        member: String,
+        member: Intern<String>,
         context: &Context,
         globals: &mut Globals,
         info: CompilerInfo,
     ) -> Option<StoredValue> {
-        let get_impl = |t: u16, m: String| match globals.implementations.get(&t) {
+        let get_impl = |t: u16, m: Intern<String>| match globals.implementations.get(&t) {
             Some(imp) => imp.get(&m).map(|mem| mem.0),
             None => None,
         };
-        if member == TYPE_MEMBER_NAME {
-            Some(match self {
-                Value::Dict(dict) => match dict.get(TYPE_MEMBER_NAME) {
+        if member == globals.TYPE_MEMBER_NAME {
+            return Some(match self {
+                Value::Dict(dict) => match dict.get(&globals.TYPE_MEMBER_NAME) {
                     Some(value) => *value,
-                    None => store_value(
+                    None => store_const_value(
                         Value::TypeIndicator(self.to_num(globals)),
-                        1,
                         globals,
-                        context,
+                        context.start_group,
                         info.position,
                     ),
                 },
 
-                _ => store_value(
+                _ => store_const_value(
                     Value::TypeIndicator(self.to_num(globals)),
-                    1,
                     globals,
-                    context,
+                    context.start_group,
                     info.position,
                 ),
-            })
+            });
         } else {
             match self {
-                // Value::Func(f) => {
-                //     if member == "group" {
-                //         return Some(store_value(
-                //             Value::Group(f.start_group),
-                //             1,
-                //             globals,
-                //             context,
-                //         ));
-                //     }
-                // }
                 Value::Str(a) => {
-                    if member == "length" {
-                        return Some(store_value(
+                    if member.as_ref() == "length" {
+                        return Some(store_const_value(
                             Value::Number(a.len() as f64),
-                            1,
                             globals,
-                            context,
+                            context.start_group,
                             info.position,
                         ));
                     }
                 }
                 Value::Array(a) => {
-                    if member == "length" {
+                    if member.as_ref() == "length" {
                         return Some(store_const_value(
                             Value::Number(a.len() as f64),
-                            1,
                             globals,
-                            context,
+                            context.start_group,
                             info.position,
                         ));
                     }
                 }
-                Value::Range(start, end, step) => match member.as_ref() {
+                Value::Range(start, end, step) => match member.as_ref().as_str() {
                     "start" => {
                         return Some(store_const_value(
                             Value::Number(*start as f64),
-                            1,
                             globals,
-                            context,
+                            context.start_group,
                             info.position,
                         ))
                     }
                     "end" => {
                         return Some(store_const_value(
                             Value::Number(*end as f64),
-                            1,
                             globals,
-                            context,
+                            context.start_group,
                             info.position,
                         ))
                     }
                     "step_size" => {
                         return Some(store_const_value(
                             Value::Number(*step as f64),
-                            1,
                             globals,
-                            context,
+                            context.start_group,
                             info.position,
                         ))
                     }
@@ -245,37 +234,33 @@ impl Value {
                 _ => (),
             };
 
-            let my_type = self.to_num(globals);
-
             match self {
                 Value::Builtins => match Builtin::from_str(member.as_str()) {
                     Err(_) => None,
-                    Ok(builtin) => Some(store_value(
+                    Ok(builtin) => Some(store_const_value(
                         Value::BuiltinFunction(builtin),
-                        1,
                         globals,
-                        context,
+                        context.start_group,
                         info.position,
                     )),
                 },
                 Value::Dict(dict) => match dict.get(&member) {
                     Some(value) => Some(*value),
-                    None => get_impl(my_type, member),
+                    None => get_impl(self.to_num(globals), member),
                 },
                 Value::TriggerFunc(f) => {
-                    if &member == "start_group" {
-                        Some(store_value(
+                    if member.as_ref() == "start_group" {
+                        Some(store_const_value(
                             Value::Group(f.start_group),
-                            1,
                             globals,
-                            context,
+                            context.start_group,
                             info.position,
                         ))
                     } else {
-                        get_impl(my_type, member)
+                        get_impl(self.to_num(globals), member)
                     }
                 }
-                _ => get_impl(my_type, member),
+                _ => get_impl(self.to_num(globals), member),
             }
         }
     }
@@ -289,7 +274,7 @@ macro_rules! typed_argument_check {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
-        let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], $globals.get_lifetime($arguments[$arg_index]), $globals, $context.start_group, true);
+        let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], $globals, $context.start_group, true);
     };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) mut ($($arg_name:ident),*)) => {
@@ -304,7 +289,7 @@ macro_rules! typed_argument_check {
         #[allow(unused_mut)]
         #[allow(unused_parens)]
 
-        let  ( $($arg_name),*) = match clone_and_get_value($arguments[$arg_index], $globals.get_lifetime($arguments[$arg_index]), $globals, $context.start_group, true) {
+        let  ( $($arg_name),*) = match clone_and_get_value($arguments[$arg_index], $globals, $context.start_group, true) {
             Value::$arg_type($($arg_name),*) => ($($arg_name),*),
 
             a => {
@@ -416,68 +401,71 @@ macro_rules! builtins {
             $arguments: Vec<StoredValue>,
             $info: CompilerInfo,
             $globals: &mut Globals,
-            $context: &Context,
-        ) -> Result<Value, RuntimeError> {
+            contexts: &mut FullContext,
+        ) -> Result<(), RuntimeError> {
+            for full_context in contexts.iter() {
+                let $context = full_context.inner();
+                match func {
+                    $(
+                        Builtin::$variant => {
 
-            match func {
-                $(
-                    Builtin::$variant => {
-
-                        $(
-                            #[allow(unused_assignments)]
-                            let mut arg_index = 0;
                             $(
-                                if arg_index >= $arguments.len() {
+                                #[allow(unused_assignments)]
+                                let mut arg_index = 0;
+                                $(
+                                    if arg_index >= $arguments.len() {
+                                        return Err(RuntimeError::BuiltinError {
+                                            message: String::from(
+                                                "Too few arguments provided",
+                                            ),
+                                            $info,
+                                        })
+                                    }
+
+                                    builtin_arg_mut_check!(
+                                        ($globals, arg_index, $arguments, $info, $context) $($mut)?
+                                        ($($arg_name),*)$(: $arg_type)?
+                                    );
+                                    typed_argument_check!(
+                                        ($globals, arg_index, $arguments, $info, $context) $($mut)?
+                                        ($($arg_name),*)$(: $arg_type)?
+                                    );
+
+                                    arg_index += 1;
+                                )+
+                                if arg_index < $arguments.len() - 1 {
                                     return Err(RuntimeError::BuiltinError {
                                         message: String::from(
-                                            "Too few arguments provided",
+                                            "Too many arguments provided",
                                         ),
                                         $info,
                                     })
                                 }
+                            )?
 
-                                builtin_arg_mut_check!(
-                                    ($globals, arg_index, $arguments, $info, $context) $($mut)?
-                                    ($($arg_name),*)$(: $arg_type)?
-                                );
-                                typed_argument_check!(
-                                    ($globals, arg_index, $arguments, $info, $context) $($mut)?
-                                    ($($arg_name),*)$(: $arg_type)?
-                                );
+                            let out = $body;
 
-                                arg_index += 1;
-                            )+
-                            if arg_index < $arguments.len() - 1 {
-                                return Err(RuntimeError::BuiltinError {
-                                    message: String::from(
-                                        "Too many arguments provided",
-                                    ),
-                                    $info,
-                                })
-                            }
-                        )?
-
-                        let out = $body;
-
-                        $(
-
-                            arg_index = 0;
                             $(
 
-
-                                reassign_variable!(
-                                    ($globals, arg_index, $arguments, $info) $($mut)? ($($arg_name),*)$(: $arg_type)?
-                                );
+                                arg_index = 0;
+                                $(
 
 
-                                arg_index += 1;
-                            )+
-                        )?
-                        Ok(out)
+                                    reassign_variable!(
+                                        ($globals, arg_index, $arguments, $info) $($mut)? ($($arg_name),*)$(: $arg_type)?
+                                    );
 
-                    }
-                )+
+
+                                    arg_index += 1;
+                                )+
+                            )?
+                            (*$context).return_value = store_const_value(out, $globals, $context.start_group, $info.position);
+
+                        }
+                    )+
+                }
             }
+            Ok(())
         }
 
         impl std::str::FromStr for Builtin {
@@ -522,8 +510,8 @@ builtins! {
     [Print]
     fn print() {
         let mut out = String::new();
-        for val in arguments {
-            out += &globals.stored_values[val].to_str(globals);
+        for val in arguments.iter() {
+            out += &globals.stored_values[*val].to_str(globals);
         }
         println!("{}", out);
         Value::Null
@@ -616,7 +604,7 @@ builtins! {
     [NaturalLog] fn ln((n): Number) {Value::Number(n.ln())}
     [Log] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
     [Min] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
-    [Max] fn min((a): Number, (b): Number) {Value::Number(a.max(b))}
+    [Max] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
     [Round] fn round((n): Number) {Value::Number(n.round())}
     [Hypot] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
 
@@ -645,8 +633,7 @@ builtins! {
                     func_id: context.func_id,
                     mode: ObjectMode::Object,
                     unique_id: globals.uid_counter,
-                    sync_group: context.sync_group,
-                    sync_part: context.sync_part,
+
                 };
                 (*globals).objects.push(obj)
             }
@@ -673,7 +660,6 @@ builtins! {
 
         let cloned = clone_value(
             arguments[1],
-            globals.get_lifetime(arguments[0]),
             globals,
             context.start_group,
             !globals.is_mutable(arguments[1]),
@@ -692,7 +678,7 @@ builtins! {
 
         for split in s.split(&*substr) {
             let entry =
-                store_const_value(Value::Str(split.to_string()), 1, globals, context, CodeArea::new());
+                store_const_value(Value::Str(split.to_string()), globals, context.start_group, CodeArea::new());
             output.push(entry);
         }
 
@@ -708,7 +694,7 @@ builtins! {
 
                 Value::Dict(d) => {
                     // this is specifically for object_key dicts
-                    let gotten_type = d.get(TYPE_MEMBER_NAME);
+                    let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
                     if gotten_type == None
                         || globals.stored_values[*gotten_type.unwrap()]
                             != Value::TypeIndicator(19)
@@ -722,7 +708,7 @@ builtins! {
                         })
                     }
 
-                    let id = d.get("id");
+                    let id = d.get(&globals.OBJ_KEY_ID);
                     if id == None {
                         return Err(RuntimeError::CustomError(create_error(
                             info,
@@ -731,7 +717,7 @@ builtins! {
                             None,
                         )));
                     }
-                    let pattern = d.get("pattern");
+                    let pattern = d.get(&globals.OBJ_KEY_PATTERN);
                     if pattern == None {
                         return Err(RuntimeError::CustomError(create_error(
                             info,
@@ -829,7 +815,7 @@ builtins! {
                     })
                 }
                 obj @ Value::Dict(_) => {
-                    let typ = obj.member(TYPE_MEMBER_NAME.to_string(), context, globals, info).unwrap();
+                    let typ = obj.member(globals.TYPE_MEMBER_NAME, context, globals, info.clone()).unwrap();
                     if globals.stored_values[typ] == Value::TypeIndicator(20) {
                         ObjParam::Epsilon
                     } else {
@@ -880,7 +866,7 @@ builtins! {
         new_context.fn_context_change_stack = vec![info.position];
         //new_info.last_context_change_stack = vec![info.position];
 
-        execute_macro((*mac, Vec::new()), &new_context, globals, NULL_STORAGE, new_info)?;
+        execute_macro((*mac, Vec::new()), &mut FullContext::Single(new_context), globals, NULL_STORAGE, new_info)?;
 
         Value::Null
     }
@@ -953,7 +939,7 @@ builtins! {
                         Value::Array(
                             rval.iter()
                                 .map(|b| {
-                                    store_value(Value::Number(*b as f64), 1, globals, context, CodeArea::new())
+                                    store_const_value(Value::Number(*b as f64), globals, context.start_group, CodeArea::new())
                                 })
                                 .collect(),
                         )
@@ -1186,7 +1172,7 @@ builtins! {
             (Value::Array(a), Value::Array(b)) => Value::Array({
                 let mut new_arr = Vec::new();
                 for el in a.iter().chain(b.iter()) {
-                    new_arr.push(clone_value(*el, 1, globals, context.start_group, !globals.is_mutable(*el), info.position));
+                    new_arr.push(clone_value(*el, globals, context.start_group, !globals.is_mutable(*el), info.position));
                 }
                 new_arr
 
@@ -1243,7 +1229,7 @@ builtins! {
             (Value::Dict(d), Value::Str(b)) => {
                 let mut out = false;
                 for k in d.keys() {
-                    if k == &b {
+                    if k.as_ref() == &b {
                         out = true;
                         break;
                     }
@@ -1259,7 +1245,7 @@ builtins! {
             }
 
             (Value::Obj(o, _m), Value::Dict(d)) => {
-                let gotten_type = d.get(TYPE_MEMBER_NAME);
+                let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
 
                 if gotten_type == None
                     || globals.stored_values[*gotten_type.unwrap()]
@@ -1274,7 +1260,7 @@ builtins! {
                     });
                 }
 
-                let id = d.get("id");
+                let id = d.get(&globals.OBJ_KEY_ID);
                 if id == None {
                     return Err(RuntimeError::BuiltinError {
                         // object_key has an ID member for the key basically
@@ -1346,7 +1332,7 @@ builtins! {
             (Value::Str(a), Value::Str(b)) => *a += &b,
             (Value::Array(a), Value::Array(b)) => {
                 for el in b.iter() {
-                    a.push(clone_value(*el, globals.get_lifetime(arguments[0]), globals, context.start_group, !globals.is_mutable(*el), info.position));
+                    a.push(clone_value(*el, globals, context.start_group, !globals.is_mutable(*el), info.position));
                 }
             },
             _ => return Err(RuntimeError::CustomError(create_error(
