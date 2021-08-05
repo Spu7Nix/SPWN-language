@@ -23,13 +23,11 @@ pub struct StoredValData {
     pub mutable: bool,
     pub def_area: CodeArea,
 }
-/*
-LIFETIME:
-
-value gets deleted when lifetime reaches 0
-deeper scope => lifetime++
-shallower scope => lifetime--
-*/
+// LIFETIME:
+//
+// value gets deleted when lifetime reaches 0
+// deeper scope => lifetime++
+// shallower scope => lifetime--
 
 impl std::ops::Index<usize> for ValStorage {
     type Output = Value;
@@ -49,7 +47,6 @@ impl std::ops::IndexMut<usize> for ValStorage {
     }
 }
 
-use std::collections::HashSet;
 impl ValStorage {
     pub fn new() -> Self {
         ValStorage {
@@ -113,7 +110,7 @@ impl ValStorage {
 // ) -> StoredValue {
 //     let index = globals.val_id;
 //     let mutable = !matches!(val, Value::Macro(_));
-//     //println!("index: {}, value: {}", index, val.to_str(&globals));
+//     ////println!("index: {}, value: {}", index, val.to_str(&globals));
 //     (*globals).stored_values.map.insert(
 //         index,
 //         StoredValData {
@@ -178,6 +175,40 @@ pub fn clone_and_get_value(
 
     old_val
 }
+pub fn get_all_ptrs_used(index: usize, globals: &mut Globals) -> Vec<usize> {
+    let mut out = vec![index];
+    match globals.stored_values[index].clone() {
+        Value::Array(arr) => {
+            for v in arr {
+                out.extend(get_all_ptrs_used(v, globals))
+            }
+        }
+
+        Value::Dict(arr) => {
+            for v in arr.values() {
+                out.extend(get_all_ptrs_used(*v, globals))
+            }
+        }
+
+        Value::Macro(m) => {
+            for arg in &m.args {
+                if let Some(def_val) = &arg.1 {
+                    out.extend(get_all_ptrs_used(*def_val, globals));
+                }
+
+                if let Some(def_val) = &arg.3 {
+                    out.extend(get_all_ptrs_used(*def_val, globals));
+                }
+            }
+
+            for (_, (v, _)) in m.def_context.variables.iter() {
+                out.extend(get_all_ptrs_used(*v, globals));
+            }
+        }
+        _ => (),
+    };
+    out
+}
 
 pub fn clone_value(
     index: usize,
@@ -221,7 +252,7 @@ pub fn clone_value_preserve_area(
     //bing bang
     //profit
     let new_index = globals.val_id;
-    //println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
+    ////println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
 
     (*globals).stored_values.map.insert(
         new_index,
@@ -253,7 +284,7 @@ pub fn clone_value_preserve_area(
 //     //bing bang
 //     //profit
 //     let new_index = to;
-//     //println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
+//     ////println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
 
 //     (*globals).stored_values.map.insert(
 //         new_index,
@@ -274,7 +305,7 @@ pub fn store_const_value(
     area: CodeArea,
 ) -> StoredValue {
     let index = globals.val_id;
-    // println!(
+    //println!(
     //     "2index: {}, value: {}, area: {:?}",
     //     index,
     //     val.to_str(&globals),

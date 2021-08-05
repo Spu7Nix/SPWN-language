@@ -453,7 +453,7 @@ pub fn compile_spwn(
             None,
         )));
     }
-    let mut start_context = FullContext::Single(Context::new());
+    let mut start_context = FullContext::new();
     //store at pos 0
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
@@ -1232,8 +1232,23 @@ pub fn compile_scope(
     // globals.increment_implementations();
     // //collect garbage
     // globals.stored_values.clean_up();
-
-    contexts.exit_scope();
+    let removed = contexts.exit_scope(globals);
+    //dbg!(removed.len());
+    // if !removed.is_empty() {
+    //     unsafe {
+    //         globals.clean_up(
+    //             contexts
+    //                 .with_breaks()
+    //                 .next()
+    //                 .unwrap()
+    //                 .inner()
+    //                 .full_context_ptr
+    //                 .as_mut()
+    //                 .unwrap(),
+    //             removed,
+    //         );
+    //     }
+    // }
 
     //(*globals).highest_x = context.x;
     Ok(())
@@ -1313,6 +1328,7 @@ pub fn import_module(
     info: CompilerInfo,
     forced: bool,
 ) -> Result<(), RuntimeError> {
+    println!("importing: {:?}", path);
     if !forced {
         if let Some(ret) = globals.prev_imports.get(path).cloned() {
             merge_impl(&mut globals.implementations, &ret.1);
@@ -1361,7 +1377,7 @@ pub fn import_module(
         Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
     };
 
-    let mut start_context = FullContext::Single(Context::new());
+    let mut start_context = FullContext::new();
 
     let mut stored_impl = None;
     if let ImportType::Lib(_) = path {

@@ -2,7 +2,11 @@ use internment::Intern;
 
 ///types and functions used by the compiler
 use crate::builtin::*;
+use crate::compiler::BUILTIN_STORAGE;
+use crate::compiler::NULL_STORAGE;
 use crate::compiler_info::CodeArea;
+use crate::context::BreakType;
+use crate::context::FullContext;
 use crate::levelstring::GdObj;
 
 use crate::compiler_types::*;
@@ -13,6 +17,7 @@ use crate::compiler_info::CompilerInfo;
 use crate::value_storage::*;
 use std::collections::HashMap;
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::compiler::RuntimeError;
@@ -75,7 +80,7 @@ impl Globals {
     pub fn is_mutable(&self, p: StoredValue) -> bool {
         match self.stored_values.map.get(&p) {
             Some(val) => val.mutable,
-            None => unreachable!(),
+            None => unreachable!("{}", p),
         }
     }
 
@@ -187,5 +192,45 @@ impl Globals {
         globals.type_id_count = globals.type_ids.len() as u16;
 
         globals
+    }
+
+    pub fn clean_up(&mut self, full_context: &mut FullContext, mut removed: HashSet<usize>) {
+        let mut used_values = HashSet::new();
+
+        // for l in self.implementations.values() {
+        //     for (v, _) in l.values() {
+        //         used_values.insert(*v);
+        //     }
+        // }
+        for c in full_context.with_breaks() {
+            used_values.extend(c.inner().variables.iter().map(|(_, (a, _))| *a));
+            // used_values.insert(c.inner().return_value);
+            // used_values.insert(c.inner().return_value2);
+            match c.inner().broken {
+                Some((BreakType::Macro(Some(v), _), _)) => {
+                    used_values.insert(v);
+                }
+                Some((BreakType::Switch(v), _)) => {
+                    used_values.insert(v);
+                }
+                _ => (),
+            };
+        }
+        let mut all_used_values = HashSet::new();
+        for v in used_values {
+            all_used_values.extend(get_all_ptrs_used(v, self));
+        }
+
+        // for v in all_used_values.iter() {
+        //     dbg!(v, self.stored_values[*v].clone());
+        // }
+        all_used_values.insert(BUILTIN_STORAGE);
+        all_used_values.insert(NULL_STORAGE);
+
+        removed.retain(|a| !all_used_values.contains(a));
+
+        self.stored_values
+            .map
+            .retain(|a, _| -> bool { !removed.contains(a) });
     }
 }

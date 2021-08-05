@@ -23,7 +23,7 @@ fn create_doc_file(mut dir: PathBuf, name: String, content: &str) {
 pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     let mut globals = Globals::new(PathBuf::new());
 
-    let mut start_context = FullContext::Single(Context::new());
+    let mut start_context = FullContext::new();
 
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
@@ -259,10 +259,11 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
 
 fn document_val(val: &Value, globals: &mut Globals) -> String {
     let mut doc = String::new();
+    let mut full_context = FullContext::new();
     let typ_index = val
         .member(
             globals.TYPE_MEMBER_NAME,
-            &Context::new(),
+            full_context.inner(),
             globals,
             CompilerInfo::new(),
         )

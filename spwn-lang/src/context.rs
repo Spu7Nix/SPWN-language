@@ -4,7 +4,7 @@ use crate::compiler_types::*;
 use crate::globals::Globals;
 use crate::levelstring::*;
 use crate::value::Value;
-use crate::value_storage::{clone_value, store_val_m, StoredValue};
+use crate::value_storage::{clone_value, get_all_ptrs_used, store_val_m, StoredValue};
 
 //use std::boxed::Box;
 use std::collections::{HashMap, HashSet};
@@ -27,6 +27,8 @@ pub struct Context {
     // gets incremented every time it enters a new scope, and decremented every time it exits
     pub return_value: StoredValue,
     pub return_value2: StoredValue,
+
+    pub full_context_ptr: *mut FullContext,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -48,6 +50,11 @@ pub enum FullContext {
 }
 
 impl FullContext {
+    pub fn new() -> Self {
+        let mut new = FullContext::Single(Context::new());
+        new.inner().full_context_ptr = &mut new;
+        new
+    }
     pub fn inner(&mut self) -> &mut Context {
         match self {
             Self::Single(c) => c,
@@ -70,19 +77,32 @@ impl FullContext {
     }
 
     pub fn enter_scope(&mut self) {
-        self.change_layers(1);
-    }
-    pub fn exit_scope(&mut self) {
-        self.change_layers(-1);
-    }
-
-    fn change_layers(&mut self, amount: i16) {
         for context in self.with_breaks() {
             for (_, layers) in context.inner().variables.values_mut() {
-                *layers += amount;
+                *layers += 1;
             }
+        }
+    }
+    pub fn exit_scope(&mut self, globals: &mut Globals) -> HashSet<usize> {
+        let mut removed = HashSet::new();
+        for context in self.with_breaks() {
+            for (_, layers) in context.inner().variables.values_mut() {
+                *layers -= 1;
+            }
+            removed.extend(context.inner().variables.values().filter_map(|(v, l)| {
+                if *l < 0 {
+                    Some(v)
+                } else {
+                    None
+                }
+            }));
             context.inner().variables.retain(|_, (_, l)| *l >= 0)
         }
+        let mut all_removed = HashSet::new();
+        for v in removed {
+            all_removed.extend(get_all_ptrs_used(v, globals));
+        }
+        all_removed
     }
 
     pub fn reset_return_vals(&mut self) {
@@ -265,7 +285,7 @@ impl<'a> Iterator for ContextIterWithBreaks<'a> {
 }
 
 impl Context {
-    pub fn new() -> Context {
+    fn new() -> Context {
         Context {
             start_group: Group::new(0),
             //spawn_triggered: false,
@@ -279,6 +299,8 @@ impl Context {
             fn_context_change_stack: Vec::new(),
             return_value: NULL_STORAGE,
             return_value2: NULL_STORAGE,
+
+            full_context_ptr: std::ptr::null_mut(),
         }
     }
 
