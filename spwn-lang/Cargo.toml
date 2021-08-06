@@ -4,6 +4,9 @@ version = "0.0.5"
 authors = ["Spu7Nix <spu7nix@outlook.com>"]
 edition = "2018"
 
+[profile.release]
+debug = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

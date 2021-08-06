@@ -9,6 +9,7 @@ use crate::compiler_types::ImportType;
 use crate::context::{Context, FullContext};
 use crate::globals::Globals;
 use crate::value::*;
+use crate::value_storage::StoredValue;
 use std::fs::File;
 
 use std::path::PathBuf;
@@ -105,7 +106,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                     key,
                     val.iter()
                         .map(|(key, val)| (key.clone(), val.0))
-                        .collect::<HashMap<Intern<String>, usize>>(),
+                        .collect::<HashMap<Intern<String>, StoredValue>>(),
                 )
             })
             .collect();
@@ -133,22 +134,22 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     Ok(())
 }
 
-fn document_dict(dict: &HashMap<Intern<String>, usize>, globals: &mut Globals) -> String {
+fn document_dict(dict: &HashMap<Intern<String>, StoredValue>, globals: &mut Globals) -> String {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
 
-    let mut macro_list: Vec<(&Intern<String>, &usize)> = dict
+    let mut macro_list: Vec<(&Intern<String>, &StoredValue)> = dict
         .iter()
         .filter(|x| matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
     macro_list.sort_by(|a, b| a.0.cmp(b.0));
 
-    let mut val_list: Vec<(&Intern<String>, &usize)> = dict
+    let mut val_list: Vec<(&Intern<String>, &StoredValue)> = dict
         .iter()
         .filter(|x| !matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
     val_list.sort_by(|a, b| a.0.cmp(b.0));
 
-    let mut document_member = |key: &String, val: &usize| -> String {
+    let mut document_member = |key: &String, val: &StoredValue| -> String {
         let mut member_doc = String::new();
         let inner_val = globals.stored_values[*val].clone();
         let val_str = document_val(&inner_val, globals);

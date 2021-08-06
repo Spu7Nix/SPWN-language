@@ -129,7 +129,7 @@ b.add_to(a)
         self,
         #[desc("Counter(s) to subtract from")] items: [@counter | @item] | @counter | @item,
         #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
-        #[desc("Multiplyer for the value subtracted")] factor: @number = 1,
+        #[desc("Multiplier for the value subtracted")] factor: @number = 1,
         #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
     ) {
 

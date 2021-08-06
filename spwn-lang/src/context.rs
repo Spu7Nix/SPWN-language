@@ -1,10 +1,10 @@
 use crate::builtin::*;
-use crate::compiler_info::{CodeArea, CompilerInfo};
+use crate::compiler_info::CodeArea;
 use crate::compiler_types::*;
 use crate::globals::Globals;
 use crate::levelstring::*;
-use crate::value::Value;
-use crate::value_storage::{clone_value, get_all_ptrs_used, store_val_m, StoredValue};
+use crate::value::{value_equality, Value};
+use crate::value_storage::{clone_value, store_val_m, StoredValue};
 
 //use std::boxed::Box;
 use std::collections::{HashMap, HashSet};
@@ -27,8 +27,7 @@ pub struct Context {
     // gets incremented every time it enters a new scope, and decremented every time it exits
     pub return_value: StoredValue,
     pub return_value2: StoredValue,
-
-    pub full_context_ptr: *mut FullContext,
+    pub root_context_ptr: *mut FullContext,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -41,6 +40,7 @@ pub enum BreakType {
     ContinueLoop,
     // used for switch cases
     Switch(StoredValue),
+    // used for contexts
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +52,7 @@ pub enum FullContext {
 impl FullContext {
     pub fn new() -> Self {
         let mut new = FullContext::Single(Context::new());
-        new.inner().full_context_ptr = &mut new;
+        new.inner().root_context_ptr = &mut new;
         new
     }
     pub fn inner(&mut self) -> &mut Context {
@@ -62,7 +62,7 @@ impl FullContext {
         }
     }
 
-    pub fn inner_value(&mut self) -> (&mut Context, usize) {
+    pub fn inner_value(&mut self) -> (&mut Context, StoredValue) {
         let context = self.inner();
         let val = context.return_value;
         (context, val)
@@ -83,26 +83,32 @@ impl FullContext {
             }
         }
     }
-    pub fn exit_scope(&mut self, globals: &mut Globals) -> HashSet<usize> {
-        let mut removed = HashSet::new();
+    pub fn exit_scope(&mut self) {
         for context in self.with_breaks() {
             for (_, layers) in context.inner().variables.values_mut() {
                 *layers -= 1;
             }
-            removed.extend(context.inner().variables.values().filter_map(|(v, l)| {
-                if *l < 0 {
-                    Some(v)
-                } else {
-                    None
-                }
-            }));
             context.inner().variables.retain(|_, (_, l)| *l >= 0)
         }
-        let mut all_removed = HashSet::new();
-        for v in removed {
-            all_removed.extend(get_all_ptrs_used(v, globals));
-        }
-        all_removed
+        // let mut removed = HashSet::new();
+        // for context in self.with_breaks() {
+        //     for (_, layers) in context.inner().variables.values_mut() {
+        //         *layers -= 1;
+        //     }
+        //     removed.extend(context.inner().variables.values().filter_map(|(v, l)| {
+        //         if *l < 0 {
+        //             Some(v)
+        //         } else {
+        //             None
+        //         }
+        //     }));
+        //     context.inner().variables.retain(|_, (_, l)| *l >= 0)
+        // }
+        // let mut all_removed = HashSet::new();
+        // for v in removed {
+        //     all_removed.extend(get_all_ptrs_used(v, globals));
+        // }
+        // all_removed
     }
 
     pub fn reset_return_vals(&mut self) {
@@ -299,8 +305,7 @@ impl Context {
             fn_context_change_stack: Vec::new(),
             return_value: NULL_STORAGE,
             return_value2: NULL_STORAGE,
-
-            full_context_ptr: std::ptr::null_mut(),
+            root_context_ptr: std::ptr::null_mut(),
         }
     }
 
@@ -316,13 +321,9 @@ impl Context {
 }
 
 //will merge one set of context, returning false if no mergable contexts were found
-pub fn merge_contexts(full_context: &mut FullContext, globals: &mut Globals) -> bool {
+pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> bool {
     let mut mergable_ind = Vec::<usize>::new();
     let mut ref_c = 0;
-    let mut contexts = full_context
-        .with_breaks()
-        .map(|a| a.inner().clone())
-        .collect::<Vec<_>>();
     loop {
         if ref_c >= contexts.len() {
             return false;
@@ -333,14 +334,14 @@ pub fn merge_contexts(full_context: &mut FullContext, globals: &mut Globals) -> 
             }
             let ref_c = &contexts[ref_c];
 
-            if (ref_c.broken.is_none()) != (c.broken.is_none()) {
+            if (ref_c.broken == None) != (c.broken == None) {
                 continue;
             }
             let mut not_eq = false;
 
             //check variables are equal
             for (key, (val, _)) in &c.variables {
-                if globals.stored_values[ref_c.variables[key].0] != globals.stored_values[*val] {
+                if !value_equality(ref_c.variables[key].0, *val, globals) {
                     not_eq = true;
                     break;
                 }
@@ -394,19 +395,14 @@ pub fn merge_contexts(full_context: &mut FullContext, globals: &mut Globals) -> 
         add_spawn_trigger(&contexts[*i])
     }
 
-    contexts[ref_c].start_group = new_group;
-    contexts[ref_c].next_fn_id(globals);
+    (*contexts)[ref_c].start_group = new_group;
+    (*contexts)[ref_c].next_fn_id(globals);
 
     for i in mergable_ind.iter().rev() {
-        contexts.swap_remove(*i);
-    }
-
-    let mut iter = contexts.into_iter();
-    *full_context = FullContext::Single(iter.next().unwrap());
-    for c in iter {
-        *full_context =
-            FullContext::Split(full_context.clone().into(), FullContext::Single(c).into());
+        (*contexts).swap_remove(*i);
     }
 
     true
 }
+
+//will merge one set of context, returning false if no mergable contexts were found

@@ -6,14 +6,17 @@ use crate::context::*;
 use crate::globals::Globals;
 use crate::value::*;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::compiler::{BUILTIN_STORAGE, NULL_STORAGE};
 
-pub type StoredValue = usize; //index to stored value in globals.stored_values
+pub type StoredValue = u64; //index to stored value in globals.stored_values
 
+#[derive(Debug)]
 pub struct ValStorage {
-    pub map: HashMap<usize, StoredValData>, //val, fn context, mutable, lifetime
+    pub map: HashMap<StoredValue, StoredValData>,
+    pub preserved_stack: Vec<Vec<StoredValue>>,
+    pub prev_value_count: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -22,6 +25,7 @@ pub struct StoredValData {
     pub fn_context: Group,
     pub mutable: bool,
     pub def_area: CodeArea,
+    marked: bool,
 }
 // LIFETIME:
 //
@@ -29,10 +33,10 @@ pub struct StoredValData {
 // deeper scope => lifetime++
 // shallower scope => lifetime--
 
-impl std::ops::Index<usize> for ValStorage {
+impl std::ops::Index<StoredValue> for ValStorage {
     type Output = Value;
 
-    fn index(&self, i: usize) -> &Self::Output {
+    fn index(&self, i: StoredValue) -> &Self::Output {
         &self
             .map
             .get(&i)
@@ -41,8 +45,8 @@ impl std::ops::Index<usize> for ValStorage {
     }
 }
 
-impl std::ops::IndexMut<usize> for ValStorage {
-    fn index_mut(&mut self, i: usize) -> &mut Self::Output {
+impl std::ops::IndexMut<StoredValue> for ValStorage {
+    fn index_mut(&mut self, i: StoredValue) -> &mut Self::Output {
         &mut self.map.get_mut(&i).unwrap().val
     }
 }
@@ -58,6 +62,7 @@ impl ValStorage {
                         fn_context: Group::new(0),
                         mutable: false,
                         def_area: CodeArea::new(),
+                        marked: false,
                     },
                 ),
                 (
@@ -67,16 +72,19 @@ impl ValStorage {
                         fn_context: Group::new(0),
                         mutable: false,
                         def_area: CodeArea::new(),
+                        marked: false,
                     },
                 ),
             ]
             .iter()
             .cloned()
             .collect(),
+            preserved_stack: Vec::new(),
+            prev_value_count: 100,
         }
     }
 
-    pub fn set_mutability(&mut self, index: usize, mutable: bool) {
+    pub fn set_mutability(&mut self, index: StoredValue, mutable: bool) {
         if !mutable || !matches!(self[index], Value::Macro(_)) {
             (*self.map.get_mut(&index).unwrap()).mutable = mutable;
         }
@@ -96,6 +104,63 @@ impl ValStorage {
             _ => (),
         };
     }
+
+    fn marked(&self, root: StoredValue) -> bool {
+        self.map
+            .get(&root)
+            .unwrap_or_else(|| panic!("Could not find {}", root))
+            .marked
+    }
+
+    pub fn mark(&mut self, root: StoredValue) {
+        if !self.marked(root) {
+            (*self.map.get_mut(&root).unwrap()).marked = true;
+            match self[root].clone() {
+                Value::Array(a) => {
+                    for e in a.iter() {
+                        self.mark(*e)
+                    }
+                }
+                Value::Dict(a) => {
+                    for (_, e) in a.iter() {
+                        self.mark(*e)
+                    }
+                }
+                Value::Macro(m) => {
+                    for (_, e, _, e2, _) in m.args {
+                        if let Some(val) = e {
+                            self.mark(val)
+                        }
+                        if let Some(val) = e2 {
+                            self.mark(val)
+                        }
+                    }
+
+                    for (_, v) in m.def_variables.iter() {
+                        self.mark(*v)
+                    }
+                }
+                _ => (),
+            };
+        }
+    }
+
+    pub fn sweep(&mut self) {
+        self.map.retain(|_, a| a.marked);
+        for v in self.map.values_mut() {
+            (*v).marked = false;
+        }
+    }
+
+    // pub fn clean_up(&mut self) {
+    //     self.map.retain(|_, a| {
+    //         if let Some(n) = a.lifetime {
+    //             n > 0
+    //         } else {
+    //             true
+    //         }
+    //     });
+    // }
 
     // pub fn get_lifetime(&self, index: usize) -> u16 {
     //     self.map.get(&index).unwrap().lifetime
@@ -126,7 +191,7 @@ impl ValStorage {
 // }
 
 pub fn clone_and_get_value(
-    index: usize,
+    index: StoredValue,
     globals: &mut Globals,
     fn_context: Group,
     constant: bool,
@@ -175,43 +240,43 @@ pub fn clone_and_get_value(
 
     old_val
 }
-pub fn get_all_ptrs_used(index: usize, globals: &mut Globals) -> Vec<usize> {
-    let mut out = vec![index];
-    match globals.stored_values[index].clone() {
-        Value::Array(arr) => {
-            for v in arr {
-                out.extend(get_all_ptrs_used(v, globals))
-            }
-        }
+// pub fn get_all_ptrs_used(index: usize, globals: &mut Globals) -> Vec<usize> {
+//     let mut out = vec![index];
+//     match globals.stored_values[index].clone() {
+//         Value::Array(arr) => {
+//             for v in arr {
+//                 out.extend(get_all_ptrs_used(v, globals))
+//             }
+//         }
 
-        Value::Dict(arr) => {
-            for v in arr.values() {
-                out.extend(get_all_ptrs_used(*v, globals))
-            }
-        }
+//         Value::Dict(arr) => {
+//             for v in arr.values() {
+//                 out.extend(get_all_ptrs_used(*v, globals))
+//             }
+//         }
 
-        Value::Macro(m) => {
-            for arg in &m.args {
-                if let Some(def_val) = &arg.1 {
-                    out.extend(get_all_ptrs_used(*def_val, globals));
-                }
+//         Value::Macro(m) => {
+//             for arg in &m.args {
+//                 if let Some(def_val) = &arg.1 {
+//                     out.extend(get_all_ptrs_used(*def_val, globals));
+//                 }
 
-                if let Some(def_val) = &arg.3 {
-                    out.extend(get_all_ptrs_used(*def_val, globals));
-                }
-            }
+//                 if let Some(def_val) = &arg.3 {
+//                     out.extend(get_all_ptrs_used(*def_val, globals));
+//                 }
+//             }
 
-            for (_, (v, _)) in m.def_context.variables.iter() {
-                out.extend(get_all_ptrs_used(*v, globals));
-            }
-        }
-        _ => (),
-    };
-    out
-}
+//             for (_, (v, _)) in m.def_context.variables.iter() {
+//                 out.extend(get_all_ptrs_used(*v, globals));
+//             }
+//         }
+//         _ => (),
+//     };
+//     out
+// }
 
 pub fn clone_value(
-    index: usize,
+    index: StoredValue,
     globals: &mut Globals,
     fn_context: Group,
     constant: bool,
@@ -233,6 +298,7 @@ pub fn clone_value(
             fn_context,
             mutable: !constant,
             def_area: area,
+            marked: false,
         },
     );
     (*globals).val_id += 1;
@@ -240,7 +306,7 @@ pub fn clone_value(
 }
 
 pub fn clone_value_preserve_area(
-    index: usize,
+    index: StoredValue,
     globals: &mut Globals,
     fn_context: Group,
     constant: bool,
@@ -262,6 +328,7 @@ pub fn clone_value_preserve_area(
             mutable: !constant,
 
             def_area: globals.get_area(index),
+            marked: false,
         },
     );
     (*globals).val_id += 1;
@@ -305,7 +372,7 @@ pub fn store_const_value(
     area: CodeArea,
 ) -> StoredValue {
     let index = globals.val_id;
-    //println!(
+    // println!(
     //     "2index: {}, value: {}, area: {:?}",
     //     index,
     //     val.to_str(&globals),
@@ -319,6 +386,7 @@ pub fn store_const_value(
             fn_context,
             mutable: false,
             def_area: area,
+            marked: false,
         },
     );
     (*globals).val_id += 1;
@@ -341,6 +409,7 @@ pub fn store_val_m(
             fn_context,
             mutable: !constant,
             def_area: area,
+            marked: false,
         },
     );
     (*globals).val_id += 1;

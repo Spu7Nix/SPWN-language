@@ -52,7 +52,7 @@ pub struct Macro {
         Option<StoredValue>,
         FileRange,
     )>,
-    pub def_context: Context,
+    pub def_variables: HashMap<Intern<String>, StoredValue>,
     pub def_file: Intern<PathBuf>,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Attribute,
@@ -132,7 +132,7 @@ impl Value {
             Value::Bool(_) => 5,
             Value::TriggerFunc(_) => 6,
             Value::Dict(d) => match d.get(&globals.TYPE_MEMBER_NAME) {
-                Some(member) => match globals.stored_values[*member as usize] {
+                Some(member) => match globals.stored_values[*member] {
                     Value::TypeIndicator(t) => t,
                     _ => unreachable!(),
                 },
@@ -274,7 +274,7 @@ impl Value {
                         break;
                     }
 
-                    let stored_val = (*globals).stored_values[*val as usize].to_str(globals);
+                    let stored_val = (*globals).stored_values[*val].to_str(globals);
                     out += &format!("{}: {},", key, stored_val);
                 }
                 if !d.is_empty() {
@@ -558,7 +558,7 @@ pub fn macro_to_value(
                     if full_context.inner().start_group != fn_context {
                         return Err(RuntimeError::ContextChangeError {
                             message: "A macro argument default value can't change the trigger function context".to_string(),
-                            info: info.clone(),
+                            info,
                             context_changes: full_context.inner().fn_context_change_stack.clone()
                         })
                     }
@@ -582,7 +582,7 @@ pub fn macro_to_value(
                     if full_context.inner().start_group != fn_context {
                         return Err(RuntimeError::ContextChangeError {
                             message: "A macro argument default value can't change the trigger function context".to_string(),
-                            info: info.clone(),
+                            info,
                             context_changes: full_context.inner().fn_context_change_stack.clone()
                         })
                     }
@@ -604,7 +604,7 @@ pub fn macro_to_value(
                 Value::Macro(Box::new(Macro {
                     args,
                     body: m.body.statements.clone(),
-                    def_context: full_context.inner().clone(),
+                    def_variables: full_context.inner().variables.iter().map(|(a, (b, _))| (*a, *b)).collect(),
                     def_file: info.position.file,
                     arg_pos: m.arg_pos,
                     tag: m.properties.clone(),
@@ -1133,6 +1133,11 @@ impl ast::Variable {
         for c in contexts.iter() {
             (*c.inner()).return_value2 = NULL_STORAGE;
         }
+        globals.stored_values.preserved_stack.push(Vec::new());
+        for full_context in contexts.iter() {
+            globals.stored_values.preserved_stack.last_mut().unwrap().push(full_context.inner().return_value);
+        }
+
         for p in &mut path_iter {
             // if !defined {
             //     use crate::fmt::SpwnFmt;
@@ -1493,7 +1498,7 @@ impl ast::Variable {
                         (*full_context.inner()).return_value2 = val_ptr;
 
                         match globals.stored_values[val_ptr].clone() {
-                            Value::TypeIndicator(t) => {
+                            Value::TypeIndicator(_) => {
                                 let mut new_defs = defs.clone();
                                 new_defs.push(ast::DictDef::Def((globals.TYPE_MEMBER_NAME, ast::ValueBody::Resolved(val_ptr).to_variable(globals.get_area(val_ptr).pos).to_expression())));
                                 ast::ValueBody::Dictionary(new_defs.clone())
@@ -1596,9 +1601,14 @@ impl ast::Variable {
                     }
                 }
             };
+
+            for full_context in contexts.iter() {
+                globals.stored_values.preserved_stack.last_mut().unwrap().push(full_context.inner().return_value);
+                globals.stored_values.preserved_stack.last_mut().unwrap().push(full_context.inner().return_value2);
+            }
         }
 
-        
+        globals.stored_values.preserved_stack.pop();
 
         use ast::UnaryOperator;
         if let Some(o) = &self.operator {
@@ -1828,7 +1838,7 @@ impl ast::Variable {
                     }
                     *ptr
                 } else {
-                    (*context).variables.insert(a.clone(), (value, 0));
+                    (*context).variables.insert(*a, (value, 0));
                     defined = false;
                     value
                 }
@@ -1890,7 +1900,7 @@ impl ast::Variable {
             match p {
                 ast::Path::Member(m) => {
                     let val = globals.stored_values[current_ptr].clone();
-                    match val.member(m.clone(), context, globals, info.clone()) {
+                    match val.member(*m, context, globals, info.clone()) {
                         Some(s) => current_ptr = s,
                         None => {
                             
@@ -1938,8 +1948,9 @@ impl ast::Variable {
                                 globals.stored_values[first_context_eval].clone()
                             {
                                 match d.get(&st) {
-                                    Some(_) => current_ptr = first_context_eval,
+                                    Some(a) => current_ptr = *a,
                                     None => {
+
                                         let stored = globals
                                             .stored_values
                                             .map
@@ -1959,6 +1970,7 @@ impl ast::Variable {
                                                 context_changes: context.fn_context_change_stack.clone()
                                             });
                                         }
+                                        
                                         if let Value::Dict(d) = &mut stored.val {
                                             (*d).insert(Intern::new(st), value);
                                             defined = false;
@@ -2011,6 +2023,7 @@ impl ast::Variable {
                                 }
                             }
                             None => {
+                                
                                 let mut new_imp = HashMap::new();
                                 new_imp.insert(*m, (value, true));
                                 (*globals).implementations.insert(*t, new_imp);

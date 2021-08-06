@@ -336,11 +336,14 @@ macro_rules! reassign_variable {
 
         $globals.stored_values[$arguments[$arg_index]] = ($($arg_name)*);
         $globals.stored_values.set_mutability($arguments[$arg_index], true);
+
     };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
         $globals.stored_values[$arguments[$arg_index]] = Value::$arg_type($($arg_name),*);
         $globals.stored_values.set_mutability($arguments[$arg_index], true);
+
+
     };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) ($($arg_name:ident),*)) => {};

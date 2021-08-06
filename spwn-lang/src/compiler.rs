@@ -430,8 +430,8 @@ impl From<RuntimeError> for ErrorReport {
     }
 }
 
-pub const NULL_STORAGE: usize = 1;
-pub const BUILTIN_STORAGE: usize = 0;
+pub const NULL_STORAGE: StoredValue = 1;
+pub const BUILTIN_STORAGE: StoredValue = 0;
 
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
@@ -588,7 +588,7 @@ pub fn compile_scope(
         use ast::StatementBody::*;
 
         let stored_context = if statement.arrow {
-            Some(contexts.clone())
+            Some(contexts.iter().map(|a| a.clone()).collect::<Vec<_>>())
         } else {
             None
         };
@@ -633,10 +633,9 @@ pub fn compile_scope(
                                 globals.stored_values[storage] =
                                     Value::TriggerFunc(TriggerFunction { start_group });
 
-                                full_context.inner().start_group = start_group;
-
                                 full_context.inner().fn_context_change_stack = vec![info.position];
                                 //new_info.last_context_change_stack = vec![info.position.clone()];
+
                                 f.to_trigger_func(
                                     full_context,
                                     globals,
@@ -861,6 +860,7 @@ pub fn compile_scope(
                             )));
                         }
                         let (_, val) = contexts.inner_value();
+
                         // make this not ugly, future me
 
                         if let Value::Dict(d) = &globals.stored_values[val] {
@@ -949,8 +949,12 @@ pub fn compile_scope(
                 */
                 let i_name = f.symbol;
                 // skips all broken contexts, so as to not interfere with potential breaks in the following loops
+
                 for full_context in contexts.iter() {
                     let (_, val) = full_context.inner_value();
+                    globals.push_new_preserved();
+                    globals.push_preserved_val(val);
+
                     match globals.stored_values[val].clone() {
                         // what are we iterating
                         Value::Array(arr) => {
@@ -994,10 +998,11 @@ pub fn compile_scope(
 
                                 for c in full_context.iter() {
                                     let fn_context = c.inner().start_group;
-                                    let key = store_const_value(
+                                    let key = store_val_m(
                                         Value::Str(k.as_ref().clone()),
                                         globals,
                                         fn_context,
+                                        true,
                                         globals.get_area(v),
                                     );
                                     let val = clone_value(
@@ -1084,11 +1089,11 @@ pub fn compile_scope(
                                     info.position,
                                 );
 
-                                //dbg!(full_context.clone());
+                                //dbg!(full_context.with_breaks().count());
 
                                 compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
-                                //dbg!(full_context.clone());
+                                //dbg!(full_context.with_breaks().count());
 
                                 let all_breaks = full_context.with_breaks().all(|fc| {
                                     !matches!(
@@ -1114,6 +1119,7 @@ pub fn compile_scope(
                     }
                     full_context.disable_breaks(BreakType::Loop);
                     full_context.disable_breaks(BreakType::ContinueLoop);
+                    globals.pop_preserved();
                 }
             }
             Break => {
@@ -1134,6 +1140,19 @@ pub fn compile_scope(
 
             Return(return_val) => {
                 for full_context in contexts.iter() {
+                    // let full_context = if statement.arrow {
+                    //     *full_context = FullContext::Split(
+                    //         full_context.clone().into(),
+                    //         full_context.clone().into(),
+                    //     );
+                    //     if let FullContext::Split(_, c) = full_context {
+                    //         &mut **c
+                    //     } else {
+                    //         unreachable!()
+                    //     }
+                    // } else {
+                    //     full_context
+                    // };
                     match return_val {
                         Some(val) => {
                             val.eval(full_context, globals, info.clone(), true)?;
@@ -1188,7 +1207,8 @@ pub fn compile_scope(
 
         if let Some(c) = stored_context {
             //resetting the context if async
-            let mut list = vec![c];
+            let mut list = c;
+
             for context in contexts.with_breaks() {
                 if let Some((r, i)) = context.inner().broken {
                     if let BreakType::Macro(_, true) = r {
@@ -1208,13 +1228,31 @@ pub fn compile_scope(
         }
 
         //try to merge contexts
-        //if statement_index < statements.len() - 1 {
-        loop {
-            if !merge_contexts(contexts, globals) {
-                break;
+
+        if let FullContext::Split(_, _) = contexts {
+            let mut broken = Vec::new();
+            let mut not_broken = Vec::new();
+            for c in contexts.with_breaks() {
+                if c.inner().broken.is_some() {
+                    broken.push(c.inner().clone())
+                } else {
+                    not_broken.push(c.inner().clone())
+                }
+            }
+
+            if not_broken.len() > 1 {
+                loop {
+                    if !merge_contexts(&mut not_broken, globals) {
+                        break;
+                    }
+                }
+
+                broken.extend(not_broken);
+
+                *contexts =
+                    FullContext::stack(&mut broken.into_iter().map(FullContext::Single)).unwrap();
             }
         }
-        //}
 
         /*println!(
             "{} -> Compiled '{}' in {} milliseconds!",
@@ -1222,35 +1260,19 @@ pub fn compile_scope(
             statement_type,
             start_time.elapsed().as_millis(),
         );*/
+
+        let increase =
+            globals.stored_values.map.len() as u32 - globals.stored_values.prev_value_count;
+
+        if increase > 50 {
+            globals.collect_garbage(contexts);
+        }
     }
 
     // TODO: get rid of lifetimes
 
-    //return values need longer lifetimes
+    contexts.exit_scope();
 
-    // globals.stored_values.decrement_lifetimes();
-    // globals.increment_implementations();
-    // //collect garbage
-    // globals.stored_values.clean_up();
-    let removed = contexts.exit_scope(globals);
-    //dbg!(removed.len());
-    // if !removed.is_empty() {
-    //     unsafe {
-    //         globals.clean_up(
-    //             contexts
-    //                 .with_breaks()
-    //                 .next()
-    //                 .unwrap()
-    //                 .inner()
-    //                 .full_context_ptr
-    //                 .as_mut()
-    //                 .unwrap(),
-    //             removed,
-    //         );
-    //     }
-    // }
-
-    //(*globals).highest_x = context.x;
     Ok(())
 }
 
@@ -1328,7 +1350,7 @@ pub fn import_module(
     info: CompilerInfo,
     forced: bool,
 ) -> Result<(), RuntimeError> {
-    println!("importing: {:?}", path);
+    //println!("importing: {:?}", path);
     if !forced {
         if let Some(ret) = globals.prev_imports.get(path).cloned() {
             merge_impl(&mut globals.implementations, &ret.1);
@@ -1358,7 +1380,9 @@ pub fn import_module(
         )));
     }
 
-    let unparsed = match fs::read_to_string(&module_path) {
+    let module_path = Intern::new(module_path);
+
+    let unparsed = match fs::read_to_string(module_path.as_ref()) {
         Ok(content) => content,
         Err(e) => {
             return Err(RuntimeError::CustomError(create_error(
@@ -1372,12 +1396,20 @@ pub fn import_module(
             )));
         }
     };
-    let (parsed, notes) = match crate::parse_spwn(unparsed, module_path.clone()) {
+    let (parsed, notes) = match crate::parse_spwn(unparsed, module_path.as_ref().clone()) {
         Ok(p) => p,
         Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
     };
 
     let mut start_context = FullContext::new();
+    let mut pushed = 0;
+    for c in contexts.with_breaks() {
+        globals
+            .stored_values
+            .preserved_stack
+            .push(c.inner().variables.values().map(|(a, _)| *a).collect());
+        pushed += 1;
+    }
 
     let mut stored_impl = None;
     if let ImportType::Lib(_) = path {
@@ -1418,12 +1450,12 @@ pub fn import_module(
         }
     }
 
-    let stored_path = globals.path.clone();
-    (*globals).path = module_path.clone();
+    let stored_path = globals.path;
+    (*globals).path = module_path;
 
     let mut new_info = info.clone();
 
-    new_info.position.file = Intern::new(module_path);
+    new_info.position.file = module_path;
     new_info.position.pos = (0, 0);
 
     if let ImportType::Lib(l) = path {
@@ -1439,6 +1471,10 @@ pub fn import_module(
             })
         }
     };
+
+    for _ in 0..pushed {
+        globals.stored_values.preserved_stack.pop();
+    }
 
     for fc in start_context.with_breaks() {
         let c = fc.inner();

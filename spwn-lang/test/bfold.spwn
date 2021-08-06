@@ -1,4 +1,8 @@
+RIGHT = 1b
+LEFT = 2b
 INCR = 3b
+DECR = 4b
+DOT = 5b
 OPEN = 6b //opening bracket
 CLOSE = 7b //closing bracket
 
@@ -39,6 +43,40 @@ insert_bf_script = (str: @string, offset: [@number]) {
     }
 }
 
+type @bytedisplay 
+
+impl @bytedisplay {
+    new: (offset: [@number]) {
+        1c.set(255, 255, 255)
+        //order = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[ ]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+        order = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        let list = []
+        for ch in order {
+            color = ?c
+            extract obj_props
+            $.add(obj {
+                OBJ_ID: 914,
+                X: offset[0],
+                Y: offset[1],
+                TEXT: $.b64encode(ch),
+                COLOR: color,
+            })
+            color.set(0,0,0, blending = true)
+            list.push(color)
+        }
+        return @bytedisplay::{list: list, chars: order.length}
+    },
+    display: (self, index: @number) {
+        for i in ..self.list.length {
+            if i == index {
+                -> self.list[index].pulse(0,255,0, fade_out = 0.5)
+                -> self.list[index].set(255,255,255, 0.5)
+            } else {
+                self.list[i].set(0,0,0, blending = true)
+            }
+        }
+    }
+}
 
 type @bfreader
 layers = counter(0)
@@ -59,7 +97,7 @@ impl @bfreader {
             SCALING: 0.5,
             DYNAMIC_BLOCK: true,
         })
-        for b in [INCR,OPEN,CLOSE] {
+        for b in [RIGHT,LEFT,INCR,DECR,DOT,OPEN,CLOSE] {
             $.add(obj {
                 OBJ_ID: 1816,
                 X: script_offset[0] - spacing * 3,
@@ -81,15 +119,17 @@ impl @bfreader {
         ptr.display(script_offset[0], script_offset[1] + 60)
         
 
-        
+        std_out = @bytedisplay::new([script_offset[0], script_offset[1] + 120])
         out = @bfreader::{
             group: group,
-            
+            right: counter(block.create_tracker_item(RIGHT)),
+            left:  counter(block.create_tracker_item(LEFT)),
             incr:  counter(block.create_tracker_item(INCR)),
-            
-            
+            dot:  counter(block.create_tracker_item(DOT)),
+            decr:  counter(block.create_tracker_item(DECR)),
             open:  counter(block.create_tracker_item(OPEN)),
             close: counter(block.create_tracker_item(CLOSE)),
+            std_out: std_out,
             ptr: ptr,
             cells: cells,
         }
@@ -98,8 +138,16 @@ impl @bfreader {
         return out
     },
     currently_on: (self) {
-        if self.incr == 1 {
+        if self.right == 1 {
+            return RIGHT
+        } else if self.left == 1 {
+            return LEFT
+        } else if self.incr == 1 {
             return INCR
+        } else if self.decr == 1 {
+            return DECR
+        } else if self.dot == 1 {
+            return DOT
         } else if self.open == 1 {
             return OPEN
         } else if self.close == 1 {
@@ -115,8 +163,32 @@ impl @bfreader {
         }
         current = self.currently_on()
         
-        if current == INCR {
+        if current == RIGHT {
+            self.ptr += 1
+            ret!
+        }
+        else if current == LEFT {
+            self.ptr -= 1
+            ret!
+        }
+        else if current == INCR {
             -> self.current_cell() += 1
+            ret!
+        }
+        else if current == DECR {
+            -> self.current_cell() -= 1
+            ret!
+        }
+        else if current == DOT {
+            std_out = counter(0)
+            () {
+                std_out.reset(5)
+                cell = self.current_cell()
+                wait()
+                cell.copy_to([std_out], speed = 6)
+            } ()
+
+            self.std_out.display(std_out.to_const(..self.std_out.chars))
             ret!
         }
         else if current == OPEN {
@@ -179,9 +251,9 @@ impl @bfreader {
 }
 
 offset = [300, 300]
-insert_bf_script("+[+]", offset)
+insert_bf_script("><+-[].", offset)
 
-reader = @bfreader::new(offset, 1)
+reader = @bfreader::new(offset, 20)
 while_loop(()=>true, (){
     reader.interpret()
 })

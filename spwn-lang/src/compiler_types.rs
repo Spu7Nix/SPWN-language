@@ -190,6 +190,8 @@ impl ast::Expression {
         let mut vals = self.values.iter();
         let first = vals.next().unwrap();
 
+        globals.stored_values.preserved_stack.push(Vec::new());
+
         first.to_value(contexts, globals, info.clone(), constant)?;
 
         let mut start_pos = first.pos.0;
@@ -212,6 +214,14 @@ impl ast::Expression {
                         (false, false)
                     };
                 let acum_val = full_context.inner().return_value;
+
+                globals
+                    .stored_values
+                    .preserved_stack
+                    .last_mut()
+                    .unwrap()
+                    .push(acum_val);
+
                 if self.operators[i] == Or
                     && !or_overwritten
                     && globals.stored_values[acum_val] == Value::Bool(true)
@@ -307,6 +317,7 @@ impl ast::Expression {
             }
             start_pos = var.pos.0;
         }
+        globals.stored_values.preserved_stack.pop();
         Ok(())
     }
 }
@@ -379,7 +390,7 @@ pub fn execute_macro(
                     }
                 }
                 None => {
-                    if def_index > m.args.len() - 1 {
+                    if def_index >= m.args.len() {
                         return Err(RuntimeError::CustomError(create_error(
                             info.clone(),
                             "Too many arguments!",
@@ -400,6 +411,8 @@ pub fn execute_macro(
                             None,
                         )));
                     }
+
+                    //dbg!(&m.args[def_index]);
 
                     //type check!!
                     if let Some(t) = m.args[def_index].3 {
@@ -494,8 +507,14 @@ Should be used like this: value.macro(arguments)",
             }
         }
 
-        new_variables.extend(m.def_context.variables.clone());
+        new_variables.extend(m.def_variables.iter().map(|(a, b)| (*a, (*b, -1))));
         let prev_vars = full_context.inner().variables.clone();
+
+        globals
+            .stored_values
+            .preserved_stack
+            .push(prev_vars.values().map(|(a, _)| *a).collect());
+
         (*full_context.inner()).variables = new_variables;
 
         let mut new_info = info.clone();
@@ -504,7 +523,14 @@ Should be used like this: value.macro(arguments)",
             file: m.def_file,
             pos: (0, 0),
         });
+
+        let stored_path = globals.path;
+        (*globals).path = m.def_file;
         compile_scope(&m.body, full_context, globals, new_info)?;
+
+        globals.stored_values.preserved_stack.pop();
+
+        (*globals).path = stored_path;
 
         let mut out_contexts = Vec::new();
         for context in full_context.with_breaks() {
@@ -533,6 +559,7 @@ Should be used like this: value.macro(arguments)",
                 out_contexts.push(context.clone());
             }
         }
+        //dbg!(out_contexts.len(), info.position);
         if !out_contexts.is_empty() {
             *full_context = FullContext::stack(&mut out_contexts.into_iter()).unwrap();
         }
@@ -554,6 +581,8 @@ pub fn all_combinations<'a>(
     info: CompilerInfo,
     constant: bool,
 ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
+    globals.stored_values.preserved_stack.push(Vec::new());
+
     let mut out = vec![(Vec::new(), contexts)];
     for expr in a {
         let mut new_out = Vec::new();
@@ -563,11 +592,20 @@ pub fn all_combinations<'a>(
             for full_context in full_context.iter() {
                 let mut new_list = list.clone();
                 new_list.push(full_context.inner().return_value);
+
+                globals
+                    .stored_values
+                    .preserved_stack
+                    .last_mut()
+                    .unwrap()
+                    .push(full_context.inner().return_value);
+
                 new_out.push((new_list, full_context));
             }
         }
         out = new_out;
     }
+    globals.stored_values.preserved_stack.pop();
 
     Ok(out)
 }
@@ -649,8 +687,7 @@ impl ast::CompoundStatement {
     ) -> Result<(), RuntimeError> {
         contexts.reset_return_vals();
         for full_context in contexts.iter() {
-            let mut new_context = full_context.clone();
-            //create the function context
+            let mut prev_context = full_context.clone();
 
             //pick a start group
             let start_group = if let Some(g) = start_group {
@@ -659,23 +696,18 @@ impl ast::CompoundStatement {
                 Group::next_free(&mut globals.closed_groups)
             };
 
-            new_context.inner().next_fn_id(globals);
-            new_context.inner().start_group = start_group;
-            new_context.inner().fn_context_change_stack = vec![info.position];
+            full_context.inner().next_fn_id(globals);
+            full_context.inner().start_group = start_group;
+            full_context.inner().fn_context_change_stack = vec![info.position];
 
-            compile_scope(&self.statements, &mut new_context, globals, info.clone())?;
+            compile_scope(&self.statements, full_context, globals, info.clone())?;
 
-            let mut carried_breaks: Option<FullContext> = None;
+            let mut carried_breaks = Vec::new();
 
-            for c in new_context.with_breaks() {
+            for c in full_context.with_breaks() {
                 if let Some((r, i)) = c.inner().broken {
-                    if let BreakType::Macro(v, true) = r {
-                        if let Some(prev) = carried_breaks {
-                            carried_breaks =
-                                Some(FullContext::Split(prev.into(), c.clone().into()));
-                        } else {
-                            carried_breaks = Some(c.clone());
-                        }
+                    if let BreakType::Macro(_, true) = r {
+                        carried_breaks.push(c.clone());
                     } else {
                         return Err(RuntimeError::BreakNeverUsedError {
                             breaktype: r,
@@ -688,16 +720,22 @@ impl ast::CompoundStatement {
                 }
             }
 
-            (*full_context.inner()).return_value = store_const_value(
+            (*prev_context.inner()).return_value = store_const_value(
                 Value::TriggerFunc(TriggerFunction { start_group }),
                 globals,
-                full_context.inner().start_group,
+                prev_context.inner().start_group,
                 info.position,
             );
 
-            if let Some(new) = carried_breaks {
-                *full_context = FullContext::Split(full_context.clone().into(), new.into());
+            if !carried_breaks.is_empty() {
+                prev_context = FullContext::Split(
+                    prev_context.clone().into(),
+                    FullContext::stack(&mut carried_breaks.into_iter())
+                        .unwrap()
+                        .into(),
+                );
             }
+            *full_context = prev_context;
         }
 
         //(TriggerFunction { start_group }, inner_returns)
