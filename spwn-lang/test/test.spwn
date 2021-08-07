@@ -1,6 +1,11 @@
 #[no_level]
 
-let a = [[1,2,3,4,5],[5,4,3,2,1],[6,7,8,9,10],[10,9,8,7,6]]
+deco = (function) {
+	$.print("decorated :0");
+	$.print("absolutely insane");
+	return function;
+}
 
-let b = a[:, :-1:];
-$.print(b)
+let a = [[deco]] (ok) {
+
+}

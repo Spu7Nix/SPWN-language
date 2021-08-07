@@ -289,6 +289,7 @@ pub struct Macro {
     pub body: CompoundStatement,
     pub properties: Attribute,
     pub arg_pos: FileRange,
+    pub decorator: Option<Box<Variable>> // poo poo stinky
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -327,7 +328,6 @@ pub struct Variable {
     pub value: ValueLiteral,
     pub path: Vec<Path>,
     pub pos: FileRange,
-    //pub comment: Comment,
     pub tag: Attribute,
 }
 

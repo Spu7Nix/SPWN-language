@@ -24,8 +24,8 @@ mod optimize;
 mod value_storage;
 
 use ariadne::{Cache, FileCache, Fmt};
-use compiler_info::CompilerInfo;
-use globals::Globals;
+
+
 use optimize::optimize;
 
 use parser::*;
@@ -131,7 +131,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     let mut cache = FileCache::default();
-                    cache.fetch(script_path.as_path()).unwrap();
+                    match cache.fetch(script_path.as_path()) {
+                        Ok(_) => (),
+                        Err(_) => {
+                            return Err(Box::from("File does not exist".to_string()));
+                        }
+                    }
 
                     print_with_color("Parsing ...", Color::Green);
                     let unparsed = fs::read_to_string(script_path.clone())?;
@@ -318,7 +323,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     match documentation::document_lib(lib_path) {
                         Ok(_) => (),
-                        Err(e) => {
+                        Err(_) => {
                             eprintln!(
                                 "{}",
                                 "Error when compiling library!".fg(ariadne::Color::Red)

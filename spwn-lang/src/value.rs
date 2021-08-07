@@ -580,6 +580,7 @@ pub fn slice_array(
 
 }
 
+
 pub fn macro_to_value(
     m: &ast::Macro,
     context: &Context,
@@ -1237,10 +1238,61 @@ impl ast::Variable {
             }
 
             ast::ValueBody::Macro(m) => {
-                let (vals, inner_ret) =
-                    macro_to_value(m, &context, globals, info.clone(), constant)?;
-                start_val.extend(vals);
-                inner_returns.extend(inner_ret);
+                //TODO: remove test
+
+                match &m.decorator {
+                    Some(b) => {
+                        //println!("Compiler: decorator exists!");
+
+                        let mut v_without_deco = self.clone();
+                        let mut m_without_deco = m.clone();
+                        m_without_deco.decorator = None;
+                        v_without_deco.value.body = ast::ValueBody::Macro(m_without_deco);
+
+                        let mut decorator_args = vec![ast::Argument {
+                            symbol: None,
+                            value: v_without_deco.to_expression(),
+                            pos: info.position.pos
+                        }];
+
+                        let mut outer_var: ast::Variable = (**b).clone();
+                        if outer_var.path.len() > 0 {
+                            let last_path = outer_var.path.pop().unwrap();
+                            match last_path {
+                                ast::Path::Call(args) => decorator_args.extend(args),
+                                _ => outer_var.path.push(last_path)
+                            }
+                        };
+
+                        let (actual_macros, returns)= outer_var.to_value(context.clone(), globals, info.clone(), true)?;
+                        inner_returns.extend(returns);
+
+                        for (mac, cont) in actual_macros {
+                            match &globals.stored_values[mac] {
+                                Value::Macro(m) => {
+                                    let (evaled, returns) = execute_macro(
+                                        ((**m).clone(), decorator_args.clone()),
+                                        &cont,
+                                        globals,
+                                        2, // :troll:
+                                        info.clone(),
+                                    )?;
+                                    inner_returns.extend(returns);
+                                    start_val.extend(evaled);
+
+                                },
+                                _ => unimplemented!("fuck you.")
+                            }
+                        }
+
+                    },
+                    _ => {
+                        let (vals, inner_ret) =
+                            macro_to_value(m, &context, globals, info.clone(), constant)?;
+                        start_val.extend(vals);
+                        inner_returns.extend(inner_ret);
+                    }
+                }
             }
             //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
             ast::ValueBody::Null => start_val.push((1, context.clone())),
