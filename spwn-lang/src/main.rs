@@ -1,5 +1,5 @@
 //#![feature(arbitrary_enum_discriminant)]
-
+mod context;
 mod ast;
 mod builtin;
 mod compiler;
@@ -13,7 +13,6 @@ mod levelstring;
 mod parser;
 mod value;
 
-mod context;
 #[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
 #[cfg_attr(windows, path = "editorlive_win.rs")]
 #[cfg_attr(

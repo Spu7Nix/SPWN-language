@@ -159,6 +159,7 @@ center = 3g
             DELAY : delay,
             Y_OFFSET : offset,
             MAX_SPEED : max_speed,
+            TARGET: self,
             DURATION: duration,
         })
         //wouldnt make any sense to wait out the duration here
