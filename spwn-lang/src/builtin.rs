@@ -515,7 +515,11 @@ builtins! {
     fn print() {
         let mut out = String::new();
         for val in arguments.iter() {
-            out += &globals.stored_values[*val].to_str(globals);
+            match &globals.stored_values[*val] {
+                Value::Str(s) => out += s,
+                a => out += &a.to_str(globals)
+            };
+
         }
         println!("{}", out);
         Value::Null
@@ -1243,14 +1247,9 @@ builtins! {
             }
 
             (Value::Dict(d), Value::Str(b)) => {
-                let mut out = false;
-                for k in d.keys() {
-                    if k.as_ref() == &b {
-                        out = true;
-                        break;
-                    }
-                }
-                Value::Bool(out)
+
+
+                Value::Bool(d.get(&Intern::new(b)).is_some())
             }
 
             (Value::Str(s), Value::Str(s2)) => Value::Bool(s.contains(&*s2)),

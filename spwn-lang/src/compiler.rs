@@ -565,6 +565,9 @@ pub fn compile_scope(
     globals: &mut Globals,
     mut info: CompilerInfo,
 ) -> Result<(), RuntimeError> {
+    if contexts.iter().next().is_none() {
+        return Ok(());
+    }
     contexts.enter_scope();
 
     for statement in statements.iter() {
@@ -699,7 +702,7 @@ pub fn compile_scope(
                     let fn_context = context.start_group;
                     match globals.stored_values[val].clone() {
                         Value::Dict(d) => {
-                            let mut iter = d.iter().map(|(k, v)| {
+                            let iter = d.iter().map(|(k, v)| {
                                 (
                                     *k,
                                     clone_value(
@@ -1251,7 +1254,13 @@ pub fn compile_scope(
 
                 *contexts =
                     FullContext::stack(&mut broken.into_iter().map(FullContext::Single)).unwrap();
+            } else if not_broken.is_empty() {
+                break;
             }
+        }
+
+        if contexts.iter().next().is_none() {
+            break;
         }
 
         /*println!(

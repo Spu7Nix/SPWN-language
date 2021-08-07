@@ -1308,8 +1308,10 @@ impl ast::Variable {
                                 }
                                 Value::Dict(d) => {
                                     match &globals.stored_values[index_ptr] {
+                                        
                                         Value::Str(s) => {
-                                            if !d.contains_key(s) {
+                                            let intern = Intern::new(s.clone());
+                                            if !d.contains_key(&intern) {
                                                 
                                                 return Err(RuntimeError::UndefinedErr {
                                                     undefined: s.to_string(),
@@ -1317,11 +1319,11 @@ impl ast::Variable {
                                                     desc: "dictionary key".to_string(),
                                                 });
                                             }
-                                            full_context.inner().return_value = d[s];
+                                            full_context.inner().return_value = d[&intern];
                                         }
                                         _ => {
                                             return Err(RuntimeError::TypeError {
-                                                expected: "number".to_string(),
+                                                expected: "string".to_string(),
                                                 found: globals.get_type_str(index_ptr),
                                                 val_def: globals.get_area(index_ptr),
                                                 info,

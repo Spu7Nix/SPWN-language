@@ -1,0 +1,73 @@
+extract obj_props
+
+let PI = 3.141592653589793
+
+type @canvas
+impl @canvas {
+    new: (x:@number, y:@number, width:@number, height:@number, scale:@number = 1, groups:@group|@array = []){
+        let colors = []
+        for w in ..width {
+            let colorsH = []
+            // let colors[w] = []
+            for h in ..height {
+                let color = ?c
+                colorsH.push(color)
+                // let colors[w][h] = ?c
+                scaling = $.ceil(scale*100)/100
+                pixel = obj {
+                    OBJ_ID: 211,
+                    X: 30*scaling*w+30*scaling/2,
+                    Y: 30*scaling*h+30*scaling/2,
+                    COLOR: color,
+                    SCALING: scaling,
+                    GROUPS: groups,
+                }
+                $.add(pixel)
+            }
+            colors.push(colorsH)
+        }
+        return @canvas::{
+            x, y,
+            width, height,
+            scale,
+            colors,
+            r: 0, g: 0, b: 0,
+        }
+    },
+    setColor: (self, r:@number = 0, g:@number = 0, b:@number = 0){
+        self.r = r
+        self.g = g
+        self.b = b
+    },
+    drawPixel: (self, x:@number, y:@number){
+        self.colors[x][y].set(self.r,self.g,self.b)
+    },
+    drawRect: (self, x:@number, y:@number, w:@number, h:@number){
+        for _x in x..x+w {
+            for _y in y..y+h {
+                self.drawPixel(_x,_y)
+            }
+        }
+    },
+    drawFill: (self){
+        self.drawRect(0,0,self.width,self.height)
+    },
+    drawEllipse: (self, x:@number, y:@number, width:@number, height:@number){
+        let tracker = []
+        for i in 0..360 {
+            let angle = i/180 * PI
+            let x1 = x + $.floor(width/2 + width/3 * $.cos(angle) - height/3 * $.sin(angle))
+            let y1 = y + $.floor(height/2 + height/3 * $.cos(angle) + width/3 * $.sin(angle))
+            let key = x1 as @string + ' ' + y1 as @string
+            if !tracker.contains(key) {
+                self.drawPixel(x1,y1)
+                tracker.push(key)
+            }
+        }
+    },
+    drawCircle: (self, x:@number, y:@number, radius:@number){
+        self.drawEllipse(x,y,radius,radius)
+    },
+}
+
+return @canvas
