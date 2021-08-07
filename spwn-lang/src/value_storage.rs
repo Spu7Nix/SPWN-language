@@ -6,11 +6,12 @@ use crate::context::*;
 use crate::globals::Globals;
 use crate::value::*;
 
+use core::panic;
 use std::collections::{HashMap, HashSet};
 
 use crate::compiler::{BUILTIN_STORAGE, NULL_STORAGE};
 
-pub type StoredValue = u64; //index to stored value in globals.stored_values
+pub type StoredValue = u32; //index to stored value in globals.stored_values
 
 #[derive(Debug)]
 pub struct ValStorage {

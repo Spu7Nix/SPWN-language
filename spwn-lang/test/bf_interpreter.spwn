@@ -500,7 +500,7 @@ impl @bfreader {
                     } else {
                         wait(0.01)
                         self.group.move(spacing, 0)
-                        return
+                        
                     }
 
 
@@ -539,7 +539,7 @@ impl @bfreader {
                     } else {
                         wait(0.01)
                         self.group.move(-spacing, 0)
-                        return
+                        
                     }
                 })
                 -> 45c.set(prog_ptr_color[0], prog_ptr_color[1], prog_ptr_color[2], blending = true)

@@ -42,7 +42,7 @@ pub struct Globals {
     pub func_ids: Vec<FunctionId>,
     pub objects: Vec<GdObj>,
 
-    pub prev_imports: HashMap<ImportType, (Value, Implementations)>,
+    pub prev_imports: HashMap<ImportType, (StoredValue, Implementations)>,
 
     pub trigger_order: usize,
 
@@ -145,7 +145,7 @@ impl Globals {
             trigger_order: 0,
             uid_counter: 0,
 
-            val_id: storage.map.len() as u64,
+            val_id: storage.map.len() as StoredValue,
             stored_values: storage,
             func_ids: vec![FunctionId {
                 parent: None,
@@ -273,8 +273,10 @@ impl Globals {
                 .unwrap();
 
             for c in root_context.with_breaks() {
-                for (v, _) in c.inner().variables.values() {
-                    self.stored_values.mark(*v);
+                for stack in c.inner().get_variables().values() {
+                    for (v, _) in stack.iter() {
+                        self.stored_values.mark(*v);
+                    }
                 }
 
                 match c.inner().broken {
@@ -299,7 +301,17 @@ impl Globals {
                 }
             }
         }
-        //dbg!(&globals.stored_values.map);
+
+        for (v, imp) in self.prev_imports.values() {
+            for imp in imp.values() {
+                for (v, _) in imp.values() {
+                    self.stored_values.mark(*v);
+                }
+            }
+
+            self.stored_values.mark(*v);
+        }
+        //dbg!(&self.stored_values.map);
 
         //sweep
         self.stored_values.sweep();

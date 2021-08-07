@@ -1,6 +1,3 @@
-#[no_std]
+$.print("hello")
 
-return {
-    message: "hello"
-}
 

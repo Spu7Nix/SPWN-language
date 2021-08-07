@@ -5,12 +5,14 @@ use crate::builtin::*;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
 use crate::context::*;
+use crate::fmt::SpwnFmt;
 use crate::globals::Globals;
 use crate::levelstring::*;
 use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
 use std::collections::{HashMap, HashSet};
+use std::mem;
 
 use crate::parser::{ParseNotes, SyntaxError};
 use std::fs;
@@ -490,10 +492,9 @@ pub fn compile_spwn(
         }
 
         if let Value::Dict(d) = &globals.stored_values[start_context.inner().return_value] {
-            start_context
-                .inner()
-                .variables
-                .extend(d.iter().map(|(k, v)| (*k, (*v, -1))));
+            for (a, b, c) in d.iter().map(|(k, v)| (*k, *v, -1)) {
+                start_context.inner().new_variable(a, b, c)
+            }
         } else {
             return Err(RuntimeError::CustomError(create_error(
                 start_info,
@@ -572,6 +573,8 @@ pub fn compile_scope(
         //let start_time = Instant::now();
 
         //print_error_intro(info.pos, &info.current_file);
+
+        //println!("{}", statement.fmt(0));
 
         // println!(
         //     "{} -> Compiling a statement in {} contexts",
@@ -696,21 +699,22 @@ pub fn compile_scope(
                     let fn_context = context.start_group;
                     match globals.stored_values[val].clone() {
                         Value::Dict(d) => {
-                            context.variables.extend(d.iter().map(|(k, v)| {
+                            let mut iter = d.iter().map(|(k, v)| {
                                 (
                                     *k,
-                                    (
-                                        clone_value(
-                                            *v,
-                                            globals,
-                                            fn_context,
-                                            !globals.is_mutable(*v),
-                                            globals.get_area(*v),
-                                        ),
-                                        0,
+                                    clone_value(
+                                        *v,
+                                        globals,
+                                        fn_context,
+                                        !globals.is_mutable(*v),
+                                        globals.get_area(*v),
                                     ),
+                                    0,
                                 )
-                            }));
+                            });
+                            for (a, b, c) in iter {
+                                context.new_variable(a, b, c);
+                            }
                         }
                         Value::Builtins => {
                             for name in BUILTIN_LIST.iter() {
@@ -721,9 +725,7 @@ pub fn compile_scope(
                                     info.position,
                                 );
 
-                                context
-                                    .variables
-                                    .insert(Intern::new(String::from(*name)), (p, 0));
+                                context.new_variable(Intern::new(String::from(*name)), p, 0);
                             }
                         }
                         a => {
@@ -1013,17 +1015,15 @@ pub fn compile_scope(
                                         globals.get_area(v),
                                     );
                                     // reset all variables per context
-                                    (*c.inner()).variables.insert(
+                                    (*c.inner()).new_variable(
                                         i_name,
-                                        (
-                                            store_const_value(
-                                                Value::Array(vec![key, val]),
-                                                globals,
-                                                fn_context,
-                                                globals.get_area(v),
-                                            ),
-                                            -1,
+                                        store_const_value(
+                                            Value::Array(vec![key, val]),
+                                            globals,
+                                            fn_context,
+                                            globals.get_area(v),
                                         ),
+                                        -1,
                                     );
                                 }
 
@@ -1264,7 +1264,7 @@ pub fn compile_scope(
         let increase =
             globals.stored_values.map.len() as u32 - globals.stored_values.prev_value_count;
 
-        if increase > 50 {
+        if increase > 5000 {
             globals.collect_garbage(contexts);
         }
     }
@@ -1355,8 +1355,7 @@ pub fn import_module(
         if let Some(ret) = globals.prev_imports.get(path).cloned() {
             merge_impl(&mut globals.implementations, &ret.1);
             for c in contexts.iter() {
-                c.inner().return_value =
-                    store_const_value(ret.0.clone(), globals, c.inner().start_group, info.position)
+                c.inner().return_value = ret.0;
             }
             return Ok(());
         }
@@ -1402,19 +1401,31 @@ pub fn import_module(
     };
 
     let mut start_context = FullContext::new();
-    let mut pushed = 0;
+
+    globals.push_new_preserved();
     for c in contexts.with_breaks() {
-        globals
-            .stored_values
-            .preserved_stack
-            .push(c.inner().variables.values().map(|(a, _)| *a).collect());
-        pushed += 1;
+        for stack in c.inner().get_variables().values() {
+            for (v, _) in stack.iter() {
+                globals.push_preserved_val(*v);
+            }
+        }
     }
 
     let mut stored_impl = None;
     if let ImportType::Lib(_) = path {
-        stored_impl = Some(globals.implementations.clone());
-        globals.implementations = HashMap::new();
+        let mut impl_vals = Vec::new();
+        for imp in globals.implementations.values() {
+            for (v, _) in imp.values() {
+                impl_vals.push(*v);
+            }
+        }
+        for v in impl_vals {
+            globals.push_preserved_val(v);
+        }
+        let mut stored = HashMap::new();
+
+        mem::swap(&mut stored, &mut globals.implementations);
+        stored_impl = Some(stored);
     }
 
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
@@ -1436,10 +1447,9 @@ pub fn import_module(
         }
 
         if let Value::Dict(d) = &globals.stored_values[start_context.inner().return_value] {
-            start_context
-                .inner()
-                .variables
-                .extend(d.iter().map(|(k, v)| (*k, (*v, -1))));
+            for (a, b, c) in d.iter().map(|(k, v)| (*k, *v, -1)) {
+                start_context.inner().new_variable(a, b, c)
+            }
         } else {
             return Err(RuntimeError::CustomError(create_error(
                 info,
@@ -1472,9 +1482,7 @@ pub fn import_module(
         }
     };
 
-    for _ in 0..pushed {
-        globals.stored_values.preserved_stack.pop();
-    }
+    globals.pop_preserved();
 
     for fc in start_context.with_breaks() {
         let c = fc.inner();

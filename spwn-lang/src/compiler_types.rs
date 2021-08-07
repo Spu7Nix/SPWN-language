@@ -190,7 +190,7 @@ impl ast::Expression {
         let mut vals = self.values.iter();
         let first = vals.next().unwrap();
 
-        globals.stored_values.preserved_stack.push(Vec::new());
+        globals.push_new_preserved();
 
         first.to_value(contexts, globals, info.clone(), constant)?;
 
@@ -215,12 +215,7 @@ impl ast::Expression {
                     };
                 let acum_val = full_context.inner().return_value;
 
-                globals
-                    .stored_values
-                    .preserved_stack
-                    .last_mut()
-                    .unwrap()
-                    .push(acum_val);
+                globals.push_preserved_val(acum_val);
 
                 if self.operators[i] == Or
                     && !or_overwritten
@@ -317,7 +312,7 @@ impl ast::Expression {
             }
             start_pos = var.pos.0;
         }
-        globals.stored_values.preserved_stack.pop();
+        globals.pop_preserved();
         Ok(())
     }
 }
@@ -330,8 +325,20 @@ pub fn execute_macro(
     info: CompilerInfo,
 ) -> Result<(), RuntimeError> {
     contexts.reset_return_vals();
-    // second returns is for any compound statements in the args
-    let conbinations = all_combinations(
+    globals.push_new_preserved();
+    for context in contexts.with_breaks() {
+        for val in context
+            .inner()
+            .get_variables()
+            .values()
+            .map(|stack| stack.iter().map(|(a, _)| *a))
+            .flatten()
+        {
+            globals.push_preserved_val(val)
+        }
+    }
+
+    let combinations = all_combinations(
         args.iter().map(|x| x.value.clone()).collect(),
         contexts,
         globals,
@@ -339,8 +346,16 @@ pub fn execute_macro(
         true,
     )?;
 
-    for (arg_values, full_context) in conbinations {
-        let mut new_variables = HashMap::new();
+    for (arg_values, _) in &combinations {
+        for val in arg_values {
+            globals.push_preserved_val(*val)
+        }
+    }
+
+    //dbg!(&conbinations);
+
+    for (arg_values, full_context) in combinations {
+        let mut new_variables: HashMap<Intern<String>, Vec<(StoredValue, i16)>> = HashMap::new();
         let context = full_context.inner();
 
         let fn_context = context.start_group;
@@ -377,7 +392,7 @@ pub fn execute_macro(
                             }
                         };
 
-                        new_variables.insert(*name, (arg_values[i], -1));
+                        new_variables.insert(*name, vec![(arg_values[i], -1)]);
                     } else {
                         return Err(RuntimeError::UndefinedErr {
                             undefined: name.as_ref().clone(),
@@ -435,7 +450,7 @@ pub fn execute_macro(
 
                     new_variables.insert(
                         m.args[def_index].0,
-                        (
+                        vec![(
                             clone_value(
                                 arg_values[i],
                                 globals,
@@ -447,7 +462,7 @@ pub fn execute_macro(
                                 },
                             ),
                             -1,
-                        ),
+                        )],
                     );
                     def_index += 1;
                 }
@@ -467,7 +482,7 @@ Should be used like this: value.macro(arguments)",
                     )));
             }
             //self doesn't need to be cloned, as it is a reference (kinda)
-            new_variables.insert(globals.SELF_MEMBER_NAME, (parent, -1));
+            new_variables.insert(globals.SELF_MEMBER_NAME, vec![(parent, -1)]);
             m_args_iter.next();
         }
         for arg in m_args_iter {
@@ -476,7 +491,7 @@ Should be used like this: value.macro(arguments)",
                     Some(default) => {
                         new_variables.insert(
                             arg.0,
-                            (
+                            vec![(
                                 clone_value(
                                     *default,
                                     globals,
@@ -488,7 +503,7 @@ Should be used like this: value.macro(arguments)",
                                     },
                                 ),
                                 -1,
-                            ),
+                            )],
                         );
                     }
 
@@ -507,15 +522,10 @@ Should be used like this: value.macro(arguments)",
             }
         }
 
-        new_variables.extend(m.def_variables.iter().map(|(a, b)| (*a, (*b, -1))));
-        let prev_vars = full_context.inner().variables.clone();
+        new_variables.extend(m.def_variables.iter().map(|(a, b)| (*a, vec![(*b, -1)])));
+        let prev_vars = full_context.inner().get_variables().clone();
 
-        globals
-            .stored_values
-            .preserved_stack
-            .push(prev_vars.values().map(|(a, _)| *a).collect());
-
-        (*full_context.inner()).variables = new_variables;
+        (*full_context.inner()).set_all_variables(new_variables);
 
         let mut new_info = info.clone();
 
@@ -528,13 +538,11 @@ Should be used like this: value.macro(arguments)",
         (*globals).path = m.def_file;
         compile_scope(&m.body, full_context, globals, new_info)?;
 
-        globals.stored_values.preserved_stack.pop();
-
         (*globals).path = stored_path;
 
         let mut out_contexts = Vec::new();
         for context in full_context.with_breaks() {
-            (*context.inner()).variables = prev_vars.clone();
+            (*context.inner()).set_all_variables(prev_vars.clone());
 
             if let Some((r, i)) = (*context.inner()).broken {
                 match r {
@@ -571,6 +579,7 @@ Should be used like this: value.macro(arguments)",
         }
     }
 
+    globals.pop_preserved();
     Ok(())
 }
 
@@ -593,12 +602,8 @@ pub fn all_combinations<'a>(
                 let mut new_list = list.clone();
                 new_list.push(full_context.inner().return_value);
 
-                globals
-                    .stored_values
-                    .preserved_stack
-                    .last_mut()
-                    .unwrap()
-                    .push(full_context.inner().return_value);
+                globals.push_preserved_val(full_context.inner().return_value);
+                //dbg!(full_context.inner().return_value);
 
                 new_out.push((new_list, full_context));
             }
@@ -629,6 +634,12 @@ pub fn eval_dict(
         info.clone(),
         constant,
     )?;
+    globals.push_new_preserved();
+    for (arg_values, _) in &combinations {
+        for val in arg_values {
+            globals.push_preserved_val(*val)
+        }
+    }
     for (results, full_context) in combinations {
         let context = full_context.inner();
         let mut dict_out: HashMap<Intern<String>, StoredValue> = HashMap::new();
@@ -674,6 +685,7 @@ pub fn eval_dict(
             info.position,
         );
     }
+    globals.pop_preserved();
     Ok(())
 }
 

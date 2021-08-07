@@ -14,6 +14,7 @@ use internment::Intern;
 
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::compiler::RuntimeError;
@@ -152,6 +153,29 @@ impl Value {
             Value::Null => 15,
             Value::Range(_, _, _) => 17,
             Value::Pattern(_) => 18,
+        }
+    }
+
+    pub fn direct_references(&self) -> Vec<StoredValue> {
+        match self {
+            Value::Array(a) => {
+                return a.iter().copied().collect()
+            }
+            Value::Dict(a) => {
+                return a.values().copied().collect()
+            }
+            Value::Macro(m) => {
+                
+                let mut out = Vec::new();
+                out.extend(m.args.iter().filter_map(|a| a.1));
+                out.extend(m.args.iter().filter_map(|a| a.3));
+                
+
+                out.extend(m.def_variables.values());
+                    
+                out
+            }
+            _ => Vec::new(),
         }
     }
 
@@ -604,7 +628,7 @@ pub fn macro_to_value(
                 Value::Macro(Box::new(Macro {
                     args,
                     body: m.body.statements.clone(),
-                    def_variables: full_context.inner().variables.iter().map(|(a, (b, _))| (*a, *b)).collect(),
+                    def_variables: full_context.inner().get_variables().iter().map(|(name, s)| (*name, s.last().unwrap().0)).collect(),
                     def_file: info.position.file,
                     arg_pos: m.arg_pos,
                     tag: m.properties.clone(),
@@ -648,8 +672,8 @@ impl ast::Variable {
             match &self.value.body {
                 ast::ValueBody::Resolved(r) => full_context.inner().return_value = *r,
                 ast::ValueBody::SelfVal => {
-                    if let Some((val,_)) = full_context.inner().variables.get(&globals.SELF_MEMBER_NAME) {
-                        full_context.inner().return_value = *val
+                    if let Some(val) = full_context.inner().get_variable(globals.SELF_MEMBER_NAME) {
+                        full_context.inner().return_value = val
                     } else {
                         return Err(RuntimeError::UndefinedErr {
                             undefined: "self".to_string(),
@@ -720,8 +744,8 @@ impl ast::Variable {
                     if string.as_ref() == "$" {
                         full_context.inner().return_value = 0;
                     } else {
-                        match full_context.inner().variables.get(string) {
-                            Some((value,_)) => full_context.inner().return_value = *value,
+                        match full_context.inner().get_variable(*string) {
+                            Some(value) => full_context.inner().return_value = value,
                             None => {
                                 return Err(RuntimeError::UndefinedErr {
                                     undefined: string.as_ref().clone(),
@@ -937,6 +961,7 @@ impl ast::Variable {
                     let combinations =
                         all_combinations(all_expr, full_context, globals, new_info, constant)?; // evaluate all expressions gathered
                     
+                        
                     for (expressions, context) in combinations {
                         let mut obj: Vec<(u16, ObjParam)> = Vec::new();
                         for i in 0..(o.props.len()) {
@@ -1118,6 +1143,7 @@ impl ast::Variable {
                             info.position,
                         );
                     }
+                    
                 }
 
                 ast::ValueBody::Macro(m) => {
@@ -1133,9 +1159,9 @@ impl ast::Variable {
         for c in contexts.iter() {
             (*c.inner()).return_value2 = NULL_STORAGE;
         }
-        globals.stored_values.preserved_stack.push(Vec::new());
+        globals.push_new_preserved();
         for full_context in contexts.iter() {
-            globals.stored_values.preserved_stack.last_mut().unwrap().push(full_context.inner().return_value);
+            globals.push_preserved_val(full_context.inner().return_value);
         }
 
         for p in &mut path_iter {
@@ -1576,6 +1602,15 @@ impl ast::Variable {
                                     constant,
                                 )?;
 
+                                globals.push_new_preserved();
+                                for (arg_values, _) in &evaled_args {
+                                    for val in arg_values {
+                                        globals.push_preserved_val(*val)
+                                    }
+                                }
+
+                                
+
                                 for (args, context) in evaled_args {
                                     built_in_function(
                                         name,
@@ -1585,6 +1620,8 @@ impl ast::Variable {
                                         context,
                                     )?;
                                 }
+
+                                globals.pop_preserved();
                             }
                             _a => {
                                 return Err(RuntimeError::TypeError {
@@ -1603,12 +1640,12 @@ impl ast::Variable {
             };
 
             for full_context in contexts.iter() {
-                globals.stored_values.preserved_stack.last_mut().unwrap().push(full_context.inner().return_value);
-                globals.stored_values.preserved_stack.last_mut().unwrap().push(full_context.inner().return_value2);
+                globals.push_preserved_val(full_context.inner().return_value);
+                globals.push_preserved_val(full_context.inner().return_value2);
             }
         }
 
-        globals.stored_values.preserved_stack.pop();
+        globals.pop_preserved();
 
         use ast::UnaryOperator;
         if let Some(o) = &self.operator {
@@ -1699,13 +1736,13 @@ impl ast::Variable {
         // println!("hello? {}", self.fmt(0));
         let mut current_ptr = match &self.value.body {
             ast::ValueBody::Symbol(a) => {
-                if let Some((ptr,_)) = context.variables.get(a) {
+                if let Some(ptr) = context.get_variable(*a) {
                     if self.path.is_empty() {
                         //redefine
-                        if globals.is_mutable(*ptr) {
+                        if globals.is_mutable(ptr) {
                             return true;
                         }
-                        if globals.stored_values[*ptr]
+                        if globals.stored_values[ptr]
                             .clone()
                             .member(
                                 globals.ASSIGN_BULTIN,
@@ -1720,7 +1757,7 @@ impl ast::Variable {
                         }
                         return false;
                     }
-                    *ptr
+                    ptr
                 } else {
                     return false;
                 }
@@ -1741,8 +1778,8 @@ impl ast::Variable {
             }
 
             ast::ValueBody::SelfVal => {
-                if let Some((ptr,_)) = context.variables.get(&globals.SELF_MEMBER_NAME) {
-                    *ptr
+                if let Some(ptr) = context.get_variable(globals.SELF_MEMBER_NAME) {
+                    ptr
                 } else {
                     return false;
                 }
@@ -1830,15 +1867,15 @@ impl ast::Variable {
 
         let mut current_ptr = match &self.value.body {
             ast::ValueBody::Symbol(a) => {
-                if let Some((ptr,_)) = context.variables.get_mut(a) {
+                if let Some(ptr) = context.get_variable(*a) {
                     if self.path.is_empty() {
                         //redefine
-                        *ptr = value;
+                        context.new_variable(*a, value, 0);
                         return Ok(value);
                     }
-                    *ptr
+                    ptr
                 } else {
-                    (*context).variables.insert(*a, (value, 0));
+                    context.new_variable(*a, value, 0);
                     defined = false;
                     value
                 }
@@ -1864,8 +1901,8 @@ impl ast::Variable {
             }
 
             ast::ValueBody::SelfVal => {
-                if let Some((ptr,_)) = context.variables.get(&globals.SELF_MEMBER_NAME) {
-                    *ptr
+                if let Some(ptr) = context.get_variable(globals.SELF_MEMBER_NAME) {
+                    ptr
                 } else {
                     return Err(RuntimeError::UndefinedErr {
                         undefined: "self".to_string(),

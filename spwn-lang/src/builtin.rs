@@ -376,7 +376,7 @@ macro_rules! builtin_arg_mut_check {
 macro_rules! builtins {
 
     {
-        ($arguments:ident, $info:ident, $globals:ident, $context:ident)
+        ($arguments:ident, $info:ident, $globals:ident, $context:ident, $full_context:ident)
         $(
             [$variant:ident] fn $name:ident(
                 $(
@@ -407,6 +407,7 @@ macro_rules! builtins {
             contexts: &mut FullContext,
         ) -> Result<(), RuntimeError> {
             for full_context in contexts.iter() {
+                let $full_context: *mut FullContext = full_context;
                 let $context = full_context.inner();
                 match func {
                     $(
@@ -496,7 +497,7 @@ macro_rules! builtins {
 }
 
 builtins! {
-    (arguments, info, globals, context)
+    (arguments, info, globals, context, full_context)
 
     [Assert]
     fn assert((b): Bool) {
@@ -861,15 +862,27 @@ builtins! {
                 })
             }
         };
+        use crate::ast::*;
+
+        let cmp_statement = CompoundStatement { statements: vec![
+            Statement {
+                body: StatementBody::Expr(Variable {
+                    operator: None,
+                    path: vec![Path::Call(Vec::new())],
+                    value: ValueLiteral { body: ValueBody::Resolved(arguments[1]) },
+                    pos: info.position.pos,
+                    tag: Attribute { tags: Vec::new() }
+                }.to_expression()),
+                arrow: false,
+                pos: info.position.pos
+            }
+        ]};
+
+        unsafe {
+            cmp_statement.to_trigger_func(full_context.as_mut().unwrap(), globals, info.clone(), Some(group))?;
+        }
 
 
-        let mut new_context = context.clone();
-        new_context.start_group = group;
-        let new_info = info.clone();
-        new_context.fn_context_change_stack = vec![info.position];
-        //new_info.last_context_change_stack = vec![info.position];
-
-        execute_macro((*mac, Vec::new()), &mut FullContext::Single(new_context), globals, NULL_STORAGE, new_info)?;
 
         Value::Null
     }

@@ -1,0 +1,12 @@
+#[no_std]
+
+m = () {
+    -> return "hi"
+    -> return "bye"
+}
+
+move = (x, y) {
+    $.print(x, y)  
+}
+
+move( m(), 0)

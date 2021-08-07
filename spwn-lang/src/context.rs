@@ -21,10 +21,7 @@ pub struct Context {
     pub start_group: Group,
     pub func_id: FnIdPtr,
     pub fn_context_change_stack: Vec<CodeArea>,
-    pub variables: HashMap<Intern<String>, (StoredValue, i16)>,
-    // the i16 is the layers of scopes since the variable was decleared
-    // it starts at 0 on decleration, and gets deleted when it goes out of scope while at 0
-    // gets incremented every time it enters a new scope, and decremented every time it exits
+    variables: HashMap<Intern<String>, Vec<(StoredValue, i16)>>,
     pub return_value: StoredValue,
     pub return_value2: StoredValue,
     pub root_context_ptr: *mut FullContext,
@@ -78,17 +75,27 @@ impl FullContext {
 
     pub fn enter_scope(&mut self) {
         for context in self.with_breaks() {
-            for (_, layers) in context.inner().variables.values_mut() {
-                *layers += 1;
+            for stack in context.inner().variables.values_mut() {
+                for (_, layers) in stack.iter_mut() {
+                    *layers += 1;
+                }
             }
         }
     }
     pub fn exit_scope(&mut self) {
         for context in self.with_breaks() {
-            for (_, layers) in context.inner().variables.values_mut() {
-                *layers -= 1;
+            for stack in context.inner().variables.values_mut() {
+                for (_, layers) in stack.iter_mut() {
+                    *layers -= 1;
+                }
             }
-            context.inner().variables.retain(|_, (_, l)| *l >= 0)
+
+            for stack in context.inner().variables.values_mut() {
+                if stack.last().unwrap().1 < 0 {
+                    stack.pop();
+                }
+            }
+            context.inner().variables.retain(|_, s| !s.is_empty())
         }
         // let mut removed = HashSet::new();
         // for context in self.with_breaks() {
@@ -131,9 +138,10 @@ impl FullContext {
         for c in self.iter() {
             // reset all variables per context
             let fn_context = c.inner().start_group;
-            (*c.inner()).variables.insert(
+            (*c.inner()).new_variable(
                 name,
-                (clone_value(val, globals, fn_context, constant, area), layer),
+                clone_value(val, globals, fn_context, constant, area),
+                layer,
             );
         }
     }
@@ -150,12 +158,10 @@ impl FullContext {
         for c in self.iter() {
             // reset all variables per context
             let fn_context = c.inner().start_group;
-            (*c.inner()).variables.insert(
+            (*c.inner()).new_variable(
                 name,
-                (
-                    store_val_m(val.clone(), globals, fn_context, constant, area),
-                    layer,
-                ),
+                store_val_m(val.clone(), globals, fn_context, constant, area),
+                layer,
             );
         }
     }
@@ -318,6 +324,27 @@ impl Context {
 
         self.func_id = globals.func_ids.len() - 1;
     }
+
+    pub fn get_variable(&self, name: Intern<String>) -> Option<StoredValue> {
+        self.variables.get(&name).map(|a| a.last().unwrap().0)
+    }
+
+    pub fn new_variable(&mut self, name: Intern<String>, val: StoredValue, layer: i16) {
+        match self.variables.get_mut(&name) {
+            Some(stack) => stack.push((val, layer)),
+            None => {
+                self.variables.insert(name, vec![(val, layer)]);
+            }
+        }
+    }
+
+    pub fn get_variables(&self) -> &HashMap<Intern<String>, Vec<(StoredValue, i16)>> {
+        &self.variables
+    }
+
+    pub fn set_all_variables(&mut self, vars: HashMap<Intern<String>, Vec<(StoredValue, i16)>>) {
+        (*self).variables = vars;
+    }
 }
 
 //will merge one set of context, returning false if no mergable contexts were found
@@ -340,10 +367,12 @@ pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> boo
             let mut not_eq = false;
 
             //check variables are equal
-            for (key, (val, _)) in &c.variables {
-                if !value_equality(ref_c.variables[key].0, *val, globals) {
-                    not_eq = true;
-                    break;
+            for (key, stack) in &c.variables {
+                for (i, (val, _)) in stack.iter().enumerate() {
+                    if !value_equality(ref_c.variables[key][i].0, *val, globals) {
+                        not_eq = true;
+                        break;
+                    }
                 }
             }
             if not_eq {
