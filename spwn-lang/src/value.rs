@@ -591,10 +591,9 @@ pub fn slice_array(
 
             let stored_arr = store_const_value(
                 Value::Array(val),
-                1,
                 globals,
-                context,
-                info.position.clone(),
+                context.start_group,
+                info.position,
             );
             result.push(stored_arr);
         } else {
@@ -1302,73 +1301,45 @@ impl ast::Variable {
 
                 ast::Path::NSlice(slices) => {
                     //TODO: nslice
+                    let mut expr_vec = Vec::<ast::Expression>::new();
 
-                    let mut new_out: Vec<(StoredValue, Context, StoredValue)> = Vec::new();
-                    for (prev_v, prev_c, _) in with_parent.clone() {
+                    for slice in slices {
+                        let null_expr = ast::Expression {
+                            operators: Vec::new(), 
+                            values: vec![
+                                    ast::Variable {
+                                        value: ast::ValueLiteral { body: ast::ValueBody::Null },
+                                        operator: None,
+                                        pos: (0, 0),
+                                        //comment: (None, None),
+                                        path: Vec::new(),
+                                        tag: ast::Attribute::new(),
+                                    }
+                            ]
+                        };
+                        expr_vec.push(slice.left.clone().unwrap_or_else(|| null_expr.clone()));
+                        expr_vec.push(slice.right.clone().unwrap_or_else(|| null_expr.clone()));
+                        expr_vec.push(slice.step.clone().unwrap_or_else(|| null_expr.clone()));
+                    }
 
-                        let mut expr_vec = Vec::<ast::Expression>::new();
+                    for full_context in contexts.iter() {
+                        let val_ptr = full_context.inner().return_value;
+                        (*full_context.inner()).return_value2 = val_ptr;
+                        let val = globals.stored_values[val_ptr].clone(); // this is the object we are indexing
 
-                        for slice in slices {
-                            expr_vec.push(slice.left.clone().unwrap_or_else(|| {
-                                ast::Expression {
-                                    operators: Vec::new(), 
-                                    values: vec![
-                                            ast::Variable {
-                                                value: ast::ValueLiteral { body: ast::ValueBody::Null },
-                                                operator: None,
-                                                pos: (0, 0),
-                                                //comment: (None, None),
-                                                path: Vec::new(),
-                                                tag: ast::Attribute::new(),
-                                            }
-                                    ]
-                                }
-                            }));
-                            expr_vec.push(slice.right.clone().unwrap_or_else(|| {
-                                ast::Expression {
-                                    operators: Vec::new(), 
-                                    values: vec![
-                                            ast::Variable {
-                                                value: ast::ValueLiteral { body: ast::ValueBody::Null },
-                                                operator: None,
-                                                pos: (0, 0),
-                                                //comment: (None, None),
-                                                path: Vec::new(),
-                                                tag: ast::Attribute::new(),
-                                            }
-                                    ]
-                                }
-                            }));
-                            expr_vec.push(slice.step.clone().unwrap_or_else(|| {
-                                ast::Expression {
-                                    operators: Vec::new(), 
-                                    values: vec![
-                                            ast::Variable {
-                                                value: ast::ValueLiteral { body: ast::ValueBody::Null },
-                                                operator: None,
-                                                pos: (0, 0),
-                                                //comment: (None, None),
-                                                path: Vec::new(),
-                                                tag: ast::Attribute::new(),
-                                            }
-                                    ]
-                                }
-                            }));
-                        }
-
-                        let (evaled, returns) = all_combinations(
-                            expr_vec,
-                            &prev_c,
+                        let combinations = all_combinations(
+                            expr_vec.clone(),
+                            full_context,
                             globals,
                             info.clone(),
                             true,
                         )?;
 
-                        let mut sorted_nslices = Vec::<(Vec<Slice>, Context)>::new();
+                        let mut sorted_nslices = Vec::<(Vec<Slice>, &mut FullContext)>::new();
                         let conv_slice = |v| -> Result<Option<isize>, RuntimeError> {
                             return match &globals.stored_values[v] {
                                 Value::Number(n) => {
-                                    if n.floor() != *n {
+                                    if (n.floor() - *n).abs() > f64::EPSILON {
                                         return Err(RuntimeError::CustomError(create_error(
                                             info.clone(),
                                             &format!("Cannot slice with non-integer number {}.", n),
@@ -1392,7 +1363,7 @@ impl ast::Variable {
                             };
                         };
 
-                        for (parsed_slices, context) in evaled {
+                        for (parsed_slices, context) in combinations {
                             let mut sorted_nslice = Vec::<Slice>::new();
                             let mut count: usize = 0;
                             loop {
@@ -1413,38 +1384,38 @@ impl ast::Variable {
                             }
                             sorted_nslices.push((sorted_nslice, context));
                         }
-                        inner_returns.extend(returns);
 
-                        match globals.stored_values[prev_v].clone() {
+                        match val {
                             Value::Array(arr) => {
                                 for nslice in sorted_nslices {
                                     //println!("slices {:?}", nslice);
                                     let mut nslice_0 = nslice.0;
                                     nslice_0.reverse();
-                                    let sliced = slice_array(&arr, nslice_0, globals, info.clone(), &nslice.1)?;
+                                    let sliced = slice_array(&arr, nslice_0, globals, info.clone(), nslice.1.inner())?;
 
                                     let stored_arr = store_const_value(
                                         Value::Array(sliced),
-                                        1,
                                         globals,
-                                        &nslice.1,
-                                        info.position.clone(),
+                                        nslice.1.inner().start_group,
+                                        info.position,
                                     );
-                                    new_out.push((stored_arr, nslice.1, prev_v));
+
+                                    nslice.1.inner().return_value = stored_arr;
+                                    
                                 }
 
                             },
                             _ => {
                                 return Err(RuntimeError::TypeError {
                                     expected: "@array".to_string(),
-                                    found: globals.get_type_str(prev_v),
-                                    val_def: globals.get_area(prev_v),
+                                    found: globals.get_type_str(val_ptr),
+                                    val_def: globals.get_area(val_ptr),
                                     info,
                                 })
                             }
                         }
                     }
-                    with_parent = new_out;
+                    
                 }
 
                 ast::Path::Index(i) => {
