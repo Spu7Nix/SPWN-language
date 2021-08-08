@@ -1072,13 +1072,13 @@ builtins! {
 
                         for i in r.find_iter(&s){
                             let mut pair = Vec::new();
-                            let p1 = store_value(Value::Number(i.start() as f64), 1, globals, context, CodeArea::new());
-                            let p2 = store_value(Value::Number(i.end() as f64), 1, globals, context, CodeArea::new());
-                            
+                            let p1 = store_const_value(Value::Number(i.start() as f64), globals, context.start_group, info.position);
+                            let p2 = store_const_value(Value::Number(i.end() as f64), globals, context.start_group, info.position);
+
                             pair.push(p1);
                             pair.push(p2);
 
-                            let pair_arr = store_value(Value::Array(pair), 1, globals, context, CodeArea::new());
+                            let pair_arr = store_const_value(Value::Array(pair), globals, context.start_group, info.position);
                             output.push(pair_arr);
                         }
 

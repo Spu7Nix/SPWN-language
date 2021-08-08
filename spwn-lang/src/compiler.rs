@@ -1271,7 +1271,7 @@ pub fn compile_scope(
         );*/
 
         let increase =
-            0; // please fix this //globals.stored_values.map.len() as u32 - globals.stored_values.prev_value_count;
+            globals.stored_values.map.len() as u32 - globals.stored_values.prev_value_count;
 
         if increase > 5000 {
             globals.collect_garbage(contexts);

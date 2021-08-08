@@ -24,13 +24,7 @@ mod optimize;
 mod value_storage;
 
 use ariadne::{Cache, FileCache, Fmt};
-<<<<<<< HEAD
-// use compiler_info::CompilerInfo;
-// use globals::Globals;
-=======
 
-
->>>>>>> a74a02c2a4c2ec6140b44d1a475a0be3a6b0cc3e
 use optimize::optimize;
 
 use parser::*;
