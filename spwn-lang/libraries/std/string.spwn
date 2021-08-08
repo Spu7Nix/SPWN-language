@@ -142,5 +142,57 @@ $.assert(str3.trim(tokens = [' ', '_']))
     ")]
     (self, tokens: @string | [@string] = [' ', '\n']){
         return self.l_trim(tokens).r_trim(tokens)
+    },
+    fmt: #[desc("Returns a formtted version of the string. Accepts either a single argument or an array") example("
+name1 = 'bob'
+name2 = 'alice'
+$.assert('hi {}'.fmt(name1) == 'hi bob')
+$.assert('hi {} and {}'.fmt([name1, name2]) == 'hi bob and alice')
+$.assert('hi {1} and {0}'.fmt([name1, name2]) == 'hi alice and bob')
+$.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
+    ")]
+    (self, subs) {
+        blank_regex = "\\{\\}"
+        numbered_regex = "\\{\\d+\\}"
+
+        blanks = $.regex(blank_regex, self, 'findall', null)
+        numbered = $.regex(numbered_regex, self, 'findall', null)
+
+        if blanks.length != 0 && numbered.length != 0 {
+            throw "FormatError: String format must only be either blank {} or numbered {1} {2}"
+        }
+
+        // turn single arg into array
+        let args = subs if subs.type == @array else [subs]
+
+        let ret_str = ""
+
+        if blanks.length != 0 {
+            if blanks.length != args.length {
+                throw "FormatError: number of formats must be the same as number of args"
+            }
+
+            splitted = self.split("{}")
+
+            for i in ..args.length {
+                ret_str += splitted[i] + (args[i] as @string)
+            }
+            ret_str += splitted[-1]
+
+        } else if numbered.length != 0 {
+            // im not gonna make the error handling here better
+            // maybe later, we can make it so any brace that has a number greater than args MUST be escpaed, but now it will be ignored
+
+            ret_str = self
+
+            for i in ..args.length {
+                ret_str = $.regex("\\{" + i as @string + "\\}", ret_str, "replace", args[i] as @string)
+            }
+            
+        } else {
+            ret_str = self
+        }
+
+        return ret_str
     }
 }
