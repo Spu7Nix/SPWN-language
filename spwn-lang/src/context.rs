@@ -1,37 +1,303 @@
 use crate::builtin::*;
-use crate::compiler_info::{CodeArea, CompilerInfo};
+use crate::compiler_info::CodeArea;
 use crate::compiler_types::*;
 use crate::globals::Globals;
 use crate::levelstring::*;
-use crate::value_storage::StoredValue;
+use crate::value::{value_equality, Value};
+use crate::value_storage::{clone_value, store_val_m, StoredValue};
 
 //use std::boxed::Box;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use smallvec::SmallVec;
+use internment::Intern;
 
-use crate::compiler::CONTEXT_MAX;
+use crate::compiler::NULL_STORAGE;
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Context {
-    pub start_group: Group,
-    pub fn_context_change_stack: Vec<CodeArea>,
-    //pub spawn_triggered: bool,
-    pub variables: HashMap<String, StoredValue>,
-    //pub self_val: Option<StoredValue>,
-    pub func_id: FnIdPtr,
-
-    // info stores the info for the break statement if the context is "broken"
     // broken doesn't mean something is wrong with it, it just means
-    // a break statement has been used :)
-    pub broken: Option<(CompilerInfo, BreakType)>,
+    // a break statement ( or similar) has been used :)
+    pub broken: Option<(BreakType, CodeArea)>,
+    pub start_group: Group,
+    pub func_id: FnIdPtr,
+    pub fn_context_change_stack: Vec<CodeArea>,
+    variables: HashMap<Intern<String>, Vec<(StoredValue, i16)>>,
+    pub return_value: StoredValue,
+    pub return_value2: StoredValue,
+    pub root_context_ptr: *mut FullContext,
+}
 
-    pub sync_group: usize,
-    pub sync_part: SyncPartId,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BreakType {
+    // used for return statements
+    Macro(Option<StoredValue>, bool),
+    // used for Break statements
+    Loop,
+    // used for continue statements
+    ContinueLoop,
+    // used for switch cases
+    Switch(StoredValue),
+    // used for contexts
+}
+
+#[derive(Debug, Clone)]
+pub enum FullContext {
+    Single(Context),
+    Split(Box<FullContext>, Box<FullContext>),
+}
+
+impl FullContext {
+    pub fn new() -> Self {
+        let mut new = FullContext::Single(Context::new());
+        new.inner().root_context_ptr = &mut new;
+        new
+    }
+    pub fn inner(&mut self) -> &mut Context {
+        match self {
+            Self::Single(c) => c,
+            _ => unreachable!("Called 'inner' on a split value"),
+        }
+    }
+
+    pub fn inner_value(&mut self) -> (&mut Context, StoredValue) {
+        let context = self.inner();
+        let val = context.return_value;
+        (context, val)
+    }
+
+    pub fn stack(list: &mut impl Iterator<Item = Self>) -> Option<Self> {
+        let first = list.next()?;
+        match Self::stack(list) {
+            Some(second) => Some(FullContext::Split(first.into(), second.into())),
+            None => Some(first),
+        }
+    }
+
+    pub fn enter_scope(&mut self) {
+        for context in self.with_breaks() {
+            for stack in context.inner().variables.values_mut() {
+                for (_, layers) in stack.iter_mut() {
+                    *layers += 1;
+                }
+            }
+        }
+    }
+    pub fn exit_scope(&mut self) {
+        for context in self.with_breaks() {
+            for stack in context.inner().variables.values_mut() {
+                for (_, layers) in stack.iter_mut() {
+                    *layers -= 1;
+                }
+            }
+
+            for stack in context.inner().variables.values_mut() {
+                if stack.last().unwrap().1 < 0 {
+                    stack.pop();
+                }
+            }
+            context.inner().variables.retain(|_, s| !s.is_empty())
+        }
+        // let mut removed = HashSet::new();
+        // for context in self.with_breaks() {
+        //     for (_, layers) in context.inner().variables.values_mut() {
+        //         *layers -= 1;
+        //     }
+        //     removed.extend(context.inner().variables.values().filter_map(|(v, l)| {
+        //         if *l < 0 {
+        //             Some(v)
+        //         } else {
+        //             None
+        //         }
+        //     }));
+        //     context.inner().variables.retain(|_, (_, l)| *l >= 0)
+        // }
+        // let mut all_removed = HashSet::new();
+        // for v in removed {
+        //     all_removed.extend(get_all_ptrs_used(v, globals));
+        // }
+        // all_removed
+    }
+
+    pub fn reset_return_vals(&mut self) {
+        for c in self.with_breaks() {
+            let c = c.inner();
+            (*c).return_value = NULL_STORAGE;
+            (*c).return_value2 = NULL_STORAGE;
+        }
+    }
+
+    pub fn set_variable_and_clone(
+        &mut self,
+        name: Intern<String>,
+        val: StoredValue,
+        layer: i16,
+        constant: bool,
+        globals: &mut Globals,
+        area: CodeArea,
+    ) {
+        for c in self.iter() {
+            // reset all variables per context
+            let fn_context = c.inner().start_group;
+            (*c.inner()).new_variable(
+                name,
+                clone_value(val, globals, fn_context, constant, area),
+                layer,
+            );
+        }
+    }
+
+    pub fn set_variable_and_store(
+        &mut self,
+        name: Intern<String>,
+        val: Value,
+        layer: i16,
+        constant: bool,
+        globals: &mut Globals,
+        area: CodeArea,
+    ) {
+        for c in self.iter() {
+            // reset all variables per context
+            let fn_context = c.inner().start_group;
+            (*c.inner()).new_variable(
+                name,
+                store_val_m(val.clone(), globals, fn_context, constant, area),
+                layer,
+            );
+        }
+    }
+
+    pub fn disable_breaks(&mut self, breaktype: BreakType) {
+        for fc in self.with_breaks() {
+            if let Some((b, _)) = &mut fc.inner().broken {
+                if std::mem::discriminant(b) == std::mem::discriminant(&breaktype) {
+                    (*fc.inner()).broken = None;
+                }
+            }
+        }
+    }
+
+    pub fn with_breaks(&mut self) -> ContextIterWithBreaks {
+        ContextIterWithBreaks::new(self)
+    }
+
+    pub fn iter(&mut self) -> ContextIter {
+        ContextIter::new(self)
+    }
+}
+
+/// Iterator type for a binary tree.
+/// This is a generator that progresses through an in-order traversal.
+pub struct ContextIter<'a> {
+    right_nodes: Vec<&'a mut FullContext>,
+    current_node: Option<&'a mut FullContext>,
+}
+
+pub struct ContextIterWithBreaks<'a> {
+    right_nodes: Vec<&'a mut FullContext>,
+    current_node: Option<&'a mut FullContext>,
+}
+
+impl<'a> ContextIter<'a> {
+    fn new(node: &'a mut FullContext) -> ContextIter<'a> {
+        let mut iter = ContextIter {
+            right_nodes: vec![],
+            current_node: None,
+        };
+        iter.add_left_subtree(node);
+        iter
+    }
+
+    /// Consume a binary tree node, traversing its left subtree and
+    /// adding all branches to the right to the `right_nodes` field
+    /// while setting the current node to the left-most child.
+    fn add_left_subtree(&mut self, mut node: &'a mut FullContext) {
+        loop {
+            match node {
+                FullContext::Split(left, right) => {
+                    self.right_nodes.push(&mut **right);
+                    node = &mut **left;
+                }
+                val @ FullContext::Single(_) => {
+                    self.current_node = Some(val);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+impl<'a> ContextIterWithBreaks<'a> {
+    fn new(node: &'a mut FullContext) -> ContextIterWithBreaks<'a> {
+        let mut iter = ContextIterWithBreaks {
+            right_nodes: vec![],
+            current_node: None,
+        };
+        iter.add_left_subtree(node);
+        iter
+    }
+
+    /// Consume a binary tree node, traversing its left subtree and
+    /// adding all branches to the right to the `right_nodes` field
+    /// while setting the current node to the left-most child.
+    fn add_left_subtree(&mut self, mut node: &'a mut FullContext) {
+        loop {
+            match node {
+                FullContext::Split(left, right) => {
+                    self.right_nodes.push(&mut **right);
+                    node = &mut **left;
+                }
+                val @ FullContext::Single(_) => {
+                    self.current_node = Some(val);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+impl<'a> Iterator for ContextIter<'a> {
+    type Item = &'a mut FullContext;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Get the item we're going to return.
+        let result = self.current_node.take();
+
+        // Now add the next left subtree
+        // (this is the "recursive call")
+        if let Some(node) = self.right_nodes.pop() {
+            self.add_left_subtree(node);
+        }
+        match result {
+            Some(c) => {
+                if c.inner().broken.is_some() {
+                    self.next()
+                } else {
+                    Some(c)
+                }
+            }
+            None => None,
+        }
+    }
+}
+
+impl<'a> Iterator for ContextIterWithBreaks<'a> {
+    type Item = &'a mut FullContext;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Get the item we're going to return.
+        let result = self.current_node.take();
+
+        // Now add the next left subtree
+        // (this is the "recursive call")
+        if let Some(node) = self.right_nodes.pop() {
+            self.add_left_subtree(node);
+        }
+        result
+    }
 }
 
 impl Context {
-    pub fn new() -> Context {
+    fn new() -> Context {
         Context {
             start_group: Group::new(0),
             //spawn_triggered: false,
@@ -42,30 +308,47 @@ impl Context {
             func_id: 0,
             broken: None,
 
-            sync_group: 0,
-            sync_part: 0,
             fn_context_change_stack: Vec::new(),
+            return_value: NULL_STORAGE,
+            return_value2: NULL_STORAGE,
+            root_context_ptr: std::ptr::null_mut(),
         }
     }
 
-    pub fn next_fn_id(&self, globals: &mut Globals) -> Context {
+    pub fn next_fn_id(&mut self, globals: &mut Globals) {
         (*globals).func_ids.push(FunctionId {
             parent: Some(self.func_id),
             obj_list: Vec::new(),
             width: None,
         });
 
-        let mut out = self.clone();
-        out.func_id = globals.func_ids.len() - 1;
-        out
+        self.func_id = globals.func_ids.len() - 1;
+    }
+
+    pub fn get_variable(&self, name: Intern<String>) -> Option<StoredValue> {
+        self.variables.get(&name).map(|a| a.last().unwrap().0)
+    }
+
+    pub fn new_variable(&mut self, name: Intern<String>, val: StoredValue, layer: i16) {
+        match self.variables.get_mut(&name) {
+            Some(stack) => stack.push((val, layer)),
+            None => {
+                self.variables.insert(name, vec![(val, layer)]);
+            }
+        }
+    }
+
+    pub fn get_variables(&self) -> &HashMap<Intern<String>, Vec<(StoredValue, i16)>> {
+        &self.variables
+    }
+
+    pub fn set_all_variables(&mut self, vars: HashMap<Intern<String>, Vec<(StoredValue, i16)>>) {
+        (*self).variables = vars;
     }
 }
 
 //will merge one set of context, returning false if no mergable contexts were found
-pub fn merge_contexts(
-    contexts: &mut SmallVec<[Context; CONTEXT_MAX]>,
-    globals: &mut Globals,
-) -> bool {
+pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> bool {
     let mut mergable_ind = Vec::<usize>::new();
     let mut ref_c = 0;
     loop {
@@ -84,10 +367,12 @@ pub fn merge_contexts(
             let mut not_eq = false;
 
             //check variables are equal
-            for (key, val) in &c.variables {
-                if globals.stored_values[ref_c.variables[key]] != globals.stored_values[*val] {
-                    not_eq = true;
-                    break;
+            for (key, stack) in &c.variables {
+                for (i, (val, _)) in stack.iter().enumerate() {
+                    if !value_equality(ref_c.variables[key][i].0, *val, globals) {
+                        not_eq = true;
+                        break;
+                    }
                 }
             }
             if not_eq {
@@ -148,3 +433,5 @@ pub fn merge_contexts(
 
     true
 }
+
+//will merge one set of context, returning false if no mergable contexts were found

@@ -1,12 +1,14 @@
 //! Abstract Syntax Tree (AST) type definitions
 
+use internment::Intern;
+
 use crate::compiler_types::ImportType;
 use crate::fmt::SpwnFmt;
 use crate::parser::FileRange;
 use crate::value_storage::StoredValue;
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
-    Def((String, Expression)),
+    Def((Intern<String>, Expression)),
     Extract(Expression),
 }
 
@@ -60,7 +62,7 @@ pub enum ValueBody {
     Number(f64),
     CmpStmt(CompoundStatement),
     Dictionary(Vec<DictDef>),
-    Symbol(String),
+    Symbol(Intern<String>),
     Bool(bool),
     Expression(Expression),
     Str(String),
@@ -207,8 +209,8 @@ impl Attribute {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Path {
-    Member(String),
-    Associated(String),
+    Member(Intern<String>),
+    Associated(Intern<String>),
     Index(Expression),
     NSlice(Vec<Slice>),
     Call(Vec<Argument>),
@@ -219,14 +221,14 @@ pub enum Path {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Definition {
-    pub symbol: String,
+    pub symbol: Intern<String>,
     pub value: Expression,
     //pub mutable: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Argument {
-    pub symbol: Option<String>,
+    pub symbol: Option<Intern<String>>,
     pub value: Expression,
     pub pos: FileRange,
 }
@@ -277,7 +279,7 @@ pub struct Native {
 }*/
 //                 name         def value     props       type ind.
 pub type ArgDef = (
-    String,
+    Intern<String>,
     Option<Expression>,
     Attribute,
     Option<Expression>,
@@ -288,13 +290,12 @@ pub struct Macro {
     pub args: Vec<ArgDef>,
     pub body: CompoundStatement,
     pub properties: Attribute,
-    pub arg_pos: FileRange,
-    pub decorator: Option<Box<Variable>> // poo poo stinky
+    pub arg_pos: FileRange
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct For {
-    pub symbol: String,
+    pub symbol: Intern<String>,
     pub array: Expression,
     pub body: Vec<Statement>,
 }

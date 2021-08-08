@@ -1,11 +1,13 @@
 #[no_level]
 
-deco = (function) {
-	$.print("decorated :0");
-	$.print("absolutely insane");
-	return function;
-}
+type @cum;
 
-let a = [[deco]] (ok) {
-
+impl @cum {
+	deco: (func, str) {
+	$.print(str);
+	return func;
 }
+}
+let b = [[@cum::{}.deco("sex")]] !{
+
+};

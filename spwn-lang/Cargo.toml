@@ -4,6 +4,9 @@ version = "0.0.5"
 authors = ["Spu7Nix <spu7nix@outlook.com>"]
 edition = "2018"
 
+[profile.release]
+debug = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
@@ -18,9 +21,7 @@ lazy_static = "1.4.0"
 crc32fast = "1.2.0"
 logos = "0.11.4"
 termcolor = "1.1.2"
-smallvec = "1.4.2"
 text_io = "0.1.8"
-tempfile = "3.2.0"
 regex = "1.5.4"
 slyce = "0.3.1"
 

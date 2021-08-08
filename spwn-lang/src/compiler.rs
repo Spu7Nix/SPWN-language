@@ -5,12 +5,14 @@ use crate::builtin::*;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
 use crate::context::*;
+use crate::fmt::SpwnFmt;
 use crate::globals::Globals;
 use crate::levelstring::*;
 use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
 use std::collections::{HashMap, HashSet};
+use std::mem;
 
 use crate::parser::{ParseNotes, SyntaxError};
 use std::fs;
@@ -18,7 +20,6 @@ use std::path::PathBuf;
 
 use crate::compiler_types::*;
 use crate::print_with_color;
-pub const CONTEXT_MAX: usize = 2;
 
 use ariadne::Fmt;
 use internment::Intern;
@@ -414,7 +415,8 @@ impl From<RuntimeError> for ErrorReport {
                     match breaktype {
                         BreakType::ContinueLoop => "Continue",
                         BreakType::Loop => "Break",
-                        BreakType::Macro => "Return",
+                        BreakType::Macro(_, _) => "Return",
+                        BreakType::Switch(_) => unreachable!("Switch break in the wild"),
                     }
                 ),
                 &[
@@ -430,8 +432,8 @@ impl From<RuntimeError> for ErrorReport {
     }
 }
 
-pub const NULL_STORAGE: usize = 1;
-pub const BUILTIN_STORAGE: usize = 0;
+pub const NULL_STORAGE: StoredValue = 1;
+pub const BUILTIN_STORAGE: StoredValue = 0;
 
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
@@ -453,7 +455,7 @@ pub fn compile_spwn(
             None,
         )));
     }
-    let mut start_context = Context::new();
+    let mut start_context = FullContext::new();
     //store at pos 0
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
@@ -472,15 +474,15 @@ pub fn compile_spwn(
     let start_time = Instant::now();
 
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
-        let standard_lib = import_module(
+        import_module(
             &ImportType::Lib(STD_PATH.to_string()),
-            &start_context,
+            &mut start_context,
             &mut globals,
             start_info.clone(),
             false,
         )?;
 
-        if standard_lib.len() != 1 {
+        if let FullContext::Split(_, _) = start_context {
             return Err(RuntimeError::CustomError(create_error(
                 start_info,
                 "The standard library can not split the context",
@@ -489,10 +491,10 @@ pub fn compile_spwn(
             )));
         }
 
-        start_context = standard_lib[0].1.clone();
-
-        if let Value::Dict(d) = &globals.stored_values[standard_lib[0].0] {
-            start_context.variables.extend(d.clone());
+        if let Value::Dict(d) = &globals.stored_values[start_context.inner().return_value] {
+            for (a, b, c) in d.iter().map(|(k, v)| (*k, *v, -1)) {
+                start_context.inner().new_variable(a, b, c)
+            }
         } else {
             return Err(RuntimeError::CustomError(create_error(
                 start_info,
@@ -503,20 +505,16 @@ pub fn compile_spwn(
         }
     }
 
-    let (contexts, _) = compile_scope(
-        &statements,
-        smallvec![start_context],
-        &mut globals,
-        start_info,
-    )?;
+    compile_scope(&statements, &mut start_context, &mut globals, start_info)?;
 
-    for c in contexts {
+    for fc in start_context.with_breaks() {
+        let c = fc.inner();
         let end_pos = statements.last().unwrap().pos.1;
-        if let Some((i, r)) = c.broken {
+        if let Some((r, i)) = c.broken {
             return Err(RuntimeError::BreakNeverUsedError {
                 breaktype: r,
-                info: i.clone(),
-                broke: i.position,
+                info: CompilerInfo::from_area(i),
+                broke: i,
                 dropped: CodeArea {
                     pos: (end_pos, end_pos),
                     file: Intern::new(path),
@@ -561,42 +559,25 @@ pub fn compile_spwn(
     Ok(globals)
 }
 
-use smallvec::{smallvec, SmallVec};
-
 pub fn compile_scope(
     statements: &[ast::Statement],
-    mut contexts: SmallVec<[Context; CONTEXT_MAX]>,
+    contexts: &mut FullContext,
     globals: &mut Globals,
     mut info: CompilerInfo,
-) -> Result<(SmallVec<[Context; CONTEXT_MAX]>, Returns), RuntimeError> {
-    let mut returns: Returns = SmallVec::new();
-
-    //take out broken contexts
-
-    let mut broken_contexts = SmallVec::new();
-    let mut to_be_removed = SmallVec::<[usize; CONTEXT_MAX]>::new();
-
-    for (i, c) in contexts.iter().enumerate() {
-        if c.broken != None {
-            broken_contexts.push(c.clone());
-            to_be_removed.push(i)
-        }
+) -> Result<(), RuntimeError> {
+    if contexts.iter().next().is_none() {
+        return Ok(());
     }
-
-    for i in to_be_removed.iter().rev() {
-        contexts.swap_remove(*i);
-    }
-    if contexts.is_empty() {
-        return Ok((broken_contexts, returns));
-    }
-
-    globals.stored_values.increment_lifetimes();
+    contexts.enter_scope();
 
     for statement in statements.iter() {
+        contexts.reset_return_vals();
         //find out what kind of statement this is
         //let start_time = Instant::now();
 
         //print_error_intro(info.pos, &info.current_file);
+
+        //println!("{}", statement.fmt(0));
 
         // println!(
         //     "{} -> Compiling a statement in {} contexts",
@@ -610,18 +591,10 @@ pub fn compile_scope(
         //     info.position.file.to_string_lossy(),
         //     info.position.pos.0
         // );
-        if contexts.is_empty() {
-            return Err(RuntimeError::CustomError(create_error(
-                info,
-                "No context! This is probably a bug, please contact sputnix",
-                &[],
-                None,
-            )));
-        }
         use ast::StatementBody::*;
 
         let stored_context = if statement.arrow {
-            Some(contexts.clone())
+            Some(contexts.iter().map(|a| a.clone()).collect::<Vec<_>>())
         } else {
             None
         };
@@ -630,35 +603,35 @@ pub fn compile_scope(
         //use crate::fmt::SpwnFmt;
         match &statement.body {
             Expr(expr) => {
-                let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> = SmallVec::new();
-                for context in &contexts {
-                    let is_assign = !expr.operators.is_empty()
-                        && expr.operators[0] == ast::Operator::Assign
-                        && !expr.values[0].is_undefinable(context, globals);
+                let is_assign = !expr.operators.is_empty()
+                    && expr.operators[0] == ast::Operator::Assign
+                    && !expr.values[0]
+                        .is_undefinable(contexts.iter().next().unwrap().inner(), globals);
 
-                    //println!("{:?}, {}", expr, is_assign);
+                //println!("{:?}, {}", expr, is_assign);
 
-                    if is_assign {
-                        let mut new_expr = expr.clone();
-                        let symbol = new_expr.values.remove(0);
-                        //use crate::fmt::SpwnFmt;
-                        new_expr.operators.remove(0); //assign operator
-                        let mutable = symbol.operator == Some(ast::UnaryOperator::Let);
+                if is_assign {
+                    let mut new_expr = expr.clone();
+                    let symbol = new_expr.values.remove(0);
+                    //use crate::fmt::SpwnFmt;
+                    new_expr.operators.remove(0); //assign operator
+                    let mutable = symbol.operator == Some(ast::UnaryOperator::Let);
 
-                        //let mut new_context = context.clone();
+                    //let mut new_context = context.clone();
 
-                        match (
-                            new_expr.values.len() == 1
-                                && new_expr.values[0].path.is_empty()
-                                && new_expr.values[0].operator.is_none(),
-                            &new_expr.values[0].value.body,
-                        ) {
-                            (true, ast::ValueBody::CmpStmt(f)) => {
-                                //to account for recursion
+                    match (
+                        new_expr.values.len() == 1
+                            && new_expr.values[0].path.is_empty()
+                            && new_expr.values[0].operator.is_none(),
+                        &new_expr.values[0].value.body,
+                    ) {
+                        (true, ast::ValueBody::CmpStmt(f)) => {
+                            //to account for recursion
 
-                                //create the function context
-                                let mut new_context = context.clone();
-                                let storage = symbol.define(&mut new_context, globals, &info)?;
+                            //create the function context
+                            for full_context in contexts.iter() {
+                                let storage =
+                                    symbol.define(full_context.inner(), globals, &info)?;
 
                                 //pick a start group
                                 let start_group = Group::next_free(&mut globals.closed_groups);
@@ -666,131 +639,96 @@ pub fn compile_scope(
                                 globals.stored_values[storage] =
                                     Value::TriggerFunc(TriggerFunction { start_group });
 
-                                new_context.start_group = start_group;
-
-                                let new_info = info.clone();
-                                new_context.fn_context_change_stack = vec![info.position];
+                                full_context.inner().fn_context_change_stack = vec![info.position];
                                 //new_info.last_context_change_stack = vec![info.position.clone()];
-                                let (_, inner_returns) = compile_scope(
-                                    &f.statements,
-                                    smallvec![new_context],
+
+                                f.to_trigger_func(
+                                    full_context,
                                     globals,
-                                    new_info,
+                                    info.clone(),
+                                    Some(start_group),
                                 )?;
-                                returns.extend(inner_returns);
-
-                                let mut after_context = context.clone();
-
-                                let var_storage =
-                                    symbol.define(&mut after_context, globals, &info)?;
-
-                                globals.stored_values[var_storage] =
-                                    Value::TriggerFunc(TriggerFunction { start_group });
-
-                                new_contexts.push(after_context);
-                            }
-                            // (true, ast::ValueBody::Macro(m)) => {
-                            //     let (evaled, inner_returns) =
-                            //         new_expr.eval(context, globals, info.clone(), !mutable)?;
-
-                            //     returns.extend(inner_returns);
-                            //     for (e, c2) in evaled {
-                            //         let mut new_context = c2.clone();
-                            //         let storage =
-                            //             symbol.define(&mut new_context, globals, &info, None)?;
-
-                            //         if let Value::Macro(m) = &mut globals.stored_values[e] {
-                            //             m.def_context
-                            //         } else {
-                            //             unreachable!()
-                            //         }
-
-                            //         globals.stored_values[storage] =
-                            //             globals.stored_values[e].clone();
-                            //         new_contexts.push(new_context);
-                            //     }
-                            // }
-                            _ => {
-                                let (evaled, inner_returns) =
-                                    new_expr.eval(context, globals, info.clone(), !mutable)?;
-
-                                returns.extend(inner_returns);
-                                for (e, c2) in evaled {
-                                    let mut new_context = c2.clone();
-                                    let storage =
-                                        symbol.define(&mut new_context, globals, &info)?;
-                                    //clone the value so as to not share the reference
-
-                                    let cloned = clone_value(
-                                        e,
-                                        globals.get_lifetime(storage),
-                                        globals,
-                                        new_context.start_group,
-                                        !mutable,
-                                        info.position,
-                                    );
-
-                                    globals.stored_values[storage] =
-                                        globals.stored_values[cloned].clone();
-                                    new_contexts.push(new_context);
-                                }
                             }
                         }
-                    } else {
-                        //we dont care about the return value in this case
-                        let (evaled, inner_returns) =
-                            expr.eval(context, globals, info.clone(), false)?;
-                        returns.extend(inner_returns);
-                        new_contexts.extend(evaled.iter().map(|x| {
-                            //globals.stored_values.map.remove(&x.0);
-                            x.1.clone()
-                        }));
+                        // (true, ast::ValueBody::Macro(m)) => {
+                        //     let (evaled, inner_returns) =
+                        //         new_expr.eval(context, globals, info.clone(), !mutable)?;
+
+                        //     returns.extend(inner_returns);
+                        //     for (e, c2) in evaled {
+                        //         let mut new_context = c2.clone();
+                        //         let storage =
+                        //             symbol.define(&mut new_context, globals, &info, None)?;
+
+                        //         if let Value::Macro(m) = &mut globals.stored_values[e] {
+                        //             m.def_context
+                        //         } else {
+                        //             unreachable!()
+                        //         }
+
+                        //         globals.stored_values[storage] =
+                        //             globals.stored_values[e].clone();
+                        //         new_contexts.push(new_context);
+                        //     }
+                        // }
+                        _ => {
+                            new_expr.eval(contexts, globals, info.clone(), !mutable)?;
+
+                            for full_context in contexts.iter() {
+                                let (context, val) = full_context.inner_value();
+                                let storage = symbol.define(context, globals, &info)?;
+                                //clone the value so as to not share the reference
+
+                                let cloned = clone_and_get_value(
+                                    val,
+                                    globals,
+                                    context.start_group,
+                                    !mutable,
+                                );
+
+                                globals.stored_values[storage] = cloned;
+                            }
+                        }
                     }
+                } else {
+                    expr.eval(contexts, globals, info.clone(), true)?;
                 }
-                contexts = new_contexts;
             }
 
             Extract(val) => {
-                let mut all_values: Returns = SmallVec::new();
-                for context in &contexts {
-                    let (evaled, inner_returns) = val.eval(context, globals, info.clone(), true)?;
-                    returns.extend(inner_returns);
-                    all_values.extend(evaled);
-                }
-
-                contexts = SmallVec::new();
-                for (val, mut context) in all_values {
+                val.eval(contexts, globals, info.clone(), true)?;
+                for full_context in contexts.iter() {
+                    let (context, val) = full_context.inner_value();
+                    let fn_context = context.start_group;
                     match globals.stored_values[val].clone() {
                         Value::Dict(d) => {
-                            context.variables.extend(
-                                d.iter()
-                                    .map(|(k, v)| {
-                                        (
-                                            k.clone(),
-                                            clone_value(
-                                                *v,
-                                                1,
-                                                globals,
-                                                context.start_group,
-                                                !globals.is_mutable(*v),
-                                                globals.get_area(*v),
-                                            ),
-                                        )
-                                    })
-                                    .collect::<HashMap<String, StoredValue>>(),
-                            );
+                            let iter = d.iter().map(|(k, v)| {
+                                (
+                                    *k,
+                                    clone_value(
+                                        *v,
+                                        globals,
+                                        fn_context,
+                                        !globals.is_mutable(*v),
+                                        globals.get_area(*v),
+                                    ),
+                                    0,
+                                )
+                            });
+                            for (a, b, c) in iter {
+                                context.new_variable(a, b, c);
+                            }
                         }
                         Value::Builtins => {
                             for name in BUILTIN_LIST.iter() {
-                                let p = store_value(
+                                let p = store_const_value(
                                     Value::BuiltinFunction(*name),
-                                    1,
                                     globals,
-                                    &context,
+                                    fn_context,
                                     info.position,
                                 );
 
-                                context.variables.insert(String::from(*name), p);
+                                context.new_variable(Intern::new(String::from(*name)), p, 0);
                             }
                         }
                         a => {
@@ -802,8 +740,6 @@ pub fn compile_scope(
                             })
                         }
                     }
-
-                    contexts.push(context);
                 }
             }
 
@@ -832,52 +768,27 @@ pub fn compile_scope(
             }
 
             If(if_stmt) => {
-                let mut all_values: Returns = SmallVec::new();
-                for context in &contexts {
-                    let (evaled, inner_returns) =
-                        if_stmt
-                            .condition
-                            .eval(context, globals, info.clone(), true)?;
-                    returns.extend(inner_returns);
-                    all_values.extend(evaled);
-                }
-                contexts = SmallVec::new();
-                for (val, context) in all_values {
+                if_stmt
+                    .condition
+                    .eval(contexts, globals, info.clone(), true)?;
+                for full_context in contexts.iter() {
+                    let (_, val) = full_context.inner_value();
                     match &globals.stored_values[val] {
                         Value::Bool(b) => {
                             //internal if statement
                             if *b {
-                                let new_info = info.clone();
-                                let compiled = compile_scope(
+                                compile_scope(
                                     &if_stmt.if_body,
-                                    smallvec![context.clone()],
+                                    full_context,
                                     globals,
-                                    new_info,
+                                    info.clone(),
                                 )?;
-                                returns.extend(compiled.1);
-                                contexts.extend(compiled.0.iter().map(|c| Context {
-                                    variables: context.variables.clone(),
-
-                                    ..c.clone()
-                                }));
                             } else {
                                 match &if_stmt.else_body {
                                     Some(body) => {
-                                        let new_info = info.clone();
-                                        let compiled = compile_scope(
-                                            body,
-                                            smallvec![context.clone()],
-                                            globals,
-                                            new_info,
-                                        )?;
-                                        returns.extend(compiled.1);
-                                        contexts.extend(compiled.0.iter().map(|c| Context {
-                                            variables: context.variables.clone(),
-
-                                            ..c.clone()
-                                        }));
+                                        compile_scope(body, full_context, globals, info.clone())?;
                                     }
-                                    None => contexts.push(context),
+                                    None => (),
                                 };
                             }
                         }
@@ -895,20 +806,27 @@ pub fn compile_scope(
 
             Impl(imp) => {
                 let message = "cannot run impl statement in a trigger function context, consider moving it to the start of your script.".to_string();
-                if contexts.len() > 1 || contexts[0].start_group.id != Id::Specific(0) {
-                    return Err(RuntimeError::ContextChangeError {
-                        message,
+
+                if let FullContext::Single(c) = &contexts {
+                    if c.start_group.id != Id::Specific(0) {
+                        return Err(RuntimeError::ContextChangeError {
+                            message,
+                            info,
+                            context_changes: c.fn_context_change_stack.clone(),
+                        });
+                    }
+                } else {
+                    return Err(RuntimeError::CustomError(create_error(
                         info,
-                        context_changes: contexts[0].fn_context_change_stack.clone(),
-                    });
+                        "impl cannot run in a split context",
+                        &[],
+                        None,
+                    )));
                 }
 
-                let new_info = info.clone();
-                let (evaled, inner_returns) =
-                    imp.symbol
-                        .to_value(contexts[0].clone(), globals, new_info, true)?;
+                imp.symbol.to_value(contexts, globals, info.clone(), true)?;
 
-                if evaled.len() > 1 {
+                if let FullContext::Split(_, _) = contexts {
                     return Err(RuntimeError::CustomError(create_error(
                         info,
                         "impl statements with context-splitting values are not allowed",
@@ -916,22 +834,20 @@ pub fn compile_scope(
                         None,
                     )));
                 }
-                returns.extend(inner_returns);
-                let (typ, c) = evaled[0].clone();
+
+                let (c, typ) = contexts.inner_value();
 
                 if c.start_group.id != Id::Specific(0) {
                     return Err(RuntimeError::ContextChangeError {
-                        message,
+                        message: "impl type changes the context".to_string(),
                         info,
-                        context_changes: contexts[0].fn_context_change_stack.clone(),
+                        context_changes: c.fn_context_change_stack.clone(),
                     });
                 }
                 match globals.stored_values[typ].clone() {
                     Value::TypeIndicator(s) => {
-                        let new_info = info.clone();
-                        let (evaled, inner_returns) =
-                            eval_dict(imp.members.clone(), &c, globals, new_info, true)?;
-                        if evaled.len() > 1 {
+                        eval_dict(imp.members.clone(), contexts, globals, info.clone(), true)?;
+                        if let FullContext::Split(_, _) = contexts {
                             return Err(RuntimeError::CustomError(create_error(
                                 info,
                                 "impl statements with context-splitting values are not allowed",
@@ -940,34 +856,30 @@ pub fn compile_scope(
                             )));
                         }
                         //Returns inside impl values dont really make sense do they
-                        if !inner_returns.is_empty() {
+                        if contexts.inner().broken.is_some() {
                             return Err(RuntimeError::CustomError(create_error(
                                 info,
-                                "you can't use return from inside an impl statement",
+                                "you can't use return from inside an impl statement value",
                                 &[],
                                 None,
                             )));
                         }
-                        let (val, _) = evaled[0];
+                        let (_, val) = contexts.inner_value();
+
                         // make this not ugly, future me
-                        globals.stored_values.increment_single_lifetime(
-                            val,
-                            1000,
-                            &mut HashSet::new(),
-                        );
 
                         if let Value::Dict(d) = &globals.stored_values[val] {
                             match globals.implementations.get_mut(&s) {
                                 Some(implementation) => {
                                     for (key, val) in d.iter() {
-                                        (*implementation).insert(key.clone(), (*val, true));
+                                        (*implementation).insert(*key, (*val, true));
                                     }
                                 }
                                 None => {
                                     globals.implementations.insert(
                                         s,
                                         d.iter()
-                                            .map(|(key, value)| (key.clone(), (*value, true)))
+                                            .map(|(key, value)| (*key, (*value, true)))
                                             .collect(),
                                     );
                                 }
@@ -992,18 +904,12 @@ pub fn compile_scope(
                 /*for context in &mut contexts {
                     context.x += 1;
                 }*/
-                let mut all_values: Returns = SmallVec::new();
-                for context in contexts {
-                    let (evaled, inner_returns) =
-                        call.function
-                            .to_value(context, globals, info.clone(), true)?;
-                    returns.extend(inner_returns);
-                    all_values.extend(evaled);
-                }
-                contexts = SmallVec::new();
+                call.function
+                    .to_value(contexts, globals, info.clone(), true)?;
+
                 //let mut obj_list = Vec::<GDObj>::new();
-                for (func, context) in all_values {
-                    contexts.push(context.clone());
+                for full_context in contexts.iter() {
+                    let (context, func) = full_context.inner_value();
                     let mut params = HashMap::new();
                     params.insert(
                         51,
@@ -1036,14 +942,7 @@ pub fn compile_scope(
             }
 
             For(f) => {
-                let mut all_arrays: Returns = SmallVec::new();
-                for context in &contexts {
-                    let (evaled, inner_returns) =
-                        f.array.eval(context, globals, info.clone(), true)?;
-                    returns.extend(inner_returns);
-                    all_arrays.extend(evaled);
-                }
-                contexts = SmallVec::new();
+                f.array.eval(contexts, globals, info.clone(), true)?;
                 /*
                 Before going further you should probably understand what contexts mean.
                 A "context", in SPWN, is like a parallel universe. Each context is nearly
@@ -1053,192 +952,125 @@ pub fn compile_scope(
                 of contexts, one for each possible value from the conversion. All of the branched contexts
                 will be evaluated in isolation to each other.
                 */
-                for (val, context) in all_arrays {
+                let i_name = f.symbol;
+                // skips all broken contexts, so as to not interfere with potential breaks in the following loops
+
+                for full_context in contexts.iter() {
+                    let (_, val) = full_context.inner_value();
+                    globals.push_new_preserved();
+                    globals.push_preserved_val(val);
+
                     match globals.stored_values[val].clone() {
                         // what are we iterating
                         Value::Array(arr) => {
-                            // its an array!
-
-                            let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                smallvec![context.clone()];
-                            // new contexts: any contexts that are created in the loop. currently only has 1
-
-                            let mut out_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                SmallVec::new(); // out contexts: anything declared outside the loop
+                            // its an array!for
 
                             for element in arr {
                                 // going through the array items
+                                full_context.disable_breaks(BreakType::ContinueLoop);
 
-                                for c in &mut new_contexts {
-                                    // reset all variables per context
-                                    (*c).variables = context.variables.clone();
-                                    (*c).variables.insert(f.symbol.clone(), element);
-                                }
+                                full_context.set_variable_and_clone(
+                                    i_name,
+                                    element,
+                                    -1, // so that it gets removed at the end of the scope
+                                    true,
+                                    globals,
+                                    globals.get_area(element),
+                                );
 
-                                let new_info = info.clone(); // file position info
+                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
-                                let (end_contexts, inner_returns) =
-                                    compile_scope(&f.body, new_contexts, globals, new_info)?; // eval the stuff
+                                let all_breaks = full_context.with_breaks().all(|fc| {
+                                    !matches!(
+                                        fc.inner().broken,
+                                        Some((BreakType::ContinueLoop, _)) | None
+                                    )
+                                });
 
-                                // end_contexts has any new contexts made in the loop
-
-                                new_contexts = SmallVec::new();
-                                for mut c in end_contexts {
-                                    // add contexts made in the loop to the new_contexts, if they dont have a break
-                                    match c.broken {
-                                        Some((_, BreakType::Loop)) => {
-                                            c.broken = None;
-                                            out_contexts.push(c)
-                                        }
-                                        Some((_, BreakType::Macro)) => out_contexts.push(c),
-                                        Some((_, BreakType::ContinueLoop)) => {
-                                            c.broken = None;
-                                            new_contexts.push(c)
-                                        }
-                                        _ => new_contexts.push(c),
-                                    }
-                                }
-
-                                returns.extend(inner_returns); // return stuff
-                                if new_contexts.is_empty() {
+                                if all_breaks {
                                     break;
                                 }
                             }
-
-                            out_contexts.extend(new_contexts);
-                            contexts.extend(out_contexts.iter().map(|c| Context {
-                                variables: context.variables.clone(),
-                                ..c.clone()
-                            }));
 
                             // finally append all newly created ones to the global count
                         }
                         Value::Dict(d) => {
                             // its a dict!
 
-                            let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                smallvec![context.clone()];
-                            // new contexts: any contexts that are created in the loop. currently only has 1
-
-                            let mut out_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                SmallVec::new(); // out contexts: anything declared outside the loop
-
                             for (k, v) in d {
-                                // going through the array items
+                                // going through the dict items
+                                full_context.disable_breaks(BreakType::ContinueLoop);
 
-                                for c in &mut new_contexts {
+                                for c in full_context.iter() {
+                                    let fn_context = c.inner().start_group;
+                                    let key = store_val_m(
+                                        Value::Str(k.as_ref().clone()),
+                                        globals,
+                                        fn_context,
+                                        true,
+                                        globals.get_area(v),
+                                    );
+                                    let val = clone_value(
+                                        v,
+                                        globals,
+                                        fn_context,
+                                        true,
+                                        globals.get_area(v),
+                                    );
                                     // reset all variables per context
-                                    (*c).variables = context.variables.clone();
-                                    let key_stored = store_const_value(
-                                        // store the dict key
-                                        Value::Str(k.clone()),
-                                        1,
-                                        globals,
-                                        c,
-                                        info.position,
+                                    (*c.inner()).new_variable(
+                                        i_name,
+                                        store_const_value(
+                                            Value::Array(vec![key, val]),
+                                            globals,
+                                            fn_context,
+                                            globals.get_area(v),
+                                        ),
+                                        -1,
                                     );
-                                    let stored = store_const_value(
-                                        // store the val key
-                                        Value::Array(vec![key_stored, v]),
-                                        1,
-                                        globals,
-                                        c,
-                                        info.position,
-                                    );
-                                    (*c).variables.insert(f.symbol.clone(), stored);
                                 }
 
-                                let new_info = info.clone(); // file position info
+                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
-                                let (end_contexts, inner_returns) =
-                                    compile_scope(&f.body, new_contexts, globals, new_info)?; // eval the stuff
-                                                                                              // end_contexts has any new contexts made in the loop
+                                let all_breaks = full_context.with_breaks().all(|fc| {
+                                    !matches!(
+                                        fc.inner().broken,
+                                        Some((BreakType::ContinueLoop, _)) | None
+                                    )
+                                });
 
-                                new_contexts = SmallVec::new();
-                                for mut c in end_contexts {
-                                    // add contexts made in the loop to the new_contexts, if they dont have a break
-                                    match c.broken {
-                                        Some((_, BreakType::Loop)) => {
-                                            c.broken = None;
-                                            out_contexts.push(c)
-                                        }
-                                        Some((_, BreakType::Macro)) => out_contexts.push(c),
-                                        Some((_, BreakType::ContinueLoop)) => {
-                                            c.broken = None;
-                                            new_contexts.push(c)
-                                        }
-                                        _ => new_contexts.push(c),
-                                    }
-                                }
-
-                                returns.extend(inner_returns); // return stuff
-                                if new_contexts.is_empty() {
+                                if all_breaks {
                                     break;
                                 }
                             }
-                            out_contexts.extend(new_contexts);
-                            contexts.extend(out_contexts.iter().map(|c| Context {
-                                variables: context.variables.clone(),
-                                ..c.clone()
-                            }));
-                            // finally append all newly created ones to the global count
                         }
                         Value::Str(s) => {
-                            //let iterator_val = store_value(Value::Null, globals);
-                            //let scope_vars = context.variables.clone();
-
-                            let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                smallvec![context.clone()];
-                            let mut out_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                SmallVec::new();
-
                             for ch in s.chars() {
-                                //println!("{}", new_contexts.len());
-                                for c in &mut new_contexts {
-                                    (*c).variables = context.variables.clone();
-                                    let stored = store_const_value(
-                                        Value::Str(ch.to_string()),
-                                        1,
-                                        globals,
-                                        c,
-                                        info.position,
-                                    );
-                                    (*c).variables.insert(f.symbol.clone(), stored);
-                                }
+                                // going through the array items
+                                full_context.disable_breaks(BreakType::ContinueLoop);
 
-                                let new_info = info.clone();
+                                full_context.set_variable_and_store(
+                                    i_name,
+                                    Value::Str(ch.to_string()),
+                                    -1, // so that it gets removed at the end of the scope
+                                    true,
+                                    globals,
+                                    info.position,
+                                );
 
-                                let (end_contexts, inner_returns) =
-                                    compile_scope(&f.body, new_contexts, globals, new_info)?;
+                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
-                                new_contexts = SmallVec::new();
-                                for mut c in end_contexts {
-                                    // add contexts made in the loop to the new_contexts, if they dont have a break
-                                    match c.broken {
-                                        Some((_, BreakType::Loop)) => {
-                                            c.broken = None;
-                                            out_contexts.push(c)
-                                        }
-                                        Some((_, BreakType::Macro)) => out_contexts.push(c),
-                                        Some((_, BreakType::ContinueLoop)) => {
-                                            c.broken = None;
-                                            new_contexts.push(c)
-                                        }
-                                        _ => new_contexts.push(c),
-                                    }
-                                }
+                                let all_breaks = full_context.with_breaks().all(|fc| {
+                                    !matches!(
+                                        fc.inner().broken,
+                                        Some((BreakType::ContinueLoop, _)) | None
+                                    )
+                                });
 
-                                returns.extend(inner_returns);
-
-                                if new_contexts.is_empty() {
+                                if all_breaks {
                                     break;
                                 }
                             }
-                            out_contexts.extend(new_contexts);
-                            contexts.extend(out_contexts.iter().map(|c| Context {
-                                variables: context.variables.clone(),
-                                ..c.clone()
-                            }));
                         }
 
                         Value::Range(start, end, step) => {
@@ -1247,60 +1079,36 @@ pub fn compile_scope(
                             let range: &mut dyn Iterator<Item = i32> =
                                 if start < end { &mut normal } else { &mut rev };
 
-                            let mut new_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                smallvec![context.clone()];
-                            let mut out_contexts: SmallVec<[Context; CONTEXT_MAX]> =
-                                SmallVec::new();
-
                             for num in range {
-                                //println!("{}", new_contexts.len());
-                                let element = store_value(
+                                // going through the array items
+                                full_context.disable_breaks(BreakType::ContinueLoop);
+
+                                full_context.set_variable_and_store(
+                                    i_name,
                                     Value::Number(num as f64),
-                                    0,
+                                    -1, // so that it gets removed at the end of the scope
+                                    true,
                                     globals,
-                                    &context,
                                     info.position,
                                 );
-                                for c in &mut new_contexts {
-                                    (*c).variables = context.variables.clone();
-                                    (*c).variables.insert(f.symbol.clone(), element);
-                                }
 
-                                let new_info = info.clone();
+                                //dbg!(full_context.with_breaks().count());
 
-                                //println!("{}", new_contexts.len());
+                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
-                                let (end_contexts, inner_returns) =
-                                    compile_scope(&f.body, new_contexts, globals, new_info)?;
+                                //dbg!(full_context.with_breaks().count());
 
-                                new_contexts = SmallVec::new();
-                                for mut c in end_contexts {
-                                    // add contexts made in the loop to the new_contexts, if they dont have a break
-                                    match c.broken {
-                                        Some((_, BreakType::Loop)) => {
-                                            c.broken = None;
-                                            out_contexts.push(c)
-                                        }
-                                        Some((_, BreakType::Macro)) => out_contexts.push(c),
-                                        Some((_, BreakType::ContinueLoop)) => {
-                                            c.broken = None;
-                                            new_contexts.push(c)
-                                        }
-                                        _ => new_contexts.push(c),
-                                    }
-                                }
+                                let all_breaks = full_context.with_breaks().all(|fc| {
+                                    !matches!(
+                                        fc.inner().broken,
+                                        Some((BreakType::ContinueLoop, _)) | None
+                                    )
+                                });
 
-                                returns.extend(inner_returns);
-
-                                if new_contexts.is_empty() {
+                                if all_breaks {
                                     break;
                                 }
                             }
-                            out_contexts.extend(new_contexts);
-                            contexts.extend(out_contexts.iter().map(|c| Context {
-                                variables: context.variables.clone(),
-                                ..c.clone()
-                            }));
                         }
 
                         a => {
@@ -1312,66 +1120,81 @@ pub fn compile_scope(
                             })
                         }
                     }
+                    full_context.disable_breaks(BreakType::Loop);
+                    full_context.disable_breaks(BreakType::ContinueLoop);
+                    globals.pop_preserved();
                 }
             }
             Break => {
                 //set all contexts to broken
-                for c in &mut contexts {
-                    (*c).broken = Some((info.clone(), BreakType::Loop));
+                for c in contexts.iter() {
+                    (*c.inner()).broken = Some((BreakType::Loop, info.position));
                 }
                 break;
             }
 
             Continue => {
                 //set all contexts to broken
-                for c in &mut contexts {
-                    (*c).broken = Some((info.clone(), BreakType::ContinueLoop));
+                for c in contexts.iter() {
+                    (*c.inner()).broken = Some((BreakType::ContinueLoop, info.position));
                 }
                 break;
             }
 
             Return(return_val) => {
-                match return_val {
-                    Some(val) => {
-                        let mut all_values: Returns = SmallVec::new();
-                        for context in &contexts {
-                            let (evaled, inner_returns) =
-                                val.eval(context, globals, info.clone(), true)?;
-                            returns.extend(inner_returns);
-                            all_values.extend(evaled);
+                for full_context in contexts.iter() {
+                    // let full_context = if statement.arrow {
+                    //     *full_context = FullContext::Split(
+                    //         full_context.clone().into(),
+                    //         full_context.clone().into(),
+                    //     );
+                    //     if let FullContext::Split(_, c) = full_context {
+                    //         &mut **c
+                    //     } else {
+                    //         unreachable!()
+                    //     }
+                    // } else {
+                    //     full_context
+                    // };
+                    match return_val {
+                        Some(val) => {
+                            val.eval(full_context, globals, info.clone(), true)?;
+                            for context in full_context.iter() {
+                                let return_val = context.inner().return_value;
+                                context.inner().broken = Some((
+                                    BreakType::Macro(
+                                        Some(clone_value(
+                                            return_val,
+                                            globals,
+                                            context.inner().start_group,
+                                            true,
+                                            globals.get_area(return_val),
+                                        )),
+                                        statement.arrow,
+                                    ),
+                                    info.position,
+                                ));
+                            }
                         }
 
-                        returns.extend(all_values);
-                    }
-
-                    None => {
-                        let mut all_values: Returns = SmallVec::new();
-                        for context in &contexts {
-                            all_values.push((
-                                store_value(Value::Null, 1, globals, context, info.position),
-                                context.clone(),
-                            ));
+                        None => {
+                            full_context.inner().broken =
+                                Some((BreakType::Macro(None, statement.arrow), info.position));
                         }
-                        returns.extend(all_values);
-                    }
-                };
+                    };
+                }
                 if !statement.arrow {
-                    //set all contexts to broken
-                    for c in &mut contexts {
-                        (*c).broken = Some((info.clone(), BreakType::Macro));
-                    }
                     break;
                 }
             }
 
             Error(e) => {
                 let mut errors = Vec::new();
-                for context in &contexts {
-                    let (evaled, _) = e.message.eval(context, globals, info.clone(), true)?;
-                    for (msg, _) in evaled {
-                        let err = globals.stored_values[msg].to_str(globals);
-                        errors.push((info.position, err))
-                    }
+
+                e.message.eval(contexts, globals, info.clone(), true)?;
+                for c in contexts.iter() {
+                    let err = globals.stored_values[c.inner().return_value].to_str(globals);
+                    errors.push((info.position, err))
                 }
 
                 let mut new_errors = Vec::new();
@@ -1385,48 +1208,60 @@ pub fn compile_scope(
             }
         }
 
-        let mut to_be_removed = Vec::new();
-
-        for (i, c) in contexts.iter().enumerate() {
-            if c.broken != None {
-                broken_contexts.push(c.clone());
-                to_be_removed.push(i)
-            }
-        }
-
-        for i in to_be_removed.iter().rev() {
-            contexts.swap_remove(*i);
-        }
-
-        // does this make sense?? why wasn't this here earlier??
-        if contexts.is_empty() {
-            return Ok((broken_contexts, returns));
-        }
-
         if let Some(c) = stored_context {
             //resetting the context if async
-            for c in contexts {
-                if let Some((i, r)) = c.broken {
-                    return Err(RuntimeError::BreakNeverUsedError {
-                        breaktype: r,
-                        info: i.clone(),
-                        broke: i.position,
-                        dropped: info.position,
-                        reason: "it's inside an arrow statement".to_string(),
-                    });
+            let mut list = c;
+
+            for context in contexts.with_breaks() {
+                if let Some((r, i)) = context.inner().broken {
+                    if let BreakType::Macro(_, true) = r {
+                        list.push(context.clone());
+                    } else {
+                        return Err(RuntimeError::BreakNeverUsedError {
+                            breaktype: r,
+                            info: CompilerInfo::from_area(i),
+                            broke: i,
+                            dropped: info.position,
+                            reason: "it's inside an arrow statement".to_string(),
+                        });
+                    }
                 }
             }
-            contexts = c;
+            *contexts = FullContext::stack(&mut list.into_iter()).unwrap();
         }
 
         //try to merge contexts
-        //if statement_index < statements.len() - 1 {
-        loop {
-            if !merge_contexts(&mut contexts, globals) {
+
+        if let FullContext::Split(_, _) = contexts {
+            let mut broken = Vec::new();
+            let mut not_broken = Vec::new();
+            for c in contexts.with_breaks() {
+                if c.inner().broken.is_some() {
+                    broken.push(c.inner().clone())
+                } else {
+                    not_broken.push(c.inner().clone())
+                }
+            }
+
+            if not_broken.len() > 1 {
+                loop {
+                    if !merge_contexts(&mut not_broken, globals) {
+                        break;
+                    }
+                }
+
+                broken.extend(not_broken);
+
+                *contexts =
+                    FullContext::stack(&mut broken.into_iter().map(FullContext::Single)).unwrap();
+            } else if not_broken.is_empty() {
                 break;
             }
         }
-        //}
+
+        if contexts.iter().next().is_none() {
+            break;
+        }
 
         /*println!(
             "{} -> Compiled '{}' in {} milliseconds!",
@@ -1434,32 +1269,26 @@ pub fn compile_scope(
             statement_type,
             start_time.elapsed().as_millis(),
         );*/
+
+        let increase =
+            0; // please fix this //globals.stored_values.map.len() as u32 - globals.stored_values.prev_value_count;
+
+        if increase > 5000 {
+            globals.collect_garbage(contexts);
+        }
     }
 
-    //return values need longer lifetimes
-    let mut incremented = HashSet::new();
-    for (val, _) in &returns {
-        globals
-            .stored_values
-            .increment_single_lifetime(*val, 1, &mut incremented);
-    }
+    // TODO: get rid of lifetimes
 
-    globals.stored_values.decrement_lifetimes();
-    globals.increment_implementations();
-    //collect garbage
-    globals.stored_values.clean_up();
+    contexts.exit_scope();
 
-    // put broken contexts back
-    contexts.extend(broken_contexts);
-
-    //(*globals).highest_x = context.x;
-    Ok((contexts, returns))
+    Ok(())
 }
 
 fn merge_impl(target: &mut Implementations, source: &Implementations) {
     for (key, imp) in source.iter() {
         match target.get_mut(key) {
-            Some(target_imp) => (*target_imp).extend(imp.iter().map(|x| (x.0.clone(), *x.1))),
+            Some(target_imp) => (*target_imp).extend(imp.iter().map(|x| (*x.0, *x.1))),
             None => {
                 (*target).insert(*key, imp.clone());
             }
@@ -1525,18 +1354,19 @@ pub fn get_import_path(
 
 pub fn import_module(
     path: &ImportType,
-    context: &Context,
+    contexts: &mut FullContext,
     globals: &mut Globals,
     info: CompilerInfo,
     forced: bool,
-) -> Result<Returns, RuntimeError> {
+) -> Result<(), RuntimeError> {
+    //println!("importing: {:?}", path);
     if !forced {
-        if let Some(ret) = globals.prev_imports.get(path) {
+        if let Some(ret) = globals.prev_imports.get(path).cloned() {
             merge_impl(&mut globals.implementations, &ret.1);
-            return Ok(smallvec![(
-                store_value(ret.0.clone(), 1, globals, context, info.position),
-                context.clone()
-            )]);
+            for c in contexts.iter() {
+                c.inner().return_value = ret.0;
+            }
+            return Ok(());
         }
     }
 
@@ -1558,7 +1388,9 @@ pub fn import_module(
         )));
     }
 
-    let unparsed = match fs::read_to_string(&module_path) {
+    let module_path = Intern::new(module_path);
+
+    let unparsed = match fs::read_to_string(module_path.as_ref()) {
         Ok(content) => content,
         Err(e) => {
             return Err(RuntimeError::CustomError(create_error(
@@ -1572,29 +1404,49 @@ pub fn import_module(
             )));
         }
     };
-    let (parsed, notes) = match crate::parse_spwn(unparsed, module_path.clone()) {
+    let (parsed, notes) = match crate::parse_spwn(unparsed, module_path.as_ref().clone()) {
         Ok(p) => p,
         Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
     };
 
-    let mut start_context = Context::new();
+    let mut start_context = FullContext::new();
+
+    globals.push_new_preserved();
+    for c in contexts.with_breaks() {
+        for stack in c.inner().get_variables().values() {
+            for (v, _) in stack.iter() {
+                globals.push_preserved_val(*v);
+            }
+        }
+    }
 
     let mut stored_impl = None;
     if let ImportType::Lib(_) = path {
-        stored_impl = Some(globals.implementations.clone());
-        globals.implementations = HashMap::new();
+        let mut impl_vals = Vec::new();
+        for imp in globals.implementations.values() {
+            for (v, _) in imp.values() {
+                impl_vals.push(*v);
+            }
+        }
+        for v in impl_vals {
+            globals.push_preserved_val(v);
+        }
+        let mut stored = HashMap::new();
+
+        mem::swap(&mut stored, &mut globals.implementations);
+        stored_impl = Some(stored);
     }
 
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
-        let standard_lib = import_module(
+        import_module(
             &ImportType::Lib(STD_PATH.to_string()),
-            &start_context,
+            &mut start_context,
             globals,
             info.clone(),
             false,
         )?;
 
-        if standard_lib.len() != 1 {
+        if let FullContext::Split(_, _) = start_context {
             return Err(RuntimeError::CustomError(create_error(
                 info,
                 "The standard library can not split the context",
@@ -1603,10 +1455,10 @@ pub fn import_module(
             )));
         }
 
-        start_context = standard_lib[0].1.clone();
-
-        if let Value::Dict(d) = &globals.stored_values[standard_lib[0].0] {
-            start_context.variables.extend(d.clone());
+        if let Value::Dict(d) = &globals.stored_values[start_context.inner().return_value] {
+            for (a, b, c) in d.iter().map(|(k, v)| (*k, *v, -1)) {
+                start_context.inner().new_variable(a, b, c)
+            }
         } else {
             return Err(RuntimeError::CustomError(create_error(
                 info,
@@ -1617,36 +1469,46 @@ pub fn import_module(
         }
     }
 
-    let stored_path = globals.path.clone();
-    (*globals).path = module_path.clone();
+    let stored_path = globals.path;
+    (*globals).path = module_path;
 
     let mut new_info = info.clone();
 
-    new_info.position.file = Intern::new(module_path);
+    new_info.position.file = module_path;
     new_info.position.pos = (0, 0);
 
     if let ImportType::Lib(l) = path {
         new_info.current_module = l.clone();
     }
 
-    let (contexts, mut returns) =
-        match compile_scope(&parsed, smallvec![start_context], globals, new_info) {
-            Ok(a) => a,
-            Err(err) => {
-                return Err(RuntimeError::PackageError {
-                    err: Box::new(err),
-                    info,
-                })
-            }
-        };
+    match compile_scope(&parsed, &mut start_context, globals, new_info) {
+        Ok(_) => (),
+        Err(err) => {
+            return Err(RuntimeError::PackageError {
+                err: Box::new(err),
+                info,
+            })
+        }
+    };
 
-    for c in &contexts {
-        if let Some((i, r)) = &c.broken {
-            if *r != BreakType::Macro {
+    globals.pop_preserved();
+
+    for fc in start_context.with_breaks() {
+        let c = fc.inner();
+        if let Some((r, i)) = c.broken {
+            if let BreakType::Macro(v, _) = r {
+                for full_context in contexts.iter() {
+                    let fn_context = full_context.inner().start_group;
+                    (*full_context).inner().return_value = match v {
+                        Some(v) => clone_value(v, globals, fn_context, true, info.position),
+                        None => NULL_STORAGE,
+                    };
+                }
+            } else {
                 return Err(RuntimeError::BreakNeverUsedError {
-                    breaktype: *r,
-                    info: i.clone(),
-                    broke: i.position,
+                    breaktype: r,
+                    info: CompilerInfo::from_area(i),
+                    broke: i,
                     dropped: info.position,
                     reason: "the file ended".to_string(),
                 });
@@ -1663,7 +1525,7 @@ pub fn import_module(
                 if *in_scope {
                     (*in_scope) = false;
                 } else {
-                    to_be_deleted.push((*k1, k2.clone()));
+                    to_be_deleted.push((*k1, *k2));
                 }
                 // globals
                 //     .stored_values
@@ -1678,31 +1540,7 @@ pub fn import_module(
         merge_impl(&mut globals.implementations, &stored_impl);
     }
 
-    let out = if returns.is_empty() {
-        contexts
-            .iter()
-            .map(|x| {
-                let mut new_context = x.clone();
-                new_context.variables = context.variables.clone();
-                (NULL_STORAGE, new_context)
-            })
-            .collect()
-    } else {
-        for (_, c) in &mut returns {
-            (*c).variables = context.variables.clone();
-        }
-
-        returns
-    };
-
-    if out.len() == 1 && &out[0].1 == context {
-        let cloned = clone_and_get_value(out[0].0, 9999, globals, context.start_group, true);
-        let s_impl = globals.implementations.clone();
-
-        globals.prev_imports.insert(path.clone(), (cloned, s_impl));
-    }
-
-    Ok(out)
+    Ok(())
 }
 
 // const ID_MAX: u16 = 999;

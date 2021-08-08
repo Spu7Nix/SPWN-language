@@ -2,7 +2,11 @@ use internment::Intern;
 
 ///types and functions used by the compiler
 use crate::builtin::*;
+use crate::compiler::BUILTIN_STORAGE;
+use crate::compiler::NULL_STORAGE;
 use crate::compiler_info::CodeArea;
+use crate::context::BreakType;
+use crate::context::FullContext;
 use crate::levelstring::GdObj;
 
 use crate::compiler_types::*;
@@ -12,11 +16,13 @@ use crate::value::*;
 use crate::compiler_info::CompilerInfo;
 use crate::value_storage::*;
 use std::collections::HashMap;
+
 use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::compiler::RuntimeError;
 
+#[allow(non_snake_case)]
 pub struct Globals {
     //counters for arbitrary groups
     pub closed_groups: u16,
@@ -24,11 +30,11 @@ pub struct Globals {
     pub closed_blocks: u16,
     pub closed_items: u16,
 
-    pub path: PathBuf,
+    pub path: Intern<PathBuf>,
 
     pub lowest_y: HashMap<u32, u16>,
     pub stored_values: ValStorage,
-    pub val_id: usize,
+    pub val_id: StoredValue,
 
     pub type_ids: HashMap<String, (u16, CodeArea)>,
     pub type_id_count: u16,
@@ -36,7 +42,7 @@ pub struct Globals {
     pub func_ids: Vec<FunctionId>,
     pub objects: Vec<GdObj>,
 
-    pub prev_imports: HashMap<ImportType, (Value, Implementations)>,
+    pub prev_imports: HashMap<ImportType, (StoredValue, Implementations)>,
 
     pub trigger_order: usize,
 
@@ -45,6 +51,14 @@ pub struct Globals {
 
     pub sync_groups: Vec<SyncGroup>,
     pub includes: Vec<PathBuf>,
+
+    pub TYPE_MEMBER_NAME: Intern<String>,
+    pub SELF_MEMBER_NAME: Intern<String>,
+    pub OR_BUILTIN: Intern<String>,
+    pub AND_BUILTIN: Intern<String>,
+    pub ASSIGN_BULTIN: Intern<String>,
+    pub OBJ_KEY_ID: Intern<String>,
+    pub OBJ_KEY_PATTERN: Intern<String>,
 }
 
 impl Globals {
@@ -66,7 +80,7 @@ impl Globals {
     pub fn is_mutable(&self, p: StoredValue) -> bool {
         match self.stored_values.map.get(&p) {
             Some(val) => val.mutable,
-            None => unreachable!(),
+            None => unreachable!("{}", p),
         }
     }
 
@@ -74,15 +88,12 @@ impl Globals {
         self.is_mutable(p)
     }
 
-    pub fn increment_implementations(&mut self) {
-        let mut incremented = HashSet::new();
-        for imp in self.implementations.values() {
-            for (val, _) in imp.values() {
-                self.stored_values
-                    .increment_single_lifetime(*val, 1, &mut incremented);
-            }
-        }
-    }
+    // pub fn get_lifetime(&self, p: StoredValue) -> Option<u16> {
+    //     match self.stored_values.map.get(&p) {
+    //         Some(val) => val.lifetime,
+    //         None => unreachable!(),
+    //     }
+    // }
 
     // pub fn get_fn_context(&self, p: StoredValue) -> Group {
     //     match self.stored_values.map.get(&p) {
@@ -90,13 +101,6 @@ impl Globals {
     //         None => unreachable!(),
     //     }
     // }
-
-    pub fn get_lifetime(&self, p: StoredValue) -> u16 {
-        match self.stored_values.map.get(&p) {
-            Some(val) => val.lifetime,
-            None => unreachable!(),
-        }
-    }
 
     pub fn get_area(&self, p: StoredValue) -> CodeArea {
         match self.stored_values.map.get(&p) {
@@ -109,7 +113,7 @@ impl Globals {
         let val = &self.stored_values[p];
         let typ = match val {
             Value::Dict(d) => {
-                if let Some(s) = d.get(TYPE_MEMBER_NAME) {
+                if let Some(s) = d.get(&self.TYPE_MEMBER_NAME) {
                     match self.stored_values[*s] {
                         Value::TypeIndicator(t) => t,
                         _ => unreachable!(),
@@ -130,7 +134,7 @@ impl Globals {
             closed_colors: 0,
             closed_blocks: 0,
             closed_items: 0,
-            path,
+            path: Intern::new(path),
 
             lowest_y: HashMap::new(),
 
@@ -141,7 +145,7 @@ impl Globals {
             trigger_order: 0,
             uid_counter: 0,
 
-            val_id: storage.map.len(),
+            val_id: storage.map.len() as StoredValue,
             stored_values: storage,
             func_ids: vec![FunctionId {
                 parent: None,
@@ -155,6 +159,13 @@ impl Globals {
                 groups_used: Vec::new(),
             }],
             includes: Vec::new(),
+            TYPE_MEMBER_NAME: Intern::new(String::from("type")),
+            SELF_MEMBER_NAME: Intern::new(String::from("self")),
+            OR_BUILTIN: Intern::new(String::from("_or_")),
+            AND_BUILTIN: Intern::new(String::from("_and_")),
+            ASSIGN_BULTIN: Intern::new(String::from("_assign_")),
+            OBJ_KEY_ID: Intern::new(String::from("id")),
+            OBJ_KEY_PATTERN: Intern::new(String::from("pattern")),
         };
 
         let mut add_type = |name: &str, id: u16| {
@@ -188,5 +199,123 @@ impl Globals {
         globals.type_id_count = globals.type_ids.len() as u16;
 
         globals
+    }
+
+    // pub fn clean_up(&mut self, full_context: &mut FullContext, mut removed: HashSet<usize>) {
+    //     let mut used_values = HashSet::new();
+
+    //     // for l in self.implementations.values() {
+    //     //     for (v, _) in l.values() {
+    //     //         used_values.insert(*v);
+    //     //     }
+    //     // }
+    //     for c in full_context.with_breaks() {
+    //         used_values.extend(c.inner().variables.iter().map(|(_, (a, _))| *a));
+    //         // used_values.insert(c.inner().return_value);
+    //         // used_values.insert(c.inner().return_value2);
+    //         match c.inner().broken {
+    //             Some((BreakType::Macro(Some(v), _), _)) => {
+    //                 used_values.insert(v);
+    //             }
+    //             Some((BreakType::Switch(v), _)) => {
+    //                 used_values.insert(v);
+    //             }
+    //             _ => (),
+    //         };
+    //     }
+    //     let mut all_used_values = HashSet::new();
+    //     for v in used_values {
+    //         all_used_values.extend(get_all_ptrs_used(v, self));
+    //     }
+
+    //     // for v in all_used_values.iter() {
+    //     //     dbg!(v, self.stored_values[*v].clone());
+    //     // }
+    //     all_used_values.insert(BUILTIN_STORAGE);
+    //     all_used_values.insert(NULL_STORAGE);
+
+    //     removed.retain(|a| !all_used_values.contains(a));
+
+    //     self.stored_values
+    //         .map
+    //         .retain(|a, _| -> bool { !removed.contains(a) });
+    // }
+    pub fn push_new_preserved(&mut self) {
+        self.stored_values.preserved_stack.push(Vec::new());
+    }
+
+    pub fn pop_preserved(&mut self) {
+        self.stored_values.preserved_stack.pop();
+    }
+
+    pub fn push_preserved_val(&mut self, val: StoredValue) {
+        self.stored_values
+            .preserved_stack
+            .last_mut()
+            .unwrap()
+            .push(val);
+    }
+
+    pub fn collect_garbage(&mut self, contexts: &mut FullContext) {
+        //gc
+        //mark
+        self.stored_values.mark(NULL_STORAGE);
+        self.stored_values.mark(BUILTIN_STORAGE);
+
+        unsafe {
+            let root_context = contexts
+                .with_breaks()
+                .next()
+                .unwrap()
+                .inner()
+                .root_context_ptr
+                .as_mut()
+                .unwrap();
+
+            for c in root_context.with_breaks() {
+                for stack in c.inner().get_variables().values() {
+                    for (v, _) in stack.iter() {
+                        self.stored_values.mark(*v);
+                    }
+                }
+
+                match c.inner().broken {
+                    Some((BreakType::Macro(Some(v), _), _)) | Some((BreakType::Switch(v), _)) => {
+                        self.stored_values.mark(v);
+                    }
+                    _ => (),
+                }
+
+                // for split contexts
+                self.stored_values.mark(c.inner().return_value);
+                self.stored_values.mark(c.inner().return_value2);
+            }
+            for s in self.stored_values.preserved_stack.clone() {
+                for v in s {
+                    self.stored_values.mark(v);
+                }
+            }
+            for imp in self.implementations.values() {
+                for (v, _) in imp.values() {
+                    self.stored_values.mark(*v);
+                }
+            }
+        }
+
+        for (v, imp) in self.prev_imports.values() {
+            for imp in imp.values() {
+                for (v, _) in imp.values() {
+                    self.stored_values.mark(*v);
+                }
+            }
+
+            self.stored_values.mark(*v);
+        }
+        //dbg!(&self.stored_values.map);
+
+        //sweep
+        self.stored_values.sweep();
+
+        self.stored_values.prev_value_count = self.stored_values.map.len() as u32;
     }
 }

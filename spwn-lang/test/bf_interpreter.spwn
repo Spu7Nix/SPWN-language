@@ -500,7 +500,7 @@ impl @bfreader {
                     } else {
                         wait(0.01)
                         self.group.move(spacing, 0)
-                        return
+                        
                     }
 
 
@@ -539,7 +539,7 @@ impl @bfreader {
                     } else {
                         wait(0.01)
                         self.group.move(-spacing, 0)
-                        return
+                        
                     }
                 })
                 -> 45c.set(prog_ptr_color[0], prog_ptr_color[1], prog_ptr_color[2], blending = true)
@@ -1375,7 +1375,7 @@ tut_func = !{
 
 
 
-for i in 1..669 {
+for i in 5..669 {
     //game
     $.add( obj{
         X: switch_spacing * i - 2,
@@ -1415,8 +1415,7 @@ for i in 1..669 {
     })
 }
 // added this because compiler stupid and im too lazy to fix
--> call_with_delay(999, start_func)
--> call_with_delay(999, tut_func)
+
 wait(2.5)
 
 

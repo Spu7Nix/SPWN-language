@@ -1,12 +1,15 @@
+use internment::Intern;
+
 // tools for generating documentation for SPWN libraries
 //use crate::ast::*;
-use crate::builtin::TYPE_MEMBER_NAME;
+
 use crate::compiler::{import_module, RuntimeError};
 use crate::compiler_info::CompilerInfo;
 use crate::compiler_types::ImportType;
-use crate::context::Context;
+use crate::context::{Context, FullContext};
 use crate::globals::Globals;
 use crate::value::*;
+use crate::value_storage::StoredValue;
 use std::fs::File;
 
 use std::path::PathBuf;
@@ -21,7 +24,7 @@ fn create_doc_file(mut dir: PathBuf, name: String, content: &str) {
 pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     let mut globals = Globals::new(PathBuf::new());
 
-    let start_context = Context::new();
+    let mut start_context = FullContext::new();
 
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
@@ -43,15 +46,15 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
             .to_path_buf(),
     );
 
-    let module = import_module(
+    import_module(
         &ImportType::Lib(path.to_string()),
-        &start_context,
+        &mut start_context,
         &mut globals,
         info,
         false,
     )?;
 
-    if module.len() > 1 {
+    if let FullContext::Split(_, _) = start_context {
         return Err(RuntimeError::CustomError(crate::compiler::create_error(
             CompilerInfo::new(),
             "Documentation of context-splitting libraries is not yet supported!",
@@ -62,7 +65,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 
     let mut doc = format!("# Documentation for `{}` \n", path);
 
-    let exports = globals.stored_values[module[0].0].clone();
+    let exports = globals.stored_values[start_context.inner().return_value].clone();
     let implementations = globals.implementations.clone();
 
     doc += "_Generated using `spwn doc [file name]`_\n";
@@ -95,7 +98,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     if !implementations.is_empty() && implementations.iter().any(|(_, a)| !a.is_empty()) {
         doc += "# Type Implementations:\n";
 
-        let mut list: Vec<(&u16, HashMap<String, usize>)> = implementations
+        let mut list: Vec<_> = implementations
             .iter()
             .filter(|(_, a)| !a.is_empty())
             .map(|(key, val)| {
@@ -103,7 +106,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                     key,
                     val.iter()
                         .map(|(key, val)| (key.clone(), val.0))
-                        .collect::<HashMap<String, usize>>(),
+                        .collect::<HashMap<Intern<String>, StoredValue>>(),
                 )
             })
             .collect();
@@ -131,22 +134,22 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     Ok(())
 }
 
-fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String {
+fn document_dict(dict: &HashMap<Intern<String>, StoredValue>, globals: &mut Globals) -> String {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
 
-    let mut macro_list: Vec<(&String, &usize)> = dict
+    let mut macro_list: Vec<(&Intern<String>, &StoredValue)> = dict
         .iter()
         .filter(|x| matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
     macro_list.sort_by(|a, b| a.0.cmp(b.0));
 
-    let mut val_list: Vec<(&String, &usize)> = dict
+    let mut val_list: Vec<(&Intern<String>, &StoredValue)> = dict
         .iter()
         .filter(|x| !matches!(globals.stored_values[*x.1], Value::Macro(_)))
         .collect();
     val_list.sort_by(|a, b| a.0.cmp(b.0));
 
-    let mut document_member = |key: &String, val: &usize| -> String {
+    let mut document_member = |key: &String, val: &StoredValue| -> String {
         let mut member_doc = String::new();
         let inner_val = globals.stored_values[*val].clone();
         let val_str = document_val(&inner_val, globals);
@@ -175,7 +178,7 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
             doc += "\n## Macros:\n";
         }
         for (key, val) in macro_list.iter() {
-            doc += &document_member(*key, *val)
+            doc += &document_member(key.as_ref(), *val)
         }
     }
     if !val_list.is_empty() {
@@ -183,7 +186,7 @@ fn document_dict(dict: &HashMap<String, usize>, globals: &mut Globals) -> String
             doc += "## Other values:\n";
         }
         for (key, val) in val_list.iter() {
-            doc += &document_member(*key, *val)
+            doc += &document_member(key.as_ref(), *val)
         }
     }
     doc
@@ -200,7 +203,8 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
         doc += &format!("### Example: \n```spwn\n {}\n```\n", example)
     }
 
-    if !(mac.args.is_empty() || (mac.args.len() == 1 && mac.args[0].0 == "self")) {
+    if !(mac.args.is_empty() || (mac.args.len() == 1 && mac.args[0].0 == globals.SELF_MEMBER_NAME))
+    {
         doc += "## Arguments:\n";
         doc += "
 | # | name | type | default value | description |
@@ -210,7 +214,7 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
         for arg in mac.args.iter() {
             let mut arg_string = String::new();
 
-            if arg.0 == "self" {
+            if arg.0 == globals.SELF_MEMBER_NAME {
                 continue;
             }
             i += 1;
@@ -256,10 +260,11 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
 
 fn document_val(val: &Value, globals: &mut Globals) -> String {
     let mut doc = String::new();
+    let mut full_context = FullContext::new();
     let typ_index = val
         .member(
-            TYPE_MEMBER_NAME.to_string(),
-            &Context::new(),
+            globals.TYPE_MEMBER_NAME,
+            full_context.inner(),
             globals,
             CompilerInfo::new(),
         )

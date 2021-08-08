@@ -97,8 +97,6 @@ pub struct GdObj {
     pub params: HashMap<u16, ObjParam>,
     pub mode: ObjectMode,
     pub unique_id: usize,
-    pub sync_group: usize,
-    pub sync_part: SyncPartId,
 }
 
 impl GdObj {

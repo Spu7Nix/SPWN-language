@@ -490,8 +490,6 @@ pub fn create_spawn_trigger(
         func_id: trigger.obj.0,
         mode: ObjectMode::Trigger,
         unique_id: objects[trigger.obj].0.unique_id,
-        sync_group: 0,
-        sync_part: 0,
     };
 
     (*objects.list)[trigger.obj.0]
