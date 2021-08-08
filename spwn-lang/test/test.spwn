@@ -1,13 +1,2 @@
-#[no_level]
-
-type @cum;
-
-impl @cum {
-	deco: (func, str) {
-	$.print(str);
-	return func;
-}
-}
-let b = [[@cum::{}.deco("sex")]] !{
-
-};
+import gamescene
+$.print("ok")
