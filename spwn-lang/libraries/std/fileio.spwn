@@ -1,4 +1,4 @@
-#[no_std]
+#[no_std, cache_output]
 // brought to you by camden314
 
 type @file

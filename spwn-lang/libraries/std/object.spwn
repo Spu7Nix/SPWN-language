@@ -1,4 +1,4 @@
-#[no_std]
+#[no_std, cache_output]
 extract import "constants.spwn"
 impl @object {
 	set: (self, key: @object_key, value) {

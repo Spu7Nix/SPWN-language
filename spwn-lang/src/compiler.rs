@@ -5,13 +5,13 @@ use crate::builtin::*;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
 use crate::context::*;
-use crate::fmt::SpwnFmt;
+
 use crate::globals::Globals;
 use crate::levelstring::*;
 use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::mem;
 
 use crate::parser::{ParseNotes, SyntaxError};
@@ -1271,7 +1271,7 @@ pub fn compile_scope(
         );*/
 
         let increase =
-            0; // please fix this //globals.stored_values.map.len() as u32 - globals.stored_values.prev_value_count;
+            globals.stored_values.map.len() as i32 - globals.stored_values.prev_value_count as i32;
 
         if increase > 5000 {
             globals.collect_garbage(contexts);
@@ -1493,6 +1493,11 @@ pub fn import_module(
 
     globals.pop_preserved();
 
+    let save_value = notes.tag.tags.iter().any(|x| x.0 == "cache_output");
+    let mut out_values = 0;
+    let mut output_saved = None;
+    let mut impl_saved = None;
+
     for fc in start_context.with_breaks() {
         let c = fc.inner();
         if let Some((r, i)) = c.broken {
@@ -1500,7 +1505,21 @@ pub fn import_module(
                 for full_context in contexts.iter() {
                     let fn_context = full_context.inner().start_group;
                     (*full_context).inner().return_value = match v {
-                        Some(v) => clone_value(v, globals, fn_context, true, info.position),
+                        Some(v) => {
+                            if save_value {
+                                if out_values > 0 {
+                                    return Err(RuntimeError::CustomError(create_error(
+                                        info,
+                                        "Cannot cache a context splitting library",
+                                        &[],
+                                        None,
+                                    )));
+                                }
+                                output_saved = Some(v);
+                            }
+                            out_values += 1;
+                            clone_value(v, globals, fn_context, true, info.position)
+                        }
                         None => NULL_STORAGE,
                     };
                 }
@@ -1535,9 +1554,24 @@ pub fn import_module(
         for (k1, k2) in to_be_deleted {
             (*globals).implementations.get_mut(&k1).unwrap().remove(&k2);
         }
+        if save_value {
+            impl_saved = Some(globals.implementations.clone());
+        }
 
         //merge impls
         merge_impl(&mut globals.implementations, &stored_impl);
+    } else if save_value {
+        impl_saved = Some(globals.implementations.clone());
+    }
+
+    if save_value {
+        globals.prev_imports.insert(
+            path.clone(),
+            (
+                output_saved.unwrap_or(NULL_STORAGE),
+                impl_saved.unwrap_or_else(HashMap::new),
+            ),
+        );
     }
 
     Ok(())

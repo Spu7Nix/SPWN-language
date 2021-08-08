@@ -248,7 +248,7 @@ impl SpwnFmt for ValueBody {
         match self {
             Id(x) => x.fmt(ind),
             Number(x) => format!("{}", x),
-            CmpStmt(x) => format!("{{\n{}\n{}}}", x.fmt(ind + 4), tabs(ind)),
+            CmpStmt(x) => format!("!{{\n{}\n{}}}", x.fmt(ind + 4), tabs(ind)),
             Dictionary(x) => element_list(x, '{', '}', ind),
             Array(x) => element_list(x, '[', ']', ind),
             Symbol(x) => x.to_string(),
@@ -301,7 +301,7 @@ impl SpwnFmt for Path {
         match self {
             Path::Member(def) => format!(".{}", def),
             Path::Associated(def) => format!("::{}", def),
-            Path::NSlice(_def) => format!("[its a slice ok]"),
+            Path::NSlice(_def) => "[its a slice ok]".to_string(),
             Path::Constructor(dict) => format!("::{}", element_list(dict, '{', '}', ind)),
             Path::Index(call) => format!("[{}]", call.fmt(ind)),
             Path::Call(x) => element_list(x, '(', ')', ind),

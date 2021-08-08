@@ -2,7 +2,7 @@
 use internment::Intern;
 
 use crate::ast::ObjectMode;
-use crate::compiler::{create_error, RuntimeError, NULL_STORAGE};
+use crate::compiler::{create_error, RuntimeError};
 use crate::compiler_types::*;
 use crate::context::*;
 use crate::globals::Globals;
@@ -1066,7 +1066,24 @@ builtins! {
                                 )
                             }
                         }
-                    }
+                    },
+                    "findall" => {
+                        let mut output = Vec::new();
+
+                        for i in r.find_iter(&s){
+                            let mut pair = Vec::new();
+                            let p1 = store_const_value(Value::Number(i.start() as f64), globals, context.start_group, info.position);
+                            let p2 = store_const_value(Value::Number(i.end() as f64), globals, context.start_group, info.position);
+
+                            pair.push(p1);
+                            pair.push(p2);
+
+                            let pair_arr = store_const_value(Value::Array(pair), globals, context.start_group, info.position);
+                            output.push(pair_arr);
+                        }
+
+                        Value::Array(output)
+                    },
                     _ => {
                         return Err(RuntimeError::BuiltinError {
                             message: format!(
@@ -1085,8 +1102,6 @@ builtins! {
             }
 
     }
-
-
 
     [RangeOp]
     fn _range_((val_a), (b): Number) {
@@ -1218,7 +1233,6 @@ builtins! {
         }
     }
     [MinusOp]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
-
     [AssignOp]           fn _assign_(mut (a), (b))                      {
         a = b;
         (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;

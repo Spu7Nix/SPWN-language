@@ -1,4 +1,4 @@
-#[no_std]
+#[no_std, cache_output]
 
 impl @number {
     map: #[desc("Maps a number linearily from one interval to another") example("$.assert(2.map(1, 4, 5, 11) == 7)")]

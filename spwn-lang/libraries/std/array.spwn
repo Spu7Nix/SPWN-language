@@ -1,4 +1,4 @@
-#[no_std]
+#[no_std, cache_output]
 impl @array {
     is_empty: #[desc("Returns true if the array has a length of 0, false otherwise.") example("
 arr = []

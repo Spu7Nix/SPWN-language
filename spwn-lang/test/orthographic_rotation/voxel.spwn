@@ -1,0 +1,134 @@
+extract obj_props
+extract $
+
+make_voxel_partial = (colors: [@color], groups: [@group], group: @group, side: @number, offset, layer, d, vert) {
+    left = groups[0]
+    middle = groups[1]
+    right = groups[2]
+    left_color = colors[0]
+    right_color = colors[1]
+
+    
+
+    add(obj {
+        OBJ_ID: 211,
+        X: offset[0],
+        Y: offset[1],
+        COLOR: right_color,
+        Z_ORDER: -1 + layer,
+        GROUPS: [right, group]
+    })
+
+    for y in [-1, 1] {
+        let positions = [
+            [(30 / 4) * d, (30 / 4) * y],
+            [- (30 / 4) * side * d, (30 / 4) * y]
+        ]
+        if vert {
+            positions = positions[:, :-1:]
+        }
+        add(obj {
+            OBJ_ID: 211,
+            X: offset[0] + positions[0][0],
+            Y: offset[1] + positions[0][1],
+            COLOR: left_color,
+            Z_ORDER: 1 + layer,
+            GROUPS: [middle, group],
+            SCALING: 0.5
+        })
+
+        add(obj {
+            OBJ_ID: 211,
+            X: offset[0] + positions[1][0],
+            Y: offset[1] + positions[1][1],
+            COLOR: left_color,
+            Z_ORDER: 1 + layer,
+            GROUPS: [left, group],
+            SCALING: 0.5
+        })
+    }
+}
+
+type @voxel
+impl @voxel {
+    new: (colors: [@color], groups: [@group], part_2: @group, direction, vert) {
+        assert(colors.length == 2)
+        assert(groups.length == 3)
+        colors[0].set(255, 255, 255)
+        colors[1].set(0, 0, 0)
+        part_2.toggle_off()
+
+        return @voxel::{
+            colors, groups, part_2, direction, vert
+        }
+    },
+
+    make: (self, offset, z_layer) {
+        left = self.groups[0]
+        middle = self.groups[1]
+        right = self.groups[2]
+        left_color = self.colors[0]
+        right_color = self.colors[1]
+        make_voxel_partial(
+            [left_color, right_color], 
+            [left, middle, right], 
+            0g,  
+            1, 
+            offset, 
+            0 + z_layer * 4, 
+            self.direction,
+            self.vert,
+        )
+        make_voxel_partial(
+            [right_color, left_color], 
+            [right, middle, left], 
+            self.part_2, 
+            -1, 
+            offset, 
+            2 + z_layer * 4, 
+            self.direction,
+            self.vert,
+        )
+    },
+
+    animate: (self, t) {
+        left = self.groups[0]
+        middle = self.groups[1]
+        right = self.groups[2]
+        left_color = self.colors[0]
+        right_color = self.colors[1]
+
+        // animation
+        if self.vert {
+            -> left.move(0, -3 * self.direction, t, easing = SINE_OUT)
+            -> right.move(0, 3 * self.direction, t, easing = SINE_OUT)
+            -> middle.move(0, -5 * self.direction, t)
+        } else {
+            -> left.move(-3 * self.direction, 0, t, easing = SINE_OUT)
+            -> right.move(3 * self.direction, 0, t, easing = SINE_OUT)
+            -> middle.move(-5 * self.direction, 0, t)
+        }
+        
+        
+        wait(t)
+        self.part_2.toggle_on()
+
+        if self.vert {
+            -> left.move(0, 3 * self.direction, t, easing = SINE_OUT)
+            -> right.move(0, -3 * self.direction, t, easing = SINE_OUT)
+            
+            -> middle.move(0, 5 * self.direction)
+            -> middle.move(0, -5 * self.direction, t)
+        } else {
+            -> left.move(3 * self.direction, 0, t, easing = SINE_OUT)
+            -> right.move(-3 * self.direction, 0, t, easing = SINE_OUT)
+            
+            -> middle.move(5 * self.direction, 0)
+            -> middle.move(-5 * self.direction, 0, t)
+        }
+        
+        
+        wait(t)
+    }
+}
+

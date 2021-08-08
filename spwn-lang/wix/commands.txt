@@ -1,3 +1,4 @@
+python wix/generate_wix_lib_file.py
 rustup override unset
 
 rustup default nightly-i686-pc-windows-msvc

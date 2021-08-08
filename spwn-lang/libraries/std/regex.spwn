@@ -1,4 +1,4 @@
-#[no_std]
+#[no_std, cache_output]
 type @regex
 
 impl @regex {
@@ -17,5 +17,9 @@ impl @regex {
     (self, to_replace: @string, replacer: @string) {
         let t_rep = to_replace;
         return $.regex(self.regex, t_rep, "replace", replacer)
+    },
+    findall: #[desc("Regex find all matche indices of the string argument")]
+    (self, match: @string) {
+        return $.regex(self.regex, match, "findall", null)
     }
 }

@@ -15,7 +15,7 @@ use internment::Intern;
 
 
 use std::collections::HashMap;
-use std::collections::HashSet;
+
 use std::path::PathBuf;
 
 use crate::compiler::RuntimeError;
@@ -159,28 +159,28 @@ impl Value {
         }
     }
 
-    pub fn direct_references(&self) -> Vec<StoredValue> {
-        match self {
-            Value::Array(a) => {
-                return a.iter().copied().collect()
-            }
-            Value::Dict(a) => {
-                return a.values().copied().collect()
-            }
-            Value::Macro(m) => {
+    // pub fn direct_references(&self) -> Vec<StoredValue> {
+    //     match self {
+    //         Value::Array(a) => {
+    //             return a.iter().copied().collect()
+    //         }
+    //         Value::Dict(a) => {
+    //             return a.values().copied().collect()
+    //         }
+    //         Value::Macro(m) => {
                 
-                let mut out = Vec::new();
-                out.extend(m.args.iter().filter_map(|a| a.1));
-                out.extend(m.args.iter().filter_map(|a| a.3));
+    //             let mut out = Vec::new();
+    //             out.extend(m.args.iter().filter_map(|a| a.1));
+    //             out.extend(m.args.iter().filter_map(|a| a.3));
                 
 
-                out.extend(m.def_variables.values());
+    //             out.extend(m.def_variables.values());
                     
-                out
-            }
-            _ => Vec::new(),
-        }
-    }
+    //             out
+    //         }
+    //         _ => Vec::new(),
+    //     }
+    // }
 
     pub fn get_type_str(&self, globals: &Globals) -> String {
         let t = self.to_num(globals);
@@ -558,7 +558,7 @@ pub fn find_key_for_value(
 }
 
 pub fn slice_array(
-    input: &Vec<StoredValue>,
+    input: &[StoredValue],
     slices_: Vec<Slice>, //note: slices are in *reverse order*
     globals: &mut Globals,
     info: CompilerInfo,
@@ -567,21 +567,21 @@ pub fn slice_array(
     let mut slices = slices_;
 
     let current_slice = slices.pop().unwrap();
-    let s = Slyce {start: current_slice.0.into(), end: current_slice.1.into(), step: current_slice.2.into()};
+    let s = Slyce {start: current_slice.0.into(), end: current_slice.1.into(), step: current_slice.2};
 
-    let sliced = s.apply(input).map(|x| *x).collect::<Vec<_>>();
+    let sliced = s.apply(input).copied().collect::<Vec<_>>();
 
     let mut result = Vec::<StoredValue>::new();
 
     for i in &sliced {
-        if slices.len() > 0 {
+        if !slices.is_empty() {
             let val = match globals.stored_values[*i].clone() {
                 Value::Array(arr) => {
                      slice_array(&arr, slices.clone(), globals, info.clone(), context)?
                 },
                 _ => {
                     return Err(RuntimeError::CustomError(create_error(
-                        info.clone(),
+                        info,
                         "Cannot slice noncomforming multidimensional array",
                         &[],
                         None,

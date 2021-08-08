@@ -17,7 +17,7 @@ use crate::compiler_info::CompilerInfo;
 use crate::value_storage::*;
 use std::collections::HashMap;
 
-use std::collections::HashSet;
+
 use std::path::PathBuf;
 
 use crate::compiler::RuntimeError;

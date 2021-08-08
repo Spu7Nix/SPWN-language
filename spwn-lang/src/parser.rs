@@ -1415,7 +1415,7 @@ fn parse_dict(
                             });
                         }
                         defs.push(ast::DictDef::Def((
-                            symbol.clone(),
+                            symbol,
                             ast::ValueBody::Symbol(symbol)
                                 .to_variable(tokens.position())
                                 .to_expression(),
@@ -1801,18 +1801,15 @@ pub fn str_content(
     Ok(out)
 }
 
-fn check_if_slice(
-    mut tokens: Tokens,
-    notes: &mut ParseNotes
-) -> Result<bool, SyntaxError> {
+fn check_if_slice(mut tokens: Tokens, notes: &mut ParseNotes) -> Result<bool, SyntaxError> {
     loop {
         match tokens.next(false) {
             Some(Token::Colon) => {
                 return Ok(true);
-            },
+            }
             Some(Token::ClosingSquareBracket) => {
                 return Ok(false);
-            },
+            }
             _ => {
                 tokens.previous_no_ignore(false);
                 parse_expr(&mut tokens, notes, true, true)?;
@@ -2260,29 +2257,29 @@ fn parse_variable(
                         let mut curr_slice = ast::Slice {
                             left: None,
                             right: None,
-                            step: None
+                            step: None,
                         };
                         let mut colon_pos = tokens.position();
                         let mut i: i32 = 0;
-                        loop { 
+                        loop {
                             match tokens.next(false) {
                                 Some(Token::Colon) => {
                                     colon_pos = tokens.position();
-                                    if i==1 {
+                                    if i == 1 {
                                         curr_slice.step = curr_slice.right.clone();
                                         curr_slice.right = None;
                                     }
-                                    i+=1;
-                                },
+                                    i += 1;
+                                }
 
                                 Some(Token::ClosingSquareBracket) => {
                                     slices.push(curr_slice);
                                     break 'main;
-                                },
+                                }
                                 Some(Token::Comma) => {
                                     slices.push(curr_slice);
                                     continue 'main;
-                                },
+                                }
                                 _ => {
                                     tokens.previous_no_ignore(false);
                                     let result = parse_expr(tokens, notes, true, true)?;
@@ -2299,7 +2296,6 @@ fn parse_variable(
                                         }
                                     };
                                 }
-
                             };
                         }
                     }
