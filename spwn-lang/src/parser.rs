@@ -2098,7 +2098,7 @@ fn parse_variable(
 
                                         match test_tokens.next(true) { // fuck this, i ain't allowing !;{ }
                                             Some(Token::OpenCurlyBracket) => (),
-                                            a => expected!("{".to_string(), tokens, notes, a)
+                                            a => expected!("{".to_string(), test_tokens, notes, a)
                                         }
 
                                         *tokens = test_tokens;
