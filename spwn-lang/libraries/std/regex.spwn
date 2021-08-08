@@ -18,7 +18,7 @@ impl @regex {
         let t_rep = to_replace;
         return $.regex(self.regex, t_rep, "replace", replacer)
     },
-    findall: #[desc("Regex find all matches of the stirng argument")]
+    findall: #[desc("Regex find all matche indices of the string argument")]
     (self, match: @string) {
         return $.regex(self.regex, match, "findall", null)
     }

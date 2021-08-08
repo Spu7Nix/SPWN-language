@@ -1062,11 +1062,18 @@ builtins! {
                         }
                     },
                     "findall" => {
-                        let mut output = Vec::<StoredValue>::new();
+                        let mut output = Vec::new();
 
                         for i in r.find_iter(&s){
-                            let entry = store_const_value(Value::Str(s[i.start()..i.end()].to_string()), 1, globals, context, CodeArea::new());
-                            output.push(entry);
+                            let mut pair = Vec::new();
+                            let p1 = store_value(Value::Number(i.start() as f64), 1, globals, context, CodeArea::new());
+                            let p2 = store_value(Value::Number(i.end() as f64), 1, globals, context, CodeArea::new());
+                            
+                            pair.push(p1);
+                            pair.push(p2);
+
+                            let pair_arr = store_value(Value::Array(pair), 1, globals, context, CodeArea::new());
+                            output.push(pair_arr);
                         }
 
                         Value::Array(output)
