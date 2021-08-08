@@ -6,7 +6,7 @@ use internment::Intern;
 use crate::compiler::{import_module, RuntimeError};
 use crate::compiler_info::CompilerInfo;
 use crate::compiler_types::ImportType;
-use crate::context::{Context, FullContext};
+use crate::context::FullContext;
 use crate::globals::Globals;
 use crate::value::*;
 use crate::value_storage::StoredValue;

@@ -124,25 +124,20 @@
 >| 1 | **`cb`** | @macro | | |
 >
 
-## **flat\_map**:
+## **flatten**:
 
 > **Value:** 
 >```spwn
->(self, cb: @macro = () { /* code omitted */ }) { /* code omitted */ }
+>(self) { /* code omitted */ }
 >``` 
 >**Type:** `@macro` 
 >## Description: 
-> _Works the same way as map but flattens any sub-arrays into one big array._
+> _Flattens any sub-arrays into one big array._
 >### Example: 
 >```spwn
 > arr = [1, 2, [3, 4], 5, [6, 7, [8]]]
->$.assert(arr.flat_map(el => el > 4) == [5, 6, 7, 8])
+>$.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
 >```
->## Arguments:
->
->| # | name | type | default value | description |
->| - | ---- | ---- | ------------- | ----------- |
->| 1 | `cb` | @macro | `() { /* code omitted */ }` | |
 >
 
 ## **index**:

@@ -1,4 +1,4 @@
-#[no_std]
+#[no_std, cache_output]
 constants = import "constants.spwn"
 
 extract constants.obj_props

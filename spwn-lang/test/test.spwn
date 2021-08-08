@@ -1,15 +1,21 @@
-#[no_level]
-
-
-
-let a = [1, 2, 3, 4, 5]
-c = counter()
-c2 = counter()
-
-n1 = c.to_const(1..3)
-n2 = c.to_const(2..4)
-
-$.print(n1, " ", n2)
-
-let b = a[n1:n2];
-$.print(b)
+             extract $; let
+         v=[];extract obj_props
+      p=3.14;h=100;d=sin;u=cos;for
+    i in..20..628{for j in..40..628{
+   t=d(i/h);c=u(i/h);s=d(j/h);p=u(j/h
+  );x=3*c+p*c;y=3*t+p*t;g=?g;a=1/(s+5)
+ add(obj{1:725,X:615+40*a*(x*5),Y:415 +
+ 40*a*(y*5),57:g});v.push([x,y,s,g]);}}
+ r=(a,i){c=u(a*p/      180);s=d(a*p/180
+);n=i[0];m=i[1];        l=i[2];z=(-s)*n+
+(c*s)*m+(c*c)*l          +5;return[15+40
+*(1/z)*(((c*c)*n        +((c*s*s)-(s*c))
+ *m+((c*s*c)+(s*s      ))*l)*5),15+40*(
+ 1/z)*(((s*c)*n+((s*s*s)+(c*c))*m+((s*s
+ *c)-(c*s))*l)*5)]};q=!{for j in ..12..
+  360{wait(0.1);for i in v{n=r(j+12,i)
+   c=r(j,i); ->i[3].move(n[0]/%3-c[0]
+    /%3,n[1]/%3-c[1]/%3,0.1);}}; q!}
+      q!/* --27 seconds to compile
+         using spwn 0.0.6-- ###
+             -donut.spwn-*/

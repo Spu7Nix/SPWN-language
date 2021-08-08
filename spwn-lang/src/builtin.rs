@@ -2,7 +2,7 @@
 use internment::Intern;
 
 use crate::ast::ObjectMode;
-use crate::compiler::{create_error, RuntimeError, NULL_STORAGE};
+use crate::compiler::{create_error, RuntimeError};
 use crate::compiler_types::*;
 use crate::context::*;
 use crate::globals::Globals;

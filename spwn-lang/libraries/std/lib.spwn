@@ -1,4 +1,4 @@
-#[no_std]
+#[no_std, cache_output]
 let constants = import "constants.spwn"
 
 //type implementations

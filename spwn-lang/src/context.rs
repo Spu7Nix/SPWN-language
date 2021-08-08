@@ -7,7 +7,7 @@ use crate::value::{value_equality, Value};
 use crate::value_storage::{clone_value, store_val_m, StoredValue};
 
 //use std::boxed::Box;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use internment::Intern;
 

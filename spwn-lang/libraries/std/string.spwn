@@ -1,4 +1,4 @@
-#[no_std]
+#[no_std, cache_output]
 impl @string {
 	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise")]
 	(self) {

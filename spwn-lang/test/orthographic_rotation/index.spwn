@@ -1,0 +1,20 @@
+import "voxel.spwn"
+
+
+box = @voxel::new([?c, ?c], [?g, ?g, ?g], ?g, -1, true)
+box.make([300 + 60 * 0, 300], 0)
+-> box.animate(1)
+
+box = @voxel::new([?c, ?c], [?g, ?g, ?g], ?g, 1, true)
+box.make([300 + 60 * 1, 300], 0)
+-> box.animate(1)
+
+box = @voxel::new([?c, ?c], [?g, ?g, ?g], ?g, -1, false)
+box.make([300 + 60 * 2, 300], 0)
+-> box.animate(1)
+
+
+box = @voxel::new([?c, ?c], [?g, ?g, ?g], ?g, 1, false)
+box.make([300 + 60 * 3, 300], 0)
+-> box.animate(1)
+

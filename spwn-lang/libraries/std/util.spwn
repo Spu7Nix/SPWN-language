@@ -1,5 +1,5 @@
 // utility macroes
-#[no_std]
+#[no_std, cache_output]
 -> return {
     create_range_macro: #[desc("implementation of the range (`..`) operator")] (typ: @type_indicator) {
         -> return (self, other: typ) {

@@ -721,7 +721,7 @@
 >| - | ---- | ---- | ------------- | ----------- |
 >| 1 | **`items`** | [@counter or @item] or @counter or @item | |Counter(s) to subtract from |
 >| 2 | `speed` | @number | `1` |Speed of operation (higher number increases group usage) |
->| 3 | `factor` | @number | `1` |Multiplyer for the value subtracted |
+>| 3 | `factor` | @number | `1` |Multiplier for the value subtracted |
 >| 4 | `for_each` | @macro | `(n) { /* code omitted */ }` |Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1) |
 >
 

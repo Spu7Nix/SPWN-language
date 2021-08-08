@@ -1,10 +1,10 @@
 //#![feature(arbitrary_enum_discriminant)]
-mod context;
 mod ast;
 mod builtin;
 mod compiler;
 mod compiler_info;
 mod compiler_types;
+mod context;
 mod documentation;
 mod fmt;
 mod globals;
@@ -24,8 +24,8 @@ mod optimize;
 mod value_storage;
 
 use ariadne::{Cache, FileCache, Fmt};
-use compiler_info::CompilerInfo;
-use globals::Globals;
+// use compiler_info::CompilerInfo;
+// use globals::Globals;
 use optimize::optimize;
 
 use parser::*;
@@ -188,6 +188,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p) => p,
                     };
 
+                    //dbg!(&compiled.prev_imports);
+
                     if !compile_only {
                         let level_string = if let Some(gd_path) = &gd_path {
                             print_with_color("Reading savefile...", Color::Cyan);
@@ -318,7 +320,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     match documentation::document_lib(lib_path) {
                         Ok(_) => (),
-                        Err(e) => {
+                        Err(_e) => {
                             eprintln!(
                                 "{}",
                                 "Error when compiling library!".fg(ariadne::Color::Red)
@@ -345,7 +347,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 //     let (parsed, _) = match parse_spwn(unparsed, script_path) {
                 //         Err(err) => {
-                //             eprintln!("{}\n", err);
                 //             std::process::exit(ERROR_EXIT_CODE);
                 //         }
                 //         Ok(p) => p,

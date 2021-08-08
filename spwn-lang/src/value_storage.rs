@@ -2,12 +2,12 @@
 use crate::builtin::*;
 
 use crate::compiler_info::CodeArea;
-use crate::context::*;
+
 use crate::globals::Globals;
 use crate::value::*;
 
 use core::panic;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::compiler::{BUILTIN_STORAGE, NULL_STORAGE};
 
