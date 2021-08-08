@@ -1066,7 +1066,24 @@ builtins! {
                                 )
                             }
                         }
-                    }
+                    },
+                    "findall" => {
+                        let mut output = Vec::new();
+
+                        for i in r.find_iter(&s){
+                            let mut pair = Vec::new();
+                            let p1 = store_value(Value::Number(i.start() as f64), 1, globals, context, CodeArea::new());
+                            let p2 = store_value(Value::Number(i.end() as f64), 1, globals, context, CodeArea::new());
+                            
+                            pair.push(p1);
+                            pair.push(p2);
+
+                            let pair_arr = store_value(Value::Array(pair), 1, globals, context, CodeArea::new());
+                            output.push(pair_arr);
+                        }
+
+                        Value::Array(output)
+                    },
                     _ => {
                         return Err(RuntimeError::BuiltinError {
                             message: format!(
@@ -1085,8 +1102,6 @@ builtins! {
             }
 
     }
-
-
 
     [RangeOp]
     fn _range_((val_a), (b): Number) {
@@ -1218,7 +1233,6 @@ builtins! {
         }
     }
     [MinusOp]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
-
     [AssignOp]           fn _assign_(mut (a), (b))                      {
         a = b;
         (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
