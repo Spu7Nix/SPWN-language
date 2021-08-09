@@ -3,3 +3,5 @@ spwn-lang/.vscode
 **/*.rs.bk
 .DS_Store
 spwn-lang/std-docs
+*.sublime-project
+*.sublime-workspace
