@@ -41,8 +41,8 @@ deb@spwn:~$ sudo dpkg -i spwn_0.0.5-0_amd64.deb
 
 - Install the arch package using pacman and add `/usr/local/bin` to path:
 ```sh
-[deb@spwn ~$] pacman -U spwn-0.0.5-0_amd64.pkg.tar.zst
-[deb@spwn ~$] echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+[arch@spwn ~$] pacman -U spwn-0.0.5-0_amd64.pkg.tar.zst
+[arch@spwn ~$] echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
 ```
 
 ###### Compiling from source
