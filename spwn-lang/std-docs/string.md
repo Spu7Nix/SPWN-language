@@ -25,7 +25,7 @@
 >``` 
 >**Type:** `@macro` 
 >## Description: 
-> _Checks does the string starts with a string._
+> _Checks if the string starts with a string._
 >## Arguments:
 >
 >| # | name | type | default value | description |
@@ -41,7 +41,7 @@
 >``` 
 >**Type:** `@macro` 
 >## Description: 
-> _Gets the index of a string, if it doesn't exists returns null._
+> _Gets the index of a string, if it doesn't exist return null._
 >## Arguments:
 >
 >| # | name | type | default value | description |
@@ -244,7 +244,7 @@
 >``` 
 >**Type:** `@macro` 
 >## Description: 
-> _Gets a substring beginning at the specified start and ending at the specified end._
+> _Gets a substring beginning and ending at the specified locations._
 >## Arguments:
 >
 >| # | name | type | default value | description |
