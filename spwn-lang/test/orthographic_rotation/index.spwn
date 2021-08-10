@@ -33,7 +33,7 @@ import "full_cube.spwn"
 
 let cubes = []
 
-for i in ..10 {
+for i in ..(sides.length - 1) {
     cube = @fullcube::new(
         s,
         scaling,

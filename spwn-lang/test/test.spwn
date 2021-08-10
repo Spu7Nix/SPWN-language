@@ -1,1 +1,5 @@
-10g.follow(11g, x_mod = 0, y_mod = 1)
+
+
+while true {
+    wait(1)
+}

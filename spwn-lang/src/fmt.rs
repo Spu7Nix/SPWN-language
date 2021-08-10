@@ -227,6 +227,7 @@ impl SpwnFmt for StatementBody {
             StatementBody::Impl(x) => x.fmt(ind),
             StatementBody::If(x) => x.fmt(ind),
             StatementBody::For(x) => x.fmt(ind),
+            StatementBody::While(_) => "While loop lol".to_string(),
             StatementBody::Error(x) => x.fmt(ind),
             StatementBody::Extract(x) => format!("extract {}", x.fmt(ind)),
             StatementBody::Break => String::from("break"),

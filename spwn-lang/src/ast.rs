@@ -34,6 +34,7 @@ pub enum StatementBody {
     Impl(Implementation),
     If(If),
     For(For),
+    While(While),
     Error(Error),
     Extract(Expression),
 
@@ -237,7 +238,7 @@ pub struct Argument {
 pub struct Slice {
     pub left: Option<Expression>,
     pub right: Option<Expression>,
-    pub step: Option<Expression>
+    pub step: Option<Expression>,
 }
 
 impl Argument {
@@ -290,7 +291,7 @@ pub struct Macro {
     pub args: Vec<ArgDef>,
     pub body: CompoundStatement,
     pub properties: Attribute,
-    pub arg_pos: FileRange
+    pub arg_pos: FileRange,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -299,6 +300,13 @@ pub struct For {
     pub array: Expression,
     pub body: Vec<Statement>,
 }
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct While {
+    pub condition: Expression,
+    pub body: Vec<Statement>,
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum CaseType {
     Value(Expression),
