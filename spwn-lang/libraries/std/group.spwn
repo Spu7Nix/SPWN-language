@@ -201,6 +201,34 @@ center = 3g
         wait(duration)
     },
 
+    move_to_xy:
+    #[desc("Moves group to a specific coordinate") example("
+10g.move_to_xy(300, 300)
+10g.move_to_xy(x = 300) // does not move on the y axis
+10g.move_to_xy(y = 300) // does not move on the x axis
+    ")]
+    (
+        self, 
+        #[desc("X position to move to in units (1 grid square is 30 units)")] x: @number | @NULL = null, 
+        #[desc("Y position to move to in units (1 grid square is 30 units)")] y: @number | @NULL = null,
+        #[desc("Duration of movement")] duration: @number = 0, 
+        #[desc("Easing type")] easing: @easing_type = NONE, 
+        #[desc("Easing rate")] easing_rate: @number = 2,
+    ) {
+        if x == null && y == null {
+            throw "At least one coordinate must be specified"
+        }
+        target = ?g
+        $.add(obj {
+            OBJ_ID: 1765,
+            X: x if x != null else 0,
+            Y: y if y != null else 0,
+            GROUPS: target,
+        }, true)
+        target.alpha(0)
+        self.move_to(target, duration, y == null, x == null, easing, easing_rate)
+    },
+
     pulse:
     #[desc("Implementation of the pulse trigger for groups") example("10g.pulse(255, 0, 0, fade_out = 0.5)")]
     (

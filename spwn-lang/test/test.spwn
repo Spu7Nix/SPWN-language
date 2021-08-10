@@ -1,5 +1,8 @@
 
+10g.move_to_xy(300, 300, 1)
 
-while true {
-    wait(1)
-}
+10g.move_to_xy(x = 0, duration = 1)
+
+10g.move_to_xy(150, 300, 1)
+
+10g.move_to_xy(y = 0, duration = 1)

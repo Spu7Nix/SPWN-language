@@ -617,7 +617,35 @@ builtins! {
     [Hypot] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
 
     [Add]
-    fn add((obj, mode): Obj) {
+    fn add() {
+        if arguments.is_empty() || arguments.len() > 2 {
+            return Err(RuntimeError::BuiltinError {
+                message: "Expected 1 argument".to_string(),
+                info,
+            });
+        }
+        let (obj, mode) = match globals.stored_values[arguments[0]].clone() {
+            Value::Obj(obj, mode) => (obj, mode),
+            _ => return Err(RuntimeError::TypeError {
+                expected: "@object or @trigger".to_string(),
+                found: globals.get_type_str(arguments[0]),
+                val_def: globals.get_area(arguments[0]),
+                info,
+            })
+        };
+
+        let mut ignore_context = false;
+        if arguments.len() == 2 {
+            match globals.stored_values[arguments[1]].clone() {
+                Value::Bool(b) => ignore_context = b,
+                _ => return Err(RuntimeError::TypeError {
+                    expected: "boolean".to_string(),
+                    found: globals.get_type_str(arguments[1]),
+                    val_def: globals.get_area(arguments[1]),
+                    info,
+                })
+            };
+        }
 
         let mut obj_map = HashMap::<u16, ObjParam>::new();
 
@@ -628,7 +656,7 @@ builtins! {
 
         match mode {
             ObjectMode::Object => {
-                if context.start_group.id != Id::Specific(0) {
+                if !ignore_context && context.start_group.id != Id::Specific(0) {
                     return Err(RuntimeError::BuiltinError { // objects cant be added dynamically, of course
                         message: String::from(
                             "you cannot add an obj type object at runtime"),
