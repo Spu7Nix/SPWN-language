@@ -3,6 +3,7 @@ constants = import "constants.spwn"
 
 extract constants.obj_props
 extract constants.comparisons
+extract constants.easing_types
 extract import "control_flow.spwn"
 
 return {
