@@ -5,7 +5,7 @@ let a = [1,2,3,4]
 let c = counter(10);
 
 
-let b = [c.to_const(0..x) for x in a]
+let b = [x for x in 0..10]
 
 //$.print(c)
 $.print(b)

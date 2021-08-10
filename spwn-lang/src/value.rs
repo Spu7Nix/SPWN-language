@@ -825,25 +825,17 @@ impl ast::Variable {
                         globals.push_new_preserved();
                         globals.push_preserved_val(val);
 
+                        context.inner().return_value = store_const_value(
+                            Value::Array(vec![]),
+                            globals,
+                            context.inner().start_group,
+                            info.position
+                        );
+
                         match globals.stored_values[val].clone() {
                             // what are we iterating
                             Value::Array(arr) => {
                                 // its an array!
-
-                                /*context.set_variable_and_store(
-                                    Intern::new("&fuck".to_string()),
-                                    Value::Array(vec![]),
-                                    10,
-                                    true,
-                                    globals,
-                                    info.position
-                                );*/
-                                context.inner().return_value = store_const_value(
-                                    Value::Array(vec![]),
-                                    globals,
-                                    context.inner().start_group,
-                                    info.position
-                                );
 
                                 for element in arr {
                                     context.set_variable_and_clone(
@@ -890,7 +882,14 @@ impl ast::Variable {
                                                                 ); 
                                                             }
                                                         },
-                                                        a => println!("not a bool lol {:?}", a)
+                                                        a => {
+                                                            return Err(RuntimeError::TypeError {
+                                                                expected: "bool".to_string(),
+                                                                found: a.get_type_str(globals),
+                                                                val_def: globals.get_area(val),
+                                                                info,
+                                                            })
+                                                        }
                                                     }
                                                 }
                                             },
@@ -951,7 +950,72 @@ impl ast::Variable {
                                         );
                                     }
 
-                                    //compile_scope(&f.body, context, globals, info.clone())?; // eval the stuff
+                                    for con_iter in context.iter() {
+                                        con_iter.enter_scope(); // mini scope sandwich
+
+                                        let item_list = globals.stored_values[con_iter.inner().return_value].clone();
+
+                                        match &comp.condition {
+                                            Some(cond) => {
+                                                cond.eval(con_iter, globals, info.clone(), true)?;
+                                                for cond_ctx in con_iter.iter() {
+                                                    match &globals.stored_values[cond_ctx.inner().return_value] {
+                                                        Value::Bool(b) => {
+                                                            if *b {
+                                                                comp.body.eval(cond_ctx, globals, info.clone(), true)?;
+                                                                for expr_ctx in cond_ctx.iter() {
+                                                                    let mut local_list = item_list.clone();
+                                                                    if let Value::Array(ref mut a) = local_list {
+                                                                        a.push(expr_ctx.inner().return_value);
+                                                                    } else {unreachable!();}
+
+                                                                    expr_ctx.inner().return_value = store_const_value(
+                                                                        local_list,
+                                                                        globals,
+                                                                        expr_ctx.inner().start_group,
+                                                                        info.position
+                                                                    ); 
+                                                                }
+                                                            } else {
+                                                                cond_ctx.inner().return_value = store_const_value(
+                                                                    item_list.clone(),
+                                                                    globals,
+                                                                    cond_ctx.inner().start_group,
+                                                                    info.position
+                                                                ); 
+                                                            }
+                                                        },
+                                                        a => {
+                                                            return Err(RuntimeError::TypeError {
+                                                                expected: "bool".to_string(),
+                                                                found: a.get_type_str(globals),
+                                                                val_def: globals.get_area(val),
+                                                                info,
+                                                            })
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            _ => {
+                                                comp.body.eval(con_iter, globals, info.clone(), true)?;
+                                                for expr_ctx in con_iter.iter() {
+                                                    let mut local_list = item_list.clone();
+                                                    if let Value::Array(ref mut a) = local_list {
+                                                        a.push(expr_ctx.inner().return_value);
+                                                    } else {unreachable!();}
+
+                                                    expr_ctx.inner().return_value = store_const_value(
+                                                        local_list,
+                                                        globals,
+                                                        expr_ctx.inner().start_group,
+                                                        info.position
+                                                    ); 
+                                                }
+                                            }
+                                        }
+
+                                        con_iter.exit_scope();
+                                    }
                                 }
                             }
                             Value::Str(s) => {
@@ -966,7 +1030,72 @@ impl ast::Variable {
                                         info.position,
                                     );
 
-                                    //compile_scope(&f.body, context, globals, info.clone())?; // eval the stuff
+                                    for con_iter in context.iter() {
+                                        con_iter.enter_scope(); // mini scope sandwich
+
+                                        let item_list = globals.stored_values[con_iter.inner().return_value].clone();
+
+                                        match &comp.condition {
+                                            Some(cond) => {
+                                                cond.eval(con_iter, globals, info.clone(), true)?;
+                                                for cond_ctx in con_iter.iter() {
+                                                    match &globals.stored_values[cond_ctx.inner().return_value] {
+                                                        Value::Bool(b) => {
+                                                            if *b {
+                                                                comp.body.eval(cond_ctx, globals, info.clone(), true)?;
+                                                                for expr_ctx in cond_ctx.iter() {
+                                                                    let mut local_list = item_list.clone();
+                                                                    if let Value::Array(ref mut a) = local_list {
+                                                                        a.push(expr_ctx.inner().return_value);
+                                                                    } else {unreachable!();}
+
+                                                                    expr_ctx.inner().return_value = store_const_value(
+                                                                        local_list,
+                                                                        globals,
+                                                                        expr_ctx.inner().start_group,
+                                                                        info.position
+                                                                    ); 
+                                                                }
+                                                            } else {
+                                                                cond_ctx.inner().return_value = store_const_value(
+                                                                    item_list.clone(),
+                                                                    globals,
+                                                                    cond_ctx.inner().start_group,
+                                                                    info.position
+                                                                ); 
+                                                            }
+                                                        },
+                                                        a => {
+                                                            return Err(RuntimeError::TypeError {
+                                                                expected: "bool".to_string(),
+                                                                found: a.get_type_str(globals),
+                                                                val_def: globals.get_area(val),
+                                                                info,
+                                                            })
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            _ => {
+                                                comp.body.eval(con_iter, globals, info.clone(), true)?;
+                                                for expr_ctx in con_iter.iter() {
+                                                    let mut local_list = item_list.clone();
+                                                    if let Value::Array(ref mut a) = local_list {
+                                                        a.push(expr_ctx.inner().return_value);
+                                                    } else {unreachable!();}
+
+                                                    expr_ctx.inner().return_value = store_const_value(
+                                                        local_list,
+                                                        globals,
+                                                        expr_ctx.inner().start_group,
+                                                        info.position
+                                                    ); 
+                                                }
+                                            }
+                                        }
+
+                                        con_iter.exit_scope();
+                                    }
                                 }
                             }
 
@@ -986,7 +1115,72 @@ impl ast::Variable {
                                         info.position,
                                     );
 
-                                    //compile_scope(&f.body, context, globals, info.clone())?; // eval the stuff
+                                    for con_iter in context.iter() {
+                                        con_iter.enter_scope(); // mini scope sandwich
+
+                                        let item_list = globals.stored_values[con_iter.inner().return_value].clone();
+
+                                        match &comp.condition {
+                                            Some(cond) => {
+                                                cond.eval(con_iter, globals, info.clone(), true)?;
+                                                for cond_ctx in con_iter.iter() {
+                                                    match &globals.stored_values[cond_ctx.inner().return_value] {
+                                                        Value::Bool(b) => {
+                                                            if *b {
+                                                                comp.body.eval(cond_ctx, globals, info.clone(), true)?;
+                                                                for expr_ctx in cond_ctx.iter() {
+                                                                    let mut local_list = item_list.clone();
+                                                                    if let Value::Array(ref mut a) = local_list {
+                                                                        a.push(expr_ctx.inner().return_value);
+                                                                    } else {unreachable!();}
+
+                                                                    expr_ctx.inner().return_value = store_const_value(
+                                                                        local_list,
+                                                                        globals,
+                                                                        expr_ctx.inner().start_group,
+                                                                        info.position
+                                                                    ); 
+                                                                }
+                                                            } else {
+                                                                cond_ctx.inner().return_value = store_const_value(
+                                                                    item_list.clone(),
+                                                                    globals,
+                                                                    cond_ctx.inner().start_group,
+                                                                    info.position
+                                                                ); 
+                                                            }
+                                                        },
+                                                        a => {
+                                                            return Err(RuntimeError::TypeError {
+                                                                expected: "bool".to_string(),
+                                                                found: a.get_type_str(globals),
+                                                                val_def: globals.get_area(val),
+                                                                info,
+                                                            })
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            _ => {
+                                                comp.body.eval(con_iter, globals, info.clone(), true)?;
+                                                for expr_ctx in con_iter.iter() {
+                                                    let mut local_list = item_list.clone();
+                                                    if let Value::Array(ref mut a) = local_list {
+                                                        a.push(expr_ctx.inner().return_value);
+                                                    } else {unreachable!();}
+
+                                                    expr_ctx.inner().return_value = store_const_value(
+                                                        local_list,
+                                                        globals,
+                                                        expr_ctx.inner().start_group,
+                                                        info.position
+                                                    ); 
+                                                }
+                                            }
+                                        }
+
+                                        con_iter.exit_scope();
+                                    }
                                 }
                             }
 
