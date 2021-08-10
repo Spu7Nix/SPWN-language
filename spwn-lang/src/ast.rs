@@ -69,6 +69,7 @@ pub enum ValueBody {
     Import(ImportType, bool),
     Switch(Expression, Vec<Case>),
     Array(Vec<Expression>),
+    ListComp(Comprehension),
     Obj(ObjectLiteral),
     Macro(Macro),
     Resolved(StoredValue),
@@ -357,6 +358,14 @@ pub struct Ternary {
     pub condition: Expression,
     pub if_expr: Expression,
     pub else_expr: Expression,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Comprehension {
+    pub symbol: Intern<String>,
+    pub iterator: Expression,
+    pub condition: Option<Expression>,
+    pub body: Expression
 }
 
 impl Expression {

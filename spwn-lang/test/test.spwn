@@ -1,3 +1,11 @@
-for i in 1..10 {
-    -> 4g.move(4,4);
-}
+#[no_level]
+let a = [1,2,3,4]
+
+
+let c = counter(10);
+
+
+let b = [c.to_const(0..x) for x in a]
+
+//$.print(c)
+$.print(b)

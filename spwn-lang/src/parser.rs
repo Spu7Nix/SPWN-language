@@ -21,6 +21,7 @@ use logos::Logos;
 
 use crate::compiler::create_error;
 use crate::compiler_types::ImportType;
+use crate::fmt;
 
 pub type FileRange = (usize, usize);
 
@@ -2149,27 +2150,81 @@ fn parse_variable(
 
                     //Array
                     let mut arr = Vec::new();
+                    let mut potential_listcomp: Option<ast::Comprehension> = None;
 
                     if tokens.next(false) != Some(Token::ClosingSquareBracket) {
                         tokens.previous();
                         loop {
-                            arr.push(parse_expr(tokens, notes, true, true)?);
+                            let item = parse_expr(tokens, notes, true, true)?;
                             match tokens.next(false) {
+                                Some(Token::For) => {
+                                    if arr.len() > 0 {
+                                        expected!("comma (',') or ']'".to_string(), tokens, notes, Some(Token::For));
+                                    }
+
+                                    match tokens.next(false) {
+                                        Some(Token::Symbol) => {
+                                            let tok_name = tokens.slice();
+
+                                            match tokens.next(false) {
+                                                Some(Token::In) => (),
+                                                a => expected!("'in'".to_string(), tokens, notes, a),
+                                            }
+
+                                            let iter = parse_expr(tokens, notes, true, true)?;
+
+                                            let mut potential_condition: Option<ast::Expression> = None;
+
+                                            match tokens.next(false) {
+                                                Some(Token::ClosingSquareBracket) => (),
+                                                Some(Token::Comma) => {
+                                                    match tokens.next(false) {
+                                                        Some(Token::If) => {
+                                                            potential_condition = Some(parse_expr(tokens, notes, true, true)?);
+                                                            match tokens.next(false) {
+                                                                Some(Token::ClosingSquareBracket) => (),
+                                                                a => expected!("]".to_string(), tokens, notes, a)
+                                                            }
+                                                        },
+                                                        a => expected!("if".to_string(), tokens, notes, a)
+                                                    }
+                                                },
+                                                a => expected!("']' or ','".to_string(), tokens, notes, a),
+                                            }
+
+                                            potential_listcomp = Some(ast::Comprehension {
+                                                body: item,
+                                                symbol: Intern::new(tok_name),
+                                                iterator: iter,
+                                                condition: potential_condition
+                                            });
+                                            break;
+                                        },
+                                        a => expected!("identifier".to_string(), tokens, notes, a)
+                                    }
+                                },
                                 Some(Token::Comma) => {
                                     //accounting for trailing comma
+                                    arr.push(item);
                                     if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
                                         break;
                                     } else {
                                         tokens.previous();
                                     }
                                 }
-                                Some(Token::ClosingSquareBracket) => break,
-                                a => expected!("comma (',') or ']'".to_string(), tokens, notes, a),
+                                Some(Token::ClosingSquareBracket) => {
+                                    arr.push(item);
+                                    break;
+                                },
+                                a => expected!("comma (','), ']', or 'for'".to_string(), tokens, notes, a),
                             }
                         }
                     }
-
-                    ast::ValueBody::Array(arr)
+                    if let Some(c) = potential_listcomp {
+                        ast::ValueBody::ListComp(c)
+                    } else {
+                        ast::ValueBody::Array(arr)
+                    }
                 }
             }
         }

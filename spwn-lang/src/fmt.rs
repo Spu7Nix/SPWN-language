@@ -30,6 +30,10 @@ pub fn _format(input: Vec<Statement>) -> String {
     out
 }
 
+pub fn _format2(input: &ValueBody) -> String {
+    input.fmt(0).to_string()
+}
+
 fn element_list(elements: &[impl SpwnFmt], open: char, closing: char, ind: Indent) -> String {
     if elements.is_empty() {
         return format!("{}{}", open, closing);
@@ -272,6 +276,12 @@ impl SpwnFmt for ValueBody {
                 t.if_expr.fmt(ind),
                 t.condition.fmt(ind),
                 t.else_expr.fmt(ind)
+            ),
+            ListComp(c) => format!(
+                "{} for {} in {}",
+                c.body.fmt(ind),
+                c.symbol,
+                c.iterator.fmt(ind)
             ),
             Switch(_, _) => "switch".to_string(),
         }
