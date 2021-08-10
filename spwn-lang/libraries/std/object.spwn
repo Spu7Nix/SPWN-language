@@ -4,6 +4,11 @@ impl @object {
 	set: (self, key: @object_key, value) {
 		$.edit_obj(self, key, value);
 	},
+	with: (self, key: @object_key, value) {
+		let new_obj = self
+		new_obj.set(key, value)
+		return new_obj
+	},
 	add_groups: (self, groups: @group | [@group]) {
 		let grps = switch groups {
 			@group: [groups],

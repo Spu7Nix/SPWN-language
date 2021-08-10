@@ -142,6 +142,26 @@ center = 3g
         })
         //wouldnt make any sense to wait out the duration here
     },
+    
+    follow_lerp:
+    #[desc("Keeps an object's position proportionally between 2 others")
+    example("
+    // Since this function works using follow triggers, objects need to already be in the proper position,
+    // otherwise they'll be offset.
+    1g.follow_lerp(2g,3g,0.5) // Keeps group 1 in the middle of groups 2 and 3
+    1g.follow_lerp(2g,3g,0.25) // Keeps group 1 25% of the way between groups 2 and 3
+    1g.follow_lerp(2g,3g,-1) // Keeps group 1 as a reflection of group 3 by group 2
+    ")]
+    (
+        self,
+        #[desc("Group of object A to follow")] groupA: @group,
+        #[desc("Group of object B to follow")] groupB: @group,
+        #[desc("Group of object B to follow")] weight: @number = 0.5,
+        #[desc("Duration of following")] duration: @number = 999,
+    ){
+        self.follow(groupA,x_mod = 1 - weight,y_mod = 1 - weight,duration = duration)
+        self.follow(groupB,x_mod = weight,y_mod = weight,duration = duration)
+    },
 
     follow_player_y:
     #[desc("Implementation of the follow player Y trigger") example("10g.follow_player_y(delay = 0.5)")]
