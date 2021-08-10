@@ -941,6 +941,77 @@ pub fn compile_scope(
                 }
             }
 
+            While(w) => {
+                for full_context in contexts.iter() {
+                    let fn_context = full_context.inner().start_group;
+                    loop {
+                        full_context.disable_breaks(BreakType::ContinueLoop);
+
+                        w.condition
+                            .eval(full_context, globals, info.clone(), true)?;
+
+                        if let FullContext::Split(_, _) = full_context {
+                            return Err(RuntimeError::CustomError(create_error(
+                                info,
+                                "While loop condition can not split the context",
+                                &[],
+                                Some("Consider using a runtime while loop"),
+                            )));
+                        }
+
+                        if full_context.inner().start_group != fn_context {
+                            return Err(RuntimeError::ContextChangeError {
+                                message: "While loop condition can not change the trigger function context (consider using a runtime while loop)".to_string(),
+                                info,
+                                context_changes: full_context.inner().fn_context_change_stack.clone()
+                            });
+                        }
+
+                        if let Value::Bool(b) =
+                            globals.stored_values[full_context.inner().return_value]
+                        {
+                            if b {
+                                compile_scope(&w.body, full_context, globals, info.clone())?;
+                                if let FullContext::Split(_, _) = full_context {
+                                    return Err(RuntimeError::CustomError(create_error(
+                                        info,
+                                        "While loop body can not split the context (consider using a runtime while loop)",
+                                        &[],
+                                        Some("Consider using a runtime while loop"),
+                                    )));
+                                }
+                                if full_context.inner().start_group != fn_context {
+                                    return Err(RuntimeError::ContextChangeError {
+                                        message: "While loop body can not change the trigger function context".to_string(),
+                                        info,
+                                        context_changes: full_context.inner().fn_context_change_stack.clone()
+                                    });
+                                }
+                            } else {
+                                full_context.inner().broken =
+                                    Some((BreakType::Loop, CodeArea::new()));
+                            }
+                        } else {
+                            return Err(RuntimeError::TypeError {
+                                expected: "boolean".to_string(),
+                                found: globals.get_type_str(full_context.inner().return_value),
+                                val_def: globals.get_area(full_context.inner().return_value),
+                                info,
+                            });
+                        }
+
+                        let all_breaks = full_context.with_breaks().all(|fc| {
+                            !matches!(fc.inner().broken, Some((BreakType::ContinueLoop, _)) | None)
+                        });
+                        if all_breaks {
+                            break;
+                        }
+                    }
+                    full_context.disable_breaks(BreakType::Loop);
+                    full_context.disable_breaks(BreakType::ContinueLoop);
+                }
+            }
+
             For(f) => {
                 f.array.eval(contexts, globals, info.clone(), true)?;
                 /*

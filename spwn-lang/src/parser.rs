@@ -21,7 +21,6 @@ use logos::Logos;
 
 use crate::compiler::create_error;
 use crate::compiler_types::ImportType;
-use crate::fmt;
 
 pub type FileRange = (usize, usize);
 
@@ -399,14 +398,11 @@ impl Token {
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
             | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
-            While | Sync => {
-                "reserved keyword (not currently in use, but may be used in future updates)"
-            }
+            Sync => "reserved keyword (not currently in use, but may be used in future updates)",
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case => {
-                "keyword"
-            }
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case
+            | While => "keyword",
             //Comment | MultiCommentStart | MultiCommentEnd => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -807,6 +803,21 @@ pub fn parse_statement(
                 check for any "else" or "else if" statements
                 return a syntax tree for it
             */
+        }
+
+        Some(Token::While) => {
+            let condition = parse_expr(tokens, notes, true, false)?;
+            match tokens.next(false) {
+                // check for brace
+                Some(Token::OpenCurlyBracket) => {}
+                a => {
+                    // no brace
+                    expected!("'{'".to_string(), tokens, notes, a)
+                }
+            };
+            let body = parse_cmp_stmt(tokens, notes)?; // parse whats in the while loop
+
+            ast::StatementBody::While(ast::While { condition, body })
         }
 
         Some(Token::For) => {
@@ -1823,72 +1834,71 @@ fn parse_macro(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
     properties: ast::Attribute,
-    decorator: Option<Box<ast::Variable>>
+    decorator: Option<Box<ast::Variable>>,
 ) -> Result<ast::ValueBody, SyntaxError> {
-    let parse_macro_def = |tokens: &mut Tokens,
-                           notes: &mut ParseNotes|
-     -> Result<ast::ValueBody, SyntaxError> {
-        let arg_start = tokens.position().0;
-        let args = parse_arg_def(tokens, notes)?;
-        let arg_end = tokens.position().1;
-        let body = match tokens.next(false) {
-            Some(Token::OpenCurlyBracket) => parse_cmp_stmt(tokens, notes)?,
-            Some(Token::ThickArrow) => {
-                let start = tokens.position().0;
-                let expr = parse_expr(tokens, notes, true, true)?;
-                let end = tokens.position().1;
-                vec![ast::Statement {
-                    body: ast::StatementBody::Return(Some(expr)),
-                    arrow: false,
-                    //comment: (None, None),
-                    pos: (start, end),
-                }]
-            }
-            a => expected!("'{'".to_string(), tokens, notes, a),
-        };
-
-        let m_value = ast::ValueBody::Macro(ast::Macro {
-            args,
-            body: ast::CompoundStatement { statements: body },
-            properties: properties.clone(),
-            arg_pos: (arg_start, arg_end)
-        });
-
-        if let Some(d) = decorator {
-            let mut unwrapped_deco = (*d).clone();
-
-            let m_var = ast::Variable {
-                value: ast::ValueLiteral::new(m_value),
-                path: Vec::new(),
-                operator: None,
-                pos: (arg_start, arg_end),
-                tag: properties.clone()
+    let parse_macro_def =
+        |tokens: &mut Tokens, notes: &mut ParseNotes| -> Result<ast::ValueBody, SyntaxError> {
+            let arg_start = tokens.position().0;
+            let args = parse_arg_def(tokens, notes)?;
+            let arg_end = tokens.position().1;
+            let body = match tokens.next(false) {
+                Some(Token::OpenCurlyBracket) => parse_cmp_stmt(tokens, notes)?,
+                Some(Token::ThickArrow) => {
+                    let start = tokens.position().0;
+                    let expr = parse_expr(tokens, notes, true, true)?;
+                    let end = tokens.position().1;
+                    vec![ast::Statement {
+                        body: ast::StatementBody::Return(Some(expr)),
+                        arrow: false,
+                        //comment: (None, None),
+                        pos: (start, end),
+                    }]
+                }
+                a => expected!("'{'".to_string(), tokens, notes, a),
             };
 
-            let mut new_path = vec![ast::Argument {
-                symbol: None,
-                value: m_var.to_expression(),
-                pos: (arg_start, arg_end)
-            }];
+            let m_value = ast::ValueBody::Macro(ast::Macro {
+                args,
+                body: ast::CompoundStatement { statements: body },
+                properties: properties.clone(),
+                arg_pos: (arg_start, arg_end),
+            });
 
-            if let Some(p_) = unwrapped_deco.path.pop() {
-                match p_ {
-                    ast::Path::Call(v) => {
-                        new_path.extend(v);
-                    },
-                    _ => {
-                        unwrapped_deco.path.push(p_);
+            if let Some(d) = decorator {
+                let mut unwrapped_deco = (*d).clone();
+
+                let m_var = ast::Variable {
+                    value: ast::ValueLiteral::new(m_value),
+                    path: Vec::new(),
+                    operator: None,
+                    pos: (arg_start, arg_end),
+                    tag: properties.clone(),
+                };
+
+                let mut new_path = vec![ast::Argument {
+                    symbol: None,
+                    value: m_var.to_expression(),
+                    pos: (arg_start, arg_end),
+                }];
+
+                if let Some(p_) = unwrapped_deco.path.pop() {
+                    match p_ {
+                        ast::Path::Call(v) => {
+                            new_path.extend(v);
+                        }
+                        _ => {
+                            unwrapped_deco.path.push(p_);
+                        }
                     }
                 }
+
+                unwrapped_deco.path.push(ast::Path::Call(new_path));
+
+                Ok(ast::ValueBody::Expression(unwrapped_deco.to_expression()))
+            } else {
+                Ok(m_value)
             }
-
-            unwrapped_deco.path.push(ast::Path::Call(new_path));
-
-            Ok(ast::ValueBody::Expression(unwrapped_deco.to_expression()))
-        } else {
-            Ok(m_value)
-        }
-    };
+        };
 
     let mut test_tokens = tokens.clone();
 
@@ -2064,7 +2074,7 @@ fn parse_variable(
                             statements: macro_body,
                         },
                         arg_pos: start,
-                        properties: properties.clone()
+                        properties: properties.clone(),
                     })
                 }
                 _ => {
@@ -2076,7 +2086,6 @@ fn parse_variable(
         }
 
         Some(Token::OpenSquareBracket) => {
-
             let mut potential_macro: Option<ast::ValueBody> = None;
 
             if let Some(Token::OpenSquareBracket) = tokens.next(false) {
@@ -2089,41 +2098,48 @@ fn parse_variable(
                                     Some(Token::OpenBracket) => {
                                         // its a decorator on a macro
                                         *tokens = test_tokens;
-                                        potential_macro = Some(parse_macro(tokens, notes, properties.clone(), Some(Box::new(v)))?);
-                                    },
+                                        potential_macro = Some(parse_macro(
+                                            tokens,
+                                            notes,
+                                            properties.clone(),
+                                            Some(Box::new(v)),
+                                        )?);
+                                    }
                                     Some(Token::Exclamation) => {
                                         // its a decorator on a trigger function
 
-                                        match test_tokens.next(true) { // fuck this, i ain't allowing !;{ }
+                                        match test_tokens.next(true) {
+                                            // fuck this, i ain't allowing !;{ }
                                             Some(Token::OpenCurlyBracket) => (),
-                                            a => expected!("{".to_string(), test_tokens, notes, a)
+                                            a => expected!("{".to_string(), tokens, notes, a),
                                         }
 
                                         *tokens = test_tokens;
 
-                                        let trig = ast::ValueBody::CmpStmt(ast::CompoundStatement {
-                                            statements: parse_cmp_stmt(tokens, notes)?,
-                                        });
+                                        let trig =
+                                            ast::ValueBody::CmpStmt(ast::CompoundStatement {
+                                                statements: parse_cmp_stmt(tokens, notes)?,
+                                            });
 
                                         let t_var = ast::Variable {
                                             value: ast::ValueLiteral::new(trig),
                                             path: Vec::new(),
                                             operator: None,
                                             pos: (0, 0),
-                                            tag: properties.clone()
+                                            tag: properties.clone(),
                                         };
 
                                         let mut new_path = vec![ast::Argument {
                                             symbol: None,
                                             value: t_var.to_expression(),
-                                            pos: (0, 0)
+                                            pos: (0, 0),
                                         }];
 
                                         if let Some(p_) = v.path.pop() {
                                             match p_ {
                                                 ast::Path::Call(vv) => {
                                                     new_path.extend(vv);
-                                                },
+                                                }
                                                 _ => {
                                                     v.path.push(p_);
                                                 }
@@ -2132,14 +2148,15 @@ fn parse_variable(
 
                                         v.path.push(ast::Path::Call(new_path));
 
-                                        potential_macro = Some(ast::ValueBody::Expression(v.to_expression()))
-                                    },
-                                    _ => ()
+                                        potential_macro =
+                                            Some(ast::ValueBody::Expression(v.to_expression()))
+                                    }
+                                    _ => (),
                                 }
-                            } 
+                            }
                         }
-                    },
-                    Err(_) => ()
+                    }
+                    Err(_) => (),
                 }
             }
 
@@ -2150,81 +2167,27 @@ fn parse_variable(
 
                     //Array
                     let mut arr = Vec::new();
-                    let mut potential_listcomp: Option<ast::Comprehension> = None;
 
                     if tokens.next(false) != Some(Token::ClosingSquareBracket) {
                         tokens.previous();
                         loop {
-                            let item = parse_expr(tokens, notes, true, true)?;
+                            arr.push(parse_expr(tokens, notes, true, true)?);
                             match tokens.next(false) {
-                                Some(Token::For) => {
-                                    if arr.len() > 0 {
-                                        expected!("comma (',') or ']'".to_string(), tokens, notes, Some(Token::For));
-                                    }
-
-                                    match tokens.next(false) {
-                                        Some(Token::Symbol) => {
-                                            let tok_name = tokens.slice();
-
-                                            match tokens.next(false) {
-                                                Some(Token::In) => (),
-                                                a => expected!("'in'".to_string(), tokens, notes, a),
-                                            }
-
-                                            let iter = parse_expr(tokens, notes, true, true)?;
-
-                                            let mut potential_condition: Option<ast::Expression> = None;
-
-                                            match tokens.next(false) {
-                                                Some(Token::ClosingSquareBracket) => (),
-                                                Some(Token::Comma) => {
-                                                    match tokens.next(false) {
-                                                        Some(Token::If) => {
-                                                            potential_condition = Some(parse_expr(tokens, notes, true, true)?);
-                                                            match tokens.next(false) {
-                                                                Some(Token::ClosingSquareBracket) => (),
-                                                                a => expected!("]".to_string(), tokens, notes, a)
-                                                            }
-                                                        },
-                                                        a => expected!("if".to_string(), tokens, notes, a)
-                                                    }
-                                                },
-                                                a => expected!("']' or ','".to_string(), tokens, notes, a),
-                                            }
-
-                                            potential_listcomp = Some(ast::Comprehension {
-                                                body: item,
-                                                symbol: Intern::new(tok_name),
-                                                iterator: iter,
-                                                condition: potential_condition
-                                            });
-                                            break;
-                                        },
-                                        a => expected!("identifier".to_string(), tokens, notes, a)
-                                    }
-                                },
                                 Some(Token::Comma) => {
                                     //accounting for trailing comma
-                                    arr.push(item);
                                     if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
                                         break;
                                     } else {
                                         tokens.previous();
                                     }
                                 }
-                                Some(Token::ClosingSquareBracket) => {
-                                    arr.push(item);
-                                    break;
-                                },
-                                a => expected!("comma (','), ']', or 'for'".to_string(), tokens, notes, a),
+                                Some(Token::ClosingSquareBracket) => break,
+                                a => expected!("comma (',') or ']'".to_string(), tokens, notes, a),
                             }
                         }
                     }
-                    if let Some(c) = potential_listcomp {
-                        ast::ValueBody::ListComp(c)
-                    } else {
-                        ast::ValueBody::Array(arr)
-                    }
+
+                    ast::ValueBody::Array(arr)
                 }
             }
         }
