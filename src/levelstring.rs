@@ -157,8 +157,8 @@ pub fn get_used_ids(ls: &str) -> [HashSet<u16>; 4] {
 
                 "80" => {
                     match map.get("1") {
-                        //if collision trigger, add block id
-                        Some(&"1815") => out[2].insert(value.parse().unwrap()),
+                        //if collision trigger or block, add block id
+                        Some(&"1815") | Some(&"1816") => out[2].insert(value.parse().unwrap()),
                         //counter display => do nothing
                         Some(&"1615") => false,
                         // else add item id
