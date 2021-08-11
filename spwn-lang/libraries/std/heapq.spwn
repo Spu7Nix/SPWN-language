@@ -1,0 +1,94 @@
+#[no_std, cache_output]
+// import "array.spwn"
+
+type @heapq
+
+impl @heapq {
+    new: (arr: @array = [0], comp: @macro = (a, b) => a <= b) {
+        if !arr.all(el => el != null) {
+            throw "HeapError: Elements of heap should not be null"
+        }
+
+        let pobj = {
+            type: @heapq,
+            arr: arr,
+            comp: comp,
+            allocator: allocator,
+            size: arr.length
+        };
+
+        pobj.heapify()
+
+        return pobj
+    },
+
+    heapify: (self, root: @number = 0) {
+        l = root * 2 + 1
+        r = root * 2 + 2
+
+        let lnode = null
+        let rnode = null
+
+        if l < self.size {
+            lnode = self.arr[l]
+        }
+
+        if r < self.size {
+            rnode = self.arr[r]
+        }
+
+        if lnode != null {
+            self.heapify(l)
+
+            if !self.comp(self.arr[root], self.arr[l]) {
+                self.arr[root] <=> self.arr[l]
+            }
+        }
+        
+        if rnode != null {
+            self.heapify(r)
+
+            if !self.comp(self.arr[root], self.arr[r]) {
+                self.arr[root] <=> self.arr[r]
+            }
+        }
+    },
+
+    space: (self) { // how big the array is, size is how many non null elements
+        return self.arr.length
+    },
+
+    resize: (self, new_size: @number) {
+        let ret = self
+
+        if new_size < self.space() {
+            ret = self[:new_size]
+        } else {
+            diff = new_size - self.space() 
+
+            for i in ..diff {
+                ret.push(null)
+            }
+        }
+
+        return ret
+    },
+
+    insert: (self, val) {
+        // check to make sure we have enough space
+        if self.size == self.space() {
+            // once array multiplication is availible, make this better
+            self.arr = self.resize(self.allocator(self.size))
+        }
+
+        // insert at top, then feed through
+        let index = 0
+
+        while true {
+            let l = index * 2 + 1
+            let r = index * 2 + 2
+
+            break
+        }
+    }
+}
