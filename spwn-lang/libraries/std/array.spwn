@@ -285,5 +285,20 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         }
 
         return output
+    },
+    repeat: #[desc("Returns self repeated `n` times") example("
+arr = [1,2,3]
+$.assert(arr.repeat(3) == [1,2,3,1,2,3,1,2,3])
+    ")] (self, n: @number) {
+        if n < 0 {
+            throw "Array repeat error: Cannot repeat an array a negative amount of times"
+        }
+
+        let ret = []
+        for i in ..n {
+            ret += self
+        }
+
+        return ret
     }
 }
