@@ -38,3 +38,18 @@
 >| 1 | **`key`** | @object_key | | |
 >| 2 | **`value`** |any | | |
 >
+
+## **with**:
+
+> **Value:** 
+>```spwn
+>(self, key: @object_key, value) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 1 | **`key`** | @object_key | | |
+>| 2 | **`value`** |any | | |
+>

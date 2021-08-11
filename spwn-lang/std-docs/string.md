@@ -33,6 +33,31 @@
 >| 1 | **`substr`** | @string | | |
 >
 
+## **fmt**:
+
+> **Value:** 
+>```spwn
+>(self, subs) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
+>## Description: 
+> _Returns a formtted version of the string. Accepts either a single argument or an array_
+>### Example: 
+>```spwn
+> name1 = 'bob'
+>name2 = 'alice'
+>$.assert('hi {}'.fmt(name1) == 'hi bob')
+>$.assert('hi {} and {}'.fmt([name1, name2]) == 'hi bob and alice')
+>$.assert('hi {1} and {0}'.fmt([name1, name2]) == 'hi alice and bob')
+>$.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
+>```
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 1 | **`subs`** |any | | |
+>
+
 ## **index**:
 
 > **Value:** 

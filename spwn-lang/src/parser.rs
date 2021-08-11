@@ -1274,7 +1274,7 @@ fn parse_expr(
 
             // iterate though the operators until we get one like =
             while !old_operators.is_empty() {
-                if operator_precedence(old_operators.last().unwrap()) == 0 {
+                if operator_precedence(old_operators.last().unwrap()) < 1 {
                     break;
                 }
 
@@ -1302,6 +1302,9 @@ fn parse_expr(
                     })
                 }
             }?;
+
+            tern_values.reverse();
+            tern_operators.reverse();
 
             let (end_pos, _) = tokens.position();
 
