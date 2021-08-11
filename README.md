@@ -50,7 +50,7 @@ deb@spwn:~$ sudo dpkg -i spwn_0.0.5-0_amd64.deb
 2. Install rust if you haven't already.
 3. Open `spwn-lang` folder in the terminal.
 4. Run `cargo build --release`.
-5. Compiled binary is placed in `target/debug`.
+5. Compiled binary is placed in `target/release`.
 
 ## Using SPWN - Setup
 
