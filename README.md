@@ -24,30 +24,30 @@ You can either use the installers for your operating system, or build SPWN from 
 1. Download the .msi file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
 2. Open the .msi file and follow the install wizard.
 
-###### MacOS
+###### macOS
 1. Download the .pkg file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
 2. Open the .pkg file and follow the install wizard.
 
  - Note: *If you get a message telling you that you cant open files from unidentified developers, open 'System Preferences' then click 'Security & Privacy' and click 'Open Anyway' on the 'General' menu*
 
 ###### Linux
-1. Download the .deb file (debian based) or the .pkg.tar.zst (arch based) from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases)
+1. Download the .deb file (Debian based) or the .pkg.tar.zst (Arch based) from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases)
 
 2. 
-- Install the debian package using dpkg:
+- Install the Debian package using dpkg:
 ```sh
 deb@spwn:~$ sudo dpkg -i spwn_0.0.5-0_amd64.deb
 ```
 
-- Install the arch package using pacman and add `/usr/local/bin` to path:
+- Install the Arch package using pacman and add `/usr/bin/spwn/` to path:
 ```sh
 [arch@spwn ~$] pacman -U spwn-0.0.5-0_amd64.pkg.tar.zst
-[arch@spwn ~$] echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+[arch@spwn ~$] echo 'export PATH="/usr/bin/spwn/:$PATH"' >> ~/.bashrc
 ```
 
 ###### Compiling from source
 1. Download source code from this repository.
-2. Install rust if you haven't already.
+2. Install Rust if you haven't already.
 3. Open `spwn-lang` folder in the terminal.
 4. Run `cargo build --release`.
 5. Compiled binary is placed in `target/debug`.
