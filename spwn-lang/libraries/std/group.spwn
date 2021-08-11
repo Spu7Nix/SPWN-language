@@ -6,6 +6,7 @@ extract constants.comparisons
 extract constants.easing_types
 extract import "control_flow.spwn"
 extract import "util.spwn"
+extract import "general_triggers.spwn"
 
 impl @group {
 
@@ -34,6 +35,34 @@ for group in 1g..10g {
         })
 
         wait(duration)
+    },
+
+    precise_move: #[desc("Combines a move trigger with a follow trigger to allow for more precise decimal movement (up to 2 decimal places)")
+    example("10g.precise_move(50.45,-15.23,0.5, easing = EASE_IN_OUT)")]
+    (
+        self,
+        #[desc("Units to move on the X axis (10 units per grid square)")] x: @number,
+        #[desc("Units to move on the Y axis (10 units per grid square)")] y: @number,
+        #[desc("Duration of movement")] duration: @number = 0,
+        easing: @easing_type = NONE,
+        easing_rate: @number = 2,
+        #[desc("Saves groups and objects if the group only contains one object")] single: @bool = false,
+    ) {
+        if single {
+            self.follow(self,x_mod=-1+x,y_mod=-1+y,duration = duration)
+            self.move(1,1,duration=duration,easing=easing,easing_rate=easing_rate)
+        } else {
+            target = ?g
+            $.add(obj {
+                OBJ_ID: 1765,
+                X: 0,
+                Y: 80*30,
+                GROUPS: target,
+            }, true)
+            $.add( alpha_trigger(target,0).with(X,0).with(Y,75*30), true )
+            self.follow(target,x_mod=x,y_mod=y,duration = duration)
+            target.move(1,1,duration=duration,easing=easing,easing_rate=easing_rate)
+        }
     },
 
     lock_to_player: #[desc("Lock group to player position") example("10g.lock_to_player(lock_x = true, duration = 20)")]
@@ -228,7 +257,7 @@ center = 3g
 10g.move_to_xy(y = 300) // does not move on the x axis
     ")]
     (
-        self, 
+        self,
         #[desc("X position to move to in units (1 grid square is 30 units)")] x: @number | @NULL = null, 
         #[desc("Y position to move to in units (1 grid square is 30 units)")] y: @number | @NULL = null,
         #[desc("Duration of movement")] duration: @number = 0, 
@@ -245,7 +274,7 @@ center = 3g
             Y: y if y != null else 0,
             GROUPS: target,
         }, true)
-        target.alpha(0)
+        $.add( alpha_trigger(target,0).with(X,0).with(Y,75*30), true )
         self.move_to(target, duration, y == null, x == null, easing, easing_rate)
     },
 
