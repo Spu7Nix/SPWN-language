@@ -650,27 +650,27 @@ pub fn compile_scope(
                                 )?;
                             }
                         }
-                        // (true, ast::ValueBody::Macro(m)) => {
-                        //     let (evaled, inner_returns) =
-                        //         new_expr.eval(context, globals, info.clone(), !mutable)?;
+                        (true, ast::ValueBody::Macro(m)) => {
+                            for full_context in contexts.iter() {
+                                let storage =
+                                    symbol.define(full_context.inner(), globals, &info)?;
 
-                        //     returns.extend(inner_returns);
-                        //     for (e, c2) in evaled {
-                        //         let mut new_context = c2.clone();
-                        //         let storage =
-                        //             symbol.define(&mut new_context, globals, &info, None)?;
+                                macro_to_value(m, full_context, globals, info.clone(), !mutable)?;
 
-                        //         if let Value::Macro(m) = &mut globals.stored_values[e] {
-                        //             m.def_context
-                        //         } else {
-                        //             unreachable!()
-                        //         }
+                                let (context, val) = full_context.inner_value();
 
-                        //         globals.stored_values[storage] =
-                        //             globals.stored_values[e].clone();
-                        //         new_contexts.push(new_context);
-                        //     }
-                        // }
+                                //clone the value so as to not share the reference
+
+                                let cloned = clone_and_get_value(
+                                    val,
+                                    globals,
+                                    context.start_group,
+                                    !mutable,
+                                );
+
+                                globals.stored_values[storage] = cloned;
+                            }
+                        }
                         _ => {
                             new_expr.eval(contexts, globals, info.clone(), !mutable)?;
 

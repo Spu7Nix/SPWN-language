@@ -1,11 +1,12 @@
 #[no_level]
-let a = [1,2,3,4]
 
+m = (d) {
+    $.print(d)
+    if d < 50 {
+        m(d + 1)
+    }
+    
+}
 
-let c = counter(10);
+m(4)
 
-
-let b = [x for x in 0..10]
-
-//$.print(c)
-$.print(b)
