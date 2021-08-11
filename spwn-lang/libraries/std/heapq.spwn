@@ -1,0 +1,163 @@
+#[no_std, cache_output]
+// import "array.spwn"
+
+type @heapq
+
+impl @heapq {
+    new: #[desc("Creates a new priority queue") example("
+let newheap = @heapq::new([5])
+    ")]
+    (
+        #[desc("The vanilla array")] arr: @array = [], 
+        #[desc("Comparator function (hueristic default to minheap)")] comp: @macro = (a, b) => a < b, 
+        #[desc("When sifting down, how to determine which node to replace if both are viable")] tiebreak: @macro = (a, b) => a < b
+    ) {
+        if !arr.all(el => el != null) {
+            throw "HeapError: Elements of heap should not be null"
+        }
+
+        return {
+            type: @heapq,
+            arr: arr,
+            comp: comp,
+            tiebreak: tiebreak,
+            size: arr.length,
+            count: 0
+        };
+    },
+
+    heapify: (
+        self, 
+        #[desc("What node to start heaping")] root: @number = -1
+    ) {
+        // in case uninitted array
+        if self.size == 0 {
+            return
+        }
+
+        if root == -1 {
+            for i in 1..(self.size+1) {
+                self.heapify(self.size - i)
+            }
+            return
+        }
+
+        let smallest = root
+        let l = root * 2 + 1
+        let r = root * 2 + 2
+
+        if l < self.size && self.comp(self.arr[l], self.arr[smallest]) {
+            smallest = l
+        }
+
+        if r < self.size && self.comp(self.arr[r], self.arr[smallest]) {
+            smallest = r
+        }
+
+        if smallest != root {
+            self.arr[root] <=> self.arr[smallest]
+
+            self.heapify(smallest)
+        }
+    },
+
+    push: (
+        self, 
+        #[desc("Value to push into stack")] val
+    ) {
+        // for uninitted arrays
+        if self.size == 0 {
+            self.arr.push(val)
+            self.size++
+            return
+        }
+
+        let index = self.size
+        self.size++
+
+        // swim up approach
+        self.arr.push(val)
+        
+        // get root
+        let root = index - 1
+        if root % 2 == 1 {
+            index--
+        }
+        root /= 2
+
+        while true {
+            if index == 0 {
+                break
+            }
+            if !self.comp(self.arr[root], self.arr[index]){
+                self.arr[root] <=> self.arr[index]
+                index = root
+                root = index - 1
+                if root % 2 == 1 {
+                    index--
+                }
+                root /= 2
+            } else {
+                break
+            }
+        }
+    },
+
+    pop: (self) {
+        if self.size == 0 {
+            throw "HeapError: cannot pop from heap with no elements"
+        }
+
+        // remove root and insert last element of heap
+        self.arr[0] = self.arr[-1]
+        self.arr.pop()
+        self.size--
+
+        // sift down approach
+        let index = 0
+        let l = index * 2 + 1
+        let r = index * 2 + 2
+        
+        while true {
+            let l_valid = true
+            let r_valid = true
+
+            if l < self.size {
+                l_valid = self.comp(self.arr[index], self.arr[l])
+            }
+
+            if r < self.size {
+                r_valid = self.comp(self.arr[index], self.arr[r])
+            }
+
+            if !l_valid && !r_valid {
+                if self.tiebreak(self.arr[l], self.arr[r]) {
+                    self.arr[index] <=> self.arr[l]
+                    index = l
+                } else {
+                    self.arr[index] <=> self.arr[r]
+                    index = r
+                }
+            } else if !l_valid {
+                self.arr[index] <=> self.arr[l]
+                index = l
+            } else if !r_valid {
+                self.arr[index] <=> self.arr[r]
+                index = r
+            } else {
+                break
+            }
+
+            l = index * 2 + 1
+            r = index * 2 + 2
+        }
+    }, 
+
+    top: (self) {
+        if self.size == 0 {
+            return null
+        }
+
+        return self.arr[0]
+    }
+}
