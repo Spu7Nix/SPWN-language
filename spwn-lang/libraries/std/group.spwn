@@ -17,8 +17,8 @@ for group in 1g..10g {
     move: #[desc("Implementation of the move trigger") example("10g.move(100, 0, 0.5, easing = EASE_IN_OUT)")]
     (
         self,
-        #[desc("Units to move on the X axis")] x: @number,
-        #[desc("Units to move on the Y axis")] y: @number,
+        #[desc("Units to move on the X axis (10 units per grid square)")] x: @number,
+        #[desc("Units to move on the Y axis (10 units per grid square)")] y: @number,
         #[desc("Duration of movement")] duration: @number = 0,
         easing: @easing_type = NONE,
         easing_rate: @number = 2
