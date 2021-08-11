@@ -373,7 +373,7 @@ pub struct Comprehension {
     pub symbol: Intern<String>,
     pub iterator: Expression,
     pub condition: Option<Expression>,
-    pub body: Expression
+    pub body: Expression,
 }
 
 impl Expression {

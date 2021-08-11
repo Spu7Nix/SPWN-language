@@ -1,12 +1,4 @@
 #[no_level]
 
-m = (d) {
-    $.print(d)
-    if d < 50 {
-        m(d + 1)
-    }
-    
-}
 
-m(4)
-
+$.print(1 - 5 if false else "hi")

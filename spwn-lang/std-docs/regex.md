@@ -1,6 +1,22 @@
   
 # **@regex**: 
  
+## **findall**:
+
+> **Value:** 
+>```spwn
+>(self, match: @string) { /* code omitted */ }
+>``` 
+>**Type:** `@macro` 
+>## Description: 
+> _Regex find all matche indices of the string argument_
+>## Arguments:
+>
+>| # | name | type | default value | description |
+>| - | ---- | ---- | ------------- | ----------- |
+>| 1 | **`match`** | @string | | |
+>
+
 ## **match**:
 
 > **Value:** 
