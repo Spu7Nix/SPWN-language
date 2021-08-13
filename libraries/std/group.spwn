@@ -175,11 +175,11 @@ center = 3g
     follow_lerp:
     #[desc("Keeps an object's position proportionally between 2 others")
     example("
-    // Since this function works using follow triggers, objects need to already be in the proper position,
-    // otherwise they'll be offset.
-    1g.follow_lerp(2g,3g,0.5) // Keeps group 1 in the middle of groups 2 and 3
-    1g.follow_lerp(2g,3g,0.25) // Keeps group 1 25% of the way between groups 2 and 3
-    1g.follow_lerp(2g,3g,-1) // Keeps group 1 as a reflection of group 3 by group 2
+// Since this function works using follow triggers, objects need to already be in the proper position,
+// otherwise they'll be offset.
+1g.follow_lerp(2g,3g,0.5) // Keeps group 1 in the middle of groups 2 and 3
+1g.follow_lerp(2g,3g,0.25) // Keeps group 1 25% of the way between groups 2 and 3
+1g.follow_lerp(2g,3g,-1) // Keeps group 1 as a reflection of group 3 by group 2
     ")]
     (
         self,

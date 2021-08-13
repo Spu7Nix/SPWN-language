@@ -360,6 +360,8 @@ pub fn execute_macro(
 
         let fn_context = context.start_group;
 
+        new_variables.extend(m.def_variables.iter().map(|(a, b)| (*a, vec![(*b, -1)])));
+
         //parse each argument given into a local macro variable
         //index of arg if no arg is specified
         let mut def_index = if !m.args.is_empty() && m.args[0].0 == globals.SELF_MEMBER_NAME {
@@ -522,7 +524,6 @@ Should be used like this: value.macro(arguments)",
             }
         }
 
-        new_variables.extend(m.def_variables.iter().map(|(a, b)| (*a, vec![(*b, -1)])));
         let prev_vars = full_context.inner().get_variables().clone();
 
         (*full_context.inner()).set_all_variables(new_variables);

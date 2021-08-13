@@ -1,4 +1,9 @@
-#[no_level]
+#[no_std]
+number = 5
 
+anotha = (number){
+    $.print(number)
+}
+anotha(6)
 
-$.print(1 - 5 if false else "hi")
+$.print(number)
