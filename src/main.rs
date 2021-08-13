@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         std::env::current_exe()
                             .expect("Cannot access directory of executable")
                             .parent()
-                            .expect("Executable must be in some directory")
+                            .expect("Executable must be in a directory")
                             .to_path_buf(),
                     ];
                     //change to current_exe before release (from current_dir)
