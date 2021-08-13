@@ -933,9 +933,9 @@ pub fn compile_scope(
                         GdObj {
                             params,
 
-                            ..context_trigger(&context, &mut globals.uid_counter)
+                            ..context_trigger(context, &mut globals.uid_counter)
                         }
-                        .context_parameters(&context),
+                        .context_parameters(context),
                         globals.trigger_order,
                     ))
                 }

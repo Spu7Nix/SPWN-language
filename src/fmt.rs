@@ -31,7 +31,7 @@ pub fn _format(input: Vec<Statement>) -> String {
 }
 
 pub fn _format2(input: &ValueBody) -> String {
-    input.fmt(0).to_string()
+    input.fmt(0)
 }
 
 fn element_list(elements: &[impl SpwnFmt], open: char, closing: char, ind: Indent) -> String {
@@ -176,8 +176,8 @@ mod tests {
                 */
 
 //bruh
-    //bruh
-        //bruh
+//bruh
+//bruh
         "
                 ),
                 0

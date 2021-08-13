@@ -38,7 +38,7 @@ macro_rules! expected {
             ),
             pos: $tokens.position(),
             file: $notes.file.clone(),
-        });
+        })
     };
 }
 

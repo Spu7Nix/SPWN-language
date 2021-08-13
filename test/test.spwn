@@ -1,3 +1,1 @@
-#[no_std]
-
-while true {}
+$.print(obj {obj_props.GROUPS: 1g})
