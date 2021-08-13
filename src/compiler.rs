@@ -945,6 +945,7 @@ pub fn compile_scope(
                 for full_context in contexts.iter() {
                     let fn_context = full_context.inner().start_group;
                     loop {
+                        //dbg!(&full_context);
                         full_context.disable_breaks(BreakType::ContinueLoop);
 
                         w.condition
@@ -1301,6 +1302,13 @@ pub fn compile_scope(
             *contexts = FullContext::stack(&mut list.into_iter()).unwrap();
         }
 
+        let increase =
+            globals.stored_values.map.len() as i32 - globals.stored_values.prev_value_count as i32;
+
+        if increase > 5000 {
+            globals.collect_garbage(contexts);
+        }
+
         //try to merge contexts
 
         if let FullContext::Split(_, _) = contexts {
@@ -1340,13 +1348,13 @@ pub fn compile_scope(
             statement_type,
             start_time.elapsed().as_millis(),
         );*/
+    }
 
-        let increase =
-            globals.stored_values.map.len() as i32 - globals.stored_values.prev_value_count as i32;
+    let increase =
+        globals.stored_values.map.len() as i32 - globals.stored_values.prev_value_count as i32;
 
-        if increase > 5000 {
-            globals.collect_garbage(contexts);
-        }
+    if increase > 5000 {
+        globals.collect_garbage(contexts);
     }
 
     // TODO: get rid of lifetimes
