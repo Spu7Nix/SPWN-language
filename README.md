@@ -46,11 +46,12 @@ deb@spwn:~$ sudo dpkg -i spwn_0.0.5-0_amd64.deb
 ```
 
 ###### Compiling from source
-1. Download source code from this repository.
-2. Install rust if you haven't already.
-3. Open `spwn-lang` folder in the terminal.
-4. Run `cargo build --release`.
-5. Compiled binary is placed in `target/debug`.
+1. Download source code from this repository
+2. Unzip the .zip file
+3. Install rust if you haven't already
+4. Open the unzipped folder in the terminal
+5. Run `cargo build --release`
+6. Compiled binary is placed in `target/release`
 
 ## Using SPWN - Setup
 
