@@ -501,7 +501,7 @@ pub fn convert_type(
                 }
             }
         },
-        (Value::Str(s), 1) => {
+        (Value::Str(s), 10) => {
             Value::Array(s.chars().map(|x| store_const_value(Value::Str(x.to_string()),  globals, context.start_group, info.position)).collect::<Vec<StoredValue>>())
         },
         
