@@ -1249,7 +1249,6 @@ fn parse_expr(
 
     tokens.previous_no_ignore(false);
     let express = fix_precedence(ast::Expression { values, operators }); //pemdas and stuff
-
     match tokens.next(true) {
         Some(Token::If) => {
             // oooh ternaries

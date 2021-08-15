@@ -276,7 +276,7 @@
 	"buffers":
 	[
 	],
-	"build_system": "Packages/Rust Enhanced/RustEnhanced.sublime-build",
+	"build_system": "",
 	"build_system_choices":
 	[
 		[
@@ -452,6 +452,10 @@
 		"selected_items":
 		[
 			[
+				"python",
+				"Set Syntax: Python"
+			],
+			[
 				"list all",
 				"Rust: List All Messages"
 			],
@@ -486,10 +490,6 @@
 			[
 				"C++",
 				"Set Syntax: C++"
-			],
-			[
-				"python",
-				"Set Syntax: Python"
 			],
 			[
 				"install",
@@ -710,17 +710,22 @@
 		"side_bar_visible": false,
 		"status_bar_visible": false
 	},
-	"expanded_folders":
-	[
-		"/Users/jakrillis/projects/SPWN-language",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/libraries",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/libraries/std",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/test"
-	],
 	"file_history":
 	[
+		"/Users/jakrillis/projects/2p2/theformat.txt",
+		"/Users/jakrillis/projects/2p2/from_xref.py",
+		"/Users/jakrillis/projects/2p2/to_xrefs.py",
+		"/Users/jakrillis/projects/2p2/from_xrefs.py",
+		"/Users/jakrillis/projects/2p2/str_xrefs.py",
+		"/Users/jakrillis/projects/2p2/to_xref.py",
+		"/Users/jakrillis/projects/2p2/xref2.txt",
+		"/Users/jakrillis/projects/2p2/strlist.py",
+		"/Users/jakrillis/projects/2p2/xref1.py",
+		"/Users/jakrillis/projects/2p2/xref1.txt",
+		"/Users/jakrillis/projects/2p2/xref1_.txt",
+		"/Users/jakrillis/gddec/finished_works/PlayerObject/flipGravity.cpp",
+		"/Users/jakrillis/projects/2p2/strlist.txt",
+		"/Users/jakrillis/projects/2p2/python3",
 		"/Users/jakrillis/projects/gdmods/gdstdlib/research.txt",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/value.rs",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/compiler_types.rs",
@@ -834,21 +839,7 @@
 		"/Users/jakrillis/projects/gdmods/phantom/Makefile",
 		"/Users/jakrillis/projects/gdmods/phantom/main.cpp",
 		"/Users/jakrillis/projects/gdmods/phantom/Cacao/include/cocos2dx/draw_nodes/CCDrawingPrimitives.h",
-		"/Users/jakrillis/projects/gdmods/phantom/Cacao/include/cocos2dx/draw_nodes/CCDrawNode.h",
-		"/Users/jakrillis/projects/gdmods/phantom/Cacao/include/cocos2dx/include/ccTypes.h",
-		"/Users/jakrillis/projects/gdmods/phantom/_tmp.cxx",
-		"/Users/jakrillis/projects/gdmods/phantom/ControlPoint.cpp",
-		"/Users/jakrillis/projects/gdmods/phantom/BezierEditor.cpp",
-		"/Users/jakrillis/projects/gdmods/phantom/BezierCanvas.cpp",
-		"/Users/jakrillis/projects/gdmods/phantom/DurationTextDelegate.cpp",
-		"/Users/jakrillis/projects/gdmods/phantom/SpacingLayer.cpp",
-		"/Users/jakrillis/projects/gdmods/phantom/Cacao/include/cocos2dx/cocoa/CCGeometry.h",
-		"/Users/jakrillis/projects/gdmods/phantom/GrossBezierStuff.cpp",
-		"/Users/jakrillis/projects/gdmods/phantom/GrossBezierStuff.h",
-		"/Users/jakrillis/PARADIGM",
-		"/Users/jakrillis/projects/gdmods/phantom/main.s",
-		"/Users/jakrillis/projects/gdmods/phantom/Cacao/include/cocos2dx/support/CCPointExtension.h",
-		"/Users/jakrillis/projects/gdmods/phantom/Cacao/include/cocos2dx/touch_dispatcher/CCTouchDelegateProtocol.h"
+		"/Users/jakrillis/projects/gdmods/phantom/Cacao/include/cocos2dx/draw_nodes/CCDrawNode.h"
 	],
 	"find":
 	{
@@ -859,93 +850,13 @@
 		"height": 102.0,
 		"where_history":
 		[
-			""
 		]
 	},
 	"find_state":
 	{
-		"case_sensitive": true,
+		"case_sensitive": false,
 		"find_history":
 		[
-			"spwn debug mode",
-			"is_undefinable",
-			"println",
-			"UndefinedErr",
-			"UndefinedError",
-			"RuntimeError",
-			"Undefined",
-			"undefined",
-			"UndefinedErr",
-			"create_error",
-			"RuntimeError",
-			"println!",
-			"Assign",
-			"precedence",
-			"Assign",
-			"parse_expr\\(",
-			"Symbol",
-			"operator_precedence",
-			"Assign",
-			"=",
-			"ast::Expression {",
-			"parse_expr",
-			"ast::Expression {",
-			"Assign",
-			"Equal",
-			"to_value\\(",
-			"UndefinedErr {",
-			"Use of undefined",
-			"eval\\(\\n",
-			"eval",
-			"val\\)",
-			"val",
-			"TypeError",
-			"Slice",
-			"eval",
-			"FullCon",
-			"FnIdPtr",
-			"store_const_value",
-			"store_const",
-			"stored_values",
-			"stored_values\\",
-			"stored_values",
-			"store",
-			"set_variable",
-			"fn_context",
-			"store_val",
-			"store_value",
-			"inner",
-			"ContextIter<",
-			"ContextIter {",
-			"FullContext {",
-			"all_combinations",
-			"all_com",
-			"iter",
-			"all_combina",
-			"ContextIter",
-			"FullContext",
-			"parse_expr",
-			"parse_expr(",
-			"compile_scope\\(",
-			"-1",
-			"layer",
-			"set_variable_and",
-			"layer",
-			"For",
-			"fmt",
-			"Intern",
-			"symbol:",
-			"[^a-zA-Z0-9 ]",
-			"Identifier",
-			"Comprehen",
-			"For",
-			"speed",
-			"Ternary",
-			"garbage",
-			"index =",
-			"index ",
-			"macro",
-			".unwrap"
 		],
 		"highlight": true,
 		"in_selection": false,
@@ -953,13 +864,12 @@
 		"regex": true,
 		"replace_history":
 		[
-			""
 		],
 		"reverse": false,
 		"scrollbar_highlights": true,
 		"show_context": true,
 		"use_buffer2": true,
-		"use_gitignore": true,
+		"use_gitignore": false,
 		"whole_word": false,
 		"wrap": true
 	},
@@ -1011,7 +921,7 @@
 		"height": 0.0
 	},
 	"pinned_build_system": "Packages/Rust Enhanced/RustEnhanced.sublime-build",
-	"project": "spwn-language.sublime-project",
+	"project": "*.sublime-project",
 	"replace":
 	{
 		"height": 48.0

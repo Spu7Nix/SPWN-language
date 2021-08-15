@@ -1,11 +1,1 @@
-#[no_level]
-let a = [1,2,3,4]
-
-
-let c = counter(10);
-
-
-let b = [x for x in 0..10]
-
-//$.print(c)
-$.print(b)
+[a, ..b, c] = [1,2,3,4,5]

@@ -2289,7 +2289,7 @@ impl ast::Variable {
         Ok(())
     }
 
-    pub fn is_undefinable(&self, context: &Context, globals: &mut Globals) -> bool {
+    pub fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool {
         //use crate::fmt::SpwnFmt;
         // if self.operator == Some(ast::UnaryOperator::Let) {
         //     return true
@@ -2345,6 +2345,10 @@ impl ast::Variable {
                 } else {
                     return false;
                 }
+            }
+
+            ast::ValueBody::Array(_) => {
+                return !(self.path.is_empty() && dstruct_allowed);
             }
 
             _ => return true,
