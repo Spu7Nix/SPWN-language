@@ -31,14 +31,27 @@ You can either use the installers for your operating system, or build SPWN from 
  - Note: *If you get a message telling you that you cant open files from unidentified developers, open 'System Preferences' then click 'Security & Privacy' and click 'Open Anyway' on the 'General' menu*
 
 ###### Linux
- - Linux is not currently supported natively. Please compile from source, or use Wine to use SPWN. Join the [discord](https://discord.gg/xqny9rX9hA) if you have more questions.
+1. Download the .deb file (debian based) or the .pkg.tar.zst (arch based) from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases)
+
+2. 
+- Install the debian package using dpkg:
+```sh
+deb@spwn:~$ sudo dpkg -i spwn_0.0.5-0_amd64.deb
+```
+
+- Install the arch package using pacman and add `/usr/local/bin` to path:
+```sh
+[arch@spwn ~$] pacman -U spwn-0.0.5-0_amd64.pkg.tar.zst
+[arch@spwn ~$] echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+```
 
 ###### Compiling from source
-1. Download source code from this repository.
-2. Install rust if you haven't already.
-3. Open `spwn-lang` folder in the terminal.
-4. Run `cargo build --release`.
-5. Compiled binary is placed in `target/debug`.
+1. Download source code from this repository
+2. Unzip the .zip file
+3. Install rust if you haven't already
+4. Open the unzipped folder in the terminal
+5. Run `cargo build --release`
+6. Compiled binary is placed in `target/release`
 
 ## Using SPWN - Setup
 

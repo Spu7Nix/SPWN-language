@@ -1273,7 +1273,7 @@ fn parse_expr(
 
             // iterate though the operators until we get one like =
             while !old_operators.is_empty() {
-                if operator_precedence(old_operators.last().unwrap()) == 0 {
+                if operator_precedence(old_operators.last().unwrap()) < 1 {
                     break;
                 }
 
@@ -1301,6 +1301,9 @@ fn parse_expr(
                     })
                 }
             }?;
+
+            tern_values.reverse();
+            tern_operators.reverse();
 
             let (end_pos, _) = tokens.position();
 
@@ -2089,73 +2092,69 @@ fn parse_variable(
 
             if let Some(Token::OpenSquareBracket) = tokens.next(false) {
                 let mut test_tokens = tokens.clone();
-                match parse_variable(&mut test_tokens, notes, false) {
-                    Ok(mut v) => {
+                if let Ok(mut v) = parse_variable(&mut test_tokens, notes, false) {
+                    if let Some(Token::ClosingSquareBracket) = test_tokens.next(false) {
                         if let Some(Token::ClosingSquareBracket) = test_tokens.next(false) {
-                            if let Some(Token::ClosingSquareBracket) = test_tokens.next(false) {
-                                match test_tokens.next(false) {
-                                    Some(Token::OpenBracket) => {
-                                        // its a decorator on a macro
-                                        *tokens = test_tokens;
-                                        potential_macro = Some(parse_macro(
-                                            tokens,
-                                            notes,
-                                            properties.clone(),
-                                            Some(Box::new(v)),
-                                        )?);
+                            match test_tokens.next(false) {
+                                Some(Token::OpenBracket) => {
+                                    // its a decorator on a macro
+                                    *tokens = test_tokens;
+                                    potential_macro = Some(parse_macro(
+                                        tokens,
+                                        notes,
+                                        properties.clone(),
+                                        Some(Box::new(v)),
+                                    )?);
+                                }
+                                Some(Token::Exclamation) => {
+                                    // its a decorator on a trigger function
+
+                                    match test_tokens.next(true) {
+                                        // fuck this, i ain't allowing !;{ }
+                                        Some(Token::OpenCurlyBracket) => (),
+                                        a => expected!("{".to_string(), tokens, notes, a),
                                     }
-                                    Some(Token::Exclamation) => {
-                                        // its a decorator on a trigger function
 
-                                        match test_tokens.next(true) {
-                                            // fuck this, i ain't allowing !;{ }
-                                            Some(Token::OpenCurlyBracket) => (),
-                                            a => expected!("{".to_string(), tokens, notes, a),
-                                        }
+                                    *tokens = test_tokens;
 
-                                        *tokens = test_tokens;
+                                    let trig = ast::ValueBody::CmpStmt(ast::CompoundStatement {
+                                        statements: parse_cmp_stmt(tokens, notes)?,
+                                    });
 
-                                        let trig =
-                                            ast::ValueBody::CmpStmt(ast::CompoundStatement {
-                                                statements: parse_cmp_stmt(tokens, notes)?,
-                                            });
+                                    let t_var = ast::Variable {
+                                        value: ast::ValueLiteral::new(trig),
+                                        path: Vec::new(),
+                                        operator: None,
+                                        pos: (0, 0),
+                                        tag: properties.clone(),
+                                    };
 
-                                        let t_var = ast::Variable {
-                                            value: ast::ValueLiteral::new(trig),
-                                            path: Vec::new(),
-                                            operator: None,
-                                            pos: (0, 0),
-                                            tag: properties.clone(),
-                                        };
+                                    let mut new_path = vec![ast::Argument {
+                                        symbol: None,
+                                        value: t_var.to_expression(),
+                                        pos: (0, 0),
+                                    }];
 
-                                        let mut new_path = vec![ast::Argument {
-                                            symbol: None,
-                                            value: t_var.to_expression(),
-                                            pos: (0, 0),
-                                        }];
-
-                                        if let Some(p_) = v.path.pop() {
-                                            match p_ {
-                                                ast::Path::Call(vv) => {
-                                                    new_path.extend(vv);
-                                                }
-                                                _ => {
-                                                    v.path.push(p_);
-                                                }
+                                    if let Some(p_) = v.path.pop() {
+                                        match p_ {
+                                            ast::Path::Call(vv) => {
+                                                new_path.extend(vv);
+                                            }
+                                            _ => {
+                                                v.path.push(p_);
                                             }
                                         }
-
-                                        v.path.push(ast::Path::Call(new_path));
-
-                                        potential_macro =
-                                            Some(ast::ValueBody::Expression(v.to_expression()))
                                     }
-                                    _ => (),
+
+                                    v.path.push(ast::Path::Call(new_path));
+
+                                    potential_macro =
+                                        Some(ast::ValueBody::Expression(v.to_expression()))
                                 }
+                                _ => (),
                             }
                         }
                     }
-                    Err(_) => (),
                 }
             }
 

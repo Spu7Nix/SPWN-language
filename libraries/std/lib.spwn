@@ -15,11 +15,11 @@ import "counter.spwn"
 import "fileio.spwn"
 import "regex.spwn"
 import "number.spwn"
+import "heapq.spwn"
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"
 ctrl_flow = import "control_flow.spwn"
-
 
 -> return {
     ..constants.easing_types,
@@ -32,9 +32,11 @@ ctrl_flow = import "control_flow.spwn"
     counter: @counter::new,
     on: @event::on,
     obj_props: constants.obj_props,
+    obj_ids: constants.obj_ids,
     open: @file::new,
     obj_set: @obj_set::new,
-    regex: @regex::new
+    regex: @regex::new,
+    heapq: @heapq::new
 }
 
 
