@@ -1226,7 +1226,7 @@ builtins! {
             }
         }
     }
-    [ModOp]             fn _mod_((a): Number, (b): Number)              { Value::Number(a % b) }
+    [ModOp]             fn _mod_((a): Number, (b): Number)              { Value::Number(a.rem_euclid(b)) }
     [PowOp]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
     [PlusOp] fn _plus_((a), (b)) {
         match (a, b) {
@@ -1434,7 +1434,7 @@ builtins! {
     [DivideOp]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
     [IntdivideOp]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
     [ExponateOp]        fn _exponate_(mut (a): Number, (b): Number)         { a = a.powf(b); Value::Null }
-    [ModulateOp]        fn _modulate_(mut (a): Number, (b): Number)         { a %= b; Value::Null }
+    [ModulateOp]        fn _modulate_(mut (a): Number, (b): Number)         { a = a.rem_euclid(b); Value::Null }
 
     [EitherOp]
     fn _either_((a), (b)) {

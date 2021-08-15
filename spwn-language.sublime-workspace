@@ -276,7 +276,7 @@
 	"buffers":
 	[
 	],
-	"build_system": "Packages/Rust Enhanced/RustEnhanced.sublime-build",
+	"build_system": "",
 	"build_system_choices":
 	[
 		[
@@ -710,32 +710,25 @@
 		"side_bar_visible": false,
 		"status_bar_visible": false
 	},
-	"expanded_folders":
-	[
-		"/Users/jakrillis/projects/SPWN-language",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/libraries",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/libraries/std",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/test"
-	],
 	"file_history":
 	[
+		"/Users/jakrillis/projects/SPWN-language/test/test.spwn",
+		"/Users/jakrillis/projects/SPWN-language/libraries/std/lib.spwn",
+		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/compiler.rs",
+		"/Users/jakrillis/projects/SPWN-language/src/value.rs",
+		"/Users/jakrillis/projects/SPWN-language/spwn-lang/test/test.spwn",
+		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/builtin.rs",
 		"/Users/jakrillis/projects/gdmods/gdstdlib/research.txt",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/value.rs",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/compiler_types.rs",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/compiler.rs",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/fmt.rs",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/context.rs",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/test/test.spwn",
 		"/Users/jakrillis/t.cpp",
 		"/Users/jakrillis/t.c",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/parser.rs",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/libraries/std/string.spwn",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/ast.rs",
-		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/builtin.rs",
 		"/Users/jakrillis/gddec/finished_works/PlayLayer/checkCollisions.cpp",
-		"/Users/jakrillis/projects/SPWN-language/test/test.spwn",
 		"/Users/jakrillis/t.spwn",
 		"/Users/jakrillis/projects/SPWN-language/spwn-lang/src/main.rs",
 		"/Users/jakrillis/gddec/show.cpp",
@@ -846,9 +839,7 @@
 		"/Users/jakrillis/projects/gdmods/phantom/GrossBezierStuff.cpp",
 		"/Users/jakrillis/projects/gdmods/phantom/GrossBezierStuff.h",
 		"/Users/jakrillis/PARADIGM",
-		"/Users/jakrillis/projects/gdmods/phantom/main.s",
-		"/Users/jakrillis/projects/gdmods/phantom/Cacao/include/cocos2dx/support/CCPointExtension.h",
-		"/Users/jakrillis/projects/gdmods/phantom/Cacao/include/cocos2dx/touch_dispatcher/CCTouchDelegateProtocol.h"
+		"/Users/jakrillis/projects/gdmods/phantom/main.s"
 	],
 	"find":
 	{
@@ -859,7 +850,6 @@
 		"height": 102.0,
 		"where_history":
 		[
-			""
 		]
 	},
 	"find_state":
@@ -867,85 +857,6 @@
 		"case_sensitive": true,
 		"find_history":
 		[
-			"spwn debug mode",
-			"is_undefinable",
-			"println",
-			"UndefinedErr",
-			"UndefinedError",
-			"RuntimeError",
-			"Undefined",
-			"undefined",
-			"UndefinedErr",
-			"create_error",
-			"RuntimeError",
-			"println!",
-			"Assign",
-			"precedence",
-			"Assign",
-			"parse_expr\\(",
-			"Symbol",
-			"operator_precedence",
-			"Assign",
-			"=",
-			"ast::Expression {",
-			"parse_expr",
-			"ast::Expression {",
-			"Assign",
-			"Equal",
-			"to_value\\(",
-			"UndefinedErr {",
-			"Use of undefined",
-			"eval\\(\\n",
-			"eval",
-			"val\\)",
-			"val",
-			"TypeError",
-			"Slice",
-			"eval",
-			"FullCon",
-			"FnIdPtr",
-			"store_const_value",
-			"store_const",
-			"stored_values",
-			"stored_values\\",
-			"stored_values",
-			"store",
-			"set_variable",
-			"fn_context",
-			"store_val",
-			"store_value",
-			"inner",
-			"ContextIter<",
-			"ContextIter {",
-			"FullContext {",
-			"all_combinations",
-			"all_com",
-			"iter",
-			"all_combina",
-			"ContextIter",
-			"FullContext",
-			"parse_expr",
-			"parse_expr(",
-			"compile_scope\\(",
-			"-1",
-			"layer",
-			"set_variable_and",
-			"layer",
-			"For",
-			"fmt",
-			"Intern",
-			"symbol:",
-			"[^a-zA-Z0-9 ]",
-			"Identifier",
-			"Comprehen",
-			"For",
-			"speed",
-			"Ternary",
-			"garbage",
-			"index =",
-			"index ",
-			"macro",
-			".unwrap"
 		],
 		"highlight": true,
 		"in_selection": false,
@@ -953,7 +864,6 @@
 		"regex": true,
 		"replace_history":
 		[
-			""
 		],
 		"reverse": false,
 		"scrollbar_highlights": true,
