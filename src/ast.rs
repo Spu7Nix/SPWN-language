@@ -279,13 +279,14 @@ pub struct Native {
     pub function: Variable,
     pub args: Vec<Argument>,
 }*/
-//                 name         def value     props       type ind.
+//     name     def value     props     type ind.     location in file     is reference
 pub type ArgDef = (
     Intern<String>,
     Option<Expression>,
     Attribute,
     Option<Expression>,
     FileRange,
+    bool
 );
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {

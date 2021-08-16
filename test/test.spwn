@@ -1,1 +1,9 @@
-[x for x in 1..10]
+a = (&omg) {
+	omg = 1000
+}
+
+
+let b = 5
+a(b)
+
+$.print(b)

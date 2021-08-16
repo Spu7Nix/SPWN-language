@@ -55,6 +55,7 @@ pub struct Macro {
         ast::Attribute,
         Option<StoredValue>,
         FileRange,
+        bool
     )>,
     pub def_variables: HashMap<Intern<String>, StoredValue>,
     pub def_file: Intern<PathBuf>,
@@ -621,9 +622,10 @@ pub fn macro_to_value(
             ast::Attribute,
             Option<StoredValue>,
             FileRange,
+            bool
         )> = Vec::new();
 
-        for (name, default, attr, pat, pos) in m.args.iter() {
+        for (name, default, attr, pat, pos, as_ref) in m.args.iter() {
             let def_val = match default {
                 Some(e) => {
 
@@ -671,6 +673,7 @@ pub fn macro_to_value(
                 attr.clone(),
                 pat,
                 *pos,
+                *as_ref
             ));
         }
 
@@ -1826,7 +1829,7 @@ impl ast::Variable {
                                     match &globals.stored_values[index_ptr] {
                                         Value::Number(n) => {
                                             let len = arr.len();
-                                            if (*n) < 0.0 && (-*n) as usize >= len {
+                                            if (*n) < 0.0 && (-*n) as usize > len {
                                                 
                                                 return Err(RuntimeError::CustomError(create_error(
                                                     info,
