@@ -40,7 +40,7 @@ You can either use the installers for your operating system, or build SPWN from 
 [deb@spwn ~] $ sudo dpkg -i spwn_0.0.6-0_amd64.deb
 ```
 ###### Arch (Manjaro, Artix, ...)
-- Install the [package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
+- Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
 ```sh
 [arch@spwn ~] $ pacman -U spwn-0.0.6_amd64.pkg.tar.zst
