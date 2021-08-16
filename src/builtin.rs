@@ -1208,6 +1208,22 @@ builtins! {
         match a {
             Value::Number(a) => Value::Number(a * b),
             Value::Str(a) => Value::Str(a.repeat(convert_to_int(b, &info)? as usize)),
+            Value::Array(ar) => {
+                let mut new_out = Vec::<StoredValue>::new();
+                for _ in 0..convert_to_int(b, &info)? {
+                    for value in &ar {
+                        new_out.push(clone_value(
+                            *value,
+                            globals,
+                            context.start_group,
+                            !globals.is_mutable(*value),
+                            info.position)
+                        );
+                    }
+                }
+
+                Value::Array(new_out)
+            }
             _ => {
                 return Err(RuntimeError::CustomError(create_error(
                     info.clone(),
