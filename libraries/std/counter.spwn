@@ -343,8 +343,10 @@ cmp = c1.compare(c2) // -1
         if self == 0 {
             -> return 0
         } else if self > 0 {
+            self.reset(speed)
             -> return 1
         } else {
+            self.reset_negative(speed)
             -> return -1
         }
     },
@@ -368,6 +370,44 @@ c.reset()
                 self.item.if_is(LARGER_THAN, num - 1, !{
                     self.add(-num)
                     for_each(num)
+                    call_with_delay(@epsilon::{}, add)
+                })
+            }
+
+            for i in 0..speed {
+                mini_add(3^i)
+            }
+
+
+
+            self.item.if_is(EQUAL_TO, 0, !{
+                wait()
+                if speed > 1 { supress_signal(0.1) }
+                -> return
+            })
+        }
+        add!
+    },
+
+    reset_negative: #[desc("Resets a negative counter to 0") example("
+c = counter(-100)
+wait(1)
+c.reset_negative()
+// c is now 0
+    ")]
+    (
+        self,
+        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
+    ){
+
+        //almost the same
+        add = !{
+
+            mini_add = (num){
+                self.item.if_is(LARGER_THAN, num - 1, !{
+                    self.add(num)
+                    for_each(-num)
                     call_with_delay(@epsilon::{}, add)
                 })
             }

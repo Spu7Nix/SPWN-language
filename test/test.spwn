@@ -1,1 +1,57 @@
-$.print(obj {obj_props.GROUPS: 1g})
+// spwn build main.spwn (build command)
+
+gs = import gamescene
+
+counterMoney = @counter::new(1i) // starts at 0 by default
+counterMoneyOnClick = @counter::new(2i)
+counterMoneyOnClick += 1 // += is faster than =
+counterMoneyCostForUpgrade = @counter::new(3i)
+counterMoneyCostForUpgrade += 4
+
+operator_speed = 10 // reduce this to use less groups
+
+carry_out_click = !{
+    counterMoney += counterMoneyOnClick
+    BG.set(255,0,0)
+}
+
+carry_out_upgrade = !{
+    // operations in-place are much more efficient than reassignments
+    // if we use these macros, we also have access to the `speed` argument
+
+    // this is equivalent to the >= operator, but with the `speed` argument accesible 
+    if counterMoney.clone(speed = operator_speed).compare(
+            counterMoneyCostForUpgrade.clone(speed = operator_speed), 
+            speed = operator_speed
+        ) >= 0 
+    {
+        
+
+        // this is equivalent to `counterMoney -= counterMoneyCostForUpgrade`, but is faster because 
+        // we set `speed` to 5
+        counterMoneyCostForUpgrade.copy_to(counterMoney, speed = operator_speed, factor = -1)
+
+        // this is equivalent to `counterMoneyCostForUpgrade *= 4`
+        counterMoneyCostForUpgrade.multiply(4, speed = operator_speed)
+
+        // this operation doesn't need a `speed` argument, because it's instant anyways
+        counterMoneyOnClick += 1
+
+        BG.set(255,100,100)
+    }
+}
+// if you want a more readable version, use this:
+/*
+carry_out_upgrade = !{
+    if counterMoney >= counterMoneyCostForUpgrade {
+        counterMoney -= counterMoneyCostForUpgrade
+        counterMoneyCostForUpgrade *= 4
+        counterMoneyOnClick += 1
+        BG.set(255,100,100)
+    }
+}
+
+*/
+
+on(gs.button_a(), carry_out_click)
+on(gs.button_b(), carry_out_upgrade)

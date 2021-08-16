@@ -372,6 +372,7 @@ fn get_targets<'a>(
                 .copied()
                 .enumerate()
                 .collect();
+            dbg!(g, &list);
         } else {
             //dangling
 
@@ -407,21 +408,28 @@ fn get_targets<'a>(
         let target_out = (trigger_ptr.0, full_delay);
 
         if trigger.optimized && !ignore_optimized {
+            println!("reached");
             if !trigger.deleted {
+                println!("r");
                 out.insert(target_out);
             }
         } else if network[&trigger_ptr.0].connections_in > 1 {
-            (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
+            println!("reached1");
+
             let (keep, new_swaps) =
                 optimize_from(network, objects, trigger_ptr, closed_group, reserved_groups);
+
+            (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
 
             swaps.extend(new_swaps);
             if keep {
                 out.insert(target_out);
             } else {
+                println!("r2");
                 (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = true;
             }
         } else {
+            println!("reached2");
             match trigger.role {
                 TriggerRole::Output => {
                     (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted =
@@ -561,19 +569,19 @@ fn optimize_from<'a>(
 
     swaps.extend(new_swaps);
 
-    // {
-    //     let object = &objects[trigger.obj];
-    //     println!("\nsource");
-    //     println!("Deleted: {}", trigger.deleted);
-    //     println!("Optimized: {}", trigger.optimized);
-    //     let mut paramlist = object.0.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
-    //     paramlist.sort_by(|a, b| (a.0).cmp(b.0));
-    //     for (k, v) in &paramlist {
-    //         println!("{}: {:?}", k, v);
-    //     }
-    // }
+    {
+        let object = &objects[trigger.obj];
+        println!("\nsource");
+        println!("Deleted: {}", trigger.deleted);
+        println!("Optimized: {}", trigger.optimized);
+        let mut paramlist = object.0.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
+        paramlist.sort_by(|a, b| (a.0).cmp(b.0));
+        for (k, v) in &paramlist {
+            println!("{}: {:?}", k, v);
+        }
+    }
 
-    //println!("targets: {:?}", targets);
+    println!("targets: {:?}", targets);
 
     if let Some(targets) = targets {
         if targets.is_empty() {
