@@ -305,6 +305,9 @@ pub enum Token {
     #[token("#")]
     Hash,
 
+    #[token("&")]
+    Ampersand,
+
     //KEY WORDS
     #[token("return")]
     Return,
@@ -396,7 +399,7 @@ impl Token {
 
             Comma | OpenCurlyBracket | ClosingCurlyBracket | OpenSquareBracket
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
-            | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
+            | Period | DotDot | At | Hash | Arrow | ThickArrow | Ampersand => "terminator",
 
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
 
@@ -1249,7 +1252,6 @@ fn parse_expr(
 
     tokens.previous_no_ignore(false);
     let express = fix_precedence(ast::Expression { values, operators }); //pemdas and stuff
-
     match tokens.next(true) {
         Some(Token::If) => {
             // oooh ternaries
@@ -1618,39 +1620,44 @@ fn parse_arg_def(
     let opening_bracket = tokens.position();
     loop {
         let properties = check_for_tag(tokens, notes)?;
-        if tokens.next(false) == Some(Token::ClosingBracket) {
-            break;
+
+        let mut arg_tok = tokens.next(false);
+        let as_ref = match arg_tok {
+            Some(Token::ClosingBracket) => break,
+            Some(Token::Ampersand) => {
+                arg_tok = tokens.next(false);
+                true
+            },
+            _ => false
         };
+
+        let symbol = Intern::new(tokens.slice());
+        let start = tokens.position().0;
+
         args.push(match tokens.next(false) {
             Some(Token::Assign) => {
-                if tokens.previous() == Some(Token::SelfVal) {
+                if arg_tok == Some(Token::SelfVal) {
                     return Err(SyntaxError::SyntaxError {
                         message: "\"self\" argument cannot have a default value".to_string(),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     });
                 }
-                let start = tokens.position().0;
-                let symbol = Intern::new(tokens.slice());
-                tokens.next(false);
                 let value = Some(parse_expr(tokens, notes, true, true)?);
                 let end = tokens.position().1;
-                //tokens.previous();
+                //xtokens.previous();
 
-                (symbol, value, properties, None, (start, end))
+                (symbol, value, properties, None, (start, end), as_ref)
             }
 
             Some(Token::Colon) => {
-                if tokens.previous() == Some(Token::SelfVal) {
+                if arg_tok == Some(Token::SelfVal) {
                     return Err(SyntaxError::SyntaxError {
                         message: "\"self\" argument cannot have explicit type".to_string(),
                         pos: tokens.position(),
                         file: notes.file.clone(),
                     });
                 }
-                let start = tokens.position().0;
-                let symbol = Intern::new(tokens.slice());
-                tokens.next(false);
                 let type_value = Some(parse_expr(tokens, notes, false, true)?);
                 //tokens.previous();
 
@@ -1660,12 +1667,12 @@ fn parse_arg_def(
                         let end = tokens.position().1;
                         //tokens.previous();
 
-                        (symbol, value, properties, type_value, (start, end))
+                        (symbol, value, properties, type_value, (start, end), as_ref)
                     }
                     Some(_) => {
                         tokens.previous();
                         let end = tokens.position().1;
-                        (symbol, None, properties, type_value, (start, end))
+                        (symbol, None, properties, type_value, (start, end), as_ref)
                     }
                     None => {
                         return Err(SyntaxError::SyntaxError {
@@ -1678,7 +1685,9 @@ fn parse_arg_def(
             }
 
             Some(_) => {
-                if tokens.previous() == Some(Token::SelfVal) && !args.is_empty() {
+                tokens.previous();
+
+                if arg_tok == Some(Token::SelfVal) && !args.is_empty() {
                     return Err(SyntaxError::SyntaxError {
                         message: "\"self\" argument must be the first argument".to_string(),
                         pos: tokens.position(),
@@ -1686,13 +1695,19 @@ fn parse_arg_def(
                     });
                 }
 
-                (
-                    Intern::new(tokens.slice()),
-                    None,
-                    properties,
-                    None,
-                    tokens.position(),
-                )
+                match arg_tok {
+                    Some(Token::Symbol) | Some(Token::SelfVal) => {
+                        (
+                            symbol,
+                            None,
+                            properties,
+                            None,
+                            (start, tokens.position().1),
+                            as_ref
+                        )
+                    },
+                    _ => expected!("symbol".to_string(), tokens, notes, arg_tok)
+                }
             }
             None => {
                 return Err(SyntaxError::SyntaxError {
@@ -2056,7 +2071,7 @@ fn parse_variable(
                     // Woo macro shorthand
                     let arg = if symbol.as_ref() != "_" {
                         is_valid_symbol(&symbol, tokens, notes)?;
-                        vec![(symbol, None, properties.clone(), None, tokens.position())]
+                        vec![(symbol, None, properties.clone(), None, tokens.position(), false)]
                     } else {
                         Vec::new()
                     };
@@ -2166,27 +2181,81 @@ fn parse_variable(
 
                     //Array
                     let mut arr = Vec::new();
+                    let mut potential_listcomp: Option<ast::Comprehension> = None;
 
                     if tokens.next(false) != Some(Token::ClosingSquareBracket) {
                         tokens.previous();
                         loop {
-                            arr.push(parse_expr(tokens, notes, true, true)?);
+                            let item = parse_expr(tokens, notes, true, true)?;
                             match tokens.next(false) {
+                                Some(Token::For) => {
+                                    if arr.len() > 0 {
+                                        expected!("comma (',') or ']'".to_string(), tokens, notes, Some(Token::For));
+                                    }
+
+                                    match tokens.next(false) {
+                                        Some(Token::Symbol) => {
+                                            let tok_name = tokens.slice();
+
+                                            match tokens.next(false) {
+                                                Some(Token::In) => (),
+                                                a => expected!("'in'".to_string(), tokens, notes, a),
+                                            }
+
+                                            let iter = parse_expr(tokens, notes, true, true)?;
+
+                                            let mut potential_condition: Option<ast::Expression> = None;
+
+                                            match tokens.next(false) {
+                                                Some(Token::ClosingSquareBracket) => (),
+                                                Some(Token::Comma) => {
+                                                    match tokens.next(false) {
+                                                        Some(Token::If) => {
+                                                            potential_condition = Some(parse_expr(tokens, notes, true, true)?);
+                                                            match tokens.next(false) {
+                                                                Some(Token::ClosingSquareBracket) => (),
+                                                                a => expected!("]".to_string(), tokens, notes, a)
+                                                            }
+                                                        },
+                                                        a => expected!("if".to_string(), tokens, notes, a)
+                                                    }
+                                                },
+                                                a => expected!("']' or ','".to_string(), tokens, notes, a),
+                                            }
+
+                                            potential_listcomp = Some(ast::Comprehension {
+                                                body: item,
+                                                symbol: Intern::new(tok_name),
+                                                iterator: iter,
+                                                condition: potential_condition
+                                            });
+                                            break;
+                                        },
+                                        a => expected!("identifier".to_string(), tokens, notes, a)
+                                    }
+                                },
                                 Some(Token::Comma) => {
                                     //accounting for trailing comma
+                                    arr.push(item);
                                     if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
                                         break;
                                     } else {
                                         tokens.previous();
                                     }
                                 }
-                                Some(Token::ClosingSquareBracket) => break,
-                                a => expected!("comma (',') or ']'".to_string(), tokens, notes, a),
+                                Some(Token::ClosingSquareBracket) => {
+                                    arr.push(item);
+                                    break;
+                                },
+                                a => expected!("comma (','), ']', or 'for'".to_string(), tokens, notes, a),
                             }
                         }
                     }
-
-                    ast::ValueBody::Array(arr)
+                    if let Some(c) = potential_listcomp {
+                        ast::ValueBody::ListComp(c)
+                    } else {
+                        ast::ValueBody::Array(arr)
+                    }
                 }
             }
         }
@@ -2243,11 +2312,15 @@ fn parse_variable(
         }
         Some(Token::OpenCurlyBracket) => ast::ValueBody::Dictionary(parse_dict(tokens, notes)?),
         Some(Token::Exclamation) => {
-            //next token is a curly bracket, checked earlier
-            tokens.next(false);
-            ast::ValueBody::CmpStmt(ast::CompoundStatement {
-                statements: parse_cmp_stmt(tokens, notes)?,
-            })
+            // never assume what the next token could be, might lead to issues like !!a} being parsable
+            let check = tokens.next(false);
+            if let Some(Token::OpenCurlyBracket) = check {
+                ast::ValueBody::CmpStmt(ast::CompoundStatement {
+                    statements: parse_cmp_stmt(tokens, notes)?,
+                })
+            } else {
+                expected!("{".to_string(), tokens, notes, check);
+            }
         }
 
         Some(Token::Object) => ast::ValueBody::Obj(ast::ObjectLiteral {

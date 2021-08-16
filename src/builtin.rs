@@ -1208,6 +1208,22 @@ builtins! {
         match a {
             Value::Number(a) => Value::Number(a * b),
             Value::Str(a) => Value::Str(a.repeat(convert_to_int(b, &info)? as usize)),
+            Value::Array(ar) => {
+                let mut new_out = Vec::<StoredValue>::new();
+                for _ in 0..convert_to_int(b, &info)? {
+                    for value in &ar {
+                        new_out.push(clone_value(
+                            *value,
+                            globals,
+                            context.start_group,
+                            !globals.is_mutable(*value),
+                            info.position)
+                        );
+                    }
+                }
+
+                Value::Array(new_out)
+            }
             _ => {
                 return Err(RuntimeError::CustomError(create_error(
                     info.clone(),
@@ -1226,7 +1242,7 @@ builtins! {
             }
         }
     }
-    [ModOp]             fn _mod_((a): Number, (b): Number)              { Value::Number(a % b) }
+    [ModOp]             fn _mod_((a): Number, (b): Number)              { Value::Number(a.rem_euclid(b)) }
     [PowOp]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
     [PlusOp] fn _plus_((a), (b)) {
         match (a, b) {
@@ -1434,7 +1450,7 @@ builtins! {
     [DivideOp]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
     [IntdivideOp]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
     [ExponateOp]        fn _exponate_(mut (a): Number, (b): Number)         { a = a.powf(b); Value::Null }
-    [ModulateOp]        fn _modulate_(mut (a): Number, (b): Number)         { a %= b; Value::Null }
+    [ModulateOp]        fn _modulate_(mut (a): Number, (b): Number)         { a = a.rem_euclid(b); Value::Null }
 
     [EitherOp]
     fn _either_((a), (b)) {

@@ -393,8 +393,26 @@ pub fn execute_macro(
                                 });
                             }
                         };
-
-                        new_variables.insert(*name, vec![(arg_values[i], -1)]);
+                        if arg_def.5 {
+                            new_variables.insert(*name, vec![(arg_values[i], -1)]);
+                        } else {
+                            new_variables.insert(
+                                arg_def.0,
+                                vec![(
+                                    clone_value(
+                                        arg_values[i],
+                                        globals,
+                                        context.start_group,
+                                        true,
+                                        CodeArea {
+                                            pos: arg_def.4,
+                                            file: m.def_file,
+                                        },
+                                    ),
+                                    -1,
+                                )],
+                            );
+                        }
                     } else {
                         return Err(RuntimeError::UndefinedErr {
                             undefined: name.as_ref().clone(),
@@ -449,23 +467,26 @@ pub fn execute_macro(
                             });
                         }
                     };
-
-                    new_variables.insert(
-                        m.args[def_index].0,
-                        vec![(
-                            clone_value(
-                                arg_values[i],
-                                globals,
-                                context.start_group,
-                                true,
-                                CodeArea {
-                                    pos: m.args[def_index].4,
-                                    file: m.def_file,
-                                },
-                            ),
-                            -1,
-                        )],
-                    );
+                    if m.args[def_index].5 {
+                        new_variables.insert(m.args[def_index].0, vec![(arg_values[i], -1)]);
+                    } else {
+                        new_variables.insert(
+                            m.args[def_index].0,
+                            vec![(
+                                clone_value(
+                                    arg_values[i],
+                                    globals,
+                                    context.start_group,
+                                    true,
+                                    CodeArea {
+                                        pos: m.args[def_index].4,
+                                        file: m.def_file,
+                                    },
+                                ),
+                                -1,
+                            )],
+                        );
+                    }
                     def_index += 1;
                 }
             }
