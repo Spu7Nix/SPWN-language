@@ -537,7 +537,7 @@ impl SpwnFmt for If {
 
 impl SpwnFmt for ArgDef {
     fn fmt(&self, ind: Indent) -> String {
-        let (name, value, tag, typ, _) = self;
+        let (name, value, tag, typ, _, _) = self;
 
         let mut out = tag.fmt(ind);
         out += name;
