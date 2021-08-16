@@ -36,13 +36,12 @@ You can either use the installers for your operating system, or build SPWN from 
 2. 
 - Install the debian package using dpkg:
 ```sh
-deb@spwn:~$ sudo dpkg -i spwn_0.0.5-0_amd64.deb
+deb@spwn:~$ sudo dpkg -i spwn_0.0.6-0_amd64.deb
 ```
 
-- Install the arch package using pacman and add `/usr/local/bin` to path:
+- Install the arch package using pacman:
 ```sh
-[arch@spwn ~$] pacman -U spwn-0.0.5-0_amd64.pkg.tar.zst
-[arch@spwn ~$] echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
+[arch@spwn ~$] pacman -U spwn-0.0.6_amd64.pkg.tar.zst
 ```
 
 ###### Compiling from source
