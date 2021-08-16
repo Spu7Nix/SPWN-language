@@ -86,7 +86,7 @@ Save the file, then open a terminal and type in `spwn build YOURFILENAME.spwn`. 
 
 ## Using SPWN - Command Line Reference
 
-Here is a list of SPWN command line subcommands and flags. This Information can be found by typing `spwn help` in the command line as well.
+Here is a list of SPWN command line subcommands and flags. This information can be found by typing `spwn help` in the command line as well.
 
 ###### Subcommands:
 
