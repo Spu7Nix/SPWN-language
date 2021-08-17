@@ -104,7 +104,7 @@ impl @complex {
 		} else if other.type == @complex {
 			prev_re = self.re
 			self.re = self.re * other.re - self.im * other.im;
-			self.im = self.re * other.im + self.im * other.re;
+			self.im = prev_re * other.im + self.im * other.re;
 		}
 	},
 	
@@ -220,19 +220,19 @@ impl @complex {
 	},
 
 	cos: (self) {
-		return (@complex::(PI/2) - self).sin()
+		return (@complex::new(PI/2) - self).sin()
 	},
 
 	tan: (self) {
 		return self.sin() / self.cos();
 	},
 
-	sec: (self) {
-		return self.cos().invert();
-	},
-
 	cot: (self) {
 		return self.tan().invert();
+	},
+
+	sec: (self) {
+		return self.cos().invert();
 	},
 
 	csc: (self) {
