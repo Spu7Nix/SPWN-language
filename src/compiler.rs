@@ -631,7 +631,7 @@ pub fn compile_scope(
                                         let ranges = var_a.iter().filter(|x| x.values[0].operator == Some(ast::UnaryOperator::Range)).collect::<Vec<&ast::Expression>>();
 
                                         if ranges.len() > 1 {
-                                            let mut why_sput = info.position.clone();
+                                            let mut why_sput = info.position;
                                             why_sput.pos = ranges[0].values[0].pos;
                                             info.position.pos = ranges[1].values[0].pos;
 
@@ -661,7 +661,7 @@ pub fn compile_scope(
                                             loop {
                                                 let mut idx_step = 1;
                                                 for expr_ctx in ctx.iter() {
-                                                    if var_a[var_idx].operators.len() > 0 || var_a[var_idx].values.len() == 0 {
+                                                    if var_a[var_idx].operators.is_empty() || var_a[var_idx].values.is_empty() {
                                                         use crate::fmt::_format2;
 
                                                         return Err(RuntimeError::CustomError(create_error(
@@ -1027,9 +1027,9 @@ pub fn compile_scope(
                         GdObj {
                             params,
 
-                            ..context_trigger(&context, &mut globals.uid_counter)
+                            ..context_trigger(context, &mut globals.uid_counter)
                         }
-                        .context_parameters(&context),
+                        .context_parameters(context),
                         globals.trigger_order,
                     ))
                 }

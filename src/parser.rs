@@ -3,6 +3,7 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
+use crate::ast::StrInner;
 use crate::builtin::Builtin;
 
 use crate::compiler::ErrorReport;
@@ -2023,7 +2024,9 @@ fn parse_variable(
         }),
         Some(Token::StringLiteral) => {
             // is a string
-            ast::ValueBody::Str(str_content(tokens.slice(), tokens, notes)?)
+            let content = str_content(tokens.slice(), tokens, notes)?;
+            let inner = StrInner { inner: content, flags: None };
+            ast::ValueBody::Str(inner)
         }
         Some(Token::Id) => {
             let mut text = tokens.slice();
