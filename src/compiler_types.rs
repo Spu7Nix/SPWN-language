@@ -80,6 +80,7 @@ pub fn handle_operator(
                     let pat = &globals.stored_values[target_typ].clone();
 
                     if !val2.matches_pat(pat, info, globals, full_context.inner())? {
+
                         //if types dont match, act as if there is no macro at all
                         built_in_function(
                             macro_name,

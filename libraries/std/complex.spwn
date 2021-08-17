@@ -1,0 +1,103 @@
+#[no_std]
+type @complex
+
+let c;
+
+impl @complex {
+	new: (x, y=0) {
+		return @complex::{
+			real: x,
+			imag: y
+		}
+	},
+
+	from_polar: (r, phi) {
+		return c($.cos(phi), $.sin(phi)) * r
+	},
+
+	_times_: (self, val) {
+		let new = self;
+
+		if val.type == @number {
+			new.real *= val;
+			new.imag *= val;
+		} else if val.type == @complex {
+			new.real = self.real * self.imag - val.real * val.imag;
+			new.imag = self.real * val.imag + val.real * self.imag;
+		}
+		return new;
+	},
+
+	_divided_by_: (self, val) {
+		let new = self;
+
+		if val.type == @number {
+			new.real /= val;
+			new.imag /= val;
+		} else if val.type == @complex {
+			new.real = (self.real * val.real + self.imag * val.imag) / (val.real^2 + val.imag^2)
+			new.imag = (self.imag * val.real - self.real * val.imag) / (val.real^2 + val.imag^2)
+		} else {
+			throw "Can't divide types 'complex' and " + val.type as @string;
+		}
+
+		return new;
+	},
+
+	_plus_: (self, val) {
+		let new = self;
+		if val.type == @number {
+			new.real += val;
+		} else if val.type == @complex {
+			new.real += val.real;
+			new.imag += val.imag;
+		} else {
+			throw "Can't add types 'complex' and " + val.type as @string;
+		}
+
+		return new;
+	},
+
+	sin: (self) {
+		return @complex::new($.sin(self.real) * $.cosh(self.imag), $.cos(self.real) * $.sinh(self.imag));
+	},
+
+	cos: (self) {
+		return @complex::new($.cos(self.real) * $.cosh(self.imag), -($.sin(self.real) * $.sinh(self.imag)));
+	},
+
+	tan: (self) {
+		return self.sin() / self.cos();
+	},
+
+	sec: (self) {
+		return c(1) / self.cos();
+	},
+
+	csc: (self) {
+		return c(1) / self.sin();
+	},
+
+	cot: (self) {
+		return c(1) / self.tan();
+	},
+
+	phase: (self) {
+		return $.atan2(self.imag, self.real);
+	},
+
+	abs: (self) {
+		return $.sqrt(self.real^2 + self.imag^2);
+	},
+	polar: (self) {
+		return [self.abs(), self.phase()];
+	},
+	exp: (self) {
+		return c($.cos(self.imag), $.sin(self.imag)) * $.exp(self.real);
+	},
+	sqrt: (self) {
+		return c($.sqrt((self.real + $.sqrt(self.real ^ 2 + self.imag ^ 2)) /2), self.imag / $.abs(self.imag) * $.sqrt((-self.real + $.sqrt(self.real ^ 2 + self.imag ^ 2)) / 2))
+	}
+}
+
+c = @complex::new
