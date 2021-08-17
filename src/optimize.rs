@@ -777,6 +777,15 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
 
     let mut swaps = HashMap::new();
 
+    let mut insert_to_swaps = |a, b| {
+        for v in swaps.values_mut() {
+            if *v == a {
+                *v = b;
+            }
+        }
+        assert!(swaps.insert(a, b).is_none());
+    };
+
     for ((start, end, delay), trigger) in deduped {
         let d = if delay.delay < 50 && delay.epsiloned {
             50
@@ -785,9 +794,9 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
         };
 
         if d == 0 && network[&end].connections_in == 1 {
-            assert!(swaps.insert(end, start).is_none());
+            insert_to_swaps(end, start);
         } else if d == 0 && network[&start].triggers.len() == 1 {
-            assert!(swaps.insert(start, end).is_none());
+            insert_to_swaps(start, end);
         } else {
             create_spawn_trigger(
                 trigger,

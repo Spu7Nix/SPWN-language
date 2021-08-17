@@ -207,7 +207,6 @@ pub fn create_error(
     labels: &[(CodeArea, &str)],
     note: Option<&str>,
 ) -> ErrorReport {
-
     ErrorReport {
         info: info.clone(),
         message: message.to_string(),
@@ -606,8 +605,11 @@ pub fn compile_scope(
             Expr(expr) => {
                 let is_assign = !expr.operators.is_empty()
                     && expr.operators[0] == ast::Operator::Assign
-                    && !expr.values[0]
-                        .is_undefinable(contexts.iter().next().unwrap().inner(), globals, true);
+                    && !expr.values[0].is_undefinable(
+                        contexts.iter().next().unwrap().inner(),
+                        globals,
+                        true,
+                    );
 
                 //println!("{:?}, {}", expr, is_assign);
 
@@ -622,13 +624,18 @@ pub fn compile_scope(
 
                     match symbol.value.body {
                         ast::ValueBody::Array(var_a) => {
-
                             new_expr.eval(contexts, globals, info.clone(), true)?;
 
                             for ctx in contexts.iter() {
                                 match globals.stored_values[ctx.inner().return_value].clone() {
                                     Value::Array(val_a) => {
-                                        let ranges = var_a.iter().filter(|x| x.values[0].operator == Some(ast::UnaryOperator::Range)).collect::<Vec<&ast::Expression>>();
+                                        let ranges = var_a
+                                            .iter()
+                                            .filter(|x| {
+                                                x.values[0].operator
+                                                    == Some(ast::UnaryOperator::Range)
+                                            })
+                                            .collect::<Vec<&ast::Expression>>();
 
                                         if ranges.len() > 1 {
                                             let mut why_sput = info.position;
@@ -643,15 +650,19 @@ pub fn compile_scope(
                                                     (info.position, "Attempted to spread again"),
                                                 ],
                                                 None,
-                                            )));   
+                                            )));
                                         }
 
-
                                         if (var_a.len() < val_a.len() && ranges.is_empty())
-                                           || var_a.len() > val_a.len() {
+                                            || var_a.len() > val_a.len()
+                                        {
                                             return Err(RuntimeError::CustomError(create_error(
                                                 info,
-                                                &format!("Expected {} items to destructure, found {}", var_a.len(), val_a.len()),
+                                                &format!(
+                                                    "Expected {} items to destructure, found {}",
+                                                    var_a.len(),
+                                                    val_a.len()
+                                                ),
                                                 &[],
                                                 None,
                                             )));
@@ -661,7 +672,9 @@ pub fn compile_scope(
                                             loop {
                                                 let mut idx_step = 1;
                                                 for expr_ctx in ctx.iter() {
-                                                    if var_a[var_idx].operators.is_empty() || var_a[var_idx].values.is_empty() {
+                                                    if var_a[var_idx].operators.is_empty()
+                                                        || var_a[var_idx].values.is_empty()
+                                                    {
                                                         use crate::fmt::_format2;
 
                                                         return Err(RuntimeError::CustomError(create_error(
@@ -677,26 +690,37 @@ pub fn compile_scope(
                                                             let mut without_op = var_val.clone();
                                                             without_op.operator = None;
 
-                                                            idx_step = 1+val_a.len()-var_a.len();
-                                                            let mut packed = Vec::<StoredValue>::new();
+                                                            idx_step =
+                                                                1 + val_a.len() - var_a.len();
+                                                            let mut packed =
+                                                                Vec::<StoredValue>::new();
 
-                                                            let storage = without_op.define(expr_ctx.inner(), globals, &info)?;
+                                                            let storage = without_op.define(
+                                                                expr_ctx.inner(),
+                                                                globals,
+                                                                &info,
+                                                            )?;
 
-                                                            for tmp_idx in idx..(idx+idx_step) {
+                                                            for tmp_idx in idx..(idx + idx_step) {
                                                                 let cloned = clone_value(
                                                                     val_a[tmp_idx],
                                                                     globals,
                                                                     expr_ctx.inner().start_group,
                                                                     !mutable,
-                                                                    globals.get_area(storage)
+                                                                    globals.get_area(storage),
                                                                 );
                                                                 packed.push(cloned);
                                                             }
                                                             //println!("collecting {} items", val_a.len()-var_a.len());
-                                                            globals.stored_values[storage] = Value::Array(packed);
+                                                            globals.stored_values[storage] =
+                                                                Value::Array(packed);
                                                         }
                                                         _ => {
-                                                            let storage = var_val.define(expr_ctx.inner(), globals, &info)?;
+                                                            let storage = var_val.define(
+                                                                expr_ctx.inner(),
+                                                                globals,
+                                                                &info,
+                                                            )?;
                                                             //clone the value so as to not share the reference
 
                                                             let cloned = clone_and_get_value(
@@ -718,7 +742,7 @@ pub fn compile_scope(
                                                 }
                                             }
                                         }
-                                    },
+                                    }
                                     b => {
                                         return Err(RuntimeError::TypeError {
                                             expected: "array".to_string(),
@@ -729,7 +753,7 @@ pub fn compile_scope(
                                     }
                                 }
                             }
-                        },
+                        }
                         _ => {
                             match (
                                 new_expr.values.len() == 1
@@ -746,12 +770,14 @@ pub fn compile_scope(
                                             symbol.define(full_context.inner(), globals, &info)?;
 
                                         //pick a start group
-                                        let start_group = Group::next_free(&mut globals.closed_groups);
+                                        let start_group =
+                                            Group::next_free(&mut globals.closed_groups);
                                         //store value
                                         globals.stored_values[storage] =
                                             Value::TriggerFunc(TriggerFunction { start_group });
 
-                                        full_context.inner().fn_context_change_stack = vec![info.position];
+                                        full_context.inner().fn_context_change_stack =
+                                            vec![info.position];
                                         //new_info.last_context_change_stack = vec![info.position.clone()];
 
                                         f.to_trigger_func(
