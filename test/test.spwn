@@ -1,1 +1,14 @@
-$.print([1]*4)
+gs = import gamescene
+mode = counter(0)
+
+gs.button_a().on_triggered(!{
+    ((mode.to_const(0..6) + 127) as @group).alpha(0)
+    wait()
+    mode += 1
+    if mode == 6
+    {
+        mode -= 6
+        wait()
+    }
+    ((mode.to_const(0..6) + 127) as @group).alpha(1)
+})

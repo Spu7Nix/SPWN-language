@@ -60,3 +60,14 @@ impl @binaryCalculator {
         self.binaryToDecimal(source);
     }
 }
+
+
+c = @binaryCalculator::new(8, 300, 300)
+
+num = counter(100)
+
+wait(1)
+
+c.decimalToBinary(num)
+
+
