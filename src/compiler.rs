@@ -421,7 +421,7 @@ impl From<RuntimeError> for ErrorReport {
                     }
                 ),
                 &[
-                    (broke, "Decleared here"),
+                    (broke, "Declared here"),
                     (
                         dropped,
                         &format!("Can't reach past here because {}", reason),

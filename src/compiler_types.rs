@@ -353,7 +353,7 @@ pub fn execute_macro(
         }
     }
 
-    //dbg!(&conbinations);
+    //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
         let mut new_variables: HashMap<Intern<String>, Vec<(StoredValue, i16)>> = HashMap::new();
@@ -442,7 +442,7 @@ pub fn execute_macro(
                                         if m.args.len() == 1 { "" } else { "s" }
                                     ),
                                 ),
-                                (info.position, "Recieved too many arguments here"),
+                                (info.position, "Received too many arguments here"),
                             ],
                             None,
                         )));
