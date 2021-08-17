@@ -285,5 +285,24 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         }
 
         return output
+    },
+
+    enumerate: #[desc("Returns an array of index-element pairs") example("
+    arr = [\"a\",\"b\",\"c\"]
+    for i in arr.enumerate() {
+        $.print(i[0], \": \", i[1])
     }
+    /* output:
+    0: 'a'
+    1: 'b'
+    2: 'c'
+    */
+        ")]
+    (self, #[desc("Return the pair as a dictionary")] dict: @bool = false) {
+        if dict {
+            return @array(..self.length).map(i => {index: i, value: self[i]})
+        }
+        return @array(..self.length).map(i => [i, self[i]])
+    },
+
 }
