@@ -1,3 +1,6 @@
-let a = complex(3,4)
+let reg = r"\w"; // raw string, ignores any escapes (TODO: add regex rule for spwn.vim and the spwn vscode ext)
+let str = "hewwo";
 
-$.print(a.sqrt())
+$.print(str.find(reg)) //=> true
+$.print(str.findall(reg)) //=> [[0,1],[1,2],[2,3],[3,4],[4,5]]
+$.print(str.replace(reg, "byebye")) //=> byebye

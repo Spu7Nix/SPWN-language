@@ -1,4 +1,5 @@
 #[no_std, cache_output]
+
 impl @string {
 	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise")]
 	(self) {
@@ -152,8 +153,8 @@ $.assert('hi {1} and {0}'.fmt([name1, name2]) == 'hi alice and bob')
 $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
     ")]
     (self, subs) {
-        blank_regex = "\\{\\}"
-        numbered_regex = "\\{\\d+\\}"
+        blank_regex = r"\{\}"
+        numbered_regex = r"\{\d+\}"
 
         blanks = $.regex(blank_regex, self, 'findall', null)
         numbered = $.regex(numbered_regex, self, 'findall', null)
@@ -194,5 +195,17 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
         }
 
         return ret_str
+    },
+
+    find: (self, re: @string) {
+        $.regex(re, self, "match", null)
+    },
+
+    findall: (self, re: @string) {
+        $.regex(re, self, "findall", null)
+    },
+
+    replace: (self, re: @string, replacement: @string) {
+        $.regex(re, self, "replace", replacement)
     }
 }
