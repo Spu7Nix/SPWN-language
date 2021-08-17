@@ -128,7 +128,7 @@ impl ValStorage {
                     }
                 }
                 Value::Macro(m) => {
-                    for (_, e, _, e2, _) in m.args {
+                    for (_, e, _, e2, _, _) in m.args {
                         if let Some(val) = e {
                             self.mark(val)
                         }

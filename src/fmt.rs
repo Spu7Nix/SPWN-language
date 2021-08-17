@@ -25,13 +25,13 @@ fn tabs(mut num: Indent) -> String {
 pub fn _format(input: Vec<Statement>) -> String {
     let mut out = String::new();
     for s in input {
-        out += &s.fmt(0).to_string();
+        out += &s.fmt(0)
     }
     out
 }
 
 pub fn _format2(input: &ValueBody) -> String {
-    input.fmt(0).to_string()
+    input.fmt(0)
 }
 
 fn element_list(elements: &[impl SpwnFmt], open: char, closing: char, ind: Indent) -> String {
@@ -259,7 +259,7 @@ impl SpwnFmt for ValueBody {
             Symbol(x) => x.to_string(),
             Bool(x) => format!("{}", x),
             Expression(x) => format!("({})", x.fmt(ind)),
-            Str(x) => format!("\"{}\"", x),
+            Str(x) => format!("\"{}\"", x.inner),
             Import(x, f) => format!("import{} {:?}", if *f { "!" } else { "" }, x),
             Obj(x) => {
                 (match x.mode {
@@ -537,7 +537,7 @@ impl SpwnFmt for If {
 
 impl SpwnFmt for ArgDef {
     fn fmt(&self, ind: Indent) -> String {
-        let (name, value, tag, typ, _) = self;
+        let (name, value, tag, typ, _, _) = self;
 
         let mut out = tag.fmt(ind);
         out += name;

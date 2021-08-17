@@ -1,4 +1,6 @@
-#[no_level]
+let reg = r"\w"; // raw string, ignores any escapes (TODO: add regex rule for spwn.vim and the spwn vscode ext)
+let str = "hewwo";
 
-
-$.print(1 - 5 if false else "hi")
+$.print(str.find(reg)) //=> true
+$.print(str.findall(reg)) //=> [[0,1],[1,2],[2,3],[3,4],[4,5]]
+$.print(str.replace(reg, "byebye")) //=> byebye

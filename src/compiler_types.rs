@@ -80,6 +80,7 @@ pub fn handle_operator(
                     let pat = &globals.stored_values[target_typ].clone();
 
                     if !val2.matches_pat(pat, info, globals, full_context.inner())? {
+
                         //if types dont match, act as if there is no macro at all
                         built_in_function(
                             macro_name,
@@ -360,6 +361,8 @@ pub fn execute_macro(
 
         let fn_context = context.start_group;
 
+        new_variables.extend(m.def_variables.iter().map(|(a, b)| (*a, vec![(*b, -1)])));
+
         //parse each argument given into a local macro variable
         //index of arg if no arg is specified
         let mut def_index = if !m.args.is_empty() && m.args[0].0 == globals.SELF_MEMBER_NAME {
@@ -391,8 +394,26 @@ pub fn execute_macro(
                                 });
                             }
                         };
-
-                        new_variables.insert(*name, vec![(arg_values[i], -1)]);
+                        if arg_def.5 {
+                            new_variables.insert(*name, vec![(arg_values[i], -1)]);
+                        } else {
+                            new_variables.insert(
+                                arg_def.0,
+                                vec![(
+                                    clone_value(
+                                        arg_values[i],
+                                        globals,
+                                        context.start_group,
+                                        true,
+                                        CodeArea {
+                                            pos: arg_def.4,
+                                            file: m.def_file,
+                                        },
+                                    ),
+                                    -1,
+                                )],
+                            );
+                        }
                     } else {
                         return Err(RuntimeError::UndefinedErr {
                             undefined: name.as_ref().clone(),
@@ -447,23 +468,26 @@ pub fn execute_macro(
                             });
                         }
                     };
-
-                    new_variables.insert(
-                        m.args[def_index].0,
-                        vec![(
-                            clone_value(
-                                arg_values[i],
-                                globals,
-                                context.start_group,
-                                true,
-                                CodeArea {
-                                    pos: m.args[def_index].4,
-                                    file: m.def_file,
-                                },
-                            ),
-                            -1,
-                        )],
-                    );
+                    if m.args[def_index].5 {
+                        new_variables.insert(m.args[def_index].0, vec![(arg_values[i], -1)]);
+                    } else {
+                        new_variables.insert(
+                            m.args[def_index].0,
+                            vec![(
+                                clone_value(
+                                    arg_values[i],
+                                    globals,
+                                    context.start_group,
+                                    true,
+                                    CodeArea {
+                                        pos: m.args[def_index].4,
+                                        file: m.def_file,
+                                    },
+                                ),
+                                -1,
+                            )],
+                        );
+                    }
                     def_index += 1;
                 }
             }
@@ -522,7 +546,6 @@ Should be used like this: value.macro(arguments)",
             }
         }
 
-        new_variables.extend(m.def_variables.iter().map(|(a, b)| (*a, vec![(*b, -1)])));
         let prev_vars = full_context.inner().get_variables().clone();
 
         (*full_context.inner()).set_all_variables(new_variables);

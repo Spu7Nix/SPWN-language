@@ -106,6 +106,19 @@ return {
             SPEED_GREEN: 202,
             SPEED_PINK: 203,
             SPEED_RED: 1334,
+        },
+        special: {
+            COLLISION_BLOCK: 1816,
+
+            J_BLOCK: 1813,
+            H_BLOCK: 1859,
+            D_BLOCK: 1755,
+            S_BLOCK: 1829,
+
+            ITEM_DISPLAY: 1615,
+            TEXT: 914,
+
+            USER_COIN: 1329,
         }
     },
 

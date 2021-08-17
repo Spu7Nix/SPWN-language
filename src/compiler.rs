@@ -207,6 +207,7 @@ pub fn create_error(
     labels: &[(CodeArea, &str)],
     note: Option<&str>,
 ) -> ErrorReport {
+
     ErrorReport {
         info: info.clone(),
         message: message.to_string(),
@@ -606,7 +607,7 @@ pub fn compile_scope(
                 let is_assign = !expr.operators.is_empty()
                     && expr.operators[0] == ast::Operator::Assign
                     && !expr.values[0]
-                        .is_undefinable(contexts.iter().next().unwrap().inner(), globals);
+                        .is_undefinable(contexts.iter().next().unwrap().inner(), globals, true);
 
                 //println!("{:?}, {}", expr, is_assign);
 
@@ -619,74 +620,167 @@ pub fn compile_scope(
 
                     //let mut new_context = context.clone();
 
-                    match (
-                        new_expr.values.len() == 1
-                            && new_expr.values[0].path.is_empty()
-                            && new_expr.values[0].operator.is_none(),
-                        &new_expr.values[0].value.body,
-                    ) {
-                        (true, ast::ValueBody::CmpStmt(f)) => {
-                            //to account for recursion
+                    match symbol.value.body {
+                        ast::ValueBody::Array(var_a) => {
 
-                            //create the function context
-                            for full_context in contexts.iter() {
-                                let storage =
-                                    symbol.define(full_context.inner(), globals, &info)?;
+                            new_expr.eval(contexts, globals, info.clone(), true)?;
 
-                                //pick a start group
-                                let start_group = Group::next_free(&mut globals.closed_groups);
-                                //store value
-                                globals.stored_values[storage] =
-                                    Value::TriggerFunc(TriggerFunction { start_group });
+                            for ctx in contexts.iter() {
+                                match globals.stored_values[ctx.inner().return_value].clone() {
+                                    Value::Array(val_a) => {
+                                        let ranges = var_a.iter().filter(|x| x.values[0].operator == Some(ast::UnaryOperator::Range)).collect::<Vec<&ast::Expression>>();
 
-                                full_context.inner().fn_context_change_stack = vec![info.position];
-                                //new_info.last_context_change_stack = vec![info.position.clone()];
+                                        if ranges.len() > 1 {
+                                            let mut why_sput = info.position;
+                                            why_sput.pos = ranges[0].values[0].pos;
+                                            info.position.pos = ranges[1].values[0].pos;
 
-                                f.to_trigger_func(
-                                    full_context,
-                                    globals,
-                                    info.clone(),
-                                    Some(start_group),
-                                )?;
+                                            return Err(RuntimeError::CustomError(create_error(
+                                                info.clone(),
+                                                "Cannot spread a destructure multiple times",
+                                                &[
+                                                    (why_sput, "First spread is here"),
+                                                    (info.position, "Attempted to spread again"),
+                                                ],
+                                                None,
+                                            )));   
+                                        }
+
+
+                                        if (var_a.len() < val_a.len() && ranges.is_empty())
+                                           || var_a.len() > val_a.len() {
+                                            return Err(RuntimeError::CustomError(create_error(
+                                                info,
+                                                &format!("Expected {} items to destructure, found {}", var_a.len(), val_a.len()),
+                                                &[],
+                                                None,
+                                            )));
+                                        } else {
+                                            let mut idx: usize = 0;
+                                            let mut var_idx: usize = 0;
+                                            loop {
+                                                let mut idx_step = 1;
+                                                for expr_ctx in ctx.iter() {
+                                                    if var_a[var_idx].operators.is_empty() || var_a[var_idx].values.is_empty() {
+                                                        use crate::fmt::_format2;
+
+                                                        return Err(RuntimeError::CustomError(create_error(
+                                                            info,
+                                                            &format!("Cannot destructure value into expression '{}'", _format2(&ast::ValueBody::Expression(var_a[idx].clone()))),
+                                                            &[],
+                                                            None,
+                                                        )));
+                                                    }
+                                                    let var_val = &var_a[var_idx].values[0];
+                                                    match var_val.operator {
+                                                        Some(ast::UnaryOperator::Range) => {
+                                                            let mut without_op = var_val.clone();
+                                                            without_op.operator = None;
+
+                                                            idx_step = 1+val_a.len()-var_a.len();
+                                                            let mut packed = Vec::<StoredValue>::new();
+
+                                                            let storage = without_op.define(expr_ctx.inner(), globals, &info)?;
+
+                                                            for tmp_idx in idx..(idx+idx_step) {
+                                                                let cloned = clone_value(
+                                                                    val_a[tmp_idx],
+                                                                    globals,
+                                                                    expr_ctx.inner().start_group,
+                                                                    !mutable,
+                                                                    globals.get_area(storage)
+                                                                );
+                                                                packed.push(cloned);
+                                                            }
+                                                            //println!("collecting {} items", val_a.len()-var_a.len());
+                                                            globals.stored_values[storage] = Value::Array(packed);
+                                                        }
+                                                        _ => {
+                                                            let storage = var_val.define(expr_ctx.inner(), globals, &info)?;
+                                                            //clone the value so as to not share the reference
+
+                                                            let cloned = clone_and_get_value(
+                                                                val_a[idx],
+                                                                globals,
+                                                                expr_ctx.inner().start_group,
+                                                                !mutable,
+                                                            );
+
+                                                            globals.stored_values[storage] = cloned;
+                                                        }
+                                                    }
+                                                }
+
+                                                idx += idx_step;
+                                                var_idx += 1;
+                                                if idx >= val_a.len() {
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    },
+                                    b => {
+                                        return Err(RuntimeError::TypeError {
+                                            expected: "array".to_string(),
+                                            found: b.get_type_str(globals),
+                                            val_def: globals.get_area(ctx.inner().return_value),
+                                            info,
+                                        })
+                                    }
+                                }
                             }
-                        }
-                        (true, ast::ValueBody::Macro(m)) => {
-                            for full_context in contexts.iter() {
-                                let storage =
-                                    symbol.define(full_context.inner(), globals, &info)?;
-
-                                macro_to_value(m, full_context, globals, info.clone(), !mutable)?;
-
-                                let (context, val) = full_context.inner_value();
-
-                                //clone the value so as to not share the reference
-
-                                let cloned = clone_and_get_value(
-                                    val,
-                                    globals,
-                                    context.start_group,
-                                    !mutable,
-                                );
-
-                                globals.stored_values[storage] = cloned;
-                            }
-                        }
+                        },
                         _ => {
-                            new_expr.eval(contexts, globals, info.clone(), !mutable)?;
+                            match (
+                                new_expr.values.len() == 1
+                                    && new_expr.values[0].path.is_empty()
+                                    && new_expr.values[0].operator.is_none(),
+                                &new_expr.values[0].value.body,
+                            ) {
+                                (true, ast::ValueBody::CmpStmt(f)) => {
+                                    //to account for recursion
 
-                            for full_context in contexts.iter() {
-                                let (context, val) = full_context.inner_value();
-                                let storage = symbol.define(context, globals, &info)?;
-                                //clone the value so as to not share the reference
+                                    //create the function context
+                                    for full_context in contexts.iter() {
+                                        let storage =
+                                            symbol.define(full_context.inner(), globals, &info)?;
 
-                                let cloned = clone_and_get_value(
-                                    val,
-                                    globals,
-                                    context.start_group,
-                                    !mutable,
-                                );
+                                        //pick a start group
+                                        let start_group = Group::next_free(&mut globals.closed_groups);
+                                        //store value
+                                        globals.stored_values[storage] =
+                                            Value::TriggerFunc(TriggerFunction { start_group });
 
-                                globals.stored_values[storage] = cloned;
+                                        full_context.inner().fn_context_change_stack = vec![info.position];
+                                        //new_info.last_context_change_stack = vec![info.position.clone()];
+
+                                        f.to_trigger_func(
+                                            full_context,
+                                            globals,
+                                            info.clone(),
+                                            Some(start_group),
+                                        )?;
+                                    }
+                                }
+
+                                _ => {
+                                    new_expr.eval(contexts, globals, info.clone(), !mutable)?;
+
+                                    for full_context in contexts.iter() {
+                                        let (context, val) = full_context.inner_value();
+                                        let storage = symbol.define(context, globals, &info)?;
+                                        //clone the value so as to not share the reference
+
+                                        let cloned = clone_and_get_value(
+                                            val,
+                                            globals,
+                                            context.start_group,
+                                            !mutable,
+                                        );
+
+                                        globals.stored_values[storage] = cloned;
+                                    }
+                                }
                             }
                         }
                     }
@@ -933,9 +1027,9 @@ pub fn compile_scope(
                         GdObj {
                             params,
 
-                            ..context_trigger(&context, &mut globals.uid_counter)
+                            ..context_trigger(context, &mut globals.uid_counter)
                         }
-                        .context_parameters(&context),
+                        .context_parameters(context),
                         globals.trigger_order,
                     ))
                 }

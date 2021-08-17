@@ -20,37 +20,44 @@ SPWN is a programming language that compiles to Geometry Dash levels. What that 
 
 You can either use the installers for your operating system, or build SPWN from source. Please note that building from source will give you access to newer features and bug fixes, but **may be unstable**.
 
-###### Windows
+#### Windows
 1. Download the .msi file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
 2. Open the .msi file and follow the install wizard.
 
-###### MacOS
+#### MacOS
 1. Download the .pkg file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
 2. Open the .pkg file and follow the install wizard.
 
  - Note: *If you get a message telling you that you cant open files from unidentified developers, open 'System Preferences' then click 'Security & Privacy' and click 'Open Anyway' on the 'General' menu*
 
-###### Linux
+#### Linux
+
+###### Debian (Ubuntu, Mint, Elementary, ...)
 1. Download the .deb file (debian based) or the .pkg.tar.zst (arch based) from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases)
+2. Install the debian package using dpkg:
 
-2. 
-- Install the debian package using dpkg:
 ```sh
-deb@spwn:~$ sudo dpkg -i spwn_0.0.5-0_amd64.deb
+sudo dpkg -i spwn_0.0.6-0_amd64.deb
+```
+###### Arch (Manjaro, Artix, ...)
+- Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
+
+```sh
+pacman -U spwn-0.0.6_amd64.pkg.tar.zst
+```
+- Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
+
+```sh
+yay -S spwn-bin
 ```
 
-- Install the arch package using pacman and add `/usr/local/bin` to path:
-```sh
-[arch@spwn ~$] pacman -U spwn-0.0.5-0_amd64.pkg.tar.zst
-[arch@spwn ~$] echo 'export PATH="/usr/local/bin:$PATH"' >> ~/.bashrc
-```
-
-###### Compiling from source
-1. Download source code from this repository.
-2. Install rust if you haven't already.
-3. Open `spwn-lang` folder in the terminal.
-4. Run `cargo build --release`.
-5. Compiled binary is placed in `target/debug`.
+#### Compiling from source
+1. Download source code from this repository
+2. Unzip the .zip file
+3. Install rust if you haven't already
+4. Open the unzipped folder in the terminal
+5. Run `cargo build --release`
+6. Compiled binary is placed in `target/release`
 
 ## Using SPWN - Setup
 
@@ -86,7 +93,7 @@ Save the file, then open a terminal and type in `spwn build YOURFILENAME.spwn`. 
 
 ## Using SPWN - Command Line Reference
 
-Here is a list of SPWN command line subcommands and flags. This Information can be found by typing `spwn help` in the command line as well.
+Here is a list of SPWN command line subcommands and flags. This information can be found by typing `spwn help` in the command line as well.
 
 ###### Subcommands:
 
