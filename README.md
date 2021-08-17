@@ -45,7 +45,7 @@ You can either use the installers for your operating system, or build SPWN from 
 ```sh
 [arch@spwn ~] $ pacman -U spwn-0.0.6_amd64.pkg.tar.zst
 ```
-- Alternatively, you can install the SPWN binary from the AUR:
+- Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
 
 ```sh
 [arch@spwn ~] $ yay -S spwn-bin
