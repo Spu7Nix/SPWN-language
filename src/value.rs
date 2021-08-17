@@ -5,7 +5,7 @@ use crate::compiler::create_error;
 use crate::compiler::import_module;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
-use slyce::{Slice as Slyce};
+use slyce::Slice as Slyce;
 
 use crate::parser::FileRange;
 use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};

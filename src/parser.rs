@@ -40,7 +40,7 @@ macro_rules! expected {
             ),
             pos: $tokens.position(),
             file: $notes.file.clone(),
-        });
+        })
     };
 }
 
@@ -1837,7 +1837,7 @@ pub fn str_content(
 
             out.1 = StringFlags::Raw.into();
 
-            while let Some(c) = chars.next() {
+            for c in chars {
                 out.0.push(c);
             }
         }
@@ -2049,7 +2049,7 @@ fn parse_variable(
             let (content, flag) = str_content(tokens.slice(), tokens, notes)?;
             let inner = StrInner {
                 inner: content,
-                flags: flag.into(),
+                flags: flag,
             };
             ast::ValueBody::Str(inner)
         }
@@ -2224,7 +2224,7 @@ fn parse_variable(
                             let item = parse_expr(tokens, notes, true, true)?;
                             match tokens.next(false) {
                                 Some(Token::For) => {
-                                    if arr.len() > 0 {
+                                    if !arr.is_empty() {
                                         expected!(
                                             "comma (',') or ']'".to_string(),
                                             tokens,
@@ -2339,15 +2339,10 @@ fn parse_variable(
                             file: notes.file.to_owned(),
                             pos: tokens.position(),
                             found: format!("string flag ({:?})", flag),
-                        })
+                        });
                     }
 
-                    ast::ValueBody::Import(
-                        ImportType::Script(PathBuf::from(
-                            content,
-                        )),
-                        forced,
-                    )
+                    ast::ValueBody::Import(ImportType::Script(PathBuf::from(content)), forced)
                 }
                 Some(Token::Symbol) => {
                     ast::ValueBody::Import(ImportType::Lib(tokens.slice()), forced)

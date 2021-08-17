@@ -510,25 +510,22 @@ Should be used like this: value.macro(arguments)",
             m_args_iter.next();
         }
         for arg in m_args_iter {
-            if !new_variables.contains_key(&arg.0) {
+            if let std::collections::hash_map::Entry::Vacant(e) = new_variables.entry(arg.0) {
                 match &arg.1 {
                     Some(default) => {
-                        new_variables.insert(
-                            arg.0,
-                            vec![(
-                                clone_value(
-                                    *default,
-                                    globals,
-                                    context.start_group,
-                                    true,
-                                    CodeArea {
-                                        pos: arg.4,
-                                        file: m.def_file,
-                                    },
-                                ),
-                                -1,
-                            )],
-                        );
+                        e.insert(vec![(
+                            clone_value(
+                                *default,
+                                globals,
+                                context.start_group,
+                                true,
+                                CodeArea {
+                                    pos: arg.4,
+                                    file: m.def_file,
+                                },
+                            ),
+                            -1,
+                        )]);
                     }
 
                     None => {

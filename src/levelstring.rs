@@ -77,13 +77,13 @@ impl fmt::Display for ObjParam {
                     if let Id::Specific(id) = g.id {
                         out += &(id.to_string() + ".")
                     } else {
-                        out += "?."
+                        out += "0."
                     };
                 }
                 out.pop();
                 write!(f, "{}", out)
             }
-            ObjParam::Epsilon => write!(f, "{{epsilon}}"),
+            ObjParam::Epsilon => write!(f, "0.05"),
         }
     }
 }
