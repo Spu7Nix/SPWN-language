@@ -582,7 +582,7 @@ pub fn slice_array(
                 _ => {
                     return Err(RuntimeError::CustomError(create_error(
                         info,
-                        "Cannot slice noncomforming multidimensional array",
+                        "Cannot slice nonconforming multidimensional array",
                         &[],
                         None,
                     )));
@@ -2307,7 +2307,7 @@ impl ast::Variable {
                         if globals.stored_values[ptr]
                             .clone()
                             .member(
-                                globals.ASSIGN_BULTIN,
+                                globals.ASSIGN_BUILTIN,
                                 context,
                                 globals,
                                 CompilerInfo::new(),
