@@ -14,6 +14,9 @@ use crate::value::*;
 use crate::value_storage::*;
 use std::io::stdout;
 use std::io::Write;
+use rand::seq::SliceRandom;
+use rand::Rng;
+
 //use text_io;
 use crate::compiler_info::{CodeArea, CompilerInfo};
 
@@ -917,6 +920,77 @@ builtins! {
 
 
         Value::Null
+    }
+
+    [Random]
+    fn random() {
+        if arguments.len() > 2 {
+            return Err(RuntimeError::BuiltinError {
+                message: "Expected up to 2 arguments, found none".to_string(),
+                info,
+            });
+        }
+
+        if arguments.is_empty() {
+            Value::Number(rand::thread_rng().gen())
+        } else {
+            let val = match convert_type(&globals.stored_values[arguments[0]].clone(), 10, &info, globals, context) {
+                Ok(Value::Array(v)) => v,
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Expected type that can be converted to @array for argument 1, found type {}", globals.get_type_str(arguments[0])),
+                        info,
+                    });
+                }
+            };
+
+            if arguments.len() == 1 {
+                let rand_elem = val.choose(&mut rand::thread_rng());
+
+                if rand_elem.is_some() {
+                    clone_and_get_value(
+                        *rand_elem.unwrap(),
+                        globals,
+                        context.start_group,
+                        !globals.is_mutable(*rand_elem.unwrap())
+                    )
+                } else {
+                    Value::Null
+                }
+            } else {
+                let times = match &globals.stored_values[arguments[1]] {
+                    Value::Number(n) => {
+                        convert_to_int(*n, &info)?
+                    },
+                    _ => {
+                        return Err(RuntimeError::BuiltinError {
+                            message: format!("Expected number, found {}", globals.get_type_str(arguments[1])),
+                            info,
+                        }); 
+                    }
+                };
+
+                let mut out_arr = Vec::<StoredValue>::new();
+
+                for _ in 0..times {
+                    let rand_elem = val.choose(&mut rand::thread_rng());
+
+                    if rand_elem.is_some() { 
+                        out_arr.push(clone_value(
+                            *rand_elem.unwrap(),
+                            globals,
+                            context.start_group,
+                            !globals.is_mutable(*rand_elem.unwrap()),
+                            CodeArea::new()
+                        ));
+                    } else {
+                        break;
+                    }
+                }
+
+                Value::Array(out_arr)
+            }
+        }
     }
 
     [ReadFile]
