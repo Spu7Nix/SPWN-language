@@ -25,7 +25,7 @@ fn tabs(mut num: Indent) -> String {
 pub fn _format(input: Vec<Statement>) -> String {
     let mut out = String::new();
     for s in input {
-        out += &s.fmt(0).to_string();
+        out += &s.fmt(0)
     }
     out
 }
@@ -259,7 +259,7 @@ impl SpwnFmt for ValueBody {
             Symbol(x) => x.to_string(),
             Bool(x) => format!("{}", x),
             Expression(x) => format!("({})", x.fmt(ind)),
-            Str(x) => format!("\"{}\"", x),
+            Str(x) => format!("\"{}\"", x.inner),
             Import(x, f) => format!("import{} {:?}", if *f { "!" } else { "" }, x),
             Obj(x) => {
                 (match x.mode {

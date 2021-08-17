@@ -16,6 +16,7 @@ import "fileio.spwn"
 import "regex.spwn"
 import "number.spwn"
 import "heapq.spwn"
+import "complex.spwn"
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"
@@ -36,7 +37,8 @@ ctrl_flow = import "control_flow.spwn"
     open: @file::new,
     obj_set: @obj_set::new,
     regex: @regex::new,
-    heapq: @heapq::new
+    heapq: @heapq::new,
+    complex: @complex::new
 }
 
 

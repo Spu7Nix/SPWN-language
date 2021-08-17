@@ -37,18 +37,18 @@ You can either use the installers for your operating system, or build SPWN from 
 2. Install the debian package using dpkg:
 
 ```sh
-[deb@spwn ~] $ sudo dpkg -i spwn_0.0.6-0_amd64.deb
+sudo dpkg -i spwn_0.0.6-0_amd64.deb
 ```
 ###### Arch (Manjaro, Artix, ...)
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
 ```sh
-[arch@spwn ~] $ pacman -U spwn-0.0.6_amd64.pkg.tar.zst
+pacman -U spwn-0.0.6_amd64.pkg.tar.zst
 ```
-- Alternatively, you can install the SPWN binary from the AUR:
+- Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
 
 ```sh
-[arch@spwn ~] $ yay -S spwn-bin
+yay -S spwn-bin
 ```
 
 #### Compiling from source

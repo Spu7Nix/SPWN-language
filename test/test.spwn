@@ -1,14 +1,6 @@
-gs = import gamescene
-mode = counter(0)
+let reg = r"\w"; // raw string, ignores any escapes (TODO: add regex rule for spwn.vim and the spwn vscode ext)
+let str = "hewwo";
 
-gs.button_a().on_triggered(!{
-    ((mode.to_const(0..6) + 127) as @group).alpha(0)
-    wait()
-    mode += 1
-    if mode == 6
-    {
-        mode -= 6
-        wait()
-    }
-    ((mode.to_const(0..6) + 127) as @group).alpha(1)
-})
+$.print(str.find(reg)) //=> true
+$.print(str.findall(reg)) //=> [[0,1],[1,2],[2,3],[3,4],[4,5]]
+$.print(str.replace(reg, "byebye")) //=> byebye

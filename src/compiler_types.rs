@@ -80,6 +80,7 @@ pub fn handle_operator(
                     let pat = &globals.stored_values[target_typ].clone();
 
                     if !val2.matches_pat(pat, info, globals, full_context.inner())? {
+
                         //if types dont match, act as if there is no macro at all
                         built_in_function(
                             macro_name,
@@ -352,7 +353,7 @@ pub fn execute_macro(
         }
     }
 
-    //dbg!(&conbinations);
+    //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
         let mut new_variables: HashMap<Intern<String>, Vec<(StoredValue, i16)>> = HashMap::new();
@@ -441,7 +442,7 @@ pub fn execute_macro(
                                         if m.args.len() == 1 { "" } else { "s" }
                                     ),
                                 ),
-                                (info.position, "Recieved too many arguments here"),
+                                (info.position, "Received too many arguments here"),
                             ],
                             None,
                         )));
