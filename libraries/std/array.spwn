@@ -56,14 +56,39 @@ fruit = ['apple', 'banana', 'mango']
 $.assert(fruit.index('apple') == 0)
 $.assert(fruit.index('carrot') == null)
     ")]
-    (self, el) {
-        let res = null
-        for i in 0..self.length {
+    (self, el, #[desc("Index to start the search from")] from: @number = 0) {
+        for i in from..self.length {
             if self[i] == el {
-                res = i
+                return i
             }
         }
-        return res
+        return null
+    },
+    index_last: #[desc("Gets the index of the last occurence of an element (if it doesn't exist, `null` is returned)") example("
+arr = [1,-5,2,4,2,6]
+$.assert(arr.index_last(2) == 4)
+$.assert(arr.index_last(-3) == null)
+    ")]
+    (self, el, #[desc("Index to end the search at")] until: @number = 0) {
+        for i in self.length..until {
+            if self[i] == el {
+                return i
+            }
+        }
+        return null
+    },
+    index_all: #[desc("Returns an array of all occurences of an element") example("
+arr = [1,-5,2,4,2,6]
+$.assert(arr.index_all(2) == [2,4])
+    ")]
+    (self, el) {
+        let occurences = []
+        for i in 0..self.length {
+            if self[i] == el {
+                occurences.push(i)
+            }
+        }
+        return occurences
     },
     clear: #[desc("Clears the array.") example("
 let arr = [1, 2, 3]
@@ -275,7 +300,7 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         let output = [];
 
         for elem in self {
-            if elem.type == @number {
+            if elem.type != @array {
                 output.push(elem)
             } else {
                 for i in elem.flatten() {
