@@ -105,7 +105,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                 (
                     key,
                     val.iter()
-                        .map(|(key, val)| (key.clone(), val.0))
+                        .map(|(key, val)| (*key, val.0))
                         .collect::<HashMap<Intern<String>, StoredValue>>(),
                 )
             })

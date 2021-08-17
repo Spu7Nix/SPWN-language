@@ -3,6 +3,8 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
+use crate::ast::StrInner;
+use crate::ast::StringFlags;
 use crate::builtin::Builtin;
 
 use crate::compiler::ErrorReport;
@@ -253,7 +255,7 @@ pub enum Token {
     #[regex(r"[0-9]+(\.[0-9]+)?")]
     Number,
 
-    #[regex(r#""(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
+    #[regex(r#"[a-z]?"(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
     StringLiteral,
 
     #[token("true")]
@@ -1627,8 +1629,8 @@ fn parse_arg_def(
             Some(Token::Ampersand) => {
                 arg_tok = tokens.next(false);
                 true
-            },
-            _ => false
+            }
+            _ => false,
         };
 
         let symbol = Intern::new(tokens.slice());
@@ -1696,17 +1698,15 @@ fn parse_arg_def(
                 }
 
                 match arg_tok {
-                    Some(Token::Symbol) | Some(Token::SelfVal) => {
-                        (
-                            symbol,
-                            None,
-                            properties,
-                            None,
-                            (start, tokens.position().1),
-                            as_ref
-                        )
-                    },
-                    _ => expected!("symbol".to_string(), tokens, notes, arg_tok)
+                    Some(Token::Symbol) | Some(Token::SelfVal) => (
+                        symbol,
+                        None,
+                        properties,
+                        None,
+                        (start, tokens.position().1),
+                        as_ref,
+                    ),
+                    _ => expected!("symbol".to_string(), tokens, notes, arg_tok),
                 }
             }
             None => {
@@ -1799,33 +1799,55 @@ pub fn str_content(
     mut inp: String,
     tokens: &Tokens,
     notes: &ParseNotes,
-) -> Result<String, SyntaxError> {
-    inp.remove(0);
+) -> Result<(String, Option<StringFlags>), SyntaxError> {
+    let first = inp.remove(0);
     inp.remove(inp.len() - 1);
-    let mut out = String::new();
+
+    let mut out = (String::new(), None);
     let mut chars = inp.chars();
 
-    while let Some(c) = chars.next() {
-        out.push(if c == '\\' {
-            match chars.next() {
-                Some('n') => '\n',
-                Some('r') => '\r',
-                Some('t') => '\t',
-                Some('"') => '\"',
-                Some('\'') => '\'',
-                Some('\\') => '\\',
-                Some(a) => {
-                    return Err(SyntaxError::SyntaxError {
-                        message: format!("Invalid escape: \\{}", a),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    })
-                }
-                None => unreachable!(),
+    match first {
+        '\'' | '"' => {
+            while let Some(c) = chars.next() {
+                out.0.push(if c == '\\' {
+                    match chars.next() {
+                        Some('n') => '\n',
+                        Some('r') => '\r',
+                        Some('t') => '\t',
+                        Some('"') => '\"',
+                        Some('\'') => '\'',
+                        Some('\\') => '\\',
+                        Some(a) => {
+                            return Err(SyntaxError::SyntaxError {
+                                message: format!("Invalid escape: \\{}", a),
+                                pos: tokens.position(),
+                                file: notes.file.clone(),
+                            })
+                        }
+                        None => unreachable!(),
+                    }
+                } else {
+                    c
+                });
             }
-        } else {
-            c
-        });
+        }
+        'r' => {
+            // remove "
+            chars.next();
+
+            out.1 = StringFlags::Raw.into();
+
+            while let Some(c) = chars.next() {
+                out.0.push(c);
+            }
+        }
+        _ => {
+            return Err(SyntaxError::SyntaxError {
+                file: notes.file.to_owned(),
+                pos: tokens.position(),
+                message: format!("Invalid string flag: {}", first),
+            })
+        }
     }
 
     Ok(out)
@@ -2023,7 +2045,13 @@ fn parse_variable(
         }),
         Some(Token::StringLiteral) => {
             // is a string
-            ast::ValueBody::Str(str_content(tokens.slice(), tokens, notes)?)
+
+            let (content, flag) = str_content(tokens.slice(), tokens, notes)?;
+            let inner = StrInner {
+                inner: content,
+                flags: flag.into(),
+            };
+            ast::ValueBody::Str(inner)
         }
         Some(Token::Id) => {
             let mut text = tokens.slice();
@@ -2071,7 +2099,14 @@ fn parse_variable(
                     // Woo macro shorthand
                     let arg = if symbol.as_ref() != "_" {
                         is_valid_symbol(&symbol, tokens, notes)?;
-                        vec![(symbol, None, properties.clone(), None, tokens.position(), false)]
+                        vec![(
+                            symbol,
+                            None,
+                            properties.clone(),
+                            None,
+                            tokens.position(),
+                            false,
+                        )]
                     } else {
                         Vec::new()
                     };
@@ -2190,7 +2225,12 @@ fn parse_variable(
                             match tokens.next(false) {
                                 Some(Token::For) => {
                                     if arr.len() > 0 {
-                                        expected!("comma (',') or ']'".to_string(), tokens, notes, Some(Token::For));
+                                        expected!(
+                                            "comma (',') or ']'".to_string(),
+                                            tokens,
+                                            notes,
+                                            Some(Token::For)
+                                        );
                                     }
 
                                     match tokens.next(false) {
@@ -2199,41 +2239,59 @@ fn parse_variable(
 
                                             match tokens.next(false) {
                                                 Some(Token::In) => (),
-                                                a => expected!("'in'".to_string(), tokens, notes, a),
+                                                a => {
+                                                    expected!("'in'".to_string(), tokens, notes, a)
+                                                }
                                             }
 
                                             let iter = parse_expr(tokens, notes, true, true)?;
 
-                                            let mut potential_condition: Option<ast::Expression> = None;
+                                            let mut potential_condition: Option<ast::Expression> =
+                                                None;
 
                                             match tokens.next(false) {
                                                 Some(Token::ClosingSquareBracket) => (),
-                                                Some(Token::Comma) => {
-                                                    match tokens.next(false) {
-                                                        Some(Token::If) => {
-                                                            potential_condition = Some(parse_expr(tokens, notes, true, true)?);
-                                                            match tokens.next(false) {
-                                                                Some(Token::ClosingSquareBracket) => (),
-                                                                a => expected!("]".to_string(), tokens, notes, a)
-                                                            }
-                                                        },
-                                                        a => expected!("if".to_string(), tokens, notes, a)
+                                                Some(Token::Comma) => match tokens.next(false) {
+                                                    Some(Token::If) => {
+                                                        potential_condition = Some(parse_expr(
+                                                            tokens, notes, true, true,
+                                                        )?);
+                                                        match tokens.next(false) {
+                                                            Some(Token::ClosingSquareBracket) => (),
+                                                            a => expected!(
+                                                                "]".to_string(),
+                                                                tokens,
+                                                                notes,
+                                                                a
+                                                            ),
+                                                        }
                                                     }
+                                                    a => expected!(
+                                                        "if".to_string(),
+                                                        tokens,
+                                                        notes,
+                                                        a
+                                                    ),
                                                 },
-                                                a => expected!("']' or ','".to_string(), tokens, notes, a),
+                                                a => expected!(
+                                                    "']' or ','".to_string(),
+                                                    tokens,
+                                                    notes,
+                                                    a
+                                                ),
                                             }
 
                                             potential_listcomp = Some(ast::Comprehension {
                                                 body: item,
                                                 symbol: Intern::new(tok_name),
                                                 iterator: iter,
-                                                condition: potential_condition
+                                                condition: potential_condition,
                                             });
                                             break;
-                                        },
-                                        a => expected!("identifier".to_string(), tokens, notes, a)
+                                        }
+                                        a => expected!("identifier".to_string(), tokens, notes, a),
                                     }
-                                },
+                                }
                                 Some(Token::Comma) => {
                                     //accounting for trailing comma
                                     arr.push(item);
@@ -2246,8 +2304,13 @@ fn parse_variable(
                                 Some(Token::ClosingSquareBracket) => {
                                     arr.push(item);
                                     break;
-                                },
-                                a => expected!("comma (','), ']', or 'for'".to_string(), tokens, notes, a),
+                                }
+                                a => expected!(
+                                    "comma (','), ']', or 'for'".to_string(),
+                                    tokens,
+                                    notes,
+                                    a
+                                ),
                             }
                         }
                     }
@@ -2268,10 +2331,24 @@ fn parse_variable(
                 first = tokens.next(false);
             }
             match first {
-                Some(Token::StringLiteral) => ast::ValueBody::Import(
-                    ImportType::Script(PathBuf::from(str_content(tokens.slice(), tokens, notes)?)),
-                    forced,
-                ),
+                Some(Token::StringLiteral) => {
+                    let (content, flag) = str_content(tokens.slice(), tokens, notes)?;
+
+                    if flag.is_some() {
+                        return Err(SyntaxError::UnexpectedErr {
+                            file: notes.file.to_owned(),
+                            pos: tokens.position(),
+                            found: format!("string flag ({:?})", flag),
+                        })
+                    }
+
+                    ast::ValueBody::Import(
+                        ImportType::Script(PathBuf::from(
+                            content,
+                        )),
+                        forced,
+                    )
+                }
                 Some(Token::Symbol) => {
                     ast::ValueBody::Import(ImportType::Lib(tokens.slice()), forced)
                 }

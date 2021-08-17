@@ -810,7 +810,7 @@ impl ast::Variable {
                     }
                 }
                 ast::ValueBody::Str(s) => full_context.inner().return_value = store_const_value(
-                        Value::Str(s.clone()),
+                        Value::Str(s.inner.clone()),
                         
                         globals,
                         full_context.inner().start_group,
@@ -2388,7 +2388,7 @@ impl ast::Variable {
                     if i.values.len() == 1 {
                         if let ast::ValueBody::Str(s) = &i.values[0].value.body {
                             match &globals.stored_values[current_ptr] {
-                                Value::Dict(d) => return d.get(s).is_some(),
+                                Value::Dict(d) => return d.get(&s.inner).is_some(),
                                 _ => return true,
                             }
                         } else {
