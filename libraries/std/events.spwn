@@ -103,19 +103,6 @@ on(collision_exit(1b, 2b), !{
         }
     },
 
-    counter_value: #[desc("Returns an event for when a counter reaches a certain value")
-    example("
-c = counter(2)
-
-on(counter_value(c, 10), !{
-    BG.pulse(0, 255, 0, fade_out = 0.5) // will pulse each time the counter becomes 10
-})
-    ")] (
-        #[desc("Counter")] c: @counter,
-        #[desc("Value to reach")] value: @number
-    ) {
-        return c.item.count(value)
-    },
 
     death: #[desc("Returns an event for when the player dies") example("
 on(death(), !{
