@@ -241,7 +241,7 @@ arr.sort(begin = 2, end = 4)
 $.assert(arr == [5, 1, 2, 3, 5])
 
 arr = [5, 1, 5, 3, 2]
-arr.sort(key = (a, b) => a > b)
+arr.sort(comp = (a, b) => a > b)
 $.assert(arr == [5, 5, 3, 2, 1])
     ")]
     (self, begin: @number = 0, end: @number = -1, comp: @macro = (a, b) => a <= b) {
@@ -267,11 +267,11 @@ $.assert(arr == [5, 5, 3, 2, 1])
 arr = [5, 1, 5, 3, 2]
 $.assert(arr.sorted() == [1, 2, 3, 5, 5])
 $.assert(arr.sorted(begin = 2, end = 4) == [5, 1, 2, 3, 5])
-$.assert(arr.sorted(key = (a, b) => a >= b) == [5, 5, 3, 2, 1])
+$.assert(arr.sorted(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
     ")]
-    (self) {
+    (self, begin: @number = 0, end: @number = -1, comp: @macro = (a, b) => a <= b) {
         let new_arr = self
-        new_arr.sort()
+        new_arr.sort(begin,end,comp)
 
         return new_arr
     },
