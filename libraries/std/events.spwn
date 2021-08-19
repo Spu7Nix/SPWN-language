@@ -103,6 +103,7 @@ on(collision_exit(1b, 2b), !{
         }
     },
 
+
     death: #[desc("Returns an event for when the player dies") example("
 on(death(), !{
     BG.set(0, 0, 0)

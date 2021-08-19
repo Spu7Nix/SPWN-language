@@ -156,7 +156,7 @@ Build a file called AI.spwn and output the level string to the console.
 ## Todo at some point
 
 - [x] implement live editor features for windows
-- [ ] make it work on linux
+- [x] make it work on linux
 - [x] nested comments
 - [x] get and edit obj and trigger properties
 
