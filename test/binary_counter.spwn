@@ -1,0 +1,105 @@
+
+type @binary_counter
+
+number_to_binary = (n: @number, bits: @number) {
+    let digits = []
+    let n = n
+    for i in bits..0 {
+        x = 2^i
+        if n >= x {
+            n -= x
+            digits.push(true)
+        } else {
+            digits.push(false)
+        }
+    }
+    return digits.reverse()
+}
+
+impl @binary_counter {
+
+    new: (bits: @number = 16) {
+        let data = []
+        for i in ..bits {
+            data.push(counter(0))
+        }
+        // add carry triggers
+        for i in ..(bits - 1) {
+            on(data[i].item.count(2), !{
+                data[i + 1].add(1)
+                data[i].add(-2)
+            })
+        }
+        return @binary_counter::{
+            data
+        }
+    },
+
+    _as_: (self, typ: @type_indicator) {
+        if typ == @counter {
+            c = @counter::new()
+            for i in ..self.data.length {
+                self.data[i].item.if_is(EQUAL_TO, 1, !{
+                    c.add(2^i)
+                })
+            }
+            return c
+        } else {
+            throw "Binary counter cannot convert to type: " + @string(typ)
+        }
+    },
+
+    take: (self, source: @counter) {
+        for i in self.data.length..0 {
+            x = 2^i
+
+            -> if source >= x {
+                source -= x
+                self.data[i] += 1
+            }
+        }
+    },
+
+    copy_to: (self, target: @counter) {
+        for i in ..self.data.length {
+            self.data[i].item.if_is(EQUAL_TO, 1, !{
+                target.add(2^i)
+            })
+        }
+    },
+
+    display: (self, x: @number, y: @number) {
+        // reverse order to get highest order digit first
+        for i in self.data.length..0 {
+            self.data[i].display(x + 30 * (self.data.length-i), y)
+        }
+    },
+
+    add: (self, num) {
+        bin = number_to_binary(num, self.data.length)
+        
+        for i in ..self.data.length {
+            if bin[i] {
+                self.data[i] += 1
+            }
+        }
+        wait()
+    }
+}
+
+
+$.print(number_to_binary(2, 4))
+
+c = counter(1000)
+b = @binary_counter::new()
+
+c.display(300, 300)
+b.display(300, 240)
+
+
+
+b.take(c)
+
+b.add(1000)
+
+b.copy_to(c)

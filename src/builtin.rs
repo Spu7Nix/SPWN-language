@@ -12,10 +12,10 @@ use std::fs;
 
 use crate::value::*;
 use crate::value_storage::*;
-use std::io::stdout;
-use std::io::Write;
 use rand::seq::SliceRandom;
 use rand::Rng;
+use std::io::stdout;
+use std::io::Write;
 
 //use text_io;
 use crate::compiler_info::{CodeArea, CompilerInfo};
@@ -966,7 +966,7 @@ builtins! {
                         return Err(RuntimeError::BuiltinError {
                             message: format!("Expected number, found {}", globals.get_type_str(arguments[1])),
                             info,
-                        }); 
+                        });
                     }
                 };
 
@@ -975,7 +975,7 @@ builtins! {
                 for _ in 0..times {
                     let rand_elem = val.choose(&mut rand::thread_rng());
 
-                    if rand_elem.is_some() { 
+                    if rand_elem.is_some() {
                         out_arr.push(clone_value(
                             *rand_elem.unwrap(),
                             globals,

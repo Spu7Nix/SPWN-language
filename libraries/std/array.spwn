@@ -75,8 +75,7 @@ $.assert(arr.is_empty())
     },
     reverse: #[desc("Reverses the array.") example("
 let arr = [1, 2, 3]
-arr.reverse()
-$.assert(arr == [3, 2, 1])
+$.assert(arr.reverse() == [3, 2, 1])
     ")]
     (self) {
         if self.length == 0 {

@@ -1,6 +1,31 @@
-let reg = r"\w"; // raw string, ignores any escapes (TODO: add regex rule for spwn.vim and the spwn vscode ext)
-let str = "hewwo";
 
-$.print(str.find(reg)) //=> true
-$.print(str.findall(reg)) //=> [[0,1],[1,2],[2,3],[3,4],[4,5]]
-$.print(str.replace(reg, "byebye")) //=> byebye
+
+input = counter(69696)
+input.display(0, 75)
+
+bdigits = 17 //change if you need more.
+let binaryItem = []
+for i in ..bdigits {
+    number = counter(?i)
+    binaryItem.push(number)
+    number.display(30 * (bdigits-i), 45)
+}
+
+wait(1)
+
+for num in bdigits..0 {
+    x = 2^num
+
+    -> if input >= x {
+        input -= x
+        binaryItem[num] += 1
+    }
+}
+
+type @binary_counter
+
+impl @binary_counter {
+    new: (c: @counter, bits: @number = 16) {
+        
+    }
+}

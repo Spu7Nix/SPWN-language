@@ -153,8 +153,8 @@ $.assert('hi {1} and {0}'.fmt([name1, name2]) == 'hi alice and bob')
 $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
     ")]
     (self, subs) {
-        blank_regex = r"\{\}"
-        numbered_regex = r"\{\d+\}"
+        blank_regex = "\\{\\}"
+        numbered_regex = "\\{\\d+\\}"
 
         blanks = $.regex(blank_regex, self, 'findall', null)
         numbered = $.regex(numbered_regex, self, 'findall', null)

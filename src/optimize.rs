@@ -5,7 +5,8 @@ use crate::compiler_types::FunctionId;
 //mod icalgebra;
 use crate::levelstring::{GdObj, ObjParam};
 
-use std::collections::{HashMap, HashSet};
+use std::cmp::Ordering;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 pub type Swaps = HashMap<Group, Group>;
 
@@ -140,7 +141,7 @@ pub fn optimize(
     // not an optimization, more like a consistency fix
     // also, like nothing works without this, so i should probably move
     // this somewhere else if i want to add an option to not have optimization
-    network = fix_read_write_order(&mut objects, &network, &mut closed_group);
+    //network = fix_read_write_order(&mut objects, &network, &mut closed_group);
 
     // round 1
     dead_code_optimization(
@@ -149,26 +150,22 @@ pub fn optimize(
         &mut closed_group,
         reserved_groups,
     );
+    //println!("dead code complete");
 
     clean_network(&mut network, &objects, false);
 
     spawn_optimisation(&mut network, &mut objects);
+    //println!("spawn triggers complete");
 
-    // instant_count_optimization(&mut network, &mut objects, &mut closed_group);
+    clean_network(&mut network, &objects, false);
 
-    // // //cleanup
-
-    // clean_network(&mut network, &objects, false);
-
-    // // // // round 2
-
-    // spawn_and_dead_code_optimization(&mut network, &mut objects, &mut closed_group);
-
-    // clean_network(&mut network, &objects, false);
-
-    //instant_count_optimization(&mut network, &mut objects, &mut closed_group);
+    dedup_triggers(&mut network, &mut objects, reserved_groups);
 
     rebuild(&network, &obj_in)
+}
+
+fn is_start_group(g: Group, reserved_groups: &HashSet<Group>) -> bool {
+    matches!(g.id, Id::Specific(_)) || reserved_groups.contains(&g)
 }
 
 fn dead_code_optimization(
@@ -178,7 +175,7 @@ fn dead_code_optimization(
     reserved_groups: &HashSet<Group>,
 ) {
     for (group, gang) in network.clone() {
-        if matches!(group.id, Id::Specific(_)) || reserved_groups.contains(&group) {
+        if is_start_group(group, reserved_groups) {
             for (i, trigger) in gang.triggers.iter().enumerate() {
                 if trigger.role != TriggerRole::Output {
                     let mut visited = Vec::new();
@@ -189,7 +186,7 @@ fn dead_code_optimization(
                         closed_group,
                         reserved_groups,
                         &mut visited,
-                        false,
+                        0,
                     ) {
                         (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
                     }
@@ -335,39 +332,39 @@ fn check_for_dead_code<'a>(
     start: (Group, usize),
     closed_group: &mut u16,
     reserved_groups: &HashSet<Group>,
-    visited_stack: &mut Vec<Group>,
-    visited_output: bool,
+    visited_stack: &mut Vec<(Group, usize)>,
+    d: u32,
 ) -> bool {
     //returns whether to keep or delete the trigger
-
-    if visited_stack.contains(&start.0) {
-        return visited_output;
+    let trigger = network[&start.0].triggers[start.1];
+    if !trigger.deleted {
+        return true;
     }
 
-    // if trigger is an output trigger, keep this branch
-    let trigger = network[&start.0].triggers[start.1];
     if trigger.role == TriggerRole::Output {
         (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
         return true;
     }
 
-    let start_obj = &objects[trigger.obj].0.params;
+    if visited_stack.contains(&start) {
+        return true; // keep all loops
+    }
 
-    let mut has_output = visited_output;
+    // if trigger is an output trigger, keep this branch
+
+    let start_obj = &objects[trigger.obj].0.params;
 
     //println!("{}", network[&start.0].connections_in);
 
     let list: Vec<(usize, Group)> = if let Some(ObjParam::Group(g)) = start_obj.get(&51) {
-        if matches!(g.id, Id::Specific(_)) || reserved_groups.contains(g) {
+        if is_start_group(*g, reserved_groups) {
             //(*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
             return true;
         } else if let Some(gang) = network.get(g) {
             if gang.triggers.is_empty() {
                 return false;
             }
-            if !has_output && gang.triggers.iter().any(|t| t.role == TriggerRole::Output) {
-                has_output = true
-            }
+
             vec![*g; gang.triggers.len()]
                 .iter()
                 .copied()
@@ -386,7 +383,9 @@ fn check_for_dead_code<'a>(
 
     let mut out = false;
 
-    visited_stack.push(start.0);
+    visited_stack.push(start);
+
+    
 
     for (i, g) in list {
         let trigger_ptr = (g, i);
@@ -398,14 +397,14 @@ fn check_for_dead_code<'a>(
             closed_group,
             reserved_groups,
             visited_stack,
-            has_output,
+            d + 1,
         ) {
             (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
             out = true;
         }
     }
 
-    assert_eq!(visited_stack.pop(), Some(start.0));
+    assert_eq!(visited_stack.pop(), Some(start));
 
     out
 }
@@ -596,7 +595,8 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
     let mut inputs = HashSet::<Group>::new();
     let mut outputs = HashSet::<Group>::new();
 
-    let mut to_be_subtracted_from = Vec::new();
+    let mut cycle_points = HashSet::<Group>::new();
+    let mut all = Vec::new();
 
     for (group, gang) in network.iter_mut() {
         let output_condition = gang.triggers.iter().any(|t| t.role != TriggerRole::Spawn);
@@ -642,8 +642,6 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
                 // delete trigger that will be rebuilt
                 (*trigger).deleted = true;
 
-                to_be_subtracted_from.push(target);
-
                 if let Some(l) = spawn_connections.get_mut(group) {
                     l.push((target, delay, *trigger))
                 } else {
@@ -653,16 +651,6 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
         }
     }
 
-    for g in &to_be_subtracted_from {
-        (*network.get_mut(g).unwrap()).connections_in -= 1;
-    }
-
-    // println!(
-    //     "spawn_triggers: {:?}\n\n inputs: {:?}\n\n outputs: {:?}\n",
-    //     spawn_connections, inputs, outputs
-    // );
-
-    let mut all = Vec::new();
     // set triggers that make cycles to inputs and outputs
     fn look_for_cycle(
         current: Group,
@@ -670,20 +658,25 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
         visited: &mut Vec<Group>,
         inputs: &mut HashSet<Group>,
         outputs: &mut HashSet<Group>,
+        cycle_points: &mut HashSet<Group>,
         all: &mut Vec<(Group, Group, SpawnDelay, Trigger)>,
     ) {
         if let Some(connections) = ictriggers.get(&current) {
             for (g, delay, trigger) in connections {
                 if visited.contains(g) {
+                    //println!("cycle detected");
                     outputs.insert(current);
                     inputs.insert(*g);
                     all.push((current, *g, *delay, *trigger));
+                    cycle_points.insert(current);
 
                     return;
                 }
 
                 visited.push(current);
-                look_for_cycle(*g, ictriggers, visited, inputs, outputs, all);
+
+                look_for_cycle(*g, ictriggers, visited, inputs, outputs, cycle_points, all);
+
                 assert_eq!(visited.pop(), Some(current));
             }
         }
@@ -696,26 +689,33 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
             &mut visited,
             &mut inputs,
             &mut outputs,
+            &mut cycle_points,
             &mut all,
         )
     }
 
+    // println!(
+    //     "spawn_triggers: {:?}\n\n inputs: {:?}\n\n outputs: {:?}\n",
+    //     spawn_connections, inputs, outputs
+    // );
+
     // go from every trigger in an input group and get every possible path to an
     // output group (stopping if it reaches a group already visited)
-
+    #[allow(clippy::too_many_arguments)]
     fn traverse(
         current: Group,
         origin: Group,
         delay: SpawnDelay,
         trigger: Option<Trigger>,
         outputs: &HashSet<Group>,
+        cycle_points: &HashSet<Group>,
         spawn_connections: &HashMap<Group, Vec<(Group, SpawnDelay, Trigger)>>,
-        //visited: &mut Vec<Group>,
+        visited: &mut Vec<Group>,
         all: &mut Vec<(Group, Group, SpawnDelay, Trigger)>,
     ) {
-        // if visited.contains(&current) {
-        //     unreachable!()
-        // }
+        if visited.contains(&current) {
+            unreachable!()
+        }
 
         if let Some(connections) = spawn_connections.get(&current) {
             for (g, d, trigger) in connections {
@@ -724,33 +724,75 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
                     delay: delay.delay + d.delay,
                     epsiloned: delay.epsiloned || d.epsiloned,
                 };
+                visited.push(current);
                 if outputs.contains(g) {
                     all.push((origin, *g, new_delay, *trigger));
+
+                    /*
+                    in cases like this:
+
+                    1i.if_is(SMALLER_THAN, 1, !{
+
+                        2i.if_is(EQUAL_TO, 0, !{
+                            2i.add(1)
+                            1i.if_is(SMALLER_THAN, 0, !{
+                                -> BG.pulse(0, 0, 255, fade_out = 0.5)
+                            })
+                        })
+
+                    })
+
+                    we can't simplify the three expressions together, because we need the result of the 2nd one to happen before it's result
+                    therefore, the chain is split before the third expression
+
+                    it cannot add the new inputs to the set because it's used in the current loop, but it doesn't matter since the set is not used after this.
+
+                    (this is copied from the ic trigger thing, but it makes sense here too (I think, bf doesnt work without it))
+                    */
+
+                    // avoid infinite loop
+                    if !cycle_points.contains(g) {
+                        traverse(
+                            *g,
+                            *g,
+                            SpawnDelay {
+                                delay: 0,
+                                epsiloned: false,
+                            },
+                            None,
+                            outputs,
+                            cycle_points,
+                            spawn_connections,
+                            visited,
+                            all,
+                        );
+                    }
+                } else {
+                    traverse(
+                        *g,
+                        origin,
+                        new_delay,
+                        Some(*trigger),
+                        outputs,
+                        cycle_points,
+                        spawn_connections,
+                        visited,
+                        all,
+                    );
                 }
-                //visited.push(current);
-                traverse(
-                    *g,
-                    origin,
-                    new_delay,
-                    Some(*trigger),
-                    outputs,
-                    spawn_connections,
-                    //visited,
-                    all,
-                );
-                //assert_eq!(visited.pop(), Some(current));
+                assert_eq!(visited.pop(), Some(current));
             }
         } else if let Some(t) = trigger {
             all.push((origin, current, delay, t)) //?
         } else {
-            unreachable!();
-            //assert!(outputs.contains(&current));
+            //unreachable!();
+            assert!(outputs.contains(&current));
         }
     }
 
     for start in inputs {
         //println!("<{:?}>", start);
-        //let mut visited = Vec::new();
+        let mut visited = Vec::new();
         traverse(
             start,
             start,
@@ -760,10 +802,11 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
             },
             None,
             &outputs,
+            &cycle_points,
             &spawn_connections,
-            //&mut visited,
+            &mut visited,
             &mut all,
-        )
+        );
         //println!("</{:?}>", start);
     }
 
@@ -773,16 +816,15 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
         deduped.insert((start, end, delay), trigger);
     }
 
-    //dbg!(&deduped);
-
     let mut swaps = HashMap::new();
 
-    let mut insert_to_swaps = |a, b| {
+    let mut insert_to_swaps = |a: Group, b: Group| {
         for v in swaps.values_mut() {
             if *v == a {
                 *v = b;
             }
         }
+        //dbg!(b == a);
         assert!(swaps.insert(a, b).is_none());
     };
 
@@ -795,7 +837,11 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
 
         if d == 0 && network[&end].connections_in == 1 {
             insert_to_swaps(end, start);
-        } else if d == 0 && network[&start].triggers.len() == 1 {
+        } else if d == 0
+            && network[&start].connections_in == 1 //??
+            && (network[&start].triggers.is_empty()
+                || network[&start].triggers.iter().all(|t| t.deleted))
+        {
             insert_to_swaps(start, end);
         } else {
             create_spawn_trigger(
@@ -811,4 +857,169 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
     }
 
     replace_groups(swaps, objects);
+}
+
+// trigger gang dedup :pog:
+
+fn param_identifier(param: &ObjParam) -> String {
+    let str = match param {
+        ObjParam::Group(Group { id })
+        | ObjParam::Color(crate::builtin::Color { id })
+        | ObjParam::Block(Block { id })
+        | ObjParam::Item(Item { id }) => match id {
+            Id::Specific(id) => format!("{}", id),
+            Id::Arbitrary(id) => format!("?{}", id),
+        },
+        ObjParam::Number(n) => {
+            if (n.round() - n).abs() < 0.001 {
+                format!("{}", *n as i32)
+            } else {
+                format!("{:.1$}", n, 3)
+            }
+        }
+        ObjParam::Bool(b) => (if *b { "1" } else { "0" }).to_string(),
+        ObjParam::Text(t) => t.to_string(),
+        ObjParam::GroupList(list) => {
+            let mut out = String::new();
+
+            for g in list {
+                match g.id {
+                    Id::Specific(id) => out += &format!("{}.", id),
+                    Id::Arbitrary(id) => out += &format!("?{}.", id),
+                }
+            }
+            out.pop();
+            out
+        }
+        ObjParam::Epsilon => "0.050".to_string(),
+    };
+    str
+    // use std::collections::hash_map::DefaultHasher;
+    // use std::hash::{Hash, Hasher};
+
+    // let mut hasher = DefaultHasher::new();
+
+    // str.hash(&mut hasher);
+    // hasher.finish()
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct TriggerParam(u16, String);
+impl PartialOrd for TriggerParam {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let first = self.0.cmp(&other.0);
+        Some(if first == Ordering::Equal {
+            self.1.cmp(&other.1)
+        } else {
+            first
+        })
+    }
+}
+impl Ord for TriggerParam {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct TriggerBehavior(BTreeSet<TriggerParam>);
+
+impl Ord for TriggerBehavior {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+impl PartialOrd for TriggerBehavior {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let mut iter1 = self.0.iter();
+        let mut iter2 = other.0.iter();
+        loop {
+            if let Some(val1) = iter1.next() {
+                if let Some(val2) = iter2.next() {
+                    let cmp = val1.cmp(val2);
+                    if cmp != Ordering::Equal {
+                        return Some(cmp);
+                    }
+                } else {
+                    return Some(Ordering::Greater);
+                }
+            } else {
+                return Some(Ordering::Less);
+            }
+        }
+    }
+}
+
+fn get_trigger_behavior(t: Trigger, objects: &Triggerlist) -> TriggerBehavior {
+    let mut set = BTreeSet::new();
+    for (prop, param) in &objects[t.obj].0.params {
+        if *prop == 57 {
+            // group
+            continue;
+        }
+        set.insert(TriggerParam(*prop, param_identifier(param)));
+    }
+    TriggerBehavior(set)
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct TriggerGangBehavior(BTreeSet<TriggerBehavior>);
+
+fn get_triggergang_behavior(gang: &TriggerGang, objects: &Triggerlist) -> TriggerGangBehavior {
+    let mut set = BTreeSet::new();
+
+    for trigger in &gang.triggers {
+        set.insert(get_trigger_behavior(*trigger, objects));
+    }
+
+    TriggerGangBehavior(set)
+}
+
+pub fn dedup_triggers(
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+    reserved_groups: &HashSet<Group>,
+) {
+    loop {
+        let mut swaps = HashMap::new();
+        let mut representative_groups = HashMap::<TriggerGangBehavior, Group>::new();
+
+        for (group, gang) in network.iter_mut() {
+            if is_start_group(*group, reserved_groups) {
+                continue;
+            }
+            let contains_stackable_trigger = gang.triggers.iter().any(|t| {
+                let obj = &objects[t.obj].0;
+                if let Some(ObjParam::Number(n)) = obj.params.get(&1) {
+                    let id = *n as u16;
+                    id == 901 || id == 1817
+                } else {
+                    false
+                }
+            });
+            if contains_stackable_trigger {
+                continue;
+            }
+            let behavior = get_triggergang_behavior(gang, objects);
+            if let Some(repr) = representative_groups.get(&behavior) {
+                // discard this gang and add a swap
+                for trigger in &mut gang.triggers {
+                    (*trigger).deleted = true;
+                }
+                //dbg!(behavior, repr, group, &representative_groups);
+                assert!(swaps.insert(*group, *repr).is_none());
+            } else {
+                representative_groups.insert(behavior, *group);
+            }
+        }
+
+        //dbg!(&swaps);
+
+        if swaps.is_empty() {
+            break;
+        }
+        replace_groups(swaps, objects);
+        clean_network(network, objects, false);
+    }
 }

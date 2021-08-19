@@ -182,6 +182,8 @@ pub fn get_used_ids(ls: &str) -> [HashSet<u16>; 4] {
 const START_HEIGHT: u16 = 10;
 const MAX_HEIGHT: u16 = 40;
 
+const DELTA_X: u16 = 1;
+
 pub const SPWN_SIGNATURE_GROUP: Group = Group {
     id: Id::Specific(1001),
 };
@@ -488,7 +490,12 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
                     new_obj.params.insert(
                         2,
                         if spawned {
-                            ObjParam::Number((x_pos * 30 + 15) as f64)
+                            ObjParam::Number(
+                                (x_pos * (MAX_HEIGHT - START_HEIGHT) as u32 * DELTA_X as u32
+                                    + 15
+                                    + i as u32 * DELTA_X as u32)
+                                    as f64,
+                            )
                         } else {
                             ObjParam::Number(0.0)
                         },
