@@ -857,5 +857,17 @@ b = c as @bool
         } else {
             throw "Cannot convert counter to " + _type as @string + " (counter can convert to a number using the counter.to_const macro)"
         }
+    },
+
+    reaches: #[desc("Returns an event for when the counter reaches a certain value")
+    example("
+c = counter(2)
+
+on(c.reaches(10), !{
+    BG.pulse(0, 255, 0, fade_out = 0.5) // will pulse each time the counter becomes 10
+})
+    ")] (self, #[desc("Value to reach")] value: @number) {
+        return self.item.count(value)
     }
+
 }
