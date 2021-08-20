@@ -180,7 +180,7 @@ pub fn get_used_ids(ls: &str) -> [HashSet<u16>; 4] {
 }
 
 const START_HEIGHT: u16 = 10;
-const MAX_HEIGHT: u16 = 40;
+const MAX_HEIGHT: u16 = 15;
 
 const DELTA_X: u16 = 1;
 

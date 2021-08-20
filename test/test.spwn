@@ -1,31 +1,43 @@
+let digits = 3;
 
+digits = 4 * (10 ^ digits);
 
-input = counter(69696)
-input.display(0, 75)
+total_counter = counter(digits);
+i = counter(1);
+t1 = counter();
+t2 = counter();
 
-bdigits = 17 //change if you need more.
-let binaryItem = []
-for i in ..bdigits {
-    number = counter(?i)
-    binaryItem.push(number)
-    number.display(30 * (bdigits-i), 45)
-}
+total_counter.display(300, 300)
+i.display(150, 300)
+t1.display(150, 270)
+t2.display(150, 240)
 
-wait(1)
+add_sub = counter(1)
+add_sub.display(300, 210)
 
-for num in bdigits..0 {
-    x = 2^num
+wait()
 
-    -> if input >= x {
-        input -= x
-        binaryItem[num] += 1
+count = !{
+    i += 2;
+    
+    t1 += digits
+    t2.reset()
+    wait(0.01)
+    i.copy_to(t2)
+    wait(0.01)
+    t1.divide(t2)
+    wait(0.01)
+    if add_sub == 1 {
+        t1.subtract_from([total_counter], speed = 15)
+        wait(0.01)
+        add_sub -= 1
+    } else {
+        t1.add_to([total_counter], speed = 15)
+        wait(0.01)
+        add_sub += 1
     }
+    
+    wait()
+    count!
 }
-
-type @binary_counter
-
-impl @binary_counter {
-    new: (c: @counter, bits: @number = 16) {
-        
-    }
-}
+count!
