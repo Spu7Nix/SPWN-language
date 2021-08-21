@@ -108,12 +108,12 @@ pub struct ObjectLiteral {
 #[derive(Clone, PartialEq, Debug)]
 pub struct StrInner {
     pub inner: String,
-    pub flags: Option<StringFlags>
+    pub flags: Option<StringFlags>,
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum StringFlags {
-    Raw
+    Raw,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -297,7 +297,7 @@ pub type ArgDef = (
     Attribute,
     Option<Expression>,
     FileRange,
-    bool
+    bool,
 );
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {

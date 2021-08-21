@@ -1,49 +1,26 @@
 //#![feature(arbitrary_enum_discriminant)]
-
-mod ast;
-mod builtin;
-mod compiler;
-mod compiler_info;
-mod compiler_types;
-mod documentation;
-mod fmt;
-mod globals;
-mod levelstring;
-mod parser;
-mod value;
-mod optimize;
-mod context;
+use crate::optimize::optimize;
 #[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
 #[cfg_attr(windows, path = "editorlive_win.rs")]
 #[cfg_attr(
     not(any(target_os = "macos", windows)),
     path = "editorlive_unavailable.rs"
 )]
-mod editorlive;
-mod value_storage;
-
 //#[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
 //#[cfg_attr(windows, path = "editorlive_win.rs")]
 //mod editorlive;
-
 use termcolor::Color;
-use optimize::optimize;
 
-use parser::*;
-
+use crate::parser::*;
 
 use std::path::PathBuf;
-
 
 use std::io;
 use tempfile::NamedTempFile;
 
-
 //library has no console output
-pub fn print_with_color(_text: &str, _color: Color) {
-}
-pub fn eprint_with_color(_text: &str, _color: Color) {
-}
+pub fn print_with_color(_text: &str, _color: Color) {}
+pub fn eprint_with_color(_text: &str, _color: Color) {}
 
 pub const STD_PATH: &str = "std";
 
@@ -51,7 +28,7 @@ pub const STD_PATH: &str = "std";
 pub struct Compiler {
     opti_enabled: bool,
     included_paths: Vec<PathBuf>,
-    unparsed_code: String
+    unparsed_code: String,
 }
 
 impl Compiler {
@@ -60,9 +37,13 @@ impl Compiler {
             opti_enabled: true,
             included_paths: vec![
                 std::env::current_dir().expect("Cannot access current directory"),
-                std::env::current_exe().expect("Cannot access directory of executable").parent().expect("Executable must be in some directory").to_path_buf(),
+                std::env::current_exe()
+                    .expect("Cannot access directory of executable")
+                    .parent()
+                    .expect("Executable must be in some directory")
+                    .to_path_buf(),
             ],
-            unparsed_code: String::new()
+            unparsed_code: String::new(),
         }
     }
     pub fn add_include(&mut self, path_str: String) -> io::Result<()> {
