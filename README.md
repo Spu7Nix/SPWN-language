@@ -52,6 +52,7 @@ yay -S spwn-bin
 ```
 
 #### Android
+##### This section could be confusing, "Compiling from source" should help you. If you're still stuck, ask someone for assistance in either compiling or building a package for you.
 
 ###### Requirements
 - Rooted device
