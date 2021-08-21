@@ -385,8 +385,6 @@ fn check_for_dead_code<'a>(
 
     visited_stack.push(start);
 
-    
-
     for (i, g) in list {
         let trigger_ptr = (g, i);
 
@@ -518,7 +516,7 @@ fn fix_read_write_order(
 
         //let mut previous_delays = Vec::new();
 
-        for trigger in &gang.triggers {
+        for trigger in &sorted {
             let (reads, writes) = reads_writes(*trigger, objects);
 
             if reads.iter().any(|x| written_to.contains(x))

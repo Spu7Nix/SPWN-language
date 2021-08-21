@@ -1,43 +1,23 @@
-let digits = 3;
+c1 = counter(0)
+c2 = counter(1)
+c3 = counter(0)
 
-digits = 4 * (10 ^ digits);
+c1.display(90, 90)
+c2.display(90, 60)
+c3.display(180, 60)
 
-total_counter = counter(digits);
-i = counter(1);
-t1 = counter();
-t2 = counter();
+wait(1)
 
-total_counter.display(300, 300)
-i.display(150, 300)
-t1.display(150, 270)
-t2.display(150, 240)
-
-add_sub = counter(1)
-add_sub.display(300, 210)
-
-wait()
-
-count = !{
-    i += 2;
-    
-    t1 += digits
-    t2.reset()
-    wait(0.01)
-    i.copy_to(t2)
-    wait(0.01)
-    t1.divide(t2)
-    wait(0.01)
-    if add_sub == 1 {
-        t1.subtract_from([total_counter], speed = 15)
-        wait(0.01)
-        add_sub -= 1
-    } else {
-        t1.add_to([total_counter], speed = 15)
-        wait(0.01)
-        add_sub += 1
-    }
-    
+while_loop(() => true, delay = 1, () {
+    c1++
+    c2++
     wait()
-    count!
+    c3 = c1 + c2
+})
+
+check_won = !{
+    for i in 0..3..9 {
+        $.print(i)
+    }
 }
-count!
+

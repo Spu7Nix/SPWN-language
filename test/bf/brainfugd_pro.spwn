@@ -38,7 +38,7 @@ import "text_display_pro.spwn"
 
 
 
-ended = counter(0)
+ended = counter(false)
 
 
 
@@ -83,7 +83,7 @@ activate_button = (activate, deactivate) {
 
 
 type @bfreader
-layers = counter(600i)
+layers = counter(600i, bits = 4)
 //layers.display(150, 300)
 cell_pointer = 20g
 input_layer = 21g
@@ -118,7 +118,7 @@ select_button = 11c
 input_inc_button = 12c
 input_done_button = 13c
 
-input_mode = counter()
+input_mode = counter(false)
 //input_mode.display(120, 30)
 //input_used.display(90, 30)
 
@@ -195,31 +195,31 @@ impl @bfreader {
         // CREATE CELLS
         let cells = []
         for i in ..cell_count {
-            c = counter(mem_items[i])
+            c = counter(mem_items[i], bits = 7)
             cells.push(c)
             //c.display(script_offset[0] + i * 30 + 300, script_offset[1] + 690)
         }
-        ptr = counter(0)
+        ptr = counter(0, bits = 7)
         //ptr.display(script_offset[0], script_offset[1] + 60)
         std_in = counter(85i)
         //std_in.display(script_offset[0], script_offset[1] - 90)
 
 
 
-        num_out = counter(61i)
+        num_out = counter(61i, bits = 7)
         num_out.display(script_offset[0], script_offset[1] + 210)
         out = @bfreader::{
             group: group,
-            right: counter(block.create_tracker_item(RIGHT)),
-            left:  counter(block.create_tracker_item(LEFT)),
-            incr:  counter(block.create_tracker_item(INCR)),
-            dot:   counter(block.create_tracker_item(DOT)),
-            input: counter(block.create_tracker_item(INPUT)),
-            decr:  counter(block.create_tracker_item(DECR)),
-            open:  counter(block.create_tracker_item(OPEN)),
-            close: counter(block.create_tracker_item(CLOSE)),
-            end:   counter(block.create_tracker_item(END)),
-            noop:  counter(block.create_tracker_item(NOOP)),
+            right: counter(block.create_tracker_item(RIGHT), bits = 1),
+            left:  counter(block.create_tracker_item(LEFT), bits = 1),
+            incr:  counter(block.create_tracker_item(INCR), bits = 1),
+            dot:   counter(block.create_tracker_item(DOT), bits = 1),
+            input: counter(block.create_tracker_item(INPUT), bits = 1),
+            decr:  counter(block.create_tracker_item(DECR), bits = 1),
+            open:  counter(block.create_tracker_item(OPEN), bits = 1),
+            close: counter(block.create_tracker_item(CLOSE), bits = 1),
+            end:   counter(block.create_tracker_item(END), bits = 1),
+            noop:  counter(block.create_tracker_item(NOOP), bits = 1),
             std_out: std_out,
             num_out: num_out,
             std_in: std_in,
@@ -329,15 +329,15 @@ impl @bfreader {
         -> if current == DOT {
 
             () {
-                self.num_out.reset(speed = 3)
+                self.num_out.reset()
                 cell = self.current_cell()
                 //wait()
-                cell.copy_to([self.num_out], speed = 1)
+                cell.copy_to([self.num_out], )
             } ()
             supress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APARENTLY
             // REQUIRED FOR TEXT TO WORK ON MOBILE FOR SOME REASON
 
-            self.std_out.write(self.num_out, speed = 1)
+            self.std_out.write(self.num_out, )
 
             slow_ret!
         }
@@ -356,8 +356,8 @@ impl @bfreader {
                 -> input_done_button.pulse(52, 247, 68, fade_out = 0.3)
                 -> input_layer.alpha(0, 0.5)
                 cell = self.current_cell()
-                cell.reset(speed = 1)
-                std_in.add_to([cell], speed = 1, for_each = (n){ input_char.move(100 * n, 0, 0) })
+                cell.reset()
+                std_in.add_to([cell], for_each = (n){ input_char.move(100 * n, 0, 0) })
 
                 slow_ret!
             }
@@ -548,8 +548,8 @@ $.add(obj {
     DYNAMIC_BLOCK: true,
 })
 
-is_running = counter(0)
-block_input = counter(0)
+is_running = counter(false)
+block_input = counter(false)
 
 
 reset_selector = ?b
@@ -619,10 +619,10 @@ $.add(obj {
     SCALING: 0.5,
     GROUPS: gs.hidden_group
 })
-force_quit_taps = counter(56i)
+force_quit_taps = counter(56i, bits = 3)
 //force_quit_taps.display(90, 0)
 
-reader = @bfreader::new(offset, 8)
+reader = @bfreader::new(offset, 6)
 prog_pointer.follow(reader.group)
 
 
@@ -649,7 +649,7 @@ prog_pointer.follow(reader.group)
 
 for i in ..commands {
     sg = roll_groups[i]
-    c = counter(0)
+    c = counter(0, bits = 4)
     //c.display(sel_off[0] + i * 60, sel_off[1] + 30)
     order = ["no\nop","+","-","<",">","[","]",".",",","end"]
     for c in ..order.length {
@@ -749,11 +749,11 @@ collision(130b, 166b).on_triggered(!{
 
 reset_env = !{
     for c in reader.cells {
-        -> c.reset(speed = 3)
+        -> c.reset()
     }
 
-    -> reader.ptr.reset(speed = 3, for_each = (n) { cell_pointer.move(-10 * n, 0, 0.1, easing = EASE_IN_OUT) })
-    -> reader.num_out.reset(speed = 3)
+    -> reader.ptr.reset(for_each = (n) { cell_pointer.move(-10 * n, 0, 0.1, easing = EASE_IN_OUT) })
+    -> reader.num_out.reset()
     -> reader.group.move_to(reader.start_point, 0)
     -> 952g.move_to(953g, 0.5, x_only = true, easing = EASE_IN_OUT)
     -> cell_pointer.move_to(reader.start_point, 0.3)
