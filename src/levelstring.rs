@@ -730,7 +730,7 @@ fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, String> {
         type AesEcb = Ecb<Aes256, Pkcs7>;
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_var(IOS_KEY, &[]).unwrap();
+        let cipher = AesEcb::new_from_slices(IOS_KEY, &[]).unwrap();
 
         Ok(match cipher.decrypt(&mut sf) {
             Ok(v) => v,
@@ -967,7 +967,7 @@ pub fn encrypt_level_string(
         type AesEcb = Ecb<Aes256, Pkcs7>;
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_var(IOS_KEY, &[]).unwrap();
+        let cipher = AesEcb::new_from_slices(IOS_KEY, &[]).unwrap();
 
         let fin = cipher.encrypt_vec(&bytes);
         assert!(fs::write(path, fin).is_ok());
