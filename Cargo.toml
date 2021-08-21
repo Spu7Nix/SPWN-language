@@ -3,6 +3,12 @@ name = "spwn"
 version = "0.0.6"
 authors = ["Spu7Nix <main@spu7nix.net>"]
 edition = "2018"
+description = "A language for Geometry Dash triggers"
+readme = "README.md"
+homepage = "https://spu7nix.net/spwn/"
+repository = "https://github.com/Spu7Nix/SPWN-language/"
+license = "MIT"
+license-file = "LICENSE"
 
 [profile.release]
 debug = true
