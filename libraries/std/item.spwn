@@ -48,18 +48,16 @@ on(10i.count(100), !{
         self,
         #[desc("Number to check against")] number: @number = 0
     ) {
-        -> return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1611,
-                TARGET: function,
-                COUNT: number,
-                ACTIVATE_GROUP: true,
-                ITEM: self,
-                COUNT_MULTI_ACTIVATE: true,
-
-            })
-        }
-
+        let event = @event::new()
+        $.add(trigger{
+            OBJ_ID: 1611,
+            TARGET: !{event.emit},
+            COUNT: number,
+            ACTIVATE_GROUP: true,
+            ITEM: self,
+            COUNT_MULTI_ACTIVATE: true,
+        })
+        return event
     },
     _range_: #[desc("Implementation of the range operator (`..`) for item IDs") example("
 for item in 1i..10i {

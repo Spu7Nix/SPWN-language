@@ -6,20 +6,22 @@ extract constants.obj_props
 type @event
 
 impl @event {
-    on: #[desc("Triggers a function every time an event fires") example("
-on(touch(), !{
-    10g.move(10, 0)
-})
-    ")] (
-        #[desc("Event to trigger on")] event: @event,
-        #[desc("Function to trigger")] function: @trigger_function
-    ){
-        event.on_triggered(function)
-    }
+    new: (){
+        return @event::{
+            listeners: [],
+        }
+    },
+    emit: (self){
+        for listener in self.listeners {
+            listener!
+        }
+    },
+    on: (self, function: @trigger_function | @group){
+        self.listeners.push(function)
+    },
 }
 
 return {
-
     touch: #[desc("Implementation of the touch trigger (returns an event)") example("
 on(touch(), !{
     10g.move(10, 0)
@@ -27,17 +29,15 @@ on(touch(), !{
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) {
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1595,
-                HOLD_MODE: true,
-                TOGGLE_MODE: 1,
-                TARGET: function,
-                DUAL_MODE: dual_side,
-
-            })
-        }
-
+        let event = @event::new()
+        $.add(trigger{
+            OBJ_ID: 1595,
+            HOLD_MODE: true,
+            TOGGLE_MODE: 1,
+            TARGET: !{event.emit()},
+            DUAL_MODE: dual_side,
+        })
+        return event
     },
 
     touch_end: #[desc("Returns an event for when a touch ends") example("
@@ -47,17 +47,15 @@ on(touch_end(), !{
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) {
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1595,
-                HOLD_MODE: true,
-                TOGGLE_MODE: 2,
-                TARGET: function,
-                DUAL_MODE: dual_side,
-
-            })
-        }
-
+        let event = @event::new()
+        $.add(trigger{
+            OBJ_ID: 1595,
+            HOLD_MODE: true,
+            TOGGLE_MODE: 2,
+            TARGET: !{event.emit()},
+            DUAL_MODE: dual_side,
+        })
+        return event
     },
 
     collision: #[desc("Implementation of the collision trigger (returns an event)") example("
@@ -68,18 +66,16 @@ on(collision(1b, 2b), !{
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
     ) {
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1815,
-                BLOCK_A: a,
-                BLOCK_B: b,
-                ACTIVATE_GROUP: true,
-                ACTIVATE_ON_EXIT: false,
-                TARGET: function,
-
-            })
-        }
-
+        let event = @event::new()
+        $.add(trigger{
+            OBJ_ID: 1815,
+            BLOCK_A: a,
+            BLOCK_B: b,
+            ACTIVATE_GROUP: true,
+            ACTIVATE_ON_EXIT: false,
+            TARGET: !{event.emit()},
+        })
+        return event
     },
 
     collision_exit: #[desc("Returns an event for when a collision exits") example("
@@ -90,17 +86,16 @@ on(collision_exit(1b, 2b), !{
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
     ) {
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1815,
-                BLOCK_A: a,
-                BLOCK_B: b,
-                ACTIVATE_GROUP: true,
-                ACTIVATE_ON_EXIT: true,
-                TARGET: function,
-
-            })
-        }
+        let event = @event::new()
+        $.add(trigger{
+            OBJ_ID: 1815,
+            BLOCK_A: a,
+            BLOCK_B: b,
+            ACTIVATE_GROUP: true,
+            ACTIVATE_ON_EXIT: true,
+            TARGET: !{event.emit()},
+        })
+        return event
     },
 
 
@@ -109,12 +104,12 @@ on(death(), !{
     BG.set(0, 0, 0)
 })
     ")] (){
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1812,
-                ACTIVATE_GROUP: true,
-                TARGET: function
-            })
-        }
+        let event = @event::new()
+        $.add(trigger{
+            OBJ_ID: 1812,
+            ACTIVATE_GROUP: true,
+            TARGET: !{event.emit()}
+        })
+        return event
     }
 }
