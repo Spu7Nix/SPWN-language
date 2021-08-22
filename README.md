@@ -52,15 +52,17 @@ yay -S spwn-bin
 ```
 
 #### Android
-##### This section could be confusing, "Compiling from source" should help you. If you're still stuck, ask someone for assistance in either compiling or building a package for you.
 
 ###### Requirements
 - Rooted device
 - Termux, or something similar
+- Rust
 
-###### Notes
-- Due to the variety of architectures phones use, you'll have to compile from source
-- Make sure the binary and the libraries folder are in the same directory
+Once you have these, run:
+```
+cargo install spwn
+```
+Let it compile and you're good to go
 
 #### Compiling from source
 1. Download source code from this repository
