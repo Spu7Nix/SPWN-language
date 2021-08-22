@@ -684,7 +684,7 @@ builtins! {
                     ..context_trigger(context, &mut globals.uid_counter)
                 }
                 .context_parameters(context);
-                (*globals).trigger_order += 1;
+                (*globals).trigger_order += 1.0;
                 (*globals).func_ids[context.func_id]
                     .obj_list
                     .push((obj, crate::levelstring::TriggerOrder(globals.trigger_order)))

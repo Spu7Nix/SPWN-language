@@ -2,7 +2,7 @@
 
 extract import "control_flow.spwn"
 extract import "constants.spwn".comparisons
-DEFAULT_BITS = 10
+DEFAULT_BITS = 16
 type @counter
 
 reset_counter = (
@@ -424,7 +424,7 @@ c = counter(10)
 c2 = c1 * 10
 // c2 is 100
     ")]
-    (self, num: @number | @counter) {
+    (self, other: @number | @counter) {
         if other.type == @number {
             new = @counter::new(0, self.bits)
             self.copy_to(new, factor = other)

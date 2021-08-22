@@ -407,7 +407,7 @@ pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> boo
         let mut params = HashMap::new();
         params.insert(51, ObjParam::Group(new_group));
         params.insert(1, ObjParam::Number(1268.0));
-        (*globals).trigger_order += 1;
+        (*globals).trigger_order += 1.0;
 
         (*globals).func_ids[context.func_id].obj_list.push((
             GdObj {

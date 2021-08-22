@@ -477,6 +477,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
                             //     l.iter().any(|x| x.id != ID::Specific(0))
                             // }
                             Some(ObjParam::Group(g)) => g.id != Id::Specific(0),
+                            Some(ObjParam::GroupList(g)) => g[0].id != Id::Specific(0),
                             _ => unreachable!(),
                         },
                     };

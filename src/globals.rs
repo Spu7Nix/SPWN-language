@@ -43,7 +43,7 @@ pub struct Globals {
 
     pub prev_imports: HashMap<ImportType, (StoredValue, Implementations)>,
 
-    pub trigger_order: usize,
+    pub trigger_order: f32,
 
     pub uid_counter: usize,
     pub implementations: Implementations,
@@ -141,7 +141,7 @@ impl Globals {
 
             prev_imports: HashMap::new(),
             type_id_count: 0,
-            trigger_order: 0,
+            trigger_order: 0.0,
             uid_counter: 0,
 
             val_id: storage.map.len() as StoredValue,

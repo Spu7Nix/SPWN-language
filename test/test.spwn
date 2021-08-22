@@ -1,6 +1,9 @@
-c1 = counter(0, bits = 16)
-c2 = counter(1, bits = 16)
-c3 = counter(0, bits = 16)
+
+
+c1 = counter(69)
+c2 = counter(100)
+c3 = counter(69)
+
 
 c1.display(90, 90)
 c2.display(90, 60)
@@ -8,8 +11,6 @@ c3.display(180, 60)
 
 wait(0.5)
 
-while_loop(() => true, delay = 0.2, () {
-    c3 = c1 + c2
-    c1 = c2
-    c2 = c3 
-})
+
+c3 = c1 if c1 > c2 else c2
+

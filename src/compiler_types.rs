@@ -34,8 +34,8 @@ pub enum ImportType {
     Lib(String),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TriggerOrder(pub usize);
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub struct TriggerOrder(pub f32);
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionId {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id
