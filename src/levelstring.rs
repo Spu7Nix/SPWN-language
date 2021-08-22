@@ -1,7 +1,8 @@
 // useful things for dealing with gd level data
 use crate::ast::ObjectMode;
 use crate::builtin::*;
-use crate::compiler_types::*;
+pub use crate::compiler_types::*;
+
 use crate::context::Context;
 use std::collections::{HashMap, HashSet};
 
@@ -457,7 +458,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
         //add top layer
         let possible_height = MAX_HEIGHT - (START_HEIGHT + y_offset); //30 is max (TODO: case for if y_offset is more than 30)
         let mut objectlist = id.obj_list;
-        objectlist.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+        objectlist.sort_by(|x, y| x.1.partial_cmp(&y.1).unwrap());
 
         for (i, (obj, _)) in objectlist.iter().enumerate() {
             match obj.mode {

@@ -34,12 +34,14 @@ pub enum ImportType {
     Lib(String),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TriggerOrder(pub usize);
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionId {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id
     pub width: Option<u32>,    //width of this id, is none when its not calculated yet
     //pub name: String,          //name of this id, used for the label
-    pub obj_list: Vec<(GdObj, usize)>, //list of objects in this function id, + their order id
+    pub obj_list: Vec<(GdObj, TriggerOrder)>, //list of objects in this function id, + their order id
 }
 
 pub type SyncPartId = usize;
@@ -80,7 +82,6 @@ pub fn handle_operator(
                     let pat = &globals.stored_values[target_typ].clone();
 
                     if !val2.matches_pat(pat, info, globals, full_context.inner())? {
-
                         //if types dont match, act as if there is no macro at all
                         built_in_function(
                             macro_name,

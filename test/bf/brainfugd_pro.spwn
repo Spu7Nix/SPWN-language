@@ -26,14 +26,7 @@ gs = {
 	},
 }
 
-abs = (num) {
-    if num < 0 {
-        return -num
-    } else {
-        return num
-    }
-
-}
+abs = $.abs
 import "text_display_pro.spwn"
 
 

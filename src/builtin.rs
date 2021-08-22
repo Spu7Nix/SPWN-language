@@ -687,7 +687,7 @@ builtins! {
                 (*globals).trigger_order += 1;
                 (*globals).func_ids[context.func_id]
                     .obj_list
-                    .push((obj, globals.trigger_order))
+                    .push((obj, crate::levelstring::TriggerOrder(globals.trigger_order)))
             }
         };
         Value::Null
@@ -920,6 +920,11 @@ builtins! {
 
 
         Value::Null
+    }
+
+    [TriggerFnContext]
+    fn trigger_fn_context() {
+        Value::Group(context.start_group)
     }
 
     [Random]

@@ -416,7 +416,7 @@ pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> boo
                 ..context_trigger(context, &mut globals.uid_counter)
             }
             .context_parameters(context),
-            globals.trigger_order,
+            TriggerOrder(globals.trigger_order),
         ))
     };
     add_spawn_trigger(&contexts[ref_c]);

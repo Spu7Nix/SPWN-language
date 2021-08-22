@@ -1056,7 +1056,7 @@ pub fn compile_scope(
                             ..context_trigger(context, &mut globals.uid_counter)
                         }
                         .context_parameters(context),
-                        globals.trigger_order,
+                        TriggerOrder(globals.trigger_order),
                     ))
                 }
             }

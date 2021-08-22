@@ -3,7 +3,7 @@ use crate::builtin::{Block, Group, Id, Item};
 use crate::compiler_types::FunctionId;
 
 //mod icalgebra;
-use crate::levelstring::{GdObj, ObjParam};
+use crate::levelstring::{GdObj, ObjParam, TriggerOrder};
 
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -65,7 +65,6 @@ impl TriggerGang {
 pub struct Trigger {
     pub obj: ObjPtr,
     pub role: TriggerRole,
-    pub order: usize,
     pub deleted: bool,
 }
 
@@ -74,7 +73,7 @@ pub struct Triggerlist<'a> {
 }
 
 impl<'a> std::ops::Index<ObjPtr> for Triggerlist<'a> {
-    type Output = (GdObj, usize);
+    type Output = (GdObj, TriggerOrder);
 
     fn index(&self, i: ObjPtr) -> &Self::Output {
         &self.list[i.0].obj_list[i.1]
@@ -99,7 +98,7 @@ pub fn optimize(
 
     // sort all triggers by their group
     for (f, fnid) in obj_in.iter().enumerate() {
-        for (o, (obj, order)) in fnid.obj_list.iter().enumerate() {
+        for (o, (obj, _)) in fnid.obj_list.iter().enumerate() {
             if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
                 let mut hd = false;
                 if let Some(ObjParam::Bool(hd_val)) = obj.params.get(&103) {
@@ -108,7 +107,6 @@ pub fn optimize(
                 let trigger = Trigger {
                     obj: (f, o),
                     role: get_role(*id as u16, hd),
-                    order: *order,
                     deleted: false,
                 };
                 if let Some(ObjParam::Group(group)) = obj.params.get(&57) {
@@ -160,6 +158,8 @@ pub fn optimize(
     clean_network(&mut network, &objects, false);
 
     dedup_triggers(&mut network, &mut objects, reserved_groups);
+
+    clean_network(&mut network, &objects, false);
 
     rebuild(&network, &obj_in)
 }
@@ -443,7 +443,7 @@ pub fn create_spawn_trigger(
     delay: f64,
     objects: &mut Triggerlist,
     network: &mut TriggerNetwork,
-    //         opt   del
+    role: TriggerRole,
     deleted: bool,
 ) {
     let mut new_obj_map = HashMap::new();
@@ -452,6 +452,8 @@ pub fn create_spawn_trigger(
     new_obj_map.insert(63, ObjParam::Number(delay));
 
     new_obj_map.insert(57, ObjParam::Group(group));
+
+    let order = objects[trigger.obj].1;
 
     let new_obj = GdObj {
         params: new_obj_map,
@@ -462,7 +464,7 @@ pub fn create_spawn_trigger(
 
     (*objects.list)[trigger.obj.0]
         .obj_list
-        .push((new_obj.clone(), trigger.order));
+        .push((new_obj.clone(), order));
 
     let obj_index = (
         trigger.obj.0,
@@ -472,8 +474,7 @@ pub fn create_spawn_trigger(
         obj: obj_index,
 
         deleted,
-        role: TriggerRole::Spawn,
-        ..trigger
+        role,
     };
 
     if let Some(ObjParam::Group(group)) = new_obj.params.get(&57) {
@@ -493,6 +494,7 @@ pub fn create_spawn_trigger(
     }
 }
 
+// not needed lol
 fn fix_read_write_order(
     objects: &mut Triggerlist,
     network: &TriggerNetwork,
@@ -502,7 +504,7 @@ fn fix_read_write_order(
     for (group, gang) in network {
         let mut written_to = HashSet::new();
         let mut read_from = HashSet::new();
-        let mut current_group = *group;
+        let current_group = *group;
 
         new_network.insert(
             current_group,
@@ -514,15 +516,19 @@ fn fix_read_write_order(
         let mut sorted = gang.triggers.clone();
         sorted.sort_by(|a, b| objects[a.obj].1.cmp(&objects[b.obj].1));
 
+        for trigger in &sorted {
+            let (reads, writes) = reads_writes(*trigger, objects);
+            written_to.extend(writes);
+            read_from.extend(reads);
+        }
+
         //let mut previous_delays = Vec::new();
 
         for trigger in &sorted {
-            let (reads, writes) = reads_writes(*trigger, objects);
-
-            if reads.iter().any(|x| written_to.contains(x))
-                || writes.iter().any(|x| read_from.contains(x))
-            {
-                // add delay, reset lists
+            dbg!(objects[trigger.obj].1 .0);
+            let (_, writes) = reads_writes(*trigger, objects);
+            if writes.iter().any(|x| read_from.contains(x)) {
+                // put trigger behinf a func spawn trigger
 
                 // select new group
                 (*closed_group) += 1;
@@ -535,47 +541,39 @@ fn fix_read_write_order(
                     *trigger,
                     new_group,
                     current_group,
-                    0.05,
+                    0.0,
                     objects,
                     &mut new_network,
+                    TriggerRole::Func,
                     true,
                 );
 
-                current_group = new_group;
+                (*objects)[trigger.obj]
+                    .0
+                    .params
+                    .insert(57, ObjParam::Group(new_group));
+
                 new_network.insert(
-                    current_group,
+                    new_group,
                     TriggerGang {
-                        triggers: Vec::new(),
+                        triggers: vec![*trigger],
                         connections_in: 1,
                         non_spawn_triggers_in: true,
                     },
                 );
-                written_to.clear();
-                read_from.clear();
-
-            // for obj in &previous_delays {
-            //     if let Some(ObjParam::Number(d)) = objects[*obj].0.params.get_mut(&63) {
-            //         (*d) += 0.05;
-            //     } else {
-            //         unreachable!()
-            //     }
-            // }
             } else {
-                written_to.extend(writes);
-                read_from.extend(reads);
+                (*new_network.get_mut(&current_group).unwrap())
+                    .triggers
+                    .push(*trigger);
+
+                //change object group
+                // TODO: enforce single group on trigger
+
+                (*objects)[trigger.obj]
+                    .0
+                    .params
+                    .insert(57, ObjParam::Group(current_group));
             }
-
-            (*new_network.get_mut(&current_group).unwrap())
-                .triggers
-                .push(*trigger);
-
-            //change object group
-            // TODO: enforce single group on trigger
-
-            (*objects)[trigger.obj]
-                .0
-                .params
-                .insert(57, ObjParam::Group(current_group));
         }
     }
     new_network
@@ -849,6 +847,7 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
                 d as f64 / 1000.0,
                 objects,
                 network,
+                TriggerRole::Spawn,
                 false,
             )
         }
@@ -928,6 +927,7 @@ impl Ord for TriggerBehavior {
     }
 }
 
+// TODO: make this sort by trigger order as well
 impl PartialOrd for TriggerBehavior {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let mut iter1 = self.0.iter();
@@ -1020,4 +1020,13 @@ pub fn dedup_triggers(
         replace_groups(swaps, objects);
         clean_network(network, objects, false);
     }
+}
+
+// intraframe sync grouping :pog:
+
+pub fn intraframe_grouping(
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+    reserved_groups: &HashSet<Group>,
+) {
 }

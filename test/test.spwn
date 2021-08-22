@@ -1,23 +1,15 @@
-c1 = counter(0)
-c2 = counter(1)
-c3 = counter(0)
+c1 = counter(0, bits = 16)
+c2 = counter(1, bits = 16)
+c3 = counter(0, bits = 16)
 
 c1.display(90, 90)
 c2.display(90, 60)
 c3.display(180, 60)
 
-wait(1)
+wait(0.5)
 
-while_loop(() => true, delay = 1, () {
-    c1++
-    c2++
-    wait()
+while_loop(() => true, delay = 0.2, () {
     c3 = c1 + c2
+    c1 = c2
+    c2 = c3 
 })
-
-check_won = !{
-    for i in 0..3..9 {
-        $.print(i)
-    }
-}
-

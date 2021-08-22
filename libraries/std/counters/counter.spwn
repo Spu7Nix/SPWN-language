@@ -5,6 +5,19 @@ extract import "constants.spwn".comparisons
 DEFAULT_BITS = 10
 type @counter
 
+reset_counter = (
+    c, for_each: @macro = (n){}
+){
+
+    for i in c.bits..0 {
+        x = 2^i
+        c.item.if_is(LARGER_THAN, x - 1, !{
+            c.item.add(-x)
+            for_each(x)
+        })   
+    }
+}
+
 
 impl @counter {
 
@@ -19,17 +32,21 @@ impl @counter {
             "Defines the maximum stable size of the counter. If the counter goes outside of the range from 0 to 2^size, it's behavior will be undefined. Smaller sizes are more group effective."
         )] bits: @number = DEFAULT_BITS
     ){
+        let out = null
         if source.type == @number {
             id = ?i
             if source != 0 {
                 id.add(source)
             }
-            -> return @counter::{
+            out =  @counter::{
                 item: id,
                 bits
             }
+            if $.trigger_fn_context() != 0g {
+                reset_counter(out) // in case the item has been used before
+            }
         } else if source.type == @item {
-            -> return @counter::{
+            out =  @counter::{
                 item: source,
                 bits
             }
@@ -38,16 +55,21 @@ impl @counter {
                 throw "A boolean counter can only have size = 1"
             }
             id = ?i
-
+            
             if source {
                 id.add(1)
             }
-            -> return @counter::{
+            out =  @counter::{
                 item: id,
                 bits: 1,
             }
+            if $.trigger_fn_context() != 0g {
+                reset_counter(out) // in case the item has been used before
+            }
         }
 
+        
+        return out
     }
 }
 impl @counter {
@@ -295,13 +317,7 @@ c.reset()
         #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @macro = (n){}
     ){
 
-        for i in self.bits..0 {
-            x = 2^i
-            -> if self >= x {
-                self -= x
-                for_each(x)
-            }     
-        }
+        reset_counter(self, for_each)
     },
 
     reset_negative: #[desc("Resets a negative counter to 0") example("
