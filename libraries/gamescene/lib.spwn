@@ -21,16 +21,16 @@ add(obj {
 //dual portal
 add(obj {
 	OBJ_ID: 286,
-	X: 30,
-	Y: offset_y,
+	X: -30,
+	Y: 0,
 	GROUPS: hidden_group,
 })
 
 //ship portal
 add(obj {
 	OBJ_ID: 13,
-	X: 15,
-	Y: offset_y,
+	X: -15,
+	Y: 0,
 	GROUPS: hidden_group,
 })
 
@@ -71,6 +71,16 @@ add(obj {
 	Y: 53 + ramp_offset + offset_y  - extra_off,
 
 	GROUPS: [hidden_group, follow_x_group],
+})
+
+//ramp for alignment
+add(obj{
+	OBJ_ID: 1743,
+	ROTATION: -90,
+	X: 47,
+	Y: 83,
+	SCALING: 0.61,
+	GROUPS: hidden_group
 })
 
 //block
