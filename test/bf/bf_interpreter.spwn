@@ -386,15 +386,15 @@ impl @bfreader {
         -> if @bool(self.dot) {
 
             () {
-                self.num_out.reset(speed = 1)
+                self.num_out.reset()
                 cell = self.current_cell()
                 //wait()
-                cell.copy_to([self.num_out], speed = 1)
+                cell.copy_to([self.num_out], )
             } ()
             supress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APPARENTLY
             // REQUIRED FOR TEXT TO WORK ON MOBILE FOR SOME REASON
 
-            self.std_out.write(self.num_out, speed = 1)
+            self.std_out.write(self.num_out, )
 
             slow_ret!
         }
@@ -421,8 +421,8 @@ impl @bfreader {
                 -> input_done_button.pulse(52, 247, 68, fade_out = 0.3)
                 -> input_layer.alpha(0, 0.5)
                 cell = self.current_cell()
-                cell.reset(speed = 1)
-                std_in.add_to([cell], speed = 1, for_each = (n){ input_char.move(100 * n, 0, 0) })
+                cell.reset()
+                std_in.add_to([cell], for_each = (n){ input_char.move(100 * n, 0, 0) })
 
                 slow_ret!
             }
@@ -977,13 +977,13 @@ next_challenge = !{
 
 reset_env = !{
     for c in reader.cells {
-        -> c.reset(speed = 1)
+        -> c.reset()
     }
 
     -> input_used -= input_used.to_const(1..3)
 
-    -> reader.ptr.reset(speed = 1, for_each = (n) { cell_pointer.move(-10 * n, 0, 0.1, easing = EASE_IN_OUT) })
-    -> reader.num_out.reset(speed = 1)
+    -> reader.ptr.reset(for_each = (n) { cell_pointer.move(-10 * n, 0, 0.1, easing = EASE_IN_OUT) })
+    -> reader.num_out.reset()
     -> reader.group.move_to(reader.start_point, 0)
     -> 952g.move_to(953g, 0.5, x_only = true, easing = EASE_IN_OUT)
     -> cell_pointer.move_to(reader.start_point, 0.3)

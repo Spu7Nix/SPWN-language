@@ -30,7 +30,8 @@ impl @counter {
         #[desc("Source (can be a number, item ID or boolean)")] source: @number | @item | @bool = 0,
         #[desc(
             "Defines the maximum stable size of the counter. If the counter goes outside of the range from 0 to 2^size, it's behavior will be undefined. Smaller sizes are more group effective."
-        )] bits: @number = DEFAULT_BITS
+        )] bits: @number = DEFAULT_BITS,
+        #[desc("Resets the counter in case the item has been used before. This only applies if the `source` argument is not an item.")] reset: @bool = true,
     ){
         let out = null
         if source.type == @number {
@@ -42,7 +43,7 @@ impl @counter {
                 item: id,
                 bits
             }
-            if $.trigger_fn_context() != 0g {
+            if reset && $.trigger_fn_context() != 0g {
                 reset_counter(out) // in case the item has been used before
             }
         } else if source.type == @item {
@@ -63,7 +64,7 @@ impl @counter {
                 item: id,
                 bits: 1,
             }
-            if $.trigger_fn_context() != 0g {
+            if reset && $.trigger_fn_context() != 0g {
                 reset_counter(out) // in case the item has been used before
             }
         }
@@ -188,12 +189,12 @@ c.multiply(10)
     ) {
 
         if factor.type == @number {
-            temp = @counter::new(0, bits = self.bits)
+            temp = @counter::new(0, reset = false, bits = self.bits)
             self.add_to([temp.item], factor)
             temp.add_to([self.item])
         } else if factor.type == @counter {
             wait()
-            result = @counter::new(0, bits = self.bits)
+            result = @counter::new(0, reset = false, bits = self.bits)
             for i in self.bits..0 {
                 x = 2^i
                 
@@ -224,7 +225,7 @@ c.divide(2, remainder = r)
 
 
         if divisor.type == @number {
-            result = @counter::new(0, bits = self.bits)
+            result = @counter::new(0, reset = false, bits = self.bits)
             for i in self.bits..0 {
                 num = 2^i
                 -> if self >= divisor * num {
@@ -236,12 +237,12 @@ c.divide(2, remainder = r)
             result.add_to(self)
         } else if divisor.type == @counter {
             wait()
-            result = @counter::new(0, bits = self.bits)
+            result = @counter::new(0, reset = false, bits = self.bits)
             broken = @counter::new(false)
             
-            if divisor.bits > 8 {
-                throw "Divisor max size (8 bits) exceeded"
-            }
+            // if divisor.bits > 8 {
+            //     throw "Divisor max size (8 bits) exceeded"
+            // }
 
             
             
@@ -288,7 +289,7 @@ c2 = counter(15)
 cmp = c1.compare(c2) // -1
 // c1 is now -5, c2 is now 0
     ")](self, other: @counter, factor: @number = 1) {
-        comp = @counter::new(0, bits = $.max(self.bits, other.bits))
+        comp = @counter::new(0, reset = false, bits = $.max(self.bits, other.bits))
         self.copy_to(comp)
         other.copy_to(comp, factor = -1)
 
@@ -352,7 +353,7 @@ c1.copy_to(c2)
         #[desc("Counter(s) to copy to")] items: [@counter | @item] | @counter | @item,
         #[desc("Factor of to multiply the copy by")] factor: @number = 1
     ) {
-        temp_storage = @counter::new(0, bits = self.bits)
+        temp_storage = @counter::new(0, reset = false, bits = self.bits)
 
         for i in self.bits..0 {
             x = 2^i
@@ -380,7 +381,7 @@ c2 = c1.clone()
     ")] (
         self
     ) {
-        new_counter = @counter::new(0, bits = self.bits)
+        new_counter = @counter::new(0, reset = false, bits = self.bits)
         self.copy_to([new_counter])
         return new_counter
     },
@@ -426,7 +427,7 @@ c2 = c1 * 10
     ")]
     (self, other: @number | @counter) {
         if other.type == @number {
-            new = @counter::new(0, self.bits)
+            new = @counter::new(0, reset = false, self.bits)
             self.copy_to(new, factor = other)
             return new
         } else if other.type == @counter {

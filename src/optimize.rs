@@ -158,9 +158,9 @@ pub fn optimize(
 
     clean_network(&mut network, &objects, false);
 
-    dedup_triggers(&mut network, &mut objects, reserved_groups);
+    // dedup_triggers(&mut network, &mut objects, reserved_groups);
 
-    clean_network(&mut network, &objects, false);
+    // clean_network(&mut network, &objects, false);
 
     intraframe_grouping(
         &mut network,
@@ -1045,13 +1045,20 @@ pub fn intraframe_grouping(
         let mut groupable_triggers = Vec::new();
 
         for trigger in &sorted {
-            if trigger.role == TriggerRole::Func {
-                //  || trigger.role == TriggerRole::Spawn // not included because needs to toggle the group on
-                if let Some(ObjParam::Group(target)) = objects[trigger.obj].0.params.get(&51) {
-                    if !is_start_group(*target, reserved_groups)
-                        && network[target].connections_in == 1
-                    {
-                        groupable_triggers.push(trigger.obj);
+            if let Some(ObjParam::Number(id)) = objects[trigger.obj].0.params.get(&1) {
+                if *id as u16 == 1811 {
+                    // only works with instant count
+
+                    if let Some(ObjParam::Group(target)) = objects[trigger.obj].0.params.get(&51) {
+                        if !is_start_group(*target, reserved_groups)
+                            && network[target].connections_in == 1
+                            && network[target]
+                                .triggers
+                                .iter()
+                                .all(|t| t.role == TriggerRole::Output)
+                        {
+                            groupable_triggers.push(trigger.obj);
+                        }
                     }
                 }
             };
@@ -1125,6 +1132,7 @@ fn group_triggers(
         }
         for trigger in all_outputs.iter() {
             if let Some(param) = objects[trigger.obj].0.params.get_mut(&57) {
+                // check if it already has multiple groups
                 *param = ObjParam::GroupList(vec![main_group, output_group, swapping_group])
             }
         }

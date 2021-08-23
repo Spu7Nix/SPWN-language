@@ -182,10 +182,10 @@ impl @bfreader {
         else if current == DOT {
             std_out = counter(0)
             () {
-                std_out.reset(5)
+                std_out.reset()
                 cell = self.current_cell()
                 wait()
-                cell.copy_to([std_out], speed = 6)
+                cell.copy_to([std_out])
             } ()
 
             self.std_out.display(std_out.to_const(..self.std_out.chars))
