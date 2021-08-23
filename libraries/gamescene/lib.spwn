@@ -6,85 +6,106 @@ offset_y = 90
 
 extra_off = 50
 
+extract $
 extract obj_props
 
-//Portals --------------------------------------------------
-$.add(obj {
-	OBJ_ID: obj_ids.portals.TELEPORT,
+//teleport portal
+add(obj {
+	OBJ_ID: 747,
 	X: 19,
 	Y: 0,
 	YELLOW_TELEPORTATION_PORTAL_DISTANCE: offset_y,
 	GROUPS: hidden_group,
 })
-$.add(obj {
-	OBJ_ID: obj_ids.portals.DUAL_ON,
+
+//dual portal
+add(obj {
+	OBJ_ID: 286,
 	X: 30,
 	Y: offset_y,
 	GROUPS: hidden_group,
 })
-$.add(obj {
-	OBJ_ID: obj_ids.portals.WAVE,
-	X: 15,
-	Y: offset_y,
-	GROUPS: hidden_group,
-})
-$.add(obj {
-	OBJ_ID: obj_ids.portals.SIZE_MINI,
+
+//ship portal
+add(obj {
+	OBJ_ID: 13,
 	X: 15,
 	Y: offset_y,
 	GROUPS: hidden_group,
 })
 
-//Move trigger and follow player y triggers ----------------
 follow_x_group = ?g
 follow_y_group = ?g
 
-$.add( lock_to_player_trigger(follow_x_group,lock_x=true,lock_y=false).with(X,60).with(Y,90 + offset_y - extra_off) )
-$.add( follow_player_y_trigger(follow_y_group).with(X,60).with(Y,120 + offset_y - extra_off) )
 
-//Top and bottom blocks ------------------------------------
-$.add(obj {
-	OBJ_ID: 1,
-	X: 60,
-	Y: 60 - 30/4,
-	GROUPS: [hidden_group, follow_x_group],
-})
-$.add(obj {
-	OBJ_ID: 1,
-	X: 60 - 30/4,
-	Y: 15,
-	GROUPS: [hidden_group, follow_x_group],
+
+//move trigger
+//this is obj type because it needs a specific position
+add(obj {
+	OBJ_ID: 901,
+	X: 90,
+	Y: 90 + offset_y  - extra_off,
+	LOCK_TO_PLAYER_X: true,
+	TARGET: follow_x_group,
+	DURATION: 999
 })
 
-//Collision blocks -----------------------------------------
+//follop p y
+add(obj {
+	OBJ_ID: 1814,
+	X: 90,
+	Y: 120 + offset_y  - extra_off,
+	TARGET: follow_y_group,
+	DURATION: 999,
+	SPEED: 1
+})
+
+ramp_offset = 6
+
+//ramp
+add(obj {
+	OBJ_ID: 1744,
+	HORIZONTAL_FLIP: true,
+	ROTATION: -90,
+	X: 90,
+	Y: 53 + ramp_offset + offset_y  - extra_off,
+
+	GROUPS: [hidden_group, follow_x_group],
+})
+
+//block
+add(obj {
+	OBJ_ID: 1,
+	X: 65,
+	Y: offset_y - 22  - extra_off,
+
+	GROUPS: [hidden_group, follow_x_group],
+})
+
 player_block = ?b
 collide_block = ?b
 
-$.add(obj {
-	OBJ_ID: obj_ids.special.COLLISION_BLOCK,
+//collision blocks
+add(obj {
+	OBJ_ID: 1816,
 	DYNAMIC_BLOCK: true,
 	BLOCK_A: player_block,
-	X: 60,
-	Y: 30,
+	X: 90,
+	Y: 8 + offset_y  - extra_off,
 	GROUPS: [hidden_group, follow_x_group, follow_y_group]
 })
-$.add(obj {
-	OBJ_ID: obj_ids.special.COLLISION_BLOCK,
+
+add(obj {
+	OBJ_ID: 1816,
 	DYNAMIC_BLOCK: false,
 	BLOCK_A: collide_block,
-	X: 60,
-	Y: 64,
+	X: 90,
+	Y: 39.5 + ramp_offset / 2 + offset_y  - extra_off,
 	GROUPS: [hidden_group, follow_x_group],
+
 })
 
-//D block --------------------------------------------------
-$.add(obj {
-	OBJ_ID: obj_ids.special.D_BLOCK,
-	SCALING: 2.0,
-	X: 60,
-	Y: 45,
-	GROUPS: [hidden_group, follow_x_group],
-})
+
 
 return {
 	button_a: #[desc("Returns an event for when button A is pressed (the right side by default)")] () {
