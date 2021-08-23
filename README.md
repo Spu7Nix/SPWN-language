@@ -51,6 +51,19 @@ pacman -U spwn-0.0.6_amd64.pkg.tar.zst
 yay -S spwn-bin
 ```
 
+#### Android
+
+###### Requirements
+- Rooted device
+- Termux, or something similar
+- Rust
+
+Once you have these, run:
+```
+cargo install spwn
+```
+Let it compile and you're good to go
+
 #### Compiling from source
 1. Download source code from this repository
 2. Unzip the .zip file
