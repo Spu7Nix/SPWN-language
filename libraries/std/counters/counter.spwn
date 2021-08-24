@@ -381,7 +381,7 @@ c2 = c1.clone()
     ")] (
         self
     ) {
-        new_counter = @counter::new(0, reset = false, bits = self.bits)
+        new_counter = @counter::new(0, bits = self.bits)
         self.copy_to([new_counter])
         return new_counter
     },
@@ -427,7 +427,7 @@ c2 = c1 * 10
     ")]
     (self, other: @number | @counter) {
         if other.type == @number {
-            new = @counter::new(0, reset = false, self.bits)
+            new = @counter::new(0, bits = self.bits)
             self.copy_to(new, factor = other)
             return new
         } else if other.type == @counter {
@@ -457,7 +457,7 @@ c2 = c1 % 10
     ")]
     (self, num: @number | @counter) {
         clone = self.clone()
-        out = @counter::new()
+        out = @counter::new(0, bits = self.bits)
         clone.divide(num, remainder = out)
         -> return out
     },
@@ -468,9 +468,9 @@ c %= 10
 // c is 2
     ")]
     (self, num: @number | @counter) {
-        out = @counter::new()
+        out = @counter::new(0, bits = self.bits)
         self.divide(num, remainder = out)
-        self.reset()
+        self.reset(0, bits = self.bits)
         out.add_to([self])
     },
 
@@ -694,7 +694,7 @@ c <=> c2
 // c is now 42, c2 is now 23
     ")]
     (self, num: @counter) {
-        swap_tmp = @counter::new();
+        swap_tmp = @counter::new(0, bits = self.bits);
         self.add_to(swap_tmp)
         num.add_to(self)
         swap_tmp.add_to(num)

@@ -480,12 +480,12 @@ impl @bfreader {
                 -> 45c.set(prog_ptr_color[0] * 0.3, prog_ptr_color[1] * 0.3, prog_ptr_color[2] * 0.3, blending = true)
                 //move to corresponding ]
                 //layers = counter(0)
-                condition = () => !(layers == 0 && self.close == 1)
+                condition = () => !(layers == 0 && self.close == 1) && ended == 0
                 //self.group.move(spacing, 0)
 
-                while_loop(condition, delay = 0.03, (){
+                while_loop(condition, delay = 0.05, (){
 
-                    wait(0.02)
+                    
                     -> if self.open == 1{
                         layers += 1
                     }
@@ -498,7 +498,6 @@ impl @bfreader {
 
                         force_stop!
                     } else {
-                        wait(0.01)
                         self.group.move(spacing, 0)
                         
                     }
@@ -520,12 +519,12 @@ impl @bfreader {
                 -> 45c.set(prog_ptr_color[0] * 0.3, prog_ptr_color[1] * 0.3, prog_ptr_color[2] * 0.3, blending = true)
                 //move back to corresponding [
                 //layers = counter(0)
-                condition = ()=> !(layers == 0 && self.open == 1)
+                condition = ()=> !(layers == 0 && self.open == 1) && ended == 0
                 //self.group.move(-spacing, 0)
 
                 //wait()
-                while_loop(condition, delay = 0.03, (){
-                    wait(0.02)
+                while_loop(condition, delay = 0.05, (){
+                    
                     -> if self.close == 1 {
                         layers += 1
                     }
@@ -537,7 +536,6 @@ impl @bfreader {
 
                         force_stop!
                     } else {
-                        wait(0.01)
                         self.group.move(-spacing, 0)
                         
                     }
@@ -1184,7 +1182,7 @@ start = (){
                                 top_msg_board(0, [255, 255, 255])
                                 output_correct_no_end()
                                 reset_env!
-                                call_with_delay(2, run)
+                                call_with_delay(0.3, run)
                             }
                         }
 

@@ -153,7 +153,7 @@ pub fn optimize(
 
     clean_network(&mut network, &objects, false);
 
-    spawn_optimisation(&mut network, &mut objects);
+    spawn_optimisation(&mut network, &mut objects, reserved_groups);
     //println!("spawn triggers complete");
 
     clean_network(&mut network, &objects, false);
@@ -594,7 +594,11 @@ struct SpawnDelay {
 }
 
 // spawn trigger optimisation
-pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlist) {
+pub fn spawn_optimisation(
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+    reserved_groups: &HashSet<Group>,
+) {
     let mut spawn_connections = HashMap::<Group, Vec<(Group, SpawnDelay, Trigger)>>::new();
     let mut inputs = HashSet::<Group>::new();
     let mut outputs = HashSet::<Group>::new();
@@ -828,9 +832,19 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
                 *v = b;
             }
         }
-        //dbg!(b == a);
         assert!(swaps.insert(a, b).is_none());
     };
+    // let mut start_counts = HashMap::new();
+    // let mut end_counts = HashMap::new();
+
+    // for ((start, end, _), _) in deduped.iter() {
+    //     start_counts
+    //         .entry(start)
+    //         .and_modify(|c| *c += 1)
+    //         .or_insert(1);
+
+    //     end_counts.entry(end).and_modify(|c| *c += 1).or_insert(1);
+    // }
 
     for ((start, end, delay), trigger) in deduped {
         let d = if delay.delay < 50 && delay.epsiloned {
@@ -838,10 +852,9 @@ pub fn spawn_optimisation(network: &mut TriggerNetwork, objects: &mut Triggerlis
         } else {
             delay.delay
         };
-
-        if d == 0 && network[&end].connections_in == 1 {
+        if d == 0 && !is_start_group(end, reserved_groups) && network[&end].connections_in == 1 {
             insert_to_swaps(end, start);
-        } else if d == 0
+        } else if d == 0 && !is_start_group(start, reserved_groups)
             && network[&start].connections_in == 1 //??
             && (network[&start].triggers.is_empty()
                 || network[&start].triggers.iter().all(|t| t.deleted))

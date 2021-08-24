@@ -569,9 +569,9 @@ pub fn compile_scope(
         return Ok(());
     }
     contexts.enter_scope();
+    contexts.reset_return_vals();
 
     for statement in statements.iter() {
-        contexts.reset_return_vals();
         //find out what kind of statement this is
         //let start_time = Instant::now();
 
@@ -594,7 +594,25 @@ pub fn compile_scope(
         use ast::StatementBody::*;
 
         let stored_context = if statement.arrow {
-            Some(contexts.iter().map(|a| a.clone()).collect::<Vec<_>>())
+            let mut stored = Vec::new();
+            globals.push_new_preserved();
+            for c in contexts.with_breaks() {
+                stored.push(c.clone());
+                for v in c.inner().get_variables().values() {
+                    for (v, _) in v {
+                        globals.push_preserved_val(*v)
+                    }
+                }
+                match c.inner().broken {
+                    Some((BreakType::Macro(Some(v), _), _)) | Some((BreakType::Switch(v), _)) => {
+                        globals.push_preserved_val(v)
+                    }
+                    _ => (),
+                }
+            }
+            // TODO: preserve these
+            *contexts = FullContext::stack(&mut contexts.iter().map(|c| c.clone())).unwrap();
+            Some(stored)
         } else {
             None
         };
@@ -1399,7 +1417,10 @@ pub fn compile_scope(
             }
         }
 
+        contexts.reset_return_vals();
+
         if let Some(c) = stored_context {
+            globals.pop_preserved();
             //resetting the context if async
             let mut list = c;
 
@@ -1422,33 +1443,7 @@ pub fn compile_scope(
         }
 
         //try to merge contexts
-
-        if let FullContext::Split(_, _) = contexts {
-            let mut broken = Vec::new();
-            let mut not_broken = Vec::new();
-            for c in contexts.with_breaks() {
-                if c.inner().broken.is_some() {
-                    broken.push(c.inner().clone())
-                } else {
-                    not_broken.push(c.inner().clone())
-                }
-            }
-
-            if not_broken.len() > 1 {
-                loop {
-                    if !merge_contexts(&mut not_broken, globals) {
-                        break;
-                    }
-                }
-
-                broken.extend(not_broken);
-
-                *contexts =
-                    FullContext::stack(&mut broken.into_iter().map(FullContext::Single)).unwrap();
-            } else if not_broken.is_empty() {
-                break;
-            }
-        }
+        merge_all_contexts(contexts, globals, false);
 
         if contexts.iter().next().is_none() {
             break;
@@ -1474,6 +1469,37 @@ pub fn compile_scope(
     contexts.exit_scope();
 
     Ok(())
+}
+
+pub fn merge_all_contexts(
+    contexts: &mut FullContext,
+    globals: &mut Globals,
+    check_return_vals: bool,
+) {
+    if let FullContext::Split(_, _) = contexts {
+        let mut broken = Vec::new();
+        let mut not_broken = Vec::new();
+        for c in contexts.with_breaks() {
+            if c.inner().broken.is_some() {
+                broken.push(c.inner().clone())
+            } else {
+                not_broken.push(c.inner().clone())
+            }
+        }
+
+        if not_broken.len() > 1 {
+            loop {
+                if !merge_contexts(&mut not_broken, globals, check_return_vals) {
+                    break;
+                }
+            }
+
+            broken.extend(not_broken);
+
+            *contexts =
+                FullContext::stack(&mut broken.into_iter().map(FullContext::Single)).unwrap();
+        }
+    }
 }
 
 fn merge_impl(target: &mut Implementations, source: &Implementations) {

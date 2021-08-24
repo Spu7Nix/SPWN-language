@@ -3,6 +3,7 @@ use crate::builtin::*;
 use crate::compiler::NULL_STORAGE;
 use crate::compiler::create_error;
 use crate::compiler::import_module;
+use crate::compiler::merge_all_contexts;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
 use slyce::Slice as Slyce;
@@ -2288,6 +2289,8 @@ impl ast::Variable {
                 }
             }
         }
+
+        merge_all_contexts(contexts, globals, true);
 
         Ok(())
     }
