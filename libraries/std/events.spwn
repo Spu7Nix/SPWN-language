@@ -6,7 +6,7 @@ extract constants.obj_props
 type @event
 
 impl @event {
-    on: #[desc("Triggers a function every time an event fires") example("
+    on: #[desc("Triggers a function every time an event fires (exists for legacy only)") example("
 on(touch(), !{
     10g.move(10, 0)
 })
@@ -15,15 +15,25 @@ on(touch(), !{
         #[desc("Function to trigger")] function: @trigger_function
     ){
         event.on_triggered(function)
+    },
+    handle: #[desc("Triggers a function every time an event fires") example("
+[[handle(touch())]] !{
+    10g.move(10, 0)
+}
+    ")] (
+        #[desc("Function to trigger")] function: @trigger_function,
+        #[desc("Event to trigger on")] event: @event
+    ){
+        event.on_triggered(function)
     }
 }
 
 return {
 
     touch: #[desc("Implementation of the touch trigger (returns an event)") example("
-on(touch(), !{
+[[handle(touch())]] !{
     10g.move(10, 0)
-})
+}
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) {
@@ -41,9 +51,9 @@ on(touch(), !{
     },
 
     touch_end: #[desc("Returns an event for when a touch ends") example("
-on(touch_end(), !{
-    10g.move(-10, 0)
-})
+[[handle(touch_end())]] !{
+    10g.move(10, 0)
+}
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) {
@@ -61,9 +71,9 @@ on(touch_end(), !{
     },
 
     collision: #[desc("Implementation of the collision trigger (returns an event)") example("
-on(collision(1b, 2b), !{
-    BG.set(255, 0, 0)
-})
+[[handle(collision(1b, 2b))]] !{
+    BG.set(0, 0, 0)
+}
     ")] (
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
@@ -83,9 +93,9 @@ on(collision(1b, 2b), !{
     },
 
     collision_exit: #[desc("Returns an event for when a collision exits") example("
-on(collision_exit(1b, 2b), !{
+[[handle(collision_exit(1b, 2b))]] !{
     BG.set(0, 0, 0)
-})
+}
     ")] (
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
@@ -105,15 +115,32 @@ on(collision_exit(1b, 2b), !{
 
 
     death: #[desc("Returns an event for when the player dies") example("
-on(death(), !{
+[[handle(death())]] !{
     BG.set(0, 0, 0)
-})
+}
     ")] (){
         return @event::{
             on_triggered: (function) => $.add( trigger{
                 OBJ_ID: 1812,
                 ACTIVATE_GROUP: true,
                 TARGET: function
+            })
+        }
+    },
+
+    count: #[desc("Implementation of a count trigger (returns an event)") example("
+[[handle(count(4i, 3))]] !{
+    BG.set(0, 0, 0)
+}
+    ")] (it: @item, hits: @number, multi: @bool = true) {
+        return @event::{
+            on_triggered: (function) => $.add(trigger {
+                OBJ_ID: 1611,
+                ACTIVATE_GROUP: true,
+                TARGET: function,
+                ITEM: it,
+                COUNT: hits,
+                COUNT_MULTI_ACTIVATE: multi
             })
         }
     }

@@ -189,7 +189,7 @@ return {
         COUNT : ok(77, @number),
         SUBTRACT_COUNT : ok(78, @number),
         PICKUP_MODE : ok(79, @number),
-        ITEM : ok(80, @item),
+        ITEM : ok(80, @item | @block),
         BLOCK_A : ok(80, @block),
         HOLD_MODE : ok(81, @bool),
         TOGGLE_MODE : ok(82, @number),
