@@ -53,6 +53,46 @@ impl std::ops::IndexMut<StoredValue> for ValStorage {
 }
 
 impl ValStorage {
+    pub fn mark(&mut self, root: StoredValue) {
+        if !self.marked(root) {
+            (*self.map.get_mut(&root).unwrap()).marked = true;
+            match self[root].clone() {
+                Value::Array(a) => {
+                    for e in a.iter() {
+                        self.mark(*e)
+                    }
+                }
+                Value::Dict(a) => {
+                    for (_, e) in a.iter() {
+                        self.mark(*e)
+                    }
+                }
+                Value::Macro(m) => {
+                    for (_, e, _, e2, _, _) in m.args {
+                        if let Some(val) = e {
+                            self.mark(val)
+                        }
+                        if let Some(val) = e2 {
+                            self.mark(val)
+                        }
+                    }
+
+                    for (_, v) in m.def_variables.iter() {
+                        self.mark(*v)
+                    }
+                }
+                _ => (),
+            };
+        }
+    }
+
+    fn marked(&self, root: StoredValue) -> bool {
+        self.map
+            .get(&root)
+            .unwrap_or_else(|| panic!("Could not find {}", root))
+            .marked
+    }
+
     pub fn new() -> Self {
         ValStorage {
             map: vec![
@@ -104,46 +144,6 @@ impl ValStorage {
             Value::Macro(_) => (),
             _ => (),
         };
-    }
-
-    fn marked(&self, root: StoredValue) -> bool {
-        self.map
-            .get(&root)
-            .unwrap_or_else(|| panic!("Could not find {}", root))
-            .marked
-    }
-
-    pub fn mark(&mut self, root: StoredValue) {
-        if !self.marked(root) {
-            (*self.map.get_mut(&root).unwrap()).marked = true;
-            match self[root].clone() {
-                Value::Array(a) => {
-                    for e in a.iter() {
-                        self.mark(*e)
-                    }
-                }
-                Value::Dict(a) => {
-                    for (_, e) in a.iter() {
-                        self.mark(*e)
-                    }
-                }
-                Value::Macro(m) => {
-                    for (_, e, _, e2, _, _) in m.args {
-                        if let Some(val) = e {
-                            self.mark(val)
-                        }
-                        if let Some(val) = e2 {
-                            self.mark(val)
-                        }
-                    }
-
-                    for (_, v) in m.def_variables.iter() {
-                        self.mark(*v)
-                    }
-                }
-                _ => (),
-            };
-        }
     }
 
     pub fn sweep(&mut self) {

@@ -43,7 +43,7 @@ pub struct Globals {
 
     pub prev_imports: HashMap<ImportType, (StoredValue, Implementations)>,
 
-    pub trigger_order: usize,
+    pub trigger_order: f32,
 
     pub uid_counter: usize,
     pub implementations: Implementations,
@@ -55,7 +55,7 @@ pub struct Globals {
     pub SELF_MEMBER_NAME: Intern<String>,
     pub OR_BUILTIN: Intern<String>,
     pub AND_BUILTIN: Intern<String>,
-    pub ASSIGN_BULTIN: Intern<String>,
+    pub ASSIGN_BUILTIN: Intern<String>,
     pub OBJ_KEY_ID: Intern<String>,
     pub OBJ_KEY_PATTERN: Intern<String>,
 }
@@ -141,7 +141,7 @@ impl Globals {
 
             prev_imports: HashMap::new(),
             type_id_count: 0,
-            trigger_order: 0,
+            trigger_order: 0.0,
             uid_counter: 0,
 
             val_id: storage.map.len() as StoredValue,
@@ -162,7 +162,7 @@ impl Globals {
             SELF_MEMBER_NAME: Intern::new(String::from("self")),
             OR_BUILTIN: Intern::new(String::from("_or_")),
             AND_BUILTIN: Intern::new(String::from("_and_")),
-            ASSIGN_BULTIN: Intern::new(String::from("_assign_")),
+            ASSIGN_BUILTIN: Intern::new(String::from("_assign_")),
             OBJ_KEY_ID: Intern::new(String::from("id")),
             OBJ_KEY_PATTERN: Intern::new(String::from("pattern")),
         };

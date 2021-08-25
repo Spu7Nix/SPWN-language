@@ -1,7 +1,8 @@
 // useful things for dealing with gd level data
 use crate::ast::ObjectMode;
 use crate::builtin::*;
-use crate::compiler_types::*;
+pub use crate::compiler_types::*;
+
 use crate::context::Context;
 use std::collections::{HashMap, HashSet};
 
@@ -77,13 +78,13 @@ impl fmt::Display for ObjParam {
                     if let Id::Specific(id) = g.id {
                         out += &(id.to_string() + ".")
                     } else {
-                        out += "?."
+                        out += "0."
                     };
                 }
                 out.pop();
                 write!(f, "{}", out)
             }
-            ObjParam::Epsilon => write!(f, "{{epsilon}}"),
+            ObjParam::Epsilon => write!(f, "0.05"),
         }
     }
 }
@@ -181,6 +182,8 @@ pub fn get_used_ids(ls: &str) -> [HashSet<u16>; 4] {
 
 const START_HEIGHT: u16 = 10;
 const MAX_HEIGHT: u16 = 40;
+
+const DELTA_X: u16 = 1;
 
 pub const SPWN_SIGNATURE_GROUP: Group = Group {
     id: Id::Specific(1001),
@@ -455,7 +458,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
         //add top layer
         let possible_height = MAX_HEIGHT - (START_HEIGHT + y_offset); //30 is max (TODO: case for if y_offset is more than 30)
         let mut objectlist = id.obj_list;
-        objectlist.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+        objectlist.sort_by(|x, y| x.1.partial_cmp(&y.1).unwrap());
 
         for (i, (obj, _)) in objectlist.iter().enumerate() {
             match obj.mode {
@@ -474,6 +477,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
                             //     l.iter().any(|x| x.id != ID::Specific(0))
                             // }
                             Some(ObjParam::Group(g)) => g.id != Id::Specific(0),
+                            Some(ObjParam::GroupList(g)) => g[0].id != Id::Specific(0),
                             _ => unreachable!(),
                         },
                     };
@@ -488,7 +492,12 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
                     new_obj.params.insert(
                         2,
                         if spawned {
-                            ObjParam::Number((x_pos * 30 + 15) as f64)
+                            ObjParam::Number(
+                                (x_pos * (MAX_HEIGHT - START_HEIGHT) as u32 * DELTA_X as u32
+                                    + 15
+                                    + i as u32 * DELTA_X as u32)
+                                    as f64,
+                            )
                         } else {
                             ObjParam::Number(0.0)
                         },
@@ -723,7 +732,7 @@ fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, String> {
         type AesEcb = Ecb<Aes256, Pkcs7>;
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_var(IOS_KEY, &[]).unwrap();
+        let cipher = AesEcb::new_from_slices(IOS_KEY, &[]).unwrap();
 
         Ok(match cipher.decrypt(&mut sf) {
             Ok(v) => v,
@@ -960,7 +969,7 @@ pub fn encrypt_level_string(
         type AesEcb = Ecb<Aes256, Pkcs7>;
 
         // re-create cipher mode instance
-        let cipher = AesEcb::new_var(IOS_KEY, &[]).unwrap();
+        let cipher = AesEcb::new_from_slices(IOS_KEY, &[]).unwrap();
 
         let fin = cipher.encrypt_vec(&bytes);
         assert!(fs::write(path, fin).is_ok());

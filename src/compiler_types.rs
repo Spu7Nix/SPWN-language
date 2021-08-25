@@ -34,12 +34,14 @@ pub enum ImportType {
     Lib(String),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub struct TriggerOrder(pub f32);
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionId {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id
     pub width: Option<u32>,    //width of this id, is none when its not calculated yet
     //pub name: String,          //name of this id, used for the label
-    pub obj_list: Vec<(GdObj, usize)>, //list of objects in this function id, + their order id
+    pub obj_list: Vec<(GdObj, TriggerOrder)>, //list of objects in this function id, + their order id
 }
 
 pub type SyncPartId = usize;
@@ -80,7 +82,6 @@ pub fn handle_operator(
                     let pat = &globals.stored_values[target_typ].clone();
 
                     if !val2.matches_pat(pat, info, globals, full_context.inner())? {
-
                         //if types dont match, act as if there is no macro at all
                         built_in_function(
                             macro_name,
@@ -353,7 +354,7 @@ pub fn execute_macro(
         }
     }
 
-    //dbg!(&conbinations);
+    //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
         let mut new_variables: HashMap<Intern<String>, Vec<(StoredValue, i16)>> = HashMap::new();
@@ -442,7 +443,7 @@ pub fn execute_macro(
                                         if m.args.len() == 1 { "" } else { "s" }
                                     ),
                                 ),
-                                (info.position, "Recieved too many arguments here"),
+                                (info.position, "Received too many arguments here"),
                             ],
                             None,
                         )));
@@ -510,25 +511,22 @@ Should be used like this: value.macro(arguments)",
             m_args_iter.next();
         }
         for arg in m_args_iter {
-            if !new_variables.contains_key(&arg.0) {
+            if let std::collections::hash_map::Entry::Vacant(e) = new_variables.entry(arg.0) {
                 match &arg.1 {
                     Some(default) => {
-                        new_variables.insert(
-                            arg.0,
-                            vec![(
-                                clone_value(
-                                    *default,
-                                    globals,
-                                    context.start_group,
-                                    true,
-                                    CodeArea {
-                                        pos: arg.4,
-                                        file: m.def_file,
-                                    },
-                                ),
-                                -1,
-                            )],
-                        );
+                        e.insert(vec![(
+                            clone_value(
+                                *default,
+                                globals,
+                                context.start_group,
+                                true,
+                                CodeArea {
+                                    pos: arg.4,
+                                    file: m.def_file,
+                                },
+                            ),
+                            -1,
+                        )]);
                     }
 
                     None => {

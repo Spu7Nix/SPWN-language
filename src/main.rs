@@ -172,6 +172,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         } else if cfg!(target_os = "linux") {
                             PathBuf::from(std::env::var("HOME").expect("No home directory"))
                                 .join(".steam/steam/steamapps/compatdata/322170/pfx/drive_c/users/steamuser/Local Settings/Application Data/GeometryDash/CCLocalLevels.dat")
+                        } else if cfg!(target_os = "android") {
+                            PathBuf::from("/data/data/com.robtopx.geometryjump/CCLocalLevels.dat")
                         } else {
                             panic!("Unsupported operating system");
                         })

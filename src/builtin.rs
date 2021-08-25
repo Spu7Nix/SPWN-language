@@ -12,10 +12,10 @@ use std::fs;
 
 use crate::value::*;
 use crate::value_storage::*;
-use std::io::stdout;
-use std::io::Write;
 use rand::seq::SliceRandom;
 use rand::Rng;
+use std::io::stdout;
+use std::io::Write;
 
 //use text_io;
 use crate::compiler_info::{CodeArea, CompilerInfo};
@@ -684,10 +684,10 @@ builtins! {
                     ..context_trigger(context, &mut globals.uid_counter)
                 }
                 .context_parameters(context);
-                (*globals).trigger_order += 1;
+                (*globals).trigger_order += 1.0;
                 (*globals).func_ids[context.func_id]
                     .obj_list
-                    .push((obj, globals.trigger_order))
+                    .push((obj, crate::levelstring::TriggerOrder(globals.trigger_order)))
             }
         };
         Value::Null
@@ -922,6 +922,11 @@ builtins! {
         Value::Null
     }
 
+    [TriggerFnContext]
+    fn trigger_fn_context() {
+        Value::Group(context.start_group)
+    }
+
     [Random]
     fn random() {
         if arguments.len() > 2 {
@@ -966,7 +971,7 @@ builtins! {
                         return Err(RuntimeError::BuiltinError {
                             message: format!("Expected number, found {}", globals.get_type_str(arguments[1])),
                             info,
-                        }); 
+                        });
                     }
                 };
 
@@ -975,7 +980,7 @@ builtins! {
                 for _ in 0..times {
                     let rand_elem = val.choose(&mut rand::thread_rng());
 
-                    if rand_elem.is_some() { 
+                    if rand_elem.is_some() {
                         out_arr.push(clone_value(
                             *rand_elem.unwrap(),
                             globals,
@@ -1033,6 +1038,29 @@ builtins! {
                         info,
                     });
                 }
+                fn parse_serde_value(val: serde_json::Value, globals: &mut Globals, context: &Context, info: &CompilerInfo) -> Value {
+                    // please sput forgive me for this shitcode ._.
+                    match val {
+                        serde_json::Value::Null => Value::Null,
+                        serde_json::Value::Bool(x) => Value::Bool(x),
+                        serde_json::Value::Number(x) => Value::Number(x.as_f64().unwrap()),
+                        serde_json::Value::String(x) => Value::Str(x),
+                        serde_json::Value::Array(x) => {
+                            let mut arr: Vec<StoredValue> = vec![];
+                            for v in x {
+                                arr.push(store_const_value(parse_serde_value(v, globals, context, info), globals, context.start_group, info.position));
+                            }
+                            Value::Array(arr)
+                        },
+                        serde_json::Value::Object(x) => {
+                            let mut dict: HashMap<Intern<String>, StoredValue> = HashMap::new();
+                            for (key, value) in x {
+                                dict.insert(Intern::new(key), store_const_value(parse_serde_value(value, globals, context, info), globals, context.start_group, info.position));
+                            }
+                            Value::Dict(dict)
+                        },
+                    }
+                }
                 match format {
                     "text" => {
                         let ret = fs::read_to_string(path);
@@ -1066,9 +1094,32 @@ builtins! {
                                 .collect(),
                         )
                     }
+                    "json" => {
+                        let ret = fs::read_to_string(path);
+                        let rval = match ret {
+                            Ok(file) => file,
+                            Err(e) => {
+                                return Err(RuntimeError::BuiltinError {
+                                    message: format!("Problem opening the file: {}", e),
+                                    info,
+                                });
+                            }
+                        };
+                        let parsed = match serde_json::from_str(&rval) {
+                            Ok(value) => value,
+                            Err(e) => {
+                                return Err(RuntimeError::BuiltinError {
+                                    message: format!("Problem parsing JSON: {}", e),
+                                    info,
+                                });
+                            }
+                        };
+
+                        parse_serde_value(parsed, globals, context, &info)
+                    }
                     _ => {
                         return Err(RuntimeError::BuiltinError {
-                            message: "Invalid data format ( use \"text\" or \"bin\")"
+                            message: "Invalid data format ( use \"text\", \"bin\" or \"json\")"
                                 .to_string(),
                             info,
                         })

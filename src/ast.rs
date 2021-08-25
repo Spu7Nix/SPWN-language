@@ -66,7 +66,7 @@ pub enum ValueBody {
     Symbol(Intern<String>),
     Bool(bool),
     Expression(Expression),
-    Str(String),
+    Str(StrInner),
     Import(ImportType, bool),
     Switch(Expression, Vec<Case>),
     Array(Vec<Expression>),
@@ -103,6 +103,17 @@ pub enum ObjectMode {
 pub struct ObjectLiteral {
     pub props: Vec<(Expression, Expression)>,
     pub mode: ObjectMode,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct StrInner {
+    pub inner: String,
+    pub flags: Option<StringFlags>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum StringFlags {
+    Raw,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -183,7 +194,7 @@ impl Attribute {
                     None
                 } else {
                     match &args[0].value.values[0].value.body {
-                        ValueBody::Str(s) => Some(s.clone()),
+                        ValueBody::Str(s) => Some(s.inner.clone()),
                         a => Some(a.fmt(0)),
                     }
                 }
@@ -199,7 +210,7 @@ impl Attribute {
                 None
             } else {
                 match &args[0].value.values[0].value.body {
-                    ValueBody::Str(s) => Some(s.trim().to_string()),
+                    ValueBody::Str(s) => Some(s.inner.trim().to_string()),
                     val => Some(val.fmt(0)),
                 }
             }
@@ -286,7 +297,7 @@ pub type ArgDef = (
     Attribute,
     Option<Expression>,
     FileRange,
-    bool
+    bool,
 );
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {

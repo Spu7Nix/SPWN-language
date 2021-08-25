@@ -1,4 +1,5 @@
 #[no_std, cache_output]
+
 impl @string {
 	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise")]
 	(self) {
@@ -194,5 +195,17 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
         }
 
         return ret_str
+    },
+
+    find: (self, re: @string) {
+        $.regex(re, self, "match", null)
+    },
+
+    findall: (self, re: @string) {
+        $.regex(re, self, "findall", null)
+    },
+
+    replace: (self, re: @string, replacement: @string) {
+        $.regex(re, self, "replace", replacement)
     }
 }

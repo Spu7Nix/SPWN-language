@@ -2,8 +2,22 @@
 
 extract import "control_flow.spwn"
 extract import "constants.spwn".comparisons
-let DEFAULT_SPEED = 1
+DEFAULT_BITS = 16
 type @counter
+
+reset_counter = (
+    c, for_each: @macro = (n){}
+){
+
+    for i in c.bits..0 {
+        x = 2^i
+        c.item.if_is(LARGER_THAN, x - 1, !{
+            c.item.add(-x)
+            for_each(x)
+        })   
+    }
+}
+
 
 impl @counter {
 
@@ -14,38 +28,52 @@ impl @counter {
 @counter::new(true)   // creates a new counter with a starting value of true (1)
     ")] (
         #[desc("Source (can be a number, item ID or boolean)")] source: @number | @item | @bool = 0,
-        #[desc("Adds a delay if a value gets added to the new item (to avoid confusing behavior)")] delay: @bool = true
+        #[desc(
+            "Defines the maximum stable size of the counter. If the counter goes outside of the range from 0 to 2^size, it's behavior will be undefined. Smaller sizes are more group effective."
+        )] bits: @number = DEFAULT_BITS,
+        #[desc("Resets the counter in case the item has been used before. This only applies if the `source` argument is not an item.")] reset: @bool = true,
     ){
+        let out = null
         if source.type == @number {
             id = ?i
-
             if source != 0 {
                 id.add(source)
             }
-
-            -> return {
-                type: @counter,
-                item: id
+            out =  @counter::{
+                item: id,
+                bits
+            }
+            if reset && $.trigger_fn_context() != 0g {
+                reset_counter(out) // in case the item has been used before
             }
         } else if source.type == @item {
-
-            -> return {
-                type: @counter,
-                item: source
+            out =  @counter::{
+                item: source,
+                bits
             }
         } else if source.type == @bool {
+            if bits != DEFAULT_BITS && bits != 1 {
+                throw "A boolean counter can only have size = 1"
+            }
             id = ?i
-
+            
             if source {
                 id.add(1)
             }
-            -> return {
-                type: @counter,
-                item: id
+            out =  @counter::{
+                item: id,
+                bits: 1,
+            }
+            if reset && $.trigger_fn_context() != 0g {
+                reset_counter(out) // in case the item has been used before
             }
         }
 
-    },
+        
+        return out
+    }
+}
+impl @counter {
     display:
     #[desc("Creates a item display object that displays the value of the counter") example("
 points = counter(0)
@@ -78,43 +106,43 @@ a.add_to(b)
     (
         self,
         #[desc("Counter(s) to add to")] items: [@counter | @item] | @counter | @item,
-        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
         #[desc("Multiplier for the value added")] factor: @number = 1,
-        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @macro = (n){}
     ) {
-        wait()
+        for i in self.bits..0 {
+            x = 2^i
 
-        add = !{
-
-
-            mini_add = (num){
-                self.item.if_is(LARGER_THAN, num - 1, !{
-                    self.add(-num)
-                    if items.type == @array {
-                        for item in items {
-                            item.add(num * factor)
-                        }
-                    } else {
-                        items.add(num * factor)
+            -> if self >= x {
+                self -= x
+                if  items.type == @array {
+                    for t in items {
+                        t.add(x * factor)
                     }
-                    for_each(num)
-                    call_with_delay(@epsilon::{}, add)
-                })
+                } else {
+                    items.add(x * factor)
+                }
+                for_each(x)
             }
-
-            for i in 0..speed {
-                mini_add(3^i)
-            }
-
-
-
-            self.item.if_is(EQUAL_TO, 0, !{
-                wait()
-                if speed > 1 { supress_signal(0.1) }
-                -> return
-            })
         }
-        add!
+    },
+
+    add_to_multifactor: 
+    #[desc("Like normal add_to, but each counter has its own factor")] (
+        self,
+        #[desc("Counter(s) to add to")] items: [[@counter | @number]],
+    ) {
+        for i in self.bits..0 {
+            x = 2^i
+
+            -> if self >= x {
+                self -= x
+                
+                for t in items {
+                    t[0].add(x * t[1])
+                }
+                
+            }
+        }
     },
 
     subtract_from:
@@ -122,48 +150,30 @@ a.add_to(b)
 a = counter(100)
 b = counter(70)
 wait(1)
-b.add_to(a)
+b.subtract_from(a)
 // a is now 30, b is now 0
     ")]
     (
         self,
         #[desc("Counter(s) to subtract from")] items: [@counter | @item] | @counter | @item,
-        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
         #[desc("Multiplier for the value subtracted")] factor: @number = 1,
-        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @macro = (n){}
     ) {
+        for i in self.bits..0 {
+            x = 2^i
 
-        sub = !{
-
-            self.item.if_is(LARGER_THAN, 0, !{
-                mini_sub = (num){
-                    self.item.if_is(LARGER_THAN, num - 1, !{
-                        self.add(-num)
-                        if items.type == @array {
-                            for item in items {
-                                item.add(-num * factor)
-                            }
-                        } else {
-                            items.add(-num * factor)
-                        }
-                        for_each(num)
-                        call_with_delay(@epsilon::{}, sub)
-                    })
+            -> if self >= x {
+                self -= x
+                if  items.type == @array {
+                    for t in items {
+                        t.add(-x * factor)
+                    }
+                } else {
+                    items.add(-x * factor)
                 }
-
-                for i in 0..speed {
-                    mini_sub(2^i)
-                }
-
-
-            })
-            self.item.if_is(EQUAL_TO, 0, !{
-                wait()
-                supress_signal(0.1)
-                -> return
-            })
+                for_each(x)
+            }
         }
-        sub!
     },
 
     multiply:
@@ -176,45 +186,24 @@ c.multiply(10)
     (
         self,
         #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor: @counter | @number,
-        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
     ) {
 
         if factor.type == @number {
-            temp = @counter::new(0, false)
-            self.add_to([temp.item], speed, factor)
-            temp.add_to([self.item], speed)
+            temp = @counter::new(0, reset = false, bits = self.bits)
+            self.add_to([temp.item], factor)
+            temp.add_to([self.item])
         } else if factor.type == @counter {
-            temp = @counter::new(0, false)
-            mini_mult = (num){
-                mult = !{
-
-                    self.item.if_is(SMALLER_THAN, num, !{
-                        supress_signal(0.1)
-                        wait()
-                        -> return //mult.start_group
-                    })
-
-
-                    self.item.if_is(LARGER_THAN, num - 1, !{
-                        self.add(-num)
-                        factor.copy_to([temp.item], speed, num)
-
-
-                        call_with_delay(@epsilon::{}, mult)
-                    })
-                }
-                //mult.start_group.toggle_on()
-                wait()
-                mult!
-            }
-
-
-            for i in speed..0 {
-                mini_mult(4^i)
-            }
-
             wait()
-            temp.add_to([self.item], speed)
+            result = @counter::new(0, reset = false, bits = self.bits)
+            for i in self.bits..0 {
+                x = 2^i
+                
+                -> if self >= x {
+                    self -= x
+                    factor.copy_to(result, factor = x)
+                }     
+            }
+            result.add_to(self)
 
         }
     },
@@ -231,125 +220,94 @@ c.divide(2, remainder = r)
     (
         self,
         #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor: @counter | @number,
-        #[desc("Counter or item to set to the remainder value")] remainder: @counter | @item = {item: ?i, type: @counter},
-        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
-
+        #[desc("Counter or item to set to the remainder value")] remainder: @counter | @item = @counter::new(),
     ) {
 
 
         if divisor.type == @number {
-            result = @counter::new(0, false)
-
-            div = !{
-                mini_div = (num) {
-                    self.item.if_is(LARGER_THAN, (divisor * num) - 1, !{
-
-
-                        self.add(-(divisor * num))
-                        result.add(num)
-
-                        call_with_delay(@epsilon::{}, div)
-
-                    })
+            result = @counter::new(0, reset = false, bits = self.bits)
+            for i in self.bits..0 {
+                num = 2^i
+                -> if self >= divisor * num {
+                    self.add(-divisor * num)
+                    result.add(num)
                 }
-
-                for i in 0..speed {
-                    mini_div(i * 4 + 1)
-                }
-
-                self.item.if_is(SMALLER_THAN, divisor, !{
-
-                    wait()
-                    self.add_to([remainder], speed)
-                    result.add_to([self], speed)
-
-                    -> return remainder
-                })
             }
-            div!
+            self.add_to(remainder)
+            result.add_to(self)
         } else if divisor.type == @counter {
-            //throw "Dividing a counter by another counter is currently not supported"
-            result = @counter::new(0, false)
-            remainder.reset(speed)
-            delay = @epsilon::{}
-            // IDEA:
-            // every time it goes under, undo the previous operation to simulate comparison
+            wait()
+            result = @counter::new(0, reset = false, bits = self.bits)
+            broken = @counter::new(false)
+            
+            // if divisor.bits > 8 {
+            //     throw "Divisor max size (8 bits) exceeded"
+            // }
 
-            mini_div = (num){
-                div = !{
-
+            
+            
+            -> if broken == 1 {
+                broken -= 1
+            }
+            
+            for i in self.bits..0 {
+                -> if broken == 0 {
+                    num = 2^i
 
                     self.item.if_is(LARGER_THAN, 0, !{
-                        //this basically subtracts divisor * num from self
-                        // this is the slow version
-                        //temp = divisor.clone(speed)
-                        //temp.subtract_from([self], speed, factor = num)
-
-                        //this basically does that but in one loop
-                        divisor.copy_to([self], speed, factor = -num)
-
+                        divisor.copy_to(self, factor = -num)
                         result.add(num)
-                        call_with_delay(delay, div)
                     })
 
-                    self.item.if_is(SMALLER_THAN, 1, !{
-
-                        ret = !{
-                            -> return
-                        }
-                        supress_signal(0.1)
-
-                        self.item.if_is(SMALLER_THAN, 0, !{
-                            result.add(-num)
-                            wait()
-                            divisor.copy_to([self], speed, factor = num)
-                            ret!
-                        })
-                        self.item.if_is(EQUAL_TO, 0, ret)
-
-                    })
-
-
+                    -> if self == 0 {
+                        broken += 1
+                    } 
+                    -> if self < 0 {
+                        divisor.copy_to(self, factor = num)
+                        result.add(-num)
+                    }
                 }
-                div!
+            }
+            -> if broken == 0 {
+                -> if self < 0 {
+                    divisor.copy_to(self)
+                    result.add(-1)
+                    broken += 1
+                }
             }
 
-
-
-            for i in speed..0 {
-                mini_div(5^i)
-                wait(delay)
-            }
-            //-> divisor.reset(speed)
-            self.add_to([remainder.item], speed)
-
-            result.add_to([self.item], speed * 2)
-            -> return remainder
-
-
-
+            self.add_to(remainder)
+            result.add_to(self)
         }
     },
 
     //will consume both numbers
-    compare: #[desc("Returns 0 if both counters are equal, 1 if the other is smaller, and -1 if the other is greater. After the macro the other counter will be equal to 0, while the first will be equal to the other minus the first") example("
+    compare: #[desc("Returns 0 if both counters are equal, 1 if the other is smaller, and -1 if the other is greater.") example("
 c1 = counter(10)
 c2 = counter(15)
 
 cmp = c1.compare(c2) // -1
 // c1 is now -5, c2 is now 0
-    ")](self, other: @counter, speed: @number = DEFAULT_SPEED) {
-        other.subtract_from([self.item], speed)
-        if self == 0 {
+    ")](self, other: @counter, factor: @number = 1) {
+        comp = @counter::new(0, reset = false, bits = $.max(self.bits, other.bits))
+        self.copy_to(comp)
+        other.copy_to(comp, factor = -1)
+
+        comp.item.if_is(EQUAL_TO, 0, !{
             -> return 0
-        } else if self > 0 {
+        })
+        comp.item.if_is(LARGER_THAN, 0, !{
+            comp.reset()
             -> return 1
-        } else {
+        }) 
+        comp.item.if_is(SMALLER_THAN, 0, !{
+            comp.reset_negative()
             -> return -1
-        }
+        })
+
     },
 
-    reset: #[desc("Resets counter to 0") example("
+    reset: #[desc("Resets counter to 0.") example("
 c = counter(100)
 wait(1)
 c.reset()
@@ -357,34 +315,30 @@ c.reset()
     ")]
     (
         self,
-        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
-        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by (if speed = 1 this will always be 1)")] for_each: @macro = (n){}
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @macro = (n){}
     ){
 
-        //almost the same
-        add = !{
+        reset_counter(self, for_each)
+    },
 
-            mini_add = (num){
-                self.item.if_is(LARGER_THAN, num - 1, !{
-                    self.add(-num)
-                    for_each(num)
-                    call_with_delay(@epsilon::{}, add)
-                })
-            }
+    reset_negative: #[desc("Resets a negative counter to 0") example("
+c = counter(-100)
+wait(1)
+c.reset_negative()
+// c is now 0
+    ")]
+    (
+        self,
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @macro = (n){}
+    ){
 
-            for i in 0..speed {
-                mini_add(3^i)
-            }
-
-
-
-            self.item.if_is(EQUAL_TO, 0, !{
-                wait()
-                if speed > 1 { supress_signal(0.1) }
-                -> return
-            })
+        for i in self.bits..0 {
+            x = 2^i
+            -> if self <= -x {
+                self += x
+                for_each(x)
+            }     
         }
-        add!
     },
 
     copy_to: #[desc("Copies the value of the counter to another counter (or to all counters in a list), without consuming the original") example("
@@ -396,47 +350,28 @@ c1.copy_to(c2)
     ")]
     (
         self,
-        #[desc("Items to copy to")] items: [@counter | @item] | @counter | @item,
-        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED,
+        #[desc("Counter(s) to copy to")] items: [@counter | @item] | @counter | @item,
         #[desc("Factor of to multiply the copy by")] factor: @number = 1
     ) {
-        wait()
-        temp_storage = ?i
+        temp_storage = @counter::new(0, reset = false, bits = self.bits)
 
-        add = !{
+        for i in self.bits..0 {
+            x = 2^i
 
-            self.item.if_is(LARGER_THAN, 0, !{
-                mini_add = (num){
-
-                    self.item.if_is(LARGER_THAN, num - 1, !{
-                        self.add(-num)
-                        if items.type == @array {
-                            for item in items {
-                                item.add(num * factor)
-                            }
-                        } else {
-                            items.add(num * factor)
-                        }
-                        temp_storage.add(num)
-
-                        call_with_delay(@epsilon::{}, add)
-                    })
+            -> if self >= x {
+                self -= x
+                temp_storage += x
+                if  items.type == @array {
+                    for t in items {
+                        t.add(x * factor)
+                    }
+                } else {
+                    items.add(x * factor)
                 }
-
-                for i in 0..speed {
-                    mini_add(2^i)
-                }
-
-
-            })
-            self.item.if_is(EQUAL_TO, 0, !{
-                wait()
-                if speed > 1 { supress_signal(0.1) }
-                @counter::new(temp_storage, false).add_to([self.item], speed)
-                -> return
-            })
+            }
         }
-        add!
+        temp_storage.add_to(self)
+
     },
 
     clone: #[desc("Copies the counter and returns the copy") example("
@@ -444,12 +379,11 @@ c1 = counter(100)
 c2 = c1.clone()
 // c1 and c2 are now 100
     ")] (
-        self,
-        #[desc("Speed of operation (higher number increases group usage)")] speed: @number = DEFAULT_SPEED
+        self
     ) {
-        new_counter = ?i
-        self.copy_to([new_counter], speed)
-        return @counter::new(new_counter, false)
+        new_counter = @counter::new(0, bits = self.bits)
+        self.copy_to([new_counter])
+        return new_counter
     },
 
     _plus_: #[desc("Implementation of the plus (`+`) operator") example("
@@ -478,11 +412,11 @@ c2 = c1 - 3
         if other.type == @number {
             new_counter = self.clone()
             new_counter.add(-other)
-            -> return new_counter
+            return new_counter
         } else if other.type == @counter {
             new_counter = self.clone()
             other.copy_to([new_counter.item], factor = -1)
-            -> return new_counter
+            return new_counter
         }
     },
 
@@ -491,10 +425,17 @@ c = counter(10)
 c2 = c1 * 10
 // c2 is 100
     ")]
-    (self, num: @number | @counter) {
-        clone = self.clone()
-        clone.multiply(num)
-        -> return clone
+    (self, other: @number | @counter) {
+        if other.type == @number {
+            new = @counter::new(0, bits = self.bits)
+            self.copy_to(new, factor = other)
+            return new
+        } else if other.type == @counter {
+            new = self.clone()
+            new.multiply(other)
+            return new
+        }
+        
 
     },
 
@@ -516,7 +457,7 @@ c2 = c1 % 10
     ")]
     (self, num: @number | @counter) {
         clone = self.clone()
-        out = @counter::new()
+        out = @counter::new(0, bits = self.bits)
         clone.divide(num, remainder = out)
         -> return out
     },
@@ -527,9 +468,9 @@ c %= 10
 // c is 2
     ")]
     (self, num: @number | @counter) {
-        out = @counter::new()
+        out = @counter::new(0, bits = self.bits)
         self.divide(num, remainder = out)
-        self.reset()
+        self.reset(0, bits = self.bits)
         out.add_to([self])
     },
 
@@ -550,10 +491,8 @@ more = c > 10
                 -> return false
             })
         } else if other.type == @counter {
-            self_clone = self.clone()
-            other_clone = other.clone()
-            cmp = self_clone.compare(other_clone)
-            -> return cmp == 1
+            cmp = self.compare(other)
+            return cmp == 1
         }
     },
 
@@ -574,9 +513,7 @@ less = c < 42
                 -> return false
             })
         } else if other.type == @counter {
-            self_clone = self.clone()
-            other_clone = other.clone()
-            cmp = self_clone.compare(other_clone)
+            cmp = self.compare(other)
             -> return cmp == -1
         }
     },
@@ -598,9 +535,7 @@ more_or_eq = c >= 10
                 -> return false
             })
         } else if other.type == @counter {
-            self_clone = self.clone()
-            other_clone = other.clone()
-            cmp = self_clone.compare(other_clone)
+            cmp = self.compare(other)
             -> return cmp == 1 || cmp == 0
         }
     },
@@ -622,9 +557,7 @@ less_or_eq = c <= 42
                 -> return false
             })
         } else if other.type == @counter {
-            self_clone = self.clone()
-            other_clone = other.clone()
-            cmp = self_clone.compare(other_clone)
+            cmp = self.compare(other)
             -> return cmp == -1 || cmp == 0
         }
     },
@@ -648,9 +581,7 @@ eq = c == 42
             self.item.if_is(LARGER_THAN, other, ret_false)
             self.item.if_is(SMALLER_THAN, other, ret_false)
         } else if other.type == @counter {
-            self_clone = self.clone()
-            other_clone = other.clone()
-            cmp = self_clone.compare(other_clone)
+            cmp = self.compare(other)
             -> return cmp == 0
         }
     },
@@ -681,7 +612,7 @@ c += 10
 
             self.add(num)
         } else if num.type == @counter {
-            num.clone().add_to([self])
+            num.copy_to(self) //holy shit why was this not like this all along
         }
     },
 
@@ -711,7 +642,7 @@ c -= 5
             self.add(-num)
 
         } else if num.type == @counter {
-            num.clone().subtract_from([self])
+            num.copy_to(self, factor = -1)
         }
     },
 
@@ -751,7 +682,7 @@ c = 42
                 self.add(num)
             }
         } else if num.type == @counter {
-            num.copy_to([self])
+            num.copy_to(self)
         }
     },
 
@@ -763,7 +694,7 @@ c <=> c2
 // c is now 42, c2 is now 23
     ")]
     (self, num: @counter) {
-        swap_tmp = @counter::new();
+        swap_tmp = @counter::new(0, bits = self.bits);
         self.add_to(swap_tmp)
         num.add_to(self)
         swap_tmp.add_to(num)
@@ -817,5 +748,21 @@ b = c as @bool
         } else {
             throw "Cannot convert counter to " + _type as @string + " (counter can convert to a number using the counter.to_const macro)"
         }
+    },
+
+    reaches: #[desc("Returns an event for when the counter reaches a certain value")
+    example("
+c = counter(2)
+
+on(c.reaches(10), !{
+    BG.pulse(0, 255, 0, fade_out = 0.5) // will pulse each time the counter becomes 10
+})
+    ")] (self, #[desc("Value to reach")] value: @number) {
+        return self.item.count(value)
     }
+
 }
+
+
+
+

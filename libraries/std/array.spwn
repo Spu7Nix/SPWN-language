@@ -56,14 +56,39 @@ fruit = ['apple', 'banana', 'mango']
 $.assert(fruit.index('apple') == 0)
 $.assert(fruit.index('carrot') == null)
     ")]
-    (self, el) {
-        let res = null
-        for i in 0..self.length {
+    (self, el, #[desc("Index to start the search from")] from: @number = 0) {
+        for i in from..self.length {
             if self[i] == el {
-                res = i
+                return i
             }
         }
-        return res
+        return null
+    },
+    index_last: #[desc("Gets the index of the last occurence of an element (if it doesn't exist, `null` is returned)") example("
+arr = [1,-5,2,4,2,6]
+$.assert(arr.index_last(2) == 4)
+$.assert(arr.index_last(-3) == null)
+    ")]
+    (self, el, #[desc("Index to end the search at")] until: @number = 0) {
+        for i in self.length..until {
+            if self[i] == el {
+                return i
+            }
+        }
+        return null
+    },
+    index_all: #[desc("Returns an array of all occurences of an element") example("
+arr = [1,-5,2,4,2,6]
+$.assert(arr.index_all(2) == [2,4])
+    ")]
+    (self, el) {
+        let occurences = []
+        for i in 0..self.length {
+            if self[i] == el {
+                occurences.push(i)
+            }
+        }
+        return occurences
     },
     clear: #[desc("Clears the array.") example("
 let arr = [1, 2, 3]
@@ -75,8 +100,7 @@ $.assert(arr.is_empty())
     },
     reverse: #[desc("Reverses the array.") example("
 let arr = [1, 2, 3]
-arr.reverse()
-$.assert(arr == [3, 2, 1])
+$.assert(arr.reverse() == [3, 2, 1])
     ")]
     (self) {
         if self.length == 0 {
@@ -98,21 +122,24 @@ $.assert(arr == [1, 2, 3, 4])
     (self, value) {
         $.append(self, value)
     },
-    pop: #[desc("Removes the last value from the array and returns it.") example("
+    pop: #[desc("Removes a specific index from the array and returns it.") example("
 let arr = [1, 2, 3, 4]
 arr.pop()
 $.assert(arr == [1, 2, 3])
+arr.pop(1)
+$.assert(arr == [1, 3])
     ")]
-    (self) {
-        return $.pop(self)
+    (self, index: @number = -1) {
+        index = index if index >= 0 else self.length + index // to correct for negative values
+        return $.remove_index(self, index)
     },
-    remove: #[desc("Removes a specific index from the array and returns it.") example("
+    remove: #[desc("Returns array with all elements that match value removed") example("
 let arr = [1, 2, 3, 4, 5]
 arr.remove(3)
-$.assert(arr == [1, 2, 3, 5])
+$.assert(arr == [1, 2, 4, 5])
     ")]
     (self, index: @number) {
-        return $.remove_index(self, index)
+        return self.map(x => x if x != index else null).filter(el => el != null)
     },
     map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results.") example("
 arr = [1, 2, 3, 4, 5]
@@ -216,7 +243,7 @@ arr.sort(begin = 2, end = 4)
 $.assert(arr == [5, 1, 2, 3, 5])
 
 arr = [5, 1, 5, 3, 2]
-arr.sort(key = (a, b) => a > b)
+arr.sort(comp = (a, b) => a > b)
 $.assert(arr == [5, 5, 3, 2, 1])
     ")]
     (self, begin: @number = 0, end: @number = -1, comp: @macro = (a, b) => a <= b) {
@@ -242,11 +269,11 @@ $.assert(arr == [5, 5, 3, 2, 1])
 arr = [5, 1, 5, 3, 2]
 $.assert(arr.sorted() == [1, 2, 3, 5, 5])
 $.assert(arr.sorted(begin = 2, end = 4) == [5, 1, 2, 3, 5])
-$.assert(arr.sorted(key = (a, b) => a >= b) == [5, 5, 3, 2, 1])
+$.assert(arr.sorted(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
     ")]
-    (self) {
+    (self, begin: @number = 0, end: @number = -1, comp: @macro = (a, b) => a <= b) {
         let new_arr = self
-        new_arr.sort()
+        new_arr.sort(begin,end,comp)
 
         return new_arr
     },
@@ -275,7 +302,7 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         let output = [];
 
         for elem in self {
-            if elem.type == @number {
+            if elem.type != @array {
                 output.push(elem)
             } else {
                 for i in elem.flatten() {
@@ -285,5 +312,24 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         }
 
         return output
+    },
+
+    enumerate: #[desc("Returns an array of index-element pairs") example("
+    arr = [\"a\",\"b\",\"c\"]
+    for i in arr.enumerate() {
+        $.print(i[0], \": \", i[1])
     }
+    /* output:
+    0: 'a'
+    1: 'b'
+    2: 'c'
+    */
+        ")]
+    (self, #[desc("Return the pair as a dictionary")] dict: @bool = false) {
+        if dict {
+            return @array(..self.length).map(i => {index: i, value: self[i]})
+        }
+        return @array(..self.length).map(i => [i, self[i]])
+    },
+
 }

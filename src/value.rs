@@ -3,9 +3,10 @@ use crate::builtin::*;
 use crate::compiler::NULL_STORAGE;
 use crate::compiler::create_error;
 use crate::compiler::import_module;
+use crate::compiler::merge_all_contexts;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
-use slyce::{Slice as Slyce};
+use slyce::Slice as Slyce;
 
 use crate::parser::FileRange;
 use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};
@@ -583,7 +584,7 @@ pub fn slice_array(
                 _ => {
                     return Err(RuntimeError::CustomError(create_error(
                         info,
-                        "Cannot slice noncomforming multidimensional array",
+                        "Cannot slice nonconforming multidimensional array",
                         &[],
                         None,
                     )));
@@ -810,7 +811,7 @@ impl ast::Variable {
                     }
                 }
                 ast::ValueBody::Str(s) => full_context.inner().return_value = store_const_value(
-                        Value::Str(s.clone()),
+                        Value::Str(s.inner.clone()),
                         
                         globals,
                         full_context.inner().start_group,
@@ -2289,6 +2290,8 @@ impl ast::Variable {
             }
         }
 
+        merge_all_contexts(contexts, globals, true);
+
         Ok(())
     }
 
@@ -2310,7 +2313,7 @@ impl ast::Variable {
                         if globals.stored_values[ptr]
                             .clone()
                             .member(
-                                globals.ASSIGN_BULTIN,
+                                globals.ASSIGN_BUILTIN,
                                 context,
                                 globals,
                                 CompilerInfo::new(),
@@ -2388,7 +2391,7 @@ impl ast::Variable {
                     if i.values.len() == 1 {
                         if let ast::ValueBody::Str(s) = &i.values[0].value.body {
                             match &globals.stored_values[current_ptr] {
-                                Value::Dict(d) => return d.get(s).is_some(),
+                                Value::Dict(d) => return d.get(&s.inner).is_some(),
                                 _ => return true,
                             }
                         } else {

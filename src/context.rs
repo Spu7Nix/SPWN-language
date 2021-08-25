@@ -348,7 +348,11 @@ impl Context {
 }
 
 //will merge one set of context, returning false if no mergable contexts were found
-pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> bool {
+pub fn merge_contexts(
+    contexts: &mut Vec<Context>,
+    globals: &mut Globals,
+    check_return_vals: bool,
+) -> bool {
     let mut mergable_ind = Vec::<usize>::new();
     let mut ref_c = 0;
     loop {
@@ -366,15 +370,20 @@ pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> boo
             }
             let mut not_eq = false;
 
-            //check variables are equal
-            for (key, stack) in &c.variables {
-                for (i, (val, _)) in stack.iter().enumerate() {
-                    if !value_equality(ref_c.variables[key][i].0, *val, globals) {
-                        not_eq = true;
-                        break;
+            if check_return_vals && !value_equality(c.return_value, ref_c.return_value, globals) {
+                not_eq = true;
+            } else {
+                //check variables are equal
+                for (key, stack) in &c.variables {
+                    for (i, (val, _)) in stack.iter().enumerate() {
+                        if !value_equality(ref_c.variables[key][i].0, *val, globals) {
+                            not_eq = true;
+                            break;
+                        }
                     }
                 }
             }
+
             if not_eq {
                 continue;
             }
@@ -407,7 +416,7 @@ pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> boo
         let mut params = HashMap::new();
         params.insert(51, ObjParam::Group(new_group));
         params.insert(1, ObjParam::Number(1268.0));
-        (*globals).trigger_order += 1;
+        (*globals).trigger_order += 1.0;
 
         (*globals).func_ids[context.func_id].obj_list.push((
             GdObj {
@@ -416,7 +425,7 @@ pub fn merge_contexts(contexts: &mut Vec<Context>, globals: &mut Globals) -> boo
                 ..context_trigger(context, &mut globals.uid_counter)
             }
             .context_parameters(context),
-            globals.trigger_order,
+            TriggerOrder(globals.trigger_order),
         ))
     };
     add_spawn_trigger(&contexts[ref_c]);

@@ -1,0 +1,28 @@
+
+
+move_counter = (from, to) {
+    for i in 16..0 {
+        x = 2^i
+
+        -> if from >= x {
+            from -= x
+            to += x
+        }
+    }
+}
+
+
+
+add = (c1, c2) {
+    out = counter()
+    move_counter(c1, out)
+    move_counter(c2, out)
+}
+
+
+
+
+
+
+
+

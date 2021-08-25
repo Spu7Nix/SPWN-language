@@ -207,7 +207,6 @@ pub fn create_error(
     labels: &[(CodeArea, &str)],
     note: Option<&str>,
 ) -> ErrorReport {
-
     ErrorReport {
         info: info.clone(),
         message: message.to_string(),
@@ -421,7 +420,7 @@ impl From<RuntimeError> for ErrorReport {
                     }
                 ),
                 &[
-                    (broke, "Decleared here"),
+                    (broke, "Declared here"),
                     (
                         dropped,
                         &format!("Can't reach past here because {}", reason),
@@ -570,9 +569,9 @@ pub fn compile_scope(
         return Ok(());
     }
     contexts.enter_scope();
+    contexts.reset_return_vals();
 
     for statement in statements.iter() {
-        contexts.reset_return_vals();
         //find out what kind of statement this is
         //let start_time = Instant::now();
 
@@ -595,7 +594,25 @@ pub fn compile_scope(
         use ast::StatementBody::*;
 
         let stored_context = if statement.arrow {
-            Some(contexts.iter().map(|a| a.clone()).collect::<Vec<_>>())
+            let mut stored = Vec::new();
+            globals.push_new_preserved();
+            for c in contexts.with_breaks() {
+                stored.push(c.clone());
+                for v in c.inner().get_variables().values() {
+                    for (v, _) in v {
+                        globals.push_preserved_val(*v)
+                    }
+                }
+                match c.inner().broken {
+                    Some((BreakType::Macro(Some(v), _), _)) | Some((BreakType::Switch(v), _)) => {
+                        globals.push_preserved_val(v)
+                    }
+                    _ => (),
+                }
+            }
+            // TODO: preserve these
+            *contexts = FullContext::stack(&mut contexts.iter().map(|c| c.clone())).unwrap();
+            Some(stored)
         } else {
             None
         };
@@ -606,8 +623,11 @@ pub fn compile_scope(
             Expr(expr) => {
                 let is_assign = !expr.operators.is_empty()
                     && expr.operators[0] == ast::Operator::Assign
-                    && !expr.values[0]
-                        .is_undefinable(contexts.iter().next().unwrap().inner(), globals, true);
+                    && !expr.values[0].is_undefinable(
+                        contexts.iter().next().unwrap().inner(),
+                        globals,
+                        true,
+                    );
 
                 //println!("{:?}, {}", expr, is_assign);
 
@@ -622,16 +642,21 @@ pub fn compile_scope(
 
                     match symbol.value.body {
                         ast::ValueBody::Array(var_a) => {
-
                             new_expr.eval(contexts, globals, info.clone(), true)?;
 
                             for ctx in contexts.iter() {
                                 match globals.stored_values[ctx.inner().return_value].clone() {
                                     Value::Array(val_a) => {
-                                        let ranges = var_a.iter().filter(|x| x.values[0].operator == Some(ast::UnaryOperator::Range)).collect::<Vec<&ast::Expression>>();
+                                        let ranges = var_a
+                                            .iter()
+                                            .filter(|x| {
+                                                x.values[0].operator
+                                                    == Some(ast::UnaryOperator::Range)
+                                            })
+                                            .collect::<Vec<&ast::Expression>>();
 
                                         if ranges.len() > 1 {
-                                            let mut why_sput = info.position.clone();
+                                            let mut why_sput = info.position;
                                             why_sput.pos = ranges[0].values[0].pos;
                                             info.position.pos = ranges[1].values[0].pos;
 
@@ -643,15 +668,19 @@ pub fn compile_scope(
                                                     (info.position, "Attempted to spread again"),
                                                 ],
                                                 None,
-                                            )));   
+                                            )));
                                         }
 
-
                                         if (var_a.len() < val_a.len() && ranges.is_empty())
-                                           || var_a.len() > val_a.len() {
+                                            || var_a.len() > val_a.len()
+                                        {
                                             return Err(RuntimeError::CustomError(create_error(
                                                 info,
-                                                &format!("Expected {} items to destructure, found {}", var_a.len(), val_a.len()),
+                                                &format!(
+                                                    "Expected {} items to destructure, found {}",
+                                                    var_a.len(),
+                                                    val_a.len()
+                                                ),
                                                 &[],
                                                 None,
                                             )));
@@ -661,7 +690,9 @@ pub fn compile_scope(
                                             loop {
                                                 let mut idx_step = 1;
                                                 for expr_ctx in ctx.iter() {
-                                                    if var_a[var_idx].operators.len() > 0 || var_a[var_idx].values.len() == 0 {
+                                                    if var_a[var_idx].operators.is_empty()
+                                                        || var_a[var_idx].values.is_empty()
+                                                    {
                                                         use crate::fmt::_format2;
 
                                                         return Err(RuntimeError::CustomError(create_error(
@@ -677,26 +708,37 @@ pub fn compile_scope(
                                                             let mut without_op = var_val.clone();
                                                             without_op.operator = None;
 
-                                                            idx_step = 1+val_a.len()-var_a.len();
-                                                            let mut packed = Vec::<StoredValue>::new();
+                                                            idx_step =
+                                                                1 + val_a.len() - var_a.len();
+                                                            let mut packed =
+                                                                Vec::<StoredValue>::new();
 
-                                                            let storage = without_op.define(expr_ctx.inner(), globals, &info)?;
+                                                            let storage = without_op.define(
+                                                                expr_ctx.inner(),
+                                                                globals,
+                                                                &info,
+                                                            )?;
 
-                                                            for tmp_idx in idx..(idx+idx_step) {
+                                                            for tmp_idx in idx..(idx + idx_step) {
                                                                 let cloned = clone_value(
                                                                     val_a[tmp_idx],
                                                                     globals,
                                                                     expr_ctx.inner().start_group,
                                                                     !mutable,
-                                                                    globals.get_area(storage)
+                                                                    globals.get_area(storage),
                                                                 );
                                                                 packed.push(cloned);
                                                             }
                                                             //println!("collecting {} items", val_a.len()-var_a.len());
-                                                            globals.stored_values[storage] = Value::Array(packed);
+                                                            globals.stored_values[storage] =
+                                                                Value::Array(packed);
                                                         }
                                                         _ => {
-                                                            let storage = var_val.define(expr_ctx.inner(), globals, &info)?;
+                                                            let storage = var_val.define(
+                                                                expr_ctx.inner(),
+                                                                globals,
+                                                                &info,
+                                                            )?;
                                                             //clone the value so as to not share the reference
 
                                                             let cloned = clone_and_get_value(
@@ -718,7 +760,7 @@ pub fn compile_scope(
                                                 }
                                             }
                                         }
-                                    },
+                                    }
                                     b => {
                                         return Err(RuntimeError::TypeError {
                                             expected: "array".to_string(),
@@ -729,7 +771,7 @@ pub fn compile_scope(
                                     }
                                 }
                             }
-                        },
+                        }
                         _ => {
                             match (
                                 new_expr.values.len() == 1
@@ -746,12 +788,14 @@ pub fn compile_scope(
                                             symbol.define(full_context.inner(), globals, &info)?;
 
                                         //pick a start group
-                                        let start_group = Group::next_free(&mut globals.closed_groups);
+                                        let start_group =
+                                            Group::next_free(&mut globals.closed_groups);
                                         //store value
                                         globals.stored_values[storage] =
                                             Value::TriggerFunc(TriggerFunction { start_group });
 
-                                        full_context.inner().fn_context_change_stack = vec![info.position];
+                                        full_context.inner().fn_context_change_stack =
+                                            vec![info.position];
                                         //new_info.last_context_change_stack = vec![info.position.clone()];
 
                                         f.to_trigger_func(
@@ -1021,16 +1065,16 @@ pub fn compile_scope(
                         },
                     );
                     params.insert(1, ObjParam::Number(1268.0));
-                    (*globals).trigger_order += 1;
+                    (*globals).trigger_order += 1.0;
 
                     (*globals).func_ids[context.func_id].obj_list.push((
                         GdObj {
                             params,
 
-                            ..context_trigger(&context, &mut globals.uid_counter)
+                            ..context_trigger(context, &mut globals.uid_counter)
                         }
-                        .context_parameters(&context),
-                        globals.trigger_order,
+                        .context_parameters(context),
+                        TriggerOrder(globals.trigger_order),
                     ))
                 }
             }
@@ -1373,7 +1417,10 @@ pub fn compile_scope(
             }
         }
 
+        contexts.reset_return_vals();
+
         if let Some(c) = stored_context {
+            globals.pop_preserved();
             //resetting the context if async
             let mut list = c;
 
@@ -1396,33 +1443,7 @@ pub fn compile_scope(
         }
 
         //try to merge contexts
-
-        if let FullContext::Split(_, _) = contexts {
-            let mut broken = Vec::new();
-            let mut not_broken = Vec::new();
-            for c in contexts.with_breaks() {
-                if c.inner().broken.is_some() {
-                    broken.push(c.inner().clone())
-                } else {
-                    not_broken.push(c.inner().clone())
-                }
-            }
-
-            if not_broken.len() > 1 {
-                loop {
-                    if !merge_contexts(&mut not_broken, globals) {
-                        break;
-                    }
-                }
-
-                broken.extend(not_broken);
-
-                *contexts =
-                    FullContext::stack(&mut broken.into_iter().map(FullContext::Single)).unwrap();
-            } else if not_broken.is_empty() {
-                break;
-            }
-        }
+        merge_all_contexts(contexts, globals, false);
 
         if contexts.iter().next().is_none() {
             break;
@@ -1448,6 +1469,37 @@ pub fn compile_scope(
     contexts.exit_scope();
 
     Ok(())
+}
+
+pub fn merge_all_contexts(
+    contexts: &mut FullContext,
+    globals: &mut Globals,
+    check_return_vals: bool,
+) {
+    if let FullContext::Split(_, _) = contexts {
+        let mut broken = Vec::new();
+        let mut not_broken = Vec::new();
+        for c in contexts.with_breaks() {
+            if c.inner().broken.is_some() {
+                broken.push(c.inner().clone())
+            } else {
+                not_broken.push(c.inner().clone())
+            }
+        }
+
+        if not_broken.len() > 1 {
+            loop {
+                if !merge_contexts(&mut not_broken, globals, check_return_vals) {
+                    break;
+                }
+            }
+
+            broken.extend(not_broken);
+
+            *contexts =
+                FullContext::stack(&mut broken.into_iter().map(FullContext::Single)).unwrap();
+        }
+    }
 }
 
 fn merge_impl(target: &mut Implementations, source: &Implementations) {

@@ -37,19 +37,32 @@ You can either use the installers for your operating system, or build SPWN from 
 2. Install the debian package using dpkg:
 
 ```sh
-[deb@spwn ~] $ sudo dpkg -i spwn_0.0.6-0_amd64.deb
+sudo dpkg -i spwn_0.0.6-0_amd64.deb
 ```
 ###### Arch (Manjaro, Artix, ...)
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
 ```sh
-[arch@spwn ~] $ pacman -U spwn-0.0.6_amd64.pkg.tar.zst
+pacman -U spwn-0.0.6_amd64.pkg.tar.zst
 ```
 - Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
 
 ```sh
-[arch@spwn ~] $ yay -S spwn-bin
+yay -S spwn-bin
 ```
+
+#### Android
+
+###### Requirements
+- Rooted device
+- Termux, or something similar
+- Rust
+
+Once you have these, run:
+```
+cargo install spwn
+```
+Let it compile and you're good to go
 
 #### Compiling from source
 1. Download source code from this repository
@@ -156,7 +169,7 @@ Build a file called AI.spwn and output the level string to the console.
 ## Todo at some point
 
 - [x] implement live editor features for windows
-- [ ] make it work on linux
+- [x] make it work on linux
 - [x] nested comments
 - [x] get and edit obj and trigger properties
 

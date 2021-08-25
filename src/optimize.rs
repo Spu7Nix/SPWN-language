@@ -3,9 +3,10 @@ use crate::builtin::{Block, Group, Id, Item};
 use crate::compiler_types::FunctionId;
 
 //mod icalgebra;
-use crate::levelstring::{GdObj, ObjParam};
+use crate::levelstring::{GdObj, ObjParam, TriggerOrder};
 
-use std::collections::{HashMap, HashSet};
+use std::cmp::Ordering;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 pub type Swaps = HashMap<Group, Group>;
 
@@ -37,7 +38,8 @@ fn get_role(obj_id: u16, hd: bool) -> TriggerRole {
     }
 }
 
-type ObjPtr = (usize, usize);
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ObjPtr(usize, usize);
 //                                     triggers      connections in
 pub type TriggerNetwork = HashMap<Group, TriggerGang>;
 
@@ -47,7 +49,7 @@ pub struct TriggerGang {
     pub triggers: Vec<Trigger>,
     pub connections_in: u32,
     // wether any of the connections in are not instant count triggers
-    pub non_ic_triggers_in: bool,
+    pub non_spawn_triggers_in: bool,
 }
 
 impl TriggerGang {
@@ -55,7 +57,7 @@ impl TriggerGang {
         TriggerGang {
             triggers,
             connections_in: 0,
-            non_ic_triggers_in: false,
+            non_spawn_triggers_in: false,
         }
     }
 }
@@ -64,9 +66,7 @@ impl TriggerGang {
 pub struct Trigger {
     pub obj: ObjPtr,
     pub role: TriggerRole,
-    pub order: usize,
     pub deleted: bool,
-    pub optimized: bool,
 }
 
 pub struct Triggerlist<'a> {
@@ -74,7 +74,7 @@ pub struct Triggerlist<'a> {
 }
 
 impl<'a> std::ops::Index<ObjPtr> for Triggerlist<'a> {
-    type Output = (GdObj, usize);
+    type Output = (GdObj, TriggerOrder);
 
     fn index(&self, i: ObjPtr) -> &Self::Output {
         &self.list[i.0].obj_list[i.1]
@@ -99,18 +99,16 @@ pub fn optimize(
 
     // sort all triggers by their group
     for (f, fnid) in obj_in.iter().enumerate() {
-        for (o, (obj, order)) in fnid.obj_list.iter().enumerate() {
+        for (o, (obj, _)) in fnid.obj_list.iter().enumerate() {
             if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
                 let mut hd = false;
                 if let Some(ObjParam::Bool(hd_val)) = obj.params.get(&103) {
                     hd = *hd_val;
                 }
                 let trigger = Trigger {
-                    obj: (f, o),
+                    obj: ObjPtr(f, o),
                     role: get_role(*id as u16, hd),
-                    order: *order,
                     deleted: false,
-                    optimized: false,
                 };
                 if let Some(ObjParam::Group(group)) = obj.params.get(&57) {
                     match network.get_mut(group) {
@@ -142,56 +140,70 @@ pub fn optimize(
     // not an optimization, more like a consistency fix
     // also, like nothing works without this, so i should probably move
     // this somewhere else if i want to add an option to not have optimization
-    network = fix_read_write_order(&mut objects, &network, &mut closed_group);
+    //network = fix_read_write_order(&mut objects, &network, &mut closed_group);
 
     // round 1
-    spawn_and_dead_code_optimization(
+    dead_code_optimization(
         &mut network,
         &mut objects,
         &mut closed_group,
         reserved_groups,
     );
+    //println!("dead code complete");
+
+    clean_network(&mut network, &objects, false);
+
+    spawn_optimisation(&mut network, &mut objects, reserved_groups);
+    //println!("spawn triggers complete");
+
+    clean_network(&mut network, &objects, false);
+
+    // dedup_triggers(&mut network, &mut objects, reserved_groups);
 
     // clean_network(&mut network, &objects, false);
 
-    // instant_count_optimization(&mut network, &mut objects, &mut closed_group);
-
-    // // //cleanup
-
-    // clean_network(&mut network, &objects, false);
-
-    // // // // round 2
-
-    // spawn_and_dead_code_optimization(&mut network, &mut objects, &mut closed_group);
-
-    // clean_network(&mut network, &objects, false);
-
-    //instant_count_optimization(&mut network, &mut objects, &mut closed_group);
+    intraframe_grouping(
+        &mut network,
+        &mut objects,
+        reserved_groups,
+        &mut closed_group,
+    );
 
     rebuild(&network, &obj_in)
 }
 
-fn spawn_and_dead_code_optimization(
+fn is_start_group(g: Group, reserved_groups: &HashSet<Group>) -> bool {
+    matches!(g.id, Id::Specific(_)) || reserved_groups.contains(&g)
+}
+
+fn dead_code_optimization(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
     closed_group: &mut u16,
     reserved_groups: &HashSet<Group>,
 ) {
-    let mut swaps = HashMap::new();
     for (group, gang) in network.clone() {
-        if matches!(group.id, Id::Specific(_)) || reserved_groups.contains(&group) {
+        if is_start_group(group, reserved_groups) {
             for (i, trigger) in gang.triggers.iter().enumerate() {
                 if trigger.role != TriggerRole::Output {
-                    let (_, new_swaps) =
-                        optimize_from(network, objects, (group, i), closed_group, reserved_groups);
-                    swaps.extend(new_swaps);
+                    let mut visited = Vec::new();
+                    if check_for_dead_code(
+                        network,
+                        objects,
+                        (group, i),
+                        closed_group,
+                        reserved_groups,
+                        &mut visited,
+                        0,
+                    ) {
+                        (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
+                    }
                 } else {
                     (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
                 }
             }
         }
     }
-    replace_groups(swaps, objects);
 }
 
 fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete_objects: bool) {
@@ -203,7 +215,6 @@ fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete_obj
             .iter()
             .filter(|a| !a.deleted)
             .map(|a| Trigger {
-                optimized: false,
                 deleted: delete_objects,
                 ..*a
             })
@@ -236,12 +247,8 @@ fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete_obj
                 if let Some(gang) = new_network.get_mut(id) {
                     (*gang).connections_in += 1;
 
-                    if let Some(ObjParam::Number(objid)) = obj.params.get(&1) {
-                        if *objid as i16 != 1811 {
-                            (*gang).non_ic_triggers_in = true;
-                        }
-                    } else {
-                        (*gang).non_ic_triggers_in = true;
+                    if trigger.role != TriggerRole::Spawn {
+                        (*gang).non_spawn_triggers_in = true;
                     }
                 }
             }
@@ -326,358 +333,86 @@ fn reads_writes(t: Trigger, objects: &Triggerlist) -> (Vec<IdData>, Vec<IdData>)
     out
 }
 
-fn get_targets<'a>(
+#[must_use]
+fn check_for_dead_code<'a>(
     network: &'a mut TriggerNetwork,
-    objects: &'a mut Triggerlist,
+    objects: &mut Triggerlist,
     start: (Group, usize),
-    delay: u32,
-    ignore_optimized: bool,
     closed_group: &mut u16,
     reserved_groups: &HashSet<Group>,
-) -> (Option<Vec<(Group, u32)>>, Swaps) {
-    //u32: delay in millis
-
-    let mut swaps = HashMap::new();
-
-    let trigger = network.get(&start.0).unwrap().triggers[start.1];
-    let start_obj = &objects[trigger.obj].0.params;
-
-    if network[&start.0].triggers[start.1].optimized {
-        if network[&start.0].triggers[start.1].deleted {
-            return (Some(Vec::new()), swaps);
-        } else {
-            // if its a spawn trigger, go to targets anyways
-            return (None, swaps);
-        }
+    visited_stack: &mut Vec<(Group, usize)>,
+    d: u32,
+) -> bool {
+    //returns whether to keep or delete the trigger
+    let trigger = network[&start.0].triggers[start.1];
+    if !trigger.deleted {
+        return true;
     }
 
-    (*network.get_mut(&start.0).unwrap()).triggers[start.1].optimized = true;
+    if trigger.role == TriggerRole::Output {
+        (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
+        return true;
+    }
+
+    if visited_stack.contains(&start) {
+        return true; // keep all loops
+    }
+
+    // if trigger is an output trigger, keep this branch
+
+    let start_obj = &objects[trigger.obj].0.params;
 
     //println!("{}", network[&start.0].connections_in);
 
-    let list: Vec<(usize, Group)>;
-
-    if let Some(ObjParam::Group(g)) = start_obj.get(&51) {
-        if matches!(g.id, Id::Specific(_)) || reserved_groups.contains(g) {
+    let list: Vec<(usize, Group)> = if let Some(ObjParam::Group(g)) = start_obj.get(&51) {
+        if is_start_group(*g, reserved_groups) {
             //(*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
-            return (Some(vec![(*g, delay)]), swaps);
-        }
-
-        if let Some(gang) = network.get(g) {
+            return true;
+        } else if let Some(gang) = network.get(g) {
             if gang.triggers.is_empty() {
-                return (Some(Vec::new()), swaps);
+                return false;
             }
-            list = vec![*g; gang.triggers.len()]
+
+            vec![*g; gang.triggers.len()]
                 .iter()
                 .copied()
                 .enumerate()
-                .collect();
+                .collect()
         } else {
             //dangling
 
-            return (Some(Vec::new()), swaps);
+            return false;
         }
     } else {
         //dangling
 
-        return (Some(Vec::new()), swaps);
-    }
-
-    let added_delay = match start_obj.get(&63) {
-        Some(ObjParam::Number(n)) => (*n * 1000.0) as u32,
-        Some(ObjParam::Epsilon) => {
-            if delay == 0 {
-                50
-            } else {
-                0
-            }
-        }
-        _ => 0,
+        return false;
     };
 
-    let mut out = HashSet::<(Group, u32)>::new();
+    let mut out = false;
+
+    visited_stack.push(start);
 
     for (i, g) in list {
         let trigger_ptr = (g, i);
-        let trigger = network[&trigger_ptr.0].triggers[trigger_ptr.1];
 
-        let full_delay = delay + added_delay;
-
-        //let full_trigger_ptr = (trigger_ptr.0, trigger_ptr.1, full_delay);
-        let target_out = (trigger_ptr.0, full_delay);
-
-        if trigger.optimized && !ignore_optimized {
-            if !trigger.deleted {
-                out.insert(target_out);
-            }
-        } else if network[&trigger_ptr.0].connections_in > 1 {
+        if check_for_dead_code(
+            network,
+            objects,
+            trigger_ptr,
+            closed_group,
+            reserved_groups,
+            visited_stack,
+            d + 1,
+        ) {
             (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
-            let (keep, new_swaps) =
-                optimize_from(network, objects, trigger_ptr, closed_group, reserved_groups);
-
-            swaps.extend(new_swaps);
-            if keep {
-                out.insert(target_out);
-            } else {
-                (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = true;
-            }
-        } else {
-            match trigger.role {
-                TriggerRole::Output => {
-                    (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted =
-                        false;
-
-                    out.insert(target_out);
-                }
-                TriggerRole::Func => {
-                    let (keep, new_swaps) =
-                        optimize_from(network, objects, trigger_ptr, closed_group, reserved_groups);
-                    swaps.extend(new_swaps);
-                    if keep {
-                        (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1]
-                            .deleted = false;
-                        out.insert(target_out);
-                    }
-                }
-                TriggerRole::Spawn => {
-                    let (result, new_swaps) = get_targets(
-                        network,
-                        objects,
-                        trigger_ptr,
-                        delay + added_delay,
-                        ignore_optimized,
-                        closed_group,
-                        reserved_groups,
-                    );
-                    swaps.extend(new_swaps);
-                    match result {
-                        Some(children) => out.extend(children),
-                        None => {
-                            (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1]
-                                .deleted = false;
-                            out.insert(target_out);
-                        }
-                    }
-                }
-            }
+            out = true;
         }
     }
 
-    (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = true;
+    assert_eq!(visited_stack.pop(), Some(start));
 
-    (Some(out.iter().copied().collect()), swaps)
-}
-
-pub fn create_spawn_trigger(
-    trigger: Trigger,
-    target_group: Group,
-    group: Group,
-    delay: f64,
-    objects: &mut Triggerlist,
-    network: &mut TriggerNetwork,
-    //         opt   del
-    settings: (bool, bool),
-) {
-    let mut new_obj_map = HashMap::new();
-    new_obj_map.insert(1, ObjParam::Number(1268.0));
-    new_obj_map.insert(51, ObjParam::Group(target_group));
-    new_obj_map.insert(63, ObjParam::Number(delay));
-
-    new_obj_map.insert(57, ObjParam::Group(group));
-
-    let new_obj = GdObj {
-        params: new_obj_map,
-        func_id: trigger.obj.0,
-        mode: ObjectMode::Trigger,
-        unique_id: objects[trigger.obj].0.unique_id,
-    };
-
-    (*objects.list)[trigger.obj.0]
-        .obj_list
-        .push((new_obj.clone(), trigger.order));
-
-    let obj_index = (
-        trigger.obj.0,
-        objects.list[trigger.obj.0].obj_list.len() - 1,
-    );
-    let new_trigger = Trigger {
-        obj: obj_index,
-        optimized: settings.0,
-        deleted: settings.1,
-        role: TriggerRole::Spawn,
-        ..trigger
-    };
-
-    if let Some(ObjParam::Group(group)) = new_obj.params.get(&57) {
-        match network.get_mut(group) {
-            Some(gang) => (*gang).triggers.push(new_trigger),
-            None => {
-                network.insert(*group, TriggerGang::new(vec![new_trigger]));
-            }
-        }
-    } else {
-        match network.get_mut(&NO_GROUP) {
-            Some(gang) => (*gang).triggers.push(new_trigger),
-            None => {
-                network.insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
-            }
-        }
-    }
-}
-
-#[must_use]
-fn optimize_from<'a>(
-    network: &'a mut TriggerNetwork,
-    objects: &mut Triggerlist,
-    start: (Group, usize),
-    closed_group: &mut u16,
-    reserved_groups: &HashSet<Group>,
-) -> (bool, Swaps) {
-    //returns weather to keep or delete the trigger
-    let mut swaps = HashMap::new();
-
-    let trigger = network[&start.0].triggers[start.1];
-    if trigger.role == TriggerRole::Output {
-        (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
-        return (true, swaps);
-    }
-
-    if trigger.optimized {
-        return (!trigger.deleted, swaps);
-    }
-
-    //let role = trigger.role;
-
-    let (targets, new_swaps) = get_targets(
-        network,
-        objects,
-        start,
-        0,
-        false,
-        closed_group,
-        reserved_groups,
-    );
-    let trigger = network[&start.0].triggers[start.1];
-
-    swaps.extend(new_swaps);
-
-    // {
-    //     let object = &objects[trigger.obj];
-    //     println!("\nsource");
-    //     println!("Deleted: {}", trigger.deleted);
-    //     println!("Optimized: {}", trigger.optimized);
-    //     let mut paramlist = object.0.params.iter().collect::<Vec<(&u16, &ObjParam)>>();
-    //     paramlist.sort_by(|a, b| (a.0).cmp(b.0));
-    //     for (k, v) in &paramlist {
-    //         println!("{}: {:?}", k, v);
-    //     }
-    // }
-
-    //println!("targets: {:?}", targets);
-
-    if let Some(targets) = targets {
-        if targets.is_empty() {
-            return (false, swaps);
-        }
-
-        if (trigger.role == TriggerRole::Func) && targets.len() == 1 && targets[0].1 == 0
-        //&& network[&start.0].connections_in > 1
-        {
-            //let new_trigger = clone_trigger(trigger, network, objects);
-            objects[trigger.obj]
-                .0
-                .params
-                .insert(51, ObjParam::Group(targets[0].0));
-            (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
-            (*network.get_mut(&start.0).unwrap()).triggers[start.1].optimized = true;
-            return (true, swaps);
-        }
-
-        let spawn_group = if trigger.role == TriggerRole::Func {
-            (*closed_group) += 1;
-            let new_group = Group {
-                id: Id::Arbitrary(*closed_group),
-            };
-
-            objects[trigger.obj]
-                .0
-                .params
-                .insert(51, ObjParam::Group(new_group));
-
-            (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
-
-            new_group
-        } else {
-            match objects[trigger.obj].0.params.get(&57) {
-                Some(ObjParam::Group(g)) => *g,
-                _ => NO_GROUP,
-            }
-        };
-        let mut delay_map: HashMap<u32, Vec<Group>> = HashMap::new();
-        for (group, delay) in targets {
-            if let Some(list) = delay_map.get_mut(&delay) {
-                list.push(group);
-            } else {
-                delay_map.insert(delay, vec![group]);
-            }
-        }
-
-        for (delay, targets) in delay_map {
-            // let can_be_combined = targets
-            //     .iter()
-            //     .filter(|a| network[a].connections_in == 1)
-            //     .collect::<Vec<_>>();
-            // if !can_be_combined.is_empty() {
-            //     if delay == 0 {
-            //         swaps.extend(can_be_combined.iter().map(|a| (**a, spawn_group)));
-            //     } else {
-            //         (*closed_group) += 1;
-            //         let new_group = Group {
-            //             id: Id::Arbitrary(*closed_group),
-            //         };
-            //         create_spawn_trigger(
-            //             trigger,
-            //             new_group,
-            //             spawn_group,
-            //             delay as f64 / 1000.0,
-            //             objects,
-            //             network,
-            //             (true, false),
-            //         );
-            //         swaps.extend(can_be_combined.iter().map(|a| (**a, new_group)));
-            //     }
-            // }
-            // can't be combined
-            for g in targets
-            // .iter()
-            // .filter(|a| network[a].connections_in != 1)
-            // .collect::<Vec<_>>()
-            // .iter()
-            {
-                if !(matches!(g.id, Id::Specific(_)) || reserved_groups.contains(&g))
-                    && network[&g].connections_in == 1
-                    && delay == 0
-                {
-                    swaps.insert(g, spawn_group);
-                } else {
-                    create_spawn_trigger(
-                        trigger,
-                        g,
-                        spawn_group,
-                        delay as f64 / 1000.0,
-                        objects,
-                        network,
-                        (true, false),
-                    );
-                }
-            }
-        }
-
-        (true, swaps)
-    } else {
-        (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
-        (true, swaps)
-    }
+    out
 }
 
 fn rebuild(network: &TriggerNetwork, orig_structure: &[FunctionId]) -> Vec<FunctionId> {
@@ -709,6 +444,65 @@ fn rebuild(network: &TriggerNetwork, orig_structure: &[FunctionId]) -> Vec<Funct
     out
 }
 
+pub fn create_spawn_trigger(
+    trigger: Trigger,
+    target_group: Group,
+    group: Group,
+    delay: f64,
+    objects: &mut Triggerlist,
+    network: &mut TriggerNetwork,
+    role: TriggerRole,
+    deleted: bool,
+) {
+    let mut new_obj_map = HashMap::new();
+    new_obj_map.insert(1, ObjParam::Number(1268.0));
+    new_obj_map.insert(51, ObjParam::Group(target_group));
+    new_obj_map.insert(63, ObjParam::Number(delay));
+
+    new_obj_map.insert(57, ObjParam::Group(group));
+
+    let order = objects[trigger.obj].1;
+
+    let new_obj = GdObj {
+        params: new_obj_map,
+        func_id: trigger.obj.0,
+        mode: ObjectMode::Trigger,
+        unique_id: objects[trigger.obj].0.unique_id,
+    };
+
+    (*objects.list)[trigger.obj.0]
+        .obj_list
+        .push((new_obj.clone(), order));
+
+    let obj_index = ObjPtr(
+        trigger.obj.0,
+        objects.list[trigger.obj.0].obj_list.len() - 1,
+    );
+    let new_trigger = Trigger {
+        obj: obj_index,
+
+        deleted,
+        role,
+    };
+
+    if let Some(ObjParam::Group(group)) = new_obj.params.get(&57) {
+        match network.get_mut(group) {
+            Some(gang) => (*gang).triggers.push(new_trigger),
+            None => {
+                network.insert(*group, TriggerGang::new(vec![new_trigger]));
+            }
+        }
+    } else {
+        match network.get_mut(&NO_GROUP) {
+            Some(gang) => (*gang).triggers.push(new_trigger),
+            None => {
+                network.insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
+            }
+        }
+    }
+}
+
+// not needed lol
 fn fix_read_write_order(
     objects: &mut Triggerlist,
     network: &TriggerNetwork,
@@ -718,7 +512,7 @@ fn fix_read_write_order(
     for (group, gang) in network {
         let mut written_to = HashSet::new();
         let mut read_from = HashSet::new();
-        let mut current_group = *group;
+        let current_group = *group;
 
         new_network.insert(
             current_group,
@@ -728,17 +522,21 @@ fn fix_read_write_order(
             },
         );
         let mut sorted = gang.triggers.clone();
-        sorted.sort_by(|a, b| objects[a.obj].1.cmp(&objects[b.obj].1));
+        sorted.sort_by(|a, b| objects[a.obj].1.partial_cmp(&objects[b.obj].1).unwrap());
+
+        for trigger in &sorted {
+            let (reads, writes) = reads_writes(*trigger, objects);
+            written_to.extend(writes);
+            read_from.extend(reads);
+        }
 
         //let mut previous_delays = Vec::new();
 
-        for trigger in &gang.triggers {
-            let (reads, writes) = reads_writes(*trigger, objects);
-
-            if reads.iter().any(|x| written_to.contains(x))
-                || writes.iter().any(|x| read_from.contains(x))
-            {
-                // add delay, reset lists
+        for trigger in &sorted {
+            dbg!(objects[trigger.obj].1 .0);
+            let (_, writes) = reads_writes(*trigger, objects);
+            if writes.iter().any(|x| read_from.contains(x)) {
+                // put trigger behinf a func spawn trigger
 
                 // select new group
                 (*closed_group) += 1;
@@ -751,98 +549,701 @@ fn fix_read_write_order(
                     *trigger,
                     new_group,
                     current_group,
-                    0.05,
+                    0.0,
                     objects,
                     &mut new_network,
-                    (false, true),
+                    TriggerRole::Func,
+                    true,
                 );
 
-                current_group = new_group;
+                (*objects)[trigger.obj]
+                    .0
+                    .params
+                    .insert(57, ObjParam::Group(new_group));
+
                 new_network.insert(
-                    current_group,
+                    new_group,
                     TriggerGang {
-                        triggers: Vec::new(),
+                        triggers: vec![*trigger],
                         connections_in: 1,
-                        non_ic_triggers_in: true,
+                        non_spawn_triggers_in: true,
                     },
                 );
-                written_to.clear();
-                read_from.clear();
-
-            // for obj in &previous_delays {
-            //     if let Some(ObjParam::Number(d)) = objects[*obj].0.params.get_mut(&63) {
-            //         (*d) += 0.05;
-            //     } else {
-            //         unreachable!()
-            //     }
-            // }
             } else {
-                written_to.extend(writes);
-                read_from.extend(reads);
+                (*new_network.get_mut(&current_group).unwrap())
+                    .triggers
+                    .push(*trigger);
+
+                //change object group
+                // TODO: enforce single group on trigger
+
+                (*objects)[trigger.obj]
+                    .0
+                    .params
+                    .insert(57, ObjParam::Group(current_group));
             }
-
-            // get mutable ref to delay
-            // match trigger.role {
-            //     TriggerRole::Func => {
-            //         // add spawn trigger
-            //         (*closed_group) += 1;
-            //         let new_group = Group {
-            //             id: ID::Arbitrary(*closed_group),
-            //         };
-            //         let target = if let ObjParam::Group(g) = &objects[trigger.obj].0.params[&51] {
-            //             g
-            //         } else {
-            //             unreachable!()
-            //         };
-
-            //         create_spawn_trigger(
-            //             *trigger,
-            //             *target,
-            //             Some(*group),
-            //             0.0,
-            //             objects,
-            //             &mut new_network,
-            //             (false, true),
-            //         );
-
-            //         (*objects[trigger.obj].0.params.get_mut(&51).unwrap()) =
-            //             ObjParam::Group(new_group);
-
-            //         new_network.insert(new_group, TriggerGang::new(vec![*trigger]));
-            //     }
-            //     TriggerRole::Spawn => {
-            //         // use existing
-            //         match objects[trigger.obj].0.params.get_mut(&63) {
-            //             Some(ObjParam::Number(_)) => (),
-            //             _ => {
-            //                 objects[trigger.obj]
-            //                     .0
-            //                     .params
-            //                     .insert(63, ObjParam::Number(0.0));
-            //             }
-            //         };
-            //         previous_delays.push(trigger.obj);
-            //         (*new_network.get_mut(&current_group).unwrap())
-            //             .triggers
-            //             .push(*trigger)
-            //     }
-            //     TriggerRole::Output => (*new_network.get_mut(&current_group).unwrap())
-            //         .triggers
-            //         .push(*trigger),
-            // };
-
-            (*new_network.get_mut(&current_group).unwrap())
-                .triggers
-                .push(*trigger);
-
-            //change object group
-            // TODO: enforce single group on trigger
-
-            (*objects)[trigger.obj]
-                .0
-                .params
-                .insert(57, ObjParam::Group(current_group));
         }
     }
     new_network
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+struct SpawnDelay {
+    delay: u32,
+    epsiloned: bool,
+}
+
+// spawn trigger optimisation
+pub fn spawn_optimisation(
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+    reserved_groups: &HashSet<Group>,
+) {
+    let mut spawn_connections = HashMap::<Group, Vec<(Group, SpawnDelay, Trigger)>>::new();
+    let mut inputs = HashSet::<Group>::new();
+    let mut outputs = HashSet::<Group>::new();
+
+    let mut cycle_points = HashSet::<Group>::new();
+    let mut all = Vec::new();
+
+    for (group, gang) in network.iter_mut() {
+        let output_condition = gang.triggers.iter().any(|t| t.role != TriggerRole::Spawn);
+        if output_condition {
+            outputs.insert(*group);
+        }
+        for trigger in &mut gang.triggers {
+            let obj = &objects[trigger.obj].0.params;
+
+            if trigger.role == TriggerRole::Spawn {
+                // dont include ones that dont activate a group
+
+                let target = match obj.get(&51) {
+                    Some(ObjParam::Group(g)) => *g,
+
+                    _ => continue,
+                };
+
+                if gang.non_spawn_triggers_in
+                    || *group
+                        == (Group {
+                            id: Id::Specific(0),
+                        })
+                {
+                    inputs.insert(*group);
+                }
+
+                let delay = match obj.get(&63).unwrap_or(&ObjParam::Number(0.0)) {
+                    ObjParam::Number(d) => SpawnDelay {
+                        delay: (*d * 1000.0) as u32,
+                        epsiloned: false,
+                    },
+                    ObjParam::Epsilon => SpawnDelay {
+                        delay: 0,
+                        epsiloned: true,
+                    },
+                    _ => SpawnDelay {
+                        delay: 0,
+                        epsiloned: false,
+                    },
+                };
+
+                // delete trigger that will be rebuilt
+                (*trigger).deleted = true;
+
+                if let Some(l) = spawn_connections.get_mut(group) {
+                    l.push((target, delay, *trigger))
+                } else {
+                    spawn_connections.insert(*group, vec![(target, delay, *trigger)]);
+                }
+            }
+        }
+    }
+
+    // set triggers that make cycles to inputs and outputs
+    fn look_for_cycle(
+        current: Group,
+        ictriggers: &HashMap<Group, Vec<(Group, SpawnDelay, Trigger)>>,
+        visited: &mut Vec<Group>,
+        inputs: &mut HashSet<Group>,
+        outputs: &mut HashSet<Group>,
+        cycle_points: &mut HashSet<Group>,
+        all: &mut Vec<(Group, Group, SpawnDelay, Trigger)>,
+    ) {
+        if let Some(connections) = ictriggers.get(&current) {
+            for (g, delay, trigger) in connections {
+                if visited.contains(g) {
+                    //println!("cycle detected");
+                    outputs.insert(current);
+                    inputs.insert(*g);
+                    all.push((current, *g, *delay, *trigger));
+                    cycle_points.insert(current);
+
+                    return;
+                }
+
+                visited.push(current);
+
+                look_for_cycle(*g, ictriggers, visited, inputs, outputs, cycle_points, all);
+
+                assert_eq!(visited.pop(), Some(current));
+            }
+        }
+    }
+    for start in inputs.clone() {
+        let mut visited = Vec::new();
+        look_for_cycle(
+            start,
+            &spawn_connections,
+            &mut visited,
+            &mut inputs,
+            &mut outputs,
+            &mut cycle_points,
+            &mut all,
+        )
+    }
+
+    // println!(
+    //     "spawn_triggers: {:?}\n\n inputs: {:?}\n\n outputs: {:?}\n",
+    //     spawn_connections, inputs, outputs
+    // );
+
+    // go from every trigger in an input group and get every possible path to an
+    // output group (stopping if it reaches a group already visited)
+    #[allow(clippy::too_many_arguments)]
+    fn traverse(
+        current: Group,
+        origin: Group,
+        delay: SpawnDelay,
+        trigger: Option<Trigger>,
+        outputs: &HashSet<Group>,
+        cycle_points: &HashSet<Group>,
+        spawn_connections: &HashMap<Group, Vec<(Group, SpawnDelay, Trigger)>>,
+        visited: &mut Vec<Group>,
+        all: &mut Vec<(Group, Group, SpawnDelay, Trigger)>,
+    ) {
+        if visited.contains(&current) {
+            unreachable!()
+        }
+
+        if let Some(connections) = spawn_connections.get(&current) {
+            for (g, d, trigger) in connections {
+                //println!("{:?} -> {:?}", current, g);
+                let new_delay = SpawnDelay {
+                    delay: delay.delay + d.delay,
+                    epsiloned: delay.epsiloned || d.epsiloned,
+                };
+                visited.push(current);
+                if outputs.contains(g) {
+                    all.push((origin, *g, new_delay, *trigger));
+
+                    /*
+                    in cases like this:
+
+                    1i.if_is(SMALLER_THAN, 1, !{
+
+                        2i.if_is(EQUAL_TO, 0, !{
+                            2i.add(1)
+                            1i.if_is(SMALLER_THAN, 0, !{
+                                -> BG.pulse(0, 0, 255, fade_out = 0.5)
+                            })
+                        })
+
+                    })
+
+                    we can't simplify the three expressions together, because we need the result of the 2nd one to happen before it's result
+                    therefore, the chain is split before the third expression
+
+                    it cannot add the new inputs to the set because it's used in the current loop, but it doesn't matter since the set is not used after this.
+
+                    (this is copied from the ic trigger thing, but it makes sense here too (I think, bf doesnt work without it))
+                    */
+
+                    // avoid infinite loop
+                    if !cycle_points.contains(g) {
+                        traverse(
+                            *g,
+                            *g,
+                            SpawnDelay {
+                                delay: 0,
+                                epsiloned: false,
+                            },
+                            None,
+                            outputs,
+                            cycle_points,
+                            spawn_connections,
+                            visited,
+                            all,
+                        );
+                    }
+                } else {
+                    traverse(
+                        *g,
+                        origin,
+                        new_delay,
+                        Some(*trigger),
+                        outputs,
+                        cycle_points,
+                        spawn_connections,
+                        visited,
+                        all,
+                    );
+                }
+                assert_eq!(visited.pop(), Some(current));
+            }
+        } else if let Some(t) = trigger {
+            all.push((origin, current, delay, t)) //?
+        } else {
+            //unreachable!();
+            assert!(outputs.contains(&current));
+        }
+    }
+
+    for start in inputs {
+        //println!("<{:?}>", start);
+        let mut visited = Vec::new();
+        traverse(
+            start,
+            start,
+            SpawnDelay {
+                delay: 0,
+                epsiloned: false,
+            },
+            None,
+            &outputs,
+            &cycle_points,
+            &spawn_connections,
+            &mut visited,
+            &mut all,
+        );
+        //println!("</{:?}>", start);
+    }
+
+    let mut deduped = HashMap::new();
+
+    for (start, end, delay, trigger) in all {
+        deduped.insert((start, end, delay), trigger);
+    }
+
+    let mut swaps = HashMap::new();
+
+    let mut insert_to_swaps = |a: Group, b: Group| {
+        for v in swaps.values_mut() {
+            if *v == a {
+                *v = b;
+            }
+        }
+        assert!(swaps.insert(a, b).is_none());
+    };
+    // let mut start_counts = HashMap::new();
+    // let mut end_counts = HashMap::new();
+
+    // for ((start, end, _), _) in deduped.iter() {
+    //     start_counts
+    //         .entry(start)
+    //         .and_modify(|c| *c += 1)
+    //         .or_insert(1);
+
+    //     end_counts.entry(end).and_modify(|c| *c += 1).or_insert(1);
+    // }
+
+    for ((start, end, delay), trigger) in deduped {
+        let d = if delay.delay < 50 && delay.epsiloned {
+            50
+        } else {
+            delay.delay
+        };
+        if d == 0 && !is_start_group(end, reserved_groups) && network[&end].connections_in == 1 {
+            insert_to_swaps(end, start);
+        } else if d == 0 && !is_start_group(start, reserved_groups)
+            && network[&start].connections_in == 1 //??
+            && (network[&start].triggers.is_empty()
+                || network[&start].triggers.iter().all(|t| t.deleted))
+        {
+            insert_to_swaps(start, end);
+        } else {
+            create_spawn_trigger(
+                trigger,
+                end,
+                start,
+                d as f64 / 1000.0,
+                objects,
+                network,
+                TriggerRole::Spawn,
+                false,
+            )
+        }
+    }
+
+    replace_groups(swaps, objects);
+}
+
+// trigger gang dedup :pog:
+
+fn param_identifier(param: &ObjParam) -> String {
+    let str = match param {
+        ObjParam::Group(Group { id })
+        | ObjParam::Color(crate::builtin::Color { id })
+        | ObjParam::Block(Block { id })
+        | ObjParam::Item(Item { id }) => match id {
+            Id::Specific(id) => format!("{}", id),
+            Id::Arbitrary(id) => format!("?{}", id),
+        },
+        ObjParam::Number(n) => {
+            if (n.round() - n).abs() < 0.001 {
+                format!("{}", *n as i32)
+            } else {
+                format!("{:.1$}", n, 3)
+            }
+        }
+        ObjParam::Bool(b) => (if *b { "1" } else { "0" }).to_string(),
+        ObjParam::Text(t) => t.to_string(),
+        ObjParam::GroupList(list) => {
+            let mut out = String::new();
+
+            for g in list {
+                match g.id {
+                    Id::Specific(id) => out += &format!("{}.", id),
+                    Id::Arbitrary(id) => out += &format!("?{}.", id),
+                }
+            }
+            out.pop();
+            out
+        }
+        ObjParam::Epsilon => "0.050".to_string(),
+    };
+    str
+    // use std::collections::hash_map::DefaultHasher;
+    // use std::hash::{Hash, Hasher};
+
+    // let mut hasher = DefaultHasher::new();
+
+    // str.hash(&mut hasher);
+    // hasher.finish()
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct TriggerParam(u16, String);
+impl PartialOrd for TriggerParam {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let first = self.0.cmp(&other.0);
+        Some(if first == Ordering::Equal {
+            self.1.cmp(&other.1)
+        } else {
+            first
+        })
+    }
+}
+impl Ord for TriggerParam {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct TriggerBehavior(BTreeSet<TriggerParam>);
+
+impl Ord for TriggerBehavior {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+// TODO: make this sort by trigger order as well
+impl PartialOrd for TriggerBehavior {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let mut iter1 = self.0.iter();
+        let mut iter2 = other.0.iter();
+        loop {
+            if let Some(val1) = iter1.next() {
+                if let Some(val2) = iter2.next() {
+                    let cmp = val1.cmp(val2);
+                    if cmp != Ordering::Equal {
+                        return Some(cmp);
+                    }
+                } else {
+                    return Some(Ordering::Greater);
+                }
+            } else {
+                return Some(Ordering::Less);
+            }
+        }
+    }
+}
+
+fn get_trigger_behavior(t: Trigger, objects: &Triggerlist) -> TriggerBehavior {
+    let mut set = BTreeSet::new();
+    for (prop, param) in &objects[t.obj].0.params {
+        if *prop == 57 {
+            // group
+            continue;
+        }
+        set.insert(TriggerParam(*prop, param_identifier(param)));
+    }
+    TriggerBehavior(set)
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct TriggerGangBehavior(BTreeSet<TriggerBehavior>);
+
+fn get_triggergang_behavior(gang: &TriggerGang, objects: &Triggerlist) -> TriggerGangBehavior {
+    let mut set = BTreeSet::new();
+
+    for trigger in &gang.triggers {
+        set.insert(get_trigger_behavior(*trigger, objects));
+    }
+
+    TriggerGangBehavior(set)
+}
+
+pub fn dedup_triggers(
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+    reserved_groups: &HashSet<Group>,
+) {
+    loop {
+        let mut swaps = HashMap::new();
+        let mut representative_groups = HashMap::<TriggerGangBehavior, Group>::new();
+
+        for (group, gang) in network.iter_mut() {
+            if is_start_group(*group, reserved_groups) {
+                continue;
+            }
+            let contains_stackable_trigger = gang.triggers.iter().any(|t| {
+                let obj = &objects[t.obj].0;
+                if let Some(ObjParam::Number(n)) = obj.params.get(&1) {
+                    let id = *n as u16;
+                    id == 901 || id == 1817
+                } else {
+                    false
+                }
+            });
+            if contains_stackable_trigger {
+                continue;
+            }
+            let behavior = get_triggergang_behavior(gang, objects);
+            if let Some(repr) = representative_groups.get(&behavior) {
+                // discard this gang and add a swap
+                for trigger in &mut gang.triggers {
+                    (*trigger).deleted = true;
+                }
+                //dbg!(behavior, repr, group, &representative_groups);
+                assert!(swaps.insert(*group, *repr).is_none());
+            } else {
+                representative_groups.insert(behavior, *group);
+            }
+        }
+
+        //dbg!(&swaps);
+
+        if swaps.is_empty() {
+            break;
+        }
+        replace_groups(swaps, objects);
+        clean_network(network, objects, false);
+    }
+}
+
+// intraframe sync grouping :pog:
+
+pub fn intraframe_grouping(
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+    reserved_groups: &HashSet<Group>,
+    closed_group: &mut u16,
+) {
+    for (group, gang) in network.clone() {
+        let mut sorted = gang.triggers;
+        sorted.sort_by(|a, b| objects[a.obj].1.partial_cmp(&objects[b.obj].1).unwrap());
+
+        let mut groupable_triggers = Vec::new();
+
+        for trigger in &sorted {
+            if let Some(ObjParam::Number(id)) = objects[trigger.obj].0.params.get(&1) {
+                if *id as u16 == 1811 {
+                    // only works with instant count
+
+                    if let Some(ObjParam::Group(target)) = objects[trigger.obj].0.params.get(&51) {
+                        if !is_start_group(*target, reserved_groups)
+                            && network[target].connections_in == 1
+                            && network[target]
+                                .triggers
+                                .iter()
+                                .all(|t| t.role == TriggerRole::Output)
+                        {
+                            groupable_triggers.push(trigger.obj);
+                        }
+                    }
+                }
+            };
+        }
+
+        if groupable_triggers.len() > 4 {
+            group_triggers(groupable_triggers, network, objects, group, closed_group);
+        }
+    }
+}
+
+fn group_triggers(
+    triggers: Vec<ObjPtr>, // sorted
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+    group: Group,
+    closed_group: &mut u16,
+) {
+    let mut get_new_group = || {
+        (*closed_group) += 1;
+        Group {
+            id: Id::Arbitrary(*closed_group),
+        }
+    };
+
+    // let mut add_group = |trigger, group| {
+    //     if let Some(param) = objects[trigger].0.params.get_mut(&57) {
+    //         *param = ObjParam::GroupList(vec![
+    //             match param {
+    //                 ObjParam::Group(g) => *g,
+
+    //                 _ => unreachable!(),
+    //             },
+    //             group,
+    //         ])
+    //     }
+    // };
+    let main_group = group;
+    let swapping_group = get_new_group();
+    let output_group = get_new_group();
+
+    for trigger in triggers.iter() {
+        let mut all_outputs = Vec::<Trigger>::new();
+
+        let order = objects[*trigger].1;
+
+        if let Some(ObjParam::Group(target)) = objects[*trigger].0.params.get_mut(&51) {
+            all_outputs.extend(network[target].triggers.iter().copied());
+            for t in &mut network.get_mut(target).unwrap().triggers {
+                t.deleted = true;
+            }
+
+            *target = output_group; // enable output
+        } else {
+            unreachable!()
+        };
+        for output in all_outputs.iter_mut() {
+            let new_obj = (
+                GdObj {
+                    func_id: trigger.0,
+                    ..objects[output.obj].0.clone()
+                },
+                objects[output.obj].1,
+            );
+
+            (*objects.list)[trigger.0].obj_list.push(new_obj);
+
+            let obj_index = ObjPtr(trigger.0, objects.list[trigger.0].obj_list.len() - 1);
+
+            (*output).obj = obj_index;
+        }
+        for trigger in all_outputs.iter() {
+            if let Some(param) = objects[trigger.obj].0.params.get_mut(&57) {
+                // check if it already has multiple groups
+                *param = ObjParam::GroupList(vec![main_group, output_group, swapping_group])
+            }
+        }
+
+        {
+            all_outputs.sort();
+            let mut current_order = order.0 + 0.2;
+            let delta = 0.6 / all_outputs.len() as f32;
+            for trigger in all_outputs.iter() {
+                current_order += delta;
+                objects[trigger.obj].1 = TriggerOrder(current_order);
+            }
+        }
+        network
+            .get_mut(&main_group)
+            .unwrap()
+            .triggers
+            .extend(all_outputs);
+
+        // create toggle triggers
+        create_toggle_trigger(
+            *trigger,
+            swapping_group,
+            main_group,
+            false,
+            objects,
+            network,
+            TriggerOrder(order.0 - 0.1), // before the function trigger
+        );
+        create_toggle_trigger(
+            *trigger,
+            output_group,
+            main_group,
+            false,
+            objects,
+            network,
+            TriggerOrder(order.0 - 0.1), // before the function trigger
+        );
+        create_toggle_trigger(
+            *trigger,
+            swapping_group,
+            main_group,
+            true,
+            objects,
+            network,
+            TriggerOrder(order.0 + 0.1), // after the function trigger
+        );
+    }
+}
+
+pub fn create_toggle_trigger(
+    obj: ObjPtr,
+    target_group: Group,
+    group: Group,
+    enable: bool,
+    objects: &mut Triggerlist,
+    network: &mut TriggerNetwork,
+    order: TriggerOrder,
+) {
+    let mut new_obj_map = HashMap::new();
+    new_obj_map.insert(1, ObjParam::Number(1049.0));
+    new_obj_map.insert(51, ObjParam::Group(target_group));
+    new_obj_map.insert(56, ObjParam::Bool(enable));
+
+    new_obj_map.insert(57, ObjParam::Group(group));
+
+    let new_obj = GdObj {
+        params: new_obj_map,
+        func_id: obj.0,
+        mode: ObjectMode::Trigger,
+        unique_id: objects[obj].0.unique_id,
+    };
+
+    (*objects.list)[obj.0]
+        .obj_list
+        .push((new_obj.clone(), order));
+
+    let obj_index = ObjPtr(obj.0, objects.list[obj.0].obj_list.len() - 1);
+    let new_trigger = Trigger {
+        obj: obj_index,
+
+        deleted: false,
+        role: TriggerRole::Output,
+    };
+
+    if let Some(ObjParam::Group(group)) = new_obj.params.get(&57) {
+        match network.get_mut(group) {
+            Some(gang) => (*gang).triggers.push(new_trigger),
+            None => {
+                network.insert(*group, TriggerGang::new(vec![new_trigger]));
+            }
+        }
+    } else {
+        match network.get_mut(&NO_GROUP) {
+            Some(gang) => (*gang).triggers.push(new_trigger),
+            None => {
+                network.insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
+            }
+        }
+    }
 }

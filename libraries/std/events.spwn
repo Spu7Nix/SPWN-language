@@ -6,10 +6,20 @@ extract constants.obj_props
 type @event
 
 impl @event {
-    on: #[desc("Triggers a function every time an event fires") example("
+    on: #[desc("Triggers a function every time an event fires (exists for legacy only)") example("
 on(touch(), !{
     10g.move(10, 0)
 })
+    ")] (
+        #[desc("Event to trigger on")] event: @event,
+        #[desc("Function to trigger")] function: @trigger_function
+    ){
+        event.on_triggered(function)
+    },
+    handle: #[desc("Triggers a function every time an event fires") example("
+[[handle(touch())]] !{
+    10g.move(10, 0)
+}
     ")] (
         #[desc("Function to trigger")] function: @trigger_function,
         #[desc("Event to trigger on")] event: @event
@@ -21,7 +31,7 @@ on(touch(), !{
 return {
 
     touch: #[desc("Implementation of the touch trigger (returns an event)") example("
-[[ on(touch()) ]] !{
+[[handle(touch())]] !{
     10g.move(10, 0)
 }
     ")] (
@@ -41,7 +51,7 @@ return {
     },
 
     touch_end: #[desc("Returns an event for when a touch ends") example("
-[[ on(touch_end()) ]] !{
+[[handle(touch_end())]] !{
     10g.move(10, 0)
 }
     ")] (
@@ -61,7 +71,7 @@ return {
     },
 
     collision: #[desc("Implementation of the collision trigger (returns an event)") example("
-[[ on(collision(1b, 2b)) ]] !{
+[[handle(collision(1b, 2b))]] !{
     BG.set(0, 0, 0)
 }
     ")] (
@@ -83,7 +93,7 @@ return {
     },
 
     collision_exit: #[desc("Returns an event for when a collision exits") example("
-[[ on(collision_exit(1b, 2b)) ]] !{
+[[handle(collision_exit(1b, 2b))]] !{
     BG.set(0, 0, 0)
 }
     ")] (
@@ -103,8 +113,9 @@ return {
         }
     },
 
+
     death: #[desc("Returns an event for when the player dies") example("
-[[ on(death()) ]] !{
+[[handle(death())]] !{
     BG.set(0, 0, 0)
 }
     ")] (){
@@ -118,7 +129,7 @@ return {
     },
 
     count: #[desc("Implementation of a count trigger (returns an event)") example("
-[[ on(count(4i, 3)) ]] !{
+[[handle(count(4i, 3))]] !{
     BG.set(0, 0, 0)
 }
     ")] (it: @item, hits: @number, multi: @bool = true) {

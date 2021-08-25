@@ -11,12 +11,13 @@ import "object.spwn"
 import "obj_set.spwn"
 import "dictionary.spwn"
 import "string.spwn"
-import "counter.spwn"
+import "counters/counter.spwn"
 import "fileio.spwn"
 import "regex.spwn"
 import "number.spwn"
 import "heapq.spwn"
 import "complex.spwn"
+import "zip.spwn"
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"
@@ -38,7 +39,8 @@ ctrl_flow = import "control_flow.spwn"
     obj_set: @obj_set::new,
     regex: @regex::new,
     heapq: @heapq::new,
-    complex: @complex::new
+    complex: @complex::new,
+    zip: @zip::new
 }
 
 
