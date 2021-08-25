@@ -24,7 +24,23 @@ impl @complex {
 		} else if val.type == @complex {
 			new.real = self.real * self.imag - val.real * val.imag;
 			new.imag = self.real * val.imag + val.real * self.imag;
+		} else {
+			throw "Can't multiply types 'complex' and " + val.type as @string;
 		}
+		return new;
+	},
+
+	_minus_: (self, val) {
+		let new = self;
+		if val.type == @number {
+			new.real -= val;
+		} else if val.type == @complex {
+			new.real -= val.real;
+			new.imag -= val.imag;
+		} else {
+			throw "Can't subtract types 'complex' and " + val.type as @string;
+		}
+
 		return new;
 	},
 

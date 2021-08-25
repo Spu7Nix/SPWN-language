@@ -113,17 +113,3 @@ impl @collection {
 		while_loop(_=>self.done_indicator==0, (){wait()});
 	}
 }
-
-
-
-let test = @collection::new(5);
-
-test.set(3, 5);
-
-wait(3)
-
-[[test.index(3)]] (count) {
-	if count == 5 {
-		BG.set(255,0,0);
-	}
-}

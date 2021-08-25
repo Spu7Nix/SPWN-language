@@ -1,3 +1,2 @@
-$.print("hello")
-
-
+#[no_level]
+[a, b] = [3, 4]
