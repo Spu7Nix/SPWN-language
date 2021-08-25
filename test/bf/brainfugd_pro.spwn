@@ -249,19 +249,6 @@ impl @bfreader {
     interpret: (self) {
 
         ret = !{
-            supress_signal(0.05)
-            -> self.group.move(spacing, 0, 0)
-            -> return
-        }
-
-        fast_ret = !{
-            -> self.group.move(spacing, 0, 0)
-            -> return
-        }
-
-        slow_ret =  !{
-            supress_signal(0.1)
-            wait(0.1)
             -> self.group.move(spacing, 0, 0)
             -> return
         }
@@ -306,7 +293,7 @@ impl @bfreader {
         -> if current == INCR {
             -> self.current_cell() += 1
             pulse_ptr()
-            fast_ret!
+            ret!
         }
         -> if current == DECR {
             -> (){
@@ -317,7 +304,7 @@ impl @bfreader {
                 }
             }()
             pulse_ptr()
-            fast_ret!
+            ret!
         }
         -> if current == DOT {
 
@@ -332,7 +319,7 @@ impl @bfreader {
 
             self.std_out.write(self.num_out, )
 
-            slow_ret!
+            ret!
         }
         -> if current == INPUT {
             //supress_signal(0.1)
@@ -352,7 +339,7 @@ impl @bfreader {
                 cell.reset()
                 std_in.add_to([cell], for_each = (n){ input_char.move(100 * n, 0, 0) })
 
-                slow_ret!
+                ret!
             }
 
 
@@ -385,9 +372,9 @@ impl @bfreader {
                 condition = () => !(layers == 0 && self.close == 1)
                 //self.group.move(spacing, 0)
 
-                while_loop(condition, delay = 0.03, (){
+                while_loop(condition, delay = 0.05, (){
 
-                    wait(0.02)
+                    
                     -> if self.open == 1{
                         layers += 1
                     }
@@ -400,7 +387,7 @@ impl @bfreader {
 
                         force_stop!
                     } else {
-                        wait(0.01)
+                        
                         self.group.move(spacing, 0)
                         
                     }
@@ -426,8 +413,8 @@ impl @bfreader {
                 //self.group.move(-spacing, 0)
 
                 //wait()
-                while_loop(condition, delay = 0.03, (){
-                    wait(0.02)
+                while_loop(condition, delay = 0.05, (){
+                    
                     -> if self.close == 1 {
                         layers += 1
                     }
@@ -439,7 +426,7 @@ impl @bfreader {
 
                         force_stop!
                     } else {
-                        wait(0.01)
+                        
                         self.group.move(-spacing, 0)
                         
                     }
@@ -455,7 +442,7 @@ impl @bfreader {
             }
         }
         -> if current == NOOP {
-            fast_ret!
+            ret!
         }
 
 
@@ -806,7 +793,7 @@ start = (){
             reader.group.move(10, 0, 0.05)
             //-> BG.pulse(255, 0, 0, fade_out = 1)
 
-            while_loop(()=> reader.end == 0 && force_quit_taps < 3, delay = 0.1, (){
+            while_loop(()=> reader.end == 0 && force_quit_taps < 3, delay = 0.05, (){
                 reader.interpret()
             })
 

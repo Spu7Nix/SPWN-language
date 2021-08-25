@@ -224,17 +224,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         } else {
                             String::new()
                         };
-                        let mut reserved_groups = HashSet::new();
+                        let mut reserved = crate::optimize::ReservedIds {
+                            object_groups: Default::default(),
+                            trigger_groups: Default::default(),
+                            object_colors: Default::default(),
+
+                            object_blocks: Default::default(),
+
+                            object_items: Default::default(),
+                        };
                         for obj in &compiled.objects {
                             for param in obj.params.values() {
                                 match &param {
                                     levelstring::ObjParam::Group(g) => {
-                                        reserved_groups.insert(*g);
+                                        reserved.object_groups.insert(g.id);
                                     }
                                     levelstring::ObjParam::GroupList(g) => {
-                                        reserved_groups.extend(g);
+                                        reserved.object_colors.extend(g.iter().map(|g| g.id));
+                                    }
+
+                                    levelstring::ObjParam::Color(g) => {
+                                        reserved.object_colors.insert(g.id);
+                                    }
+
+                                    levelstring::ObjParam::Block(g) => {
+                                        reserved.object_blocks.insert(g.id);
+                                    }
+
+                                    levelstring::ObjParam::Item(g) => {
+                                        reserved.object_items.insert(g.id);
                                     }
                                     _ => (),
+                                }
+                            }
+                        }
+
+                        for fn_id in &compiled.func_ids {
+                            for (trigger, _) in &fn_id.obj_list {
+                                for (prop, param) in trigger.params.iter() {
+                                    if *prop == 57 {
+                                        match &param {
+                                            levelstring::ObjParam::Group(g) => {
+                                                reserved.trigger_groups.insert(g.id);
+                                            }
+                                            levelstring::ObjParam::GroupList(g) => {
+                                                reserved
+                                                    .trigger_groups
+                                                    .extend(g.iter().map(|g| g.id));
+                                            }
+
+                                            _ => (),
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -242,11 +283,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let has_stuff = compiled.func_ids.iter().any(|x| !x.obj_list.is_empty());
                         if opti_enabled && has_stuff {
                             print_with_color("Optimizing triggers...", Color::Cyan);
-                            compiled.func_ids = optimize(
-                                compiled.func_ids,
-                                compiled.closed_groups,
-                                &reserved_groups,
-                            );
+                            compiled.func_ids =
+                                optimize(compiled.func_ids, compiled.closed_groups, reserved);
                         }
 
                         let mut objects = levelstring::apply_fn_ids(&compiled.func_ids);

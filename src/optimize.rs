@@ -24,6 +24,18 @@ pub enum TriggerRole {
     Func,
 }
 
+#[derive(Debug, Clone)]
+pub struct ReservedIds {
+    pub object_groups: HashSet<Id>,
+    pub trigger_groups: HashSet<Id>, // only includes the 57 prop
+
+    pub object_colors: HashSet<Id>,
+
+    pub object_blocks: HashSet<Id>,
+
+    pub object_items: HashSet<Id>,
+}
+
 fn get_role(obj_id: u16, hd: bool) -> TriggerRole {
     match obj_id {
         1268 => {
@@ -93,7 +105,7 @@ const NO_GROUP: Group = Group {
 pub fn optimize(
     mut obj_in: Vec<FunctionId>,
     mut closed_group: u16,
-    reserved_groups: &HashSet<Group>,
+    mut reserved: ReservedIds,
 ) -> Vec<FunctionId> {
     let mut network = TriggerNetwork::new();
 
@@ -143,63 +155,115 @@ pub fn optimize(
     //network = fix_read_write_order(&mut objects, &network, &mut closed_group);
 
     // round 1
-    dead_code_optimization(
-        &mut network,
-        &mut objects,
-        &mut closed_group,
-        reserved_groups,
-    );
-    //println!("dead code complete");
+
+    dead_code_optimization(&mut network, &mut objects, &mut closed_group, &reserved);
 
     clean_network(&mut network, &objects, false);
 
-    spawn_optimisation(&mut network, &mut objects, reserved_groups);
-    //println!("spawn triggers complete");
+    spawn_optimisation(&mut network, &mut objects, &reserved);
+
+    clean_network(&mut network, &objects, true);
+
+    update_reserved(&mut network, &mut objects, &mut reserved);
+
+    dead_code_optimization(&mut network, &mut objects, &mut closed_group, &reserved);
 
     clean_network(&mut network, &objects, false);
 
-    // dedup_triggers(&mut network, &mut objects, reserved_groups);
+    spawn_optimisation(&mut network, &mut objects, &reserved);
+
+    clean_network(&mut network, &objects, false);
+
+    // dedup_triggers(&mut network, &mut objects, reserved);
 
     // clean_network(&mut network, &objects, false);
 
-    intraframe_grouping(
-        &mut network,
-        &mut objects,
-        reserved_groups,
-        &mut closed_group,
-    );
+    intraframe_grouping(&mut network, &mut objects, &reserved, &mut closed_group);
+    let zero_group = Group {
+        id: Id::Specific(0),
+    };
+    if network[&zero_group].triggers.len() > 1 {
+        closed_group += 1;
+        let new_start_group = Group {
+            id: Id::Arbitrary(closed_group),
+        };
+
+        let mut swaps = Swaps::new();
+        swaps.insert(zero_group, new_start_group);
+
+        replace_groups(swaps, &mut objects);
+
+        create_spawn_trigger(
+            Trigger {
+                obj: ObjPtr(0, 0), // arbitrary object
+                role: TriggerRole::Spawn,
+                deleted: false,
+            },
+            new_start_group,
+            zero_group,
+            0.0,
+            &mut objects,
+            &mut network,
+            TriggerRole::Spawn,
+            false,
+        );
+    }
 
     rebuild(&network, &obj_in)
 }
 
-fn is_start_group(g: Group, reserved_groups: &HashSet<Group>) -> bool {
-    matches!(g.id, Id::Specific(_)) || reserved_groups.contains(&g)
+fn is_start_group(g: Group, reserved: &ReservedIds) -> bool {
+    matches!(g.id, Id::Specific(_)) || reserved.object_groups.contains(&g.id)
 }
 
 fn dead_code_optimization(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
     closed_group: &mut u16,
-    reserved_groups: &HashSet<Group>,
+    reserved: &ReservedIds,
 ) {
     for (group, gang) in network.clone() {
-        if is_start_group(group, reserved_groups) {
-            for (i, trigger) in gang.triggers.iter().enumerate() {
-                if trigger.role != TriggerRole::Output {
-                    let mut visited = Vec::new();
-                    if check_for_dead_code(
-                        network,
-                        objects,
-                        (group, i),
-                        closed_group,
-                        reserved_groups,
-                        &mut visited,
-                        0,
-                    ) {
-                        (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
-                    }
-                } else {
+        if is_start_group(group, reserved) {
+            for (i, _) in gang.triggers.iter().enumerate() {
+                let mut visited = Vec::new();
+                if check_for_dead_code(
+                    network,
+                    objects,
+                    (group, i),
+                    closed_group,
+                    reserved,
+                    &mut visited,
+                    0,
+                ) {
                     (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
+                }
+            }
+        }
+    }
+}
+
+fn update_reserved(
+    network: &mut TriggerNetwork,
+    objects: &mut Triggerlist,
+
+    reserved: &mut ReservedIds,
+) {
+    reserved.trigger_groups.clear();
+
+    for gang in network.values() {
+        for trigger in gang.triggers.iter() {
+            for (prop, param) in objects[trigger.obj].0.params.iter() {
+                if *prop == 57 {
+                    match &param {
+                        ObjParam::Group(g) => {
+                            reserved.trigger_groups.insert(g.id);
+                        }
+                        ObjParam::GroupList(g) => {
+                            reserved.trigger_groups.extend(g.iter().map(|g| g.id));
+                        }
+
+                        _ => (),
+                    }
                 }
             }
         }
@@ -339,7 +403,7 @@ fn check_for_dead_code<'a>(
     objects: &mut Triggerlist,
     start: (Group, usize),
     closed_group: &mut u16,
-    reserved_groups: &HashSet<Group>,
+    reserved: &ReservedIds,
     visited_stack: &mut Vec<(Group, usize)>,
     d: u32,
 ) -> bool {
@@ -350,6 +414,15 @@ fn check_for_dead_code<'a>(
     }
 
     if trigger.role == TriggerRole::Output {
+        if let Some(ObjParam::Group(Group {
+            id: i @ Id::Arbitrary(_),
+        })) = objects[trigger.obj].0.params.get(&51)
+        {
+            // maybe restrict this to only stop triggers and toggle triggers
+            if !reserved.trigger_groups.contains(i) && !reserved.object_groups.contains(i) {
+                return false;
+            }
+        }
         (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
         return true;
     }
@@ -365,7 +438,7 @@ fn check_for_dead_code<'a>(
     //println!("{}", network[&start.0].connections_in);
 
     let list: Vec<(usize, Group)> = if let Some(ObjParam::Group(g)) = start_obj.get(&51) {
-        if is_start_group(*g, reserved_groups) {
+        if is_start_group(*g, reserved) {
             //(*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
             return true;
         } else if let Some(gang) = network.get(g) {
@@ -401,7 +474,7 @@ fn check_for_dead_code<'a>(
             objects,
             trigger_ptr,
             closed_group,
-            reserved_groups,
+            reserved,
             visited_stack,
             d + 1,
         ) {
@@ -597,7 +670,7 @@ struct SpawnDelay {
 pub fn spawn_optimisation(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
-    reserved_groups: &HashSet<Group>,
+    reserved: &ReservedIds,
 ) {
     let mut spawn_connections = HashMap::<Group, Vec<(Group, SpawnDelay, Trigger)>>::new();
     let mut inputs = HashSet::<Group>::new();
@@ -852,9 +925,9 @@ pub fn spawn_optimisation(
         } else {
             delay.delay
         };
-        if d == 0 && !is_start_group(end, reserved_groups) && network[&end].connections_in == 1 {
+        if d == 0 && !is_start_group(end, reserved) && network[&end].connections_in == 1 {
             insert_to_swaps(end, start);
-        } else if d == 0 && !is_start_group(start, reserved_groups)
+        } else if d == 0 && !is_start_group(start, reserved)
             && network[&start].connections_in == 1 //??
             && (network[&start].triggers.is_empty()
                 || network[&start].triggers.iter().all(|t| t.deleted))
@@ -998,14 +1071,14 @@ fn get_triggergang_behavior(gang: &TriggerGang, objects: &Triggerlist) -> Trigge
 pub fn dedup_triggers(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
-    reserved_groups: &HashSet<Group>,
+    reserved: &ReservedIds,
 ) {
     loop {
         let mut swaps = HashMap::new();
         let mut representative_groups = HashMap::<TriggerGangBehavior, Group>::new();
 
         for (group, gang) in network.iter_mut() {
-            if is_start_group(*group, reserved_groups) {
+            if is_start_group(*group, reserved) {
                 continue;
             }
             let contains_stackable_trigger = gang.triggers.iter().any(|t| {
@@ -1048,7 +1121,7 @@ pub fn dedup_triggers(
 pub fn intraframe_grouping(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
-    reserved_groups: &HashSet<Group>,
+    reserved: &ReservedIds,
     closed_group: &mut u16,
 ) {
     for (group, gang) in network.clone() {
@@ -1063,7 +1136,7 @@ pub fn intraframe_grouping(
                     // only works with instant count
 
                     if let Some(ObjParam::Group(target)) = objects[trigger.obj].0.params.get(&51) {
-                        if !is_start_group(*target, reserved_groups)
+                        if !is_start_group(*target, reserved)
                             && network[target].connections_in == 1
                             && network[target]
                                 .triggers

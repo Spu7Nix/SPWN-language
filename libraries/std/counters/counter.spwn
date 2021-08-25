@@ -193,7 +193,6 @@ c.multiply(10)
             self.add_to([temp.item], factor)
             temp.add_to([self.item])
         } else if factor.type == @counter {
-            wait()
             result = @counter::new(0, reset = false, bits = self.bits)
             for i in self.bits..0 {
                 x = 2^i
@@ -236,19 +235,8 @@ c.divide(2, remainder = r)
             self.add_to(remainder)
             result.add_to(self)
         } else if divisor.type == @counter {
-            wait()
             result = @counter::new(0, reset = false, bits = self.bits)
             broken = @counter::new(false)
-            
-            // if divisor.bits > 8 {
-            //     throw "Divisor max size (8 bits) exceeded"
-            // }
-
-            
-            
-            -> if broken == 1 {
-                broken -= 1
-            }
             
             for i in self.bits..0 {
                 -> if broken == 0 {
@@ -483,13 +471,19 @@ more = c > 10
 
         if other.type == @number {
 
+            ret_false = !{
+                -> return false
+            }
+
             self.item.if_is(LARGER_THAN, other, !{
+                ret_false.start_group.toggle_off()
                 -> return true
             })
 
-            self.item.if_is(SMALLER_THAN, other + 1, !{
-                -> return false
-            })
+            self.item.if_is(SMALLER_THAN, other + 1, !{ ret_false! })
+
+            ret_false.start_group.toggle_on()
+            
         } else if other.type == @counter {
             cmp = self.compare(other)
             return cmp == 1
@@ -505,13 +499,18 @@ less = c < 42
 
         if other.type == @number {
 
+            ret_false = !{
+                -> return false
+            }
+
             self.item.if_is(SMALLER_THAN, other, !{
+                ret_false.start_group.toggle_off()
                 -> return true
             })
 
-            self.item.if_is(LARGER_THAN, other - 1, !{
-                -> return false
-            })
+            self.item.if_is(LARGER_THAN, other - 1, !{ ret_false! })
+
+            ret_false.start_group.toggle_on()
         } else if other.type == @counter {
             cmp = self.compare(other)
             -> return cmp == -1
@@ -527,13 +526,18 @@ more_or_eq = c >= 10
 
         if other.type == @number {
 
+            ret_false = !{
+                -> return false
+            }
+
             self.item.if_is(LARGER_THAN, other - 1, !{
+                ret_false.start_group.toggle_off()
                 -> return true
             })
 
-            self.item.if_is(SMALLER_THAN, other, !{
-                -> return false
-            })
+            self.item.if_is(SMALLER_THAN, other, !{ ret_false! })
+
+            ret_false.start_group.toggle_on()
         } else if other.type == @counter {
             cmp = self.compare(other)
             -> return cmp == 1 || cmp == 0
@@ -549,13 +553,18 @@ less_or_eq = c <= 42
 
         if other.type == @number {
 
+            ret_false = !{
+                -> return false
+            }
+
             self.item.if_is(SMALLER_THAN, other + 1, !{
+                ret_false.start_group.toggle_off()
                 -> return true
             })
 
-            self.item.if_is(LARGER_THAN, other, !{
-                -> return false
-            })
+            self.item.if_is(LARGER_THAN, other, !{ ret_false! })
+
+            ret_false.start_group.toggle_on()
         } else if other.type == @counter {
             cmp = self.compare(other)
             -> return cmp == -1 || cmp == 0
@@ -570,16 +579,21 @@ eq = c == 42
     (self, other: @number | @counter) {
         if other.type == @number {
 
-            self.item.if_is(EQUAL_TO, other, !{
-                -> return true
-            })
-
             ret_false = !{
                 -> return false
             }
 
-            self.item.if_is(LARGER_THAN, other, ret_false)
-            self.item.if_is(SMALLER_THAN, other, ret_false)
+            self.item.if_is(EQUAL_TO, other, !{
+                ret_false.start_group.toggle_off()
+                -> return true
+            })
+
+            activate_group_fix = !{ ret_false! }
+
+            self.item.if_is(LARGER_THAN, other, activate_group_fix)
+            self.item.if_is(SMALLER_THAN, other, activate_group_fix)
+
+            ret_false.start_group.toggle_on()
         } else if other.type == @counter {
             cmp = self.compare(other)
             -> return cmp == 0
@@ -694,7 +708,7 @@ c <=> c2
 // c is now 42, c2 is now 23
     ")]
     (self, num: @counter) {
-        swap_tmp = @counter::new(0, bits = self.bits);
+        swap_tmp = @counter::new(0, bits = self.bits, reset = false);
         self.add_to(swap_tmp)
         num.add_to(self)
         swap_tmp.add_to(num)

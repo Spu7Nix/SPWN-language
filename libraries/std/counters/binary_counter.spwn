@@ -23,9 +23,9 @@ impl @binary_counter {
         digits = number_to_binary(from, bits)
         let data = []
         for i in ..bits {
-            data.push(@counter::new(digits[i]))
+            data.push(@counter::new(digits[i], bits = 1))
         }
-        carry = @counter::new(0)
+        carry = @counter::new(0, bits = 1)
         return @binary_counter::{
             data, carry
         }
