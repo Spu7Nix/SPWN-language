@@ -198,14 +198,14 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
     },
 
     find: (self, re: @string) {
-        $.regex(re, self, "match", null)
+        return $.regex(re, self, "match", null)
     },
 
     findall: (self, re: @string) {
-        $.regex(re, self, "findall", null)
+        return $.regex(re, self, "findall", null)
     },
 
     replace: (self, re: @string, replacement: @string) {
-        $.regex(re, self, "replace", replacement)
+        return $.regex(re, self, "replace", replacement)
     }
 }
