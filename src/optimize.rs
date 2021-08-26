@@ -1138,10 +1138,17 @@ pub fn intraframe_grouping(
                     if let Some(ObjParam::Group(target)) = objects[trigger.obj].0.params.get(&51) {
                         if !is_start_group(*target, reserved)
                             && network[target].connections_in == 1
-                            && network[target]
-                                .triggers
-                                .iter()
-                                .all(|t| t.role == TriggerRole::Output)
+                            && network[target].triggers.iter().all(|t| {
+                                t.role == TriggerRole::Output
+                                // || if let Some(ObjParam::Number(n)) =
+                                //     objects[t.obj].0.params.get(&1)
+                                // {
+                                //     let id = *n as u16;
+                                //     id == 1811 || id == 1268
+                                // } else {
+                                //     false
+                                // }
+                            })
                         {
                             groupable_triggers.push(trigger.obj);
                         }

@@ -1,81 +1,86 @@
-list = [{ c: counter(i), g: ?g } for i in 1i..70i]
-nums = (0..70) as @array
-extract obj_props
+c1 = counter(10)
+c2 = counter(5)
+c1 /= c2
 
-unit = 1
-scale = 10
-x_off = 450
 
-for i in ..list.length {
-    //list[i].c.display(90 + 45 * i, 90)
-    num = $.random(nums)
-    $.add(pickup_trigger(list[i].c.item, num).with(X, 15).with(Y, 30 * i + 15))
-    $.add(obj {
-        OBJ_ID: 1754,
-        ROTATION: 90,
-        SCALING: scale,
-        X: x_off + i * scale,
-        Y: 150,
-        Z_ORDER: 10,
-        COLOR: 2c,
-        GROUPS: list[i].g,
-    })
-    for y in ..3 {
-        $.add(obj {
-            OBJ_ID: 1753,
-            ROTATION: 90,
-            SCALING: scale,
-            X: x_off + i * scale,
-            Y: 150 - y * 30 * scale,
-            Z_ORDER: 0,
-            COLOR: 1c,
-            GROUPS: list[i].g,
-        })
+// list = [{ c: counter(i), g: ?g } for i in 1i..70i]
+// nums = (0..70) as @array
+// extract obj_props
+
+// unit = 1
+// scale = 10
+// x_off = 450
+
+// for i in ..list.length {
+//     //list[i].c.display(90 + 45 * i, 90)
+//     num = $.random(nums)
+//     $.add(pickup_trigger(list[i].c.item, num).with(X, 15).with(Y, 30 * i + 15))
+//     $.add(obj {
+//         OBJ_ID: 1754,
+//         ROTATION: 90,
+//         SCALING: scale,
+//         X: x_off + i * scale,
+//         Y: 150,
+//         Z_ORDER: 10,
+//         COLOR: 2c,
+//         GROUPS: list[i].g,
+//     })
+//     for y in ..3 {
+//         $.add(obj {
+//             OBJ_ID: 1753,
+//             ROTATION: 90,
+//             SCALING: scale,
+//             X: x_off + i * scale,
+//             Y: 150 - y * 30 * scale,
+//             Z_ORDER: 0,
+//             COLOR: 1c,
+//             GROUPS: list[i].g,
+//         })
 
         
-    }
+//     }
 
-    $.add(obj {
-        OBJ_ID: 1615,
-        SCALING: 0.03 * scale,
-        X: x_off + i * scale,
-        Y: 150 + 15 * scale + 5,
-        ITEM: list[i].c.item,
-        COLOR: 1c,
-        GROUPS: list[i].g
-    });
+//     $.add(obj {
+//         OBJ_ID: 1615,
+//         SCALING: 0.03 * scale,
+//         X: x_off + i * scale,
+//         Y: 150 + 15 * scale + 5,
+//         ITEM: list[i].c.item,
+//         COLOR: 1c,
+//         GROUPS: list[i].g
+//     });
 
     
-}
+// }
 
-swap_tmp = counter()
+// swap_tmp = counter()
 
-wait(1)
-for i in ..list.length {
-    list[i].c.add_to(swap_tmp, for_each = (n) {
-        -> list[i].g.move(0, unit * n, 0.5, easing = EXPONENTIAL_IN_OUT)
-    })
-    swap_tmp.add_to(list[i].c)
-}
-wait(1)
+// wait(1)
+// for i in ..list.length {
+//     list[i].c.add_to(swap_tmp, for_each = (n) {
+//         -> list[i].g.move(0, unit * n, 0.5, easing = EXPONENTIAL_IN_OUT)
+//     })
+//     swap_tmp.add_to(list[i].c)
+// }
+// wait(1)
 
-while_loop(() => true, () {
-    for i in ..(list.length - 1) {
-        if list[i].c > list[i + 1].c {
-            list[i].c.add_to(swap_tmp, for_each = (n) {
-                -> list[i].g.move(0, -unit * n, 0.1, easing = EXPONENTIAL_IN_OUT)
-            })
-            list[i + 1].c.add_to(list[i].c, for_each = (n) {
-                -> list[i + 1].g.move(0, -unit * n, 0.1, easing = EXPONENTIAL_IN_OUT)
-                -> list[i].g.move(0, unit * n, 0.1, easing = EXPONENTIAL_IN_OUT)
-            })
-            swap_tmp.add_to(list[i + 1].c, for_each = (n) {
-                -> list[i + 1].g.move(0, unit * n, 0.1, easing = EXPONENTIAL_IN_OUT)
-            })
+// while_loop(() => true, () {
+//     for i in ..(list.length - 1) {
+//         if list[i].c > list[i + 1].c {
+//             list[i].c.add_to(swap_tmp, for_each = (n) {
+//                 -> list[i].g.move(0, -unit * n, 0.1, easing = EXPONENTIAL_IN_OUT)
+//             })
+//             list[i + 1].c.add_to(list[i].c, for_each = (n) {
+//                 -> list[i + 1].g.move(0, -unit * n, 0.1, easing = EXPONENTIAL_IN_OUT)
+//                 -> list[i].g.move(0, unit * n, 0.1, easing = EXPONENTIAL_IN_OUT)
+//             })
+//             swap_tmp.add_to(list[i + 1].c, for_each = (n) {
+//                 -> list[i + 1].g.move(0, unit * n, 0.1, easing = EXPONENTIAL_IN_OUT)
+//             })
 
-            -> list[i + 1].g.pulse(255, 0, 0, fade_out = 0.2)
-            -> list[i].g.pulse(255, 0, 0, fade_out = 0.2)
-            wait(0.03)
-        } 
-    }
-})
+//             -> list[i + 1].g.pulse(255, 0, 0, fade_out = 0.2)
+//             -> list[i].g.pulse(255, 0, 0, fade_out = 0.2)
+//             wait(0.03)
+//         } 
+//     }
+// })
