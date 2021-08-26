@@ -213,9 +213,6 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
 let num = \"123\"
 num.isdigit() // true
     ")] (self) {
-    	if @regex::new("^[0-9]").match(self) {
-        	return true
-    	}
-	    return false
+    	return @regex::new("^[0-9]").match(self)
     }
 }
