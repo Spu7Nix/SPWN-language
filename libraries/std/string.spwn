@@ -208,4 +208,12 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
     replace: (self, re: @string, replacement: @string) {
         return $.regex(re, self, "replace", replacement)
     }
+    
+    isdigit:  #[desc("Returns true if string is numeric, false otherwise") example("let num = "123" 
+    num.isdigit() // true")] (self) {
+    	if @regex::new("^[0-9]").match(self) {
+        	return true
+    	}
+	return false
+    }
 }
