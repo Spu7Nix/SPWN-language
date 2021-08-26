@@ -1,4 +1,0 @@
-x = $.readfile("jsontest.json", "json")
-for i in x {
-    $.print(i)
-}

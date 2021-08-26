@@ -1038,29 +1038,7 @@ builtins! {
                         info,
                     });
                 }
-                fn parse_serde_value(val: serde_json::Value, globals: &mut Globals, context: &Context, info: &CompilerInfo) -> Value {
-                    // please sput forgive me for this shitcode ._.
-                    match val {
-                        serde_json::Value::Null => Value::Null,
-                        serde_json::Value::Bool(x) => Value::Bool(x),
-                        serde_json::Value::Number(x) => Value::Number(x.as_f64().unwrap()),
-                        serde_json::Value::String(x) => Value::Str(x),
-                        serde_json::Value::Array(x) => {
-                            let mut arr: Vec<StoredValue> = vec![];
-                            for v in x {
-                                arr.push(store_const_value(parse_serde_value(v, globals, context, info), globals, context.start_group, info.position));
-                            }
-                            Value::Array(arr)
-                        },
-                        serde_json::Value::Object(x) => {
-                            let mut dict: HashMap<Intern<String>, StoredValue> = HashMap::new();
-                            for (key, value) in x {
-                                dict.insert(Intern::new(key), store_const_value(parse_serde_value(value, globals, context, info), globals, context.start_group, info.position));
-                            }
-                            Value::Dict(dict)
-                        },
-                    }
-                }
+                
                 match format {
                     "text" => {
                         let ret = fs::read_to_string(path);
@@ -1114,12 +1092,125 @@ builtins! {
                                 });
                             }
                         };
-
-                        parse_serde_value(parsed, globals, context, &info)
+                        fn parse_json_value(val: serde_json::Value, globals: &mut Globals, context: &Context, info: &CompilerInfo) -> Value {
+                            // please sput forgive me for this shitcode ._.
+                            match val {
+                                serde_json::Value::Null => Value::Null,
+                                serde_json::Value::Bool(x) => Value::Bool(x),
+                                serde_json::Value::Number(x) => Value::Number(x.as_f64().unwrap()),
+                                serde_json::Value::String(x) => Value::Str(x),
+                                serde_json::Value::Array(x) => {
+                                    let mut arr: Vec<StoredValue> = vec![];
+                                    for v in x {
+                                        arr.push(store_const_value(parse_json_value(v, globals, context, info), globals, context.start_group, info.position));
+                                    }
+                                    Value::Array(arr)
+                                },
+                                serde_json::Value::Object(x) => {
+                                    let mut dict: HashMap<Intern<String>, StoredValue> = HashMap::new();
+                                    for (key, value) in x {
+                                        dict.insert(Intern::new(key), store_const_value(parse_json_value(value, globals, context, info), globals, context.start_group, info.position));
+                                    }
+                                    Value::Dict(dict)
+                                },
+                            }
+                        }
+                        parse_json_value(parsed, globals, context, &info)
+                    }
+                    "toml" => {
+                        let ret = fs::read_to_string(path);
+                        let rval = match ret {
+                            Ok(file) => file,
+                            Err(e) => {
+                                return Err(RuntimeError::BuiltinError {
+                                    message: format!("Problem opening the file: {}", e),
+                                    info,
+                                });
+                            }
+                        };
+                        let parsed = match toml::from_str(&rval) {
+                            Ok(value) => value,
+                            Err(e) => {
+                                return Err(RuntimeError::BuiltinError {
+                                    message: format!("Problem parsing toml: {}", e),
+                                    info,
+                                });
+                            }
+                        };
+                        fn parse_toml_value(val: toml::Value, globals: &mut Globals, context: &Context, info: &CompilerInfo) -> Value {
+                            // please sput forgive me for this shitcode ._.
+                            match val {
+                                toml::Value::Boolean(x) => Value::Bool(x),
+                                toml::Value::Integer(x) => Value::Number(x as f64),
+                                toml::Value::Float(x) => Value::Number(x),
+                                toml::Value::String(x) => Value::Str(x),
+                                toml::Value::Datetime(x) => Value::Str(x.to_string()),
+                                toml::Value::Array(x) => {
+                                    let mut arr: Vec<StoredValue> = vec![];
+                                    for v in x {
+                                        arr.push(store_const_value(parse_toml_value(v, globals, context, info), globals, context.start_group, info.position));
+                                    }
+                                    Value::Array(arr)
+                                },
+                                toml::Value::Table(x) => {
+                                    let mut dict: HashMap<Intern<String>, StoredValue> = HashMap::new();
+                                    for (key, value) in x {
+                                        dict.insert(Intern::new(key), store_const_value(parse_toml_value(value, globals, context, info), globals, context.start_group, info.position));
+                                    }
+                                    Value::Dict(dict)
+                                },
+                            }
+                        }
+                        parse_toml_value(parsed, globals, context, &info)
+                    }
+                    "yaml" => {
+                        let ret = fs::read_to_string(path);
+                        let rval = match ret {
+                            Ok(file) => file,
+                            Err(e) => {
+                                return Err(RuntimeError::BuiltinError {
+                                    message: format!("Problem opening the file: {}", e),
+                                    info,
+                                });
+                            }
+                        };
+                        let parsed: serde_yaml::Value = match serde_yaml::from_str(&rval) {
+                            Ok(value) => value,
+                            Err(e) => {
+                                return Err(RuntimeError::BuiltinError {
+                                    message: format!("Problem parsing toml: {}", e),
+                                    info,
+                                });
+                            }
+                        };
+                        fn parse_yaml_value(val: &serde_yaml::Value, globals: &mut Globals, context: &Context, info: &CompilerInfo) -> Value {
+                            // please sput forgive me for this shitcode ._.
+                            match val {
+                                serde_yaml::Value::Null => Value::Null,
+                                serde_yaml::Value::Bool(x) => Value::Bool(*x),
+                                serde_yaml::Value::Number(x) => Value::Number(x.as_f64().unwrap()),
+                                serde_yaml::Value::String(x) => Value::Str(x.to_string()),
+                                serde_yaml::Value::Sequence(x) => {
+                                    let mut arr: Vec<StoredValue> = vec![];
+                                    for v in x {
+                                        arr.push(store_const_value(parse_yaml_value(v, globals, context, info), globals, context.start_group, info.position));
+                                    }
+                                    Value::Array(arr)
+                                },
+                                serde_yaml::Value::Mapping(x) => {
+                                    let mut dict: HashMap<Intern<String>, StoredValue> = HashMap::new();
+                                    for (key, value) in x.iter() {
+                                        dict.insert(Intern::new(key.as_str().unwrap().to_string()), store_const_value(parse_yaml_value(value, globals, context, info), globals, context.start_group, info.position));
+                                    }
+                                    Value::Dict(dict)
+                                },
+                            }
+                        }
+                        parse_yaml_value(&parsed, globals, context, &info)
                     }
                     _ => {
                         return Err(RuntimeError::BuiltinError {
-                            message: "Invalid data format ( use \"text\", \"bin\" or \"json\")"
+                            message: "Invalid data format ( use \"text\", \"bin\", \"json\", \"toml\" or \"yaml\" )"
                                 .to_string(),
                             info,
                         })
