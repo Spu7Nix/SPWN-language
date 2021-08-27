@@ -16,6 +16,7 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 use std::io::stdout;
 use std::io::Write;
+use std::str::FromStr;
 
 //use text_io;
 use crate::compiler_info::{CodeArea, CompilerInfo};
@@ -268,8 +269,6 @@ impl Value {
         }
     }
 }
-
-use std::str::FromStr;
 
 macro_rules! typed_argument_check {
 
