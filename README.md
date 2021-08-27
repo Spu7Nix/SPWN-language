@@ -32,14 +32,12 @@ You can either use the installers for your operating system, or build SPWN from 
 
 #### Linux
 
-###### Debian (Ubuntu, Mint, Elementary, ...)
-1. Download the .deb file (debian based) or the .pkg.tar.zst (arch based) from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases)
-2. Install the debian package using dpkg:
+###### Debian based (Ubuntu, Mint, Elementary, ...)
+You can either:
+- Download the .deb file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases) and install it using dpkg with `sudo dpkg -i spwn_0.0.6-0_amd64.deb`.
+- Use a one-liner to do this faster: `curl -sLO https://github.com/Spu7Nix/SPWN-language/releases/download/v0.6-beta/spwn_0.6.0-0_amd64.deb && sudo dpkg -i spwn_0.6.0-0_amd64.deb`
 
-```sh
-sudo dpkg -i spwn_0.0.6-0_amd64.deb
-```
-###### Arch (Manjaro, Artix, ...)
+###### Arch based (Manjaro, Artix, ...)
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
 ```sh
