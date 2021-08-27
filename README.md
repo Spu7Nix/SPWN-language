@@ -85,7 +85,7 @@ VSCode should automatically change the language syntax to SPWN, but if it doesn'
 Open Sublime Text and open the Command Palette... by selecting Command Palette from the Tools pull-down menu. In the menu that opens type install which will result in the Install Package Control option being presented. Hit Enter or left click the entry to install Package Control. Open the Command Palette again, and type 'install'. When `Package Control: Install Package` is highlighted press 'Enter' then type 'SPWN Language' and press 'Enter' when `SPWN Language` is highlighted.
 
 ###### Vim
-Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-viml) and follow to instructions on that page.
+Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-vim) and follow to instructions on that page.
 
 ###### Other Editors
 For any other editor with syntax highlighting, most C type syntax highlighting schemes work fine.
