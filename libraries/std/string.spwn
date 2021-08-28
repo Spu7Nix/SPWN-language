@@ -1,7 +1,10 @@
 #[no_std, cache_output]
 
 impl @string {
-	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise")]
+	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise") example("
+$.assert(''.is_empty())
+$.assert(!('x'.is_empty()))
+    ")]
 	(self) {
 		return self.length == 0;
 	},
@@ -10,7 +13,10 @@ impl @string {
 		if start > end { return $.substr(self, end, start); }
 		return $.substr(self, start, end);
 	},
-	join: #[desc("Joins a list using the string.")]
+	join: #[desc("Joins a list using the string.") example("
+$.assert(''.join(['a', 'b']) == 'ab')
+$.assert('current'.join(['string', ' element', ' join']) == 'currentstring element join')
+    ")]
 	(self, list: @array) {
 		let out = "";
 		for i in list {
@@ -19,7 +25,10 @@ impl @string {
 		}
 		return out.substr(0, out.length-self.length);
 	},
-	split: #[desc("Splits the string by the specified seperator.")]
+	split: #[desc("Splits the string by the specified seperator.") example("
+$.assert('a b c'.split(' ') == ['a', 'b', 'c'])
+$.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
+    ")]
 	(self, spstr: @string) {
 		if spstr.length == 0 {
 			return self as @array;
