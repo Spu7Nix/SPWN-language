@@ -1,0 +1,1 @@
+.\target\release\spwn.exe build .\TEST_.spwn
