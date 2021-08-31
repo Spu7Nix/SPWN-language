@@ -14,12 +14,41 @@ impl @http {
             return ",".join(output)
         }
     },
-    get: #[desc("Makes a get request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
-    (url: @string, headers: @dictionary = {}) {
+    _abstract_request: (url: @string, headers: @dictionary, method) {
         let temp = @http::{
-            encoded: $.http_get(url, @http::_dict_to_str(headers))
+            encoded: method(url, @http::_dict_to_str(headers))
         }
         return temp.decode()
+    },
+    _abstract_request_body: (url: @string, headers: @dictionary, body, method) {
+        let temp = @http::{
+            encoded: method(url, @http::_dict_to_str(headers), body as @string)
+        }
+        return temp.decode()
+    },
+    get: #[desc("Makes a get request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
+    (url: @string, headers: @dictionary = {}, body = "") {
+        return @http::_abstract_request_body(url, headers, body, $.http_get)
+    },
+    post: #[desc("Makes a post request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
+    (url: @string, headers: @dictionary = {}, body = "") {
+        return @http::_abstract_request_body(url, headers, body, $.http_post)
+    },
+    put: #[desc("Makes a put request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
+    (url: @string, headers: @dictionary = {}, body = "") {
+        return @http::_abstract_request_body(url, headers, body, $.http_put)
+    },
+    delete: #[desc("Makes a put request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
+    (url: @string, headers: @dictionary = {}, body = "") {
+        return @http::_abstract_request_body(url, headers, body, $.http_delete)
+    },
+    patch: #[desc("Makes a patch request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
+    (url: @string, headers: @dictionary = {}, body = "") {
+        return @http::_abstract_request_body(url, headers, body, $.http_patch)
+    },
+    head: #[desc("Makes a head request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
+    (url: @string, headers: @dictionary = {}, body = "") {
+        return @http::_abstract_request_body(url, headers, body, $.http_head)
     },
     _decode_headers: (headers: @string) {
         pairs = headers.substr(1, headers.length-1).split(',')

@@ -175,24 +175,33 @@ fn str_into_headermap(as_string: &String) -> Result<reqwest::header::HeaderMap, 
         if parts[0].len() > 0 {
             let decoded_header_name = match base64::decode(parts[0]) {
                 Ok(name) => name,
-                Err(error) => {return Err(format!("{} is not a valid b64 string", parts[0]))}
+                Err(_) => {return Err(format!("{} is not a valid b64 string", parts[0]))}
             };
             let header_name = match reqwest::header::HeaderName::from_bytes(&decoded_header_name) {
                 Ok(name) => name,
-                Err(error) => {return Err(format!("{} is not a valid header name", String::from_utf8_lossy(&decoded_header_name)))}
+                Err(_) => {return Err(format!("{} is not a valid header name", String::from_utf8_lossy(&decoded_header_name)))}
             };
             let decoded_header_value = match base64::decode(parts[1]) {
                 Ok(value) => value,
-                Err(error) => {return Err(format!("{} is not a valid b64 string", parts[0]))}
+                Err(_) => {return Err(format!("{} is not a valid b64 string", parts[0]))}
             };
             let header_value = match reqwest::header::HeaderValue::from_bytes(&decoded_header_value) {
                 Ok(value) => value,
-                Err(error) => {return Err(format!("{} is not a valid header value", String::from_utf8_lossy(&decoded_header_name)))}
+                Err(_) => {return Err(format!("{} is not a valid header value", String::from_utf8_lossy(&decoded_header_name)))}
             };
             headers.insert(header_name, header_value);
         }
     }
     Ok(headers)
+}
+fn encode_http_response(response: reqwest::blocking::Response) -> String {
+    let mut response_builder = String::new();
+    response_builder.push_str(&base64::encode(&(response.status()).as_str()));
+    response_builder.push_str("||");
+    response_builder.push_str(&base64::encode(&headermap_into_str(response.headers())));
+    response_builder.push_str("||");
+    response_builder.push_str(&base64::encode(response.text().expect("Couldn't load response text"))); // will always work (if it doesn't and someone sends in a bug report i can properly error handle this)
+    return response_builder
 }
 
 impl Value {
@@ -627,10 +636,7 @@ builtins! {
         Value::Str(String::from_utf8_lossy(&decrypted).to_string())
     }
 
-    [HTTPGet] fn http_get((url): Str, (headers): Str) {
-
-        let mut response_builder = String::new();
-
+    [HTTPPost] fn http_post((url): Str, (headers): Str, (body): Str) {
         let client = reqwest::blocking::Client::new();
         let request_headers = match str_into_headermap(&headers) {
             Ok(headers) => headers,
@@ -641,7 +647,7 @@ builtins! {
                 })
             }
         };
-        let response = match client.get(&url).headers(request_headers).send() {
+        let response = match client.post(&url).headers(request_headers).body(body).send() {
             Ok(data) => data,
             Err(_) => {
                 return Err(RuntimeError::BuiltinError {
@@ -650,15 +656,123 @@ builtins! {
                 })
             }
         };
+        Value::Str(encode_http_response(response)) 
+    }
 
-        response_builder.push_str(&base64::encode(&(response.status()).as_str()));
-        response_builder.push_str("||");
-        response_builder.push_str(&base64::encode(&headermap_into_str(response.headers())));
-        response_builder.push_str("||");
-        response_builder.push_str(&base64::encode(response.text().expect("Couldn't load response text"))); // will always work (if it doesn't and someone sends in a bug report i can properly error handle this)
-        
-        
-        Value::Str(response_builder) 
+    [HTTPPut] fn http_put((url): Str, (headers): Str, (body): Str) {
+        let client = reqwest::blocking::Client::new();
+        let request_headers = match str_into_headermap(&headers) {
+            Ok(headers) => headers,
+            Err(error) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: error,
+                    info,
+                })
+            }
+        };
+        let response = match client.put(&url).headers(request_headers).body(body).send() {
+            Ok(data) => data,
+            Err(_) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
+                    info,
+                })
+            }
+        };
+        Value::Str(encode_http_response(response)) 
+    }
+
+    [HTTPDelete] fn http_delete((url): Str, (headers): Str, (body): Str) {
+        let client = reqwest::blocking::Client::new();
+        let request_headers = match str_into_headermap(&headers) {
+            Ok(headers) => headers,
+            Err(error) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: error,
+                    info,
+                })
+            }
+        };
+        let response = match client.delete(&url).headers(request_headers).body(body).send() {
+            Ok(data) => data,
+            Err(_) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
+                    info,
+                })
+            }
+        };
+        Value::Str(encode_http_response(response)) 
+    }
+
+    [HTTPHead] fn http_head((url): Str, (headers): Str, (body): Str) {
+        let client = reqwest::blocking::Client::new();
+        let request_headers = match str_into_headermap(&headers) {
+            Ok(headers) => headers,
+            Err(error) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: error,
+                    info,
+                })
+            }
+        };
+        let response = match client.head(&url).headers(request_headers).body(body).send() {
+            Ok(data) => data,
+            Err(_) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
+                    info,
+                })
+            }
+        };
+        Value::Str(encode_http_response(response)) 
+    }
+
+
+    [HTTPPatch] fn http_patch((url): Str, (headers): Str, (body): Str) {
+        let client = reqwest::blocking::Client::new();
+        let request_headers = match str_into_headermap(&headers) {
+            Ok(headers) => headers,
+            Err(error) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: error,
+                    info,
+                })
+            }
+        };
+        let response = match client.patch(&url).headers(request_headers).body(body).send() {
+            Ok(data) => data,
+            Err(_) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
+                    info,
+                })
+            }
+        };
+        Value::Str(encode_http_response(response)) 
+    }
+
+    [HTTPGet] fn http_get((url): Str, (headers): Str, (body): Str) {
+        let client = reqwest::blocking::Client::new();
+        let request_headers = match str_into_headermap(&headers) {
+            Ok(headers) => headers,
+            Err(error) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: error,
+                    info,
+                })
+            }
+        };
+        let response = match client.get(&url).headers(request_headers).body(body).send() {
+            Ok(data) => data,
+            Err(_) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
+                    info,
+                })
+            }
+        };
+        Value::Str(encode_http_response(response)) 
     }
 
     [Sin] fn sin((n): Number) { Value::Number(n.sin()) }
