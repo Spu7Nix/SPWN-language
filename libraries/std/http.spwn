@@ -1,0 +1,49 @@
+#[no_std, cache_output]
+
+type @http
+impl @http {
+    _dict_to_str: (dict: @dictionary) {
+        let output = []
+        for pair in dict.items() {
+            output.push($.b64encode(pair[0]) + ":" + $.b64encode(pair[1]))
+        }
+        if output == [] {
+            return ""
+        }
+        else {
+            return ",".join(output)
+        }
+    },
+    get: #[desc("Makes a get request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
+    (url: @string, headers: @dictionary = {}) {
+        let temp = @http::{
+            encoded: $.http_get(url, @http::_dict_to_str(headers))
+        }
+        return temp.decode()
+    },
+    _decode_headers: (headers: @string) {
+        pairs = headers.substr(1, headers.length-1).split(',')
+        let output = {}
+        for pair in pairs {
+            parts = pair.split(': ')
+            if parts != [''] {
+                key = $.b64decode(parts[0])
+                value = $.b64decode(parts[1])
+                output.set(key, value)
+            }
+        }
+        return output
+    },
+    decode: 
+    (self) {
+        parts = self.encoded.split("||")
+        status = $.b64decode(parts[0]) as @number
+        text = $.b64decode(parts[2])
+        headers = @http::_decode_headers($.b64decode(parts[1]))
+        return {
+            status,
+            text,
+            headers
+        }
+    }
+}
