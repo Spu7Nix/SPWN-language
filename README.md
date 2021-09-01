@@ -166,13 +166,6 @@ Build a file called AI.spwn and output the level string to the console.
 - [x] escaped characters in string
 - [x] fix post-compile optimizations
 
-## Todo at some point
-
-- [x] implement live editor features for windows
-- [x] make it work on linux
-- [x] nested comments
-- [x] get and edit obj and trigger properties
-
 
 
 # Enjoy SPWN!
