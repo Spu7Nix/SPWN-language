@@ -2,77 +2,46 @@
 
 type @http
 impl @http {
-    _dict_to_str: (dict: @dictionary) {
-        let output = []
-        for pair in dict.items() {
-            output.push($.b64encode(pair[0]) + ":" + $.b64encode(pair[1]))
-        }
-        if output == [] {
-            return ""
-        }
-        else {
-            return ",".join(output)
-        }
-    },
-    _abstract_request: (url: @string, headers: @dictionary, method) {
-        let temp = @http::{
-            encoded: method(url, @http::_dict_to_str(headers))
-        }
-        return temp.decode()
-    },
-    _abstract_request_body: (url: @string, headers: @dictionary, body, method) {
-        let temp = @http::{
-            encoded: method(url, @http::_dict_to_str(headers), body as @string)
-        }
-        return temp.decode()
-    },
     get: #[desc("Makes a get request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
     (url: @string, headers: @dictionary = {}, body = "") {
-        return @http::_abstract_request_body(url, headers, body, $.http_get)
+        return $.http_request(
+            "get",
+            url, headers, body
+        )
     },
     post: #[desc("Makes a post request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
     (url: @string, headers: @dictionary = {}, body = "") {
-        return @http::_abstract_request_body(url, headers, body, $.http_post)
+        return $.http_request(
+            "post",
+            url, headers, body
+        )
     },
     put: #[desc("Makes a put request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
     (url: @string, headers: @dictionary = {}, body = "") {
-        return @http::_abstract_request_body(url, headers, body, $.http_put)
+        return $.http_request(
+            "put",
+            url, headers, body
+        )
     },
     delete: #[desc("Makes a put request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
     (url: @string, headers: @dictionary = {}, body = "") {
-        return @http::_abstract_request_body(url, headers, body, $.http_delete)
+        return $.http_request(
+            "delete",
+            url, headers, body
+        )
     },
     patch: #[desc("Makes a patch request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
     (url: @string, headers: @dictionary = {}, body = "") {
-        return @http::_abstract_request_body(url, headers, body, $.http_patch)
+        return $.http_request(
+            "patch",
+            url, headers, body
+        )
     },
     head: #[desc("Makes a head request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]
     (url: @string, headers: @dictionary = {}, body = "") {
-        return @http::_abstract_request_body(url, headers, body, $.http_head)
+        return $.http_request(
+            "head",
+            url, headers, body
+        )
     },
-    _decode_headers: (headers: @string) {
-        pairs = headers.substr(1, headers.length-1).split(',')
-        let output = {}
-        for pair in pairs {
-            parts = pair.split(': ')
-            if parts != [''] {
-                key = $.b64decode(parts[0])
-                value = $.b64decode(parts[1])
-                output.set(key, value)
-            }
-        }
-        return output
-    },
-    decode: 
-    (self) {
-        parts = self.encoded.split("||")
-        status = $.b64decode(parts[0]) as @number
-        text = $.b64decode(parts[2])
-        headers = @http::_decode_headers($.b64decode(parts[1]))
-        return {
-            status,
-            text,
-            headers
-        }
-    }
 }

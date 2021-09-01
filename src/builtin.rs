@@ -636,143 +636,99 @@ builtins! {
         Value::Str(String::from_utf8_lossy(&decrypted).to_string())
     }
 
-    [HTTPPost] fn http_post((url): Str, (headers): Str, (body): Str) {
-        let client = reqwest::blocking::Client::new();
-        let request_headers = match str_into_headermap(&headers) {
-            Ok(headers) => headers,
-            Err(error) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: error,
-                    info,
-                })
-            }
-        };
-        let response = match client.post(&url).headers(request_headers).body(body).send() {
-            Ok(data) => data,
-            Err(_) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
-                    info,
-                })
-            }
-        };
-        Value::Str(encode_http_response(response)) 
-    }
-
-    [HTTPPut] fn http_put((url): Str, (headers): Str, (body): Str) {
-        let client = reqwest::blocking::Client::new();
-        let request_headers = match str_into_headermap(&headers) {
-            Ok(headers) => headers,
-            Err(error) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: error,
-                    info,
-                })
-            }
-        };
-        let response = match client.put(&url).headers(request_headers).body(body).send() {
-            Ok(data) => data,
-            Err(_) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
-                    info,
-                })
-            }
-        };
-        Value::Str(encode_http_response(response)) 
-    }
-
-    [HTTPDelete] fn http_delete((url): Str, (headers): Str, (body): Str) {
-        let client = reqwest::blocking::Client::new();
-        let request_headers = match str_into_headermap(&headers) {
-            Ok(headers) => headers,
-            Err(error) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: error,
-                    info,
-                })
-            }
-        };
-        let response = match client.delete(&url).headers(request_headers).body(body).send() {
-            Ok(data) => data,
-            Err(_) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
-                    info,
-                })
-            }
-        };
-        Value::Str(encode_http_response(response)) 
-    }
-
-    [HTTPHead] fn http_head((url): Str, (headers): Str, (body): Str) {
-        let client = reqwest::blocking::Client::new();
-        let request_headers = match str_into_headermap(&headers) {
-            Ok(headers) => headers,
-            Err(error) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: error,
-                    info,
-                })
-            }
-        };
-        let response = match client.head(&url).headers(request_headers).body(body).send() {
-            Ok(data) => data,
-            Err(_) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
-                    info,
-                })
-            }
-        };
-        Value::Str(encode_http_response(response)) 
-    }
 
 
-    [HTTPPatch] fn http_patch((url): Str, (headers): Str, (body): Str) {
-        let client = reqwest::blocking::Client::new();
-        let request_headers = match str_into_headermap(&headers) {
-            Ok(headers) => headers,
-            Err(error) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: error,
-                    info,
-                })
-            }
-        };
-        let response = match client.patch(&url).headers(request_headers).body(body).send() {
-            Ok(data) => data,
-            Err(_) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
-                    info,
-                })
-            }
-        };
-        Value::Str(encode_http_response(response)) 
-    }
+    [HTTPRequest] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
 
-    [HTTPGet] fn http_get((url): Str, (headers): Str, (body): Str) {
+        let mut headermap = reqwest::header::HeaderMap::new();
+        for (name, value) in &headers {
+            let header_name = match reqwest::header::HeaderName::from_bytes(name.as_bytes()) {
+                Ok(hname) => hname,
+                Err(_) => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Could not convert header name: '{}'", name),
+                        info
+                    })
+                }
+            };
+            let header_value = globals.stored_values[*value].clone().to_str(globals);
+            headermap.insert(header_name, header_value.parse().unwrap());
+        }
+
         let client = reqwest::blocking::Client::new();
-        let request_headers = match str_into_headermap(&headers) {
-            Ok(headers) => headers,
-            Err(error) => {
+        let request_maker = match &method[..] {
+            "get" => client.get(&url),
+            "post" => client.post(&url),
+            "put" => {
+                client.put(&url)
+            },
+            "patch" => client.patch(&url),
+            "delete" => client.delete(&url),
+            "head" => client.head(&url),
+            _ => {
                 return Err(RuntimeError::BuiltinError {
-                    message: error,
-                    info,
+                    message: format!("Request type not supported: '{}'", method),
+                    info
                 })
             }
         };
-        let response = match client.get(&url).headers(request_headers).body(body).send() {
-            Ok(data) => data,
-            Err(_) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
-                    info,
-                })
-            }
+
+        let response = match request_maker
+            .headers(headermap)
+            .body(body)
+            .send() {
+                Ok(resp) => resp,
+                Err(_) => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Could not make request to: '{}'", url),
+                        info
+                    })
+                }
         };
-        Value::Str(encode_http_response(response)) 
+
+        let mut output_map = HashMap::new();
+
+        let response_status = store_const_value(
+            Value::Number(
+                response.status().as_u16() as f64
+            ),
+            globals,
+            context.start_group,
+            CodeArea::new(),
+        );
+
+        let response_headermap = response.headers();
+        let mut response_headers_value = HashMap::new();
+        for (name, value) in response_headermap.iter() {
+            let header_value = store_const_value(
+                Value::Str(String::from(value.to_str().expect("Couldn't parse return header value"))),
+                globals,
+                context.start_group,
+                CodeArea::new()
+            );
+            response_headers_value.insert(Intern::new(String::from(name.as_str())), header_value);
+        }
+
+        let response_headers = store_const_value(
+            Value::Dict(response_headers_value),
+            globals,
+            context.start_group,
+            CodeArea::new()
+        );
+
+        let response_text = store_const_value(
+            Value::Str(
+                response.text().expect("Failed to parse response text")
+            ),
+            globals,
+            context.start_group,
+            CodeArea::new(),
+        );
+
+        output_map.insert(Intern::new(String::from("status")), response_status);
+        output_map.insert(Intern::new(String::from("headers")), response_headers);
+        output_map.insert(Intern::new(String::from("text")), response_text);
+        Value::Dict(output_map)
     }
 
     [Sin] fn sin((n): Number) { Value::Number(n.sin()) }
