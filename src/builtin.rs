@@ -17,8 +17,6 @@ use rand::Rng;
 use std::io::stdout;
 use std::io::Write;
 
-use reqwest;
-
 //use text_io;
 use crate::compiler_info::{CodeArea, CompilerInfo};
 
@@ -161,7 +159,9 @@ fn headermap_into_str(map: &reqwest::header::HeaderMap) -> String {
     for (key, value) in map.iter() {
         output.push_str(&base64::encode(key.as_str()));
         output.push_str(": ");
-        output.push_str(&base64::encode(value.to_str().expect("Failed to parse header value"))); // Guaranteed to work- function inputs are responses from a request
+        output.push_str(&base64::encode(
+            value.to_str().expect("Failed to parse header value"),
+        )); // Guaranteed to work- function inputs are responses from a request
         output.push_str(",");
     }
     output.push_str("}");
@@ -175,19 +175,30 @@ fn str_into_headermap(as_string: &String) -> Result<reqwest::header::HeaderMap, 
         if parts[0].len() > 0 {
             let decoded_header_name = match base64::decode(parts[0]) {
                 Ok(name) => name,
-                Err(error) => {return Err(format!("{} is not a valid b64 string", parts[0]))}
+                Err(error) => return Err(format!("{} is not a valid b64 string", parts[0])),
             };
             let header_name = match reqwest::header::HeaderName::from_bytes(&decoded_header_name) {
                 Ok(name) => name,
-                Err(error) => {return Err(format!("{} is not a valid header name", String::from_utf8_lossy(&decoded_header_name)))}
+                Err(error) => {
+                    return Err(format!(
+                        "{} is not a valid header name",
+                        String::from_utf8_lossy(&decoded_header_name)
+                    ))
+                }
             };
             let decoded_header_value = match base64::decode(parts[1]) {
                 Ok(value) => value,
-                Err(error) => {return Err(format!("{} is not a valid b64 string", parts[0]))}
+                Err(error) => return Err(format!("{} is not a valid b64 string", parts[0])),
             };
-            let header_value = match reqwest::header::HeaderValue::from_bytes(&decoded_header_value) {
+            let header_value = match reqwest::header::HeaderValue::from_bytes(&decoded_header_value)
+            {
                 Ok(value) => value,
-                Err(error) => {return Err(format!("{} is not a valid header value", String::from_utf8_lossy(&decoded_header_name)))}
+                Err(error) => {
+                    return Err(format!(
+                        "{} is not a valid header value",
+                        String::from_utf8_lossy(&decoded_header_name)
+                    ))
+                }
             };
             headers.insert(header_name, header_value);
         }
@@ -656,9 +667,9 @@ builtins! {
         response_builder.push_str(&base64::encode(&headermap_into_str(response.headers())));
         response_builder.push_str("||");
         response_builder.push_str(&base64::encode(response.text().expect("Couldn't load response text"))); // will always work (if it doesn't and someone sends in a bug report i can properly error handle this)
-        
-        
-        Value::Str(response_builder) 
+
+
+        Value::Str(response_builder)
     }
 
     [Sin] fn sin((n): Number) { Value::Number(n.sin()) }
@@ -1113,7 +1124,7 @@ builtins! {
                         info,
                     });
                 }
-                
+
                 match format {
                     "text" => {
                         let ret = fs::read_to_string(path);

@@ -24,7 +24,7 @@ general = import "general_triggers.spwn"
 events = import "events.spwn"
 ctrl_flow = import "control_flow.spwn"
 
--> return {
+return {
     ..constants.easing_types,
     ..constants.comparisons,
     ..constants.colors,
@@ -42,7 +42,6 @@ ctrl_flow = import "control_flow.spwn"
     heapq: @heapq::new,
     complex: @complex::new,
     zip: @zip::new,
-    http: @http,
 }
 
 
