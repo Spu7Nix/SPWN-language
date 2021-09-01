@@ -32,14 +32,12 @@ You can either use the installers for your operating system, or build SPWN from 
 
 #### Linux
 
-###### Debian (Ubuntu, Mint, Elementary, ...)
-1. Download the .deb file (debian based) or the .pkg.tar.zst (arch based) from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases)
-2. Install the debian package using dpkg:
+###### Debian based (Ubuntu, Mint, Elementary, ...)
+You can either:
+- Download the .deb file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases) and install it using dpkg with `sudo dpkg -i spwn_0.0.6-0_amd64.deb`.
+- Use a one-liner to do this faster: `curl -sLO https://github.com/Spu7Nix/SPWN-language/releases/download/v0.6-beta/spwn_0.6.0-0_amd64.deb && sudo dpkg -i spwn_0.6.0-0_amd64.deb`
 
-```sh
-sudo dpkg -i spwn_0.0.6-0_amd64.deb
-```
-###### Arch (Manjaro, Artix, ...)
+###### Arch based (Manjaro, Artix, ...)
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
 ```sh
@@ -87,7 +85,7 @@ VSCode should automatically change the language syntax to SPWN, but if it doesn'
 Open Sublime Text and open the Command Palette... by selecting Command Palette from the Tools pull-down menu. In the menu that opens type install which will result in the Install Package Control option being presented. Hit Enter or left click the entry to install Package Control. Open the Command Palette again, and type 'install'. When `Package Control: Install Package` is highlighted press 'Enter' then type 'SPWN Language' and press 'Enter' when `SPWN Language` is highlighted.
 
 ###### Vim
-Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-viml) and follow to instructions on that page.
+Go to [spwn().vim!](https://gitlab.com/verticallity/spwn-vim) and follow to instructions on that page.
 
 ###### Other Editors
 For any other editor with syntax highlighting, most C type syntax highlighting schemes work fine.
@@ -160,12 +158,11 @@ Build a file called AI.spwn and output the level string to the console.
 - [x] Finish mutable variables
 - [x] Type annotations for function arguments, variable definitions etc.
 - [x] `as` operator for automatically changing type
-- [ ] finish documentation
-- [x] break/continue statement
-- [x] operation order
-- [x] escaped characters in string
-- [x] fix post-compile optimizations
-
+- [ ] Finish documentation
+- [x] Break/continue statement
+- [x] Operation order
+- [x] Escaped characters in string
+- [x] Fix post-compile optimizations
 
 
 # Enjoy SPWN!
