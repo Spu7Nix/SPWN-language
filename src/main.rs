@@ -135,7 +135,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     .cloned()
                                     .expect("Expected built-in function name");
                                 permissions.set(
-                                    builtin::Builtin::from_str(&b).expect("Invalid builtin name"),
+                                    builtin::Builtin::from_str(&b)
+                                        .unwrap_or_else(|_| panic!("Invalid builtin name: {}", b)),
                                     true,
                                 );
                             }
@@ -145,7 +146,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     .cloned()
                                     .expect("Expected built-in function name");
                                 permissions.set(
-                                    builtin::Builtin::from_str(&b).expect("Invalid builtin name"),
+                                    builtin::Builtin::from_str(&b)
+                                        .unwrap_or_else(|_| panic!("Invalid builtin name: {}", b)),
                                     false,
                                 );
                             }

@@ -1,4 +1,2 @@
-[[on(touch())]] !{
-    10g.move(10, 0)
-}
-
+arr = [1, 2, 3, 4, 5]
+$.print(arr.reverse())

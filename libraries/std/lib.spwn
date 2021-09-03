@@ -34,7 +34,6 @@ ctrl_flow = import "control_flow.spwn"
 
     counter: @counter::new,
     on: @event::on,
-    handle: @event::handle,
     obj_props: constants.obj_props,
     obj_ids: constants.obj_ids,
     open: @file::new,
