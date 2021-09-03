@@ -443,19 +443,20 @@ pub fn compile_spwn(
     permissions: BuiltinPermissions,
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
+
     let mut globals = Globals::new(path.clone(), permissions);
     globals.includes = included_paths;
-    if statements.is_empty() {
-        return Err(RuntimeError::CustomError(create_error(
-            CompilerInfo::from_area(crate::compiler_info::CodeArea {
-                file: Intern::new(path),
-                pos: (0, 0),
-            }),
-            "this script is empty",
-            &[],
-            None,
-        )));
-    }
+    // if statements.is_empty() {
+    //     return Err(RuntimeError::CustomError(create_error(
+    //         CompilerInfo::from_area(crate::compiler_info::CodeArea {
+    //             file: Intern::new(path),
+    //             pos: (0, 0),
+    //         }),
+    //         "this script is empty",
+    //         &[],
+    //         None,
+    //     )));
+    // }
     let mut start_context = FullContext::new();
     //store at pos 0
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
@@ -464,7 +465,7 @@ pub fn compile_spwn(
     let start_info = CompilerInfo {
         ..CompilerInfo::from_area(crate::compiler_info::CodeArea {
             file: Intern::new(path.clone()),
-            pos: statements[0].pos,
+            pos: (0, 0),
         })
     };
     use std::time::Instant;
@@ -507,21 +508,22 @@ pub fn compile_spwn(
     }
 
     compile_scope(&statements, &mut start_context, &mut globals, start_info)?;
-
-    for fc in start_context.with_breaks() {
-        let c = fc.inner();
-        let end_pos = statements.last().unwrap().pos.1;
-        if let Some((r, i)) = c.broken {
-            return Err(RuntimeError::BreakNeverUsedError {
-                breaktype: r,
-                info: CompilerInfo::from_area(i),
-                broke: i,
-                dropped: CodeArea {
-                    pos: (end_pos, end_pos),
-                    file: Intern::new(path),
-                },
-                reason: "the program ended".to_string(),
-            });
+    if !statements.is_empty() {
+        for fc in start_context.with_breaks() {
+            let c = fc.inner();
+            let end_pos = statements.last().unwrap().pos.1;
+            if let Some((r, i)) = c.broken {
+                return Err(RuntimeError::BreakNeverUsedError {
+                    breaktype: r,
+                    info: CompilerInfo::from_area(i),
+                    broke: i,
+                    dropped: CodeArea {
+                        pos: (end_pos, end_pos),
+                        file: Intern::new(path),
+                    },
+                    reason: "the program ended".to_string(),
+                });
+            }
         }
     }
 

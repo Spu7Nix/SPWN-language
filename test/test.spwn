@@ -1,8 +1,1 @@
-
-let a = {
-    hello: {
-
-    }
-}
-
-a["hello"]["hi"] = 10
+#[no_std]
