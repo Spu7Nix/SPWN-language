@@ -1608,6 +1608,20 @@ pub fn import_module(
         )));
     }
 
+    if let Some(ext) = module_path.extension() {
+        if ext != "spwn" {
+            return Err(RuntimeError::CustomError(create_error(
+                info,
+                &format!(
+                    "Imported files must have a .spwn extension (found {})",
+                    ext.to_string_lossy()
+                ),
+                &[],
+                None,
+            )));
+        }
+    }
+
     let module_path = Intern::new(module_path);
 
     let unparsed = match fs::read_to_string(module_path.as_ref()) {

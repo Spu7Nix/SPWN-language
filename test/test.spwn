@@ -1,7 +1,1 @@
-dict = {
-    hello2: 10,
-    "hello": 10,
-    "my value": 100,
-}
-
-$.print(dict)
+import "test2.spwn"
