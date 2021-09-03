@@ -1,2 +1,8 @@
 
-$.writefile("test/readfiletest.txt", "hello uwu")
+let a = {
+    hello: {
+
+    }
+}
+
+a["hello"]["hi"] = 10
