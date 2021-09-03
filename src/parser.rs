@@ -534,16 +534,16 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    /*fn current(&self) -> Option<Token> {
+    fn current(&self) -> Option<Token> {
         let len = self.stack.len();
         if len == 0 {
             None
         } else if len - self.index < 1 {
             None
         } else {
-            Some(self.stack[len - self.index - 1].0)
+            self.stack[len - self.index - 1].0
         }
-    }*/
+    }
 
     fn slice(&self) -> String {
         self.stack[self.stack.len() - self.index - 1].1.clone()
@@ -1394,10 +1394,14 @@ fn parse_dict(
 
     loop {
         match tokens.next(false) {
-            Some(Token::Symbol) | Some(Token::Type) => {
-                let symbol = tokens.slice();
-
-                is_valid_symbol(&symbol, tokens, notes)?;
+            Some(Token::Symbol) | Some(Token::Type) | Some(Token::StringLiteral) => {
+                let symbol = if let Some(Token::StringLiteral) = tokens.current() {
+                    str_content(tokens.slice(), tokens, notes)?.0
+                } else {
+                    let s = tokens.slice();
+                    is_valid_symbol(&s, tokens, notes)?;
+                    s
+                };
 
                 let symbol = Intern::new(symbol);
 
