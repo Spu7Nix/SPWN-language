@@ -1358,6 +1358,23 @@ builtins! {
         }
     }
 
+
+    [WriteFile] #[safe = false]
+    fn writefile((path): Str, (data): Str) {
+
+
+        match fs::write(path, data) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: format!("Error when writing to file: {}", e),
+                    info,
+                });
+            }
+        };
+        Value::Null
+    }
+
     [Pop] #[safe = true]
     fn pop(mut (arr)) {
 
