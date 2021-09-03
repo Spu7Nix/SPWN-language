@@ -1919,16 +1919,12 @@ fn parse_macro(
                     tag: properties.clone(),
                 };
 
-                let mut new_path = vec![ast::Argument {
-                    symbol: None,
-                    value: m_var.to_expression(),
-                    pos: (arg_start, arg_end),
-                }];
+                let mut new_args = Vec::new();
 
                 if let Some(p_) = unwrapped_deco.path.pop() {
                     match p_ {
                         ast::Path::Call(v) => {
-                            new_path.extend(v);
+                            new_args.extend(v);
                         }
                         _ => {
                             unwrapped_deco.path.push(p_);
@@ -1936,7 +1932,13 @@ fn parse_macro(
                     }
                 }
 
-                unwrapped_deco.path.push(ast::Path::Call(new_path));
+                new_args.push(ast::Argument {
+                    symbol: None,
+                    value: m_var.to_expression(),
+                    pos: (arg_start, arg_end),
+                });
+
+                unwrapped_deco.path.push(ast::Path::Call(new_args));
 
                 Ok(ast::ValueBody::Expression(unwrapped_deco.to_expression()))
             } else {
@@ -2163,6 +2165,7 @@ fn parse_variable(
                                 }
                                 Some(Token::Exclamation) => {
                                     // its a decorator on a trigger function
+                                    let start = test_tokens.position().0;
 
                                     match test_tokens.next(true) {
                                         // fuck this, i ain't allowing !;{ }
@@ -2176,32 +2179,35 @@ fn parse_variable(
                                         statements: parse_cmp_stmt(tokens, notes)?,
                                     });
 
+                                    let end = tokens.position().1;
+
                                     let t_var = ast::Variable {
                                         value: ast::ValueLiteral::new(trig),
                                         path: Vec::new(),
                                         operator: None,
-                                        pos: (0, 0),
+                                        pos: (start, end),
                                         tag: properties.clone(),
                                     };
 
-                                    let mut new_path = vec![ast::Argument {
-                                        symbol: None,
-                                        value: t_var.to_expression(),
-                                        pos: (0, 0),
-                                    }];
+                                    let mut arguments = Vec::new();
 
                                     if let Some(p_) = v.path.pop() {
                                         match p_ {
                                             ast::Path::Call(vv) => {
-                                                new_path.extend(vv);
+                                                arguments.extend(vv);
                                             }
                                             _ => {
                                                 v.path.push(p_);
                                             }
                                         }
                                     }
+                                    arguments.push(ast::Argument {
+                                        symbol: None,
+                                        value: t_var.to_expression(),
+                                        pos: (start, end),
+                                    });
 
-                                    v.path.push(ast::Path::Call(new_path));
+                                    v.path.push(ast::Path::Call(arguments));
 
                                     potential_macro =
                                         Some(ast::ValueBody::Expression(v.to_expression()))

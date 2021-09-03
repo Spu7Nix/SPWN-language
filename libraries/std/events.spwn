@@ -6,26 +6,22 @@ extract constants.obj_props
 type @event
 
 impl @event {
-    on: #[desc("Triggers a function every time an event fires (exists for legacy only)") example("
+    on: #[desc("Triggers a function every time an event fires") example("
 on(touch(), !{
     10g.move(10, 0)
 })
+
+// you can also use it as a decorator
+[[ on(touch()) ]] !{
+    10g.move(10, 0)
+}
     ")] (
         #[desc("Event to trigger on")] event: @event,
         #[desc("Function to trigger")] function: @trigger_function
     ){
         event.on_triggered(function)
     },
-    handle: #[desc("Triggers a function every time an event fires") example("
-[[handle(touch())]] !{
-    10g.move(10, 0)
-}
-    ")] (
-        #[desc("Function to trigger")] function: @trigger_function,
-        #[desc("Event to trigger on")] event: @event
-    ){
-        event.on_triggered(function)
-    }
+    
 }
 
 return {

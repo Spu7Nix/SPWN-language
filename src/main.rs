@@ -421,7 +421,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 //         Ok(p) => p,
                 //     };
 
-                //     let formatted = fmt::format(parsed);
+                //     let formatted = fmt::_format(parsed);
 
                 //     let mut output_file = File::create("test/formatted.spwn")?;
                 //     output_file.write_all(formatted.as_bytes())?;

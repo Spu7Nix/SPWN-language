@@ -1,1 +1,4 @@
-import "test2.spwn"
+[[on(touch())]] !{
+    10g.move(10, 0)
+}
+
