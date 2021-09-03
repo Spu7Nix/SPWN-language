@@ -440,9 +440,10 @@ pub fn compile_spwn(
     path: PathBuf,
     included_paths: Vec<PathBuf>,
     notes: ParseNotes,
+    permissions: BuiltinPermissions,
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
-    let mut globals = Globals::new(path.clone());
+    let mut globals = Globals::new(path.clone(), permissions);
     globals.includes = included_paths;
     if statements.is_empty() {
         return Err(RuntimeError::CustomError(create_error(

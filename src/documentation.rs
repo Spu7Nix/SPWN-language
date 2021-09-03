@@ -3,6 +3,7 @@ use internment::Intern;
 // tools for generating documentation for SPWN libraries
 //use crate::ast::*;
 
+use crate::builtin::BuiltinPermissions;
 use crate::compiler::{import_module, RuntimeError};
 use crate::compiler_info::CompilerInfo;
 use crate::compiler_types::ImportType;
@@ -22,7 +23,7 @@ fn create_doc_file(mut dir: PathBuf, name: String, content: &str) {
     println!("written to {:?}", dir);
 }
 pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
-    let mut globals = Globals::new(PathBuf::new());
+    let mut globals = Globals::new(PathBuf::new(), BuiltinPermissions::new());
 
     let mut start_context = FullContext::new();
 

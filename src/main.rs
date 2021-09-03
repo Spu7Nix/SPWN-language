@@ -27,6 +27,7 @@ use ariadne::{Cache, FileCache, Fmt};
 
 use optimize::optimize;
 
+use builtin::BuiltinPermissions;
 use parser::*;
 
 use std::path::PathBuf;
@@ -102,7 +103,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .expect("Executable must be in a directory")
                             .to_path_buf(),
                     ];
+
+                    let mut permissions = BuiltinPermissions::new();
                     //change to current_exe before release (from current_dir)
+                    use std::str::FromStr;
 
                     while let Some(arg) = args_iter.next() {
                         match arg.as_ref() {
@@ -125,6 +129,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     return Err(Box::from("Invalid path".to_string()));
                                 }
                             }),
+                            "--allow" | "-a" => {
+                                let b = args_iter
+                                    .next()
+                                    .cloned()
+                                    .expect("Expected built-in function name");
+                                permissions.set(
+                                    builtin::Builtin::from_str(&b).expect("Invalid builtin name"),
+                                    true,
+                                );
+                            }
+                            "--deny" | "-d" => {
+                                let b = args_iter
+                                    .next()
+                                    .cloned()
+                                    .expect("Expected built-in function name");
+                                permissions.set(
+                                    builtin::Builtin::from_str(&b).expect("Invalid builtin name"),
+                                    false,
+                                );
+                            }
                             _ => (),
                         };
                     }
@@ -186,6 +210,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         script_path,
                         included_paths,
                         notes,
+                        permissions,
                     ) {
                         Err(err) => {
                             create_report(ErrorReport::from(err)).eprint(cache).unwrap();
