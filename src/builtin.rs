@@ -384,6 +384,7 @@ macro_rules! builtins {
             ]
 
             fn $name:ident(
+                $(#[$argdesc:literal])?
                 $(
                     $(
                         $($mut:ident)? ($($arg_name:ident),*)$(: $arg_type:ident)?
@@ -535,15 +536,16 @@ macro_rules! builtins {
         }
 
         pub fn builtin_docs() -> String {
-            let mut out = String::new();
+            let mut all = Vec::new();
             $(
+                let mut out = String::new();
                 out += &format!(
                     "## $.{}\n",
                     stringify!($name).replace("_", "\\_")
                 );
                 if !$desc.is_empty() {
                     out += &format!(
-                        "> ## Description:\n> {} <div> \n",
+                        "> ## Description:\n> {} <div>\n",
                         $desc
                     );
                 }
@@ -555,10 +557,13 @@ macro_rules! builtins {
                     );
 
                 }
-
                 out += &format!("> **Allowed by default:** {}\n", if $safe { "yes" } else { "no" });
-
-
+                #[allow(unused_mut, unused_assignments, unused_variables)]
+                let mut arg_title_set = false;
+                $(
+                    out += &format!("> ## Arguments: \n > **{}**\n", $argdesc);
+                    arg_title_set = true;
+                )?
                 $(
                     let mut args = Vec::<(&str, Option<&str>, bool)>::new();
 
@@ -573,9 +578,8 @@ macro_rules! builtins {
                         $(mutable = stringify!($mut) == "mut";)?
                         args.push((name, typ, mutable));
                     )+
-
-
-                    out += "> ## Arguments: \n> | # | **Name** | **Type** |\n> |-|-|-|\n";
+                    if !arg_title_set { out += "> ## Arguments: \n"; }
+                    out += "> | # | **Name** | **Type** |\n> |-|-|-|\n";
                     for (i, (name, typ, mutable)) in args.into_iter().enumerate() {
                         out += &format!("> | {} | `{}` | {}{} |\n", i + 1, name, if mutable {"_mutable_ "} else {""}, match typ {
                             Some(s) => format!("_{}_", s),
@@ -586,12 +590,38 @@ macro_rules! builtins {
 
                 )?
 
-
-
-
-
+                all.push((stringify!($name), out));
 
             )*
+            let mut out = String::new();
+
+            let mut operators = Vec::new();
+            let mut normal_ones = Vec::new();
+
+            for (name, doc) in all {
+                if name.starts_with("_") && name.ends_with("_") {
+                    operators.push((name, doc));
+                } else {
+                    normal_ones.push((name, doc));
+                }
+            }
+
+            normal_ones.sort_by(|a, b| a.0.cmp(&b.0));
+            operators.sort_by(|a, b| a.0.cmp(&b.0));
+
+            out += "# List of Built-in functions\n";
+
+            for (_, doc) in normal_ones.iter() {
+                out += doc;
+            }
+
+            out += "# Default Implementations for Operators\n";
+
+            for (_, doc) in operators.iter() {
+                out += doc;
+            }
+
+
             out
         }
 
@@ -615,7 +645,7 @@ builtins! {
     }
 
     [Print] #[safe = true, desc = "Prints value(s) to the console", example = "$.print(\"Hello world!\")"]
-    fn print() {
+    fn print(#["any"]) {
         let mut out = String::new();
         for val in arguments.iter() {
             match &globals.stored_values[*val] {
@@ -629,7 +659,7 @@ builtins! {
     }
 
     [Time] #[safe = true, desc = "Gets the current system time in seconds", example = "now = $.time()"]
-    fn time() {
+    fn time(#["none"]) {
         arg_length!(info, 0, arguments, "Expected no arguments".to_string());
         use std::time::SystemTime;
         let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
@@ -646,7 +676,7 @@ builtins! {
     }
 
     [SpwnVersion] #[safe = true, desc = "Gets the current version of spwn", example = "$.spwn_version()"]
-    fn spwn_version() {
+    fn spwn_version(#["none"]) {
         arg_length!(info, 0, arguments, "Expected no arguments".to_string());
 
         Value::Str(env!("CARGO_PKG_VERSION").to_string())
