@@ -389,16 +389,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     };
 
-                    match documentation::document_lib(lib_path) {
-                        Ok(_) => (),
-                        Err(_) => {
-                            eprintln!(
-                                "{}",
-                                "Error when compiling library!".fg(ariadne::Color::Red)
-                            );
-                            std::process::exit(ERROR_EXIT_CODE);
-                        }
-                    };
+                    if "$" == lib_path {
+                        // doc builtins
+                        let doc = builtin::builtin_docs();
+                        fs::write("builtins.md", doc)?;
+                    } else {
+                        match documentation::document_lib(lib_path) {
+                            Ok(_) => (),
+                            Err(_) => {
+                                eprintln!(
+                                    "{}",
+                                    "Error when compiling library!".fg(ariadne::Color::Red)
+                                );
+                                std::process::exit(ERROR_EXIT_CODE);
+                            }
+                        };
+                    }
 
                     //println!("doc {:?}", documentation);
 

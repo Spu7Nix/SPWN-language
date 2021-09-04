@@ -378,8 +378,10 @@ macro_rules! builtins {
         $(
             [$variant:ident]
             #[
-                safe = $safe:expr
+                safe = $safe:expr,
+                desc = $desc:expr$(,)?
             ]
+
             fn $name:ident(
                 $(
                     $(
@@ -532,6 +534,22 @@ macro_rules! builtins {
             }
         }
 
+        pub fn builtin_docs() -> String {
+            let mut out = String::new();
+            $(
+                out += &format!(
+                    "## $.{}\n",
+                    stringify!($name).replace("_", "\\_")
+                );
+
+                out += &format!(
+                    "> ## Description:\n> {} <div> \n> **Allowed by default:** {}\n",
+                    $desc, if $safe { "yes" } else { "no" }
+                );
+            )*
+            out
+        }
+
 
     };
 }
@@ -539,7 +557,7 @@ macro_rules! builtins {
 builtins! {
     (arguments, info, globals, context, full_context)
 
-    [Assert] #[safe = true]
+    [Assert] #[safe = true, desc = "Throws an error if the argument is not `true`"]
     fn assert((b): Bool) {
         if !b {
             return Err(RuntimeError::BuiltinError {
@@ -551,7 +569,7 @@ builtins! {
         }
     }
 
-    [Print] #[safe = true]
+    [Print] #[safe = true, desc = "Prints value(s) to the console"]
     fn print() {
         let mut out = String::new();
         for val in arguments.iter() {
@@ -565,7 +583,7 @@ builtins! {
         Value::Null
     }
 
-    [Time] #[safe = true]
+    [Time] #[safe = true, desc = "Gets the current system time in seconds"]
     fn time() {
         arg_length!(info, 0, arguments, "Expected no arguments".to_string());
         use std::time::SystemTime;
@@ -582,14 +600,14 @@ builtins! {
         Value::Number(now as f64)
     }
 
-    [SpwnVersion] #[safe = true]
+    [SpwnVersion] #[safe = true, desc = "Gets the current version of spwn"]
     fn spwn_version() {
         arg_length!(info, 0, arguments, "Expected no arguments".to_string());
 
         Value::Str(env!("CARGO_PKG_VERSION").to_string())
     }
 
-    [GetInput] #[safe = true]
+    [GetInput] #[safe = true, desc = "Gets some input from the user"]
     fn get_input((prompt): Str) {
         print!("{}", prompt);
         stdout()
@@ -598,18 +616,18 @@ builtins! {
         Value::Str(text_io::read!("{}\n"))
     }
 
-    [Matches] #[safe = true]
+    [Matches] #[safe = true, desc = "Returns `true` if the value matches the pattern, otherwise it returns `false`"]
     fn matches((val), (pattern)) {
         Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
     }
 
-    [B64Encode] #[safe = true]
+    [B64Encode] #[safe = true, desc = "Returns the input string encoded with base64 encoding (useful for text objects)"]
     fn b64encode((s): Str) {
         let encrypted = base64::encode(s.as_bytes());
         Value::Str(encrypted)
     }
 
-    [B64Decode] #[safe = true]
+    [B64Decode] #[safe = true, desc = "Returns the input string decoded from base64 encoding (useful for text objects)"]
     fn b64decode((s): Str) {
         let decrypted = match base64::decode(&s) {
             Ok(s) => s,
@@ -625,7 +643,7 @@ builtins! {
 
 
 
-    [HTTPRequest] #[safe = false] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
+    [HTTPRequest] #[safe = false, desc = "Sends an HTTP request"] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
 
         let mut headermap = reqwest::header::HeaderMap::new();
         for (name, value) in &headers {
@@ -718,40 +736,40 @@ builtins! {
         Value::Dict(output_map)
     }
 
-    [Sin] #[safe = true] fn sin((n): Number) { Value::Number(n.sin()) }
-    [Cos] #[safe = true] fn cos((n): Number) { Value::Number(n.cos()) }
-    [Tan] #[safe = true] fn tan((n): Number) { Value::Number(n.tan()) }
+    [Sin] #[safe = true, desc = "Calculates the sin of an angle in radians"] fn sin((n): Number) { Value::Number(n.sin()) }
+    [Cos] #[safe = true, desc = "Calculates the cos of an angle in radians"] fn cos((n): Number) { Value::Number(n.cos()) }
+    [Tan] #[safe = true, desc = "	Calculates the tan of an angle in radians"] fn tan((n): Number) { Value::Number(n.tan()) }
 
-    [Asin] #[safe = true] fn asin((n): Number) { Value::Number(n.asin()) }
-    [Acos] #[safe = true] fn acos((n): Number) { Value::Number(n.acos()) }
-    [Atan] #[safe = true] fn atan((n): Number) { Value::Number(n.atan()) }
+    [Asin] #[safe = true, desc = "Calculates the arcsin of a number"] fn asin((n): Number) { Value::Number(n.asin()) }
+    [Acos] #[safe = true, desc = "Calculates the arccos of a number"] fn acos((n): Number) { Value::Number(n.acos()) }
+    [Atan] #[safe = true, desc = "Calculates the arctan of a number"] fn atan((n): Number) { Value::Number(n.atan()) }
 
-    [Floor] #[safe = true] fn floor((n): Number) { Value::Number(n.floor()) }
-    [Ceil] #[safe = true] fn ceil((n): Number) { Value::Number(n.ceil()) }
+    [Floor] #[safe = true, desc = "Calculates the floor of a number, AKA the number rounded down to the nearest integer"] fn floor((n): Number) { Value::Number(n.floor()) }
+    [Ceil] #[safe = true, desc = "Calculates the ceil of a number, AKA the number rounded up to the nearest integer"] fn ceil((n): Number) { Value::Number(n.ceil()) }
 
-    [Abs] #[safe = true] fn abs((n): Number) {Value::Number(n.abs())}
-    [Acosh] #[safe = true] fn acosh((n): Number) {Value::Number(n.acosh())}
-    [Asinh] #[safe = true] fn asinh((n): Number) {Value::Number(n.asinh())}
-    [Atan2] #[safe = true] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
-    [Atanh] #[safe = true] fn atanh((n): Number) {Value::Number(n.atanh())}
-    [Cbrt] #[safe = true] fn cbrt((n): Number) {Value::Number(n.cbrt())}
-    [Cosh] #[safe = true] fn cosh((n): Number) {Value::Number(n.cosh())}
-    [Exp] #[safe = true] fn exp((n): Number) {Value::Number(n.exp())}
-    [Exp2] #[safe = true] fn exp2((n): Number) {Value::Number(n.exp2())}
-    [Expm1] #[safe = true] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
-    [Fract] #[safe = true] fn fract((n): Number) {Value::Number(n.fract())}
+    [Abs] #[safe = true, desc = "Calculates the absolute value of a number"] fn abs((n): Number) {Value::Number(n.abs())}
+    [Acosh] #[safe = true, desc = "Calculates the arccosh of a number"] fn acosh((n): Number) {Value::Number(n.acosh())}
+    [Asinh] #[safe = true, desc = "Calculates the arcsinh of a number"] fn asinh((n): Number) {Value::Number(n.asinh())}
+    [Atan2] #[safe = true, desc = "Calculates the arctan^2 of a number"] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
+    [Atanh] #[safe = true, desc = "Calculates the arctanh of a number"] fn atanh((n): Number) {Value::Number(n.atanh())}
+    [Cbrt] #[safe = true, desc = "Calculates the cube root of a number"] fn cbrt((n): Number) {Value::Number(n.cbrt())}
+    [Cosh] #[safe = true, desc = "Calculates the cosh of a number"] fn cosh((n): Number) {Value::Number(n.cosh())}
+    [Exp] #[safe = true, desc = "Calculates the e^x of a number"] fn exp((n): Number) {Value::Number(n.exp())}
+    [Exp2] #[safe = true, desc = "Calculates the 2^x of a number"] fn exp2((n): Number) {Value::Number(n.exp2())}
+    [Expm1] #[safe = true, desc = "Calculates e^x - 1 in a way that is accurate even if the number is close to zero"] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
+    [Fract] #[safe = true, desc = "Gets the fractional part of a number"] fn fract((n): Number) {Value::Number(n.fract())}
 
-    [Sqrt] #[safe = true] fn sqrt((n): Number) {Value::Number(n.sqrt())}
-    [Sinh] #[safe = true] fn sinh((n): Number) {Value::Number(n.sinh())}
-    [Tanh] #[safe = true] fn tanh((n): Number) {Value::Number(n.tanh())}
-    [NaturalLog] #[safe = true] fn ln((n): Number) {Value::Number(n.ln())}
-    [Log] #[safe = true] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
-    [Min] #[safe = true] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
-    [Max] #[safe = true] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
-    [Round] #[safe = true] fn round((n): Number) {Value::Number(n.round())}
-    [Hypot] #[safe = true] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
+    [Sqrt] #[safe = true, desc = "Calculates the square root of a number"] fn sqrt((n): Number) {Value::Number(n.sqrt())}
+    [Sinh] #[safe = true, desc = "Calculates the hyperbolic sin of a number"] fn sinh((n): Number) {Value::Number(n.sinh())}
+    [Tanh] #[safe = true, desc = "Calculates the hyperbolic tan of a number"] fn tanh((n): Number) {Value::Number(n.tanh())}
+    [NaturalLog] #[safe = true, desc = "Calculates the ln (natural log) of a number"] fn ln((n): Number) {Value::Number(n.ln())}
+    [Log] #[safe = true, desc = "Calculates the log base x of a number"] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
+    [Min] #[safe = true, desc = "Calculates the min of two numbers"] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
+    [Max] #[safe = true, desc = "Calculates the max of two numbers"] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
+    [Round] #[safe = true, desc = "Rounds a number"] fn round((n): Number) {Value::Number(n.round())}
+    [Hypot] #[safe = true, desc = "Calculates the hypothenuse in a right triangle with sides a and b"] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
 
-    [Add] #[safe = true]
+    [Add] #[safe = true, desc = "Adds a Geometry Dash object or trigger to the target level"]
     fn add() {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
@@ -825,7 +843,7 @@ builtins! {
         Value::Null
     }
 
-    [Append] #[safe = true]
+    [Append] #[safe = true, desc = "Appends a value to the end of an array. You can also use `array.push(value)`"]
     fn append(mut (arr): Array, (val)) {
         //set lifetime to the lifetime of the array
 
@@ -842,7 +860,7 @@ builtins! {
         Value::Null
     }
 
-    [SplitStr] #[safe = true]
+    [SplitStr] #[safe = true, desc = "Returns an array from the split string. You can also use `string.split(delimiter)`"]
     fn split_str((s): Str, (substr): Str) {
 
         let mut output = Vec::<StoredValue>::new();
@@ -856,7 +874,7 @@ builtins! {
         Value::Array(output)
     }
 
-    [EditObj] #[safe = true]
+    [EditObj] #[safe = true, desc = "Changes the value of an object key. You can also use `object.set(key, value)`"]
     fn edit_obj(mut (o, m): Obj, (key), (value)) {
 
         let (okey, oval) = {
@@ -1009,12 +1027,12 @@ builtins! {
         Value::Null
     }
 
-    [Mutability] #[safe = true]
+    [Mutability] #[safe = true, desc = ""]
     fn mutability((var)) {
         Value::Bool(globals.can_mutate(arguments[0]))
     }
 
-    [ExtendTriggerFunc] #[safe = true]
+    [ExtendTriggerFunc] #[safe = true, desc = ""]
     fn extend_trigger_func((group),(mac): Macro) {
         let group = match group {
             Value::Group(g) => g,
@@ -1054,12 +1072,12 @@ builtins! {
         Value::Null
     }
 
-    [TriggerFnContext] #[safe = true]
+    [TriggerFnContext] #[safe = true, desc = ""]
     fn trigger_fn_context() {
         Value::Group(context.start_group)
     }
 
-    [Random] #[safe = true]
+    [Random] #[safe = true, desc = ""]
     fn random() {
         if arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
@@ -1130,7 +1148,7 @@ builtins! {
         }
     }
 
-    [ReadFile] #[safe = true]
+    [ReadFile] #[safe = true, desc = ""]
     fn readfile() {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
@@ -1359,7 +1377,7 @@ builtins! {
     }
 
 
-    [WriteFile] #[safe = false]
+    [WriteFile] #[safe = false, desc = ""]
     fn writefile((path): Str, (data): Str) {
 
 
@@ -1375,7 +1393,7 @@ builtins! {
         Value::Null
     }
 
-    [Pop] #[safe = true]
+    [Pop] #[safe = true, desc = "Removes a value from the end of an array. You can also use `array.pop()`"]
     fn pop(mut (arr)) {
 
         let typ = globals.get_type_str(arguments[0]);
@@ -1398,7 +1416,7 @@ builtins! {
         }
     }
 
-    [Substr] #[safe = true]
+    [Substr] #[safe = true, desc = ""]
     fn substr((val): Str, (start_index): Number, (end_index): Number) {
         let start_index = start_index as usize;
         let end_index = end_index as usize;
@@ -1417,7 +1435,7 @@ builtins! {
         Value::Str(val.as_str()[start_index..end_index].to_string())
     }
 
-    [RemoveIndex] #[safe = true]
+    [RemoveIndex] #[safe = true, desc = ""]
     fn remove_index(mut (arr), (index): Number) {
 
         let typ = globals.get_type_str(arguments[0]);
@@ -1438,7 +1456,7 @@ builtins! {
         }
     }
 
-    [Regex] #[safe = true] fn regex((regex): Str, (s): Str, (mode): Str, (replace)) {
+    [Regex] #[safe = true, desc = ""] fn regex((regex): Str, (s): Str, (mode): Str, (replace)) {
         use regex::Regex;
 
 
@@ -1496,7 +1514,7 @@ builtins! {
 
     }
 
-    [RangeOp] #[safe = true]
+    [RangeOp] #[safe = true, desc = ""]
     fn _range_((val_a), (b): Number) {
         let end = convert_to_int(b, &info)?;
         match val_a {
@@ -1543,32 +1561,32 @@ builtins! {
         }
     }
     // unary operators
-    [IncrOp] #[safe = true]            fn _increment_(mut (a): Number)                 { a += 1.0; Value::Number(a - 1.0)}
-    [DecrOp] #[safe = true]            fn _decrement_(mut (a): Number)                 { a -= 1.0; Value::Number(a + 1.0)}
+    [IncrOp] #[safe = true, desc = ""]            fn _increment_(mut (a): Number)                 { a += 1.0; Value::Number(a - 1.0)}
+    [DecrOp] #[safe = true, desc = ""]            fn _decrement_(mut (a): Number)                 { a -= 1.0; Value::Number(a + 1.0)}
 
-    [PreIncrOp] #[safe = true]         fn _pre_increment_(mut (a): Number)             { a += 1.0; Value::Number(a)}
-    [PreDecrOp] #[safe = true]         fn _pre_decrement_(mut (a): Number)             { a -= 1.0; Value::Number(a)}
+    [PreIncrOp] #[safe = true, desc = ""]         fn _pre_increment_(mut (a): Number)             { a += 1.0; Value::Number(a)}
+    [PreDecrOp] #[safe = true, desc = ""]         fn _pre_decrement_(mut (a): Number)             { a -= 1.0; Value::Number(a)}
 
-    [NegOp] #[safe = true]             fn _negate_((a): Number)                        { Value::Number(-a)}
-    [NotOp] #[safe = true]             fn _not_((a): Bool)                             { Value::Bool(!a)}
-    [UnaryRangeOp] #[safe = true]      fn _unary_range_((a): Number)                   { Value::Range(0, convert_to_int(a, &info)?, 1)}
+    [NegOp] #[safe = true, desc = ""]             fn _negate_((a): Number)                        { Value::Number(-a)}
+    [NotOp] #[safe = true, desc = ""]             fn _not_((a): Bool)                             { Value::Bool(!a)}
+    [UnaryRangeOp] #[safe = true, desc = ""]      fn _unary_range_((a): Number)                   { Value::Range(0, convert_to_int(a, &info)?, 1)}
 
     // operators
-    [OrOp] #[safe = true]              fn _or_((a): Bool, (b): Bool)                   { Value::Bool(a || b) }
-    [AndOp] #[safe = true]             fn _and_((a): Bool, (b): Bool)                  { Value::Bool(a && b) }
+    [OrOp] #[safe = true, desc = ""]              fn _or_((a): Bool, (b): Bool)                   { Value::Bool(a || b) }
+    [AndOp] #[safe = true, desc = ""]             fn _and_((a): Bool, (b): Bool)                  { Value::Bool(a && b) }
 
-    [MoreThanOp] #[safe = true]        fn _more_than_((a): Number, (b): Number)        { Value::Bool(a > b) }
-    [LessThanOp] #[safe = true]        fn _less_than_((a): Number, (b): Number)        { Value::Bool(a < b) }
+    [MoreThanOp] #[safe = true, desc = ""]        fn _more_than_((a): Number, (b): Number)        { Value::Bool(a > b) }
+    [LessThanOp] #[safe = true, desc = ""]        fn _less_than_((a): Number, (b): Number)        { Value::Bool(a < b) }
 
-    [MoreOrEqOp] #[safe = true]        fn _more_or_equal_((a): Number, (b): Number)    { Value::Bool(a >= b) }
-    [LessOrEqOp] #[safe = true]        fn _less_or_equal_((a): Number, (b): Number)    { Value::Bool(a <= b) }
+    [MoreOrEqOp] #[safe = true, desc = ""]        fn _more_or_equal_((a): Number, (b): Number)    { Value::Bool(a >= b) }
+    [LessOrEqOp] #[safe = true, desc = ""]        fn _less_or_equal_((a): Number, (b): Number)    { Value::Bool(a <= b) }
 
-    [EqOp] #[safe = true]              fn _equal_((a), (b))                            { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
-    [NotEqOp] #[safe = true]           fn _not_equal_((a), (b))                        { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
+    [EqOp] #[safe = true, desc = ""]              fn _equal_((a), (b))                            { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
+    [NotEqOp] #[safe = true, desc = ""]           fn _not_equal_((a), (b))                        { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
 
-    [DividedByOp] #[safe = true]       fn _divided_by_((a): Number, (b): Number)       { Value::Number(a / b) }
-    [IntdividedByOp] #[safe = true]    fn _intdivided_by_((a): Number, (b): Number)    { Value::Number((a / b).floor()) }
-    [TimesOp] #[safe = true]
+    [DividedByOp] #[safe = true, desc = ""]       fn _divided_by_((a): Number, (b): Number)       { Value::Number(a / b) }
+    [IntdividedByOp] #[safe = true, desc = ""]    fn _intdivided_by_((a): Number, (b): Number)    { Value::Number((a / b).floor()) }
+    [TimesOp] #[safe = true, desc = ""]
     fn _times_((a), (b): Number) {
         match a {
             Value::Number(a) => Value::Number(a * b),
@@ -1607,9 +1625,9 @@ builtins! {
             }
         }
     }
-    [ModOp] #[safe = true]             fn _mod_((a): Number, (b): Number)              { Value::Number(a.rem_euclid(b)) }
-    [PowOp] #[safe = true]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
-    [PlusOp] #[safe = true] fn _plus_((a), (b)) {
+    [ModOp] #[safe = true, desc = ""]             fn _mod_((a): Number, (b): Number)              { Value::Number(a.rem_euclid(b)) }
+    [PowOp] #[safe = true, desc = ""]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
+    [PlusOp] #[safe = true, desc = ""] fn _plus_((a), (b)) {
         match (a, b) {
             (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
             (Value::Str(a), Value::Str(b)) => Value::Str(a + &b),
@@ -1641,13 +1659,13 @@ builtins! {
             }
         }
     }
-    [MinusOp] #[safe = true]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
-    [AssignOp] #[safe = true]           fn _assign_(mut (a), (b))                      {
+    [MinusOp] #[safe = true, desc = ""]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
+    [AssignOp] #[safe = true, desc = ""]           fn _assign_(mut (a), (b))                      {
         a = b;
         (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
         Value::Null
     }
-    [SwapOp] #[safe = true]           fn _swap_(mut (a), mut (b))                      {
+    [SwapOp] #[safe = true, desc = ""]           fn _swap_(mut (a), mut (b))                      {
 
         std::mem::swap(&mut a, &mut b);
         (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
@@ -1655,7 +1673,7 @@ builtins! {
         Value::Null
     }
 
-    [HasOp] #[safe = true]
+    [HasOp] #[safe = true, desc = ""]
     fn _has_((a), (b)) {
         match (a, b) {
             (Value::Array(ar), _) => {
@@ -1760,10 +1778,10 @@ builtins! {
         }
     }
 
-    [AsOp] #[safe = true]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,context)? }
+    [AsOp] #[safe = true, desc = ""]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,context)? }
 
-    [SubtractOp] #[safe = true]        fn _subtract_(mut (a): Number, (b): Number)         { a -= b; Value::Null }
-    [AddOp] #[safe = true]
+    [SubtractOp] #[safe = true, desc = ""]        fn _subtract_(mut (a): Number, (b): Number)         { a -= b; Value::Null }
+    [AddOp] #[safe = true, desc = ""]
     fn _add_(mut (a), (b)) {
         match (&mut a, b) {
             (Value::Number(a), Value::Number(b)) => *a += b,
@@ -1789,7 +1807,7 @@ builtins! {
         }
         Value::Null
     }
-    [MultiplyOp] #[safe = true]        fn _multiply_(mut (a), (b): Number)         {
+    [MultiplyOp] #[safe = true, desc = ""]        fn _multiply_(mut (a), (b): Number)         {
         match &mut a {
             Value::Number(a) => *a *= b,
             Value::Str(a) => *a = a.repeat(convert_to_int(b, &info)? as usize),
@@ -1812,12 +1830,12 @@ builtins! {
         };
         Value::Null
     }
-    [DivideOp] #[safe = true]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
-    [IntdivideOp] #[safe = true]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
-    [ExponateOp] #[safe = true]        fn _exponate_(mut (a): Number, (b): Number)         { a = a.powf(b); Value::Null }
-    [ModulateOp] #[safe = true]        fn _modulate_(mut (a): Number, (b): Number)         { a = a.rem_euclid(b); Value::Null }
+    [DivideOp] #[safe = true, desc = ""]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
+    [IntdivideOp] #[safe = true, desc = ""]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
+    [ExponateOp] #[safe = true, desc = ""]        fn _exponate_(mut (a): Number, (b): Number)         { a = a.powf(b); Value::Null }
+    [ModulateOp] #[safe = true, desc = ""]        fn _modulate_(mut (a): Number, (b): Number)         { a = a.rem_euclid(b); Value::Null }
 
-    [EitherOp] #[safe = true]
+    [EitherOp] #[safe = true, desc = ""]
     fn _either_((a), (b)) {
         Value::Pattern(Pattern::Either(
             if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, context)? {
