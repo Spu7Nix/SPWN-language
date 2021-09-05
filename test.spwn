@@ -1,2 +1,0 @@
-let request = @http::get("https://httpbin.org/get", {header_name: '!!Header value!!'})
-$.print(request)
