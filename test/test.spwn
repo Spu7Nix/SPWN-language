@@ -1,44 +1,47 @@
 extract obj_props
-"hello".to_obj().with(X, 45).with(Y, 45).add()
 
-// extract obj_props
+fizz = ?g
+buzz = ?g
+fizzbuzz = ?g
+c = counter(1)
 
-// fizz = ?g
-// buzz = ?g
-// c = counter()
+// display
+pos = [60, 45]
+c.display(pos[0], pos[1] + 30)
 
-// // display
-// pos = [45, 45]
-// c.display(pos[0], pos[1])
-// $.add(obj {
-//     OBJ_ID: 914,
-//     TEXT: $.b64encode("fizz"),
-//     GROUPS: fizz,
-//     X: pos[0] - 30, Y: pos[1]
-// })
-// $.add(obj {
-//     OBJ_ID: 914,
-//     TEXT: $.b64encode("buzz"),
-//     GROUPS: buzz,
-//     X: pos[0] + 30, Y: pos[1]
-// })
+"fizz".to_obj()
+    .with(X, pos[0])
+    .with(Y, pos[1])
+    .with(GROUPS, fizz)
+    .add()
+"buzz".to_obj()
+    .with(X, pos[0])
+    .with(Y, pos[1])
+    .with(GROUPS, buzz)
+    .add()
+"fizzbuzz".to_obj()
+    .with(X, pos[0])
+    .with(Y, pos[1])
+    .with(GROUPS, fizzbuzz)
+    .add()
 
-// // the actual thing
-// fizz.toggle_off()
-// buzz.toggle_off()
+enable = (g) {
+    for thing in [fizz, buzz, fizzbuzz] {
+        if g == thing {
+            thing.toggle_on()
+        } else {
+            thing.toggle_off()
+        }
+    }
+}
+// the actual thing
+while_loop(() => true, delay = 0.2, () {
+    c++
 
-// while_loop(() => true, delay = 0.2, () {
-//     if c % 3 == 0 {
-//         fizz.toggle_on()
-//     } else {
-//         fizz.toggle_off()
-//     }
-
-//     if c % 5 == 0 {
-//         buzz.toggle_on()
-//     } else {
-//         buzz.toggle_off()
-//     }
-
-//     c++
-// })
+    switch [c % 3 == 0, c % 5 == 0] {
+        case [true, true]: enable(fizzbuzz),
+        case [true, false]: enable(fizz),
+        case [false, true]: enable(buzz),
+        else: enable(0g),
+    }
+})
