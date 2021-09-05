@@ -2556,7 +2556,8 @@ impl ast::Variable {
                             if let Value::Str(st) =
                                 globals.stored_values[first_context_eval].clone()
                             {
-                                match d.get(&st) {
+                                let intern = Intern::new(st);
+                                match d.get(&intern) {
                                     Some(a) => current_ptr = *a,
                                     None => {
 
@@ -2581,7 +2582,7 @@ impl ast::Variable {
                                         }
                                         
                                         if let Value::Dict(d) = &mut stored.val {
-                                            (*d).insert(Intern::new(st), value);
+                                            (*d).insert(intern, value);
                                             defined = false;
                                             current_ptr = value;
                                         } else {

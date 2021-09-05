@@ -147,65 +147,6 @@ pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GdObj {
     }
 }
 
-#[test]
-fn test_intern() {
-    let str2 = Intern::new(String::from("hello"));
-
-    dbg!(str2.as_ref() == "hello");
-}
-
-fn headermap_into_str(map: &reqwest::header::HeaderMap) -> String {
-    let mut output = String::from("{");
-    for (key, value) in map.iter() {
-        output.push_str(&base64::encode(key.as_str()));
-        output.push_str(": ");
-        output.push_str(&base64::encode(
-            value.to_str().expect("Failed to parse header value"),
-        )); // Guaranteed to work- function inputs are responses from a request
-        output.push_str(",");
-    }
-    output.push_str("}");
-    output
-}
-fn str_into_headermap(as_string: &String) -> Result<reqwest::header::HeaderMap, String> {
-    let mut headers = reqwest::header::HeaderMap::new();
-    let pairs = as_string.split(',');
-    for pair in pairs {
-        let parts: Vec<&str> = pair.split(':').collect();
-        if parts[0].len() > 0 {
-            let decoded_header_name = match base64::decode(parts[0]) {
-                Ok(name) => name,
-                Err(error) => return Err(format!("{} is not a valid b64 string", parts[0])),
-            };
-            let header_name = match reqwest::header::HeaderName::from_bytes(&decoded_header_name) {
-                Ok(name) => name,
-                Err(error) => {
-                    return Err(format!(
-                        "{} is not a valid header name",
-                        String::from_utf8_lossy(&decoded_header_name)
-                    ))
-                }
-            };
-            let decoded_header_value = match base64::decode(parts[1]) {
-                Ok(value) => value,
-                Err(error) => return Err(format!("{} is not a valid b64 string", parts[0])),
-            };
-            let header_value = match reqwest::header::HeaderValue::from_bytes(&decoded_header_value)
-            {
-                Ok(value) => value,
-                Err(error) => {
-                    return Err(format!(
-                        "{} is not a valid header value",
-                        String::from_utf8_lossy(&decoded_header_name)
-                    ))
-                }
-            };
-            headers.insert(header_name, header_value);
-        }
-    }
-    Ok(headers)
-}
-
 impl Value {
     pub fn member(
         &self,
@@ -433,7 +374,15 @@ macro_rules! builtins {
     {
         ($arguments:ident, $info:ident, $globals:ident, $context:ident, $full_context:ident)
         $(
-            [$variant:ident] fn $name:ident(
+            [$variant:ident]
+            #[
+                safe = $safe:expr,
+                desc = $desc:expr,
+                example = $example:expr$(,)?
+            ]
+
+            fn $name:ident(
+                $(#[$argdesc:literal])?
                 $(
                     $(
                         $($mut:ident)? ($($arg_name:ident),*)$(: $arg_type:ident)?
@@ -443,7 +392,7 @@ macro_rules! builtins {
         )*
     } => {
 
-        #[derive(Debug,Clone, Copy, PartialEq, Eq)]
+        #[derive(Debug,Clone, Copy, PartialEq, Eq, Hash)]
         pub enum Builtin {
             $(
                 $variant,
@@ -454,6 +403,31 @@ macro_rules! builtins {
                 Builtin::$variant,
             )*
         ];
+
+        pub struct BuiltinPermissions (HashMap<Builtin, bool>);
+
+        impl BuiltinPermissions {
+            pub fn new() -> Self {
+                let mut map = HashMap::new();
+                $(
+                    map.insert(Builtin::$variant, $safe);
+                )*
+                Self(map)
+            }
+            pub fn is_allowed(&self, b: Builtin) -> bool {
+                self.0[&b]
+            }
+            pub fn set(&mut self, b: Builtin, setting: bool) {
+                self.0.insert(b, setting);
+            }
+            pub fn is_safe(&self, b: Builtin) -> bool {
+                match b {
+                    $(
+                        Builtin::$variant => $safe,
+                    )*
+                }
+            }
+        }
         pub fn built_in_function(
             func: Builtin,
             $arguments: Vec<StoredValue>,
@@ -461,6 +435,19 @@ macro_rules! builtins {
             $globals: &mut Globals,
             contexts: &mut FullContext,
         ) -> Result<(), RuntimeError> {
+            if !$globals.permissions.is_allowed(func) {
+                if !$globals.permissions.is_safe(func) {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("This built-in function requires an explicit `--allow {}` flag when running the script", String::from(func)),
+                        $info,
+                    })
+                } else {
+                    return Err(RuntimeError::BuiltinError {
+                        message: String::from("This built-in function was denied permission to run"),
+                        $info,
+                    })
+                }
+            }
             for full_context in contexts.iter() {
                 let $full_context: *mut FullContext = full_context;
                 let $context = full_context.inner();
@@ -514,7 +501,6 @@ macro_rules! builtins {
                                         ($globals, arg_index, $arguments, $info) $($mut)? ($($arg_name),*)$(: $arg_type)?
                                     );
 
-
                                     arg_index += 1;
                                 )+
                             )?
@@ -547,6 +533,105 @@ macro_rules! builtins {
             }
         }
 
+        pub fn builtin_docs() -> String {
+            let mut all = Vec::new();
+            $(
+                let mut full_out = format!(
+                    "## $.{}\n",
+                    stringify!($name).replace("_", "\\_")
+                );
+                let mut out = String::new();
+
+
+                if !$desc.is_empty() {
+                    out += &format!(
+                        "## Description:\n{} <div>\n",
+                        $desc
+                    );
+                }
+
+                if !$example.is_empty() {
+                    out += &format!(
+                        "## Example:\n```spwn\n{}\n```\n",
+                        $example.trim()
+                    );
+
+                }
+                out += &format!("**Allowed by default:** {}\n", if $safe { "yes" } else { "no" });
+                #[allow(unused_mut, unused_assignments, unused_variables)]
+                let mut arg_title_set = false;
+                $(
+                    out += &format!("## Arguments: \n **{}**\n", $argdesc);
+                    arg_title_set = true;
+                )?
+                $(
+                    let mut args = Vec::<(&str, Option<&str>, bool)>::new();
+
+                    $(
+                        #[allow(unused_mut)]
+                        let mut name = stringify!($($arg_name),*);
+                        #[allow(unused_mut, unused_assignments)]
+                        let mut typ: Option<&str> = None;
+                        $(typ = Some(stringify!($arg_type));)?
+                        #[allow(unused_mut, unused_assignments)]
+                        let mut mutable = false;
+                        $(mutable = stringify!($mut) == "mut";)?
+                        args.push((name, typ, mutable));
+                    )+
+                    if !arg_title_set { out += "## Arguments: \n"; }
+                    out += "| # | **Name** | **Type** |\n|-|-|-|\n";
+                    for (i, (name, typ, mutable)) in args.into_iter().enumerate() {
+                        out += &format!("| {} | `{}` | {}{} |\n", i + 1, name, if mutable {"_mutable_ "} else {""}, match typ {
+                            Some(s) => format!("_{}_", s),
+                            None => String::new(),
+                        });
+                    }
+
+
+
+
+
+                )?
+
+                for line in out.lines() {
+                    full_out += &format!("> {}\n", line);
+                }
+
+                all.push((stringify!($name), full_out));
+
+            )*
+            let mut out = String::new();
+
+            let mut operators = Vec::new();
+            let mut normal_ones = Vec::new();
+
+            for (name, doc) in all {
+                if name.starts_with("_") && name.ends_with("_") {
+                    operators.push((name, doc));
+                } else {
+                    normal_ones.push((name, doc));
+                }
+            }
+
+            normal_ones.sort_by(|a, b| a.0.cmp(&b.0));
+            operators.sort_by(|a, b| a.0.cmp(&b.0));
+
+            out += "# List of Built-in functions\n";
+
+            for (_, doc) in normal_ones.iter() {
+                out += doc;
+            }
+
+            out += "# Default Implementations for Operators\n";
+
+            for (_, doc) in operators.iter() {
+                out += doc;
+            }
+
+
+            out
+        }
+
 
     };
 }
@@ -554,7 +639,7 @@ macro_rules! builtins {
 builtins! {
     (arguments, info, globals, context, full_context)
 
-    [Assert]
+    [Assert] #[safe = true, desc = "Throws an error if the argument is not `true`", example = "$.assert(true)"]
     fn assert((b): Bool) {
         if !b {
             return Err(RuntimeError::BuiltinError {
@@ -566,8 +651,8 @@ builtins! {
         }
     }
 
-    [Print]
-    fn print() {
+    [Print] #[safe = true, desc = "Prints value(s) to the console", example = "$.print(\"Hello world!\")"]
+    fn print(#["any"]) {
         let mut out = String::new();
         for val in arguments.iter() {
             match &globals.stored_values[*val] {
@@ -580,8 +665,8 @@ builtins! {
         Value::Null
     }
 
-    [Time]
-    fn time() {
+    [Time] #[safe = true, desc = "Gets the current system time in seconds", example = "now = $.time()"]
+    fn time(#["none"]) {
         arg_length!(info, 0, arguments, "Expected no arguments".to_string());
         use std::time::SystemTime;
         let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
@@ -597,14 +682,14 @@ builtins! {
         Value::Number(now as f64)
     }
 
-    [SpwnVersion]
-    fn spwn_version() {
+    [SpwnVersion] #[safe = true, desc = "Gets the current version of spwn", example = "$.spwn_version()"]
+    fn spwn_version(#["none"]) {
         arg_length!(info, 0, arguments, "Expected no arguments".to_string());
 
         Value::Str(env!("CARGO_PKG_VERSION").to_string())
     }
 
-    [GetInput]
+    [GetInput] #[safe = true, desc = "Gets some input from the user", example = "inp = $.get_input()"]
     fn get_input((prompt): Str) {
         print!("{}", prompt);
         stdout()
@@ -613,18 +698,18 @@ builtins! {
         Value::Str(text_io::read!("{}\n"))
     }
 
-    [Matches]
+    [Matches] #[safe = true, desc = "Returns `true` if the value matches the pattern, otherwise it returns `false`", example = "$.matches([1, 2, 3], [@number])"]
     fn matches((val), (pattern)) {
         Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
     }
 
-    [B64Encode]
+    [B64Encode] #[safe = true, desc = "Returns the input string encoded with base64 encoding (useful for text objects)", example = "$.b64encode(\"hello there\")"]
     fn b64encode((s): Str) {
         let encrypted = base64::encode(s.as_bytes());
         Value::Str(encrypted)
     }
 
-    [B64Decode]
+    [B64Decode] #[safe = true, desc = "Returns the input string decoded from base64 encoding (useful for text objects)", example = "$.b64decode(\"aGVsbG8gdGhlcmU=\")"]
     fn b64decode((s): Str) {
         let decrypted = match base64::decode(&s) {
             Ok(s) => s,
@@ -638,75 +723,143 @@ builtins! {
         Value::Str(String::from_utf8_lossy(&decrypted).to_string())
     }
 
-    [HTTPGet] fn http_get((url): Str, (headers): Str) {
 
-        let mut response_builder = String::new();
+
+    [HTTPRequest] #[safe = false, desc = "Sends a HTTP request", example = ""] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
+
+        let mut headermap = reqwest::header::HeaderMap::new();
+        for (name, value) in &headers {
+            let header_name = match reqwest::header::HeaderName::from_bytes(name.as_bytes()) {
+                Ok(hname) => hname,
+                Err(_) => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Could not convert header name: '{}'", name),
+                        info
+                    })
+                }
+            };
+            let header_value = globals.stored_values[*value].clone().to_str(globals);
+            headermap.insert(header_name, header_value.parse().unwrap());
+        }
 
         let client = reqwest::blocking::Client::new();
-        let request_headers = match str_into_headermap(&headers) {
-            Ok(headers) => headers,
-            Err(error) => {
+        let request_maker = match &method[..] {
+            "get" => client.get(&url),
+            "post" => client.post(&url),
+            "put" => {
+                client.put(&url)
+            },
+            "patch" => client.patch(&url),
+            "delete" => client.delete(&url),
+            "head" => client.head(&url),
+            _ => {
                 return Err(RuntimeError::BuiltinError {
-                    message: error,
-                    info,
+                    message: format!("Request type not supported: '{}'", method),
+                    info
                 })
             }
         };
-        let response = match client.get(&url).headers(request_headers).send() {
-            Ok(data) => data,
-            Err(_) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: format!("Could not make request to '{}'. Check the URL is valid and your internet connection is working.", url),
-                    info,
-                })
-            }
+
+        let response = match request_maker
+            .headers(headermap)
+            .body(body)
+            .send() {
+                Ok(resp) => resp,
+                Err(_) => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("Could not make request to: '{}'", url),
+                        info
+                    })
+                }
         };
 
-        response_builder.push_str(&base64::encode(&(response.status()).as_str()));
-        response_builder.push_str("||");
-        response_builder.push_str(&base64::encode(&headermap_into_str(response.headers())));
-        response_builder.push_str("||");
-        response_builder.push_str(&base64::encode(response.text().expect("Couldn't load response text"))); // will always work (if it doesn't and someone sends in a bug report i can properly error handle this)
+        let mut output_map = HashMap::new();
 
+        let response_status = store_const_value(
+            Value::Number(
+                response.status().as_u16() as f64
+            ),
+            globals,
+            context.start_group,
+            CodeArea::new(),
+        );
 
-        Value::Str(response_builder)
+        let response_headermap = response.headers();
+        let mut response_headers_value = HashMap::new();
+        for (name, value) in response_headermap.iter() {
+            let header_value = store_const_value(
+                Value::Str(String::from(value.to_str().expect("Couldn't parse return header value"))),
+                globals,
+                context.start_group,
+                CodeArea::new()
+            );
+            response_headers_value.insert(Intern::new(String::from(name.as_str())), header_value);
+        }
+
+        let response_headers = store_const_value(
+            Value::Dict(response_headers_value),
+            globals,
+            context.start_group,
+            CodeArea::new()
+        );
+
+        let response_text = store_const_value(
+            Value::Str(
+                response.text().expect("Failed to parse response text")
+            ),
+            globals,
+            context.start_group,
+            CodeArea::new(),
+        );
+
+        output_map.insert(Intern::new(String::from("status")), response_status);
+        output_map.insert(Intern::new(String::from("headers")), response_headers);
+        output_map.insert(Intern::new(String::from("text")), response_text);
+        Value::Dict(output_map)
     }
 
-    [Sin] fn sin((n): Number) { Value::Number(n.sin()) }
-    [Cos] fn cos((n): Number) { Value::Number(n.cos()) }
-    [Tan] fn tan((n): Number) { Value::Number(n.tan()) }
+    [Sin] #[safe = true, desc = "Calculates the sin of an angle in radians", example = "$.sin(3.1415)"] fn sin((n): Number) { Value::Number(n.sin()) }
+    [Cos] #[safe = true, desc = "Calculates the cos of an angle in radians", example = "$.cos(3.1415)"] fn cos((n): Number) { Value::Number(n.cos()) }
+    [Tan] #[safe = true, desc = "Calculates the tan of an angle in radians", example = "$.tan(3.1415)"] fn tan((n): Number) { Value::Number(n.tan()) }
 
-    [Asin] fn asin((n): Number) { Value::Number(n.asin()) }
-    [Acos] fn acos((n): Number) { Value::Number(n.acos()) }
-    [Atan] fn atan((n): Number) { Value::Number(n.atan()) }
+    [Asin] #[safe = true, desc = "Calculates the arcsin of a number", example = "$.asin(1)"] fn asin((n): Number) { Value::Number(n.asin()) }
+    [Acos] #[safe = true, desc = "Calculates the arccos of a number", example = "$.acos(-1)"] fn acos((n): Number) { Value::Number(n.acos()) }
+    [Atan] #[safe = true, desc = "Calculates the arctan of a number", example = "$.atan(1)"] fn atan((n): Number) { Value::Number(n.atan()) }
 
-    [Floor] fn floor((n): Number) { Value::Number(n.floor()) }
-    [Ceil] fn ceil((n): Number) { Value::Number(n.ceil()) }
+    [Floor] #[safe = true, desc = "Calculates the floor of a number, AKA the number rounded down to the nearest integer", example = "$.assert($.floor(1.5) == 1)"] fn floor((n): Number) { Value::Number(n.floor()) }
+    [Ceil] #[safe = true, desc = "Calculates the ceil of a number, AKA the number rounded up to the nearest integer", example = "$.assert($.ceil(1.5) == 2)"] fn ceil((n): Number) { Value::Number(n.ceil()) }
 
-    [Abs] fn abs((n): Number) {Value::Number(n.abs())}
-    [Acosh] fn acosh((n): Number) {Value::Number(n.acosh())}
-    [Asinh] fn asinh((n): Number) {Value::Number(n.asinh())}
-    [Atan2] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
-    [Atanh] fn atanh((n): Number) {Value::Number(n.atanh())}
-    [Cbrt] fn cbrt((n): Number) {Value::Number(n.cbrt())}
-    [Cosh] fn cosh((n): Number) {Value::Number(n.cosh())}
-    [Exp] fn exp((n): Number) {Value::Number(n.exp())}
-    [Exp2] fn exp2((n): Number) {Value::Number(n.exp2())}
-    [Expm1] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
-    [Fract] fn fract((n): Number) {Value::Number(n.fract())}
+    [Abs] #[safe = true, desc = "Calculates the absolute value of a number", example = "$.assert($.abs(-100) == 100)"] fn abs((n): Number) {Value::Number(n.abs())}
+    [Acosh] #[safe = true, desc = "Calculates the arccosh of a number", example = "$.acosh(num)"] fn acosh((n): Number) {Value::Number(n.acosh())}
+    [Asinh] #[safe = true, desc = "Calculates the arcsinh of a number", example = "$.asinh(num)"] fn asinh((n): Number) {Value::Number(n.asinh())}
+    [Atan2] #[safe = true, desc = "Calculates the arctan^2 of a number", example = "$.atan2(a, b)"] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
+    [Atanh] #[safe = true, desc = "Calculates the arctanh of a number", example = "$.atanh(num)"] fn atanh((n): Number) {Value::Number(n.atanh())}
+    [Cbrt] #[safe = true, desc = "Calculates the cube root of a number", example = "$.assert($.cbrt(27) == 3)"] fn cbrt((n): Number) {Value::Number(n.cbrt())}
+    [Cosh] #[safe = true, desc = "Calculates the cosh of a number", example = "$.cosh(num)"] fn cosh((n): Number) {Value::Number(n.cosh())}
+    [Exp] #[safe = true, desc = "Calculates the e^x of a number", example = "$.exp(x)"] fn exp((n): Number) {Value::Number(n.exp())}
+    [Exp2] #[safe = true, desc = "Calculates the 2^x of a number", example = "$.assert($.exp2(10) == 1024)"] fn exp2((n): Number) {Value::Number(n.exp2())}
+    [Expm1] #[safe = true, desc = "Calculates e^x - 1 in a way that is accurate even if the number is close to zero", example = "$.exp_m1(num)"] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
+    [Fract] #[safe = true, desc = "Gets the fractional part of a number", example = "$.assert($.fract(123.456) == 0.456)"] fn fract((n): Number) {Value::Number(n.fract())}
 
-    [Sqrt] fn sqrt((n): Number) {Value::Number(n.sqrt())}
-    [Sinh] fn sinh((n): Number) {Value::Number(n.sinh())}
-    [Tanh] fn tanh((n): Number) {Value::Number(n.tanh())}
-    [NaturalLog] fn ln((n): Number) {Value::Number(n.ln())}
-    [Log] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
-    [Min] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
-    [Max] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
-    [Round] fn round((n): Number) {Value::Number(n.round())}
-    [Hypot] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
+    [Sqrt] #[safe = true, desc = "Calculates the square root of a number", example = "$.sqrt(2)"] fn sqrt((n): Number) {Value::Number(n.sqrt())}
+    [Sinh] #[safe = true, desc = "Calculates the hyperbolic sin of a number", example = "$.sinh(num)"] fn sinh((n): Number) {Value::Number(n.sinh())}
+    [Tanh] #[safe = true, desc = "Calculates the hyperbolic tan of a number", example = "$.tanh(num)"] fn tanh((n): Number) {Value::Number(n.tanh())}
+    [NaturalLog] #[safe = true, desc = "Calculates the ln (natural log) of a number", example = "$.ln(num)"] fn ln((n): Number) {Value::Number(n.ln())}
+    [Log] #[safe = true, desc = "Calculates the log base x of a number", example = "$.log(num, base)"] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
+    [Min] #[safe = true, desc = "Calculates the min of two numbers", example = "$.assert($.min(1, 2) == 1)"] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
+    [Max] #[safe = true, desc = "Calculates the max of two numbers", example = "$.assert($.max(1, 2) == 2)"] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
+    [Round] #[safe = true, desc = "Rounds a number", example = "$.assert($.round(1.2) == 1)"] fn round((n): Number) {Value::Number(n.round())}
+    [Hypot] #[safe = true, desc = "Calculates the hypothenuse in a right triangle with sides a and b", example = "$.assert($.hypot(3, 4) == 5) // because 3^2 + 4^2 = 5^2"] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
 
-    [Add]
-    fn add() {
+    [Add] #[safe = true, desc = "Adds a Geometry Dash object or trigger to the target level", example = "
+extract obj_props
+$.add(obj {
+    OBJ_ID: 1,
+    X: 45,
+    Y: 45,
+})
+    "]
+    fn add(#["The object or trigger to add"]) {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
                 message: "Expected 1 argument".to_string(),
@@ -779,7 +932,11 @@ builtins! {
         Value::Null
     }
 
-    [Append]
+    [Append] #[safe = true, desc = "Appends a value to the end of an array. You can also use `array.push(value)`", example = "
+let arr = []
+$.append(arr, 1)
+$.assert(arr = [1])
+    "]
     fn append(mut (arr): Array, (val)) {
         //set lifetime to the lifetime of the array
 
@@ -796,7 +953,7 @@ builtins! {
         Value::Null
     }
 
-    [SplitStr]
+    [SplitStr] #[safe = true, desc = "Returns an array from the split string. You can also use `string.split(delimiter)`", example = "$.assert($.split_str(\"1,2,3\", \",\") == [\"1\", \"2\", \"3\"])"]
     fn split_str((s): Str, (substr): Str) {
 
         let mut output = Vec::<StoredValue>::new();
@@ -810,7 +967,7 @@ builtins! {
         Value::Array(output)
     }
 
-    [EditObj]
+    [EditObj] #[safe = true, desc = "Changes the value of an object key. You can also use `object.set(key, value)`", example = "$.edit_obj(object, ROTATION, 180)"]
     fn edit_obj(mut (o, m): Obj, (key), (value)) {
 
         let (okey, oval) = {
@@ -963,12 +1120,21 @@ builtins! {
         Value::Null
     }
 
-    [Mutability]
+    [Mutability] #[safe = true, desc = "Checks if a value reference is mutable", example = "
+const = 1
+$.assert(!$.mutability(const))
+let mut = 1
+$.assert($.mutability(mut))
+    "]
     fn mutability((var)) {
         Value::Bool(globals.can_mutate(arguments[0]))
     }
 
-    [ExtendTriggerFunc]
+    [ExtendTriggerFunc] #[safe = true, desc = "Executes a macro in a specific trigger function context", example = "
+$.extend_trigger_func(10g, () {
+    11g.move(10, 0, 0.5) // will add a move trigger in group 10
+})
+    "]
     fn extend_trigger_func((group),(mac): Macro) {
         let group = match group {
             Value::Group(g) => g,
@@ -1008,16 +1174,20 @@ builtins! {
         Value::Null
     }
 
-    [TriggerFnContext]
-    fn trigger_fn_context() {
+    [TriggerFnContext] #[safe = true, desc = "Returns the start group of the current trigger function context", example = "$.trigger_fn_context()"]
+    fn trigger_fn_context(#["none"]) {
         Value::Group(context.start_group)
     }
 
-    [Random]
-    fn random() {
+    [Random] #[safe = true, desc = "Generates random numbers, or picks a random element of an array", example = "
+$.random() // a completely random number
+$.random([1, 2, 3, 6]) // returns either 1, 2, 3, or 6
+$.random(1, 10) // returns a random integer between 1 and 10
+    "]
+    fn random(#["see example"]) {
         if arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
-                message: "Expected up to 2 arguments, found none".to_string(),
+                message: "Expected up to 2 arguments".to_string(),
                 info,
             });
         }
@@ -1084,7 +1254,7 @@ builtins! {
         }
     }
 
-    [ReadFile]
+    [ReadFile] #[safe = false, desc = "", example = ""]
     fn readfile() {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
@@ -1312,7 +1482,24 @@ builtins! {
         }
     }
 
-    [Pop]
+
+    [WriteFile] #[safe = false, desc = "", example = ""]
+    fn writefile((path): Str, (data): Str) {
+
+
+        match fs::write(path, data) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(RuntimeError::BuiltinError {
+                    message: format!("Error when writing to file: {}", e),
+                    info,
+                });
+            }
+        };
+        Value::Null
+    }
+
+    [Pop] #[safe = true, desc = "Removes a value from the end of an array. You can also use `array.pop()`", example = ""]
     fn pop(mut (arr)) {
 
         let typ = globals.get_type_str(arguments[0]);
@@ -1335,7 +1522,7 @@ builtins! {
         }
     }
 
-    [Substr]
+    [Substr] #[safe = true, desc = "", example = ""]
     fn substr((val): Str, (start_index): Number, (end_index): Number) {
         let start_index = start_index as usize;
         let end_index = end_index as usize;
@@ -1354,7 +1541,7 @@ builtins! {
         Value::Str(val.as_str()[start_index..end_index].to_string())
     }
 
-    [RemoveIndex]
+    [RemoveIndex] #[safe = true, desc = "", example = ""]
     fn remove_index(mut (arr), (index): Number) {
 
         let typ = globals.get_type_str(arguments[0]);
@@ -1375,7 +1562,7 @@ builtins! {
         }
     }
 
-    [Regex] fn regex((regex): Str, (s): Str, (mode): Str, (replace)) {
+    [Regex] #[safe = true, desc = "", example = ""] fn regex((regex): Str, (s): Str, (mode): Str, (replace)) {
         use regex::Regex;
 
 
@@ -1433,7 +1620,7 @@ builtins! {
 
     }
 
-    [RangeOp]
+    [RangeOp] #[safe = true, desc = "", example = ""]
     fn _range_((val_a), (b): Number) {
         let end = convert_to_int(b, &info)?;
         match val_a {
@@ -1480,32 +1667,32 @@ builtins! {
         }
     }
     // unary operators
-    [IncrOp]            fn _increment_(mut (a): Number)                 { a += 1.0; Value::Number(a - 1.0)}
-    [DecrOp]            fn _decrement_(mut (a): Number)                 { a -= 1.0; Value::Number(a + 1.0)}
+    [IncrOp] #[safe = true, desc = "", example = ""]            fn _increment_(mut (a): Number)                 { a += 1.0; Value::Number(a - 1.0)}
+    [DecrOp] #[safe = true, desc = "", example = ""]            fn _decrement_(mut (a): Number)                 { a -= 1.0; Value::Number(a + 1.0)}
 
-    [PreIncrOp]         fn _pre_increment_(mut (a): Number)             { a += 1.0; Value::Number(a)}
-    [PreDecrOp]         fn _pre_decrement_(mut (a): Number)             { a -= 1.0; Value::Number(a)}
+    [PreIncrOp] #[safe = true, desc = "", example = ""]         fn _pre_increment_(mut (a): Number)             { a += 1.0; Value::Number(a)}
+    [PreDecrOp] #[safe = true, desc = "", example = ""]         fn _pre_decrement_(mut (a): Number)             { a -= 1.0; Value::Number(a)}
 
-    [NegOp]             fn _negate_((a): Number)                        { Value::Number(-a)}
-    [NotOp]             fn _not_((a): Bool)                             { Value::Bool(!a)}
-    [UnaryRangeOp]      fn _unary_range_((a): Number)                   { Value::Range(0, convert_to_int(a, &info)?, 1)}
+    [NegOp] #[safe = true, desc = "", example = ""]             fn _negate_((a): Number)                        { Value::Number(-a)}
+    [NotOp] #[safe = true, desc = "", example = ""]             fn _not_((a): Bool)                             { Value::Bool(!a)}
+    [UnaryRangeOp] #[safe = true, desc = "", example = ""]      fn _unary_range_((a): Number)                   { Value::Range(0, convert_to_int(a, &info)?, 1)}
 
     // operators
-    [OrOp]              fn _or_((a): Bool, (b): Bool)                   { Value::Bool(a || b) }
-    [AndOp]             fn _and_((a): Bool, (b): Bool)                  { Value::Bool(a && b) }
+    [OrOp] #[safe = true, desc = "", example = ""]              fn _or_((a): Bool, (b): Bool)                   { Value::Bool(a || b) }
+    [AndOp] #[safe = true, desc = "", example = ""]             fn _and_((a): Bool, (b): Bool)                  { Value::Bool(a && b) }
 
-    [MoreThanOp]        fn _more_than_((a): Number, (b): Number)        { Value::Bool(a > b) }
-    [LessThanOp]        fn _less_than_((a): Number, (b): Number)        { Value::Bool(a < b) }
+    [MoreThanOp] #[safe = true, desc = "", example = ""]        fn _more_than_((a): Number, (b): Number)        { Value::Bool(a > b) }
+    [LessThanOp] #[safe = true, desc = "", example = ""]        fn _less_than_((a): Number, (b): Number)        { Value::Bool(a < b) }
 
-    [MoreOrEqOp]        fn _more_or_equal_((a): Number, (b): Number)    { Value::Bool(a >= b) }
-    [LessOrEqOp]        fn _less_or_equal_((a): Number, (b): Number)    { Value::Bool(a <= b) }
+    [MoreOrEqOp] #[safe = true, desc = "", example = ""]        fn _more_or_equal_((a): Number, (b): Number)    { Value::Bool(a >= b) }
+    [LessOrEqOp] #[safe = true, desc = "", example = ""]        fn _less_or_equal_((a): Number, (b): Number)    { Value::Bool(a <= b) }
 
-    [EqOp]              fn _equal_((a), (b))                            { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
-    [NotEqOp]           fn _not_equal_((a), (b))                        { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
+    [EqOp] #[safe = true, desc = "", example = ""]              fn _equal_((a), (b))                            { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
+    [NotEqOp] #[safe = true, desc = "", example = ""]           fn _not_equal_((a), (b))                        { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
 
-    [DividedByOp]       fn _divided_by_((a): Number, (b): Number)       { Value::Number(a / b) }
-    [IntdividedByOp]    fn _intdivided_by_((a): Number, (b): Number)    { Value::Number((a / b).floor()) }
-    [TimesOp]
+    [DividedByOp] #[safe = true, desc = "", example = ""]       fn _divided_by_((a): Number, (b): Number)       { Value::Number(a / b) }
+    [IntdividedByOp] #[safe = true, desc = "", example = ""]    fn _intdivided_by_((a): Number, (b): Number)    { Value::Number((a / b).floor()) }
+    [TimesOp] #[safe = true, desc = "", example = ""]
     fn _times_((a), (b): Number) {
         match a {
             Value::Number(a) => Value::Number(a * b),
@@ -1544,9 +1731,9 @@ builtins! {
             }
         }
     }
-    [ModOp]             fn _mod_((a): Number, (b): Number)              { Value::Number(a.rem_euclid(b)) }
-    [PowOp]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
-    [PlusOp] fn _plus_((a), (b)) {
+    [ModOp] #[safe = true, desc = "", example = ""]             fn _mod_((a): Number, (b): Number)              { Value::Number(a.rem_euclid(b)) }
+    [PowOp] #[safe = true, desc = "", example = ""]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
+    [PlusOp] #[safe = true, desc = "", example = ""] fn _plus_((a), (b)) {
         match (a, b) {
             (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
             (Value::Str(a), Value::Str(b)) => Value::Str(a + &b),
@@ -1578,13 +1765,13 @@ builtins! {
             }
         }
     }
-    [MinusOp]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
-    [AssignOp]           fn _assign_(mut (a), (b))                      {
+    [MinusOp] #[safe = true, desc = "", example = ""]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
+    [AssignOp] #[safe = true, desc = "", example = ""]           fn _assign_(mut (a), (b))                      {
         a = b;
         (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
         Value::Null
     }
-    [SwapOp]           fn _swap_(mut (a), mut (b))                      {
+    [SwapOp] #[safe = true, desc = "", example = ""]           fn _swap_(mut (a), mut (b))                      {
 
         std::mem::swap(&mut a, &mut b);
         (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
@@ -1592,7 +1779,7 @@ builtins! {
         Value::Null
     }
 
-    [HasOp]
+    [HasOp] #[safe = true, desc = "", example = ""]
     fn _has_((a), (b)) {
         match (a, b) {
             (Value::Array(ar), _) => {
@@ -1697,10 +1884,10 @@ builtins! {
         }
     }
 
-    [AsOp]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,context)? }
+    [AsOp] #[safe = true, desc = "", example = ""]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,context)? }
 
-    [SubtractOp]        fn _subtract_(mut (a): Number, (b): Number)         { a -= b; Value::Null }
-    [AddOp]
+    [SubtractOp] #[safe = true, desc = "", example = ""]        fn _subtract_(mut (a): Number, (b): Number)         { a -= b; Value::Null }
+    [AddOp] #[safe = true, desc = "", example = ""]
     fn _add_(mut (a), (b)) {
         match (&mut a, b) {
             (Value::Number(a), Value::Number(b)) => *a += b,
@@ -1726,7 +1913,7 @@ builtins! {
         }
         Value::Null
     }
-    [MultiplyOp]        fn _multiply_(mut (a), (b): Number)         {
+    [MultiplyOp] #[safe = true, desc = "", example = ""]        fn _multiply_(mut (a), (b): Number)         {
         match &mut a {
             Value::Number(a) => *a *= b,
             Value::Str(a) => *a = a.repeat(convert_to_int(b, &info)? as usize),
@@ -1749,12 +1936,12 @@ builtins! {
         };
         Value::Null
     }
-    [DivideOp]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
-    [IntdivideOp]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
-    [ExponateOp]        fn _exponate_(mut (a): Number, (b): Number)         { a = a.powf(b); Value::Null }
-    [ModulateOp]        fn _modulate_(mut (a): Number, (b): Number)         { a = a.rem_euclid(b); Value::Null }
+    [DivideOp] #[safe = true, desc = "", example = ""]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
+    [IntdivideOp] #[safe = true, desc = "", example = ""]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
+    [ExponateOp] #[safe = true, desc = "", example = ""]        fn _exponate_(mut (a): Number, (b): Number)         { a = a.powf(b); Value::Null }
+    [ModulateOp] #[safe = true, desc = "", example = ""]        fn _modulate_(mut (a): Number, (b): Number)         { a = a.rem_euclid(b); Value::Null }
 
-    [EitherOp]
+    [EitherOp] #[safe = true, desc = "", example = ""]
     fn _either_((a), (b)) {
         Value::Pattern(Pattern::Either(
             if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, context)? {

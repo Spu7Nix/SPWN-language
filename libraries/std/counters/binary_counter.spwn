@@ -19,7 +19,7 @@ type @binary_counter
 
 impl @binary_counter {
 
-    new: (from: @number = 0, bits: @number = 16) {
+    new: #[constructor] (from: @number = 0, bits: @number = 16) {
         digits = number_to_binary(from, bits)
         let data = []
         for i in ..bits {

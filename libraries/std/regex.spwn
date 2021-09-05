@@ -2,7 +2,7 @@
 type @regex
 
 impl @regex {
-    new: #[desc("Create a new instance of regex")]
+    new: #[constructor, desc("Create a new instance of regex")]
     (#[desc("A regex string. Make sure to use two backslashes to escape selectors instead of one or it will error")] re: @string) {
         return {
             type: @regex,

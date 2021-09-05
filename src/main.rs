@@ -27,6 +27,7 @@ use ariadne::{Cache, FileCache, Fmt};
 
 use optimize::optimize;
 
+use builtin::BuiltinPermissions;
 use parser::*;
 
 use std::path::PathBuf;
@@ -102,7 +103,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .expect("Executable must be in a directory")
                             .to_path_buf(),
                     ];
+
+                    let mut permissions = BuiltinPermissions::new();
                     //change to current_exe before release (from current_dir)
+                    use std::str::FromStr;
 
                     while let Some(arg) = args_iter.next() {
                         match arg.as_ref() {
@@ -125,6 +129,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     return Err(Box::from("Invalid path".to_string()));
                                 }
                             }),
+                            "--allow" | "-a" => {
+                                let b = args_iter
+                                    .next()
+                                    .cloned()
+                                    .expect("Expected built-in function name");
+                                permissions.set(
+                                    builtin::Builtin::from_str(&b)
+                                        .unwrap_or_else(|_| panic!("Invalid builtin name: {}", b)),
+                                    true,
+                                );
+                            }
+                            "--deny" | "-d" => {
+                                let b = args_iter
+                                    .next()
+                                    .cloned()
+                                    .expect("Expected built-in function name");
+                                permissions.set(
+                                    builtin::Builtin::from_str(&b)
+                                        .unwrap_or_else(|_| panic!("Invalid builtin name: {}", b)),
+                                    false,
+                                );
+                            }
                             _ => (),
                         };
                     }
@@ -186,6 +212,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         script_path,
                         included_paths,
                         notes,
+                        permissions,
                     ) {
                         Err(err) => {
                             create_report(ErrorReport::from(err)).eprint(cache).unwrap();
@@ -362,16 +389,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     };
 
-                    match documentation::document_lib(lib_path) {
-                        Ok(_) => (),
-                        Err(_) => {
-                            eprintln!(
-                                "{}",
-                                "Error when compiling library!".fg(ariadne::Color::Red)
-                            );
-                            std::process::exit(ERROR_EXIT_CODE);
-                        }
-                    };
+                    if "$" == lib_path {
+                        // doc builtins
+                        let doc = builtin::builtin_docs();
+                        fs::write("builtins.md", doc)?;
+                    } else {
+                        match documentation::document_lib(lib_path) {
+                            Ok(_) => (),
+                            Err(_) => {
+                                eprintln!(
+                                    "{}",
+                                    "Error when compiling library!".fg(ariadne::Color::Red)
+                                );
+                                std::process::exit(ERROR_EXIT_CODE);
+                            }
+                        };
+                    }
 
                     //println!("doc {:?}", documentation);
 
@@ -396,7 +429,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 //         Ok(p) => p,
                 //     };
 
-                //     let formatted = fmt::format(parsed);
+                //     let formatted = fmt::_format(parsed);
 
                 //     let mut output_file = File::create("test/formatted.spwn")?;
                 //     output_file.write_all(formatted.as_bytes())?;

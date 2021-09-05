@@ -51,6 +51,8 @@ pub struct Globals {
     pub sync_groups: Vec<SyncGroup>,
     pub includes: Vec<PathBuf>,
 
+    pub permissions: BuiltinPermissions,
+
     pub TYPE_MEMBER_NAME: Intern<String>,
     pub SELF_MEMBER_NAME: Intern<String>,
     pub OR_BUILTIN: Intern<String>,
@@ -126,7 +128,7 @@ impl Globals {
         find_key_for_value(&self.type_ids, typ).unwrap().clone()
     }
 
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf, permissions: BuiltinPermissions) -> Self {
         let storage = ValStorage::new();
         let mut globals = Globals {
             closed_groups: 0,
@@ -158,6 +160,8 @@ impl Globals {
                 groups_used: Vec::new(),
             }],
             includes: Vec::new(),
+
+            permissions,
             TYPE_MEMBER_NAME: Intern::new(String::from("type")),
             SELF_MEMBER_NAME: Intern::new(String::from("self")),
             OR_BUILTIN: Intern::new(String::from("_or_")),

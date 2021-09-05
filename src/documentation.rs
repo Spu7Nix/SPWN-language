@@ -3,6 +3,7 @@ use internment::Intern;
 // tools for generating documentation for SPWN libraries
 //use crate::ast::*;
 
+use crate::builtin::BuiltinPermissions;
 use crate::compiler::{import_module, RuntimeError};
 use crate::compiler_info::CompilerInfo;
 use crate::compiler_types::ImportType;
@@ -22,7 +23,7 @@ fn create_doc_file(mut dir: PathBuf, name: String, content: &str) {
     println!("written to {:?}", dir);
 }
 pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
-    let mut globals = Globals::new(PathBuf::new());
+    let mut globals = Globals::new(PathBuf::new(), BuiltinPermissions::new());
 
     let mut start_context = FullContext::new();
 
@@ -136,24 +137,36 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 
 fn document_dict(dict: &HashMap<Intern<String>, StoredValue>, globals: &mut Globals) -> String {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
+    type ValList = Vec<(Intern<String>, StoredValue)>;
+    let mut categories = [
+        ("Constructors", ValList::new()),
+        ("Macros", ValList::new()),
+        ("Operator Implementations", ValList::new()),
+        ("Values", ValList::new()),
+    ];
 
-    let mut macro_list: Vec<(&Intern<String>, &StoredValue)> = dict
-        .iter()
-        .filter(|x| matches!(globals.stored_values[*x.1], Value::Macro(_)))
-        .collect();
-    macro_list.sort_by(|a, b| a.0.cmp(b.0));
+    for (name, x) in dict {
+        if let Value::Macro(m) = &globals.stored_values[*x] {
+            if m.tag.get("constructor").is_some() {
+                categories[0].1.push((*name, *x));
+            } else if name.starts_with("_") && name.ends_with("_") {
+                categories[2].1.push((*name, *x));
+            } else {
+                categories[1].1.push((*name, *x));
+            }
+        } else {
+            categories[3].1.push((*name, *x));
+        }
+    }
 
-    let mut val_list: Vec<(&Intern<String>, &StoredValue)> = dict
-        .iter()
-        .filter(|x| !matches!(globals.stored_values[*x.1], Value::Macro(_)))
-        .collect();
-    val_list.sort_by(|a, b| a.0.cmp(b.0));
+    for (_, list) in &mut categories {
+        list.sort_by_key(|a| a.0);
+    }
 
     let mut document_member = |key: &String, val: &StoredValue| -> String {
         let mut member_doc = String::new();
         let inner_val = globals.stored_values[*val].clone();
         let val_str = document_val(&inner_val, globals);
-
         let mut formatted = String::new();
 
         for line in val_str.lines() {
@@ -173,22 +186,17 @@ fn document_dict(dict: &HashMap<Intern<String>, StoredValue>, globals: &mut Glob
         );
         member_doc
     };
-    if !macro_list.is_empty() {
-        if !val_list.is_empty() {
-            doc += "\n## Macros:\n";
-        }
-        for (key, val) in macro_list.iter() {
-            doc += &document_member(key.as_ref(), *val)
-        }
-    }
-    if !val_list.is_empty() {
-        if !macro_list.is_empty() {
-            doc += "## Other values:\n";
-        }
-        for (key, val) in val_list.iter() {
-            doc += &document_member(key.as_ref(), *val)
+
+    for list in categories {
+        if !list.1.is_empty() {
+            doc += &format!("\n## {}:\n", list.0);
+
+            for (key, val) in list.1.iter() {
+                doc += &document_member(key.as_ref(), val)
+            }
         }
     }
+
     doc
 }
 
