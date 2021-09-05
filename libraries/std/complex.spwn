@@ -4,18 +4,18 @@ type @complex
 PI = 3.14159265358979323846
 
 impl @complex {
-	new: (re, im = 0) {
+	new: #[constructor] (re, im = 0) {
 		return @complex::{re, im}
 	},
 
-	from_polar: (r, phi) {
+	from_polar: #[constructor] (r, phi) {
 		return @complex::new($.cos(phi), $.sin(phi)) * r
 	},
 
-	I: (coef: @number = 1) {
+	I: #[constructor] (coef: @number = 1) {
         return @complex::new(0,coef)
     },
-	zero: () {
+	zero: #[constructor] () {
         return @complex::new(0, 0)
     },
 

@@ -21,7 +21,7 @@ reset_counter = (
 
 impl @counter {
 
-    new: #[desc("Creates a new counter") example("
+    new: #[constructor, desc("Creates a new counter") example("
 @counter::new()     // creates a new counter with a starting value of 0
 @counter::new(10)   // creates a new counter with a starting value of 10
 @counter::new(5i)   // creates a new counter thaat uses item ID 5

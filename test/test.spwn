@@ -1,2 +1,41 @@
-arr = [1, 2, 3, 4, 5]
-$.print(arr.reverse())
+extract obj_props
+
+fizz = ?g
+buzz = ?g
+c = counter()
+
+// display
+pos = [45, 45]
+c.display(pos[0], pos[1])
+$.add(obj {
+    OBJ_ID: 1267,
+    TEXT: $.b64encode("fizz"),
+    GROUPS: fizz,
+    X: pos[0] - 30, Y: pos[1]
+})
+$.add(obj {
+    OBJ_ID: 1267,
+    TEXT: $.b64encode("buzz"),
+    GROUPS: buzz,
+    X: pos[0] + 30, Y: pos[1]
+})
+
+// the actual thing
+fizz.toggle_off()
+buzz.toggle_off()
+
+while_loop(() => true, delay = 0.2, () {
+    if c % 3 == 0 {
+        fizz.toggle_on()
+    } else {
+        fizz.toggle_off()
+    }
+
+    if c % 5 == 0 {
+        buzz.toggle_on()
+    } else {
+        buzz.toggle_off()
+    }
+
+    c++
+})

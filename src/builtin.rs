@@ -538,30 +538,32 @@ macro_rules! builtins {
         pub fn builtin_docs() -> String {
             let mut all = Vec::new();
             $(
-                let mut out = String::new();
-                out += &format!(
+                let mut full_out = format!(
                     "## $.{}\n",
                     stringify!($name).replace("_", "\\_")
                 );
+                let mut out = String::new();
+
+
                 if !$desc.is_empty() {
                     out += &format!(
-                        "> ## Description:\n> {} <div>\n",
+                        "## Description:\n{} <div>\n",
                         $desc
                     );
                 }
 
                 if !$example.is_empty() {
                     out += &format!(
-                        "> ## Example:\n> ```spwn\n> {}\n> ```\n",
-                        $example
+                        "## Example:\n```spwn\n{}\n```\n",
+                        $example.trim()
                     );
 
                 }
-                out += &format!("> **Allowed by default:** {}\n", if $safe { "yes" } else { "no" });
+                out += &format!("**Allowed by default:** {}\n", if $safe { "yes" } else { "no" });
                 #[allow(unused_mut, unused_assignments, unused_variables)]
                 let mut arg_title_set = false;
                 $(
-                    out += &format!("> ## Arguments: \n > **{}**\n", $argdesc);
+                    out += &format!("## Arguments: \n **{}**\n", $argdesc);
                     arg_title_set = true;
                 )?
                 $(
@@ -578,19 +580,26 @@ macro_rules! builtins {
                         $(mutable = stringify!($mut) == "mut";)?
                         args.push((name, typ, mutable));
                     )+
-                    if !arg_title_set { out += "> ## Arguments: \n"; }
-                    out += "> | # | **Name** | **Type** |\n> |-|-|-|\n";
+                    if !arg_title_set { out += "## Arguments: \n"; }
+                    out += "| # | **Name** | **Type** |\n|-|-|-|\n";
                     for (i, (name, typ, mutable)) in args.into_iter().enumerate() {
-                        out += &format!("> | {} | `{}` | {}{} |\n", i + 1, name, if mutable {"_mutable_ "} else {""}, match typ {
+                        out += &format!("| {} | `{}` | {}{} |\n", i + 1, name, if mutable {"_mutable_ "} else {""}, match typ {
                             Some(s) => format!("_{}_", s),
                             None => String::new(),
                         });
                     }
 
 
+
+
+
                 )?
 
-                all.push((stringify!($name), out));
+                for line in out.lines() {
+                    full_out += &format!("> {}\n", line);
+                }
+
+                all.push((stringify!($name), full_out));
 
             )*
             let mut out = String::new();
@@ -718,7 +727,7 @@ builtins! {
 
 
 
-    [HTTPRequest] #[safe = false, desc = "Sends an HTTP request", example = ""] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
+    [HTTPRequest] #[safe = false, desc = "Sends a HTTP request", example = ""] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
 
         let mut headermap = reqwest::header::HeaderMap::new();
         for (name, value) in &headers {
@@ -811,41 +820,48 @@ builtins! {
         Value::Dict(output_map)
     }
 
-    [Sin] #[safe = true, desc = "Calculates the sin of an angle in radians", example = ""] fn sin((n): Number) { Value::Number(n.sin()) }
-    [Cos] #[safe = true, desc = "Calculates the cos of an angle in radians", example = ""] fn cos((n): Number) { Value::Number(n.cos()) }
-    [Tan] #[safe = true, desc = "	Calculates the tan of an angle in radians", example = ""] fn tan((n): Number) { Value::Number(n.tan()) }
+    [Sin] #[safe = true, desc = "Calculates the sin of an angle in radians", example = "$.sin(3.1415)"] fn sin((n): Number) { Value::Number(n.sin()) }
+    [Cos] #[safe = true, desc = "Calculates the cos of an angle in radians", example = "$.cos(3.1415)"] fn cos((n): Number) { Value::Number(n.cos()) }
+    [Tan] #[safe = true, desc = "Calculates the tan of an angle in radians", example = "$.tan(3.1415)"] fn tan((n): Number) { Value::Number(n.tan()) }
 
-    [Asin] #[safe = true, desc = "Calculates the arcsin of a number", example = ""] fn asin((n): Number) { Value::Number(n.asin()) }
-    [Acos] #[safe = true, desc = "Calculates the arccos of a number", example = ""] fn acos((n): Number) { Value::Number(n.acos()) }
-    [Atan] #[safe = true, desc = "Calculates the arctan of a number", example = ""] fn atan((n): Number) { Value::Number(n.atan()) }
+    [Asin] #[safe = true, desc = "Calculates the arcsin of a number", example = "$.asin(1)"] fn asin((n): Number) { Value::Number(n.asin()) }
+    [Acos] #[safe = true, desc = "Calculates the arccos of a number", example = "$.acos(-1)"] fn acos((n): Number) { Value::Number(n.acos()) }
+    [Atan] #[safe = true, desc = "Calculates the arctan of a number", example = "$.atan(1)"] fn atan((n): Number) { Value::Number(n.atan()) }
 
-    [Floor] #[safe = true, desc = "Calculates the floor of a number, AKA the number rounded down to the nearest integer", example = ""] fn floor((n): Number) { Value::Number(n.floor()) }
-    [Ceil] #[safe = true, desc = "Calculates the ceil of a number, AKA the number rounded up to the nearest integer", example = ""] fn ceil((n): Number) { Value::Number(n.ceil()) }
+    [Floor] #[safe = true, desc = "Calculates the floor of a number, AKA the number rounded down to the nearest integer", example = "$.assert($.floor(1.5) == 1)"] fn floor((n): Number) { Value::Number(n.floor()) }
+    [Ceil] #[safe = true, desc = "Calculates the ceil of a number, AKA the number rounded up to the nearest integer", example = "$.assert($.ceil(1.5) == 2)"] fn ceil((n): Number) { Value::Number(n.ceil()) }
 
-    [Abs] #[safe = true, desc = "Calculates the absolute value of a number", example = ""] fn abs((n): Number) {Value::Number(n.abs())}
-    [Acosh] #[safe = true, desc = "Calculates the arccosh of a number", example = ""] fn acosh((n): Number) {Value::Number(n.acosh())}
-    [Asinh] #[safe = true, desc = "Calculates the arcsinh of a number", example = ""] fn asinh((n): Number) {Value::Number(n.asinh())}
-    [Atan2] #[safe = true, desc = "Calculates the arctan^2 of a number", example = ""] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
-    [Atanh] #[safe = true, desc = "Calculates the arctanh of a number", example = ""] fn atanh((n): Number) {Value::Number(n.atanh())}
-    [Cbrt] #[safe = true, desc = "Calculates the cube root of a number", example = ""] fn cbrt((n): Number) {Value::Number(n.cbrt())}
-    [Cosh] #[safe = true, desc = "Calculates the cosh of a number", example = ""] fn cosh((n): Number) {Value::Number(n.cosh())}
-    [Exp] #[safe = true, desc = "Calculates the e^x of a number", example = ""] fn exp((n): Number) {Value::Number(n.exp())}
-    [Exp2] #[safe = true, desc = "Calculates the 2^x of a number", example = ""] fn exp2((n): Number) {Value::Number(n.exp2())}
-    [Expm1] #[safe = true, desc = "Calculates e^x - 1 in a way that is accurate even if the number is close to zero", example = ""] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
-    [Fract] #[safe = true, desc = "Gets the fractional part of a number", example = ""] fn fract((n): Number) {Value::Number(n.fract())}
+    [Abs] #[safe = true, desc = "Calculates the absolute value of a number", example = "$.assert($.abs(-100) == 100)"] fn abs((n): Number) {Value::Number(n.abs())}
+    [Acosh] #[safe = true, desc = "Calculates the arccosh of a number", example = "$.acosh(num)"] fn acosh((n): Number) {Value::Number(n.acosh())}
+    [Asinh] #[safe = true, desc = "Calculates the arcsinh of a number", example = "$.asinh(num)"] fn asinh((n): Number) {Value::Number(n.asinh())}
+    [Atan2] #[safe = true, desc = "Calculates the arctan^2 of a number", example = "$.atan2(a, b)"] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
+    [Atanh] #[safe = true, desc = "Calculates the arctanh of a number", example = "$.atanh(num)"] fn atanh((n): Number) {Value::Number(n.atanh())}
+    [Cbrt] #[safe = true, desc = "Calculates the cube root of a number", example = "$.assert($.cbrt(27) == 3)"] fn cbrt((n): Number) {Value::Number(n.cbrt())}
+    [Cosh] #[safe = true, desc = "Calculates the cosh of a number", example = "$.cosh(num)"] fn cosh((n): Number) {Value::Number(n.cosh())}
+    [Exp] #[safe = true, desc = "Calculates the e^x of a number", example = "$.exp(x)"] fn exp((n): Number) {Value::Number(n.exp())}
+    [Exp2] #[safe = true, desc = "Calculates the 2^x of a number", example = "$.assert($.exp2(10) == 1024)"] fn exp2((n): Number) {Value::Number(n.exp2())}
+    [Expm1] #[safe = true, desc = "Calculates e^x - 1 in a way that is accurate even if the number is close to zero", example = "$.exp_m1(num)"] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
+    [Fract] #[safe = true, desc = "Gets the fractional part of a number", example = "$.assert($.fract(123.456) == 0.456)"] fn fract((n): Number) {Value::Number(n.fract())}
 
-    [Sqrt] #[safe = true, desc = "Calculates the square root of a number", example = ""] fn sqrt((n): Number) {Value::Number(n.sqrt())}
-    [Sinh] #[safe = true, desc = "Calculates the hyperbolic sin of a number", example = ""] fn sinh((n): Number) {Value::Number(n.sinh())}
-    [Tanh] #[safe = true, desc = "Calculates the hyperbolic tan of a number", example = ""] fn tanh((n): Number) {Value::Number(n.tanh())}
-    [NaturalLog] #[safe = true, desc = "Calculates the ln (natural log) of a number", example = ""] fn ln((n): Number) {Value::Number(n.ln())}
-    [Log] #[safe = true, desc = "Calculates the log base x of a number", example = ""] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
-    [Min] #[safe = true, desc = "Calculates the min of two numbers", example = ""] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
-    [Max] #[safe = true, desc = "Calculates the max of two numbers", example = ""] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
-    [Round] #[safe = true, desc = "Rounds a number", example = ""] fn round((n): Number) {Value::Number(n.round())}
-    [Hypot] #[safe = true, desc = "Calculates the hypothenuse in a right triangle with sides a and b", example = ""] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
+    [Sqrt] #[safe = true, desc = "Calculates the square root of a number", example = "$.sqrt(2)"] fn sqrt((n): Number) {Value::Number(n.sqrt())}
+    [Sinh] #[safe = true, desc = "Calculates the hyperbolic sin of a number", example = "$.sinh(num)"] fn sinh((n): Number) {Value::Number(n.sinh())}
+    [Tanh] #[safe = true, desc = "Calculates the hyperbolic tan of a number", example = "$.tanh(num)"] fn tanh((n): Number) {Value::Number(n.tanh())}
+    [NaturalLog] #[safe = true, desc = "Calculates the ln (natural log) of a number", example = "$.ln(num)"] fn ln((n): Number) {Value::Number(n.ln())}
+    [Log] #[safe = true, desc = "Calculates the log base x of a number", example = "$.log(num, base)"] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
+    [Min] #[safe = true, desc = "Calculates the min of two numbers", example = "$.assert($.min(1, 2) == 1)"] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
+    [Max] #[safe = true, desc = "Calculates the max of two numbers", example = "$.assert($.max(1, 2) == 2)"] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
+    [Round] #[safe = true, desc = "Rounds a number", example = "$.assert($.round(1.2) == 1)"] fn round((n): Number) {Value::Number(n.round())}
+    [Hypot] #[safe = true, desc = "Calculates the hypothenuse in a right triangle with sides a and b", example = "$.assert($.hypot(3, 4) == 5) // because 3^2 + 4^2 = 5^2"] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
 
-    [Add] #[safe = true, desc = "Adds a Geometry Dash object or trigger to the target level", example = ""]
-    fn add() {
+    [Add] #[safe = true, desc = "Adds a Geometry Dash object or trigger to the target level", example = "
+extract obj_props
+$.add(obj {
+    OBJ_ID: 1,
+    X: 45,
+    Y: 45,
+})
+    "]
+    fn add(#["The object or trigger to add"]) {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
                 message: "Expected 1 argument".to_string(),
@@ -918,7 +934,11 @@ builtins! {
         Value::Null
     }
 
-    [Append] #[safe = true, desc = "Appends a value to the end of an array. You can also use `array.push(value)`", example = ""]
+    [Append] #[safe = true, desc = "Appends a value to the end of an array. You can also use `array.push(value)`", example = "
+let arr = []
+$.append(arr, 1)
+$.assert(arr = [1])
+    "]
     fn append(mut (arr): Array, (val)) {
         //set lifetime to the lifetime of the array
 
@@ -935,7 +955,7 @@ builtins! {
         Value::Null
     }
 
-    [SplitStr] #[safe = true, desc = "Returns an array from the split string. You can also use `string.split(delimiter)`", example = ""]
+    [SplitStr] #[safe = true, desc = "Returns an array from the split string. You can also use `string.split(delimiter)`", example = "$.assert($.split_str(\"1,2,3\", \",\") == [\"1\", \"2\", \"3\"])"]
     fn split_str((s): Str, (substr): Str) {
 
         let mut output = Vec::<StoredValue>::new();
@@ -949,7 +969,7 @@ builtins! {
         Value::Array(output)
     }
 
-    [EditObj] #[safe = true, desc = "Changes the value of an object key. You can also use `object.set(key, value)`", example = ""]
+    [EditObj] #[safe = true, desc = "Changes the value of an object key. You can also use `object.set(key, value)`", example = "$.edit_obj(object, ROTATION, 180)"]
     fn edit_obj(mut (o, m): Obj, (key), (value)) {
 
         let (okey, oval) = {
@@ -1102,12 +1122,21 @@ builtins! {
         Value::Null
     }
 
-    [Mutability] #[safe = true, desc = "", example = ""]
+    [Mutability] #[safe = true, desc = "Checks if a value reference is mutable", example = "
+const = 1
+$.assert(!$.mutability(const))
+let mut = 1
+$.assert($.mutability(mut))
+    "]
     fn mutability((var)) {
         Value::Bool(globals.can_mutate(arguments[0]))
     }
 
-    [ExtendTriggerFunc] #[safe = true, desc = "", example = ""]
+    [ExtendTriggerFunc] #[safe = true, desc = "Executes a macro in a specific trigger function context", example = "
+$.extend_trigger_func(10g, () {
+    11g.move(10, 0, 0.5) // will add a move trigger in group 10
+})
+    "]
     fn extend_trigger_func((group),(mac): Macro) {
         let group = match group {
             Value::Group(g) => g,
@@ -1147,16 +1176,20 @@ builtins! {
         Value::Null
     }
 
-    [TriggerFnContext] #[safe = true, desc = "", example = ""]
-    fn trigger_fn_context() {
+    [TriggerFnContext] #[safe = true, desc = "Returns the start group of the current trigger function context", example = "$.trigger_fn_context()"]
+    fn trigger_fn_context(#["none"]) {
         Value::Group(context.start_group)
     }
 
-    [Random] #[safe = true, desc = "", example = ""]
-    fn random() {
+    [Random] #[safe = true, desc = "Generates random numbers, or picks a random element of an array", example = "
+$.random() // a completely random number
+$.random([1, 2, 3, 6]) // returns either 1, 2, 3, or 6
+$.random(1, 10) // returns a random integer between 1 and 10
+    "]
+    fn random(#["see example"]) {
         if arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
-                message: "Expected up to 2 arguments, found none".to_string(),
+                message: "Expected up to 2 arguments".to_string(),
                 info,
             });
         }

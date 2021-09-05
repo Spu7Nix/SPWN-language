@@ -3,7 +3,7 @@ extract import "constants.spwn"
 type @obj_set
 
 impl @obj_set {
-    new: #[desc("Creates a new object set") example("
+    new: #[constructor, desc("Creates a new object set") example("
 my_objects = @obj_set::new()
     ")]
     (

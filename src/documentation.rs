@@ -137,26 +137,31 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 
 fn document_dict(dict: &HashMap<Intern<String>, StoredValue>, globals: &mut Globals) -> String {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
-
-    let mut macro_list = Vec::new();
-    let mut operator_list = Vec::new();
-    let mut val_list = Vec::new();
+    type ValList = Vec<(Intern<String>, StoredValue)>;
+    let mut categories = [
+        ("Constructors", ValList::new()),
+        ("Macros", ValList::new()),
+        ("Operator Implementations", ValList::new()),
+        ("Values", ValList::new()),
+    ];
 
     for (name, x) in dict {
-        if matches!(globals.stored_values[*x], Value::Macro(_)) {
-            if name.starts_with("_") && name.ends_with("_") {
-                operator_list.push((*name, *x));
+        if let Value::Macro(m) = &globals.stored_values[*x] {
+            if m.tag.get("constructor").is_some() {
+                categories[0].1.push((*name, *x));
+            } else if name.starts_with("_") && name.ends_with("_") {
+                categories[2].1.push((*name, *x));
             } else {
-                macro_list.push((*name, *x));
+                categories[1].1.push((*name, *x));
             }
         } else {
-            val_list.push((*name, *x));
+            categories[3].1.push((*name, *x));
         }
     }
 
-    macro_list.sort_by(|a, b| a.0.cmp(&b.0));
-    val_list.sort_by(|a, b| a.0.cmp(&b.0));
-    operator_list.sort_by(|a, b| a.0.cmp(&b.0));
+    for (_, list) in &mut categories {
+        list.sort_by_key(|a| a.0);
+    }
 
     let mut document_member = |key: &String, val: &StoredValue| -> String {
         let mut member_doc = String::new();
@@ -181,32 +186,17 @@ fn document_dict(dict: &HashMap<Intern<String>, StoredValue>, globals: &mut Glob
         );
         member_doc
     };
-    if !macro_list.is_empty() {
-        if !(val_list.is_empty() && operator_list.is_empty()) {
-            doc += "\n## Macros:\n";
-        }
-        for (key, val) in macro_list.iter() {
-            doc += &document_member(key.as_ref(), val)
+
+    for list in categories {
+        if !list.1.is_empty() {
+            doc += &format!("\n## {}:\n", list.0);
+
+            for (key, val) in list.1.iter() {
+                doc += &document_member(key.as_ref(), val)
+            }
         }
     }
 
-    if !operator_list.is_empty() {
-        if !(val_list.is_empty() && macro_list.is_empty()) {
-            doc += "\n## Operator Implementations:\n";
-        }
-        for (key, val) in operator_list.iter() {
-            doc += &document_member(key.as_ref(), val)
-        }
-    }
-
-    if !val_list.is_empty() {
-        if !(operator_list.is_empty() && macro_list.is_empty()) {
-            doc += "## Other values:\n";
-        }
-        for (key, val) in val_list.iter() {
-            doc += &document_member(key.as_ref(), val)
-        }
-    }
     doc
 }
 

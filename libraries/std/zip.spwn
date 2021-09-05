@@ -3,7 +3,7 @@
 type @zip
 
 impl @zip {
-    new: #[desc("Returns a zip object")]
+    new: #[constructor, desc("Returns a zip object")]
     (iter1: @array | @string | @dictionary, iter2: @array | @string | @dictionary) {
         let iters = [iter1, iter2]
 
