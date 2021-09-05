@@ -167,6 +167,12 @@ impl ValStorage {
     //     self.map.get(&index).unwrap().lifetime
     // }
 }
+
+impl Default for ValStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 // pub fn store_value(
 //     val: Value,
 //     lifetime: u16,

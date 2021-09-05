@@ -935,7 +935,7 @@ $.add(obj {
     [Append] #[safe = true, desc = "Appends a value to the end of an array. You can also use `array.push(value)`", example = "
 let arr = []
 $.append(arr, 1)
-$.assert(arr = [1])
+$.assert(arr == [1])
     "]
     fn append(mut (arr): Array, (val)) {
         //set lifetime to the lifetime of the array

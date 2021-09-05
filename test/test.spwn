@@ -1,41 +1,44 @@
 extract obj_props
+"hello".to_obj().with(X, 45).with(Y, 45).add()
 
-fizz = ?g
-buzz = ?g
-c = counter()
+// extract obj_props
 
-// display
-pos = [45, 45]
-c.display(pos[0], pos[1])
-$.add(obj {
-    OBJ_ID: 1267,
-    TEXT: $.b64encode("fizz"),
-    GROUPS: fizz,
-    X: pos[0] - 30, Y: pos[1]
-})
-$.add(obj {
-    OBJ_ID: 1267,
-    TEXT: $.b64encode("buzz"),
-    GROUPS: buzz,
-    X: pos[0] + 30, Y: pos[1]
-})
+// fizz = ?g
+// buzz = ?g
+// c = counter()
 
-// the actual thing
-fizz.toggle_off()
-buzz.toggle_off()
+// // display
+// pos = [45, 45]
+// c.display(pos[0], pos[1])
+// $.add(obj {
+//     OBJ_ID: 914,
+//     TEXT: $.b64encode("fizz"),
+//     GROUPS: fizz,
+//     X: pos[0] - 30, Y: pos[1]
+// })
+// $.add(obj {
+//     OBJ_ID: 914,
+//     TEXT: $.b64encode("buzz"),
+//     GROUPS: buzz,
+//     X: pos[0] + 30, Y: pos[1]
+// })
 
-while_loop(() => true, delay = 0.2, () {
-    if c % 3 == 0 {
-        fizz.toggle_on()
-    } else {
-        fizz.toggle_off()
-    }
+// // the actual thing
+// fizz.toggle_off()
+// buzz.toggle_off()
 
-    if c % 5 == 0 {
-        buzz.toggle_on()
-    } else {
-        buzz.toggle_off()
-    }
+// while_loop(() => true, delay = 0.2, () {
+//     if c % 3 == 0 {
+//         fizz.toggle_on()
+//     } else {
+//         fizz.toggle_off()
+//     }
 
-    c++
-})
+//     if c % 5 == 0 {
+//         buzz.toggle_on()
+//     } else {
+//         buzz.toggle_off()
+//     }
+
+//     c++
+// })

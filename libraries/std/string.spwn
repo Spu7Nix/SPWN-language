@@ -217,6 +217,17 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
     replace: (self, re: @string, replacement: @string) {
         return $.regex(re, self, "replace", replacement)
     },
+
+    to_obj: #[desc("Returns a text object with the string as text") example("
+extract obj_props
+\"hello\".to_obj().with(X, 45).with(Y, 45).add()
+    ")] (self) {
+        extract import "constants.spwn".obj_props
+        return obj {
+            OBJ_ID: 914,
+            TEXT: $.b64encode(self),
+        }
+    },
     
     isdigit:  #[desc("Returns true if string is numeric, false otherwise") example("
 let num = \"123\"

@@ -536,9 +536,7 @@ impl<'a> Tokens<'a> {
 
     fn current(&self) -> Option<Token> {
         let len = self.stack.len();
-        if len == 0 {
-            None
-        } else if len - self.index < 1 {
+        if len == 0 || len - self.index < 1 {
             None
         } else {
             self.stack[len - self.index - 1].0
