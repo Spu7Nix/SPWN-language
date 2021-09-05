@@ -732,7 +732,7 @@ builtins! {
                 }
             };
             let header_value = globals.stored_values[*value].clone().to_str(globals);
-            headermap.insert(header_name, header_value.parse().unwrap());
+            headermap.insert(header_name, header_value.trim_matches('\'').parse().unwrap());
         }
 
         let client = reqwest::blocking::Client::new();
