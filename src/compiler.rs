@@ -722,16 +722,20 @@ pub fn compile_scope(
                                                                 &info,
                                                             )?;
 
-                                                            for tmp_idx in idx..(idx + idx_step) {
-                                                                let cloned = clone_value(
-                                                                    val_a[tmp_idx],
-                                                                    globals,
-                                                                    expr_ctx.inner().start_group,
-                                                                    !mutable,
-                                                                    globals.get_area(storage),
-                                                                );
-                                                                packed.push(cloned);
-                                                            }
+                                                            (idx..(idx + idx_step)).for_each(
+                                                                |tmp_idx| {
+                                                                    let cloned = clone_value(
+                                                                        val_a[tmp_idx],
+                                                                        globals,
+                                                                        expr_ctx
+                                                                            .inner()
+                                                                            .start_group,
+                                                                        !mutable,
+                                                                        globals.get_area(storage),
+                                                                    );
+                                                                    packed.push(cloned);
+                                                                },
+                                                            );
                                                             //println!("collecting {} items", val_a.len()-var_a.len());
                                                             globals.stored_values[storage] =
                                                                 Value::Array(packed);
@@ -807,6 +811,36 @@ pub fn compile_scope(
                                             info.clone(),
                                             Some(start_group),
                                         )?;
+                                    }
+                                }
+
+                                // dont remove this camlin
+                                // this is what makes recursion work lmao
+                                (true, ast::ValueBody::Macro(m)) => {
+                                    for full_context in contexts.iter() {
+                                        let storage =
+                                            symbol.define(full_context.inner(), globals, &info)?;
+
+                                        macro_to_value(
+                                            m,
+                                            full_context,
+                                            globals,
+                                            info.clone(),
+                                            !mutable,
+                                        )?;
+
+                                        let (context, val) = full_context.inner_value();
+
+                                        //clone the value so as to not share the reference
+
+                                        let cloned = clone_and_get_value(
+                                            val,
+                                            globals,
+                                            context.start_group,
+                                            !mutable,
+                                        );
+
+                                        globals.stored_values[storage] = cloned;
                                     }
                                 }
 
