@@ -6,9 +6,11 @@ use parser::ast::ObjectMode;
 use compiler::leveldata::{GdObj, ObjParam};
 
 use std::cmp::Ordering;
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::BTreeSet;
 
-pub type Swaps = HashMap<Group, Group>;
+use fnv::{FnvHashMap, FnvHashSet};
+
+pub type Swaps = FnvHashMap<Group, Group>;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum TriggerRole {
@@ -26,14 +28,14 @@ pub enum TriggerRole {
 
 #[derive(Debug, Clone)]
 pub struct ReservedIds {
-    pub object_groups: HashSet<Id>,
-    pub trigger_groups: HashSet<Id>, // only includes the 57 prop
+    pub object_groups: FnvHashSet<Id>,
+    pub trigger_groups: FnvHashSet<Id>, // only includes the 57 prop
 
-    pub object_colors: HashSet<Id>,
+    pub object_colors: FnvHashSet<Id>,
 
-    pub object_blocks: HashSet<Id>,
+    pub object_blocks: FnvHashSet<Id>,
 
-    pub object_items: HashSet<Id>,
+    pub object_items: FnvHashSet<Id>,
 }
 
 fn get_role(obj_id: u16, hd: bool) -> TriggerRole {
@@ -53,7 +55,7 @@ fn get_role(obj_id: u16, hd: bool) -> TriggerRole {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ObjPtr(usize, usize);
 //                                     triggers      connections in
-pub type TriggerNetwork = HashMap<Group, TriggerGang>;
+pub type TriggerNetwork = FnvHashMap<Group, TriggerGang>;
 
 #[derive(Debug, Clone)]
 // what do you mean? its a trigger gang!
@@ -107,7 +109,7 @@ pub fn optimize(
     mut closed_group: u16,
     mut reserved: ReservedIds,
 ) -> Vec<FunctionId> {
-    let mut network = TriggerNetwork::new();
+    let mut network = TriggerNetwork::default();
 
     // sort all triggers by their group
     for (f, fnid) in obj_in.iter().enumerate() {
@@ -188,7 +190,7 @@ pub fn optimize(
             id: Id::Arbitrary(closed_group),
         };
 
-        let mut swaps = Swaps::new();
+        let mut swaps = Swaps::default();
         swaps.insert(zero_group, new_start_group);
 
         replace_groups(swaps, &mut objects);
@@ -271,7 +273,7 @@ fn update_reserved(
 }
 
 fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete_objects: bool) {
-    let mut new_network = TriggerNetwork::new();
+    let mut new_network = TriggerNetwork::default();
 
     for (_, gang) in network.iter() {
         let new_triggers: Vec<Trigger> = gang
@@ -355,7 +357,7 @@ pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
             }
         }
     }
-    // let mut new_network = TriggerNetwork::new();
+    // let mut new_network = TriggerNetwork::default();
     // for (group, gang) in network.iter() {
     //     let new_group = if let Some(new) = table.get(group) {
     //         new
@@ -527,7 +529,7 @@ pub fn create_spawn_trigger(
     role: TriggerRole,
     deleted: bool,
 ) {
-    let mut new_obj_map = HashMap::new();
+    let mut new_obj_map = FnvHashMap::default();
     new_obj_map.insert(1, ObjParam::Number(1268.0));
     new_obj_map.insert(51, ObjParam::Group(target_group));
     new_obj_map.insert(63, ObjParam::Number(delay));
@@ -581,10 +583,10 @@ fn fix_read_write_order(
     network: &TriggerNetwork,
     closed_group: &mut u16,
 ) -> TriggerNetwork {
-    let mut new_network = TriggerNetwork::new();
+    let mut new_network = TriggerNetwork::default();
     for (group, gang) in network {
-        let mut written_to = HashSet::new();
-        let mut read_from = HashSet::new();
+        let mut written_to = FnvHashSet::default();
+        let mut read_from = FnvHashSet::default();
         let current_group = *group;
 
         new_network.insert(
@@ -672,11 +674,11 @@ pub fn spawn_optimisation(
     objects: &mut Triggerlist,
     reserved: &ReservedIds,
 ) {
-    let mut spawn_connections = HashMap::<Group, Vec<(Group, SpawnDelay, Trigger)>>::new();
-    let mut inputs = HashSet::<Group>::new();
-    let mut outputs = HashSet::<Group>::new();
+    let mut spawn_connections = FnvHashMap::<Group, Vec<(Group, SpawnDelay, Trigger)>>::default();
+    let mut inputs = FnvHashSet::<Group>::default();
+    let mut outputs = FnvHashSet::<Group>::default();
 
-    let mut cycle_points = HashSet::<Group>::new();
+    let mut cycle_points = FnvHashSet::<Group>::default();
     let mut all = Vec::new();
 
     for (group, gang) in network.iter_mut() {
@@ -735,11 +737,11 @@ pub fn spawn_optimisation(
     // set triggers that make cycles to inputs and outputs
     fn look_for_cycle(
         current: Group,
-        ictriggers: &HashMap<Group, Vec<(Group, SpawnDelay, Trigger)>>,
+        ictriggers: &FnvHashMap<Group, Vec<(Group, SpawnDelay, Trigger)>>,
         visited: &mut Vec<Group>,
-        inputs: &mut HashSet<Group>,
-        outputs: &mut HashSet<Group>,
-        cycle_points: &mut HashSet<Group>,
+        inputs: &mut FnvHashSet<Group>,
+        outputs: &mut FnvHashSet<Group>,
+        cycle_points: &mut FnvHashSet<Group>,
         all: &mut Vec<(Group, Group, SpawnDelay, Trigger)>,
     ) {
         if let Some(connections) = ictriggers.get(&current) {
@@ -788,9 +790,9 @@ pub fn spawn_optimisation(
         origin: Group,
         delay: SpawnDelay,
         trigger: Option<Trigger>,
-        outputs: &HashSet<Group>,
-        cycle_points: &HashSet<Group>,
-        spawn_connections: &HashMap<Group, Vec<(Group, SpawnDelay, Trigger)>>,
+        outputs: &FnvHashSet<Group>,
+        cycle_points: &FnvHashSet<Group>,
+        spawn_connections: &FnvHashMap<Group, Vec<(Group, SpawnDelay, Trigger)>>,
         visited: &mut Vec<Group>,
         all: &mut Vec<(Group, Group, SpawnDelay, Trigger)>,
     ) {
@@ -891,13 +893,13 @@ pub fn spawn_optimisation(
         //println!("</{:?}>", start);
     }
 
-    let mut deduped = HashMap::new();
+    let mut deduped = FnvHashMap::default();
 
     for (start, end, delay, trigger) in all {
         deduped.insert((start, end, delay), trigger);
     }
 
-    let mut swaps = HashMap::new();
+    let mut swaps = FnvHashMap::default();
 
     let mut insert_to_swaps = |a: Group, b: Group| {
         for v in swaps.values_mut() {
@@ -907,8 +909,8 @@ pub fn spawn_optimisation(
         }
         assert!(swaps.insert(a, b).is_none());
     };
-    // let mut start_counts = HashMap::new();
-    // let mut end_counts = HashMap::new();
+    // let mut start_counts = FnvHashMap::default();
+    // let mut end_counts = FnvHashMap::default();
 
     // for ((start, end, _), _) in deduped.iter() {
     //     start_counts
@@ -1074,8 +1076,8 @@ pub fn dedup_triggers(
     reserved: &ReservedIds,
 ) {
     loop {
-        let mut swaps = HashMap::new();
-        let mut representative_groups = HashMap::<TriggerGangBehavior, Group>::new();
+        let mut swaps = FnvHashMap::default();
+        let mut representative_groups = FnvHashMap::<TriggerGangBehavior, Group>::default();
 
         for (group, gang) in network.iter_mut() {
             if is_start_group(*group, reserved) {
@@ -1285,7 +1287,7 @@ pub fn create_toggle_trigger(
     network: &mut TriggerNetwork,
     order: TriggerOrder,
 ) {
-    let mut new_obj_map = HashMap::new();
+    let mut new_obj_map = FnvHashMap::default();
     new_obj_map.insert(1, ObjParam::Number(1049.0));
     new_obj_map.insert(51, ObjParam::Group(target_group));
     new_obj_map.insert(56, ObjParam::Bool(enable));

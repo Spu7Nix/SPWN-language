@@ -221,13 +221,13 @@ impl Attribute {
 }
 
 pub trait CountSymbols {
-    fn symbols(&self) -> std::collections::HashSet<Intern<String>>;
+    fn symbols(&self) -> fnv::FnvHashSet<Intern<String>>;
 
-    fn properties(&self) -> std::collections::HashSet<Intern<String>> {
+    fn properties(&self) -> fnv::FnvHashSet<Intern<String>> {
         Default::default()
     }
 
-    fn all(&self) -> std::collections::HashSet<Intern<String>> {
+    fn all(&self) -> fnv::FnvHashSet<Intern<String>> {
         let mut out = self.symbols();
         out.extend(self.properties());
         out

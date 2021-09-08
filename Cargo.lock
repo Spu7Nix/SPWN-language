@@ -124,6 +124,7 @@ dependencies = [
  "ariadne",
  "base64",
  "errors",
+ "fnv",
  "internment",
  "parser",
  "rand",
@@ -179,6 +180,7 @@ version = "0.0.0"
 dependencies = [
  "compiler",
  "errors",
+ "fnv",
  "internment",
  "shared",
 ]
@@ -720,6 +722,7 @@ name = "optimizer"
 version = "0.0.0"
 dependencies = [
  "compiler",
+ "fnv",
  "parser",
 ]
 
@@ -754,6 +757,7 @@ version = "0.0.0"
 dependencies = [
  "ariadne",
  "errors",
+ "fnv",
  "internment",
  "logos",
  "shared",

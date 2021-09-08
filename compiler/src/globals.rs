@@ -16,10 +16,11 @@ use crate::leveldata::GdObj;
 use crate::compiler_types::*;
 use crate::value::*;
 
+use fnv::FnvHashMap;
+
 //use std::boxed::Box;
 use crate::value_storage::*;
 use errors::compiler_info::CompilerInfo;
-use std::collections::HashMap;
 
 use std::path::PathBuf;
 
@@ -33,17 +34,17 @@ pub struct Globals {
 
     pub path: Intern<PathBuf>,
 
-    pub lowest_y: HashMap<u32, u16>,
+    pub lowest_y: FnvHashMap<u32, u16>,
     pub stored_values: ValStorage,
     pub val_id: StoredValue,
 
-    pub type_ids: HashMap<String, (u16, CodeArea)>,
+    pub type_ids: FnvHashMap<String, (u16, CodeArea)>,
     pub type_id_count: u16,
 
     pub func_ids: Vec<FunctionId>,
     pub objects: Vec<GdObj>,
 
-    pub prev_imports: HashMap<ImportType, (StoredValue, Implementations)>,
+    pub prev_imports: FnvHashMap<ImportType, (StoredValue, Implementations)>,
 
     pub trigger_order: f32,
 
@@ -139,11 +140,11 @@ impl Globals {
             closed_items: 0,
             path: Intern::new(path),
 
-            lowest_y: HashMap::new(),
+            lowest_y: FnvHashMap::default(),
 
-            type_ids: HashMap::new(),
+            type_ids: FnvHashMap::default(),
 
-            prev_imports: HashMap::new(),
+            prev_imports: FnvHashMap::default(),
             type_id_count: 0,
             trigger_order: 0.0,
             uid_counter: 0,
@@ -156,7 +157,7 @@ impl Globals {
                 obj_list: Vec::new(),
             }],
             objects: Vec::new(),
-            implementations: HashMap::new(),
+            implementations: FnvHashMap::default(),
             sync_groups: vec![SyncGroup {
                 parts: vec![0],
                 groups_used: Vec::new(),
@@ -206,8 +207,8 @@ impl Globals {
         globals
     }
 
-    // pub fn clean_up(&mut self, full_context: &mut FullContext, mut removed: HashSet<usize>) {
-    //     let mut used_values = HashSet::new();
+    // pub fn clean_up(&mut self, full_context: &mut FullContext, mut removed: FnvHashSet<usize>) {
+    //     let mut used_values = FnvHashSet::new();
 
     //     // for l in self.implementations.values() {
     //     //     for (v, _) in l.values() {
@@ -228,7 +229,7 @@ impl Globals {
     //             _ => (),
     //         };
     //     }
-    //     let mut all_used_values = HashSet::new();
+    //     let mut all_used_values = FnvHashSet::new();
     //     for v in used_values {
     //         all_used_values.extend(get_all_ptrs_used(v, self));
     //     }

@@ -6,7 +6,7 @@ use pest_derive::Parser;*/
 use crate::ast::StrInner;
 use crate::ast::StringFlags;
 
-use std::collections::HashSet;
+use fnv::FnvHashSet;
 //use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -320,7 +320,7 @@ impl Token {
 pub struct ParseNotes {
     pub tag: ast::Attribute,
     pub file: PathBuf,
-    pub builtins: HashSet<&'static str>,
+    pub builtins: FnvHashSet<&'static str>,
 }
 
 impl ParseNotes {

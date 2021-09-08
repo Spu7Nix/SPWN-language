@@ -16,7 +16,8 @@ use compiler::value::*;
 use std::fs::File;
 
 use std::path::PathBuf;
-use std::{collections::HashMap, env::current_dir};
+use fnv::FnvHashMap;
+use std::{env::current_dir};
 fn create_doc_file(mut dir: PathBuf, name: String, content: &str) {
     use std::io::Write;
     dir.push(format!("{}.md", name));
@@ -109,7 +110,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                     key,
                     val.iter()
                         .map(|(key, val)| (*key, val.0))
-                        .collect::<HashMap<Intern<String>, StoredValue>>(),
+                        .collect::<FnvHashMap<Intern<String>, StoredValue>>(),
                 )
             })
             .collect();
@@ -137,7 +138,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     Ok(())
 }
 
-fn document_dict(dict: &HashMap<Intern<String>, StoredValue>, globals: &mut Globals) -> String {
+fn document_dict(dict: &FnvHashMap<Intern<String>, StoredValue>, globals: &mut Globals) -> String {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
     type ValList = Vec<(Intern<String>, StoredValue)>;
     let mut categories = [

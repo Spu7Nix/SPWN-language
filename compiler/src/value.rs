@@ -19,7 +19,7 @@ use crate::{compiler_types::*, context::*, globals::Globals, leveldata::*, value
 use internment::Intern;
 
 
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 use std::path::PathBuf;
 
@@ -34,7 +34,7 @@ pub enum Value {
     Number(f64),
     Bool(bool),
     TriggerFunc(TriggerFunction),
-    Dict(HashMap<Intern<String>, StoredValue>),
+    Dict(FnvHashMap<Intern<String>, StoredValue>),
     Macro(Box<Macro>),
     Str(String),
     Array(Vec<StoredValue>),
@@ -62,7 +62,7 @@ pub struct Macro {
         FileRange,
         bool
     )>,
-    pub def_variables: HashMap<Intern<String>, StoredValue>,
+    pub def_variables: FnvHashMap<Intern<String>, StoredValue>,
     pub def_file: Intern<PathBuf>,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Attribute,
@@ -556,7 +556,7 @@ pub fn convert_type(
 
 //copied from https://stackoverflow.com/questions/59401720/how-do-i-find-the-key-for-a-value-in-a-hashmap
 pub fn find_key_for_value(
-    map: &HashMap<String, (u16, CodeArea)>,
+    map: &FnvHashMap<String, (u16, CodeArea)>,
     value: u16,
 ) -> Option<&String> {
     map.iter()
@@ -1989,7 +1989,7 @@ impl VariableFuncs for ast::Variable {
                                                         },
 
                                                         ObjParam::Epsilon => {
-                                                            let mut map = HashMap::<Intern<String>, StoredValue>::new();
+                                                            let mut map = FnvHashMap::<Intern<String>, StoredValue>::default();
                                                             let stored = store_const_value(Value::TypeIndicator(20),  globals, full_context.inner().start_group,info.position);
                                                             map.insert(globals.TYPE_MEMBER_NAME, stored);
                                                             Value::Dict(map)
@@ -2663,7 +2663,7 @@ impl VariableFuncs for ast::Variable {
                             }
                             None => {
                                 
-                                let mut new_imp = HashMap::new();
+                                let mut new_imp = FnvHashMap::default();
                                 new_imp.insert(*m, (value, true));
                                 (*globals).implementations.insert(*t, new_imp);
                                 defined = false;

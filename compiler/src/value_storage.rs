@@ -9,13 +9,13 @@ use crate::globals::Globals;
 use crate::value::*;
 
 use core::panic;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 use crate::compiler::{BUILTIN_STORAGE, NULL_STORAGE};
 
 #[derive(Debug)]
 pub struct ValStorage {
-    pub map: HashMap<StoredValue, StoredValData>,
+    pub map: FnvHashMap<StoredValue, StoredValData>,
     pub preserved_stack: Vec<Vec<StoredValue>>,
     pub prev_value_count: u32,
 }

@@ -3,8 +3,8 @@
 use crate::builtins::*;
 use crate::compiler_types::FunctionId;
 use crate::context::Context;
+use fnv::{FnvHashMap, FnvHashSet};
 use parser::ast::ObjectMode;
-use std::collections::{HashMap, HashSet};
 
 pub struct TriggerOrder(f32);
 
@@ -97,7 +97,7 @@ pub struct GdObj {
     pub target: Group,
     pub spawn_triggered: bool,*/
     pub func_id: usize,
-    pub params: HashMap<u16, ObjParam>,
+    pub params: FnvHashMap<u16, ObjParam>,
     pub mode: ObjectMode,
     pub unique_id: usize,
 }
@@ -110,17 +110,17 @@ impl GdObj {
     }
 }
 
-pub fn get_used_ids(ls: &str) -> [HashSet<u16>; 4] {
+pub fn get_used_ids(ls: &str) -> [FnvHashSet<u16>; 4] {
     let mut out = [
-        HashSet::<u16>::new(),
-        HashSet::<u16>::new(),
-        HashSet::<u16>::new(),
-        HashSet::<u16>::new(),
+        FnvHashSet::<u16>::default(),
+        FnvHashSet::<u16>::default(),
+        FnvHashSet::<u16>::default(),
+        FnvHashSet::<u16>::default(),
     ];
     let objects = ls.split(';');
     for obj in objects {
         let props: Vec<&str> = obj.split(',').collect();
-        let mut map = HashMap::new();
+        let mut map = FnvHashMap::default();
 
         for i in (0..props.len() - 1).step_by(2) {
             map.insert(props[i], props[i + 1]);
@@ -266,11 +266,11 @@ pub fn append_objects(
     }
 
     //find new ids for all the arbitrary ones
-    let mut id_maps: [HashMap<ArbitraryId, SpecificId>; 4] = [
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
-        HashMap::new(),
+    let mut id_maps: [FnvHashMap<ArbitraryId, SpecificId>; 4] = [
+        FnvHashMap::default(),
+        FnvHashMap::default(),
+        FnvHashMap::default(),
+        FnvHashMap::default(),
     ];
 
     const ID_MAX: u16 = 999;

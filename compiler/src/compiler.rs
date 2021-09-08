@@ -21,7 +21,7 @@ use crate::leveldata::*;
 use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 use std::mem;
 
 use errors::RuntimeError;
@@ -698,7 +698,7 @@ pub fn compile_scope(
                 //let mut obj_list = Vec::<GDObj>::new();
                 for full_context in contexts.iter() {
                     let (context, func) = full_context.inner_value();
-                    let mut params = HashMap::new();
+                    let mut params = FnvHashMap::default();
                     params.insert(
                         51,
                         match &globals.stored_values[func] {
@@ -1313,7 +1313,7 @@ pub fn import_module(
         for v in impl_vals {
             globals.push_preserved_val(v);
         }
-        let mut stored = HashMap::new();
+        let mut stored = FnvHashMap::default();
 
         mem::swap(&mut stored, &mut globals.implementations);
         stored_impl = Some(stored);
@@ -1430,7 +1430,7 @@ pub fn import_module(
                 }
                 // globals
                 //     .stored_values
-                //     .increment_single_lifetime(*val, 1, &mut HashSet::new());
+                //     .increment_single_lifetime(*val, 1, &mut FnvHashSet::new());
             }
         }
         for (k1, k2) in to_be_deleted {
@@ -1451,7 +1451,7 @@ pub fn import_module(
             path.clone(),
             (
                 output_saved.unwrap_or(NULL_STORAGE),
-                impl_saved.unwrap_or_else(HashMap::new),
+                impl_saved.unwrap_or_else(FnvHashMap::default),
             ),
         );
     }
