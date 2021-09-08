@@ -414,7 +414,6 @@ impl From<RuntimeError> for ErrorReport {
     }
 }
 
-#[derive(Debug)]
 pub enum SyntaxError {
     ExpectedErr {
         expected: String,
@@ -432,6 +431,7 @@ pub enum SyntaxError {
         pos: FileRange,
         file: PathBuf,
     },
+    CustomError(ErrorReport),
 }
 
 impl From<SyntaxError> for ErrorReport {
@@ -500,6 +500,8 @@ impl From<SyntaxError> for ErrorReport {
                 )],
                 None,
             ),
+
+            SyntaxError::CustomError(report) => report,
         }
     }
 }

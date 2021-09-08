@@ -6,7 +6,12 @@ use pest_derive::Parser;*/
 use crate::ast::StrInner;
 use crate::ast::StringFlags;
 
+use errors::compiler_info::CodeArea;
+use errors::compiler_info::CompilerInfo;
+use errors::create_error;
+use fnv::FnvHashMap;
 use fnv::FnvHashSet;
+use shared::FileRange;
 //use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -1295,6 +1300,8 @@ fn parse_dict(
 ) -> Result<Vec<ast::DictDef>, SyntaxError> {
     let mut defs = Vec::<ast::DictDef>::new();
 
+    let mut defined_members = FnvHashMap::<Intern<String>, FileRange>::default();
+
     loop {
         match tokens.next(false) {
             Some(Token::Symbol) | Some(Token::Type) | Some(Token::StringLiteral) => {
@@ -1309,6 +1316,33 @@ fn parse_dict(
                 };
 
                 let symbol = Intern::new(symbol);
+
+                if let Some(range) = defined_members.get(&symbol) {
+                    let file = Intern::new(notes.file.clone());
+                    return Err(SyntaxError::CustomError(create_error(
+                        CompilerInfo::from_area(CodeArea {
+                            file,
+                            pos: tokens.position(),
+                        }),
+                        "Dictionary member duplicate",
+                        &[
+                            (
+                                CodeArea { file, pos: *range },
+                                "Member with this name was first defined here",
+                            ),
+                            (
+                                CodeArea {
+                                    file,
+                                    pos: tokens.position(),
+                                },
+                                "Duplicate was found here",
+                            ),
+                        ],
+                        None,
+                    )));
+                }
+
+                defined_members.insert(symbol, tokens.position());
 
                 match tokens.next(false) {
                     Some(Token::Colon) => {

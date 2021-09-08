@@ -1,7 +1,7 @@
-_eywgfd_ = "Hi"
-
-$.print(while_loop)
-
+dict = {
+    hello: 1,
+    hello: 2,
+}
 // extract obj_props
 
 // fizz = ?g
