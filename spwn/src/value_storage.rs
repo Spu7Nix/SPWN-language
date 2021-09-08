@@ -1,3 +1,5 @@
+use shared::StoredValue;
+
 ///types and functions used by the compiler
 use crate::builtin::*;
 
@@ -10,8 +12,6 @@ use core::panic;
 use std::collections::HashMap;
 
 use crate::compiler::{BUILTIN_STORAGE, NULL_STORAGE};
-
-pub type StoredValue = u32; //index to stored value in globals.stored_values
 
 #[derive(Debug)]
 pub struct ValStorage {

@@ -1,12 +1,13 @@
 //! Defining all native types (and functions?)
 use internment::Intern;
+use shared::StoredValue;
 
-use crate::ast::ObjectMode;
-use crate::compiler::{create_error, RuntimeError};
 use crate::compiler_types::*;
 use crate::context::*;
 use crate::globals::Globals;
-use crate::levelstring::*;
+use crate::leveldata::*;
+use errors::{create_error, RuntimeError};
+use parser::ast::ObjectMode;
 use std::collections::HashMap;
 use std::fs;
 
@@ -18,7 +19,7 @@ use std::io::stdout;
 use std::io::Write;
 
 //use text_io;
-use crate::compiler_info::{CodeArea, CompilerInfo};
+use errors::compiler_info::{CodeArea, CompilerInfo};
 
 macro_rules! arg_length {
     ($info:expr , $count:expr, $args:expr , $message:expr) => {
@@ -29,6 +30,18 @@ macro_rules! arg_length {
             });
         }
     };
+}
+
+pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GdObj {
+    let mut params = HashMap::new();
+    params.insert(57, ObjParam::Group(context.start_group));
+    (*uid_counter) += 1;
+    GdObj {
+        params: HashMap::new(),
+        func_id: context.func_id,
+        mode: ObjectMode::Trigger,
+        unique_id: *uid_counter,
+    }
 }
 
 pub type ArbitraryId = u16;
@@ -132,18 +145,6 @@ impl Item {
         Self {
             id: Id::Arbitrary(*counter),
         }
-    }
-}
-
-pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GdObj {
-    let mut params = HashMap::new();
-    params.insert(57, ObjParam::Group(context.start_group));
-    (*uid_counter) += 1;
-    GdObj {
-        params: HashMap::new(),
-        func_id: context.func_id,
-        mode: ObjectMode::Trigger,
-        unique_id: *uid_counter,
     }
 }
 
@@ -926,7 +927,7 @@ $.add(obj {
                 (*globals).trigger_order += 1.0;
                 (*globals).func_ids[context.func_id]
                     .obj_list
-                    .push((obj, crate::levelstring::TriggerOrder(globals.trigger_order)))
+                    .push((obj, crate::compiler_types::TriggerOrder(globals.trigger_order)))
             }
         };
         Value::Null
@@ -1149,7 +1150,7 @@ $.extend_trigger_func(10g, () {
                 })
             }
         };
-        use crate::ast::*;
+        use parser::ast::*;
 
         let cmp_statement = CompoundStatement { statements: vec![
             Statement {

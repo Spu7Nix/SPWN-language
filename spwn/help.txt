@@ -8,7 +8,7 @@ Subcommands:
     Generates documentation for a SPWN library, in the form of a markdown file
 
     version, -v, --version
-    Gets the version of spwn
+    Gets the version of SPWN
 
 Flags:
     --console-output, -c

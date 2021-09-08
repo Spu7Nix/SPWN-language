@@ -1,0 +1,41 @@
+[package]
+name = "parser"
+version = "0.0.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+logos = "0.12.0"
+
+quick-xml = "0.22.0"
+base64 = "0.13.0"
+libflate = "1.1.0"
+lazy_static = "1.4.0"
+crc32fast = "1.2.0"
+termcolor = "1.1.2"
+text_io = "0.1.8"
+regex = "1.5.4"
+slyce = "0.3.1"
+rand = "0.8.4"
+tempfile = "3.2.0"
+reqwest = { version = "0.11", features = ["blocking"] }
+
+internment = "0.5.4"
+
+ariadne = "0.1.3" # errors
+
+aes = "0.7.4"
+block-modes = "0.8.1"
+
+itertools = "0.10.1"
+cached = "0.25.0"
+
+serde = { version = "1.0.104", features = ["derive"] }
+serde_json = "1.0.48"
+serde_yaml = "0.8.19"
+toml = "0.5.7"
+
+shared = { path = "../shared" }
+errors = { path = "../errors" }

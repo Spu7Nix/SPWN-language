@@ -1,13 +1,17 @@
+use errors::RuntimeError;
 use internment::Intern;
+use shared::BreakType;
+use shared::ImportType;
+use shared::StoredValue;
 
 ///types and functions used by the compiler
 use crate::builtin::*;
 use crate::compiler::BUILTIN_STORAGE;
 use crate::compiler::NULL_STORAGE;
 use crate::compiler_info::CodeArea;
-use crate::context::BreakType;
+
 use crate::context::FullContext;
-use crate::levelstring::GdObj;
+use crate::leveldata::GdObj;
 
 use crate::compiler_types::*;
 use crate::value::*;
@@ -18,8 +22,6 @@ use crate::value_storage::*;
 use std::collections::HashMap;
 
 use std::path::PathBuf;
-
-use crate::compiler::RuntimeError;
 
 #[allow(non_snake_case)]
 pub struct Globals {
@@ -70,7 +72,7 @@ impl Globals {
     ) -> Result<Group, RuntimeError> {
         match self.stored_values.map.get(&p) {
             Some(val) => Ok(val.fn_context),
-            None => Err(RuntimeError::CustomError(crate::compiler::create_error(
+            None => Err(RuntimeError::CustomError(errors::create_error(
                 info,
                 "Pointer points to no data! (this is probably a bug, please contact a developer)",
                 &[],

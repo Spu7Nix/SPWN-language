@@ -1,5 +1,5 @@
 //#![feature(arbitrary_enum_discriminant)]
-use crate::optimize::optimize;
+
 #[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
 #[cfg_attr(windows, path = "editorlive_win.rs")]
 #[cfg_attr(

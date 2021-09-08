@@ -2,10 +2,10 @@
 
 use internment::Intern;
 
-use crate::compiler_types::ImportType;
 use crate::fmt::SpwnFmt;
-use crate::parser::FileRange;
-use crate::value_storage::StoredValue;
+use shared::FileRange;
+use shared::ImportType;
+use shared::StoredValue;
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
     Def((Intern<String>, Expression)),
@@ -217,6 +217,20 @@ impl Attribute {
         } else {
             None
         }
+    }
+}
+
+pub trait CountSymbols {
+    fn symbols(&self) -> std::collections::HashSet<Intern<String>>;
+
+    fn properties(&self) -> std::collections::HashSet<Intern<String>> {
+        Default::default()
+    }
+
+    fn all(&self) -> std::collections::HashSet<Intern<String>> {
+        let mut out = self.symbols();
+        out.extend(self.properties());
+        out
     }
 }
 

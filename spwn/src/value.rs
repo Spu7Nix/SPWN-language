@@ -1,15 +1,19 @@
-use crate::ast;
+use parser::ast;
 use crate::builtin::*;
 use crate::compiler::NULL_STORAGE;
-use crate::compiler::create_error;
+use errors::create_error;
 use crate::compiler::import_module;
 use crate::compiler::merge_all_contexts;
 use crate::compiler_info::CodeArea;
 use crate::compiler_info::CompilerInfo;
+use shared::BreakType;
+use shared::StoredValue;
 use slyce::Slice as Slyce;
 
-use crate::parser::FileRange;
-use crate::{compiler_types::*, context::*, globals::Globals, levelstring::*, value_storage::*};
+
+
+use shared::FileRange;
+use crate::{compiler_types::*, context::*, globals::Globals, leveldata::*, value_storage::*};
 //use std::boxed::Box;
 
 use internment::Intern;
@@ -19,7 +23,7 @@ use std::collections::HashMap;
 
 use std::path::PathBuf;
 
-use crate::compiler::RuntimeError;
+use errors::RuntimeError;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -606,6 +610,9 @@ pub fn slice_array(
 
 }
 
+use crate::compiler_types::EvalExpression;
+use crate::compiler_types::ToTriggerFunc;
+
 pub fn macro_to_value(
     m: &ast::Macro,
     contexts: &mut FullContext,
@@ -698,8 +705,30 @@ pub fn macro_to_value(
 }
 
 
-impl ast::Variable {
-    pub fn to_value(
+// bruh moment
+pub trait VariableFuncs {
+    fn to_value(
+        &self,
+        contexts: &mut FullContext,
+        globals: &mut Globals,
+        info: CompilerInfo,
+        constant: bool,
+    ) -> Result<(), RuntimeError>;
+
+    fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool;
+
+    fn define(
+        &self,
+        //value: StoredValue,
+        context: &mut Context,
+        globals: &mut Globals,
+        info: &CompilerInfo,
+    ) -> Result<StoredValue, RuntimeError>;
+}
+
+
+impl VariableFuncs for ast::Variable {
+    fn to_value(
         &self,
         contexts: &mut FullContext,
         globals: &mut Globals,
@@ -2295,7 +2324,7 @@ impl ast::Variable {
         Ok(())
     }
 
-    pub fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool {
+     fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool {
         //use crate::fmt::SpwnFmt;
         // if self.operator == Some(ast::UnaryOperator::Let) {
         //     return true
@@ -2408,7 +2437,7 @@ impl ast::Variable {
         true
     }
 
-    pub fn define(
+     fn define(
         &self,
         //value: StoredValue,
         context: &mut Context,
@@ -2416,7 +2445,7 @@ impl ast::Variable {
         info: &CompilerInfo,
     ) -> Result<StoredValue, RuntimeError> {
         // when None, the value is already defined
-        use crate::fmt::SpwnFmt;
+        use parser::fmt::SpwnFmt;
         let mut defined = true;
 
         let value = match &self.operator {

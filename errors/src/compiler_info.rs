@@ -1,5 +1,5 @@
-use crate::parser::FileRange;
 use internment::Intern;
+use shared::FileRange;
 use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerInfo {

@@ -2,14 +2,15 @@ use crate::builtin::*;
 use crate::compiler_info::CodeArea;
 use crate::compiler_types::*;
 use crate::globals::Globals;
-use crate::levelstring::*;
+use crate::leveldata::*;
 use crate::value::{value_equality, Value};
-use crate::value_storage::{clone_value, store_val_m, StoredValue};
+use crate::value_storage::{clone_value, store_val_m};
 
 //use std::boxed::Box;
 use std::collections::HashMap;
 
 use internment::Intern;
+use shared::{BreakType, StoredValue};
 
 use crate::compiler::NULL_STORAGE;
 
@@ -25,19 +26,6 @@ pub struct Context {
     pub return_value: StoredValue,
     pub return_value2: StoredValue,
     pub root_context_ptr: *mut FullContext,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BreakType {
-    // used for return statements
-    Macro(Option<StoredValue>, bool),
-    // used for Break statements
-    Loop,
-    // used for continue statements
-    ContinueLoop,
-    // used for switch cases
-    Switch(StoredValue),
-    // used for contexts
 }
 
 #[derive(Debug, Clone)]

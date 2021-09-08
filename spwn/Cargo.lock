@@ -247,15 +247,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56899898ce76aaf4a0f24d914c97ea6ed976d42fec6ad33fcbb0a1103e07b2b0"
 
 [[package]]
-name = "editorlive"
-version = "0.0.0"
-dependencies = [
- "core-foundation-sys",
- "libc",
- "named_pipe",
-]
-
-[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -268,16 +259,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80df024fbc5ac80f87dfef0d9f5209a252f2a497f7f42944cff24d8253cac065"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "errors"
-version = "0.0.0"
-dependencies = [
- "ariadne",
- "internment",
- "shared",
- "termcolor",
 ]
 
 [[package]]
@@ -629,22 +610,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
-name = "levelstring"
-version = "0.0.0"
-dependencies = [
- "aes",
- "base64",
- "block-modes",
- "crc32fast",
- "errors",
- "lazy_static",
- "libflate",
- "parser",
- "quick-xml",
- "shared",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -872,37 +837,6 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "winapi",
-]
-
-[[package]]
-name = "parser"
-version = "0.0.0"
-dependencies = [
- "aes",
- "ariadne",
- "base64",
- "block-modes",
- "cached",
- "crc32fast",
- "errors",
- "internment",
- "itertools",
- "lazy_static",
- "libflate",
- "logos",
- "quick-xml",
- "rand",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml",
- "shared",
- "slyce",
- "tempfile",
- "termcolor",
- "text_io",
- "toml",
 ]
 
 [[package]]
@@ -1190,10 +1124,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shared"
-version = "0.0.0"
-
-[[package]]
 name = "slab"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1225,22 +1155,27 @@ dependencies = [
 name = "spwn"
 version = "0.0.6"
 dependencies = [
+ "aes",
  "ariadne",
  "base64",
+ "block-modes",
  "cached",
- "editorlive",
- "errors",
+ "core-foundation-sys",
+ "crc32fast",
  "internment",
  "itertools",
- "levelstring",
- "parser",
+ "lazy_static",
+ "libc",
+ "libflate",
+ "logos",
+ "named_pipe",
+ "quick-xml",
  "rand",
  "regex",
  "reqwest",
  "serde",
  "serde_json",
  "serde_yaml",
- "shared",
  "slyce",
  "tempfile",
  "termcolor",

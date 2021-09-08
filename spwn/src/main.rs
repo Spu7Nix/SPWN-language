@@ -1,41 +1,29 @@
 //#![feature(arbitrary_enum_discriminant)]
-mod ast;
 mod builtin;
 mod compiler;
-mod compiler_info;
+use errors::compiler_info;
 mod compiler_types;
 mod context;
 mod documentation;
-mod fmt;
 mod globals;
-
-mod levelstring;
-mod parser;
+mod leveldata;
+mod optimize;
 mod value;
 
-#[cfg_attr(target_os = "macos", path = "editorlive_mac.rs")]
-#[cfg_attr(windows, path = "editorlive_win.rs")]
-#[cfg_attr(
-    not(any(target_os = "macos", windows)),
-    path = "editorlive_unavailable.rs"
-)]
-mod editorlive;
-mod optimize;
 mod value_storage;
 
 use ariadne::{Cache, FileCache, Fmt};
 
 use optimize::optimize;
 
+use ::parser::parser::*;
 use builtin::BuiltinPermissions;
-use parser::*;
 
+use std::env;
 use std::path::PathBuf;
-use std::{collections::HashSet, env};
 
+use editorlive::editorlive::editor_paste;
 use std::fs;
-
-use editorlive::editor_paste;
 
 pub const STD_PATH: &str = "std";
 
@@ -44,7 +32,7 @@ const ERROR_EXIT_CODE: i32 = 1;
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-use crate::compiler::{create_report, ErrorReport};
+use errors::{create_report, ErrorReport};
 
 const HELP: &str = include_str!("../help.txt");
 
@@ -246,7 +234,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             };
                             if level_string.is_empty() {}
-                            levelstring::remove_spwn_objects(&mut level_string);
+                            leveldata::remove_spwn_objects(&mut level_string);
                             level_string
                         } else {
                             String::new()
@@ -263,22 +251,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         for obj in &compiled.objects {
                             for param in obj.params.values() {
                                 match &param {
-                                    levelstring::ObjParam::Group(g) => {
+                                    leveldata::ObjParam::Group(g) => {
                                         reserved.object_groups.insert(g.id);
                                     }
-                                    levelstring::ObjParam::GroupList(g) => {
+                                    leveldata::ObjParam::GroupList(g) => {
                                         reserved.object_colors.extend(g.iter().map(|g| g.id));
                                     }
 
-                                    levelstring::ObjParam::Color(g) => {
+                                    leveldata::ObjParam::Color(g) => {
                                         reserved.object_colors.insert(g.id);
                                     }
 
-                                    levelstring::ObjParam::Block(g) => {
+                                    leveldata::ObjParam::Block(g) => {
                                         reserved.object_blocks.insert(g.id);
                                     }
 
-                                    levelstring::ObjParam::Item(g) => {
+                                    leveldata::ObjParam::Item(g) => {
                                         reserved.object_items.insert(g.id);
                                     }
                                     _ => (),
@@ -291,10 +279,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 for (prop, param) in trigger.params.iter() {
                                     if *prop == 57 {
                                         match &param {
-                                            levelstring::ObjParam::Group(g) => {
+                                            leveldata::ObjParam::Group(g) => {
                                                 reserved.trigger_groups.insert(g.id);
                                             }
-                                            levelstring::ObjParam::GroupList(g) => {
+                                            leveldata::ObjParam::GroupList(g) => {
                                                 reserved
                                                     .trigger_groups
                                                     .extend(g.iter().map(|g| g.id));
@@ -314,14 +302,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 optimize(compiled.func_ids, compiled.closed_groups, reserved);
                         }
 
-                        let mut objects = levelstring::apply_fn_ids(&compiled.func_ids);
+                        let mut objects = leveldata::apply_fn_ids(&compiled.func_ids);
 
                         objects.extend(compiled.objects);
 
                         print_with_color(&format!("{} objects added", objects.len()), Color::White);
 
-                        let (new_ls, used_ids) =
-                            levelstring::append_objects(objects, &level_string)?;
+                        let (new_ls, used_ids) = leveldata::append_objects(objects, &level_string)?;
 
                         print_with_color("\nLevel:", Color::Magenta);
                         for (i, len) in used_ids.iter().enumerate() {

@@ -5,26 +5,20 @@ use pest_derive::Parser;*/
 
 use crate::ast::StrInner;
 use crate::ast::StringFlags;
-use crate::builtin::Builtin;
-
-use crate::compiler::ErrorReport;
-use crate::compiler::RainbowColorGenerator;
-use crate::compiler_info::CodeArea;
 
 //use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use ariadne::Fmt;
+use errors::SyntaxError;
 use internment::Intern;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
 
-use crate::compiler::create_error;
-use crate::compiler_types::ImportType;
-
-pub type FileRange = (usize, usize);
+use errors::create_error;
+use shared::ImportType;
 
 macro_rules! expected {
     ($expected:expr, $tokens:expr, $notes:expr, $a:expr) => {
@@ -44,110 +38,22 @@ macro_rules! expected {
     };
 }
 
-#[derive(Debug)]
-pub enum SyntaxError {
-    ExpectedErr {
-        expected: String,
-        found: String,
-        pos: FileRange,
-        file: PathBuf,
-    },
-    UnexpectedErr {
-        found: String,
-        pos: FileRange,
-        file: PathBuf,
-    },
-    SyntaxError {
-        message: String,
-        pos: FileRange,
-        file: PathBuf,
-    },
-}
-
 pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Result<(), SyntaxError> {
-    if name.starts_with('_') && name.ends_with('_') {
-        if Builtin::from_str(name).is_ok() {
-            Ok(())
-        } else {
-            Err(SyntaxError::SyntaxError {
-                message: format!("{} is an invalid variable/property/argument name", name),
-                pos: tokens.position(),
-                file: notes.file.clone(),
-            })
-        }
-    } else {
-        Ok(())
-    }
-}
-
-impl From<SyntaxError> for ErrorReport {
-    fn from(err: SyntaxError) -> ErrorReport {
-        use crate::compiler_info::CompilerInfo;
-        //write!(f, "SuperErrorSideKick is here!")
-        let mut colors = RainbowColorGenerator::new(60.0, 1.0, 0.8);
-        let a = colors.next();
-        let b = colors.next();
-        match err {
-            SyntaxError::ExpectedErr {
-                expected,
-                found,
-                pos,
-                file,
-            } => create_error(
-                CompilerInfo::from_area(CodeArea {
-                    pos,
-                    file: Intern::new(file.clone()),
-                }),
-                "Syntax error",
-                &[(
-                    CodeArea {
-                        pos,
-                        file: Intern::new(file),
-                    },
-                    &format!(
-                        "{} {}, {} {}",
-                        "Expected".fg(b),
-                        expected,
-                        "found".fg(a),
-                        found
-                    ),
-                )],
-                None,
-            ),
-
-            SyntaxError::UnexpectedErr { found, pos, file } => create_error(
-                CompilerInfo::from_area(CodeArea {
-                    pos,
-                    file: Intern::new(file.clone()),
-                }),
-                "Syntax error",
-                &[(
-                    CodeArea {
-                        pos,
-                        file: Intern::new(file),
-                    },
-                    &format!("Unexpected {}", found),
-                )],
-                None,
-            ),
-
-            SyntaxError::SyntaxError { message, pos, file } => create_error(
-                CompilerInfo::from_area(CodeArea {
-                    pos,
-                    file: Intern::new(file.clone()),
-                }),
-                "Syntax error",
-                &[(
-                    CodeArea {
-                        pos,
-                        file: Intern::new(file),
-                    },
-                    &message,
-                )],
-                None,
-            ),
-        }
-    }
+    Ok(())
+    // TODO: somehow reimplement this
+    // if name.starts_with('_') && name.ends_with('_') {
+    //     if Builtin::from_str(name).is_ok() {
+    //         Ok(())
+    //     } else {
+    //         Err(SyntaxError::SyntaxError {
+    //             message: format!("{} is an invalid variable/property/argument name", name),
+    //             pos: tokens.position(),
+    //             file: notes.file.clone(),
+    //         })
+    //     }
+    // } else {
+    //     Ok(())
+    // }
 }
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]

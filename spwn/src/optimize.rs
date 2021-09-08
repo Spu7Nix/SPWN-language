@@ -1,9 +1,9 @@
-use crate::ast::ObjectMode;
-use crate::builtin::{Block, Group, Id, Item};
-use crate::compiler_types::FunctionId;
+use crate::builtin::{Block, Color, Group, Id, Item};
+use crate::compiler_types::{FunctionId, TriggerOrder};
+use parser::ast::ObjectMode;
 
 //mod icalgebra;
-use crate::levelstring::{GdObj, ObjParam, TriggerOrder};
+use crate::leveldata::{GdObj, ObjParam};
 
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -955,7 +955,7 @@ pub fn spawn_optimisation(
 fn param_identifier(param: &ObjParam) -> String {
     let str = match param {
         ObjParam::Group(Group { id })
-        | ObjParam::Color(crate::builtin::Color { id })
+        | ObjParam::Color(Color { id })
         | ObjParam::Block(Block { id })
         | ObjParam::Item(Item { id }) => match id {
             Id::Specific(id) => format!("{}", id),

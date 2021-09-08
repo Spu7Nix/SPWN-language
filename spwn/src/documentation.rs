@@ -1,16 +1,18 @@
+use errors::RuntimeError;
 use internment::Intern;
+use shared::{ImportType, StoredValue};
 
 // tools for generating documentation for SPWN libraries
 //use crate::ast::*;
 
 use crate::builtin::BuiltinPermissions;
-use crate::compiler::{import_module, RuntimeError};
+use crate::compiler::import_module;
 use crate::compiler_info::CompilerInfo;
-use crate::compiler_types::ImportType;
+
 use crate::context::FullContext;
 use crate::globals::Globals;
 use crate::value::*;
-use crate::value_storage::StoredValue;
+
 use std::fs::File;
 
 use std::path::PathBuf;
@@ -56,7 +58,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     )?;
 
     if let FullContext::Split(_, _) = start_context {
-        return Err(RuntimeError::CustomError(crate::compiler::create_error(
+        return Err(RuntimeError::CustomError(errors::create_error(
             CompilerInfo::new(),
             "Documentation of context-splitting libraries is not yet supported!",
             &[],

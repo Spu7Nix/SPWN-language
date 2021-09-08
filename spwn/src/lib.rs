@@ -1,8 +1,8 @@
 mod _lib;
-pub mod ast;
+pub use ::parser::ast;
 pub mod builtin;
 pub mod compiler;
-pub mod compiler_info;
+pub use errors::compiler_info;
 pub mod compiler_types;
 pub mod context;
 pub mod documentation;
@@ -12,13 +12,12 @@ pub mod documentation;
     not(any(target_os = "macos", windows)),
     path = "editorlive_unavailable.rs"
 )]
-mod editorlive;
-pub mod fmt;
+pub use ::parser::fmt;
 pub mod globals;
-pub mod levelstring;
-pub mod optimize;
-pub mod parser;
+pub mod leveldata;
+pub use ::parser::parser;
+pub use optimize;
 pub mod value;
 pub mod value_storage;
+pub use ::parser::parser::parse_spwn;
 pub use _lib::{eprint_with_color, print_with_color, Compiler, STD_PATH};
-pub use parser::parse_spwn;

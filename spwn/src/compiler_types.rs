@@ -1,13 +1,14 @@
-///types and functions used by the compiler
-use crate::ast;
 use crate::builtin::*;
-use crate::compiler::create_error;
 use crate::compiler::NULL_STORAGE;
 use crate::compiler_info::CodeArea;
 use crate::context::*;
 use crate::globals::Globals;
-use crate::levelstring::*;
+use crate::leveldata::*;
 use crate::value::*;
+use errors::{create_error, RuntimeError};
+///types and functions used by the compiler
+use parser::ast;
+use shared::BreakType;
 
 //use std::boxed::Box;
 use crate::compiler_info::CompilerInfo;
@@ -15,9 +16,10 @@ use crate::value_storage::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use internment::Intern;
+use crate::compiler::compile_scope;
 
-use crate::compiler::{compile_scope, RuntimeError};
+use internment::Intern;
+use shared::StoredValue;
 
 pub type TypeId = u16;
 //                                                               This bool is for if this value
@@ -26,13 +28,9 @@ pub type Implementations = HashMap<TypeId, HashMap<Intern<String>, (StoredValue,
 
 pub type FnIdPtr = usize;
 
-//pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
+use termcolor::Color as TColor;
 
-#[derive(PartialEq, Eq, Debug, Clone, Hash)]
-pub enum ImportType {
-    Script(PathBuf),
-    Lib(String),
-}
+//pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct TriggerOrder(pub f32);
@@ -180,8 +178,18 @@ pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError
     Ok(rounded as i32)
 }
 
-impl ast::Expression {
-    pub fn eval(
+pub trait EvalExpression {
+    fn eval(
+        &self,
+        contexts: &mut FullContext,
+        globals: &mut Globals,
+        info: CompilerInfo,
+        constant: bool,
+    ) -> Result<(), RuntimeError>;
+}
+
+impl EvalExpression for ast::Expression {
+    fn eval(
         &self,
         contexts: &mut FullContext,
         globals: &mut Globals,
@@ -710,8 +718,18 @@ pub fn eval_dict(
     Ok(())
 }
 
-impl ast::CompoundStatement {
-    pub fn to_trigger_func(
+pub trait ToTriggerFunc {
+    fn to_trigger_func(
+        &self,
+        contexts: &mut FullContext,
+        globals: &mut Globals,
+        info: CompilerInfo,
+        start_group: Option<Group>,
+    ) -> Result<(), RuntimeError>;
+}
+
+impl ToTriggerFunc for ast::CompoundStatement {
+    fn to_trigger_func(
         &self,
         contexts: &mut FullContext,
         globals: &mut Globals,
