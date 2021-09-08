@@ -1,20 +1,4 @@
-
-while_loop = (
-    expr: @macro, code: @macro, delay: @number = 0.05,
-) {
-    func = !{
-        if expr() {
-            code()
-            wait(delay)
-            func!
-        } else {
-            -> return
-        }
-    }
-
-    wait(delay)
-    func!
-}
+_eywgfd_ = "Hi"
 
 $.print(while_loop)
 

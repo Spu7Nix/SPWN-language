@@ -1285,10 +1285,11 @@ pub fn import_module(
             )));
         }
     };
-    let (parsed, notes) = match parser::parser::parse_spwn(unparsed, module_path.as_ref().clone()) {
-        Ok(p) => p,
-        Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
-    };
+    let (parsed, notes) =
+        match parser::parser::parse_spwn(unparsed, module_path.as_ref().clone(), BUILTIN_NAMES) {
+            Ok(p) => p,
+            Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
+        };
 
     let mut start_context = FullContext::new();
 

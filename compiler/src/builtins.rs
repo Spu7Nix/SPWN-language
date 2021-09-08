@@ -405,6 +405,12 @@ macro_rules! builtins {
             )*
         ];
 
+        pub const BUILTIN_NAMES: &[&str] = &[
+            $(
+                stringify!($name),
+            )*
+        ];
+
         pub struct BuiltinPermissions (HashMap<Builtin, bool>);
 
         impl BuiltinPermissions {

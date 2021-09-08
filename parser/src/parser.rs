@@ -6,17 +6,15 @@ use pest_derive::Parser;*/
 use crate::ast::StrInner;
 use crate::ast::StringFlags;
 
+use std::collections::HashSet;
 //use std::collections::HashMap;
 use std::path::PathBuf;
-
-
 
 use errors::SyntaxError;
 use internment::Intern;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
-
 
 use shared::ImportType;
 
@@ -39,21 +37,19 @@ macro_rules! expected {
 }
 
 pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Result<(), SyntaxError> {
-    Ok(())
-    // TODO: somehow reimplement this
-    // if name.starts_with('_') && name.ends_with('_') {
-    //     if Builtin::from_str(name).is_ok() {
-    //         Ok(())
-    //     } else {
-    //         Err(SyntaxError::SyntaxError {
-    //             message: format!("{} is an invalid variable/property/argument name", name),
-    //             pos: tokens.position(),
-    //             file: notes.file.clone(),
-    //         })
-    //     }
-    // } else {
-    //     Ok(())
-    // }
+    if name.starts_with('_') && name.ends_with('_') {
+        if notes.builtins.contains(name) {
+            Ok(())
+        } else {
+            Err(SyntaxError::SyntaxError {
+                message: format!("{} is an invalid variable/property/argument name", name),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            })
+        }
+    } else {
+        Ok(())
+    }
 }
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
@@ -324,13 +320,15 @@ impl Token {
 pub struct ParseNotes {
     pub tag: ast::Attribute,
     pub file: PathBuf,
+    pub builtins: HashSet<&'static str>,
 }
 
 impl ParseNotes {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: PathBuf, builtins: &[&'static str]) -> Self {
         ParseNotes {
             tag: ast::Attribute::new(),
             file: path,
+            builtins: builtins.iter().copied().collect(),
         }
     }
 }
@@ -478,6 +476,7 @@ const STATEMENT_SEPARATOR_DESC: &str = "Statement separator (line-break or ';')"
 pub fn parse_spwn(
     mut unparsed: String,
     path: PathBuf,
+    builtin_list: &[&'static str],
 ) -> Result<(Vec<ast::Statement>, ParseNotes), SyntaxError> {
     unparsed = unparsed.replace("\r\n", "\n");
 
@@ -487,7 +486,7 @@ pub fn parse_spwn(
 
     let mut statements = Vec::<ast::Statement>::new();
 
-    let mut notes = ParseNotes::new(path);
+    let mut notes = ParseNotes::new(path, builtin_list);
 
     let mut line_breaks = Vec::<u32>::new();
     let mut current_index: u32 = 0;
@@ -1300,7 +1299,9 @@ fn parse_dict(
         match tokens.next(false) {
             Some(Token::Symbol) | Some(Token::Type) | Some(Token::StringLiteral) => {
                 let symbol = if let Some(Token::StringLiteral) = tokens.current() {
-                    str_content(tokens.slice(), tokens, notes)?.0
+                    let s = str_content(tokens.slice(), tokens, notes)?.0;
+                    is_valid_symbol(&s, tokens, notes)?;
+                    s
                 } else {
                     let s = tokens.slice();
                     is_valid_symbol(&s, tokens, notes)?;
@@ -2008,7 +2009,9 @@ fn parse_variable(
                 Some(Token::ThickArrow) => {
                     // Woo macro shorthand
                     let arg = if symbol.as_ref() != "_" {
+                        tokens.previous();
                         is_valid_symbol(&symbol, tokens, notes)?;
+                        tokens.next(false);
                         vec![(
                             symbol,
                             None,
@@ -2041,8 +2044,9 @@ fn parse_variable(
                     })
                 }
                 _ => {
-                    is_valid_symbol(&symbol, tokens, notes)?;
                     tokens.previous_no_ignore(false);
+                    is_valid_symbol(&symbol, tokens, notes)?;
+
                     ast::ValueBody::Symbol(symbol)
                 }
             }

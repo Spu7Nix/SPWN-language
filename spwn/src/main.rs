@@ -148,7 +148,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     print_with_color("Parsing ...", Color::Green);
                     let unparsed = fs::read_to_string(script_path.clone())?;
 
-                    let (statements, notes) = match parse_spwn(unparsed, script_path.clone()) {
+                    let (statements, notes) = match parse_spwn(
+                        unparsed,
+                        script_path.clone(),
+                        ::compiler::builtins::BUILTIN_NAMES,
+                    ) {
                         Err(err) => {
                             create_report(ErrorReport::from(err)).eprint(cache).unwrap();
                             std::process::exit(ERROR_EXIT_CODE);
