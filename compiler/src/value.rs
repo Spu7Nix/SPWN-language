@@ -1,11 +1,11 @@
 use parser::ast;
-use crate::builtin::*;
+use crate::builtins::*;
 use crate::compiler::NULL_STORAGE;
 use errors::create_error;
 use crate::compiler::import_module;
 use crate::compiler::merge_all_contexts;
-use crate::compiler_info::CodeArea;
-use crate::compiler_info::CompilerInfo;
+use errors::compiler_info::CodeArea;
+use errors::compiler_info::CompilerInfo;
 use shared::BreakType;
 use shared::StoredValue;
 use slyce::Slice as Slyce;

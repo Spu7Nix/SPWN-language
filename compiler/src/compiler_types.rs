@@ -1,20 +1,19 @@
-use crate::builtin::*;
+use crate::builtins::*;
 use crate::compiler::NULL_STORAGE;
-use crate::compiler_info::CodeArea;
 use crate::context::*;
 use crate::globals::Globals;
 use crate::leveldata::*;
 use crate::value::*;
+use errors::compiler_info::CodeArea;
 use errors::{create_error, RuntimeError};
 ///types and functions used by the compiler
 use parser::ast;
 use shared::BreakType;
 
 //use std::boxed::Box;
-use crate::compiler_info::CompilerInfo;
 use crate::value_storage::*;
+use errors::compiler_info::CompilerInfo;
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use crate::compiler::compile_scope;
 
@@ -27,8 +26,6 @@ pub type TypeId = u16;
 pub type Implementations = HashMap<TypeId, HashMap<Intern<String>, (StoredValue, bool)>>;
 
 pub type FnIdPtr = usize;
-
-use termcolor::Color as TColor;
 
 //pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
 

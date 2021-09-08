@@ -1,9 +1,9 @@
 use shared::StoredValue;
 
 ///types and functions used by the compiler
-use crate::builtin::*;
+use crate::builtins::*;
 
-use crate::compiler_info::CodeArea;
+use errors::compiler_info::CodeArea;
 
 use crate::globals::Globals;
 use crate::value::*;

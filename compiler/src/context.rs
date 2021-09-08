@@ -1,10 +1,10 @@
-use crate::builtin::*;
-use crate::compiler_info::CodeArea;
+use crate::builtins::*;
 use crate::compiler_types::*;
 use crate::globals::Globals;
 use crate::leveldata::*;
 use crate::value::{value_equality, Value};
 use crate::value_storage::{clone_value, store_val_m};
+use errors::compiler_info::CodeArea;
 
 //use std::boxed::Box;
 use std::collections::HashMap;

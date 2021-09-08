@@ -5,10 +5,10 @@ use shared::ImportType;
 use shared::StoredValue;
 
 ///types and functions used by the compiler
-use crate::builtin::*;
+use crate::builtins::*;
 use crate::compiler::BUILTIN_STORAGE;
 use crate::compiler::NULL_STORAGE;
-use crate::compiler_info::CodeArea;
+use errors::compiler_info::CodeArea;
 
 use crate::context::FullContext;
 use crate::leveldata::GdObj;
@@ -17,8 +17,8 @@ use crate::compiler_types::*;
 use crate::value::*;
 
 //use std::boxed::Box;
-use crate::compiler_info::CompilerInfo;
 use crate::value_storage::*;
+use errors::compiler_info::CompilerInfo;
 use std::collections::HashMap;
 
 use std::path::PathBuf;

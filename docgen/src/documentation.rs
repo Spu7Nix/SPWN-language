@@ -5,13 +5,13 @@ use shared::{ImportType, StoredValue};
 // tools for generating documentation for SPWN libraries
 //use crate::ast::*;
 
-use crate::builtin::BuiltinPermissions;
-use crate::compiler::import_module;
-use crate::compiler_info::CompilerInfo;
+use compiler::builtins::BuiltinPermissions;
+use compiler::compiler::import_module;
+use errors::compiler_info::CompilerInfo;
 
-use crate::context::FullContext;
-use crate::globals::Globals;
-use crate::value::*;
+use compiler::context::FullContext;
+use compiler::globals::Globals;
+use compiler::value::*;
 
 use std::fs::File;
 

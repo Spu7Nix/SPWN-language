@@ -6,4 +6,7 @@ members = [
     "errors",
     "levelstring",
     "editorlive",
+    "compiler",
+    "optimizer",
+    "docgen",
 ]

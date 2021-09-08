@@ -1,6 +1,6 @@
 // useful things for dealing with gd level data
 
-use crate::builtin::*;
+use crate::builtins::*;
 use crate::compiler_types::FunctionId;
 use crate::context::Context;
 use parser::ast::ObjectMode;

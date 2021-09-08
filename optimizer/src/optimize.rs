@@ -1,9 +1,9 @@
-use crate::builtin::{Block, Color, Group, Id, Item};
-use crate::compiler_types::{FunctionId, TriggerOrder};
+use compiler::builtins::{Block, Color, Group, Id, Item};
+use compiler::compiler_types::{FunctionId, TriggerOrder};
 use parser::ast::ObjectMode;
 
 //mod icalgebra;
-use crate::leveldata::{GdObj, ObjParam};
+use compiler::leveldata::{GdObj, ObjParam};
 
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};

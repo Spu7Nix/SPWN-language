@@ -5,11 +5,15 @@ use internment::Intern;
 use shared::BreakType;
 use shared::ImportType;
 use shared::StoredValue;
+use termcolor::ColorChoice;
+use termcolor::ColorSpec;
+use termcolor::StandardStream;
+use termcolor::WriteColor;
 
-use crate::builtin::*;
-use crate::compiler_info::CodeArea;
-use crate::compiler_info::CompilerInfo;
+use crate::builtins::*;
 use crate::context::*;
+use errors::compiler_info::CodeArea;
+use errors::compiler_info::CompilerInfo;
 use parser::ast;
 
 use crate::globals::Globals;
@@ -27,7 +31,15 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::compiler_types::*;
-use crate::print_with_color;
+fn print_with_color(text: &str, color: TColor) {
+    use std::io::Write;
+    let mut stdout = StandardStream::stdout(ColorChoice::Always);
+    stdout
+        .set_color(ColorSpec::new().set_fg(Some(color)))
+        .unwrap();
+    writeln!(&mut stdout, "{}", text).unwrap();
+    stdout.set_color(&ColorSpec::new()).unwrap();
+}
 
 pub const NULL_STORAGE: StoredValue = 1;
 pub const BUILTIN_STORAGE: StoredValue = 0;
@@ -62,7 +74,7 @@ pub fn compile_spwn(
     // store_value(Value::Null, 1, &mut globals, &start_context);
 
     let start_info = CompilerInfo {
-        ..CompilerInfo::from_area(crate::compiler_info::CodeArea {
+        ..CompilerInfo::from_area(errors::compiler_info::CodeArea {
             file: Intern::new(path.clone()),
             pos: (0, 0),
         })

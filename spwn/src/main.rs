@@ -1,31 +1,25 @@
 //#![feature(arbitrary_enum_discriminant)]
-mod builtin;
-mod compiler;
-use errors::compiler_info;
-mod compiler_types;
-mod context;
-mod documentation;
-mod globals;
-mod leveldata;
-mod optimize;
-mod value;
+use ::compiler::builtins;
+use ::compiler::compiler;
 
-mod value_storage;
+use ::docgen::documentation;
+
+use ::compiler::leveldata;
+
+use optimizer::optimize;
 
 use ariadne::{Cache, FileCache, Fmt};
 
 use optimize::optimize;
 
 use ::parser::parser::*;
-use builtin::BuiltinPermissions;
+use builtins::BuiltinPermissions;
 
 use std::env;
 use std::path::PathBuf;
 
 use editorlive::editorlive::editor_paste;
 use std::fs;
-
-pub const STD_PATH: &str = "std";
 
 const ERROR_EXIT_CODE: i32 = 1;
 
@@ -123,7 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     .cloned()
                                     .expect("Expected built-in function name");
                                 permissions.set(
-                                    builtin::Builtin::from_str(&b)
+                                    builtins::Builtin::from_str(&b)
                                         .unwrap_or_else(|_| panic!("Invalid builtin name: {}", b)),
                                     true,
                                 );
@@ -134,7 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     .cloned()
                                     .expect("Expected built-in function name");
                                 permissions.set(
-                                    builtin::Builtin::from_str(&b)
+                                    builtins::Builtin::from_str(&b)
                                         .unwrap_or_else(|_| panic!("Invalid builtin name: {}", b)),
                                     false,
                                 );
@@ -378,7 +372,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     if "$" == lib_path {
                         // doc builtins
-                        let doc = builtin::builtin_docs();
+                        let doc = builtins::builtin_docs();
                         fs::write("builtins.md", doc)?;
                     } else {
                         match documentation::document_lib(lib_path) {
