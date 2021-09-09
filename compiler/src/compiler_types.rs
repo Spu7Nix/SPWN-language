@@ -345,6 +345,20 @@ pub fn execute_macro(
         }
     }
 
+    for (_, e1, _, e2, _, _) in m.args.iter() {
+        if let Some(e) = e1 {
+            globals.push_preserved_val(*e)
+        }
+        if let Some(e) = e2 {
+            globals.push_preserved_val(*e)
+        }
+    }
+
+    // dbg!(
+    //     &m.args,
+    //     globals.stored_values.preserved_stack.last().unwrap()
+    // );
+
     let combinations = all_combinations(
         args.iter().map(|x| x.value.clone()).collect(),
         contexts,
@@ -362,7 +376,8 @@ pub fn execute_macro(
     //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
-        let mut new_variables: FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>> = Default::default();
+        let mut new_variables: FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>> =
+            Default::default();
         let context = full_context.inner();
 
         let fn_context = context.start_group;
@@ -616,7 +631,7 @@ pub fn all_combinations<'a>(
     info: CompilerInfo,
     constant: bool,
 ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
-    globals.stored_values.preserved_stack.push(Vec::new());
+    globals.push_new_preserved();
 
     let mut out = vec![(Vec::new(), contexts)];
     for expr in a {
@@ -629,14 +644,13 @@ pub fn all_combinations<'a>(
                 new_list.push(full_context.inner().return_value);
 
                 globals.push_preserved_val(full_context.inner().return_value);
-                //dbg!(full_context.inner().return_value);
 
                 new_out.push((new_list, full_context));
             }
         }
         out = new_out;
     }
-    globals.stored_values.preserved_stack.pop();
+    globals.pop_preserved();
 
     Ok(out)
 }

@@ -436,7 +436,6 @@ pub enum SyntaxError {
 
 impl From<SyntaxError> for ErrorReport {
     fn from(err: SyntaxError) -> ErrorReport {
-        use crate::compiler_info::CompilerInfo;
         //write!(f, "SuperErrorSideKick is here!")
         let mut colors = RainbowColorGenerator::new(60.0, 1.0, 0.8);
         let a = colors.next();

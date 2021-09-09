@@ -10,3 +10,6 @@ members = [
     "optimizer",
     "docgen",
 ]
+
+[profile.release]
+debug = true

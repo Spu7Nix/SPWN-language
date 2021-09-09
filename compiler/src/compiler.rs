@@ -1106,12 +1106,12 @@ pub fn compile_scope(
             start_time.elapsed().as_millis(),
         );*/
 
-        let increase =
-            globals.stored_values.map.len() as i32 - globals.stored_values.prev_value_count as i32;
+        // let increase =
+        //     globals.stored_values.map.len() as i32 - globals.stored_values.prev_value_count as i32;
 
-        if increase > 5000 {
-            globals.collect_garbage(contexts);
-        }
+        // if increase > 5000 {
+        globals.collect_garbage(contexts);
+        //}
     }
 
     // TODO: get rid of lifetimes
@@ -1226,7 +1226,6 @@ pub fn import_module(
     info: CompilerInfo,
     forced: bool,
 ) -> Result<(), RuntimeError> {
-    //println!("importing: {:?}", path);
     if !forced {
         if let Some(ret) = globals.prev_imports.get(path).cloned() {
             merge_impl(&mut globals.implementations, &ret.1);

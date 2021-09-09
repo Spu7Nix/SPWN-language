@@ -621,6 +621,8 @@ pub fn macro_to_value(
     //mut define_new: bool,
     constant: bool,
 ) -> Result<(), RuntimeError> {
+
+    globals.push_new_preserved();
     
     for full_context in contexts.iter() {
         let fn_context = full_context.inner().start_group;
@@ -646,15 +648,19 @@ pub fn macro_to_value(
                             context_changes: full_context.inner().fn_context_change_stack.clone()
                         })
                     }
-                    
-                    Some(clone_value(
+
+                    let out = clone_value(
                         full_context.inner().return_value,
                         
                         globals,
                         full_context.inner().start_group,
                         true,
                         info.position,
-                    ))
+                    );
+
+                    globals.push_preserved_val(out);
+                    
+                    Some(out)
                 }
                 None => None,
             };
@@ -670,6 +676,8 @@ pub fn macro_to_value(
                             context_changes: full_context.inner().fn_context_change_stack.clone()
                         })
                     }
+
+                    globals.push_preserved_val(full_context.inner().return_value);
                     
                     Some(full_context.inner().return_value)
                 }
@@ -700,6 +708,8 @@ pub fn macro_to_value(
                 info.position,
             );
     }
+
+    globals.pop_preserved();
     
     Ok(())
 }
@@ -2324,7 +2334,7 @@ impl VariableFuncs for ast::Variable {
         Ok(())
     }
 
-     fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool {
+    fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool {
         //use crate::fmt::SpwnFmt;
         // if self.operator == Some(ast::UnaryOperator::Let) {
         //     return true
@@ -2417,7 +2427,8 @@ impl VariableFuncs for ast::Variable {
                     }
                 },
                 ast::Path::Index(i) => {
-                    if i.values.len() == 1 {
+                    // this is scuffed
+                    if i.values.len() == 1 && i.values[0].path.is_empty() {
                         if let ast::ValueBody::Str(s) = &i.values[0].value.body {
                             match &globals.stored_values[current_ptr] {
                                 Value::Dict(d) => return d.get(&s.inner).is_some(),
@@ -2437,7 +2448,7 @@ impl VariableFuncs for ast::Variable {
         true
     }
 
-     fn define(
+    fn define(
         &self,
         //value: StoredValue,
         context: &mut Context,
