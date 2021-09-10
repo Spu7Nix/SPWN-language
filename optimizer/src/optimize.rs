@@ -26,7 +26,7 @@ pub enum TriggerRole {
     Func,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ReservedIds {
     pub object_groups: FnvHashSet<Id>,
     pub trigger_groups: FnvHashSet<Id>, // only includes the 57 prop
@@ -184,31 +184,33 @@ pub fn optimize(
     let zero_group = Group {
         id: Id::Specific(0),
     };
-    if network[&zero_group].triggers.len() > 1 {
-        closed_group += 1;
-        let new_start_group = Group {
-            id: Id::Arbitrary(closed_group),
-        };
+    if let Some(gang) = network.get(&zero_group) {
+        if gang.triggers.len() > 1 {
+            closed_group += 1;
+            let new_start_group = Group {
+                id: Id::Arbitrary(closed_group),
+            };
 
-        let mut swaps = Swaps::default();
-        swaps.insert(zero_group, new_start_group);
+            let mut swaps = Swaps::default();
+            swaps.insert(zero_group, new_start_group);
 
-        replace_groups(swaps, &mut objects);
+            replace_groups(swaps, &mut objects);
 
-        create_spawn_trigger(
-            Trigger {
-                obj: ObjPtr(0, 0), // arbitrary object
-                role: TriggerRole::Spawn,
-                deleted: false,
-            },
-            new_start_group,
-            zero_group,
-            0.0,
-            &mut objects,
-            &mut network,
-            TriggerRole::Spawn,
-            false,
-        );
+            create_spawn_trigger(
+                Trigger {
+                    obj: ObjPtr(0, 0), // arbitrary object
+                    role: TriggerRole::Spawn,
+                    deleted: false,
+                },
+                new_start_group,
+                zero_group,
+                0.0,
+                &mut objects,
+                &mut network,
+                TriggerRole::Spawn,
+                false,
+            );
+        }
     }
 
     rebuild(&network, &obj_in)
@@ -420,8 +422,18 @@ fn check_for_dead_code<'a>(
             id: i @ Id::Arbitrary(_),
         })) = objects[trigger.obj].0.params.get(&51)
         {
-            // maybe restrict this to only stop triggers and toggle triggers
-            if !reserved.trigger_groups.contains(i) && !reserved.object_groups.contains(i) {
+            // if let Some(ObjParam::Number(id)) = objects[trigger.obj].0.params.get(&1) {
+            //     if matches!(*id as u16, 1049 | 1616) // toggle or stop trigger
+            //         && !reserved.object_groups.contains(i)
+            //         && !reserved.trigger_groups.contains(i)
+            //     {
+            //         dbg!(i);
+            //         return false;
+            //     }
+            // }
+
+            if !reserved.object_groups.contains(i) && !reserved.trigger_groups.contains(i) {
+                dbg!(i);
                 return false;
             }
         }

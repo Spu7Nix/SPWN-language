@@ -40,6 +40,12 @@ impl CompilerInfo {
     }
 }
 
+impl Default for CompilerInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CodeArea {
     pub file: Intern<PathBuf>,
@@ -52,6 +58,12 @@ impl CodeArea {
             file: Intern::new(PathBuf::new()),
             pos: (0, 0),
         }
+    }
+}
+
+impl Default for CodeArea {
+    fn default() -> Self {
+        Self::new()
     }
 }
 use ariadne::Span;

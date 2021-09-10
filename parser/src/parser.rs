@@ -461,9 +461,9 @@ impl<'a> Tokens<'a> {
         if self.stack.len() - self.index == 0 {
             return (0, 0);
         }
-        let file_pos1 = self.stack[self.stack.len() - self.index - 1].2.start;
-        let file_pos2 = self.stack[self.stack.len() - self.index - 1].2.end;
-        (file_pos1, file_pos2)
+        let range = &self.stack[self.stack.len() - self.index - 1].2;
+
+        (range.start, range.end)
     }
 
     /*fn abs_position(&self) -> usize {
@@ -1962,7 +1962,9 @@ fn parse_variable(
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Minus)
         }
-        Some(Token::Exclamation) => {
+        Some(Token::Exclamation) =>
+        {
+            #[allow(clippy::branches_sharing_code)]
             if tokens.next(true) == Some(Token::OpenCurlyBracket) {
                 tokens.previous_no_ignore(true);
                 None

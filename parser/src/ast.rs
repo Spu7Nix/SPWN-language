@@ -229,6 +229,12 @@ impl Attribute {
     }
 }
 
+impl Default for Attribute {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub trait CountSymbols {
     fn symbols(&self) -> fnv::FnvHashSet<Intern<String>>;
 

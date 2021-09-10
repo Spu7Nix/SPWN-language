@@ -1,6 +1,11 @@
+a = ?g
+
+$.add(obj {
+    1: 1,
+    57: a
+})
+wait(1)
+a.move(10,0)
 
 
-let arr = [1, 2, 3]
 
-arr[-1] = 1
-$.print(arr)

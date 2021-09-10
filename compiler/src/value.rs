@@ -53,20 +53,22 @@ const MAX_DICT_EL_DISPLAY: usize = 10;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
-    //             name         default val      tag          pattern
-    pub args: Vec<(
-        Intern<String>,
-        Option<StoredValue>,
-        ast::Attribute,
-        Option<StoredValue>,
-        FileRange,
-        bool
-    )>,
+    pub args: Vec<MacroArgDef>,
     pub def_variables: FnvHashMap<Intern<String>, StoredValue>,
     pub def_file: Intern<PathBuf>,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Attribute,
     pub arg_pos: FileRange,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct MacroArgDef {
+    pub name: Intern<String>,
+    pub default: Option<StoredValue>,
+    pub attribute: ast::Attribute,
+    pub pattern: Option<StoredValue>,
+    pub position: FileRange,
+    pub as_ref: bool
 }
 // impl Macro {
 //     pub fn get_arg_area(&self) -> CodeArea {
@@ -322,11 +324,11 @@ impl Value {
                 let mut out = String::from("(");
                 if !m.args.is_empty() {
                     for arg in m.args.iter() {
-                        out += &arg.0;
-                        if let Some(val) = arg.3 {
+                        out += &arg.name;
+                        if let Some(val) = arg.pattern {
                             out += &format!(": {}", globals.stored_values[val].to_str(globals),)
                         };
-                        if let Some(val) = arg.1 {
+                        if let Some(val) = arg.default {
                             out += &format!(" = {}", globals.stored_values[val].to_str(globals))
                         };
                         out += ", ";
@@ -626,14 +628,7 @@ pub fn macro_to_value(
     
     for full_context in contexts.iter() {
         let fn_context = full_context.inner().start_group;
-        let mut args: Vec<(
-            Intern<String>,
-            Option<StoredValue>,
-            ast::Attribute,
-            Option<StoredValue>,
-            FileRange,
-            bool
-        )> = Vec::new();
+        let mut args: Vec<MacroArgDef> = Vec::new();
 
         for (name, default, attr, pat, pos, as_ref) in m.args.iter() {
             let def_val = match default {
@@ -683,14 +678,14 @@ pub fn macro_to_value(
                 }
                 None => None,
             };
-            args.push((
-                *name,
-                def_val,
-                attr.clone(),
-                pat,
-                *pos,
-                *as_ref
-            ));
+            args.push(MacroArgDef {
+                name: *name,
+                default: def_val,
+                attribute: attr.clone(),
+                pattern: pat,
+                position: *pos,
+                as_ref: *as_ref
+            });
         }
 
         full_context.inner().return_value = store_const_value(
@@ -1685,7 +1680,7 @@ impl VariableFuncs for ast::Variable {
                                     Some(imp) => match imp.get(a) {
                                         Some((val, _)) => {
                                             if let Value::Macro(m) = &globals.stored_values[*val] {
-                                                if !m.args.is_empty() && m.args[0].0 == globals.SELF_MEMBER_NAME {
+                                                if !m.args.is_empty() && m.args[0].name == globals.SELF_MEMBER_NAME {
                                                     
                                                     return Err(RuntimeError::CustomError(create_error(
                                                         info,

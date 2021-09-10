@@ -81,7 +81,7 @@ impl RainbowColorGenerator {
     pub fn new(h: f64, s: f64, b: f64) -> Self {
         Self { h, s, b }
     }
-
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> ariadne::Color {
         self.h += 20.0;
         self.h %= 360.0;
