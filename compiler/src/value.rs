@@ -715,6 +715,13 @@ pub fn macro_to_value(
 }
 
 
+#[derive(PartialEq, Eq)]
+pub enum DefineResult {
+    AlreadyDefined,
+    Ok, // wasn't defined before, but is now
+}
+// the actual value comes in context.return_value
+
 // bruh moment
 pub trait VariableFuncs {
     fn to_value(
@@ -725,15 +732,15 @@ pub trait VariableFuncs {
         constant: bool,
     ) -> Result<(), RuntimeError>;
 
-    fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool;
+    //fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool;
 
-    fn define(
+    fn try_define(
         &self,
-        //value: StoredValue,
-        context: &mut Context,
+        contexts: &mut FullContext,
         globals: &mut Globals,
         info: &CompilerInfo,
-    ) -> Result<StoredValue, RuntimeError>;
+        mutable: bool,
+    ) -> Result<DefineResult, RuntimeError>;
 }
 
 
@@ -743,21 +750,10 @@ impl VariableFuncs for ast::Variable {
         contexts: &mut FullContext,
         globals: &mut Globals,
         mut info: CompilerInfo,
-        //mut define_new: bool,
         constant: bool,
     ) -> Result<(), RuntimeError> {
         contexts.reset_return_vals();
         info.position.pos = self.pos;
-
-        //let mut defined = true;
-        if let Some(UnaryOperator::Let) = self.operator {
-            for fc in contexts.iter() {
-                let val = self.define(fc.inner(), globals, &info)?;
-                fc.inner().return_value = val
-            }
-            
-            return Ok(());
-        }
 
         use ast::IdClass;
         for full_context in contexts.iter() {
@@ -2290,8 +2286,6 @@ impl VariableFuncs for ast::Variable {
                         &info,
                     )?),
 
-                    UnaryOperator::Let => (),
-
                     UnaryOperator::Range => (handle_unary_operator(
                         val_ptr,
                         Builtin::UnaryRangeOp,
@@ -2334,386 +2328,317 @@ impl VariableFuncs for ast::Variable {
         Ok(())
     }
 
-    fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool {
-        //use crate::fmt::SpwnFmt;
-        // if self.operator == Some(ast::UnaryOperator::Let) {
-        //     return true
-        // }
-
-        // println!("hello? {}", self.fmt(0));
-        let mut current_ptr = match &self.value.body {
-            ast::ValueBody::Symbol(a) => {
-                if let Some(ptr) = context.get_variable(*a) {
-                    if self.path.is_empty() {
-                        //redefine
-                        if globals.is_mutable(ptr) {
-                            return true;
-                        }
-                        if globals.stored_values[ptr]
-                            .clone()
-                            .member(
-                                globals.ASSIGN_BUILTIN,
-                                context,
-                                globals,
-                                CompilerInfo::new(),
-                            )
-                            .is_some()
-                        {
-                            // if it has assign operator implemented
-                            return true;
-                        }
-                        return false;
-                    }
-                    ptr
-                } else {
-                    return false;
-                }
-            }
-
-            ast::ValueBody::TypeIndicator(t) => {
-                if let Some(typ) = globals.type_ids.get(t) {
-                    store_const_value(
-                        Value::TypeIndicator(typ.0),
-                        
-                        globals,
-                        context.start_group,
-                        CodeArea::new(),
-                    )
-                } else {
-                    return false;
-                }
-            }
-
-            ast::ValueBody::SelfVal => {
-                if let Some(ptr) = context.get_variable(globals.SELF_MEMBER_NAME) {
-                    ptr
-                } else {
-                    return false;
-                }
-            }
-
-            ast::ValueBody::Array(_) => {
-                return !(self.path.is_empty() && dstruct_allowed);
-            }
-
-            _ => return true,
-        };
-
-        for p in &self.path {
-            match p {
-                ast::Path::Member(m) => {
-                    if let Value::Dict(d) = &globals.stored_values[current_ptr] {
-                        match d.get(m) {
-                            Some(s) => current_ptr = *s,
-                            None => return false,
-                        }
-                    } else {
-                        return true;
-                    }
-                }
-                ast::Path::Associated(m) => match &globals.stored_values[current_ptr] {
-                    Value::TypeIndicator(t) => match globals.implementations.get(t) {
-                        Some(imp) => {
-                            if let Some(val) = imp.get(m) {
-                                current_ptr = val.0;
-                            } else {
-                                return false;
-                            }
-                        }
-                        None => return false,
-                    },
-                    _ => {
-                        return true;
-                    }
-                },
-                ast::Path::Index(i) => {
-                    // this is scuffed
-                    if i.values.len() == 1 && i.values[0].path.is_empty() {
-                        if let ast::ValueBody::Str(s) = &i.values[0].value.body {
-                            match &globals.stored_values[current_ptr] {
-                                Value::Dict(d) => return d.get(&s.inner).is_some(),
-                                _ => return true,
-                            }
-                        } else {
-                            return true;
-                        }
-                    } else {
-                        return true;
-                    }
-                }
-                _ => return true,
-            }
-        }
-
-        true
-    }
-
-    fn define(
+    // writes to return_value2
+    fn try_define(
         &self,
-        //value: StoredValue,
-        context: &mut Context,
+        contexts: &mut FullContext,
         globals: &mut Globals,
         info: &CompilerInfo,
-    ) -> Result<StoredValue, RuntimeError> {
-        // when None, the value is already defined
+        mutable: bool,
+    ) -> Result<DefineResult, RuntimeError> {
+        
         use parser::fmt::SpwnFmt;
-        let mut defined = true;
+        use ariadne::Fmt;
+        let mut results = Vec::new();
+        for full_context in contexts.iter() {
+            
+            let mut defined = true;
 
-        let value = match &self.operator {
-            Some(ast::UnaryOperator::Let) => {
-                store_val_m(Value::Null,  globals, context.start_group, false,info.position, )
-            }
-            None => store_const_value(Value::Null,  globals, context.start_group, info.position),
-            a => {
-                
+            let value = match &self.operator {
+                None => store_val_m(Value::Null, globals, full_context.inner().start_group, !mutable,info.position),
+                Some(a) => {
+                    
 
-                return Err(RuntimeError::CustomError(create_error(
-                    info.clone(),
-                    &format!("Cannot use operator {:?} when defining a variable", a),
-                    &[],
-                    None,
-                )))
-                
-            }
-        };
-
-        let mut current_ptr = match &self.value.body {
-            ast::ValueBody::Symbol(a) => {
-                if let Some(ptr) = context.get_variable(*a) {
-                    if self.path.is_empty() {
-                        //redefine
-                        context.new_variable(*a, value, 0);
-                        return Ok(value);
-                    }
-                    ptr
-                } else {
-                    context.new_variable(*a, value, 0);
-                    defined = false;
-                    value
-                }
-            }
-
-            ast::ValueBody::TypeIndicator(t) => {
-                if let Some(typ) = globals.type_ids.get(t) {
-                    store_const_value(
-                        Value::TypeIndicator(typ.0),
-                        
-                        globals,
-                        context.start_group,
-                        info.position,
-                    )
-                } else {
                     return Err(RuntimeError::CustomError(create_error(
                         info.clone(),
-                        & format!("Use a type statement to define a new type: type @{}", t),
+                        &format!("Cannot use operator `{:?}` when defining a variable", a.fmt(0)),
                         &[],
                         None,
                     )))
+                    
                 }
-            }
+            };
 
-            ast::ValueBody::SelfVal => {
-                if let Some(ptr) = context.get_variable(globals.SELF_MEMBER_NAME) {
-                    ptr
-                } else {
-                    return Err(RuntimeError::UndefinedErr {
-                        undefined: "self".to_string(),
-                        desc: "variable".to_string(),
-                        info: info.clone(),
-                    });
+            let mut current_ptr = match &self.value.body {
+                ast::ValueBody::Symbol(a) => {
+                    if let (Some(ptr), false) = (full_context.inner().get_variable(*a), mutable && self.path.is_empty()) {
+                        ptr
+                    } else {
+                        // define or redefine
+                        full_context.inner().new_variable(*a, value, 0);
+                        defined = false;
+                        value
+                    }
                 }
-            }
 
-            a => {
-                
-                return Err(RuntimeError::CustomError(create_error(
-                    info.clone(),
-                    &format!("Expected symbol or type-indicator, found {}", a.fmt(0)),
-                    &[],
-                    None,
-                )))
-                
-            }
-        };
-
-        for p in &self.path {
-            if !defined {
-                return Err(RuntimeError::CustomError(create_error(
-                    info.clone(),
-                    &format!("Cannot run {} on an undefined value", p.fmt(0)),
-                    &[],
-                    None,
-                )))
-            }
-
-            match p {
-                ast::Path::Member(m) => {
-                    let val = globals.stored_values[current_ptr].clone();
-                    match val.member(*m, context, globals, info.clone()) {
-                        Some(s) => current_ptr = s,
-                        None => {
+                ast::ValueBody::TypeIndicator(t) => {
+                    if let Some(typ) = globals.type_ids.get(t) {
+                        store_const_value(
+                            Value::TypeIndicator(typ.0),
                             
-                            if !globals.is_mutable(current_ptr) {
-                                return Err(RuntimeError::MutabilityError {
-                                    val_def: globals.get_area(current_ptr),
-                                    info: info.clone(),
-                                });
-                            }
-                            let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
-                            if let Value::Dict(d) = &mut stored.val {
-                                (*d).insert(*m, value);
-                                defined = false;
-                                current_ptr = value;
-                            } else {
-                                
-                                return Err(RuntimeError::CustomError(create_error(
-                                    info.clone(),
-                                    "Cannot edit members of a non-dictionary value",
-                                    &[],
-                                    None,
-                                )))
-                            }
-                        }
-                    };
-                }
-                ast::Path::Index(i) => {
-                    let mut full_context = FullContext::Single(context.clone());
-                    i.eval(&mut full_context, globals, info.clone(), true)?;
-
-                    if let FullContext::Split(_,_) = full_context {
+                            globals,
+                            full_context.inner().start_group,
+                            info.position,
+                        )
+                    } else {
                         return Err(RuntimeError::CustomError(create_error(
                             info.clone(),
-                            "Index definition values that split the context are not supported",
+                            & format!("Use a type statement to define a new type: type @{}", t),
                             &[],
                             None,
                         )))
                     }
-                    let first_context_eval = full_context.inner().return_value;
-                    
-                    match &globals.stored_values[current_ptr] {
-                        Value::Dict(d) => {
-                            
-                            if let Value::Str(st) =
-                                globals.stored_values[first_context_eval].clone()
-                            {
-                                let intern = Intern::new(st);
-                                match d.get(&intern) {
-                                    Some(a) => current_ptr = *a,
-                                    None => {
+                }
 
-                                        let stored = globals
-                                            .stored_values
-                                            .map
-                                            .get_mut(&current_ptr)
-                                            .unwrap();
-                                        if !stored.mutable {
-                                            return Err(RuntimeError::MutabilityError {
-                                                val_def: stored.def_area,
-                                                info: info.clone(),
-                                            });
+                ast::ValueBody::SelfVal => {
+                    if let Some(ptr) = full_context.inner().get_variable(globals.SELF_MEMBER_NAME) {
+                        ptr
+                    } else {
+                        return Err(RuntimeError::UndefinedErr {
+                            undefined: globals.SELF_MEMBER_NAME.to_string(),
+                            desc: "variable".to_string(),
+                            info: info.clone(),
+                        });
+                    }
+                }
+
+                a => {
+                    
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        &format!("Expected symbol or type-indicator, found {}", a.fmt(0)),
+                        &[],
+                        None,
+                    )))
+                    
+                }
+            };
+
+            for p in &self.path {
+                if !defined {
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        &format!("You cannot have the extention `value{}` when `value` is undefined", p.fmt(0).fg(ariadne::Color::Red)),
+                        &[],
+                        None,
+                    )))
+                }
+
+                match p {
+                    ast::Path::Member(m) => {
+                        let val = globals.stored_values[current_ptr].clone();
+                        match val.member(*m, full_context.inner(), globals, info.clone()) {
+                            Some(s) => current_ptr = s,
+                            None => {
+                                
+                                if !globals.is_mutable(current_ptr) {
+                                    return Err(RuntimeError::MutabilityError {
+                                        val_def: globals.get_area(current_ptr),
+                                        info: info.clone(),
+                                    });
+                                }
+                                let stored = globals.stored_values.map.get_mut(&current_ptr).unwrap();
+                                if let Value::Dict(d) = &mut stored.val {
+                                    (*d).insert(*m, value);
+                                    defined = false;
+                                    current_ptr = value;
+                                } else {
+                                    
+                                    return Err(RuntimeError::CustomError(create_error(
+                                        info.clone(),
+                                        "Cannot edit members of a non-dictionary value",
+                                        &[],
+                                        None,
+                                    )))
+                                }
+                            }
+                        };
+                    }
+                    ast::Path::Index(i) => {
+                        // keep previous return value
+                        let prev_ret = full_context.inner().return_value;
+                        globals.push_new_preserved();
+                        globals.push_preserved_val(prev_ret);
+                        
+                        i.eval(full_context, globals, info.clone(), true)?;
+
+                        if let FullContext::Split(_,_) = full_context {
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                "Index definition values that split the context are not supported",
+                                &[],
+                                None,
+                            )))
+                        }
+                        
+                        let first_context_eval = full_context.inner().return_value;
+                        (*full_context.inner()).return_value = prev_ret;
+                        globals.pop_preserved();
+                        
+                        match &globals.stored_values[current_ptr] {
+                            Value::Dict(d) => {
+                                
+                                if let Value::Str(st) =
+                                    globals.stored_values[first_context_eval].clone()
+                                {
+                                    let intern = Intern::new(st);
+                                    match d.get(&intern) {
+                                        Some(a) => current_ptr = *a,
+                                        None => {
+
+                                            let stored = globals
+                                                .stored_values
+                                                .map
+                                                .get_mut(&current_ptr)
+                                                .unwrap();
+                                            if !stored.mutable {
+                                                return Err(RuntimeError::MutabilityError {
+                                                    val_def: stored.def_area,
+                                                    info: info.clone(),
+                                                });
+                                            }
+                                            let fn_context = full_context.inner().start_group;
+                                            if stored.fn_context != fn_context {
+                                                return Err(RuntimeError::ContextChangeMutateError {
+                                                    val_def: stored.def_area,
+                                                    info: info.clone(),
+                                                    context_changes: full_context.inner().fn_context_change_stack.clone()
+                                                });
+                                            }
+                                            
+                                            if let Value::Dict(d) = &mut stored.val {
+                                                (*d).insert(intern, value);
+                                                defined = false;
+                                                current_ptr = value;
+                                            } else {
+                                                unreachable!();
+                                            }
                                         }
-                                        let fn_context = context.start_group;
-                                        if stored.fn_context != fn_context {
-                                            return Err(RuntimeError::ContextChangeMutateError {
-                                                val_def: stored.def_area,
-                                                info: info.clone(),
-                                                context_changes: context.fn_context_change_stack.clone()
-                                            });
-                                        }
-                                        
-                                        if let Value::Dict(d) = &mut stored.val {
-                                            (*d).insert(intern, value);
-                                            defined = false;
-                                            current_ptr = value;
+                                    };
+                                } else {
+                                    return Err(RuntimeError::TypeError {
+                                        expected: "string".to_string(),
+                                        found: globals.get_type_str(first_context_eval),
+                                        val_def: globals.get_area(first_context_eval),
+                                        info: info.clone(),
+                                    });
+                                    
+                                }
+                            }
+                            Value::Array(a) => {
+
+                                if let Value::Number(n) =
+                                    globals.stored_values[first_context_eval].clone()
+                                {
+                                    if n > (a.len() - 1) as f64 || -n > a.len() as f64 {
+                                        return Err(RuntimeError::CustomError(create_error(
+                                            info.clone(),
+                                            &format!("Index {} is out of range of array (length {})", n, a.len()),
+                                            &[],
+                                            None,
+                                        )))
+                                    } else {
+                                        let i = convert_to_int(n, info)?;
+                                        if i < 0 {
+                                            current_ptr = a[a.len() - (-i as usize)];
                                         } else {
-                                            unreachable!();
+                                            current_ptr = a[i as usize];
                                         }
                                     }
-                                };
-                            } else {
+                                } else {
+                                    return Err(RuntimeError::TypeError {
+                                        expected: "number".to_string(),
+                                        found: globals.get_type_str(first_context_eval),
+                                        val_def: globals.get_area(first_context_eval),
+                                        info: info.clone(),
+                                    });
+                                }
+                                
+                                
+                                
+                            }
+
+                            Value::Str(_) => {
+                                return Err(RuntimeError::CustomError(create_error(
+                                    info.clone(),
+                                    "Assigning a character in a string is not suppored",
+                                    &[],
+                                    Some("Consider making a new string"),
+                                )));
+                            }
+                            _ => {
+                                
+                                return Err(RuntimeError::CustomError(create_error(
+                                    info.clone(),
+                                    &format!("The expression `value{} = ...` is only allowed when `value` is a dictionary or an array", "[ ... ]".fg(ariadne::Color::Red)),
+                                    &[],
+                                    None,
+                                )));
+                            }
+                        }
+                        
+                    }
+                    ast::Path::Associated(m) => {
+                        match &globals.stored_values[current_ptr] {
+                            Value::TypeIndicator(t) => match (*globals).implementations.get_mut(t) {
+                                Some(imp) => {
+                                    if let Some((val, _)) = imp.get(m) {
+                                        current_ptr = *val;
+                                    } else {
+                                        (*imp).insert(*m, (value, true));
+                                        defined = false;
+                                        current_ptr = value;
+                                    }
+                                }
+                                None => {
+                                    
+                                    let mut new_imp = FnvHashMap::default();
+                                    new_imp.insert(*m, (value, true));
+                                    (*globals).implementations.insert(*t, new_imp);
+                                    defined = false;
+                                    current_ptr = value;
+                                }
+                            },
+                            _ => {
                                 return Err(RuntimeError::TypeError {
-                                    expected: "string".to_string(),
+                                    expected: "type indicator".to_string(),
                                     found: globals.get_type_str(current_ptr),
                                     val_def: globals.get_area(current_ptr),
                                     info: info.clone(),
                                 });
                                 
                             }
-                        }
-                        Value::Array(_) => {
-                            return Err(RuntimeError::CustomError(create_error(
-                                info.clone(),
-                                "Only dictionaries can define new elements with [...] (consider using `array.push(value)`)",
-                                &[],
-                                None,
-                            )));
-                            
-                        }
-                        _ => {
-                            
-                            return Err(RuntimeError::CustomError(create_error(
-                                info.clone(),
-                                "Only dictionaries can define new elements with [...]",
-                                &[],
-                                None,
-                            )));
-                        }
+                        };
+                    }
+                    _ => {
+                        return Err(RuntimeError::CustomError(create_error(
+                            info.clone(),
+                            &format!("The expression `value{} = ...` is not allowed", p.fmt(0).fg(ariadne::Color::Red)),
+                            &[],
+                            None,
+                        )));
+                        
                     }
                 }
-                ast::Path::Associated(m) => {
-                    match &globals.stored_values[current_ptr] {
-                        Value::TypeIndicator(t) => match (*globals).implementations.get_mut(t) {
-                            Some(imp) => {
-                                if let Some((val, _)) = imp.get(m) {
-                                    current_ptr = *val;
-                                } else {
-                                    (*imp).insert(*m, (value, true));
-                                    defined = false;
-                                    current_ptr = value;
-                                }
-                            }
-                            None => {
-                                
-                                let mut new_imp = FnvHashMap::default();
-                                new_imp.insert(*m, (value, true));
-                                (*globals).implementations.insert(*t, new_imp);
-                                defined = false;
-                                current_ptr = value;
-                            }
-                        },
-                        _a => {
-                            return Err(RuntimeError::TypeError {
-                                expected: "type indicator".to_string(),
-                                found: globals.get_type_str(current_ptr),
-                                val_def: globals.get_area(current_ptr),
-                                info: info.clone(),
-                            });
-                            
-                        }
-                    };
-                }
-                _ => {
-                    return Err(RuntimeError::CustomError(create_error(
-                        info.clone(),
-                        &format!("Cannot run {} in a definition expression", p.fmt(0)),
-                        &[],
-                        None,
-                    )));
-                    
-                }
             }
-        }
 
-        if defined {
-            
+            if defined { 
+                results.push(DefineResult::AlreadyDefined)
+            } else {
+                results.push(DefineResult::Ok)
+            }
+            (*full_context.inner()).return_value2 = current_ptr;
+        }
+        let mut iter = results.into_iter();
+        let out = iter.next().unwrap();
+        if iter.any(|a| a != out) {
             return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
-                &format!("{} is already defined!", self.fmt(0)),
+                "This definition expression is executed in a split context, where some contexts make it an assign expression, while others make it a definition, which is not allowed",
                 &[],
                 None,
             )));
-        } else {
-            Ok(current_ptr)
         }
+        Ok(out)
     }
 }

@@ -173,6 +173,12 @@ impl FullContext {
     }
 }
 
+impl Default for FullContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Iterator type for a binary tree.
 /// This is a generator that progresses through an in-order traversal.
 pub struct ContextIter<'a> {

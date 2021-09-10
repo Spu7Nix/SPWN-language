@@ -228,6 +228,7 @@ impl SpwnFmt for StatementBody {
                 Some(expr) => format!("return {}", expr.fmt(ind)),
                 None => "return".to_string(),
             },
+            StatementBody::Definition(x) => x.fmt(ind),
             StatementBody::Impl(x) => x.fmt(ind),
             StatementBody::If(x) => x.fmt(ind),
             StatementBody::For(x) => x.fmt(ind),
@@ -459,7 +460,6 @@ impl SpwnFmt for UnaryOperator {
             UnaryOperator::Not => "!",
             UnaryOperator::Minus => "-",
             UnaryOperator::Range => "..",
-            UnaryOperator::Let => "let ",
             UnaryOperator::Decrement => "--",
             UnaryOperator::Increment => "++",
         }
@@ -469,7 +469,16 @@ impl SpwnFmt for UnaryOperator {
 
 impl SpwnFmt for Definition {
     fn fmt(&self, ind: Indent) -> String {
-        format!("let {} = {}", self.symbol, self.value.fmt(ind))
+        format!(
+            "{}{}{}",
+            if self.mutable { "let " } else { "" },
+            self.symbol.fmt(ind),
+            if let Some(value) = &self.value {
+                format!(" = {}", value.fmt(ind))
+            } else {
+                String::new()
+            }
+        )
     }
 }
 

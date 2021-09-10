@@ -3,6 +3,7 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
+use crate::ast::Operator;
 use crate::ast::StrInner;
 use crate::ast::StringFlags;
 
@@ -622,6 +623,25 @@ pub fn parse_statement(
             */
         }
 
+        Some(Token::Let) => {
+            // definition statement (at last)
+            // this branch only handles the immutable case, the immutable case is handled in the expression branch,
+            // because its equivalent to an assign expression
+            let symbol = parse_variable(tokens, notes, false)?;
+            let value = match tokens.next(false) {
+                Some(Token::Assign) => Some(parse_expr(tokens, notes, false, true)?),
+                _ => {
+                    tokens.previous();
+                    None
+                }
+            };
+            ast::StatementBody::Definition(ast::Definition {
+                symbol,
+                value,
+                mutable: true,
+            })
+        }
+
         Some(Token::Return) => {
             //parse return statement
 
@@ -867,7 +887,7 @@ pub fn parse_statement(
 
             //expression or call
             tokens.previous_no_ignore(false);
-            let expr = parse_expr(tokens, notes, true, true)?;
+            let mut expr = parse_expr(tokens, notes, true, true)?;
             if tokens.next(false) == Some(Token::Exclamation) {
                 //call
                 ast::StatementBody::Call(ast::Call {
@@ -875,22 +895,20 @@ pub fn parse_statement(
                 })
             } else {
                 // expression statement
-                // println!("found expr");
                 tokens.previous_no_ignore(false);
 
-                // comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone()
-                // {
-                //     (*expr.values.last_mut().unwrap()).comment.1 = None;
-                //     Some(comment)
-                // } else {
-                //     None
-                // };
-                /*println!(
-                    "current token after stmt post comment: {}: ",
-                    tokens.slice()
-                );*/
+                if expr.operators.first() == Some(&Operator::Assign) {
+                    let symbol = expr.values.remove(0);
+                    expr.operators.remove(0);
 
-                ast::StatementBody::Expr(expr)
+                    ast::StatementBody::Definition(ast::Definition {
+                        symbol,
+                        value: Some(expr),
+                        mutable: false,
+                    })
+                } else {
+                    ast::StatementBody::Expr(expr)
+                }
             }
         }
 
@@ -1960,10 +1978,6 @@ fn parse_variable(
             Some(ast::UnaryOperator::Range)
         }
 
-        Some(Token::Let) => {
-            first_token = tokens.next(false);
-            Some(ast::UnaryOperator::Let)
-        }
         Some(Token::Increment) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Increment)
