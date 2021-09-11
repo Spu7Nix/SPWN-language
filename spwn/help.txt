@@ -1,5 +1,6 @@
 Usage: spwn [subcommand] [flags]
 
+
 Subcommands:
     build [script file], b [script file]
     Runs/builds a given file
@@ -11,9 +12,6 @@ Subcommands:
     Gets the version of SPWN
 
 Flags:
-    --help, -h, (Any invalid flag)
-    Print this message
-
     --console-output, -c
     Makes the script print the created level into the console instead of
     writing it to your save file
@@ -37,3 +35,6 @@ Flags:
 
     --include-path [folder], -i [folder]
     Adds a search path to look for libraries
+
+
+Help: 'spwn' followed by any invalid argument will cause this message to be displayed
