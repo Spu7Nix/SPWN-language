@@ -195,9 +195,9 @@ impl @bfreader {
             move_to = !{
                 condition = () => !(layers == 0 && self.close == 1)
                 
-                while_loop(condition, delay = 0, (){
+                while_loop(condition, delay = 0.05, (){
                     
-                    wait(0.05)
+                    
                     -> if self.open == 1{
                         layers += 1
                     }
@@ -220,8 +220,8 @@ impl @bfreader {
         else if current == CLOSE {
             move_back = !{
                 condition = ()=> !(layers == 0 && self.open == 1)
-                while_loop(condition, delay = 0, (){
-                    wait(0.05)
+                while_loop(condition, delay = 0.05, (){
+                    
                     -> if self.close == 1 {
                         layers += 1
                     }

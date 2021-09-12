@@ -293,7 +293,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 }
                             }
                         }
-                        dbg!(&reserved);
 
                         let has_stuff = compiled.func_ids.iter().any(|x| !x.obj_list.is_empty());
                         if opti_enabled && has_stuff {

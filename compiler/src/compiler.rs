@@ -23,6 +23,7 @@ use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
 use fnv::FnvHashMap;
+use std::fmt::Debug;
 use std::mem;
 
 use errors::RuntimeError;
@@ -297,15 +298,49 @@ pub fn compile_scope(
                             // convert to assign expr
                             for full_context in contexts.iter() {
                                 let ptr = full_context.inner().return_value2;
+                                if !globals.is_mutable(ptr)
+                                    && globals.stored_values[ptr]
+                                        .clone()
+                                        .member(
+                                            Intern::new(String::from(Builtin::AssignOp)),
+                                            full_context.inner(),
+                                            globals,
+                                            info.clone(),
+                                        )
+                                        .is_none()
+                                {
+                                    use parser::fmt::SpwnFmt;
+                                    let symbol = SpwnFmt::fmt(&def.symbol, 0);
+                                    return Err(RuntimeError::CustomError(create_error(
+                                        info.clone(),
+                                        &format!("This constant `{}` is already defined", symbol),
+                                        &[
+                                            (
+                                                globals.get_area(ptr),
+                                                &format!("`{}` was first defined here", symbol),
+                                            ),
+                                            (info.position, "Attempted to redefine it here"),
+                                        ],
+                                        Some(&format!("If you want to redefine the constant, consider using `[{}] = [{}]` instead", symbol, {
+                                            let val = SpwnFmt::fmt(def.value.as_ref().unwrap(), 0);
+                                            if val.len() > 10 {
+                                                format!("{}{}", &val[..8], ariadne::Fmt::fg("...", ariadne::Color::Cyan))
+                                            } else {
+                                                val
+                                            }
+                                        })),
+                                    )));
+                                }
 
                                 if let Some(value) = &def.value {
                                     if pre_evaled {
-                                        built_in_function(
+                                        handle_operator(
+                                            ptr,
+                                            full_context.inner().return_value,
                                             Builtin::AssignOp,
-                                            vec![ptr, full_context.inner().return_value],
-                                            info.clone(),
-                                            globals,
                                             full_context,
+                                            globals,
+                                            &info,
                                         )?;
                                     } else {
                                         let symbol = ast::ValueBody::Resolved(ptr)

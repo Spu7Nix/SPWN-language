@@ -30,7 +30,7 @@ pub type FnIdPtr = usize;
 //pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub struct TriggerOrder(pub f32);
+pub struct TriggerOrder(pub f64);
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionId {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id

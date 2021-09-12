@@ -469,7 +469,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
                 }
                 ObjectMode::Trigger => {
                     let y_pos = (i as u16) % possible_height + START_HEIGHT + y_offset;
-                    let x_pos = (i as f64 / possible_height as f64).floor() as u32 + x_offset;
+                    let x_pos = x_offset;
 
                     let spawned = match obj.params.get(&62) {
                         Some(ObjParam::Bool(b)) => *b,
@@ -495,7 +495,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
                         2,
                         if spawned {
                             ObjParam::Number(
-                                (x_pos * (MAX_HEIGHT - START_HEIGHT) as u32 * DELTA_X as u32
+                                (x_pos * (MAX_HEIGHT - START_HEIGHT) as u32
                                     + 15
                                     + i as u32 * DELTA_X as u32)
                                     as f64,

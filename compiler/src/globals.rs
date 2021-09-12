@@ -46,7 +46,7 @@ pub struct Globals {
 
     pub prev_imports: FnvHashMap<ImportType, (StoredValue, Implementations)>,
 
-    pub trigger_order: f32,
+    pub trigger_order: f64,
 
     pub uid_counter: usize,
     pub implementations: Implementations,
