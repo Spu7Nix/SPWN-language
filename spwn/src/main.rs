@@ -379,6 +379,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // doc builtins
                         let doc = builtins::builtin_docs();
                         fs::write("builtins.md", doc)?;
+                        print_with_color("Written to ./builtins.md", Color::Green);
                     } else {
                         let cache = FileCache::default();
 

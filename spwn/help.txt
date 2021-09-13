@@ -4,8 +4,9 @@ Subcommands:
     build [script file], b [script file]
     Runs/builds a given file
 
-    doc [library path]
-    Generates documentation for a SPWN library, in the form of a markdown file
+    doc [library/module path/`$`]
+    Generates documentation for a SPWN library, in the form of a markdown file 
+    (do `spwn doc $` to get documentation for built-in functions)
 
     version, -v, --version
     Gets the version of SPWN

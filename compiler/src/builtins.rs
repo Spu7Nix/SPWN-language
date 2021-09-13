@@ -1272,8 +1272,8 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
     }
 
-    [ReadFile] #[safe = false, desc = "", example = ""]
-    fn readfile() {
+    [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local system", example = "data = $.readfile(\"file.txt\")"]
+    fn readfile(#["Path of file to read, and the format it's in (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"]) {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
                 message: String::from("Expected 1 or 2 arguments, the path to the file and the data format (default: utf-8)"),
@@ -1291,7 +1291,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                         } else {
                             return Err(RuntimeError::BuiltinError {
                                 message:
-                                    "Data format needs to be a string (\"text\" or \"bin\")"
+                                    "Data format needs to be a string (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"
                                         .to_string(),
                                 info,
                             });
@@ -1501,7 +1501,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
     }
 
 
-    [WriteFile] #[safe = false, desc = "", example = ""]
+    [WriteFile] #[safe = false, desc = "Writes a string to a file in the local system (any previous content will be overwritten, and a new file will be created if it does not already exist)", example = "$.write_file(\"file.txt\", \"Hello\")"]
     fn writefile((path): Str, (data): Str) {
 
 
@@ -1517,7 +1517,11 @@ $.random(1, 10) // returns a random integer between 1 and 10
         Value::Null
     }
 
-    [Pop] #[safe = true, desc = "Removes a value from the end of an array. You can also use `array.pop()`", example = ""]
+    [Pop] #[safe = true, desc = "Removes a value from the end of an array, and returns it. You can also use `array.pop()`", example = "
+let arr = [1, 2, 3]
+$.assert($.pop(arr) == 3)
+$.assert(arr == [1, 2])
+    "]
     fn pop(mut (arr)) {
 
         let typ = globals.get_type_str(arguments[0]);
@@ -1540,7 +1544,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
     }
 
-    [Substr] #[safe = true, desc = "", example = ""]
+    [Substr] #[safe = true, desc = "Returns a specified part of the input string", example = "$.substr(\"hello there\", 1, 5)"]
     fn substr((val): Str, (start_index): Number, (end_index): Number) {
         let start_index = start_index as usize;
         let end_index = end_index as usize;
@@ -1559,7 +1563,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
         Value::Str(val.as_str()[start_index..end_index].to_string())
     }
 
-    [RemoveIndex] #[safe = true, desc = "", example = ""]
+    [RemoveIndex] #[safe = true, desc = "Removes a specific value from an array. You can also use `array.remove(index)`", example = "$.remove_index(names, 2)"]
     fn remove_index(mut (arr), (index): Number) {
 
         let typ = globals.get_type_str(arguments[0]);
@@ -1580,7 +1584,8 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
     }
 
-    [Regex] #[safe = true, desc = "", example = ""] fn regex((regex): Str, (s): Str, (mode): Str, (replace)) {
+    [Regex] #[safe = true, desc = "Performs a regex operation on a string", example = ""]
+    fn regex(#["`mode` can be either \"match\", \"replace\" or \"findall\""](regex): Str, (s): Str, (mode): Str, (replace)) {
         use regex::Regex;
 
 
@@ -1638,7 +1643,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
 
     }
 
-    [RangeOp] #[safe = true, desc = "", example = ""]
+    [RangeOp] #[safe = true, desc = "Default implementation of the `..` operator", example = "$._range_(0, 10)"]
     fn _range_((val_a), (b): Number) {
         let end = convert_to_int(b, &info)?;
         match val_a {
@@ -1685,32 +1690,49 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
     }
     // unary operators
-    [IncrOp] #[safe = true, desc = "", example = ""]            fn _increment_(mut (a): Number)                 { a += 1.0; Value::Number(a - 1.0)}
-    [DecrOp] #[safe = true, desc = "", example = ""]            fn _decrement_(mut (a): Number)                 { a -= 1.0; Value::Number(a + 1.0)}
+    [IncrOp] #[safe = true, desc = "Default implementation of the `n++` operator", example = "$._increment_(n)"]
+    fn _increment_(mut (a): Number) { a += 1.0; Value::Number(a - 1.0)}
+    [DecrOp] #[safe = true, desc = "Default implementation of the `n--` operator", example = "_decrement_(n)"]
+    fn _decrement_(mut (a): Number) { a -= 1.0; Value::Number(a + 1.0)}
 
-    [PreIncrOp] #[safe = true, desc = "", example = ""]         fn _pre_increment_(mut (a): Number)             { a += 1.0; Value::Number(a)}
-    [PreDecrOp] #[safe = true, desc = "", example = ""]         fn _pre_decrement_(mut (a): Number)             { a -= 1.0; Value::Number(a)}
+    [PreIncrOp] #[safe = true, desc = "Default implementation of the `++n` operator", example = "$._pre_increment_(n)"]
+    fn _pre_increment_(mut (a): Number) { a += 1.0; Value::Number(a)}
+    [PreDecrOp] #[safe = true, desc = "Default implementation of the `--n` operator", example = "$._pre_decrement_(n)"]
+    fn _pre_decrement_(mut (a): Number) { a -= 1.0; Value::Number(a)}
 
-    [NegOp] #[safe = true, desc = "", example = ""]             fn _negate_((a): Number)                        { Value::Number(-a)}
-    [NotOp] #[safe = true, desc = "", example = ""]             fn _not_((a): Bool)                             { Value::Bool(!a)}
-    [UnaryRangeOp] #[safe = true, desc = "", example = ""]      fn _unary_range_((a): Number)                   { Value::Range(0, convert_to_int(a, &info)?, 1)}
+    [NegOp] #[safe = true, desc = "Default implementation of the `-n` operator", example = "$._negate_(n)"]
+    fn _negate_((a): Number) { Value::Number(-a)}
+    [NotOp] #[safe = true, desc = "Default implementation of the `!b` operator", example = "$._not_(b)"]
+    fn _not_((a): Bool) { Value::Bool(!a)}
+    [UnaryRangeOp] #[safe = true, desc = "Default implementation of the `..n` operator", example = "$._unary_range_(n)"]
+    fn _unary_range_((a): Number) { Value::Range(0, convert_to_int(a, &info)?, 1)}
 
     // operators
-    [OrOp] #[safe = true, desc = "", example = ""]              fn _or_((a): Bool, (b): Bool)                   { Value::Bool(a || b) }
-    [AndOp] #[safe = true, desc = "", example = ""]             fn _and_((a): Bool, (b): Bool)                  { Value::Bool(a && b) }
+    [OrOp] #[safe = true, desc = "Default implementation of the `||` operator", example = "	$._or_(true, false)"]
+    fn _or_((a): Bool, (b): Bool) { Value::Bool(a || b) }
+    [AndOp] #[safe = true, desc = "Default implementation of the `&&` operator", example = "$._and_(true, true)"]
+    fn _and_((a): Bool, (b): Bool) { Value::Bool(a && b) }
 
-    [MoreThanOp] #[safe = true, desc = "", example = ""]        fn _more_than_((a): Number, (b): Number)        { Value::Bool(a > b) }
-    [LessThanOp] #[safe = true, desc = "", example = ""]        fn _less_than_((a): Number, (b): Number)        { Value::Bool(a < b) }
+    [MoreThanOp] #[safe = true, desc = "Default implementation of the `>` operator", example = "$._more_than_(100, 50)"]
+    fn _more_than_((a): Number, (b): Number) { Value::Bool(a > b) }
+    [LessThanOp] #[safe = true, desc = "Default implementation of the `<` operator", example = "$._less_than_(50, 100)"]
+    fn _less_than_((a): Number, (b): Number) { Value::Bool(a < b) }
 
-    [MoreOrEqOp] #[safe = true, desc = "", example = ""]        fn _more_or_equal_((a): Number, (b): Number)    { Value::Bool(a >= b) }
-    [LessOrEqOp] #[safe = true, desc = "", example = ""]        fn _less_or_equal_((a): Number, (b): Number)    { Value::Bool(a <= b) }
+    [MoreOrEqOp] #[safe = true, desc = "Default implementation of the `>=` operator", example = "$._more_or_equal_(100, 100)"]
+    fn _more_or_equal_((a): Number, (b): Number) { Value::Bool(a >= b) }
+    [LessOrEqOp] #[safe = true, desc = "Default implementation of the `<=` operator", example = "$._less_or_equal_(100, 100)"]
+    fn _less_or_equal_((a): Number, (b): Number) { Value::Bool(a <= b) }
 
-    [EqOp] #[safe = true, desc = "", example = ""]              fn _equal_((a), (b))                            { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
-    [NotEqOp] #[safe = true, desc = "", example = ""]           fn _not_equal_((a), (b))                        { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
+    [EqOp] #[safe = true, desc = "Default implementation of the `==` operator", example = "$._equal_(\"hello\", \"hello\")"]
+    fn _equal_((a), (b)) { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
+    [NotEqOp] #[safe = true, desc = "Default implementation of the `!=` operator", example = "$._not_equal_(\"hello\", \"bye\")"]
+    fn _not_equal_((a), (b)) { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
 
-    [DividedByOp] #[safe = true, desc = "", example = ""]       fn _divided_by_((a): Number, (b): Number)       { Value::Number(a / b) }
-    [IntdividedByOp] #[safe = true, desc = "", example = ""]    fn _intdivided_by_((a): Number, (b): Number)    { Value::Number((a / b).floor()) }
-    [TimesOp] #[safe = true, desc = "", example = ""]
+    [DividedByOp] #[safe = true, desc = "Default implementation of the `/` operator", example = "$._divided_by_(64, 8)"]
+    fn _divided_by_((a): Number, (b): Number) { Value::Number(a / b) }
+    [IntdividedByOp] #[safe = true, desc = "Default implementation of the `/%` operator", example = "$._intdivided_by_(64, 8)"]
+    fn _intdivided_by_((a): Number, (b): Number) { Value::Number((a / b).floor()) }
+    [TimesOp] #[safe = true, desc = "Default implementation of the `*` operator", example = "$._times_(8, 8)"]
     fn _times_((a), (b): Number) {
         match a {
             Value::Number(a) => Value::Number(a * b),
@@ -1749,9 +1771,12 @@ $.random(1, 10) // returns a random integer between 1 and 10
             }
         }
     }
-    [ModOp] #[safe = true, desc = "", example = ""]             fn _mod_((a): Number, (b): Number)              { Value::Number(a.rem_euclid(b)) }
-    [PowOp] #[safe = true, desc = "", example = ""]             fn _pow_((a): Number, (b): Number)              { Value::Number(a.powf(b)) }
-    [PlusOp] #[safe = true, desc = "", example = ""] fn _plus_((a), (b)) {
+    [ModOp] #[safe = true, desc = "Default implementation of the `%` operator", example = "$._mod_(70, 8)"]
+    fn _mod_((a): Number, (b): Number) { Value::Number(a.rem_euclid(b)) }
+    [PowOp] #[safe = true, desc = "Default implementation of the `^` operator", example = "$._pow_(8, 2)"]
+    fn _pow_((a): Number, (b): Number) { Value::Number(a.powf(b)) }
+    [PlusOp] #[safe = true, desc = "Default implementation of the `+` operator", example = "$._plus_(32, 32)"]
+    fn _plus_((a), (b)) {
         match (a, b) {
             (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
             (Value::Str(a), Value::Str(b)) => Value::Str(a + &b),
@@ -1783,13 +1808,16 @@ $.random(1, 10) // returns a random integer between 1 and 10
             }
         }
     }
-    [MinusOp] #[safe = true, desc = "", example = ""]           fn _minus_((a): Number, (b): Number)            { Value::Number(a - b) }
-    [AssignOp] #[safe = true, desc = "", example = ""]           fn _assign_(mut (a), (b))                      {
+    [MinusOp] #[safe = true, desc = "Default implementation of the `-` operator", example = "$._minus_(128, 64)"]
+    fn _minus_((a): Number, (b): Number) { Value::Number(a - b) }
+    [AssignOp] #[safe = true, desc = "Default implementation of the `=` operator", example = "$._assign_(val, 64)"]
+    fn _assign_(mut (a), (b)) {
         a = b;
         (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
         Value::Null
     }
-    [SwapOp] #[safe = true, desc = "", example = ""]           fn _swap_(mut (a), mut (b))                      {
+    [SwapOp] #[safe = true, desc = "Default implementation of the `<=>` operator", example = "$._swap_(a, b)"]
+    fn _swap_(mut (a), mut (b)) {
 
         std::mem::swap(&mut a, &mut b);
         (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
@@ -1797,7 +1825,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
         Value::Null
     }
 
-    [HasOp] #[safe = true, desc = "", example = ""]
+    [HasOp] #[safe = true, desc = "Default implementation of the `has` operator", example = "$._has_([1,2,3], 2)"]
     fn _has_((a), (b)) {
         match (a, b) {
             (Value::Array(ar), _) => {
@@ -1902,10 +1930,12 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
     }
 
-    [AsOp] #[safe = true, desc = "", example = ""]              fn _as_((a), (t): TypeIndicator)                    { convert_type(&a,t,&info,globals,context)? }
+    [AsOp] #[safe = true, desc = "Default implementation of the `as` operator", example = "$._as_(1000, @string)"]
+    fn _as_((a), (t): TypeIndicator) { convert_type(&a,t,&info,globals,context)? }
 
-    [SubtractOp] #[safe = true, desc = "", example = ""]        fn _subtract_(mut (a): Number, (b): Number)         { a -= b; Value::Null }
-    [AddOp] #[safe = true, desc = "", example = ""]
+    [SubtractOp] #[safe = true, desc = "Default implementation of the `-=` operator", example = "$._subtract_(val, 10)"]
+    fn _subtract_(mut (a): Number, (b): Number) { a -= b; Value::Null }
+    [AddOp] #[safe = true, desc = "Default implementation of the `+=` operator", example = "$._add_(val, 10)"]
     fn _add_(mut (a), (b)) {
         match (&mut a, b) {
             (Value::Number(a), Value::Number(b)) => *a += b,
@@ -1931,7 +1961,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
         Value::Null
     }
-    [MultiplyOp] #[safe = true, desc = "", example = ""]        fn _multiply_(mut (a), (b): Number)         {
+    [MultiplyOp] #[safe = true, desc = "Default implementation of the `*=` operator", example = "$._multiply_(val, 10)"]        fn _multiply_(mut (a), (b): Number)         {
         match &mut a {
             Value::Number(a) => *a *= b,
             Value::Str(a) => *a = a.repeat(convert_to_int(b, &info)? as usize),
@@ -1954,12 +1984,16 @@ $.random(1, 10) // returns a random integer between 1 and 10
         };
         Value::Null
     }
-    [DivideOp] #[safe = true, desc = "", example = ""]          fn _divide_(mut (a): Number, (b): Number)           { a /= b; Value::Null }
-    [IntdivideOp] #[safe = true, desc = "", example = ""]       fn _intdivide_(mut (a): Number, (b): Number)        { a /= b; a = a.floor(); Value::Null }
-    [ExponateOp] #[safe = true, desc = "", example = ""]        fn _exponate_(mut (a): Number, (b): Number)         { a = a.powf(b); Value::Null }
-    [ModulateOp] #[safe = true, desc = "", example = ""]        fn _modulate_(mut (a): Number, (b): Number)         { a = a.rem_euclid(b); Value::Null }
+    [DivideOp] #[safe = true, desc = "Default implementation of the `/=` operator", example = "$._divide_(val, 3)"]
+    fn _divide_(mut (a): Number, (b): Number) { a /= b; Value::Null }
+    [IntdivideOp] #[safe = true, desc = "Default implementation of the `/%=` operator", example = "$._intdivide_(val, 3)"]
+    fn _intdivide_(mut (a): Number, (b): Number) { a /= b; a = a.floor(); Value::Null }
+    [ExponateOp] #[safe = true, desc = "Default implementation of the `^=` operator", example = "$._exponate_(val, 3)"]
+    fn _exponate_(mut (a): Number, (b): Number) { a = a.powf(b); Value::Null }
+    [ModulateOp] #[safe = true, desc = "Default implementation of the `%=` operator", example = "$._modulate_(val, 3)"]
+    fn _modulate_(mut (a): Number, (b): Number) { a = a.rem_euclid(b); Value::Null }
 
-    [EitherOp] #[safe = true, desc = "", example = ""]
+    [EitherOp] #[safe = true, desc = "Default implementation of the `|` operator", example = "$._either_(@number, @counter)"]
     fn _either_((a), (b)) {
         Value::Pattern(Pattern::Either(
             if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, context)? {
@@ -1974,13 +2008,13 @@ $.random(1, 10) // returns a random integer between 1 and 10
             },
         ))
     }
-    [DisplayOp] #[safe = true, desc = "", example = ""] fn _display_((a)) {
+    [DisplayOp] #[safe = true, desc = "returns the default value display string for the given value", example = "$._display_(counter()) // \"@counter::{ item: ?i, bits: 16 }\""] fn _display_((a)) {
         unsafe {
             let ptr: *mut Globals = globals;
             Value::Str(a.to_str_full(globals, |val| display_val(val.clone(), full_context.as_mut().unwrap(), ptr, &info))?)
         }
     }
-    [Display] #[safe = true, desc = "", example = ""] fn display((a)) {
+    [Display] #[safe = true, desc = "returns the value display string for the given value", example = "$.display(counter()) // \"counter(?i, bits = 16)\""] fn display((a)) {
         unsafe {
             let ctx = full_context.as_mut().unwrap();
             handle_unary_operator(arguments[0], Builtin::DisplayOp, ctx, globals, &info)?;

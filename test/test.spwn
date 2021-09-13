@@ -1,5 +1,2 @@
-let a = complex(10)
 
-a *= @complex::I()
-
-$.print(a)
+$.print($._display_(EASE_IN_OUT))
