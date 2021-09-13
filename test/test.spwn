@@ -1,2 +1,5 @@
-hello = 0
-$.print(helol)
+let a = complex(10)
+
+a *= @complex::I()
+
+$.print(a)

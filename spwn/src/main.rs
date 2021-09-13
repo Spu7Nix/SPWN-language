@@ -380,13 +380,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let doc = builtins::builtin_docs();
                         fs::write("builtins.md", doc)?;
                     } else {
+                        let cache = FileCache::default();
+
                         match documentation::document_lib(lib_path) {
                             Ok(_) => (),
-                            Err(_) => {
-                                eprintln!(
-                                    "{}",
-                                    "Error when compiling library!".fg(ariadne::Color::Red)
-                                );
+                            Err(e) => {
+                                create_report(ErrorReport::from(e)).eprint(cache).unwrap();
                                 std::process::exit(ERROR_EXIT_CODE);
                             }
                         };

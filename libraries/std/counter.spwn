@@ -689,11 +689,21 @@ c /= 6
 c = counter(23)
 c = 42
 // c is now 42
-    ")](self, num: @number | @counter) {
+    ")](self, num: @number | @counter | @bool) {
         self.reset()
         if num.type == @number {
+            if self.bits == 1 {
+                throw "You can only assign booleans to a counter initialized with a boolean"
+            }
             if num > 0 {
                 self.add(num)
+            }
+        } else if num.type == @bool {
+            if self.bits != 1 {
+                throw "You can only assign a boolean to a counter initialized with a boolean (for example `counter(true)`)"
+            }
+            if num {
+                self.add(1)
             }
         } else if num.type == @counter {
             num.copy_to(self)
@@ -777,6 +787,9 @@ b = c as @bool
     ")]
     (self, _type: @type_indicator) {
         if _type == @bool {
+            if self.bits != 1 {
+                throw "A counter must be initialized with a boolean (for example `counter(true)`) for it to be convertable to a boolean"
+            }
             -> return self != 0
         } else {
             throw "Cannot convert counter to " + _type as @string + " (counter can convert to a number using the counter.to_const macro)"
@@ -792,6 +805,10 @@ on(c.reaches(10), !{
 })
     ")] (self, #[desc("Value to reach")] value: @number) {
         return self.item.count(value)
+    },
+
+    _display_: #[desc("Formats the counter to a printable string")] (self) {
+        return "counter(" + $.display(self.item) + ", bits = " + $.display(self.bits) + ")"
     }
 
 }

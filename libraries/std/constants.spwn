@@ -5,19 +5,52 @@ type @easing_type
 
 //comparison
 cmp = (id: @number) {
-    return @comparison::{id: id}
+    return @comparison::{id}
 }
 
 //easing type
 et = (id: @number) {
-    return @easing_type::{id: id}
+    return @easing_type::{id}
 }
 
 //object key
 ok = (id: @number, pat: @pattern | @type_indicator) {
-    return @object_key::{id: id, pattern: pat}
+    return @object_key::{id, pattern: pat}
 }
 
+@easing_type::_display_ = (self) {
+    return switch self.id {
+        case 0: "NONE",
+        case 1: "EASE_IN_OUT",
+        case 2: "EASE_IN",
+        case 3: "EASE_OUT",
+        case 4: "ELASTIC_IN_OUT",
+        case 5: "ELASTIC_IN",
+        case 6: "ELASTIC_OUT",
+        case 7: "BOUNCE_IN_OUT",
+        case 8: "BOUNCE_IN",
+        case 9: "BOUNCE_OUT",
+        case 10: "EXPONENTIAL_IN_OUT",
+        case 11: "EXPONENTIAL_IN",
+        case 12: "EXPONENTIAL_OUT",
+        case 13: "SINE_IN_OUT",
+        case 14: "SINE_IN",
+        case 15: "SINE_OUT",
+        case 16: "BACK_IN_OUT",
+        case 17: "BACK_IN",
+        case 18: "BACK_OUT",
+        else: $._display_(self)
+    }
+}
+
+@comparison::_display_ = (self) {
+    return switch self.id {
+        case 0: "EQUAL_TO",
+        case 1: "LARGER_THAN",
+        case 2: "SMALLER_THAN",
+        else: $._display_(self)
+    }
+}
 
 return {
     easing_types : {

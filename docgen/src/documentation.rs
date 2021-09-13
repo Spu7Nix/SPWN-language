@@ -18,15 +18,28 @@ use std::fs::File;
 use fnv::FnvHashMap;
 use std::env::current_dir;
 use std::path::PathBuf;
-fn create_doc_file(mut dir: PathBuf, name: String, content: &str) {
+fn create_doc_file(mut dir: PathBuf, mut name: String, content: &str) -> String {
     use std::io::Write;
-    dir.push(format!("{}.md", name));
+
+    find_avaliable_name(&mut dir, &mut name);
     let mut output_file = File::create(&dir).unwrap();
     output_file.write_all(content.as_bytes()).unwrap();
     println!("written to {:?}", dir);
+    name
+}
+
+fn find_avaliable_name(dir: &mut PathBuf, name: &mut String) {
+    dir.push(format!("{}.md", name));
+    while dir.exists() {
+        dir.pop();
+        name.push('_');
+        dir.push(format!("{}.md", name));
+    }
 }
 pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
-    let mut globals = Globals::new(PathBuf::new(), BuiltinPermissions::new());
+    let mut globals_path = std::env::current_dir().unwrap();
+    globals_path.push("temp"); // this folder doesn't actually exist, but it needs to be there because .parent is called in import_module
+    let mut globals = Globals::new(globals_path, BuiltinPermissions::new());
 
     let mut start_context = FullContext::new();
 
@@ -34,7 +47,21 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     // store_value(Value::Null, 1, &mut globals, &start_context);
 
     let mut output_path = current_dir().unwrap();
-    output_path.push(PathBuf::from(format!("{}-docs", path)));
+    let is_module = path.contains('.');
+
+    let name: String = if is_module {
+        let p = PathBuf::from(path);
+        // let mut new_path = globals.path.as_ref().clone();
+        // new_path.push(p.clone());
+        // globals.path = Intern::new(new_path);
+        p.file_stem()
+            .expect("invalid module path")
+            .to_string_lossy()
+            .to_string()
+    } else {
+        path.to_string()
+    };
+    output_path.push(PathBuf::from(format!("{}-docs", name)));
     if !output_path.exists() {
         std::fs::create_dir(output_path.clone()).unwrap();
     }
@@ -51,7 +78,11 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     );
 
     import_module(
-        &ImportType::Lib(path.to_string()),
+        &if is_module {
+            ImportType::Script(PathBuf::from(path))
+        } else {
+            ImportType::Lib(path.to_string())
+        },
         &mut start_context,
         &mut globals,
         info,
@@ -67,7 +98,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         )));
     }
 
-    let mut doc = format!("# Documentation for `{}` \n", path);
+    let mut doc = format!("# Documentation for `{}` \n", name);
 
     let exports = globals.stored_values[start_context.inner().return_value].clone();
     let implementations = globals.implementations.clone();
@@ -103,7 +134,17 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         doc += "# Type Implementations:\n";
 
         let mut list: Vec<_> = implementations
-            .iter()
+            .into_iter()
+            .map(|(a, map)| {
+                (
+                    a,
+                    if is_module {
+                        map.into_iter().filter(|(_, (_, a))| *a).collect()
+                    } else {
+                        map
+                    },
+                )
+            })
             .filter(|(_, a)| !a.is_empty())
             .map(|(key, val)| {
                 (
@@ -114,31 +155,39 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                 )
             })
             .collect();
-        list.sort_by(|a, b| a.0.cmp(b.0));
+        list.sort_by(|a, b| a.0.cmp(&b.0));
         for (typ, dict) in list.iter() {
-            let type_name = find_key_for_value(&globals.type_ids, **typ)
+            let mut type_name = find_key_for_value(&globals.type_ids, *typ)
                 .expect("Implemented type was not found!")
                 .clone();
 
-            doc += &format!("- [**@{1}**]({}-docs/{1}.md)\n", path, type_name);
+            find_avaliable_name(&mut output_path.clone(), &mut type_name);
+            doc += &format!("- [**@{1}**]({}-docs/{1}.md)\n", name, type_name);
 
             let content = &format!(
                 "  \n# **@{}**: \n {}",
                 type_name,
-                document_dict(dict, &mut globals)
+                document_dict(dict, &mut globals, &mut start_context)?
             );
 
             create_doc_file(output_path.clone(), type_name, content);
         }
     }
 
-    doc += &format!("# Exports:\n{}", document_val(&exports, &mut globals));
+    doc += &format!(
+        "# Exports:\n{}",
+        document_val(&exports, &mut globals, &mut start_context)?
+    );
 
-    create_doc_file(output_path, format!("{}-docs", path), &doc);
+    create_doc_file(output_path, format!("{}-docs", name), &doc);
     Ok(())
 }
 
-fn document_dict(dict: &FnvHashMap<Intern<String>, StoredValue>, globals: &mut Globals) -> String {
+fn document_dict(
+    dict: &FnvHashMap<Intern<String>, StoredValue>,
+    globals: &mut Globals,
+    full_context: &mut FullContext,
+) -> Result<String, RuntimeError> {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
     type ValList = Vec<(Intern<String>, StoredValue)>;
     let mut categories = [
@@ -166,10 +215,10 @@ fn document_dict(dict: &FnvHashMap<Intern<String>, StoredValue>, globals: &mut G
         list.sort_by_key(|a| a.0);
     }
 
-    let mut document_member = |key: &String, val: &StoredValue| -> String {
+    let mut document_member = |key: &String, val: &StoredValue| -> Result<String, RuntimeError> {
         let mut member_doc = String::new();
         let inner_val = globals.stored_values[*val].clone();
-        let val_str = document_val(&inner_val, globals);
+        let val_str = document_val(&inner_val, globals, full_context)?;
         let mut formatted = String::new();
 
         for line in val_str.lines() {
@@ -187,7 +236,7 @@ fn document_dict(dict: &FnvHashMap<Intern<String>, StoredValue>, globals: &mut G
             key.replace("_", "\\_"),
             formatted
         );
-        member_doc
+        Ok(member_doc)
     };
 
     for list in categories {
@@ -195,15 +244,19 @@ fn document_dict(dict: &FnvHashMap<Intern<String>, StoredValue>, globals: &mut G
             doc += &format!("\n## {}:\n", list.0);
 
             for (key, val) in list.1.iter() {
-                doc += &document_member(key.as_ref(), val)
+                doc += &document_member(key.as_ref(), val)?
             }
         }
     }
 
-    doc
+    Ok(doc)
 }
 
-fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
+fn document_macro(
+    mac: &Macro,
+    globals: &mut Globals,
+    full_context: &mut FullContext,
+) -> Result<String, RuntimeError> {
     //description
     let mut doc = String::new();
     if let Some(s) = mac.tag.get_desc() {
@@ -239,14 +292,22 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
 
             if let Some(typ) = arg.pattern {
                 let val = &globals.stored_values[typ].clone();
-                arg_string += &format!(" {} |", val.to_str(globals).replace("|", "or"));
+                arg_string += &format!(
+                    " {} |",
+                    val.display(full_context, globals, &CompilerInfo::new())?
+                        .replace("|", "or")
+                );
             } else {
                 arg_string += "any |";
             }
 
             if let Some(def_val) = arg.default {
                 let val = &globals.stored_values[def_val].clone();
-                arg_string += &format!(" `{}` |", val.to_str(globals).replace("\n", ""));
+                arg_string += &format!(
+                    " `{}` |",
+                    val.display(full_context, globals, &CompilerInfo::new())?
+                        .replace("\n", "")
+                );
             } else {
                 arg_string += " |";
             }
@@ -267,12 +328,15 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
 
     //arguments
 
-    doc
+    Ok(doc)
 }
 
-fn document_val(val: &Value, globals: &mut Globals) -> String {
+fn document_val(
+    val: &Value,
+    globals: &mut Globals,
+    full_context: &mut FullContext,
+) -> Result<String, RuntimeError> {
     let mut doc = String::new();
-    let mut full_context = FullContext::new();
     let typ_index = val
         .member(
             globals.TYPE_MEMBER_NAME,
@@ -286,13 +350,14 @@ fn document_val(val: &Value, globals: &mut Globals) -> String {
         _ => unreachable!(),
     };
 
+    let literal = val.display(full_context, globals, &CompilerInfo::new())?;
+
     let type_name =
         find_key_for_value(&globals.type_ids, type_id).expect("Implemented type was not found!");
 
-    let literal = val.to_str(globals);
     if literal.len() < 300 {
         doc += &format!(
-            " **Value:** \n```spwn\n{}\n``` \n**Type:** `@{}` \n",
+            " **Printed:** \n```spwn\n{}\n``` \n**Type:** `@{}` \n",
             literal, type_name
         );
     } else {
@@ -300,15 +365,15 @@ fn document_val(val: &Value, globals: &mut Globals) -> String {
     }
 
     doc += &match &val {
-        Value::Dict(d) => document_dict(d, globals),
-        Value::Macro(m) => document_macro(m, globals),
+        Value::Dict(d) => document_dict(d, globals, full_context)?,
+        Value::Macro(m) => document_macro(m, globals, full_context)?,
         _ => String::new(),
     };
 
     //add_arrows(&mut doc);
 
     //doc += "\n  ";
-    doc
+    Ok(doc)
 }
 
 // fn add_arrows(string: &mut String) {

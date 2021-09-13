@@ -275,6 +275,9 @@ impl @complex {
     },
     acsc: (self) {
         return self.invert().asin()
-    }
+    },
+	_display_: (self) {
+		return @string(self.re) + " + " + @string(self.im) + "i"
+	}
 
 }

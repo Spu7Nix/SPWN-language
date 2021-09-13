@@ -42,18 +42,18 @@ impl @binaryCalculator {
             tempcounters.push(counter());
         }
 
-        source.copy_to(tempcounters, speed = 10);
+        source.copy_to(tempcounters);
 
         for i in ..self.bitCounters.length {
             -> () {
-                tempcounters[i].divide(2 ^ i, speed = calcSpeed);
-                tempcounters[i].divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i], speed = calcSpeed);
+                tempcounters[i].divide(2 ^ i);
+                tempcounters[i].divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i]);
             }();
         }
     },
     prettyDecimalToBinary: (self, source: @counter, calcSpeed: @number = 10) {
         for i in ..self.bitCounters.length {
-            source.divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i], speed = calcSpeed);
+            source.divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i]);
         }
 
         self.binaryToDecimal(source);

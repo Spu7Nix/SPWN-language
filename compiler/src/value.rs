@@ -244,8 +244,8 @@ impl Value {
             }
         }
     }
-    pub fn to_str(&self, globals: &Globals) -> String {
-        match self {
+    pub fn to_str_full<F, E>(&self, globals: &Globals, mut display_inner: F) -> Result<String, E> where F: FnMut(&Self) -> Result<String, E> {
+        Ok(match self {
             Value::Group(g) => {
                 (if let Id::Specific(id) = g.id {
                     id.to_string()
@@ -290,7 +290,7 @@ impl Value {
                 let mut d = dict_in.clone();
                 if let Some(n) = d.get(&globals.TYPE_MEMBER_NAME) {
                     let val = &globals.stored_values[*n];
-                    out += &val.to_str(globals);
+                    out += &display_inner(val)?;
                     d.remove(&globals.TYPE_MEMBER_NAME);
                     out += "::";
                 }
@@ -305,7 +305,7 @@ impl Value {
                         break;
                     }
 
-                    let stored_val = (*globals).stored_values[*val].to_str(globals);
+                    let stored_val = display_inner(&globals.stored_values[*val])?;
                     out += &format!("{}: {},", key, stored_val);
                 }
                 if !d.is_empty() {
@@ -322,10 +322,10 @@ impl Value {
                     for arg in m.args.iter() {
                         out += &arg.name;
                         if let Some(val) = arg.pattern {
-                            out += &format!(": {}", globals.stored_values[val].to_str(globals),)
+                            out += &format!(": {}", display_inner(&globals.stored_values[val])?)
                         };
                         if let Some(val) = arg.default {
-                            out += &format!(" = {}", globals.stored_values[val].to_str(globals))
+                            out += &format!(" = {}", display_inner(&globals.stored_values[val])?)
                         };
                         out += ", ";
                     }
@@ -341,7 +341,7 @@ impl Value {
                 } else {
                     let mut out = String::from("[");
                     for val in a {
-                        out += &globals.stored_values[*val].to_str(globals);
+                        out += &display_inner(&globals.stored_values[*val])?;
                         out += ",";
                     }
                     out.pop();
@@ -372,8 +372,8 @@ impl Value {
                 Pattern::Type(t) => Value::TypeIndicator(*t).to_str(globals),
                 Pattern::Either(p1, p2) => format!(
                     "{} | {}",
-                    Value::Pattern(*p1.clone()).to_str(globals),
-                    Value::Pattern(*p2.clone()).to_str(globals)
+                    display_inner(&Value::Pattern(*p1.clone()))?,
+                    display_inner(&Value::Pattern(*p2.clone()))?
                 ),
                 Pattern::Array(a) => {
                     if a.is_empty() {
@@ -391,6 +391,15 @@ impl Value {
                     }
                 }
             },
+        })
+    
+    }
+    pub fn to_str(&self, globals: &Globals) -> String {
+        self.to_str_full(globals, |val| -> Result<String, ()> { Ok(val.to_str(globals)) }).unwrap()
+    }
+    pub fn display(&self, full_context: &mut FullContext, globals: &mut Globals, info: &CompilerInfo) -> Result<String, RuntimeError> {
+        unsafe {
+            display_val(self.clone(), full_context, globals, info)
         }
     }
 }
@@ -2924,4 +2933,26 @@ impl VariableFuncs for ast::Variable {
         }
         Ok(out)
     }
+}
+
+#[allow(clippy::missing_safety_doc)]
+pub unsafe fn display_val(
+    val: Value,
+    full_context: &mut FullContext,
+    globals: *mut Globals,
+    info: &CompilerInfo,
+) -> Result<String, RuntimeError> {
+    
+    assert!(matches!(full_context, FullContext::Single(_)));
+    let new_globals = globals.as_mut().unwrap();
+    let stored = store_const_value(val, new_globals, full_context.inner().start_group, Default::default());
+
+    handle_unary_operator(stored, Builtin::DisplayOp, full_context, new_globals, info)?;
+    Ok(match &new_globals.stored_values[full_context.inner().return_value] {
+        Value::Str(s) => s.clone(),
+        a => {
+            display_val(a.clone(), full_context, globals, info)?
+        }
+    })
+    
 }
