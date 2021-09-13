@@ -22,8 +22,7 @@ impl @zip {
             throw "Length Mismatch: iterables must be of same length"
         }
 
-        return {
-            type: @zip,
+        return @zip::{
             iter1: iters[0],
             iter2: iters[1]
         }

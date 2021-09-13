@@ -11,8 +11,7 @@ my_objects = @obj_set::new()
         #[desc("The center group to use for rotation")] group: @group = ?g
     ) {
 
-        return {
-            type: @obj_set,
+        return @obj_set::{
             objects: objects,
             group: group,
         }
