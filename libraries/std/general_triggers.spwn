@@ -48,7 +48,7 @@ return {
     },
 
     toggle_bg_effect: #[desc("Implementation of the bg effect on/off triggers") example("toggle_bg_effect(false)")] (
-        #[desc("Weather to toggle bg effect on or off")] on: @bool = false
+        #[desc("Whether to toggle bg effect on or off")] on: @bool = false
     ) {
         if on {
             $.add( trigger{
@@ -252,7 +252,7 @@ return {
         #[desc("Fade-in duration")] fade_in: @number = 0,
         #[desc("Duration to hold the color")] hold: @number = 0,
         #[desc("Fade-out duration")] fade_out: @number = 0,
-        #[desc("Weather to prioritize this pulse over simultaneous pulses")] exclusive: @bool = false,
+        #[desc("Whether to prioritize this pulse over simultaneous pulses")] exclusive: @bool = false,
         #[desc("Toggle HSV mode")] hsv: @bool = false,
         #[desc("HSV specific: saturation checked")] s_checked: @bool = false,
         #[desc("HSV specific: brightness checked")] b_checked: @bool = false

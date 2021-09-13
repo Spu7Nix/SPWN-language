@@ -94,7 +94,7 @@ get_lighting = (normal: [@number], variant) {
     metal = [200, 200, 200]
     shine = 4
 
-    normal = normalize([normal[0] + 0.01, normal[1] - 0.01, normal[2] - 0.01]) if variant == 0 else normalize([normal[0] - 0.01, normal[1] + 0.01, normal[2] + 0.01])
+    [normal] = [normalize([normal[0] + 0.01, normal[1] - 0.01, normal[2] - 0.01]) if variant == 0 else normalize([normal[0] - 0.01, normal[1] + 0.01, normal[2] + 0.01])]
     
     fac = 2
 

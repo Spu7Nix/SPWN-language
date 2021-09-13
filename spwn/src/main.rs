@@ -159,6 +159,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         Ok(p) => p,
                     };
+                    //dbg!(&statements);
 
                     let tags = notes.tag.tags.iter();
                     for tag in tags {
@@ -253,7 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                         reserved.object_groups.insert(g.id);
                                     }
                                     leveldata::ObjParam::GroupList(g) => {
-                                        reserved.object_colors.extend(g.iter().map(|g| g.id));
+                                        reserved.object_groups.extend(g.iter().map(|g| g.id));
                                     }
 
                                     leveldata::ObjParam::Color(g) => {

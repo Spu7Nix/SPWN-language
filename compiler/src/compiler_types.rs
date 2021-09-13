@@ -13,7 +13,7 @@ use shared::BreakType;
 //use std::boxed::Box;
 use crate::value_storage::*;
 use errors::compiler_info::CompilerInfo;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 use crate::compiler::compile_scope;
 
@@ -23,14 +23,14 @@ use shared::StoredValue;
 pub type TypeId = u16;
 //                                                               This bool is for if this value
 //                                                               was implemented in the current module
-pub type Implementations = HashMap<TypeId, HashMap<Intern<String>, (StoredValue, bool)>>;
+pub type Implementations = FnvHashMap<TypeId, FnvHashMap<Intern<String>, (StoredValue, bool)>>;
 
 pub type FnIdPtr = usize;
 
 //pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub struct TriggerOrder(pub f32);
+pub struct TriggerOrder(pub f64);
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionId {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id
@@ -73,7 +73,7 @@ pub fn handle_operator(
                 }
                 let val2 = globals.stored_values[value2].clone();
 
-                if let Some(target_typ) = m.args[0].3 {
+                if let Some(target_typ) = m.args[0].pattern {
                     let pat = &globals.stored_values[target_typ].clone();
 
                     if !val2.matches_pat(pat, info, globals, full_context.inner())? {
@@ -345,6 +345,23 @@ pub fn execute_macro(
         }
     }
 
+    for MacroArgDef {
+        default, pattern, ..
+    } in m.args.iter()
+    {
+        if let Some(e) = default {
+            globals.push_preserved_val(*e)
+        }
+        if let Some(e) = pattern {
+            globals.push_preserved_val(*e)
+        }
+    }
+
+    // dbg!(
+    //     &m.args,
+    //     globals.stored_values.preserved_stack.last().unwrap()
+    // );
+
     let combinations = all_combinations(
         args.iter().map(|x| x.value.clone()).collect(),
         contexts,
@@ -362,7 +379,8 @@ pub fn execute_macro(
     //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
-        let mut new_variables: HashMap<Intern<String>, Vec<(StoredValue, i16)>> = HashMap::new();
+        let mut new_variables: FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>> =
+            Default::default();
         let context = full_context.inner();
 
         let fn_context = context.start_group;
@@ -371,7 +389,7 @@ pub fn execute_macro(
 
         //parse each argument given into a local macro variable
         //index of arg if no arg is specified
-        let mut def_index = if !m.args.is_empty() && m.args[0].0 == globals.SELF_MEMBER_NAME {
+        let mut def_index = if !m.args.is_empty() && m.args[0].name == globals.SELF_MEMBER_NAME {
             1
         } else {
             0
@@ -379,11 +397,11 @@ pub fn execute_macro(
         for (i, arg) in args.iter().enumerate() {
             match &arg.symbol {
                 Some(name) => {
-                    let arg_def = m.args.iter().enumerate().find(|e| e.1 .0 == *name);
+                    let arg_def = m.args.iter().enumerate().find(|e| e.1.name == *name);
                     if let Some((_arg_i, arg_def)) = arg_def {
                         //type check!!
                         //maybe make type check function
-                        if let Some(t) = arg_def.3 {
+                        if let Some(t) = arg_def.pattern {
                             let val = globals.stored_values[arg_values[i]].clone();
                             let pat = globals.stored_values[t].clone();
 
@@ -400,11 +418,11 @@ pub fn execute_macro(
                                 });
                             }
                         };
-                        if arg_def.5 {
+                        if arg_def.as_ref {
                             new_variables.insert(*name, vec![(arg_values[i], -1)]);
                         } else {
                             new_variables.insert(
-                                arg_def.0,
+                                arg_def.name,
                                 vec![(
                                     clone_value(
                                         arg_values[i],
@@ -412,7 +430,7 @@ pub fn execute_macro(
                                         context.start_group,
                                         true,
                                         CodeArea {
-                                            pos: arg_def.4,
+                                            pos: arg_def.position,
                                             file: m.def_file,
                                         },
                                     ),
@@ -457,7 +475,7 @@ pub fn execute_macro(
                     //dbg!(&m.args[def_index]);
 
                     //type check!!
-                    if let Some(t) = m.args[def_index].3 {
+                    if let Some(t) = m.args[def_index].pattern {
                         let val = globals.stored_values[arg_values[i]].clone();
                         let pat = globals.stored_values[t].clone();
 
@@ -474,11 +492,11 @@ pub fn execute_macro(
                             });
                         }
                     };
-                    if m.args[def_index].5 {
-                        new_variables.insert(m.args[def_index].0, vec![(arg_values[i], -1)]);
+                    if m.args[def_index].as_ref {
+                        new_variables.insert(m.args[def_index].name, vec![(arg_values[i], -1)]);
                     } else {
                         new_variables.insert(
-                            m.args[def_index].0,
+                            m.args[def_index].name,
                             vec![(
                                 clone_value(
                                     arg_values[i],
@@ -486,7 +504,7 @@ pub fn execute_macro(
                                     context.start_group,
                                     true,
                                     CodeArea {
-                                        pos: m.args[def_index].4,
+                                        pos: m.args[def_index].position,
                                         file: m.def_file,
                                     },
                                 ),
@@ -500,14 +518,14 @@ pub fn execute_macro(
         }
         //insert defaults and check non-optional arguments
         let mut m_args_iter = m.args.iter();
-        if !m.args.is_empty() && m.args[0].0 == globals.SELF_MEMBER_NAME {
+        if !m.args.is_empty() && m.args[0].name == globals.SELF_MEMBER_NAME {
             if globals.stored_values[parent] == Value::Null {
                 return Err(RuntimeError::CustomError(create_error(
                         info.clone(),
                         "
 This macro requires a parent (a \"self\" value), but it seems to have been called alone (or on a null value).
 Should be used like this: value.macro(arguments)",
-                        &[(CodeArea {pos: m.args[0].4, file: m.def_file }, "Macro defined as taking a 'self' argument here"), (info.position, "Called alone here")],
+                        &[(CodeArea {pos: m.args[0].position, file: m.def_file }, "Macro defined as taking a 'self' argument here"), (info.position, "Called alone here")],
                         None,
                     )));
             }
@@ -516,8 +534,8 @@ Should be used like this: value.macro(arguments)",
             m_args_iter.next();
         }
         for arg in m_args_iter {
-            if let std::collections::hash_map::Entry::Vacant(e) = new_variables.entry(arg.0) {
-                match &arg.1 {
+            if let std::collections::hash_map::Entry::Vacant(e) = new_variables.entry(arg.name) {
+                match &arg.default {
                     Some(default) => {
                         e.insert(vec![(
                             clone_value(
@@ -526,7 +544,7 @@ Should be used like this: value.macro(arguments)",
                                 context.start_group,
                                 true,
                                 CodeArea {
-                                    pos: arg.4,
+                                    pos: arg.position,
                                     file: m.def_file,
                                 },
                             ),
@@ -537,9 +555,9 @@ Should be used like this: value.macro(arguments)",
                     None => {
                         return Err(RuntimeError::CustomError(create_error(
                                 info.clone(),
-                                &format!("Non-optional argument '{}' not satisfied!", arg.0),
+                                &format!("Non-optional argument '{}' not satisfied!", arg.name),
                                 &[
-                                    (CodeArea {pos: arg.4, file: m.def_file}, "Value defined as mandatory here (because no default was given)"),
+                                    (CodeArea {pos: arg.position, file: m.def_file}, "Value defined as mandatory here (because no default was given)"),
                                     (info.position, "Argument not provided here")
                                 ],
                                 None,
@@ -616,7 +634,7 @@ pub fn all_combinations<'a>(
     info: CompilerInfo,
     constant: bool,
 ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
-    globals.stored_values.preserved_stack.push(Vec::new());
+    globals.push_new_preserved();
 
     let mut out = vec![(Vec::new(), contexts)];
     for expr in a {
@@ -629,14 +647,13 @@ pub fn all_combinations<'a>(
                 new_list.push(full_context.inner().return_value);
 
                 globals.push_preserved_val(full_context.inner().return_value);
-                //dbg!(full_context.inner().return_value);
 
                 new_out.push((new_list, full_context));
             }
         }
         out = new_out;
     }
-    globals.stored_values.preserved_stack.pop();
+    globals.pop_preserved();
 
     Ok(out)
 }
@@ -668,7 +685,7 @@ pub fn eval_dict(
     }
     for (results, full_context) in combinations {
         let context = full_context.inner();
-        let mut dict_out: HashMap<Intern<String>, StoredValue> = HashMap::new();
+        let mut dict_out: FnvHashMap<Intern<String>, StoredValue> = Default::default();
         for (expr_index, def) in dict.iter().enumerate() {
             match def {
                 ast::DictDef::Def(d) => {

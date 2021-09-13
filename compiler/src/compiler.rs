@@ -2,6 +2,7 @@
 
 use errors::create_error;
 use internment::Intern;
+
 use shared::BreakType;
 use shared::ImportType;
 use shared::StoredValue;
@@ -21,7 +22,8 @@ use crate::leveldata::*;
 use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
+use std::fmt::Debug;
 use std::mem;
 
 use errors::RuntimeError;
@@ -236,252 +238,216 @@ pub fn compile_scope(
         //println!("{}:{}:{}", info.current_file.to_string_lossy(), info.pos.0.0, info.pos.0.1);
         //use crate::fmt::SpwnFmt;
         match &statement.body {
-            Expr(expr) => {
-                let is_assign = !expr.operators.is_empty()
-                    && expr.operators[0] == ast::Operator::Assign
-                    && !expr.values[0].is_undefinable(
-                        contexts.iter().next().unwrap().inner(),
-                        globals,
-                        true,
-                    );
-
-                //println!("{:?}, {}", expr, is_assign);
-
-                if is_assign {
-                    let mut new_expr = expr.clone();
-                    let symbol = new_expr.values.remove(0);
-                    //use crate::fmt::SpwnFmt;
-                    new_expr.operators.remove(0); //assign operator
-                    let mutable = symbol.operator == Some(ast::UnaryOperator::Let);
-
-                    //let mut new_context = context.clone();
-
-                    match symbol.value.body {
-                        ast::ValueBody::Array(var_a) => {
-                            new_expr.eval(contexts, globals, info.clone(), true)?;
-
-                            for ctx in contexts.iter() {
-                                match globals.stored_values[ctx.inner().return_value].clone() {
-                                    Value::Array(val_a) => {
-                                        let ranges = var_a
-                                            .iter()
-                                            .filter(|x| {
-                                                x.values[0].operator
-                                                    == Some(ast::UnaryOperator::Range)
-                                            })
-                                            .collect::<Vec<&ast::Expression>>();
-
-                                        if ranges.len() > 1 {
-                                            let mut why_sput = info.position;
-                                            why_sput.pos = ranges[0].values[0].pos;
-                                            info.position.pos = ranges[1].values[0].pos;
-
-                                            return Err(RuntimeError::CustomError(create_error(
-                                                info.clone(),
-                                                "Cannot spread a destructure multiple times",
-                                                &[
-                                                    (why_sput, "First spread is here"),
-                                                    (info.position, "Attempted to spread again"),
-                                                ],
-                                                None,
-                                            )));
-                                        }
-
-                                        if (var_a.len() < val_a.len() && ranges.is_empty())
-                                            || var_a.len() > val_a.len()
-                                        {
-                                            return Err(RuntimeError::CustomError(create_error(
-                                                info,
-                                                &format!(
-                                                    "Expected {} items to destructure, found {}",
-                                                    var_a.len(),
-                                                    val_a.len()
-                                                ),
-                                                &[],
-                                                None,
-                                            )));
-                                        } else {
-                                            let mut idx: usize = 0;
-                                            let mut var_idx: usize = 0;
-                                            loop {
-                                                let mut idx_step = 1;
-                                                for expr_ctx in ctx.iter() {
-                                                    if var_a[var_idx].operators.is_empty()
-                                                        || var_a[var_idx].values.is_empty()
-                                                    {
-                                                        use parser::fmt::_format2;
-
-                                                        return Err(RuntimeError::CustomError(create_error(
-                                                            info,
-                                                            &format!("Cannot destructure value into expression '{}'", _format2(&ast::ValueBody::Expression(var_a[idx].clone()))),
-                                                            &[],
-                                                            None,
-                                                        )));
-                                                    }
-                                                    let var_val = &var_a[var_idx].values[0];
-                                                    match var_val.operator {
-                                                        Some(ast::UnaryOperator::Range) => {
-                                                            let mut without_op = var_val.clone();
-                                                            without_op.operator = None;
-
-                                                            idx_step =
-                                                                1 + val_a.len() - var_a.len();
-                                                            let mut packed =
-                                                                Vec::<StoredValue>::new();
-
-                                                            let storage = without_op.define(
-                                                                expr_ctx.inner(),
-                                                                globals,
-                                                                &info,
-                                                            )?;
-
-                                                            (idx..(idx + idx_step)).for_each(
-                                                                |tmp_idx| {
-                                                                    let cloned = clone_value(
-                                                                        val_a[tmp_idx],
-                                                                        globals,
-                                                                        expr_ctx
-                                                                            .inner()
-                                                                            .start_group,
-                                                                        !mutable,
-                                                                        globals.get_area(storage),
-                                                                    );
-                                                                    packed.push(cloned);
-                                                                },
-                                                            );
-                                                            //println!("collecting {} items", val_a.len()-var_a.len());
-                                                            globals.stored_values[storage] =
-                                                                Value::Array(packed);
-                                                        }
-                                                        _ => {
-                                                            let storage = var_val.define(
-                                                                expr_ctx.inner(),
-                                                                globals,
-                                                                &info,
-                                                            )?;
-                                                            //clone the value so as to not share the reference
-
-                                                            let cloned = clone_and_get_value(
-                                                                val_a[idx],
-                                                                globals,
-                                                                expr_ctx.inner().start_group,
-                                                                !mutable,
-                                                            );
-
-                                                            globals.stored_values[storage] = cloned;
-                                                        }
-                                                    }
-                                                }
-
-                                                idx += idx_step;
-                                                var_idx += 1;
-                                                if idx >= val_a.len() {
-                                                    break;
-                                                }
+            Definition(def) => {
+                let value_is_normalized = if let Some(new_expr) = &def.value {
+                    new_expr.values.len() == 1
+                        && new_expr.values[0].path.is_empty()
+                        && new_expr.values[0].operator.is_none()
+                } else {
+                    true
+                };
+                let pre_evaled = if let Some(new_expr) = &def.value {
+                    if value_is_normalized
+                        && matches!(
+                            new_expr.values[0].value.body,
+                            ast::ValueBody::CmpStmt(_) | ast::ValueBody::Macro(_)
+                        )
+                    {
+                        false
+                    } else {
+                        new_expr.eval(contexts, globals, info.clone(), def.mutable)?;
+                        true
+                    }
+                } else {
+                    false
+                };
+                // check if its already defined
+                if let ast::ValueBody::Array(arr) = &def.symbol.value.body {
+                    if def.symbol.operator.is_some() || !def.symbol.path.is_empty() {
+                        return Err(RuntimeError::CustomError(create_error(
+                            info.clone(),
+                            "Invalid destructure symbol",
+                            &[],
+                            Some("Remove any unary operators or extentions"),
+                        )));
+                    }
+                    if let Some(value) = &def.value {
+                        array_destructure_define(
+                            arr,
+                            value,
+                            contexts,
+                            globals,
+                            &info,
+                            def.mutable,
+                        )?;
+                    } else {
+                        return Err(RuntimeError::CustomError(create_error(
+                            info.clone(),
+                            "Destructure expressions require a value to destruct",
+                            &[],
+                            None,
+                        )));
+                    }
+                } else {
+                    match (
+                        def.symbol
+                            .try_define(contexts, globals, &info, def.mutable)?,
+                        def.mutable,
+                    ) {
+                        (DefineResult::AlreadyDefined, false) => {
+                            // convert to assign expr
+                            for full_context in contexts.iter() {
+                                let ptr = full_context.inner().return_value2;
+                                if !globals.is_mutable(ptr)
+                                    && globals.stored_values[ptr]
+                                        .clone()
+                                        .member(
+                                            Intern::new(String::from(Builtin::AssignOp)),
+                                            full_context.inner(),
+                                            globals,
+                                            info.clone(),
+                                        )
+                                        .is_none()
+                                {
+                                    use parser::fmt::SpwnFmt;
+                                    let symbol = SpwnFmt::fmt(&def.symbol, 0);
+                                    return Err(RuntimeError::CustomError(create_error(
+                                        info.clone(),
+                                        &format!("This constant `{}` is already defined", symbol),
+                                        &[
+                                            (
+                                                globals.get_area(ptr),
+                                                &format!("`{}` was first defined here", symbol),
+                                            ),
+                                            (info.position, "Attempted to redefine it here"),
+                                        ],
+                                        Some(&format!("If you want to redefine the constant, consider using `[{}] = [{}]` instead", symbol, {
+                                            let val = SpwnFmt::fmt(def.value.as_ref().unwrap(), 0);
+                                            if val.len() > 10 {
+                                                format!("{}{}", &val[..8], ariadne::Fmt::fg("...", ariadne::Color::Cyan))
+                                            } else {
+                                                val
                                             }
-                                        }
+                                        })),
+                                    )));
+                                }
+
+                                if let Some(value) = &def.value {
+                                    if pre_evaled {
+                                        handle_operator(
+                                            ptr,
+                                            full_context.inner().return_value,
+                                            Builtin::AssignOp,
+                                            full_context,
+                                            globals,
+                                            &info,
+                                        )?;
+                                    } else {
+                                        let symbol = ast::ValueBody::Resolved(ptr)
+                                            .to_variable(def.symbol.pos);
+                                        let mut expr = ast::Expression {
+                                            values: Vec::with_capacity(value.values.len() + 1),
+                                            operators: Vec::with_capacity(
+                                                value.operators.len() + 1,
+                                            ),
+                                        };
+                                        expr.values.push(symbol);
+                                        expr.operators.push(ast::Operator::Assign);
+                                        expr.values.extend(value.values.clone());
+                                        expr.operators.extend(value.operators.iter().copied());
+                                        expr.eval(full_context, globals, info.clone(), true)?;
                                     }
-                                    b => {
-                                        return Err(RuntimeError::TypeError {
-                                            expected: "array".to_string(),
-                                            found: b.get_type_str(globals),
-                                            val_def: globals.get_area(ctx.inner().return_value),
-                                            info,
-                                        })
-                                    }
+                                } else {
+                                    unreachable!()
                                 }
                             }
                         }
                         _ => {
-                            match (
-                                new_expr.values.len() == 1
-                                    && new_expr.values[0].path.is_empty()
-                                    && new_expr.values[0].operator.is_none(),
-                                &new_expr.values[0].value.body,
-                            ) {
-                                (true, ast::ValueBody::CmpStmt(f)) => {
-                                    //to account for recursion
+                            if let Some(new_expr) = &def.value {
+                                match (value_is_normalized, &new_expr.values[0].value.body) {
+                                    (true, ast::ValueBody::CmpStmt(f)) => {
+                                        //to account for recursion
+                                        assert!(!pre_evaled);
 
-                                    //create the function context
-                                    for full_context in contexts.iter() {
-                                        let storage =
-                                            symbol.define(full_context.inner(), globals, &info)?;
+                                        //create the function context
+                                        for full_context in contexts.iter() {
+                                            let storage = full_context.inner().return_value2;
 
-                                        //pick a start group
-                                        let start_group =
-                                            Group::next_free(&mut globals.closed_groups);
-                                        //store value
-                                        globals.stored_values[storage] =
-                                            Value::TriggerFunc(TriggerFunction { start_group });
+                                            //pick a start group
+                                            let start_group =
+                                                Group::next_free(&mut globals.closed_groups);
+                                            //store value
+                                            globals.stored_values[storage] =
+                                                Value::TriggerFunc(TriggerFunction { start_group });
 
-                                        full_context.inner().fn_context_change_stack =
-                                            vec![info.position];
-                                        //new_info.last_context_change_stack = vec![info.position.clone()];
+                                            full_context.inner().fn_context_change_stack =
+                                                vec![info.position];
+                                            //new_info.last_context_change_stack = vec![info.position.clone()];
 
-                                        f.to_trigger_func(
-                                            full_context,
-                                            globals,
-                                            info.clone(),
-                                            Some(start_group),
-                                        )?;
+                                            f.to_trigger_func(
+                                                full_context,
+                                                globals,
+                                                info.clone(),
+                                                Some(start_group),
+                                            )?;
+                                        }
                                     }
-                                }
 
-                                // dont remove this camlin
-                                // this is what makes recursion work lmao
-                                (true, ast::ValueBody::Macro(m)) => {
-                                    for full_context in contexts.iter() {
-                                        let storage =
-                                            symbol.define(full_context.inner(), globals, &info)?;
+                                    // dont remove this camlin
+                                    // this is what makes recursion work lmao
+                                    (true, ast::ValueBody::Macro(m)) => {
+                                        assert!(!pre_evaled);
+                                        for full_context in contexts.iter() {
+                                            let storage = full_context.inner().return_value2;
 
-                                        macro_to_value(
-                                            m,
-                                            full_context,
-                                            globals,
-                                            info.clone(),
-                                            !mutable,
-                                        )?;
+                                            macro_to_value(
+                                                m,
+                                                full_context,
+                                                globals,
+                                                info.clone(),
+                                                !def.mutable,
+                                            )?;
 
-                                        let (context, val) = full_context.inner_value();
+                                            let (context, val) = full_context.inner_value();
 
-                                        //clone the value so as to not share the reference
+                                            //clone the value so as to not share the reference
 
-                                        let cloned = clone_and_get_value(
-                                            val,
-                                            globals,
-                                            context.start_group,
-                                            !mutable,
-                                        );
+                                            let cloned = clone_and_get_value(
+                                                val,
+                                                globals,
+                                                context.start_group,
+                                                !def.mutable,
+                                            );
 
-                                        globals.stored_values[storage] = cloned;
+                                            globals.stored_values[storage] = cloned;
+                                        }
                                     }
-                                }
 
-                                _ => {
-                                    new_expr.eval(contexts, globals, info.clone(), !mutable)?;
+                                    _ => {
+                                        assert!(pre_evaled);
 
-                                    for full_context in contexts.iter() {
-                                        let (context, val) = full_context.inner_value();
-                                        let storage = symbol.define(context, globals, &info)?;
-                                        //clone the value so as to not share the reference
+                                        for full_context in contexts.iter() {
+                                            let ctx = full_context.inner();
+                                            let storage = ctx.return_value2;
+                                            //clone the value so as to not share the reference
 
-                                        let cloned = clone_and_get_value(
-                                            val,
-                                            globals,
-                                            context.start_group,
-                                            !mutable,
-                                        );
+                                            let cloned = clone_and_get_value(
+                                                ctx.return_value,
+                                                globals,
+                                                ctx.start_group,
+                                                !def.mutable,
+                                            );
 
-                                        globals.stored_values[storage] = cloned;
+                                            globals.stored_values[storage] = cloned;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                } else {
-                    expr.eval(contexts, globals, info.clone(), true)?;
                 }
             }
+            Expr(expr) => expr.eval(contexts, globals, info.clone(), true)?,
 
             Extract(val) => {
                 val.eval(contexts, globals, info.clone(), true)?;
@@ -698,7 +664,7 @@ pub fn compile_scope(
                 //let mut obj_list = Vec::<GDObj>::new();
                 for full_context in contexts.iter() {
                     let (context, func) = full_context.inner_value();
-                    let mut params = HashMap::new();
+                    let mut params = FnvHashMap::default();
                     params.insert(
                         51,
                         match &globals.stored_values[func] {
@@ -1121,6 +1087,135 @@ pub fn compile_scope(
     Ok(())
 }
 
+fn array_destructure_define(
+    arr: &[ast::Expression],
+    value: &ast::Expression,
+    contexts: &mut FullContext,
+    globals: &mut Globals,
+    info: &CompilerInfo,
+
+    mutable: bool,
+) -> Result<(), RuntimeError> {
+    value.eval(contexts, globals, info.clone(), true)?;
+    for ctx in contexts.iter() {
+        match globals.stored_values[ctx.inner().return_value].clone() {
+            Value::Array(val_a) => {
+                let ranges = arr
+                    .iter()
+                    .filter(|x| x.values[0].operator == Some(ast::UnaryOperator::Range))
+                    .collect::<Vec<&ast::Expression>>();
+
+                if ranges.len() > 1 {
+                    let mut area1 = info.position;
+                    let mut area2 = info.position;
+                    area1.pos = ranges[0].values[0].pos;
+                    area2.pos = ranges[1].values[0].pos;
+
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        "Cannot spread a destructure multiple times",
+                        &[
+                            (area1, "First spread is here"),
+                            (area2, "Attempted to spread again"),
+                        ],
+                        None,
+                    )));
+                }
+
+                if (arr.len() < val_a.len() && ranges.is_empty()) || arr.len() > val_a.len() {
+                    return Err(RuntimeError::CustomError(create_error(
+                        info.clone(),
+                        &format!(
+                            "Expected {} items to destructure, found {}",
+                            arr.len(),
+                            val_a.len()
+                        ),
+                        &[],
+                        None,
+                    )));
+                } else {
+                    let mut idx: usize = 0;
+                    let mut var_idx: usize = 0;
+                    loop {
+                        let mut idx_step = 1;
+                        for expr_ctx in ctx.iter() {
+                            if arr[var_idx].operators.is_empty() && arr[var_idx].values.is_empty() {
+                                use parser::fmt::_format2;
+
+                                return Err(RuntimeError::CustomError(create_error(
+                                    info.clone(),
+                                    &format!(
+                                        "Cannot destructure value into expression '{}'",
+                                        _format2(&ast::ValueBody::Expression(arr[idx].clone()))
+                                    ),
+                                    &[],
+                                    None,
+                                )));
+                            }
+                            let var_val = &arr[var_idx].values[0];
+                            match var_val.operator {
+                                Some(ast::UnaryOperator::Range) => {
+                                    let mut without_op = var_val.clone();
+                                    without_op.operator = None;
+
+                                    idx_step = 1 + val_a.len() - arr.len();
+                                    let mut packed = Vec::<StoredValue>::new();
+
+                                    without_op.try_define(expr_ctx, globals, info, mutable)?;
+
+                                    let storage = expr_ctx.inner().return_value2;
+
+                                    (idx..(idx + idx_step)).for_each(|tmp_idx| {
+                                        let cloned = clone_value(
+                                            val_a[tmp_idx],
+                                            globals,
+                                            expr_ctx.inner().start_group,
+                                            !mutable,
+                                            globals.get_area(storage),
+                                        );
+                                        packed.push(cloned);
+                                    });
+                                    //println!("collecting {} items", val_a.len()-var_a.len());
+                                    globals.stored_values[storage] = Value::Array(packed);
+                                }
+                                _ => {
+                                    var_val.try_define(expr_ctx, globals, info, mutable)?;
+                                    let storage = expr_ctx.inner().return_value2;
+                                    //clone the value so as to not share the reference
+
+                                    let cloned = clone_and_get_value(
+                                        val_a[idx],
+                                        globals,
+                                        expr_ctx.inner().start_group,
+                                        !mutable,
+                                    );
+
+                                    globals.stored_values[storage] = cloned;
+                                }
+                            }
+                        }
+
+                        idx += idx_step;
+                        var_idx += 1;
+                        if idx >= val_a.len() {
+                            break;
+                        }
+                    }
+                }
+            }
+            b => {
+                return Err(RuntimeError::TypeError {
+                    expected: "array".to_string(),
+                    found: b.get_type_str(globals),
+                    val_def: globals.get_area(ctx.inner().return_value),
+                    info: info.clone(),
+                })
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn merge_all_contexts(
     contexts: &mut FullContext,
     globals: &mut Globals,
@@ -1226,7 +1321,6 @@ pub fn import_module(
     info: CompilerInfo,
     forced: bool,
 ) -> Result<(), RuntimeError> {
-    //println!("importing: {:?}", path);
     if !forced {
         if let Some(ret) = globals.prev_imports.get(path).cloned() {
             merge_impl(&mut globals.implementations, &ret.1);
@@ -1313,7 +1407,7 @@ pub fn import_module(
         for v in impl_vals {
             globals.push_preserved_val(v);
         }
-        let mut stored = HashMap::new();
+        let mut stored = FnvHashMap::default();
 
         mem::swap(&mut stored, &mut globals.implementations);
         stored_impl = Some(stored);
@@ -1430,7 +1524,7 @@ pub fn import_module(
                 }
                 // globals
                 //     .stored_values
-                //     .increment_single_lifetime(*val, 1, &mut HashSet::new());
+                //     .increment_single_lifetime(*val, 1, &mut FnvHashSet::new());
             }
         }
         for (k1, k2) in to_be_deleted {
@@ -1451,7 +1545,7 @@ pub fn import_module(
             path.clone(),
             (
                 output_saved.unwrap_or(NULL_STORAGE),
-                impl_saved.unwrap_or_else(HashMap::new),
+                impl_saved.unwrap_or_else(FnvHashMap::default),
             ),
         );
     }

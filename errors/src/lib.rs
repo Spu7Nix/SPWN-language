@@ -81,7 +81,7 @@ impl RainbowColorGenerator {
     pub fn new(h: f64, s: f64, b: f64) -> Self {
         Self { h, s, b }
     }
-
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> ariadne::Color {
         self.h += 20.0;
         self.h %= 360.0;
@@ -414,7 +414,6 @@ impl From<RuntimeError> for ErrorReport {
     }
 }
 
-#[derive(Debug)]
 pub enum SyntaxError {
     ExpectedErr {
         expected: String,
@@ -432,11 +431,11 @@ pub enum SyntaxError {
         pos: FileRange,
         file: PathBuf,
     },
+    CustomError(ErrorReport),
 }
 
 impl From<SyntaxError> for ErrorReport {
     fn from(err: SyntaxError) -> ErrorReport {
-        use crate::compiler_info::CompilerInfo;
         //write!(f, "SuperErrorSideKick is here!")
         let mut colors = RainbowColorGenerator::new(60.0, 1.0, 0.8);
         let a = colors.next();
@@ -500,6 +499,8 @@ impl From<SyntaxError> for ErrorReport {
                 )],
                 None,
             ),
+
+            SyntaxError::CustomError(report) => report,
         }
     }
 }

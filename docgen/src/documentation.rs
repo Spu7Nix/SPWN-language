@@ -15,8 +15,9 @@ use compiler::value::*;
 
 use std::fs::File;
 
+use fnv::FnvHashMap;
+use std::env::current_dir;
 use std::path::PathBuf;
-use std::{collections::HashMap, env::current_dir};
 fn create_doc_file(mut dir: PathBuf, name: String, content: &str) {
     use std::io::Write;
     dir.push(format!("{}.md", name));
@@ -109,7 +110,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                     key,
                     val.iter()
                         .map(|(key, val)| (*key, val.0))
-                        .collect::<HashMap<Intern<String>, StoredValue>>(),
+                        .collect::<FnvHashMap<Intern<String>, StoredValue>>(),
                 )
             })
             .collect();
@@ -137,7 +138,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     Ok(())
 }
 
-fn document_dict(dict: &HashMap<Intern<String>, StoredValue>, globals: &mut Globals) -> String {
+fn document_dict(dict: &FnvHashMap<Intern<String>, StoredValue>, globals: &mut Globals) -> String {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
     type ValList = Vec<(Intern<String>, StoredValue)>;
     let mut categories = [
@@ -151,7 +152,7 @@ fn document_dict(dict: &HashMap<Intern<String>, StoredValue>, globals: &mut Glob
         if let Value::Macro(m) = &globals.stored_values[*x] {
             if m.tag.get("constructor").is_some() {
                 categories[0].1.push((*name, *x));
-            } else if name.starts_with("_") && name.ends_with("_") {
+            } else if name.starts_with('_') && name.ends_with('_') {
                 categories[2].1.push((*name, *x));
             } else {
                 categories[1].1.push((*name, *x));
@@ -213,7 +214,8 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
         doc += &format!("### Example: \n```spwn\n {}\n```\n", example)
     }
 
-    if !(mac.args.is_empty() || (mac.args.len() == 1 && mac.args[0].0 == globals.SELF_MEMBER_NAME))
+    if !(mac.args.is_empty()
+        || (mac.args.len() == 1 && mac.args[0].name == globals.SELF_MEMBER_NAME))
     {
         doc += "## Arguments:\n";
         doc += "
@@ -224,32 +226,32 @@ fn document_macro(mac: &Macro, globals: &mut Globals) -> String {
         for arg in mac.args.iter() {
             let mut arg_string = String::new();
 
-            if arg.0 == globals.SELF_MEMBER_NAME {
+            if arg.name == globals.SELF_MEMBER_NAME {
                 continue;
             }
             i += 1;
 
-            if arg.1 != None {
-                arg_string += &format!("| {} | `{}` |", i, arg.0);
+            if arg.default != None {
+                arg_string += &format!("| {} | `{}` |", i, arg.name);
             } else {
-                arg_string += &format!("| {} | **`{}`** |", i, arg.0);
+                arg_string += &format!("| {} | **`{}`** |", i, arg.name);
             }
 
-            if let Some(typ) = arg.3 {
+            if let Some(typ) = arg.pattern {
                 let val = &globals.stored_values[typ].clone();
                 arg_string += &format!(" {} |", val.to_str(globals).replace("|", "or"));
             } else {
                 arg_string += "any |";
             }
 
-            if let Some(def_val) = arg.1 {
+            if let Some(def_val) = arg.default {
                 let val = &globals.stored_values[def_val].clone();
                 arg_string += &format!(" `{}` |", val.to_str(globals).replace("\n", ""));
             } else {
                 arg_string += " |";
             }
 
-            if let Some(desc) = arg.2.get_desc() {
+            if let Some(desc) = arg.attribute.get_desc() {
                 arg_string += &format!("{} |\n", desc);
             } else {
                 arg_string += " |\n";

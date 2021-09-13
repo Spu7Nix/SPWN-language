@@ -7,8 +7,9 @@ use crate::context::*;
 use crate::globals::Globals;
 use crate::leveldata::*;
 use errors::{create_error, RuntimeError};
+use fnv::FnvHashMap;
 use parser::ast::ObjectMode;
-use std::collections::HashMap;
+
 use std::fs;
 
 use crate::value::*;
@@ -33,11 +34,11 @@ macro_rules! arg_length {
 }
 
 pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GdObj {
-    let mut params = HashMap::new();
+    let mut params = FnvHashMap::default();
     params.insert(57, ObjParam::Group(context.start_group));
     (*uid_counter) += 1;
     GdObj {
-        params: HashMap::new(),
+        params: FnvHashMap::default(),
         func_id: context.func_id,
         mode: ObjectMode::Trigger,
         unique_id: *uid_counter,
@@ -411,11 +412,11 @@ macro_rules! builtins {
             )*
         ];
 
-        pub struct BuiltinPermissions (HashMap<Builtin, bool>);
+        pub struct BuiltinPermissions (FnvHashMap<Builtin, bool>);
 
         impl BuiltinPermissions {
             pub fn new() -> Self {
-                let mut map = HashMap::new();
+                let mut map = FnvHashMap::default();
                 $(
                     map.insert(Builtin::$variant, $safe);
                 )*
@@ -780,7 +781,7 @@ builtins! {
                 }
         };
 
-        let mut output_map = HashMap::new();
+        let mut output_map = FnvHashMap::default();
 
         let response_status = store_const_value(
             Value::Number(
@@ -792,7 +793,7 @@ builtins! {
         );
 
         let response_headermap = response.headers();
-        let mut response_headers_value = HashMap::new();
+        let mut response_headers_value = FnvHashMap::default();
         for (name, value) in response_headermap.iter() {
             let header_value = store_const_value(
                 Value::Str(String::from(value.to_str().expect("Couldn't parse return header value"))),
@@ -896,7 +897,7 @@ $.add(obj {
             };
         }
 
-        let mut obj_map = HashMap::<u16, ObjParam>::new();
+        let mut obj_map = FnvHashMap::<u16, ObjParam>::default();
 
         for p in obj {
             obj_map.insert(p.0, p.1.clone());
@@ -1370,7 +1371,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     Value::Array(arr)
                                 },
                                 serde_json::Value::Object(x) => {
-                                    let mut dict: HashMap<Intern<String>, StoredValue> = HashMap::new();
+                                    let mut dict: FnvHashMap<Intern<String>, StoredValue> = FnvHashMap::default();
                                     for (key, value) in x {
                                         dict.insert(Intern::new(key), store_const_value(parse_json_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
@@ -1416,7 +1417,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     Value::Array(arr)
                                 },
                                 toml::Value::Table(x) => {
-                                    let mut dict: HashMap<Intern<String>, StoredValue> = HashMap::new();
+                                    let mut dict: FnvHashMap<Intern<String>, StoredValue> = FnvHashMap::default();
                                     for (key, value) in x {
                                         dict.insert(Intern::new(key), store_const_value(parse_toml_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
@@ -1461,7 +1462,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     Value::Array(arr)
                                 },
                                 serde_yaml::Value::Mapping(x) => {
-                                    let mut dict: HashMap<Intern<String>, StoredValue> = HashMap::new();
+                                    let mut dict: FnvHashMap<Intern<String>, StoredValue> = FnvHashMap::default();
                                     for (key, value) in x.iter() {
                                         dict.insert(Intern::new(key.as_str().unwrap().to_string()), store_const_value(parse_yaml_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }

@@ -16,8 +16,7 @@ let newheap = @heapq::new([5])
             throw "HeapError: Elements of heap should not be null"
         }
 
-        return {
-            type: @heapq,
+        return @heapq::{
             arr: arr,
             comp: comp,
             tiebreak: tiebreak,

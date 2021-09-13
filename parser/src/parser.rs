@@ -3,10 +3,16 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
+use crate::ast::Operator;
 use crate::ast::StrInner;
 use crate::ast::StringFlags;
 
-use std::collections::HashSet;
+use errors::compiler_info::CodeArea;
+use errors::compiler_info::CompilerInfo;
+use errors::create_error;
+use fnv::FnvHashMap;
+use fnv::FnvHashSet;
+use shared::FileRange;
 //use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -320,7 +326,7 @@ impl Token {
 pub struct ParseNotes {
     pub tag: ast::Attribute,
     pub file: PathBuf,
-    pub builtins: HashSet<&'static str>,
+    pub builtins: FnvHashSet<&'static str>,
 }
 
 impl ParseNotes {
@@ -455,9 +461,9 @@ impl<'a> Tokens<'a> {
         if self.stack.len() - self.index == 0 {
             return (0, 0);
         }
-        let file_pos1 = self.stack[self.stack.len() - self.index - 1].2.start;
-        let file_pos2 = self.stack[self.stack.len() - self.index - 1].2.end;
-        (file_pos1, file_pos2)
+        let range = &self.stack[self.stack.len() - self.index - 1].2;
+
+        (range.start, range.end)
     }
 
     /*fn abs_position(&self) -> usize {
@@ -615,6 +621,25 @@ pub fn parse_statement(
             check for double arrows, if it is then throw error because you cant do that
             enable the async flag and parse everything else
             */
+        }
+
+        Some(Token::Let) => {
+            // definition statement (at last)
+            // this branch only handles the immutable case, the immutable case is handled in the expression branch,
+            // because its equivalent to an assign expression
+            let symbol = parse_variable(tokens, notes, false)?;
+            let value = match tokens.next(false) {
+                Some(Token::Assign) => Some(parse_expr(tokens, notes, false, true)?),
+                _ => {
+                    tokens.previous();
+                    None
+                }
+            };
+            ast::StatementBody::Definition(ast::Definition {
+                symbol,
+                value,
+                mutable: true,
+            })
         }
 
         Some(Token::Return) => {
@@ -862,7 +887,7 @@ pub fn parse_statement(
 
             //expression or call
             tokens.previous_no_ignore(false);
-            let expr = parse_expr(tokens, notes, true, true)?;
+            let mut expr = parse_expr(tokens, notes, true, true)?;
             if tokens.next(false) == Some(Token::Exclamation) {
                 //call
                 ast::StatementBody::Call(ast::Call {
@@ -870,22 +895,20 @@ pub fn parse_statement(
                 })
             } else {
                 // expression statement
-                // println!("found expr");
                 tokens.previous_no_ignore(false);
 
-                // comment_after = if let Some(comment) = expr.values.last().unwrap().comment.1.clone()
-                // {
-                //     (*expr.values.last_mut().unwrap()).comment.1 = None;
-                //     Some(comment)
-                // } else {
-                //     None
-                // };
-                /*println!(
-                    "current token after stmt post comment: {}: ",
-                    tokens.slice()
-                );*/
+                if expr.operators.first() == Some(&Operator::Assign) {
+                    let symbol = expr.values.remove(0);
+                    expr.operators.remove(0);
 
-                ast::StatementBody::Expr(expr)
+                    ast::StatementBody::Definition(ast::Definition {
+                        symbol,
+                        value: Some(expr),
+                        mutable: false,
+                    })
+                } else {
+                    ast::StatementBody::Expr(expr)
+                }
             }
         }
 
@@ -1295,6 +1318,8 @@ fn parse_dict(
 ) -> Result<Vec<ast::DictDef>, SyntaxError> {
     let mut defs = Vec::<ast::DictDef>::new();
 
+    let mut defined_members = FnvHashMap::<Intern<String>, FileRange>::default();
+
     loop {
         match tokens.next(false) {
             Some(Token::Symbol) | Some(Token::Type) | Some(Token::StringLiteral) => {
@@ -1309,6 +1334,33 @@ fn parse_dict(
                 };
 
                 let symbol = Intern::new(symbol);
+
+                if let Some(range) = defined_members.get(&symbol) {
+                    let file = Intern::new(notes.file.clone());
+                    return Err(SyntaxError::CustomError(create_error(
+                        CompilerInfo::from_area(CodeArea {
+                            file,
+                            pos: tokens.position(),
+                        }),
+                        "Dictionary member duplicate",
+                        &[
+                            (
+                                CodeArea { file, pos: *range },
+                                "Member with this name was first defined here",
+                            ),
+                            (
+                                CodeArea {
+                                    file,
+                                    pos: tokens.position(),
+                                },
+                                "Duplicate was found here",
+                            ),
+                        ],
+                        None,
+                    )));
+                }
+
+                defined_members.insert(symbol, tokens.position());
 
                 match tokens.next(false) {
                     Some(Token::Colon) => {
@@ -1910,7 +1962,9 @@ fn parse_variable(
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Minus)
         }
-        Some(Token::Exclamation) => {
+        Some(Token::Exclamation) =>
+        {
+            #[allow(clippy::branches_sharing_code)]
             if tokens.next(true) == Some(Token::OpenCurlyBracket) {
                 tokens.previous_no_ignore(true);
                 None
@@ -1926,10 +1980,6 @@ fn parse_variable(
             Some(ast::UnaryOperator::Range)
         }
 
-        Some(Token::Let) => {
-            first_token = tokens.next(false);
-            Some(ast::UnaryOperator::Let)
-        }
         Some(Token::Increment) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Increment)

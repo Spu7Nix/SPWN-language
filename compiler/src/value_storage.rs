@@ -9,13 +9,13 @@ use crate::globals::Globals;
 use crate::value::*;
 
 use core::panic;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 use crate::compiler::{BUILTIN_STORAGE, NULL_STORAGE};
 
 #[derive(Debug)]
 pub struct ValStorage {
-    pub map: HashMap<StoredValue, StoredValData>,
+    pub map: FnvHashMap<StoredValue, StoredValData>,
     pub preserved_stack: Vec<Vec<StoredValue>>,
     pub prev_value_count: u32,
 }
@@ -68,11 +68,14 @@ impl ValStorage {
                     }
                 }
                 Value::Macro(m) => {
-                    for (_, e, _, e2, _, _) in m.args {
-                        if let Some(val) = e {
+                    for MacroArgDef {
+                        default, pattern, ..
+                    } in m.args
+                    {
+                        if let Some(val) = default {
                             self.mark(val)
                         }
-                        if let Some(val) = e2 {
+                        if let Some(val) = pattern {
                             self.mark(val)
                         }
                     }
@@ -229,12 +232,12 @@ pub fn clone_and_get_value(
 
         Value::Macro(m) => {
             for arg in &mut m.args {
-                if let Some(def_val) = &mut arg.1 {
+                if let Some(def_val) = &mut arg.default {
                     (*def_val) = clone_value_preserve_area(*def_val, globals, fn_context, constant);
                 }
 
-                if let Some(def_val) = &mut arg.3 {
-                    (*def_val) = clone_value_preserve_area(*def_val, globals, fn_context, constant);
+                if let Some(pat_val) = &mut arg.pattern {
+                    (*pat_val) = clone_value_preserve_area(*pat_val, globals, fn_context, constant);
                 }
             }
 

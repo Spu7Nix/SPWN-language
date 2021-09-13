@@ -7,7 +7,7 @@ use crate::value_storage::{clone_value, store_val_m};
 use errors::compiler_info::CodeArea;
 
 //use std::boxed::Box;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 use internment::Intern;
 use shared::{BreakType, StoredValue};
@@ -22,7 +22,7 @@ pub struct Context {
     pub start_group: Group,
     pub func_id: FnIdPtr,
     pub fn_context_change_stack: Vec<CodeArea>,
-    variables: HashMap<Intern<String>, Vec<(StoredValue, i16)>>,
+    variables: FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>>,
     pub return_value: StoredValue,
     pub return_value2: StoredValue,
     pub root_context_ptr: *mut FullContext,
@@ -85,7 +85,7 @@ impl FullContext {
             }
             context.inner().variables.retain(|_, s| !s.is_empty())
         }
-        // let mut removed = HashSet::new();
+        // let mut removed = FnvHashSet::new();
         // for context in self.with_breaks() {
         //     for (_, layers) in context.inner().variables.values_mut() {
         //         *layers -= 1;
@@ -99,7 +99,7 @@ impl FullContext {
         //     }));
         //     context.inner().variables.retain(|_, (_, l)| *l >= 0)
         // }
-        // let mut all_removed = HashSet::new();
+        // let mut all_removed = FnvHashSet::new();
         // for v in removed {
         //     all_removed.extend(get_all_ptrs_used(v, globals));
         // }
@@ -170,6 +170,12 @@ impl FullContext {
 
     pub fn iter(&mut self) -> ContextIter {
         ContextIter::new(self)
+    }
+}
+
+impl Default for FullContext {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -289,7 +295,7 @@ impl Context {
         Context {
             start_group: Group::new(0),
             //spawn_triggered: false,
-            variables: HashMap::new(),
+            variables: FnvHashMap::default(),
             //return_val: Box::new(Value::Null),
 
             //self_val: None,
@@ -326,11 +332,11 @@ impl Context {
         }
     }
 
-    pub fn get_variables(&self) -> &HashMap<Intern<String>, Vec<(StoredValue, i16)>> {
+    pub fn get_variables(&self) -> &FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>> {
         &self.variables
     }
 
-    pub fn set_all_variables(&mut self, vars: HashMap<Intern<String>, Vec<(StoredValue, i16)>>) {
+    pub fn set_all_variables(&mut self, vars: FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>>) {
         (*self).variables = vars;
     }
 }
@@ -401,7 +407,7 @@ pub fn merge_contexts(
     let new_group = Group::next_free(&mut globals.closed_groups);
     //add spawn triggers
     let mut add_spawn_trigger = |context: &Context| {
-        let mut params = HashMap::new();
+        let mut params = FnvHashMap::default();
         params.insert(51, ObjParam::Group(new_group));
         params.insert(1, ObjParam::Number(1268.0));
         (*globals).trigger_order += 1.0;

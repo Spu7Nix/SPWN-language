@@ -11,3 +11,5 @@ internment = "0.5.4"
 shared = { path = "../shared" }
 errors = { path = "../errors" }
 compiler = { path = "../compiler" }
+
+fnv = "1.0.6"

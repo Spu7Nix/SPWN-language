@@ -21,9 +21,8 @@ impl @binaryCalculator {
             bitCounters.push(counter(item));
         }
 
-        return {
+        return @binaryCalculator::{
             bitCounters: bitCounters,
-            type: @binaryCalculator
         }
     },
     binaryToDecimal: (self, target: @counter) {

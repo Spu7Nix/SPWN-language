@@ -27,6 +27,7 @@ pub enum StatementBody {
     //Definition(Definition),
     Call(Call),
     Expr(Expression),
+    Definition(Definition),
 
     TypeDef(String),
 
@@ -41,6 +42,15 @@ pub enum StatementBody {
     Break,
     Continue,
     //EOI,
+}
+
+// TODO: implement this in parser and compiler
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Definition {
+    pub symbol: Variable,
+    pub value: Option<Expression>,
+    pub mutable: bool,
 }
 #[derive(Clone, PartialEq, Debug)]
 pub struct ValueLiteral {
@@ -156,7 +166,6 @@ pub enum UnaryOperator {
     Not,
     Minus,
     Range,
-    Let,
     Increment,
     Decrement,
 }
@@ -220,14 +229,20 @@ impl Attribute {
     }
 }
 
-pub trait CountSymbols {
-    fn symbols(&self) -> std::collections::HashSet<Intern<String>>;
+impl Default for Attribute {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-    fn properties(&self) -> std::collections::HashSet<Intern<String>> {
+pub trait CountSymbols {
+    fn symbols(&self) -> fnv::FnvHashSet<Intern<String>>;
+
+    fn properties(&self) -> fnv::FnvHashSet<Intern<String>> {
         Default::default()
     }
 
-    fn all(&self) -> std::collections::HashSet<Intern<String>> {
+    fn all(&self) -> fnv::FnvHashSet<Intern<String>> {
         let mut out = self.symbols();
         out.extend(self.properties());
         out
@@ -244,13 +259,6 @@ pub enum Path {
     Constructor(Vec<DictDef>),
     Increment,
     Decrement,
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub struct Definition {
-    pub symbol: Intern<String>,
-    pub value: Expression,
-    //pub mutable: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]

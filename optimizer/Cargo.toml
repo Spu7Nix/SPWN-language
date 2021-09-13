@@ -9,3 +9,5 @@ edition = "2018"
 
 compiler = { path = "../compiler" }
 parser = { path = "../parser" }
+
+fnv = "1.0.6"
