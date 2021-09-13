@@ -836,7 +836,7 @@ pub fn parse_statement(
 
             match tokens.next(false) {
                 // check if type name is valid
-                Some(Token::Symbol) => ast::StatementBody::TypeDef(tokens.slice()),
+                Some(Token::Symbol | Token::Trigger) => ast::StatementBody::TypeDef(tokens.slice()),
                 a => expected!("type name".to_string(), tokens, notes, a),
             }
             /*Summary:
@@ -2321,7 +2321,7 @@ fn parse_variable(
 
         Some(Token::At) => {
             let type_name = match tokens.next(false) {
-                Some(Token::Symbol) => tokens.slice(),
+                Some(Token::Symbol | Token::Trigger) => tokens.slice(),
                 a => expected!("type name".to_string(), tokens, notes, a),
             };
 

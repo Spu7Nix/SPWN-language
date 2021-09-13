@@ -849,14 +849,14 @@ impl VariableFuncs for ast::Variable {
                     ),
 
                 ast::ValueBody::ListComp(comp) => {
-
+                    globals.push_new_preserved();
                     comp.iterator.eval(full_context, globals, info.clone(), true)?;
 
                     let i_name = comp.symbol;
 
                     for context in full_context.iter() {
                         let (_, val) = context.inner_value();
-                        globals.push_new_preserved();
+                        
                         globals.push_preserved_val(val);
 
                         context.inner().return_value = store_const_value(
@@ -890,11 +890,13 @@ impl VariableFuncs for ast::Variable {
                                             Some(cond) => {
                                                 cond.eval(con_iter, globals, info.clone(), true)?;
                                                 for cond_ctx in con_iter.iter() {
+                                                    globals.push_preserved_val(cond_ctx.inner().return_value);
                                                     match &globals.stored_values[cond_ctx.inner().return_value] {
                                                         Value::Bool(b) => {
                                                             if *b {
                                                                 comp.body.eval(cond_ctx, globals, info.clone(), true)?;
                                                                 for expr_ctx in cond_ctx.iter() {
+                                                                    
                                                                     let mut local_list = item_list.clone();
                                                                     if let Value::Array(ref mut a) = local_list {
                                                                         a.push(expr_ctx.inner().return_value);
@@ -905,7 +907,8 @@ impl VariableFuncs for ast::Variable {
                                                                         globals,
                                                                         expr_ctx.inner().start_group,
                                                                         info.position
-                                                                    ); 
+                                                                    );
+                                                                    globals.push_preserved_val(expr_ctx.inner().return_value);
                                                                 }
                                                             } else {
                                                                 cond_ctx.inner().return_value = store_const_value(
@@ -913,7 +916,8 @@ impl VariableFuncs for ast::Variable {
                                                                     globals,
                                                                     cond_ctx.inner().start_group,
                                                                     info.position
-                                                                ); 
+                                                                );
+                                                                globals.push_preserved_val(cond_ctx.inner().return_value);
                                                             }
                                                         },
                                                         a => {
@@ -940,7 +944,8 @@ impl VariableFuncs for ast::Variable {
                                                         globals,
                                                         expr_ctx.inner().start_group,
                                                         info.position
-                                                    ); 
+                                                    );
+                                                    globals.push_preserved_val(expr_ctx.inner().return_value);
                                                 }
                                             }
                                         }
@@ -1234,8 +1239,9 @@ impl VariableFuncs for ast::Variable {
                             context.inner().start_group,
                             info.position
                         );*/
-                        globals.pop_preserved();
+                        
                     }
+                    globals.pop_preserved();
                 },
 
                 ast::ValueBody::Array(a) => {

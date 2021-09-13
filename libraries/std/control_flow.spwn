@@ -139,7 +139,6 @@ for_loop(0..10, (i) {
 	#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: @macro,
         #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
         #[desc("Whether to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true,
-        #[desc("Operation speed of the reset of the iterator, if enabled")] reset_speed: @number = 1,
     ) {
 		i = @counter::new(range.start)
 
@@ -154,7 +153,7 @@ for_loop(0..10, (i) {
             i.item.if_is(LARGER_THAN, range.end - 1, !{
                 if reset {
 					wait()
-                    i.reset(reset_speed)
+                    i.reset()
                 }
                 -> return
             })
