@@ -23,7 +23,7 @@ use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
 use fnv::FnvHashMap;
-use std::fmt::Debug;
+
 use std::mem;
 
 use errors::RuntimeError;
@@ -289,15 +289,22 @@ pub fn compile_scope(
                         )));
                     }
                 } else {
-                    match (
-                        def.symbol
-                            .try_define(contexts, globals, &info, def.mutable)?,
-                        def.mutable,
-                    ) {
-                        (DefineResult::AlreadyDefined, false) => {
+                    let defined = def
+                        .symbol
+                        .try_define(contexts, globals, &info, def.mutable)?;
+                    let same_module = {
+                        let ctx = contexts.iter().next().unwrap();
+
+                        globals.get_area(ctx.inner().return_value2).file
+                            == globals.get_area(ctx.inner().return_value).file
+                    };
+
+                    match (defined, def.mutable, same_module) {
+                        (DefineResult::AlreadyDefined, false, true) => {
                             // convert to assign expr
                             for full_context in contexts.iter() {
                                 let ptr = full_context.inner().return_value2;
+
                                 if !globals.is_mutable(ptr)
                                     && globals.stored_values[ptr]
                                         .clone()
@@ -429,6 +436,18 @@ pub fn compile_scope(
                                         for full_context in contexts.iter() {
                                             let ctx = full_context.inner();
                                             let storage = ctx.return_value2;
+
+                                            if !def.mutable {
+                                                (*globals
+                                                    .stored_values
+                                                    .map
+                                                    .get_mut(&storage)
+                                                    .unwrap())
+                                                .def_area = CodeArea {
+                                                    file: info.position.file,
+                                                    pos: def.value.as_ref().unwrap().get_pos(),
+                                                };
+                                            }
                                             //clone the value so as to not share the reference
 
                                             let cloned = clone_and_get_value(
