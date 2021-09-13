@@ -251,7 +251,7 @@ impl @bfreader {
 offset = [300, 300]
 insert_bf_script(">>++++>+++[-<-[<]>>]<.", offset)
 
-reader = @bfreader::new(offset, 20)
+reader = @bfreader::new(offset, 100)
 while_loop(()=>true, (){
     reader.interpret()
 })

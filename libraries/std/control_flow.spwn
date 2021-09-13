@@ -33,7 +33,7 @@ call_with_delay(2, !{
 })
 ")] (
 	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{},
-	#[desc("Function to call after the delay")] function: @trigger_function
+	#[desc("Function to call after the delay")] function: @trigger_function | @group
 ) {
 	$.add(trigger{
 		OBJ_ID: 1268,

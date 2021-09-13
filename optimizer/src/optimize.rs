@@ -170,13 +170,14 @@ pub fn optimize(
         update_reserved(&mut network, &mut objects, &mut reserved);
     }
 
-    // clean_network(&mut network, &objects, false);
+    clean_network(&mut network, &objects, false);
 
-    // dedup_triggers(&mut network, &mut objects, &reserved);
+    dedup_triggers(&mut network, &mut objects, &reserved);
 
     clean_network(&mut network, &objects, false);
 
     group_toggling(&mut network, &mut objects, &reserved, &mut closed_group);
+    //dbg!(&network);
 
     let zero_group = Group {
         id: Id::Specific(0),
@@ -505,15 +506,15 @@ fn rebuild(network: &TriggerNetwork, orig_structure: &[FunctionId]) -> Vec<Funct
                 continue;
             }
             let (obj, order) = &orig_structure[trigger.obj.0].obj_list[trigger.obj.1];
-            let fn_id = &out[obj.func_id];
+            //let fn_id = &out[obj.func_id];
             // if it's already there, continue
-            if fn_id
-                .obj_list
-                .iter()
-                .any(|x| x.0.unique_id == obj.unique_id && &x.0 == obj)
-            {
-                continue;
-            }
+            // if fn_id
+            //     .obj_list
+            //     .iter()
+            //     .any(|x| x.0.unique_id == obj.unique_id && &x.0 == obj)
+            // {
+            //     continue;
+            // }
             out[obj.func_id].obj_list.push((obj.clone(), *order))
         }
     }
@@ -931,8 +932,14 @@ impl Ord for TriggerParam {
     }
 }
 
-#[derive(Debug, PartialEq)]
-struct TriggerBehavior(BTreeSet<TriggerParam>, TriggerOrder);
+#[derive(Debug)]
+struct TriggerBehavior(BTreeSet<TriggerParam>, i64);
+
+impl PartialEq for TriggerBehavior {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
 
 impl Eq for TriggerBehavior {}
 
@@ -978,7 +985,7 @@ fn get_trigger_behavior(t: Trigger, objects: &Triggerlist) -> TriggerBehavior {
         }
         set.insert(TriggerParam(*prop, param_identifier(param)));
     }
-    TriggerBehavior(set, objects[t.obj].1)
+    TriggerBehavior(set, (objects[t.obj].1 .0 * 100000.0) as i64)
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -1001,7 +1008,7 @@ pub fn dedup_triggers(
 ) {
     loop {
         let mut swaps = FnvHashMap::default();
-        let mut representative_groups = BTreeMap::<TriggerGangBehavior, Group>::new();
+        let mut representative_groups = Vec::<(TriggerGangBehavior, Group)>::new();
 
         for (group, gang) in network.iter_mut() {
             if is_start_group(*group, reserved) {
@@ -1020,15 +1027,22 @@ pub fn dedup_triggers(
                 continue;
             }
             let behavior = get_triggergang_behavior(gang, objects);
-            if let Some(repr) = representative_groups.get(&behavior) {
-                // discard this gang and add a swap
-                for trigger in &mut gang.triggers {
-                    (*trigger).deleted = true;
+
+            let mut found = false;
+            for (b, repr) in representative_groups.iter() {
+                if b == &behavior {
+                    for trigger in &mut gang.triggers {
+                        (*trigger).deleted = true;
+                    }
+                    //dbg!(behavior, repr, group, &representative_groups);
+                    assert!(swaps.insert(*group, *repr).is_none());
+
+                    found = true;
+                    break;
                 }
-                //dbg!(behavior, repr, group, &representative_groups);
-                assert!(swaps.insert(*group, *repr).is_none());
-            } else {
-                representative_groups.insert(behavior, *group);
+            }
+            if !found {
+                representative_groups.push((behavior, *group));
             }
         }
 
@@ -1133,7 +1147,9 @@ fn intraframe_grouping(
         }
     }
 
-    if groupable_triggers.len() > 1 {
+    //dbg!(&groupable_triggers, &ungroupable);
+
+    if groupable_triggers.len() >= 3 {
         group_triggers(
             groupable_triggers,
             network,
@@ -1149,20 +1165,22 @@ fn intraframe_grouping(
         ungroupable.extend(groupable_triggers);
     }
 
-    for (trigger, between) in ungroupable {
+    for (trigger, _) in ungroupable {
         if trigger.role == TriggerRole::Func || trigger.role == TriggerRole::Spawn {
             let obj = &objects[trigger.obj].0;
             if let Some(&ObjParam::Group(g)) = obj.params.get(&51) {
-                intraframe_grouping(
-                    network,
-                    objects,
-                    reserved,
-                    closed_group,
-                    GroupingInput::Group(g),
-                    Vec::new(),
-                    visited,
-                    None,
-                );
+                if !is_start_group(g, reserved) {
+                    intraframe_grouping(
+                        network,
+                        objects,
+                        reserved,
+                        closed_group,
+                        GroupingInput::Group(g),
+                        Vec::new(),
+                        visited,
+                        None,
+                    );
+                }
             }
         }
     }
@@ -1186,11 +1204,11 @@ fn group_triggers(
         }
     };
 
-    let disp2 = triggers
-        .iter()
-        .map(|(t, b)| (*t, objects[t.obj].1, *b))
-        .collect::<Vec<_>>();
-    //dbg!(disp2);
+    // let disp2 = triggers
+    //     .iter()
+    //     .map(|(t, b)| (*t, objects[t.obj].1, *b))
+    //     .collect::<Vec<_>>();
+    // dbg!(disp2);
 
     // let mut add_group = |trigger, group| {
     //     if let Some(param) = objects[trigger].0.params.get_mut(&57) {
@@ -1222,7 +1240,7 @@ fn group_triggers(
         if let Some(ObjParam::Group(target)) = objects[*trigger].0.params.get_mut(&51) {
             all_outputs.extend(network[target].triggers.iter().copied());
             for t in &mut network.get_mut(target).unwrap().triggers {
-                t.deleted = true;
+                (*t).deleted = true;
             }
 
             *target = output_group; // enable output
@@ -1230,6 +1248,7 @@ fn group_triggers(
             unreachable!()
         };
         for output in all_outputs.iter_mut() {
+            (*output).deleted = false;
             let new_obj = (
                 GdObj {
                     func_id: trigger.0,
@@ -1254,6 +1273,8 @@ fn group_triggers(
         }
 
         all_outputs.sort();
+
+        //dbg!(&all_outputs);
         let spacing = 0.0001;
         let mut current_order = order.0 + spacing;
         let delta = (between - spacing * 2.0) / (all_outputs.len() as f64);
@@ -1274,11 +1295,7 @@ fn group_triggers(
                 reserved,
                 closed_group,
                 GroupingInput::ObjList(
-                    all_outputs
-                        .iter()
-                        .enumerate()
-                        .map(|(i, a)| (*a, delta))
-                        .collect(),
+                    all_outputs.iter().map(|a| (*a, delta)).collect(),
                     main_group,
                 ),
                 new_add_groups,
@@ -1290,16 +1307,19 @@ fn group_triggers(
                 if output.role == TriggerRole::Func || output.role == TriggerRole::Spawn {
                     let obj = &objects[output.obj].0;
                     if let Some(&ObjParam::Group(g)) = obj.params.get(&51) {
-                        intraframe_grouping(
-                            network,
-                            objects,
-                            reserved,
-                            closed_group,
-                            GroupingInput::Group(g),
-                            Vec::new(),
-                            visited,
-                            None,
-                        );
+                        if !is_start_group(g, reserved) {
+                            //if !visited.contains(&g) && network[&g].connections_in == 1
+                            intraframe_grouping(
+                                network,
+                                objects,
+                                reserved,
+                                closed_group,
+                                GroupingInput::Group(g),
+                                Vec::new(),
+                                visited,
+                                None,
+                            );
+                        }
                     }
                 }
             }

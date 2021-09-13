@@ -723,11 +723,31 @@ wait(1)
         self,
         #[desc("Array or range of possible output values")] range: [@number] | @range
     ) {
+        let funcs = []
+
+        for val in range {
+            funcs.push([val, !{
+                -> return val
+            }])
+        }
+
 
         for val in range {
             -> self.item.if_is(EQUAL_TO, val, !{
-                -> return val
+                for func in funcs {
+                    [val2, func] = func
+                    if val2 != val {
+                        func.start_group.toggle_off()
+                    } else {
+                        func!
+                    }
+                }
+                
             })
+        }
+
+        for func in funcs {
+            func[1].start_group.toggle_on()
         }
     },
 
@@ -744,11 +764,10 @@ c.to_const_enclosed(0..10, (c_const) {
         #[desc("Closure where you can use the const value, should take the value as the first argument")] closure: @macro,
 
     ) {
-        for val in range {
-            -> self.item.if_is(EQUAL_TO, val, !{
-                closure(val)
-            })
-        }
+        -> () {
+            val = self.to_const(range)
+            closure(val)
+        } ()
     },
 
     _as_: #[desc("Implementation of the as (`as`) operator") example("

@@ -495,7 +495,7 @@ pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
                         2,
                         if spawned {
                             ObjParam::Number(
-                                (x_pos * (MAX_HEIGHT - START_HEIGHT) as u32
+                                (x_pos * (MAX_HEIGHT - START_HEIGHT) as u32 * DELTA_X as u32
                                     + 15
                                     + i as u32 * DELTA_X as u32)
                                     as f64,

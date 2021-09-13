@@ -999,7 +999,7 @@ start = (){
 
 
 
-    switch_game_bg!
+    call_with_delay(0.5, switch_game_bg)
 
     collision(reset_selector, selector.block).on_triggered(reset_selector_func)
 
