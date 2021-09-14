@@ -119,7 +119,7 @@ dependencies = [
 
 [[package]]
 name = "compiler"
-version = "0.0.0"
+version = "0.0.7"
 dependencies = [
  "ariadne",
  "base64",
@@ -183,7 +183,7 @@ checksum = "6d9d8664cf849d7d0f3114a3a387d2f5e4303176d746d5a951aaddc66dfe9240"
 
 [[package]]
 name = "docgen"
-version = "0.0.0"
+version = "0.0.7"
 dependencies = [
  "compiler",
  "errors",
@@ -200,7 +200,7 @@ checksum = "56899898ce76aaf4a0f24d914c97ea6ed976d42fec6ad33fcbb0a1103e07b2b0"
 
 [[package]]
 name = "editorlive"
-version = "0.0.0"
+version = "0.0.7"
 dependencies = [
  "core-foundation-sys",
  "libc",
@@ -218,7 +218,7 @@ dependencies = [
 
 [[package]]
 name = "errors"
-version = "0.0.0"
+version = "0.0.7"
 dependencies = [
  "ariadne",
  "internment",
@@ -509,7 +509,7 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "levelstring"
-version = "0.0.0"
+version = "0.0.7"
 dependencies = [
  "aes",
  "base64",
@@ -726,7 +726,7 @@ dependencies = [
 
 [[package]]
 name = "optimizer"
-version = "0.0.0"
+version = "0.0.7"
 dependencies = [
  "compiler",
  "fnv",
@@ -760,7 +760,7 @@ dependencies = [
 
 [[package]]
 name = "parser"
-version = "0.0.0"
+version = "0.0.7"
 dependencies = [
  "ariadne",
  "errors",
@@ -1044,7 +1044,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.0"
+version = "0.0.7"
 
 [[package]]
 name = "slab"
@@ -1076,7 +1076,7 @@ dependencies = [
 
 [[package]]
 name = "spwn"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "ariadne",
  "compiler",
