@@ -1,4 +1,5 @@
 //! Defining all native types (and functions?)
+#![allow(unused_assignments)]
 use internment::Intern;
 use shared::StoredValue;
 
@@ -436,6 +437,11 @@ macro_rules! builtins {
                 }
             }
         }
+        impl Default for BuiltinPermissions {
+            fn default() -> Self {
+                Self::new()
+            }
+        }
         pub fn built_in_function(
             func: Builtin,
             $arguments: Vec<StoredValue>,
@@ -566,7 +572,7 @@ macro_rules! builtins {
 
                 }
                 out += &format!("**Allowed by default:** {}\n", if $safe { "yes" } else { "no" });
-                #[allow(unused_mut, unused_assignments, unused_variables)]
+                #[allow(unused_mut, unused_variables)]
                 let mut arg_title_set = false;
                 $(
                     out += &format!("## Arguments: \n **{}**\n", $argdesc);

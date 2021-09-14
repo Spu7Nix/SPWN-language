@@ -6,7 +6,7 @@ use parser::ast::ObjectMode;
 use compiler::leveldata::{GdObj, ObjParam};
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use fnv::{FnvHashMap, FnvHashSet};
 
@@ -155,8 +155,8 @@ pub fn optimize(
     //network = fix_read_write_order(&mut objects, &network, &mut closed_group);
 
     // round 1
-    let rounds = 10;
-    for i in 0..rounds {
+    let rounds = 5;
+    for _ in 0..rounds {
         clean_network(&mut network, &objects, true);
 
         dead_code_optimization(&mut network, &mut objects, &mut closed_group, &reserved);
@@ -521,7 +521,7 @@ fn rebuild(network: &TriggerNetwork, orig_structure: &[FunctionId]) -> Vec<Funct
 
     out
 }
-
+#[allow(clippy::too_many_arguments)]
 pub fn create_spawn_trigger(
     trigger: Trigger,
     target_group: Group,
@@ -1063,7 +1063,7 @@ enum GroupingInput {
     Group(Group),
     ObjList(Vec<(Trigger, f64)>, Group), // main group
 }
-
+#[allow(clippy::too_many_arguments)]
 fn intraframe_grouping(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
@@ -1185,7 +1185,7 @@ fn intraframe_grouping(
         }
     }
 }
-
+#[allow(clippy::too_many_arguments)]
 fn group_triggers(
     triggers: Vec<(Trigger, f64)>, // sorted
     network: &mut TriggerNetwork,

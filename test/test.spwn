@@ -1,4 +1,28 @@
 
-a = 10
+a = counter(100, bits = 12)
+a.display(45, 45)
 
-let a = 3
+b = counter(0, bits = 12)
+b.display(45, 90)
+
+x0 = counter()
+x1 = counter()
+x0.display(150, 45)
+x1.display(150, 90)
+
+wait(1)
+
+sqrt = (s: @counter) {
+   
+    x0 = s / 2
+    x1 = x0 / 2 + 1
+
+    while_loop(() => x1 < x0, () {
+        x0 = x1
+        x1 = (x0 + s / x0) / 2
+    })
+
+    return x0
+}
+
+b = sqrt(a)

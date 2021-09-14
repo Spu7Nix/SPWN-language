@@ -8,7 +8,7 @@ use ::compiler::leveldata;
 
 use optimizer::optimize;
 
-use ariadne::{Cache, FileCache, Fmt};
+use ariadne::{Cache, FileCache};
 
 use optimize::optimize;
 
