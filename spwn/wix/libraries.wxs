@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+
+<?if $(var.Platform) = x64 ?>
+<?define Win64 = "yes" ?>
+<?define PlatformProgramFilesFolder = "ProgramFiles64Folder" ?>
+<?else ?>
+<?define Win64 = "no" ?>
+<?define PlatformProgramFilesFolder = "ProgramFilesFolder" ?>
+<?endif ?>
+
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Fragment>
+        <DirectoryRef Id="LIB_DIR">
+	<Directory Id="gamescene" Name="gamescene" />
+	<Directory Id="std" Name="std" />
+
+        </DirectoryRef>
+    </Fragment>
+    <Fragment>
+        <ComponentGroup Id="libraries">
+
+            <Component Id="C0" Directory="gamescene" Win64='$(var.Win64)' Guid="{683ee443-0c16-4965-961d-c7ffc9950e49}">
+                <File Id="F0" KeyPath="yes" Source="libraries\gamescene\lib.spwn" />
+            </Component>
+        
+            <Component Id="C1" Directory="std" Win64='$(var.Win64)' Guid="{779de285-c03a-4453-ac89-11ca617aff2c}">
+                <File Id="F1" KeyPath="yes" Source="libraries\std\array.spwn" />
+            </Component>
+        
+            <Component Id="C2" Directory="std" Win64='$(var.Win64)' Guid="{dde07e9f-dd78-45c9-aaf8-4e4e74648e90}">
+                <File Id="F2" KeyPath="yes" Source="libraries\std\binary_counter.spwn" />
+            </Component>
+        
+            <Component Id="C3" Directory="std" Win64='$(var.Win64)' Guid="{1de9a4ba-e2bd-4e89-a4d8-6de79c5e6ffa}">
+                <File Id="F3" KeyPath="yes" Source="libraries\std\block.spwn" />
+            </Component>
+        
+            <Component Id="C4" Directory="std" Win64='$(var.Win64)' Guid="{d56e20ff-8d41-4dc6-ab76-e1f4d288f5c0}">
+                <File Id="F4" KeyPath="yes" Source="libraries\std\color.spwn" />
+            </Component>
+        
+            <Component Id="C5" Directory="std" Win64='$(var.Win64)' Guid="{76297cb8-30be-4d66-b8ee-daa416ef6b36}">
+                <File Id="F5" KeyPath="yes" Source="libraries\std\complex.spwn" />
+            </Component>
+        
+            <Component Id="C6" Directory="std" Win64='$(var.Win64)' Guid="{65a6a0a9-44e3-4293-82e5-b34089e30ee0}">
+                <File Id="F6" KeyPath="yes" Source="libraries\std\constants.spwn" />
+            </Component>
+        
+            <Component Id="C7" Directory="std" Win64='$(var.Win64)' Guid="{20076c73-a3d4-4ef0-8e2d-6a7d1487c68b}">
+                <File Id="F7" KeyPath="yes" Source="libraries\std\control_flow.spwn" />
+            </Component>
+        
+            <Component Id="C8" Directory="std" Win64='$(var.Win64)' Guid="{853966f2-deaa-4d39-a8c9-ae73ed1c13f1}">
+                <File Id="F8" KeyPath="yes" Source="libraries\std\counter.spwn" />
+            </Component>
+        
+            <Component Id="C9" Directory="std" Win64='$(var.Win64)' Guid="{dfb9e175-116b-46f8-beaf-bec345a613f1}">
+                <File Id="F9" KeyPath="yes" Source="libraries\std\dictionary.spwn" />
+            </Component>
+        
+            <Component Id="C10" Directory="std" Win64='$(var.Win64)' Guid="{b0f9c6a4-db7e-475f-8e9c-e1294257ec07}">
+                <File Id="F10" KeyPath="yes" Source="libraries\std\events.spwn" />
+            </Component>
+        
+            <Component Id="C11" Directory="std" Win64='$(var.Win64)' Guid="{81a66d81-7924-4862-9177-a5a3afc2617a}">
+                <File Id="F11" KeyPath="yes" Source="libraries\std\fileio.spwn" />
+            </Component>
+        
+            <Component Id="C12" Directory="std" Win64='$(var.Win64)' Guid="{34f66596-1390-44af-b0c3-4aa4223b8fd7}">
+                <File Id="F12" KeyPath="yes" Source="libraries\std\general_triggers.spwn" />
+            </Component>
+        
+            <Component Id="C13" Directory="std" Win64='$(var.Win64)' Guid="{1985d3c9-b1b0-4015-9846-8f2432702878}">
+                <File Id="F13" KeyPath="yes" Source="libraries\std\group.spwn" />
+            </Component>
+        
+            <Component Id="C14" Directory="std" Win64='$(var.Win64)' Guid="{27f09819-202f-4042-8cfa-22bc85b1129a}">
+                <File Id="F14" KeyPath="yes" Source="libraries\std\heapq.spwn" />
+            </Component>
+        
+            <Component Id="C15" Directory="std" Win64='$(var.Win64)' Guid="{ecbbe313-b9ea-44e1-8566-3b96d3aff0b3}">
+                <File Id="F15" KeyPath="yes" Source="libraries\std\http.spwn" />
+            </Component>
+        
+            <Component Id="C16" Directory="std" Win64='$(var.Win64)' Guid="{f0e94e6a-369c-4e67-9c74-6fd5b9c16d64}">
+                <File Id="F16" KeyPath="yes" Source="libraries\std\item.spwn" />
+            </Component>
+        
+            <Component Id="C17" Directory="std" Win64='$(var.Win64)' Guid="{467bb91e-0c26-4207-a46a-2b17ad945b66}">
+                <File Id="F17" KeyPath="yes" Source="libraries\std\lib.spwn" />
+            </Component>
+        
+            <Component Id="C18" Directory="std" Win64='$(var.Win64)' Guid="{ab38183d-6ee2-4079-8797-5037dabdc54c}">
+                <File Id="F18" KeyPath="yes" Source="libraries\std\number.spwn" />
+            </Component>
+        
+            <Component Id="C19" Directory="std" Win64='$(var.Win64)' Guid="{55bcaf10-ae9a-4e4b-90dd-bb2b4b160282}">
+                <File Id="F19" KeyPath="yes" Source="libraries\std\object.spwn" />
+            </Component>
+        
+            <Component Id="C20" Directory="std" Win64='$(var.Win64)' Guid="{24af206f-20f5-43d1-b47a-059ff52b9265}">
+                <File Id="F20" KeyPath="yes" Source="libraries\std\obj_set.spwn" />
+            </Component>
+        
+            <Component Id="C21" Directory="std" Win64='$(var.Win64)' Guid="{cb66b067-045c-4caa-bb2e-89ed3667752c}">
+                <File Id="F21" KeyPath="yes" Source="libraries\std\regex.spwn" />
+            </Component>
+        
+            <Component Id="C22" Directory="std" Win64='$(var.Win64)' Guid="{644832f9-5298-4147-a515-28e1d9f1b394}">
+                <File Id="F22" KeyPath="yes" Source="libraries\std\string.spwn" />
+            </Component>
+        
+            <Component Id="C23" Directory="std" Win64='$(var.Win64)' Guid="{5b28864f-3aaf-4ca1-a8a3-2e40b5d5ca62}">
+                <File Id="F23" KeyPath="yes" Source="libraries\std\util.spwn" />
+            </Component>
+        
+            <Component Id="C24" Directory="std" Win64='$(var.Win64)' Guid="{af20fc63-4355-4903-9994-cf08a668d19a}">
+                <File Id="F24" KeyPath="yes" Source="libraries\std\zip.spwn" />
+            </Component>
+        
+        </ComponentGroup>
+    </Fragment>
+</Wix>

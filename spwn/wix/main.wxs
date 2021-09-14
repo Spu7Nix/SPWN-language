@@ -23,10 +23,12 @@
 
     <Package Id='*' Keywords='Installer' Manufacturer='Spu7Nix' InstallerVersion='450' Languages='1033' Compressed='yes'
       InstallScope='perMachine' SummaryCodepage='1252' Platform='$(var.Platform)' />
-<!--
+
     <MajorUpgrade Schedule='afterInstallInitialize'
-      DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.' />
-      -->
+      DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.' 
+      AllowSameVersionUpgrades="yes"
+    />
+     
 
     <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1' />
     <Property Id='DiskPrompt' Value='spwn Installation' />
@@ -106,7 +108,7 @@
       </Feature>
     </Feature>
 
-    <Feature Id="Libraries" Level="1">
+    <Feature Id="Libraries" Level="1" Title='SPWN Standard Library'>
 
         <ComponentGroupRef Id='libraries' />
 

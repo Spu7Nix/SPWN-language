@@ -45,6 +45,6 @@ str += """
 </Wix>
 """
 print(str)
-new_file = open("wix/libraries.wxs", mode="w")
+new_file = open("spwn/wix/libraries.wxs", mode="w")
 new_file.write(str)
 new_file.close()
