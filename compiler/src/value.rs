@@ -700,7 +700,7 @@ pub fn macro_to_value(
                     .inner()
                     .get_variables()
                     .iter()
-                    .map(|(name, s)| (*name, s.last().unwrap().0))
+                    .map(|(name, s)| (*name, s.last().unwrap().val))
                     .collect(),
                 def_file: info.position.file,
                 arg_pos: m.arg_pos,
@@ -717,9 +717,9 @@ pub fn macro_to_value(
     Ok(())
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum DefineResult {
-    AlreadyDefined,
+    AlreadyDefined(bool), // bool: redefinable
     Ok, // wasn't defined before, but is now
 }
 // the actual value comes in context.return_value
@@ -849,7 +849,7 @@ impl VariableFuncs for ast::Variable {
                                     if distance::damerau_levenshtein(name, string) < 3 {
                                         similar_names.push((name.to_string(), dist));
                                     }
-                                    let val = v.last().unwrap().0;
+                                    let val = v.last().unwrap().val;
 
                                     if let Value::Dict(d) = &globals.stored_values[val] {
                                         for key in d.keys() {
@@ -2625,6 +2625,7 @@ impl VariableFuncs for ast::Variable {
         let mut results = Vec::new();
         for full_context in contexts.iter() {
             let mut defined = true;
+            let mut redefinable = false;
 
             let value = match &self.operator {
                 None => store_val_m(
@@ -2653,6 +2654,9 @@ impl VariableFuncs for ast::Variable {
                         full_context.inner().get_variable(*a),
                         mutable && self.path.is_empty(),
                     ) {
+                        if full_context.inner().is_redefinable(*a) == Some(true) {
+                            redefinable = true;
+                        }
                         ptr
                     } else {
                         // define or redefine
@@ -2714,6 +2718,7 @@ impl VariableFuncs for ast::Variable {
                         None,
                     )));
                 }
+                redefinable = false;
 
                 match p {
                     ast::Path::Member(m) => {
@@ -2915,7 +2920,7 @@ impl VariableFuncs for ast::Variable {
             }
 
             if defined {
-                results.push(DefineResult::AlreadyDefined)
+                results.push(DefineResult::AlreadyDefined(redefinable))
             } else {
                 results.push(DefineResult::Ok)
             }

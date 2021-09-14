@@ -1229,6 +1229,8 @@ fn group_triggers(
         (get_new_group(), get_new_group())
     };
 
+    let can_recurse_further = additional_groups.len() < 5;
+
     let recursion_groups = (get_new_group(), get_new_group());
 
     for (trigger, between) in triggers.iter() {
@@ -1284,7 +1286,7 @@ fn group_triggers(
             current_order += delta;
         }
 
-        if additional_groups.len() < 5 {
+        if can_recurse_further {
             let mut new_add_groups = additional_groups.clone();
             new_add_groups.push(main_group);
             new_add_groups.push(output_group);
@@ -1305,20 +1307,72 @@ fn group_triggers(
         } else {
             for output in all_outputs.iter().copied() {
                 if output.role == TriggerRole::Func || output.role == TriggerRole::Spawn {
-                    let obj = &objects[output.obj].0;
-                    if let Some(&ObjParam::Group(g)) = obj.params.get(&51) {
-                        if !is_start_group(g, reserved) {
-                            //if !visited.contains(&g) && network[&g].connections_in == 1
+                    // let spawn_delay = objects[output.obj].0.params.get(&63).cloned();
+                    // let is_instant = match (output.role, spawn_delay) {
+                    //     (TriggerRole::Spawn, Some(ObjParam::Number(n))) => n < 0.001,
+                    //     (TriggerRole::Spawn, Some(_)) => false,
+                    //     (TriggerRole::Spawn, None) => true,
+                    //     _ => true,
+                    // };
+
+                    if let Some(ObjParam::Group(g)) = objects[output.obj].0.params.get_mut(&51) {
+                        if !is_start_group(*g, reserved) {
+                            let orig_group = *g;
+                            // if network[g].connections_in == 1 && !visited.contains(g) && is_instant
+                            // {
+                            //     let shared_group = recursion_groups.0;
+                            //     *g = shared_group;
+                            //     let mut obj_list = network[&orig_group].triggers.clone();
+                            //     for t in obj_list.iter().copied() {
+                            //         match objects[t.obj].0.params.get_mut(&57) {
+                            //             Some(ObjParam::GroupList(l)) => {
+                            //                 for g in l {
+                            //                     if *g == orig_group {
+                            //                         *g = shared_group;
+                            //                     }
+                            //                 }
+                            //             }
+                            //             Some(ObjParam::Group(g)) => *g = shared_group,
+                            //             _ => (),
+                            //         };
+                            //     }
+
+                            //     obj_list.sort_by(|a, b| {
+                            //         objects[a.obj].1.partial_cmp(&objects[b.obj].1).unwrap()
+                            //     });
+                            //     let mut with_betweens = Vec::new();
+                            //     for i in 0..(obj_list.len() - 1) {
+                            //         with_betweens.push((
+                            //             obj_list[i],
+                            //             objects[obj_list[i + 1].obj].1 .0
+                            //                 - objects[obj_list[i].obj].1 .0,
+                            //         ))
+                            //     }
+                            //     visited.insert(orig_group);
+                            //     with_betweens.push((*obj_list.last().unwrap(), 1.0));
+
+                            //     intraframe_grouping(
+                            //         network,
+                            //         objects,
+                            //         reserved,
+                            //         closed_group,
+                            //         GroupingInput::ObjList(with_betweens, shared_group),
+                            //         Vec::new(),
+                            //         visited,
+                            //         None,
+                            //     );
+                            // } else {
                             intraframe_grouping(
                                 network,
                                 objects,
                                 reserved,
                                 closed_group,
-                                GroupingInput::Group(g),
+                                GroupingInput::Group(orig_group),
                                 Vec::new(),
                                 visited,
                                 None,
                             );
+                            //}
                         }
                     }
                 }

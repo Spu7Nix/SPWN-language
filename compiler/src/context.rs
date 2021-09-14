@@ -15,6 +15,13 @@ use shared::{BreakType, StoredValue};
 use crate::compiler::NULL_STORAGE;
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct VariableData {
+    pub val: StoredValue,
+    pub layers: i16,
+    pub redefinable: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Context {
     // broken doesn't mean something is wrong with it, it just means
     // a break statement ( or similar) has been used :)
@@ -22,7 +29,7 @@ pub struct Context {
     pub start_group: Group,
     pub func_id: FnIdPtr,
     pub fn_context_change_stack: Vec<CodeArea>,
-    variables: FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>>,
+    variables: FnvHashMap<Intern<String>, Vec<VariableData>>,
     pub return_value: StoredValue,
     pub return_value2: StoredValue,
     pub root_context_ptr: *mut FullContext,
@@ -64,7 +71,7 @@ impl FullContext {
     pub fn enter_scope(&mut self) {
         for context in self.with_breaks() {
             for stack in context.inner().variables.values_mut() {
-                for (_, layers) in stack.iter_mut() {
+                for VariableData { layers, .. } in stack.iter_mut() {
                     *layers += 1;
                 }
             }
@@ -73,13 +80,13 @@ impl FullContext {
     pub fn exit_scope(&mut self) {
         for context in self.with_breaks() {
             for stack in context.inner().variables.values_mut() {
-                for (_, layers) in stack.iter_mut() {
+                for VariableData { layers, .. } in stack.iter_mut() {
                     *layers -= 1;
                 }
             }
 
             for stack in context.inner().variables.values_mut() {
-                if stack.last().unwrap().1 < 0 {
+                if stack.last().unwrap().layers < 0 {
                     stack.pop();
                 }
             }
@@ -320,23 +327,55 @@ impl Context {
     }
 
     pub fn get_variable(&self, name: Intern<String>) -> Option<StoredValue> {
-        self.variables.get(&name).map(|a| a.last().unwrap().0)
+        self.variables.get(&name).map(|a| a.last().unwrap().val)
     }
 
-    pub fn new_variable(&mut self, name: Intern<String>, val: StoredValue, layer: i16) {
+    pub fn is_redefinable(&self, name: Intern<String>) -> Option<bool> {
+        self.variables
+            .get(&name)
+            .map(|a| a.last().unwrap().redefinable)
+    }
+
+    fn new_variable_full(
+        &mut self,
+        name: Intern<String>,
+        val: StoredValue,
+        layer: i16,
+        redefinable: bool,
+    ) {
         match self.variables.get_mut(&name) {
-            Some(stack) => stack.push((val, layer)),
+            Some(stack) => stack.push(VariableData {
+                val,
+                layers: layer,
+                redefinable,
+            }),
             None => {
-                self.variables.insert(name, vec![(val, layer)]);
+                self.variables.insert(
+                    name,
+                    vec![VariableData {
+                        val,
+                        layers: layer,
+                        redefinable,
+                    }],
+                );
             }
         }
     }
 
-    pub fn get_variables(&self) -> &FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>> {
+    pub fn new_variable(&mut self, name: Intern<String>, val: StoredValue, layer: i16) {
+        self.new_variable_full(name, val, layer, false)
+    }
+
+    // only used in extract statements
+    pub fn new_redefinable_variable(&mut self, name: Intern<String>, val: StoredValue, layer: i16) {
+        self.new_variable_full(name, val, layer, true)
+    }
+
+    pub fn get_variables(&self) -> &FnvHashMap<Intern<String>, Vec<VariableData>> {
         &self.variables
     }
 
-    pub fn set_all_variables(&mut self, vars: FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>>) {
+    pub fn set_all_variables(&mut self, vars: FnvHashMap<Intern<String>, Vec<VariableData>>) {
         (*self).variables = vars;
     }
 }
@@ -369,8 +408,8 @@ pub fn merge_contexts(
             } else {
                 //check variables are equal
                 for (key, stack) in &c.variables {
-                    for (i, (val, _)) in stack.iter().enumerate() {
-                        if !value_equality(ref_c.variables[key][i].0, *val, globals) {
+                    for (i, VariableData { val, .. }) in stack.iter().enumerate() {
+                        if !value_equality(ref_c.variables[key][i].val, *val, globals) {
                             not_eq = true;
                             break;
                         }

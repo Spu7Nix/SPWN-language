@@ -8,6 +8,7 @@ use shared::StoredValue;
 use crate::builtins::*;
 use crate::compiler::BUILTIN_STORAGE;
 use crate::compiler::NULL_STORAGE;
+use crate::context::VariableData;
 use errors::compiler_info::CodeArea;
 
 use crate::context::FullContext;
@@ -281,7 +282,7 @@ impl Globals {
 
             for c in root_context.with_breaks() {
                 for stack in c.inner().get_variables().values() {
-                    for (v, _) in stack.iter() {
+                    for VariableData { val: v, .. } in stack.iter() {
                         self.stored_values.mark(*v);
                     }
                 }

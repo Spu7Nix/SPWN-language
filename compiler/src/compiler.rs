@@ -108,7 +108,7 @@ pub fn compile_spwn(
 
         if let Value::Dict(d) = &globals.stored_values[start_context.inner().return_value] {
             for (a, b, c) in d.iter().map(|(k, v)| (*k, *v, -1)) {
-                start_context.inner().new_variable(a, b, c)
+                start_context.inner().new_redefinable_variable(a, b, c)
             }
         } else {
             return Err(RuntimeError::CustomError(create_error(
@@ -217,7 +217,7 @@ pub fn compile_scope(
             for c in contexts.with_breaks() {
                 stored.push(c.clone());
                 for v in c.inner().get_variables().values() {
-                    for (v, _) in v {
+                    for VariableData { val: v, .. } in v {
                         globals.push_preserved_val(*v)
                     }
                 }
@@ -292,24 +292,31 @@ pub fn compile_scope(
                     let defined = def
                         .symbol
                         .try_define(contexts, globals, &info, def.mutable)?;
-                    let same_module = {
-                        let ctx = contexts.iter().next().unwrap();
 
-                        globals.get_area(ctx.inner().return_value2).file
-                            == globals.get_area(ctx.inner().return_value).file
-                    };
+                    for full_context in contexts.iter() {
+                        let assign_implemented = globals.stored_values
+                            [full_context.inner().return_value]
+                            .clone()
+                            .member(
+                                globals.ASSIGN_BUILTIN,
+                                full_context.inner(),
+                                globals,
+                                info.clone(),
+                            )
+                            .is_some();
 
-                    match (defined, def.mutable, same_module) {
-                        (DefineResult::AlreadyDefined, false, true) => {
-                            // convert to assign expr
-                            for full_context in contexts.iter() {
+                        match (defined, def.mutable, assign_implemented) {
+                            (DefineResult::AlreadyDefined(false), false, false) // something is already defined
+                            | (DefineResult::AlreadyDefined(_), false, true) => { // something is already defined (may be redefinable), but has implemented assign
+                                // convert to assign expr
+
                                 let ptr = full_context.inner().return_value2;
 
                                 if !globals.is_mutable(ptr)
                                     && globals.stored_values[ptr]
                                         .clone()
                                         .member(
-                                            Intern::new(String::from(Builtin::AssignOp)),
+                                            globals.ASSIGN_BUILTIN,
                                             full_context.inner(),
                                             globals,
                                             info.clone(),
@@ -368,16 +375,15 @@ pub fn compile_scope(
                                     unreachable!()
                                 }
                             }
-                        }
-                        _ => {
-                            if let Some(new_expr) = &def.value {
-                                match (value_is_normalized, &new_expr.values[0].value.body) {
-                                    (true, ast::ValueBody::CmpStmt(f)) => {
-                                        //to account for recursion
-                                        assert!(!pre_evaled);
+                            _ => {
+                                if let Some(new_expr) = &def.value {
+                                    match (value_is_normalized, &new_expr.values[0].value.body) {
+                                        (true, ast::ValueBody::CmpStmt(f)) => {
+                                            //to account for recursion
+                                            assert!(!pre_evaled);
 
-                                        //create the function context
-                                        for full_context in contexts.iter() {
+                                            //create the function context
+
                                             let storage = full_context.inner().return_value2;
 
                                             //pick a start group
@@ -398,13 +404,12 @@ pub fn compile_scope(
                                                 Some(start_group),
                                             )?;
                                         }
-                                    }
 
-                                    // dont remove this camlin
-                                    // this is what makes recursion work lmao
-                                    (true, ast::ValueBody::Macro(m)) => {
-                                        assert!(!pre_evaled);
-                                        for full_context in contexts.iter() {
+                                        // dont remove this camlin
+                                        // this is what makes recursion work lmao
+                                        (true, ast::ValueBody::Macro(m)) => {
+                                            assert!(!pre_evaled);
+
                                             let storage = full_context.inner().return_value2;
 
                                             macro_to_value(
@@ -428,12 +433,16 @@ pub fn compile_scope(
 
                                             globals.stored_values[storage] = cloned;
                                         }
-                                    }
 
-                                    _ => {
-                                        assert!(pre_evaled);
+                                        _ => {
+                                            assert!(pre_evaled);
+                                            // dbg!(
+                                            //     &defined,
+                                            //     &def.mutable,
+                                            //     &same_module,
+                                            //     &assign_implemented
+                                            // );
 
-                                        for full_context in contexts.iter() {
                                             let ctx = full_context.inner();
                                             let storage = ctx.return_value2;
 
@@ -489,7 +498,7 @@ pub fn compile_scope(
                                 )
                             });
                             for (a, b, c) in iter {
-                                context.new_variable(a, b, c);
+                                context.new_redefinable_variable(a, b, c);
                             }
                         }
                         Value::Builtins => {
@@ -501,7 +510,11 @@ pub fn compile_scope(
                                     info.position,
                                 );
 
-                                context.new_variable(Intern::new(String::from(*name)), p, 0);
+                                context.new_redefinable_variable(
+                                    Intern::new(String::from(*name)),
+                                    p,
+                                    0,
+                                );
                             }
                         }
                         a => {
@@ -1409,7 +1422,7 @@ pub fn import_module(
     globals.push_new_preserved();
     for c in contexts.with_breaks() {
         for stack in c.inner().get_variables().values() {
-            for (v, _) in stack.iter() {
+            for VariableData { val: v, .. } in stack.iter() {
                 globals.push_preserved_val(*v);
             }
         }
@@ -1452,7 +1465,7 @@ pub fn import_module(
 
         if let Value::Dict(d) = &globals.stored_values[start_context.inner().return_value] {
             for (a, b, c) in d.iter().map(|(k, v)| (*k, *v, -1)) {
-                start_context.inner().new_variable(a, b, c)
+                start_context.inner().new_redefinable_variable(a, b, c)
             }
         } else {
             return Err(RuntimeError::CustomError(create_error(

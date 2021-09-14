@@ -338,7 +338,7 @@ pub fn execute_macro(
             .inner()
             .get_variables()
             .values()
-            .map(|stack| stack.iter().map(|(a, _)| *a))
+            .map(|stack| stack.iter().map(|VariableData { val: a, .. }| *a))
             .flatten()
         {
             globals.push_preserved_val(val)
@@ -379,13 +379,21 @@ pub fn execute_macro(
     //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
-        let mut new_variables: FnvHashMap<Intern<String>, Vec<(StoredValue, i16)>> =
-            Default::default();
+        let mut new_variables: FnvHashMap<Intern<String>, Vec<VariableData>> = Default::default();
         let context = full_context.inner();
 
         let fn_context = context.start_group;
 
-        new_variables.extend(m.def_variables.iter().map(|(a, b)| (*a, vec![(*b, -1)])));
+        new_variables.extend(m.def_variables.iter().map(|(a, b)| {
+            (
+                *a,
+                vec![VariableData {
+                    val: *b,
+                    layers: -1,
+                    redefinable: false,
+                }],
+            )
+        }));
 
         //parse each argument given into a local macro variable
         //index of arg if no arg is specified
@@ -419,12 +427,19 @@ pub fn execute_macro(
                             }
                         };
                         if arg_def.as_ref {
-                            new_variables.insert(*name, vec![(arg_values[i], -1)]);
+                            new_variables.insert(
+                                *name,
+                                vec![VariableData {
+                                    val: arg_values[i],
+                                    layers: -1,
+                                    redefinable: false,
+                                }],
+                            );
                         } else {
                             new_variables.insert(
                                 arg_def.name,
-                                vec![(
-                                    clone_value(
+                                vec![VariableData {
+                                    val: clone_value(
                                         arg_values[i],
                                         globals,
                                         context.start_group,
@@ -434,8 +449,9 @@ pub fn execute_macro(
                                             file: m.def_file,
                                         },
                                     ),
-                                    -1,
-                                )],
+                                    layers: -1,
+                                    redefinable: false,
+                                }],
                             );
                         }
                     } else {
@@ -493,12 +509,19 @@ pub fn execute_macro(
                         }
                     };
                     if m.args[def_index].as_ref {
-                        new_variables.insert(m.args[def_index].name, vec![(arg_values[i], -1)]);
+                        new_variables.insert(
+                            m.args[def_index].name,
+                            vec![VariableData {
+                                val: arg_values[i],
+                                layers: -1,
+                                redefinable: false,
+                            }],
+                        );
                     } else {
                         new_variables.insert(
                             m.args[def_index].name,
-                            vec![(
-                                clone_value(
+                            vec![VariableData {
+                                val: clone_value(
                                     arg_values[i],
                                     globals,
                                     context.start_group,
@@ -508,8 +531,9 @@ pub fn execute_macro(
                                         file: m.def_file,
                                     },
                                 ),
-                                -1,
-                            )],
+                                layers: -1,
+                                redefinable: false,
+                            }],
                         );
                     }
                     def_index += 1;
@@ -530,15 +554,22 @@ Should be used like this: value.macro(arguments)",
                     )));
             }
             //self doesn't need to be cloned, as it is a reference (kinda)
-            new_variables.insert(globals.SELF_MEMBER_NAME, vec![(parent, -1)]);
+            new_variables.insert(
+                globals.SELF_MEMBER_NAME,
+                vec![VariableData {
+                    val: parent,
+                    layers: -1,
+                    redefinable: false,
+                }],
+            );
             m_args_iter.next();
         }
         for arg in m_args_iter {
             if let std::collections::hash_map::Entry::Vacant(e) = new_variables.entry(arg.name) {
                 match &arg.default {
                     Some(default) => {
-                        e.insert(vec![(
-                            clone_value(
+                        e.insert(vec![VariableData {
+                            val: clone_value(
                                 *default,
                                 globals,
                                 context.start_group,
@@ -548,8 +579,9 @@ Should be used like this: value.macro(arguments)",
                                     file: m.def_file,
                                 },
                             ),
-                            -1,
-                        )]);
+                            layers: -1,
+                            redefinable: false,
+                        }]);
                     }
 
                     None => {
