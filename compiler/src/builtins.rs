@@ -749,7 +749,7 @@ builtins! {
 
 
 
-    [HTTPRequest] #[safe = false, desc = "Sends a HTTP request", example = ""] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
+    [HTTPRequest] #[safe = false, desc = "Sends an HTTP request", example = ""] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
 
         let mut headermap = reqwest::header::HeaderMap::new();
         for (name, value) in &headers {
