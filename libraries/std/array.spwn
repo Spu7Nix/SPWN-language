@@ -242,7 +242,7 @@ arr.sort(begin = 2, end = 4)
 $.assert(arr == [5, 1, 2, 3, 5])
 
 let arr = [5, 1, 5, 3, 2]
-arr.sort(comp = (a, b) => a > b)
+arr.sort(comp = (a, b) => a >= b)
 $.assert(arr == [5, 5, 3, 2, 1])
     ")]
     (self, begin: @number = 0, end: @number = -1, comp: @macro = (a, b) => a <= b) {
