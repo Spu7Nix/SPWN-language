@@ -32,7 +32,7 @@ arr = [3, 1, 4, 1]
 $.assert(arr.min() == 1)
 
 arr = ['abc', 'b', 'abdc']
-$.assert(arr.max(key = (el: @string) => el.length) == 'b')
+$.assert(arr.min(key = (el: @string) => el.length) == 'b')
     ")]
     (self, key: @macro = (el) => el) {
         let lowest = self[0]
@@ -46,7 +46,7 @@ $.assert(arr.max(key = (el: @string) => el.length) == 'b')
     },
     contains: #[desc("See if array contains an element.") example("
 fruit = ['apple', 'banana', 'mango']
-$.assert(arr.contains('banana'))
+$.assert(fruit.contains('banana'))
     ")]
     (self, el) {
 		return self has el
@@ -130,13 +130,12 @@ arr.pop(1)
 $.assert(arr == [1, 3])
     ")]
     (self, index: @number = -1) {
-        index = index if index >= 0 else self.length + index // to correct for negative values
+        let index = index % self.length // to correct for negative values
         return $.remove_index(self, index)
     },
     remove: #[desc("Returns array with all elements that match value removed") example("
 let arr = [1, 2, 3, 4, 5]
-arr.remove(3)
-$.assert(arr == [1, 2, 4, 5])
+$.assert(arr.remove(3) == [1, 2, 4, 5])
     ")]
     (self, index: @number) {
         return self.map(x => x if x != index else null).filter(el => el != null)
@@ -257,16 +256,16 @@ $.assert(arr.sum() == 15)
     },
 
     sort: #[desc("Sorts array in-place") example("
-arr = [5, 1, 5, 3, 2]
+let arr = [5, 1, 5, 3, 2]
 arr.sort()
 $.assert(arr == [1, 2, 3, 5, 5])
 
-arr = [5, 1, 5, 3, 2]
+let arr = [5, 1, 5, 3, 2]
 arr.sort(begin = 2, end = 4)
 $.assert(arr == [5, 1, 2, 3, 5])
 
-arr = [5, 1, 5, 3, 2]
-arr.sort(comp = (a, b) => a > b)
+let arr = [5, 1, 5, 3, 2]
+arr.sort(comp = (a, b) => a >= b)
 $.assert(arr == [5, 5, 3, 2, 1])
     ")]
     (self, begin: @number = 0, end: @number = -1, comp: @macro = (a, b) => a <= b) {
@@ -306,7 +305,7 @@ $.assert(arr.shift() == 5)
 $.assert(arr == [1, 5, 3, 2])
     ")]
     (self) {
-        return self.remove(0)
+        return self.pop(0)
     },
     unshift: #[desc("Pushes a value to the start of the array and returns it.") example("
 let arr = [1, 5, 3, 2]
@@ -337,17 +336,17 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         return output
     },
 
-    enumerate: #[desc("Returns an array of index-element pairs") example("
-    arr = [\"a\",\"b\",\"c\"]
+    enumerate: #[desc("Returns an array of index-element pairs") example('
+    arr = ["a","b","c"]
     for i in arr.enumerate() {
-        $.print(i[0], \": \", i[1])
+        $.print(i[0], ": ", i[1])
     }
     /* output:
-    0: 'a'
-    1: 'b'
-    2: 'c'
+    0: a
+    1: b
+    2: c
     */
-        ")]
+        ')]
     (self, #[desc("Return the pair as a dictionary")] dict: @bool = false) {
         if dict {
             return @array(..self.length).map(i => {index: i, value: self[i]})
