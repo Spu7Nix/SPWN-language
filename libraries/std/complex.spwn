@@ -4,6 +4,7 @@ type @complex
 PI = 3.14159265358979323846
 
 impl @complex {
+
 	new: #[constructor] (re, im = 0) {
 		return @complex::{re, im}
 	},
@@ -17,21 +18,6 @@ impl @complex {
     },
 	zero: #[constructor] () {
         return @complex::new(0, 0)
-    },
-
-	print: (self) {
-        if self.re == 0 && self.im == 0 { $.print(0); return }
-        let c_string = ""
-        if self.re != 0 {
-            c_string += self.re as @string
-            if self.im > 0 {
-                c_string += "+"
-            }
-        }
-        if self.im != 0 {
-            c_string += (self.im as @string) + "i"
-        }
-        $.print(c_string)
     },
 
 	polar: (self) {
@@ -277,7 +263,30 @@ impl @complex {
         return self.invert().asin()
     },
 	_display_: (self) {
-		return @string(self.re) + " + " + @string(self.im) + "i"
+		if self.re == 0 && self.im == 0 { return 0 }
+        let c_string = ""
+		
+        if self.re != 0 {
+            c_string += self.re as @string
+            if self.im > 0 {
+                c_string += " + "
+            } else if self.im < 0 {
+				c_string += " - "
+			}
+			c_string += switch $.abs(self.im) {
+				case 0: ""
+				case 1: "i"
+				else: ($.abs(self.im) as @string) + "i"
+			} 
+        } else {
+			c_string += switch self.im {
+				case 0: ""
+				case 1: "i"
+				case -1: "-i"
+				else: (self.im as @string) + "i"
+			}
+		}
+        return c_string
 	}
 
 }
