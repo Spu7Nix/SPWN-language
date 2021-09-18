@@ -20,6 +20,7 @@ import "heapq.spwn"
 import "complex.spwn"
 import "zip.spwn"
 import "http.spwn"
+import "vector.spwn"
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"

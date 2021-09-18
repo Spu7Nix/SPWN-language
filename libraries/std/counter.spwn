@@ -239,28 +239,14 @@ c.divide(2, remainder = r)
             broken = @counter::new(false)
             
             for i in self.bits..0 {
-                -> if broken == 0 {
-                    num = 2^i
+                num = 2^i
 
-                    self.item.if_is(LARGER_THAN, 0, !{
-                        divisor.copy_to(self, factor = -num)
-                        result.add(num)
-                    })
+                divisor.copy_to(self, factor = -num)
+                result.add(num)
 
-                    -> if self == 0 {
-                        broken += 1
-                    } 
-                    -> if self < 0 {
-                        divisor.copy_to(self, factor = num)
-                        result.add(-num)
-                    }
-                }
-            }
-            -> if broken == 0 {
                 -> if self < 0 {
-                    divisor.copy_to(self)
-                    result.add(-1)
-                    broken += 1
+                    divisor.copy_to(self, factor = num)
+                    result.add(-num)
                 }
             }
 
