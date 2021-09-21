@@ -139,11 +139,11 @@ impl @textdisplay {
         let coin_coin = []
         for i in 0..9 {
             if i < 4 {
-                c1 = counter(wincon[[2, 3, 0, 1][i]].create_tracker_item(checkers[i]))
+                c1 = counter(wincon[[2, 3, 0, 1][i]].create_tracker_item(checkers[i]), bits = 1)
                 coin.push(c1)
             } else {
                 if i > 4 {
-                    coin_coin.push(counter(wincon[[2, 3, 0, 1][i - 5]].create_tracker_item(checkers[i])))
+                    coin_coin.push(counter(wincon[[2, 3, 0, 1][i - 5]].create_tracker_item(checkers[i]), bits = 1))
                 }
             }
         }

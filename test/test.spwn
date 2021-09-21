@@ -1,28 +1,41 @@
 
-a = counter(100, bits = 12)
-a.display(45, 45)
+//$.print(@t)
+// sqrt = (n: @counter) {
+//     // we need to use 12 bit counters for this,
+//     // because the division would cause too much lag otherwise
+//     BITS = 12
+//     // cast to 12 bit
+//     let n = n
+//     n.bits = BITS
+//     // babylonian method
+//     result = counter(bits = BITS)
+//     result = n
+//     y = counter(1, bits = BITS)
 
-b = counter(0, bits = 12)
-b.display(45, 90)
+//     while_loop(() => result > y, () {
+//         result = (result + y) / 2
+//         wait(0.2) // delay in case of lag
+//         y = n / result
+//         wait(0.2) // delay in case of lag
+//         // for small values this delay isnt necesary
+//     })
 
-x0 = counter()
-x1 = counter()
-x0.display(150, 45)
-x1.display(150, 90)
+//     return result
+// }
 
-wait(1)
-
-sqrt = (s: @counter) {
-   
-    x0 = s / 2
-    x1 = x0 / 2 + 1
-
-    while_loop(() => x1 < x0, () {
-        x0 = x1
-        x1 = (x0 + s / x0) / 2
-    })
-
-    return x0
+// extract obj_props
+// // create counters
+// c = counter()
+// result = counter()
+// // add a pickup trigger so you can test different values
+// pickup_trigger(c.item, 100).with(X, 45).with(Y, 90).add()
+// // add counter displays
+// c.display(45, 45)
+// result.display(105, 45)
+// // perform the calculation
+// result = sqrt(c)
+fct = !{
+    2g.move(0, -10, 0.1)
 }
 
-b = sqrt(a)
+$.extend_trigger_func(1g, () { fct! })

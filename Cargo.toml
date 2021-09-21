@@ -11,3 +11,5 @@ members = [
     "docgen",
 ]
 
+[profile.release]
+debug = true

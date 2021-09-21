@@ -155,20 +155,18 @@ pub fn optimize(
     //network = fix_read_write_order(&mut objects, &network, &mut closed_group);
 
     // round 1
-    let rounds = 5;
-    for _ in 0..rounds {
-        clean_network(&mut network, &objects, true);
 
-        dead_code_optimization(&mut network, &mut objects, &mut closed_group, &reserved);
+    clean_network(&mut network, &objects, true);
 
-        clean_network(&mut network, &objects, false);
+    dead_code_optimization(&mut network, &mut objects, &mut closed_group, &reserved);
 
-        spawn_optimisation(&mut network, &mut objects, &reserved);
+    clean_network(&mut network, &objects, false);
 
-        clean_network(&mut network, &objects, false);
+    spawn_optimisation(&mut network, &mut objects, &reserved);
 
-        update_reserved(&mut network, &mut objects, &mut reserved);
-    }
+    clean_network(&mut network, &objects, false);
+
+    update_reserved(&mut network, &mut objects, &mut reserved);
 
     clean_network(&mut network, &objects, false);
 
@@ -846,12 +844,14 @@ pub fn spawn_optimisation(
             delay.delay
         };
         if d == 0 && !is_start_group(end, reserved) && network[&end].connections_in == 1 {
+            //dbg!(end, start);
             insert_to_swaps(end, start);
         } else if d == 0 && !is_start_group(start, reserved)
             && network[&start].connections_in == 1 //??
             && (network[&start].triggers.is_empty()
                 || network[&start].triggers.iter().all(|t| t.deleted))
         {
+            //dbg!(start, end);
             insert_to_swaps(start, end);
         } else {
             create_spawn_trigger(

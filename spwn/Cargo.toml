@@ -9,8 +9,6 @@ homepage = "https://spu7nix.net/spwn/"
 repository = "https://github.com/Spu7Nix/SPWN-language/"
 license-file = "LICENSE"
 
-[profile.release]
-debug = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
