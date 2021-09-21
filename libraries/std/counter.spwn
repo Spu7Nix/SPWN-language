@@ -361,7 +361,7 @@ c2 = c1.clone()
     },
 
     _plus_: #[desc("Implementation of the plus (`+`) operator") example("
-c = counter(10)
+c1 = counter(10)
 c2 = c1 + 10
 // c2 is 20
     ")]
