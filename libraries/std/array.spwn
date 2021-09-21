@@ -354,4 +354,22 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         return @array(..self.length).map(i => [i, self[i]])
     },
 
+    split: #[desc("Splits the array on the indicies") example("
+x = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]  
+$.assert(x.split([5]) == [[0,1,2,3,4],[5,6,7,8,9]])
+$.assert(x.split([5, 7]) == [[0,1,2,3,4],[5,6],[7,8,9]])
+    ")]
+    (self, indicies: [@number]) {
+        let ret_arr = []
+
+        ret_arr.push(self[:indicies[0]])
+
+        for i in 1..indicies.length {
+            ret_arr.push(self[indicies[i-1]: indicies[i]])
+        }
+        
+        ret_arr.push(self[indicies[indicies.length - 1]:])
+
+        return ret_arr
+    }
 }
