@@ -19,7 +19,6 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 use std::io::stdout;
 use std::io::Write;
-use std::process::Command;
 
 //use text_io;
 use errors::compiler_info::{CodeArea, CompilerInfo};
@@ -841,15 +840,6 @@ builtins! {
         output_map.insert(Intern::new(String::from("headers")), response_headers);
         output_map.insert(Intern::new(String::from("text")), response_text);
         Value::Dict(output_map)
-    }
-
-    [ShellRun] #[safe = false, desc = "Runs a shell command and returns the output"]
-    fn shell_run((program): Str, (args): Array) {
-        Command::new(program)
-                .args(args)
-                .output()
-                .expect("Failed to run process.");
-                Value::Str(output.stdout);
     }
 
     [Sin] #[safe = true, desc = "Calculates the sin of an angle in radians", example = "$.sin(3.1415)"] fn sin((n): Number) { Value::Number(n.sin()) }

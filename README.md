@@ -41,7 +41,7 @@ If you would like a pre-compiled package, look below.
 
 ###### Debian based (Ubuntu, Mint, Elementary, ...)
 
-**No v0.7 installers for Debian based distros have been built yet.**
+**No installers for Debian based distros have been built yet.**
 
 You can either:
 - Download the .deb file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases) and install it using dpkg with `sudo dpkg -i spwn_0.0.6-0_amd64.deb`.
