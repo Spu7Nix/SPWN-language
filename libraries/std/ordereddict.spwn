@@ -1,3 +1,5 @@
+#[no_std, cache_output]
+
 new_wo_key = (dict, key) {
 	let new = {}
 	for k in dict.keys() {
