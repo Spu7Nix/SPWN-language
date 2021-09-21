@@ -378,7 +378,7 @@ c2 = c1 + 10
     },
 
     _minus_: #[desc("Implementation of the minus (`-`) operator") example("
-c = counter(10)
+c1 = counter(10)
 c2 = c1 - 3
 // c2 is 7
     ")]
@@ -395,7 +395,7 @@ c2 = c1 - 3
     },
 
     _times_: #[desc("Implementation of the times (`*`) operator") example("
-c = counter(10)
+c1 = counter(10)
 c2 = c1 * 10
 // c2 is 100
     ")]
@@ -414,7 +414,7 @@ c2 = c1 * 10
     },
 
     _divided_by_: #[desc("Implementation of the divided by (`/`) operator") example("
-c = counter(100)
+c1 = counter(100)
 c2 = c1 / 10
 // c2 is 10
     ")]
@@ -425,7 +425,7 @@ c2 = c1 / 10
     },
 
     _mod_: #[desc("Implementation of the modulus (`%`) operator") example("
-c = counter(42)
+c1 = counter(42)
 c2 = c1 % 10
 // c2 is 2
     ")]
@@ -697,11 +697,11 @@ c = 42
     },
 
     _swap_: #[desc("Implementation of the swap (`<=>`) operator") example("
-c = counter(23)
+c1 = counter(23)
 c2 = counter(42)
 wait(1)
-c <=> c2
-// c is now 42, c2 is now 23
+c1 <=> c2
+// c1 is now 42, c2 is now 23
     ")]
     (self, num: @counter) {
         swap_tmp = @counter::new(0, bits = self.bits, reset = false);
@@ -798,7 +798,3 @@ on(c.reaches(10), !{
     }
 
 }
-
-
-
-
