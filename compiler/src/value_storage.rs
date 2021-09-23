@@ -80,6 +80,10 @@ impl ValStorage {
                         }
                     }
 
+                    if let Some(val) = m.ret_pattern {
+                        self.mark(val)
+                    }
+
                     for (_, v) in m.def_variables.iter() {
                         self.mark(*v)
                     }

@@ -13,6 +13,7 @@ use errors::create_error;
 use fnv::FnvHashMap;
 use fnv::FnvHashSet;
 use shared::FileRange;
+use shared::SpwnSource;
 //use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -325,12 +326,12 @@ impl Token {
 
 pub struct ParseNotes {
     pub tag: ast::Attribute,
-    pub file: PathBuf,
+    pub file: SpwnSource,
     pub builtins: FnvHashSet<&'static str>,
 }
 
 impl ParseNotes {
-    pub fn new(path: PathBuf, builtins: &[&'static str]) -> Self {
+    pub fn new(path: SpwnSource, builtins: &[&'static str]) -> Self {
         ParseNotes {
             tag: ast::Attribute::new(),
             file: path,
@@ -481,7 +482,7 @@ const STATEMENT_SEPARATOR_DESC: &str = "Statement separator (line-break or ';')"
 
 pub fn parse_spwn(
     mut unparsed: String,
-    path: PathBuf,
+    source: SpwnSource,
     builtin_list: &[&'static str],
 ) -> Result<(Vec<ast::Statement>, ParseNotes), SyntaxError> {
     unparsed = unparsed.replace("\r\n", "\n");
@@ -492,7 +493,7 @@ pub fn parse_spwn(
 
     let mut statements = Vec::<ast::Statement>::new();
 
-    let mut notes = ParseNotes::new(path, builtin_list);
+    let mut notes = ParseNotes::new(source, builtin_list);
 
     let mut line_breaks = Vec::<u32>::new();
     let mut current_index: u32 = 0;
@@ -1842,6 +1843,12 @@ fn parse_macro(
             let arg_start = tokens.position().0;
             let args = parse_arg_def(tokens, notes)?;
             let arg_end = tokens.position().1;
+            let ret_type = if let Some(Token::Arrow) = tokens.next(false) {
+                Some(parse_expr(tokens, notes, false, false)?)
+            } else {
+                tokens.previous();
+                None
+            };
             let body = match tokens.next(false) {
                 Some(Token::OpenCurlyBracket) => parse_cmp_stmt(tokens, notes)?,
                 Some(Token::ThickArrow) => {
@@ -1863,6 +1870,7 @@ fn parse_macro(
                 body: ast::CompoundStatement { statements: body },
                 properties: properties.clone(),
                 arg_pos: (arg_start, arg_end),
+                ret_type,
             });
 
             if let Some(d) = decorator {
@@ -2091,6 +2099,7 @@ fn parse_variable(
                         },
                         arg_pos: start,
                         properties: properties.clone(),
+                        ret_type: None,
                     })
                 }
                 _ => {

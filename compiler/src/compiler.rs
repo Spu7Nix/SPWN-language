@@ -5,6 +5,7 @@ use internment::Intern;
 
 use shared::BreakType;
 use shared::ImportType;
+use shared::SpwnSource;
 use shared::StoredValue;
 use termcolor::ColorChoice;
 use termcolor::ColorSpec;
@@ -57,7 +58,7 @@ pub fn compile_spwn(
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
 
-    let mut globals = Globals::new(path.clone(), permissions);
+    let mut globals = Globals::new(SpwnSource::File(path.clone()), permissions);
     globals.includes = included_paths;
     // if statements.is_empty() {
     //     return Err(RuntimeError::CustomError(create_error(
@@ -77,7 +78,7 @@ pub fn compile_spwn(
 
     let start_info = CompilerInfo {
         ..CompilerInfo::from_area(errors::compiler_info::CodeArea {
-            file: Intern::new(path.clone()),
+            file: Intern::new(SpwnSource::File(path.clone())),
             pos: (0, 0),
         })
     };
@@ -132,7 +133,7 @@ pub fn compile_spwn(
                     broke: i,
                     dropped: CodeArea {
                         pos: (end_pos, end_pos),
-                        file: Intern::new(path),
+                        file: Intern::new(SpwnSource::File(path)),
                     },
                     reason: "the program ended".to_string(),
                 });
@@ -1296,16 +1297,36 @@ pub fn get_import_path(
     info: CompilerInfo,
 ) -> Result<PathBuf, RuntimeError> {
     Ok(match path {
-        ImportType::Script(p) => globals
-            .path
-            .clone()
+        ImportType::Script(p) => {
+            let p = if let SpwnSource::File(f) = globals.path.as_ref() {
+                f
+            } else {
+                // should never actually display
+                return Err(RuntimeError::CustomError(create_error(
+                    Default::default(),
+                    "Path is built in",
+                    &[],
+                    None,
+                )));
+            }
             .parent()
             .expect("Your file must be in a folder to import modules!")
-            .join(&p),
+            .join(&p);
+            if !p.exists() {
+                return Err(RuntimeError::CustomError(create_error(
+                    info,
+                    &format!("Couldn't find module file ({})", p.to_string_lossy()),
+                    &[],
+                    None,
+                )));
+            };
+            p
+        }
 
         ImportType::Lib(name) => {
             let mut outpath = globals.includes[0].clone();
             let mut found = false;
+
             for path in &globals.includes {
                 if path.join("libraries").join(name).exists() {
                     outpath = path.to_path_buf();
@@ -1313,6 +1334,7 @@ pub fn get_import_path(
                     break;
                 }
             }
+
             if found {
                 outpath
             } else {
@@ -1362,57 +1384,80 @@ pub fn import_module(
             return Ok(());
         }
     }
-
-    let mut module_path = get_import_path(path, globals, info.clone())?;
-
-    if module_path.is_dir() {
-        module_path = module_path.join("lib.spwn");
-    } else if module_path.is_file() && module_path.extension().is_none() {
-        module_path.set_extension("spwn");
-    } else if !module_path.is_file() {
-        return Err(RuntimeError::CustomError(create_error(
-            info,
-            &format!(
-                "Couldn't find library file ({})",
-                module_path.to_string_lossy()
-            ),
-            &[],
-            None,
-        )));
-    }
-
-    if let Some(ext) = module_path.extension() {
-        if ext != "spwn" {
-            return Err(RuntimeError::CustomError(create_error(
-                info,
-                &format!(
-                    "Imported files must have a .spwn extension (found {})",
-                    ext.to_string_lossy()
-                ),
-                &[],
-                None,
-            )));
+    let built_in_path = match path {
+        ImportType::Script(a) => {
+            if let Some(mut p) = globals.built_in_path.clone() {
+                p.push(a);
+                p
+            } else {
+                a.clone()
+            }
         }
-    }
-
-    let module_path = Intern::new(module_path);
-
-    let unparsed = match fs::read_to_string(module_path.as_ref()) {
-        Ok(content) => content,
-        Err(e) => {
-            return Err(RuntimeError::CustomError(create_error(
-                info.clone(),
-                &format!(
-                    "Something went wrong when opening library file ({})",
-                    module_path.to_string_lossy(),
-                ),
-                &[(info.position, &format!("{}", e))],
-                None,
-            )));
+        ImportType::Lib(a) => {
+            let mut p = PathBuf::from(a);
+            p.push("lib.spwn");
+            p
         }
     };
+
+    let stored_built_in_path = globals.built_in_path.clone();
+
+    let (unparsed, module_path) = match get_import_path(path, globals, info.clone()) {
+        Err(err) => {
+            if let Some(file) = STANDARD_LIBS.get_file(&built_in_path) {
+                (*globals).built_in_path = Some(built_in_path.parent().unwrap().to_path_buf());
+                (
+                    file.contents_utf8()
+                        .expect("Bad built-in library file")
+                        .to_string(),
+                    SpwnSource::BuiltIn(built_in_path),
+                )
+            } else {
+                return Err(err);
+            }
+        }
+        Ok(mut module_path) => {
+            if module_path.is_dir() {
+                module_path = module_path.join("lib.spwn");
+            } else if module_path.is_file() && module_path.extension().is_none() {
+                module_path.set_extension("spwn");
+            }
+            if let Some(ext) = module_path.extension() {
+                if ext != "spwn" {
+                    return Err(RuntimeError::CustomError(create_error(
+                        info,
+                        &format!(
+                            "Imported files must have a .spwn extension (found {})",
+                            ext.to_string_lossy()
+                        ),
+                        &[],
+                        None,
+                    )));
+                }
+            }
+
+            (
+                match fs::read_to_string(&module_path) {
+                    Ok(content) => content,
+                    Err(e) => {
+                        return Err(RuntimeError::CustomError(create_error(
+                            info.clone(),
+                            &format!(
+                                "Something went wrong when opening library file ({})",
+                                module_path.to_string_lossy(),
+                            ),
+                            &[(info.position, &format!("{}", e))],
+                            None,
+                        )));
+                    }
+                },
+                SpwnSource::File(module_path),
+            )
+        }
+    };
+
     let (parsed, notes) =
-        match parser::parser::parse_spwn(unparsed, module_path.as_ref().clone(), BUILTIN_NAMES) {
+        match parser::parser::parse_spwn(unparsed, module_path.clone(), BUILTIN_NAMES) {
             Ok(p) => p,
             Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
         };
@@ -1478,11 +1523,12 @@ pub fn import_module(
     }
 
     let stored_path = globals.path;
-    (*globals).path = module_path;
+
+    (*globals).path = Intern::new(module_path);
 
     let mut new_info = info.clone();
 
-    new_info.position.file = module_path;
+    new_info.position.file = (*globals).path;
     new_info.position.pos = (0, 0);
 
     if let ImportType::Lib(l) = path {
@@ -1543,6 +1589,7 @@ pub fn import_module(
         }
     }
     (*globals).path = stored_path;
+    (*globals).built_in_path = stored_built_in_path;
 
     if let Some(stored_impl) = stored_impl {
         //change and delete from impls

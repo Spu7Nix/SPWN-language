@@ -623,10 +623,29 @@ Should be used like this: value.macro(arguments)",
             if let Some((r, i)) = (*context.inner()).broken {
                 match r {
                     BreakType::Macro(v, _) => {
-                        if let Some(val) = v {
+                        let ret = if let Some(val) = v {
                             (*context.inner()).return_value = val;
+                            val
                         } else {
                             (*context.inner()).return_value = NULL_STORAGE;
+                            NULL_STORAGE
+                        };
+                        if let Some(pat) = m.ret_pattern {
+                            //dbg!(&globals.stored_values[pat], &globals.stored_values[ret]);
+                            if !globals.stored_values[ret].clone().matches_pat(
+                                &globals.stored_values[pat].clone(),
+                                &info,
+                                globals,
+                                context.inner(),
+                            )? {
+                                return Err(RuntimeError::PatternMismatchError {
+                                    pattern: globals.stored_values[pat].to_str(globals),
+                                    val: globals.stored_values[ret].to_str(globals),
+                                    pat_def: globals.get_area(pat),
+                                    val_def: globals.get_area(ret),
+                                    info,
+                                });
+                            }
                         }
                     }
                     a => {

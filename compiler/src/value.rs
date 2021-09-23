@@ -7,6 +7,7 @@ use errors::compiler_info::CompilerInfo;
 use errors::create_error;
 use parser::ast;
 use shared::BreakType;
+use shared::SpwnSource;
 use shared::StoredValue;
 use slyce::Slice as Slyce;
 
@@ -18,7 +19,7 @@ use internment::Intern;
 
 use fnv::FnvHashMap;
 
-use std::path::PathBuf;
+
 
 use errors::RuntimeError;
 
@@ -52,10 +53,11 @@ const MAX_DICT_EL_DISPLAY: usize = 10;
 pub struct Macro {
     pub args: Vec<MacroArgDef>,
     pub def_variables: FnvHashMap<Intern<String>, StoredValue>,
-    pub def_file: Intern<PathBuf>,
+    pub def_file: Intern<SpwnSource>,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Attribute,
     pub arg_pos: FileRange,
+    pub ret_pattern: Option<StoredValue>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -632,7 +634,7 @@ pub fn macro_to_value(
     constant: bool,
 ) -> Result<(), RuntimeError> {
     globals.push_new_preserved();
-
+    // todo: add check for context split on pattern and default vals
     for full_context in contexts.iter() {
         let fn_context = full_context.inner().start_group;
         let mut args: Vec<MacroArgDef> = Vec::new();
@@ -670,7 +672,7 @@ pub fn macro_to_value(
 
                     if full_context.inner().start_group != fn_context {
                         return Err(RuntimeError::ContextChangeError {
-                            message: "A macro argument default value can't change the trigger function context".to_string(),
+                            message: "A macro argument pattern can't change the trigger function context".to_string(),
                             info,
                             context_changes: full_context.inner().fn_context_change_stack.clone()
                         });
@@ -692,6 +694,25 @@ pub fn macro_to_value(
             });
         }
 
+        let ret_pattern = if let Some(expr) = &m.ret_type {
+            expr.eval(full_context, globals, info.clone(), constant)?;
+        
+            if full_context.inner().start_group != fn_context {
+                return Err(RuntimeError::ContextChangeError {
+                    message: "A macro return pattern can't change the trigger function context".to_string(),
+                    info,
+                    context_changes: full_context.inner().fn_context_change_stack.clone()
+                });
+            }
+
+            let out = full_context.inner().return_value;
+
+            globals.push_preserved_val(out);
+            Some(out)
+        } else {
+            None
+        };
+
         full_context.inner().return_value = store_const_value(
             Value::Macro(Box::new(Macro {
                 args,
@@ -705,6 +726,7 @@ pub fn macro_to_value(
                 def_file: info.position.file,
                 arg_pos: m.arg_pos,
                 tag: m.properties.clone(),
+                ret_pattern
             })),
             globals,
             full_context.inner().start_group,

@@ -14,6 +14,8 @@ use optimize::optimize;
 
 use ::parser::parser::*;
 use builtins::BuiltinPermissions;
+use shared::SpwnSource;
+use spwn::builtins::STANDARD_LIBS;
 
 use std::env;
 use std::path::PathBuf;
@@ -29,6 +31,46 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use errors::{create_report, ErrorReport};
 
 const HELP: &str = include_str!("../help.txt");
+
+use ariadne::Source;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fmt,
+};
+
+pub struct SpwnCache {
+    files: HashMap<SpwnSource, Source>,
+}
+
+impl Default for SpwnCache {
+    fn default() -> Self {
+        Self {
+            files: HashMap::default(),
+        }
+    }
+}
+
+impl ariadne::Cache<SpwnSource> for SpwnCache {
+    fn fetch(&mut self, source: &SpwnSource) -> Result<&Source, Box<dyn fmt::Debug + '_>> {
+        Ok(match self.files.entry(source.clone()) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(Source::from(&match source {
+                SpwnSource::File(path) => fs::read_to_string(path).map_err(|e| Box::new(e) as _)?,
+                SpwnSource::BuiltIn(path) => match STANDARD_LIBS.get_file(path) {
+                    Some(file) => match file.contents_utf8() {
+                        Some(c) => c.to_string(),
+                        None => return Err(Box::new("Invalid built in file content")),
+                    },
+                    None => return Err(Box::new("Could not find built in file")),
+                },
+            })),
+        })
+    }
+    fn display<'a>(&self, path: &'a SpwnSource) -> Option<Box<dyn fmt::Display + 'a>> {
+        let (SpwnSource::File(path) | SpwnSource::BuiltIn(path)) = path;
+        Some(Box::new(path.display()))
+    }
+}
 
 fn print_with_color(text: &str, color: Color) {
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
@@ -137,8 +179,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         };
                     }
 
-                    let mut cache = FileCache::default();
-                    match cache.fetch(script_path.as_path()) {
+                    let mut cache = SpwnCache::default();
+                    match cache.fetch(&SpwnSource::File(script_path.clone())) {
                         Ok(_) => (),
                         Err(_) => {
                             return Err(Box::from("File does not exist".to_string()));
@@ -150,7 +192,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     let (statements, notes) = match parse_spwn(
                         unparsed,
-                        script_path.clone(),
+                        SpwnSource::File(script_path.clone()),
                         ::compiler::builtins::BUILTIN_NAMES,
                     ) {
                         Err(err) => {
@@ -381,7 +423,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         fs::write("builtins.md", doc)?;
                         print_with_color("Written to ./builtins.md", Color::Green);
                     } else {
-                        let cache = FileCache::default();
+                        let cache = SpwnCache::default();
 
                         match documentation::document_lib(lib_path) {
                             Ok(_) => (),

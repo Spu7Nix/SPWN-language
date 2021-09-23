@@ -21,3 +21,8 @@ pub enum BreakType {
     Switch(StoredValue),
     // used for contexts
 }
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub enum SpwnSource {
+    File(PathBuf),
+    BuiltIn(PathBuf),
+}

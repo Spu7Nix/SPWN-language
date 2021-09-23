@@ -20,6 +20,11 @@ use rand::Rng;
 use std::io::stdout;
 use std::io::Write;
 
+// BUILT IN STD
+use include_dir::{include_dir, Dir};
+
+pub const STANDARD_LIBS: Dir = include_dir!("../libraries");
+
 //use text_io;
 use errors::compiler_info::{CodeArea, CompilerInfo};
 
@@ -442,6 +447,7 @@ macro_rules! builtins {
                 Self::new()
             }
         }
+        #[inline]
         pub fn built_in_function(
             func: Builtin,
             $arguments: Vec<StoredValue>,
@@ -1278,7 +1284,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
     }
 
-    [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local system", example = "data = $.readfile(\"file.txt\")"]
+    [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local system (uses the current directory as base for relative paths)", example = "data = $.readfile(\"file.txt\")"]
     fn readfile(#["Path of file to read, and the format it's in (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"]) {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
@@ -1305,12 +1311,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                     }
                     _ => "text",
                 };
-                let path = globals
-                    .path
-                    .clone()
-                    .parent()
-                    .expect("Your file must be in a folder!")
-                    .join(&p);
+                let path = std::path::PathBuf::from(p);
 
                 if !path.exists() {
                     return Err(RuntimeError::BuiltinError {

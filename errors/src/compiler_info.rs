@@ -1,6 +1,6 @@
 use internment::Intern;
 use shared::FileRange;
-use std::path::{Path, PathBuf};
+use std::path::{ PathBuf};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerInfo {
     pub depth: u8,
@@ -48,14 +48,14 @@ impl Default for CompilerInfo {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CodeArea {
-    pub file: Intern<PathBuf>,
+    pub file: Intern<shared::SpwnSource>,
     pub pos: FileRange,
 }
 
 impl CodeArea {
     pub fn new() -> Self {
         CodeArea {
-            file: Intern::new(PathBuf::new()),
+            file: Intern::new(shared::SpwnSource::File(PathBuf::new())),
             pos: (0, 0),
         }
     }
@@ -69,10 +69,10 @@ impl Default for CodeArea {
 use ariadne::Span;
 
 impl Span for CodeArea {
-    type SourceId = Path;
+    type SourceId = shared::SpwnSource;
 
     fn source(&self) -> &Self::SourceId {
-        self.file.as_path()
+        &self.file
     }
     fn start(&self) -> usize {
         self.pos.0

@@ -1,6 +1,6 @@
 use errors::RuntimeError;
 use internment::Intern;
-use shared::{ImportType, StoredValue};
+use shared::{ImportType, SpwnSource, StoredValue};
 
 // tools for generating documentation for SPWN libraries
 //use crate::ast::*;
@@ -39,7 +39,7 @@ fn find_avaliable_name(dir: &mut PathBuf, name: &mut String) {
 pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     let mut globals_path = std::env::current_dir().unwrap();
     globals_path.push("temp"); // this folder doesn't actually exist, but it needs to be there because .parent is called in import_module
-    let mut globals = Globals::new(globals_path, BuiltinPermissions::new());
+    let mut globals = Globals::new(SpwnSource::File(globals_path), BuiltinPermissions::new());
 
     let mut start_context = FullContext::new();
 

@@ -327,6 +327,7 @@ pub struct Macro {
     pub body: CompoundStatement,
     pub properties: Attribute,
     pub arg_pos: FileRange,
+    pub ret_type: Option<Expression>,
 }
 
 #[derive(Clone, PartialEq, Debug)]

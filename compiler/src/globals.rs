@@ -2,6 +2,7 @@ use errors::RuntimeError;
 use internment::Intern;
 use shared::BreakType;
 use shared::ImportType;
+use shared::SpwnSource;
 use shared::StoredValue;
 
 ///types and functions used by the compiler
@@ -33,7 +34,7 @@ pub struct Globals {
     pub closed_blocks: u16,
     pub closed_items: u16,
 
-    pub path: Intern<PathBuf>,
+    pub path: Intern<SpwnSource>,
 
     pub lowest_y: FnvHashMap<u32, u16>,
     pub stored_values: ValStorage,
@@ -64,6 +65,8 @@ pub struct Globals {
     pub ASSIGN_BUILTIN: Intern<String>,
     pub OBJ_KEY_ID: Intern<String>,
     pub OBJ_KEY_PATTERN: Intern<String>,
+    // the path to a potential executable built-in path
+    pub built_in_path: Option<PathBuf>,
 }
 
 impl Globals {
@@ -132,7 +135,7 @@ impl Globals {
         find_key_for_value(&self.type_ids, typ).unwrap().clone()
     }
 
-    pub fn new(path: PathBuf, permissions: BuiltinPermissions) -> Self {
+    pub fn new(path: SpwnSource, permissions: BuiltinPermissions) -> Self {
         let storage = ValStorage::new();
         let mut globals = Globals {
             closed_groups: 0,
@@ -173,6 +176,7 @@ impl Globals {
             ASSIGN_BUILTIN: Intern::new(String::from("_assign_")),
             OBJ_KEY_ID: Intern::new(String::from("id")),
             OBJ_KEY_PATTERN: Intern::new(String::from("pattern")),
+            built_in_path: None,
         };
 
         let mut add_type = |name: &str, id: u16| {

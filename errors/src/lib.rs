@@ -1,11 +1,11 @@
 pub mod compiler_info;
-use std::path::PathBuf;
 
 use compiler_info::{CodeArea, CompilerInfo};
 
 use ariadne::Fmt;
+
 use internment::Intern;
-use shared::{BreakType, FileRange};
+use shared::{BreakType, FileRange, SpwnSource};
 
 pub enum RuntimeError {
     UndefinedErr {
@@ -125,9 +125,13 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
 
     let mut colors = RainbowColorGenerator::new(0.0, 1.5, 0.8);
 
-    let mut report = Report::build(ReportKind::Error, position.file.as_ref(), position.pos.0)
-        .with_config(Config::default().with_cross_gap(true))
-        .with_message(message.clone());
+    let mut report = Report::build(
+        ReportKind::Error,
+        position.file.as_ref().clone(),
+        position.pos.0,
+    )
+    .with_config(Config::default().with_cross_gap(true))
+    .with_message(message.clone());
 
     let mut i = 1;
     for area in info.call_stack {
@@ -194,18 +198,21 @@ pub fn create_error(
         message: message.to_string(),
         labels: labels
             .iter()
-            .map(|(a, s)| {
-                if !a.file.as_ref().exists() {
-                    (
-                        CodeArea {
-                            pos: (0, 0),
-                            ..info.position
-                        },
-                        s.to_string(),
-                    )
-                } else {
-                    (*a, s.to_string())
+            .map(|(a, s)| match a.file.as_ref() {
+                SpwnSource::File(file) => {
+                    if !file.exists() {
+                        (
+                            CodeArea {
+                                pos: (0, 0),
+                                ..info.position
+                            },
+                            s.to_string(),
+                        )
+                    } else {
+                        (*a, s.to_string())
+                    }
                 }
+                SpwnSource::BuiltIn(_) => (*a, s.to_string()),
             })
             .collect(),
         note: note.map(|s| s.to_string()),
@@ -419,17 +426,17 @@ pub enum SyntaxError {
         expected: String,
         found: String,
         pos: FileRange,
-        file: PathBuf,
+        file: SpwnSource,
     },
     UnexpectedErr {
         found: String,
         pos: FileRange,
-        file: PathBuf,
+        file: SpwnSource,
     },
     SyntaxError {
         message: String,
         pos: FileRange,
-        file: PathBuf,
+        file: SpwnSource,
     },
     CustomError(ErrorReport),
 }
