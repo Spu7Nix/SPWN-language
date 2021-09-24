@@ -8,14 +8,15 @@ use ::compiler::leveldata;
 
 use optimizer::optimize;
 
-use ariadne::{Cache, FileCache};
+use ariadne::Cache;
 
 use optimize::optimize;
 
 use ::parser::parser::*;
 use builtins::BuiltinPermissions;
+
 use shared::SpwnSource;
-use spwn::builtins::STANDARD_LIBS;
+use spwn::SpwnCache;
 
 use std::env;
 use std::path::PathBuf;
@@ -31,46 +32,6 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use errors::{create_report, ErrorReport};
 
 const HELP: &str = include_str!("../help.txt");
-
-use ariadne::Source;
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    fmt,
-};
-
-pub struct SpwnCache {
-    files: HashMap<SpwnSource, Source>,
-}
-
-impl Default for SpwnCache {
-    fn default() -> Self {
-        Self {
-            files: HashMap::default(),
-        }
-    }
-}
-
-impl ariadne::Cache<SpwnSource> for SpwnCache {
-    fn fetch(&mut self, source: &SpwnSource) -> Result<&Source, Box<dyn fmt::Debug + '_>> {
-        Ok(match self.files.entry(source.clone()) {
-            Entry::Occupied(entry) => entry.into_mut(),
-            Entry::Vacant(entry) => entry.insert(Source::from(&match source {
-                SpwnSource::File(path) => fs::read_to_string(path).map_err(|e| Box::new(e) as _)?,
-                SpwnSource::BuiltIn(path) => match STANDARD_LIBS.get_file(path) {
-                    Some(file) => match file.contents_utf8() {
-                        Some(c) => c.to_string(),
-                        None => return Err(Box::new("Invalid built in file content")),
-                    },
-                    None => return Err(Box::new("Could not find built in file")),
-                },
-            })),
-        })
-    }
-    fn display<'a>(&self, path: &'a SpwnSource) -> Option<Box<dyn fmt::Display + 'a>> {
-        let (SpwnSource::File(path) | SpwnSource::BuiltIn(path)) = path;
-        Some(Box::new(path.display()))
-    }
-}
 
 fn print_with_color(text: &str, color: Color) {
     let mut stdout = StandardStream::stdout(ColorChoice::Always);
@@ -235,13 +196,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         None
                     };
-
+                    let mut std_out = std::io::stdout();
                     let mut compiled = match compiler::compile_spwn(
                         statements,
-                        script_path,
+                        SpwnSource::File(script_path),
                         included_paths,
                         notes,
                         permissions,
+                        &mut std_out,
                     ) {
                         Err(err) => {
                             create_report(ErrorReport::from(err)).eprint(cache).unwrap();
@@ -280,7 +242,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         } else {
                             String::new()
                         };
-                        let mut reserved = crate::optimize::ReservedIds {
+                        let mut reserved = optimize::ReservedIds {
                             object_groups: Default::default(),
                             trigger_groups: Default::default(),
                             object_colors: Default::default(),

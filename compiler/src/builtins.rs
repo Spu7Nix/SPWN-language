@@ -12,18 +12,41 @@ use fnv::FnvHashMap;
 use parser::ast::ObjectMode;
 
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::value::*;
 use crate::value_storage::*;
-use rand::seq::SliceRandom;
-use rand::Rng;
+
 use std::io::stdout;
 use std::io::Write;
 
 // BUILT IN STD
-use include_dir::{include_dir, Dir};
+use include_dir::{include_dir, Dir, File};
 
-pub const STANDARD_LIBS: Dir = include_dir!("../libraries");
+const STANDARD_LIBS: Dir = include_dir!("../libraries");
+
+pub fn get_lib_file<'a, S: AsRef<Path>>(path: S) -> Option<File<'a>> {
+    get_file(&STANDARD_LIBS, path.as_ref())
+}
+
+fn get_file<'a>(dir: &'a Dir, path: &Path) -> Option<File<'a>> {
+    for file in dir.files {
+        let replaced = &file.path.replace("\\", "/");
+        let file_path = &Path::new(replaced);
+
+        if Path::new(file_path) == path {
+            return Some(*file);
+        }
+    }
+
+    for dir in dir.dirs {
+        if let Some(d) = get_file(dir, path) {
+            return Some(d);
+        }
+    }
+
+    None
+}
 
 //use text_io;
 use errors::compiler_info::{CodeArea, CompilerInfo};
@@ -691,25 +714,31 @@ builtins! {
             };
 
         }
-        println!("{}", out);
+        writeln!(globals.std_out, "{}", out).expect("Error writing to output");
         Value::Null
     }
 
     [Time] #[safe = true, desc = "Gets the current system time in seconds", example = "now = $.time()"]
     fn time(#["none"]) {
-        arg_length!(info, 0, arguments, "Expected no arguments".to_string());
-        use std::time::SystemTime;
-        let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-            Ok(time) => time,
-            Err(e) => {
-                return Err(RuntimeError::BuiltinError {
-                    message: format!("System time error: {}", e),
-                    info,
-                })
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            arg_length!(info, 0, arguments, "Expected no arguments".to_string());
+            use std::time::SystemTime;
+            let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(time) => time,
+                Err(e) => {
+                    return Err(RuntimeError::BuiltinError {
+                        message: format!("System time error: {}", e),
+                        info,
+                    })
+                }
             }
+            .as_secs();
+            Value::Number(now as f64)
         }
-        .as_secs();
-        Value::Number(now as f64)
+
+        #[cfg(target_arch = "wasm32")]
+        Value::Number(0.0)
     }
 
     [SpwnVersion] #[safe = true, desc = "Gets the current version of spwn", example = "$.spwn_version()"]
@@ -756,96 +785,105 @@ builtins! {
 
 
     [HTTPRequest] #[safe = false, desc = "Sends an HTTP request", example = ""] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let mut headermap = reqwest::header::HeaderMap::new();
+            for (name, value) in &headers {
+                let header_name = match reqwest::header::HeaderName::from_bytes(name.as_bytes()) {
+                    Ok(hname) => hname,
+                    Err(_) => {
+                        return Err(RuntimeError::BuiltinError {
+                            message: format!("Could not convert header name: '{}'", name),
+                            info
+                        })
+                    }
+                };
+                let header_value = globals.stored_values[*value].clone().to_str(globals);
+                headermap.insert(header_name, header_value.trim_matches('\'').parse().unwrap());
+            }
 
-        let mut headermap = reqwest::header::HeaderMap::new();
-        for (name, value) in &headers {
-            let header_name = match reqwest::header::HeaderName::from_bytes(name.as_bytes()) {
-                Ok(hname) => hname,
-                Err(_) => {
+            let client = reqwest::blocking::Client::new();
+            let request_maker = match &method[..] {
+                "get" => client.get(&url),
+                "post" => client.post(&url),
+                "put" => {
+                    client.put(&url)
+                },
+                "patch" => client.patch(&url),
+                "delete" => client.delete(&url),
+                "head" => client.head(&url),
+                _ => {
                     return Err(RuntimeError::BuiltinError {
-                        message: format!("Could not convert header name: '{}'", name),
+                        message: format!("Request type not supported: '{}'", method),
                         info
                     })
                 }
             };
-            let header_value = globals.stored_values[*value].clone().to_str(globals);
-            headermap.insert(header_name, header_value.trim_matches('\'').parse().unwrap());
-        }
 
-        let client = reqwest::blocking::Client::new();
-        let request_maker = match &method[..] {
-            "get" => client.get(&url),
-            "post" => client.post(&url),
-            "put" => {
-                client.put(&url)
-            },
-            "patch" => client.patch(&url),
-            "delete" => client.delete(&url),
-            "head" => client.head(&url),
-            _ => {
-                return Err(RuntimeError::BuiltinError {
-                    message: format!("Request type not supported: '{}'", method),
-                    info
-                })
+            let response = match request_maker
+                .headers(headermap)
+                .body(body)
+                .send() {
+                    Ok(resp) => resp,
+                    Err(_) => {
+                        return Err(RuntimeError::BuiltinError {
+                            message: format!("Could not make request to: '{}'", url),
+                            info
+                        })
+                    }
+            };
+
+            let mut output_map = FnvHashMap::default();
+
+            let response_status = store_const_value(
+                Value::Number(
+                    response.status().as_u16() as f64
+                ),
+                globals,
+                context.start_group,
+                CodeArea::new(),
+            );
+
+            let response_headermap = response.headers();
+            let mut response_headers_value = FnvHashMap::default();
+            for (name, value) in response_headermap.iter() {
+                let header_value = store_const_value(
+                    Value::Str(String::from(value.to_str().expect("Couldn't parse return header value"))),
+                    globals,
+                    context.start_group,
+                    CodeArea::new()
+                );
+                response_headers_value.insert(Intern::new(String::from(name.as_str())), header_value);
             }
-        };
 
-        let response = match request_maker
-            .headers(headermap)
-            .body(body)
-            .send() {
-                Ok(resp) => resp,
-                Err(_) => {
-                    return Err(RuntimeError::BuiltinError {
-                        message: format!("Could not make request to: '{}'", url),
-                        info
-                    })
-                }
-        };
-
-        let mut output_map = FnvHashMap::default();
-
-        let response_status = store_const_value(
-            Value::Number(
-                response.status().as_u16() as f64
-            ),
-            globals,
-            context.start_group,
-            CodeArea::new(),
-        );
-
-        let response_headermap = response.headers();
-        let mut response_headers_value = FnvHashMap::default();
-        for (name, value) in response_headermap.iter() {
-            let header_value = store_const_value(
-                Value::Str(String::from(value.to_str().expect("Couldn't parse return header value"))),
+            let response_headers = store_const_value(
+                Value::Dict(response_headers_value),
                 globals,
                 context.start_group,
                 CodeArea::new()
             );
-            response_headers_value.insert(Intern::new(String::from(name.as_str())), header_value);
+
+            let response_text = store_const_value(
+                Value::Str(
+                    response.text().expect("Failed to parse response text")
+                ),
+                globals,
+                context.start_group,
+                CodeArea::new(),
+            );
+
+            output_map.insert(Intern::new(String::from("status")), response_status);
+            output_map.insert(Intern::new(String::from("headers")), response_headers);
+            output_map.insert(Intern::new(String::from("text")), response_text);
+            Value::Dict(output_map)
         }
-
-        let response_headers = store_const_value(
-            Value::Dict(response_headers_value),
-            globals,
-            context.start_group,
-            CodeArea::new()
-        );
-
-        let response_text = store_const_value(
-            Value::Str(
-                response.text().expect("Failed to parse response text")
-            ),
-            globals,
-            context.start_group,
-            CodeArea::new(),
-        );
-
-        output_map.insert(Intern::new(String::from("status")), response_status);
-        output_map.insert(Intern::new(String::from("headers")), response_headers);
-        output_map.insert(Intern::new(String::from("text")), response_text);
-        Value::Dict(output_map)
+        #[cfg(target_arch = "wasm32")]
+        {
+            return Err(RuntimeError::BuiltinError {
+                message: "http is not supported on web versions".to_string(),
+                info
+            })
+        }
     }
 
     [Sin] #[safe = true, desc = "Calculates the sin of an angle in radians", example = "$.sin(3.1415)"] fn sin((n): Number) { Value::Number(n.sin()) }
@@ -1215,72 +1253,85 @@ $.random([1, 2, 3, 6]) // returns either 1, 2, 3, or 6
 $.random(1, 10) // returns a random integer between 1 and 10
     "]
     fn random(#["see example"]) {
-        if arguments.len() > 2 {
-            return Err(RuntimeError::BuiltinError {
-                message: "Expected up to 2 arguments".to_string(),
-                info,
-            });
-        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use rand::seq::SliceRandom;
+            use rand::Rng;
+            if arguments.len() > 2 {
+                return Err(RuntimeError::BuiltinError {
+                    message: "Expected up to 2 arguments".to_string(),
+                    info,
+                });
+            }
 
-        if arguments.is_empty() {
-            Value::Number(rand::thread_rng().gen())
-        } else {
-            let val = match convert_type(&globals.stored_values[arguments[0]].clone(), 10, &info, globals, context) {
-                Ok(Value::Array(v)) => v,
-                _ => {
-                    return Err(RuntimeError::BuiltinError {
-                        message: format!("Expected type that can be converted to @array for argument 1, found type {}", globals.get_type_str(arguments[0])),
-                        info,
-                    });
-                }
-            };
-
-            if arguments.len() == 1 {
-                let rand_elem = val.choose(&mut rand::thread_rng());
-
-                if rand_elem.is_some() {
-                    clone_and_get_value(
-                        *rand_elem.unwrap(),
-                        globals,
-                        context.start_group,
-                        !globals.is_mutable(*rand_elem.unwrap())
-                    )
-                } else {
-                    Value::Null
-                }
+            if arguments.is_empty() {
+                Value::Number(rand::thread_rng().gen())
             } else {
-                let times = match &globals.stored_values[arguments[1]] {
-                    Value::Number(n) => {
-                        convert_to_int(*n, &info)?
-                    },
+                let val = match convert_type(&globals.stored_values[arguments[0]].clone(), 10, &info, globals, context) {
+                    Ok(Value::Array(v)) => v,
                     _ => {
                         return Err(RuntimeError::BuiltinError {
-                            message: format!("Expected number, found {}", globals.get_type_str(arguments[1])),
+                            message: format!("Expected type that can be converted to @array for argument 1, found type {}", globals.get_type_str(arguments[0])),
                             info,
                         });
                     }
                 };
 
-                let mut out_arr = Vec::<StoredValue>::new();
-
-                for _ in 0..times {
+                if arguments.len() == 1 {
                     let rand_elem = val.choose(&mut rand::thread_rng());
 
                     if rand_elem.is_some() {
-                        out_arr.push(clone_value(
+                        clone_and_get_value(
                             *rand_elem.unwrap(),
                             globals,
                             context.start_group,
-                            !globals.is_mutable(*rand_elem.unwrap()),
-                            CodeArea::new()
-                        ));
+                            !globals.is_mutable(*rand_elem.unwrap())
+                        )
                     } else {
-                        break;
+                        Value::Null
                     }
-                }
+                } else {
+                    let times = match &globals.stored_values[arguments[1]] {
+                        Value::Number(n) => {
+                            convert_to_int(*n, &info)?
+                        },
+                        _ => {
+                            return Err(RuntimeError::BuiltinError {
+                                message: format!("Expected number, found {}", globals.get_type_str(arguments[1])),
+                                info,
+                            });
+                        }
+                    };
 
-                Value::Array(out_arr)
+                    let mut out_arr = Vec::<StoredValue>::new();
+
+                    for _ in 0..times {
+                        let rand_elem = val.choose(&mut rand::thread_rng());
+
+                        if rand_elem.is_some() {
+                            out_arr.push(clone_value(
+                                *rand_elem.unwrap(),
+                                globals,
+                                context.start_group,
+                                !globals.is_mutable(*rand_elem.unwrap()),
+                                CodeArea::new()
+                            ));
+                        } else {
+                            break;
+                        }
+                    }
+
+                    Value::Array(out_arr)
+                }
             }
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            return Err(RuntimeError::BuiltinError {
+                message: "rng is not supported on web versions".to_string(),
+                info
+            })
         }
     }
 

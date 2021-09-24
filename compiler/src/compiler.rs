@@ -7,10 +7,6 @@ use shared::BreakType;
 use shared::ImportType;
 use shared::SpwnSource;
 use shared::StoredValue;
-use termcolor::ColorChoice;
-use termcolor::ColorSpec;
-use termcolor::StandardStream;
-use termcolor::WriteColor;
 
 use crate::builtins::*;
 use crate::context::*;
@@ -25,6 +21,7 @@ use crate::value_storage::*;
 use crate::STD_PATH;
 use fnv::FnvHashMap;
 
+use std::io::Write;
 use std::mem;
 
 use errors::RuntimeError;
@@ -34,32 +31,26 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::compiler_types::*;
-fn print_with_color(text: &str, color: TColor) {
-    use std::io::Write;
-    let mut stdout = StandardStream::stdout(ColorChoice::Always);
-    stdout
-        .set_color(ColorSpec::new().set_fg(Some(color)))
-        .unwrap();
-    writeln!(&mut stdout, "{}", text).unwrap();
-    stdout.set_color(&ColorSpec::new()).unwrap();
-}
 
 pub const NULL_STORAGE: StoredValue = 1;
 pub const BUILTIN_STORAGE: StoredValue = 0;
-
-use termcolor::Color as TColor;
-
+use ariadne::Color as TColor;
+use ariadne::Fmt;
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
-    path: PathBuf,
+    source: SpwnSource,
     included_paths: Vec<PathBuf>,
     notes: ParseNotes,
     permissions: BuiltinPermissions,
+    std_out: &mut impl Write,
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
 
-    let mut globals = Globals::new(SpwnSource::File(path.clone()), permissions);
+    let mut globals = Globals::new(source.clone(), permissions, std_out);
     globals.includes = included_paths;
+
+    let print_with_color = |a: &str, color| println!("{}", a.fg(color));
+
     // if statements.is_empty() {
     //     return Err(RuntimeError::CustomError(create_error(
     //         CompilerInfo::from_area(crate::compiler_info::CodeArea {
@@ -78,7 +69,7 @@ pub fn compile_spwn(
 
     let start_info = CompilerInfo {
         ..CompilerInfo::from_area(errors::compiler_info::CodeArea {
-            file: Intern::new(SpwnSource::File(path.clone())),
+            file: Intern::new(source.clone()),
             pos: (0, 0),
         })
     };
@@ -87,6 +78,7 @@ pub fn compile_spwn(
     //println!("Importing standard library...");
     print_with_color("Building script ...", TColor::Cyan);
     print_with_color("———————————————————————————\n", TColor::White);
+    #[cfg(not(target_arch = "wasm32"))]
     let start_time = Instant::now();
 
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
@@ -133,7 +125,7 @@ pub fn compile_spwn(
                     broke: i,
                     dropped: CodeArea {
                         pos: (end_pos, end_pos),
-                        file: Intern::new(SpwnSource::File(path)),
+                        file: Intern::new(source),
                     },
                     reason: "the program ended".to_string(),
                 });
@@ -147,28 +139,30 @@ pub fn compile_spwn(
         New build timing changes the unit form milliseconds, to seconds,
         to minutes depending on the time building took.
     */
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        // Define the different units
+        let build_time_secs = start_time.elapsed().as_secs();
+        let build_time_millis = start_time.elapsed().as_millis();
+        let build_time_mins = build_time_secs / 60;
 
-    // Define the different units
-    let build_time_secs = start_time.elapsed().as_secs();
-    let build_time_millis = start_time.elapsed().as_millis();
-    let build_time_mins = build_time_secs / 60;
-
-    // Check which unit to unit to use
-    if build_time_millis < 1000 {
-        print_with_color(
-            &format!("Built in {} milliseconds!", build_time_millis),
-            TColor::Green,
-        );
-    } else if build_time_millis < 60000 {
-        print_with_color(
-            &format!("Built in {} seconds!", build_time_secs),
-            TColor::Green,
-        );
-    } else {
-        print_with_color(
-            &format!("Built in {} minutes!", build_time_mins),
-            TColor::Green,
-        );
+        // Check which unit to unit to use
+        if build_time_millis < 1000 {
+            print_with_color(
+                &format!("Built in {} milliseconds!", build_time_millis),
+                TColor::Green,
+            );
+        } else if build_time_millis < 60000 {
+            print_with_color(
+                &format!("Built in {} seconds!", build_time_secs),
+                TColor::Green,
+            );
+        } else {
+            print_with_color(
+                &format!("Built in {} minutes!", build_time_mins),
+                TColor::Green,
+            );
+        }
     }
 
     //----------------------------------------------------------------------- **
@@ -1401,10 +1395,10 @@ pub fn import_module(
     };
 
     let stored_built_in_path = globals.built_in_path.clone();
-
+    #[cfg(not(target_arch = "wasm32"))]
     let (unparsed, module_path) = match get_import_path(path, globals, info.clone()) {
         Err(err) => {
-            if let Some(file) = STANDARD_LIBS.get_file(&built_in_path) {
+            if let Some(file) = get_lib_file(&built_in_path) {
                 (*globals).built_in_path = Some(built_in_path.parent().unwrap().to_path_buf());
                 (
                     file.contents_utf8()
@@ -1453,6 +1447,22 @@ pub fn import_module(
                 },
                 SpwnSource::File(module_path),
             )
+        }
+    };
+
+    #[cfg(target_arch = "wasm32")]
+    let (unparsed, module_path) = match get_lib_file(&built_in_path) {
+        Some(file) => {
+            (*globals).built_in_path = Some(built_in_path.parent().unwrap().to_path_buf());
+            (
+                file.contents_utf8()
+                    .expect("Bad built-in library file")
+                    .to_string(),
+                SpwnSource::BuiltIn(built_in_path),
+            )
+        }
+        None => {
+            panic!("file {:?} not found", built_in_path)
         }
     };
 

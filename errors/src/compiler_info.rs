@@ -1,6 +1,6 @@
 use internment::Intern;
 use shared::FileRange;
-use std::path::{ PathBuf};
+use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerInfo {
     pub depth: u8,

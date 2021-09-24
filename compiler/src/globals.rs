@@ -24,10 +24,11 @@ use fnv::FnvHashMap;
 use crate::value_storage::*;
 use errors::compiler_info::CompilerInfo;
 
+use std::io::Write;
 use std::path::PathBuf;
 
 #[allow(non_snake_case)]
-pub struct Globals {
+pub struct Globals<'a> {
     //counters for arbitrary groups
     pub closed_groups: u16,
     pub closed_colors: u16,
@@ -67,9 +68,10 @@ pub struct Globals {
     pub OBJ_KEY_PATTERN: Intern<String>,
     // the path to a potential executable built-in path
     pub built_in_path: Option<PathBuf>,
+    pub std_out: &'a mut dyn Write,
 }
 
-impl Globals {
+impl<'a> Globals<'a> {
     pub fn get_val_fn_context(
         &self,
         p: StoredValue,
@@ -135,7 +137,11 @@ impl Globals {
         find_key_for_value(&self.type_ids, typ).unwrap().clone()
     }
 
-    pub fn new(path: SpwnSource, permissions: BuiltinPermissions) -> Self {
+    pub fn new(
+        path: SpwnSource,
+        permissions: BuiltinPermissions,
+        std_out: &'a mut impl Write,
+    ) -> Self {
         let storage = ValStorage::new();
         let mut globals = Globals {
             closed_groups: 0,
@@ -177,6 +183,7 @@ impl Globals {
             OBJ_KEY_ID: Intern::new(String::from("id")),
             OBJ_KEY_PATTERN: Intern::new(String::from("pattern")),
             built_in_path: None,
+            std_out,
         };
 
         let mut add_type = |name: &str, id: u16| {

@@ -9,6 +9,7 @@ members = [
     "compiler",
     "optimizer",
     "docgen",
+    "spwn-web",
 ]
 
 [profile.release]

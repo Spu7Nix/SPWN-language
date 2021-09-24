@@ -16,21 +16,26 @@ license-file = "LICENSE"
 name = "spwn"
 path = "src/main.rs"
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+parking_lot = { version = "0.11", features = ["wasm-bindgen"] }
+
 [dependencies]
 
 termcolor = "1.1.2"
 
-
+internment = "0.5.4"
 ariadne = "0.1.3" # errors
 
 
 parser = { path = "../parser" }
 shared = { path = "../shared" }
 errors = { path = "../errors" }
-levelstring = { path = "../levelstring" }
 editorlive = { path = "../editorlive" }
 compiler = { path = "../compiler" }
 optimizer = { path = "../optimizer" }
 docgen = { path = "../docgen" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+levelstring = { path = "../levelstring" }
 
 # heat dir libraries -o wix/libraries.wxs -scom -frag -srd -sreg -gg -cg libraries -dr LIB_DIR -suid

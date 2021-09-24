@@ -212,7 +212,7 @@ pub fn create_error(
                         (*a, s.to_string())
                     }
                 }
-                SpwnSource::BuiltIn(_) => (*a, s.to_string()),
+                _ => (*a, s.to_string()),
             })
             .collect(),
         note: note.map(|s| s.to_string()),

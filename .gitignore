@@ -3,3 +3,5 @@ target
 **/*.rs.bk
 .DS_Store
 std-docs
+spwn-web/pkg
+spwn-web/ansi_up.js

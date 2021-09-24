@@ -39,7 +39,12 @@ fn find_avaliable_name(dir: &mut PathBuf, name: &mut String) {
 pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     let mut globals_path = std::env::current_dir().unwrap();
     globals_path.push("temp"); // this folder doesn't actually exist, but it needs to be there because .parent is called in import_module
-    let mut globals = Globals::new(SpwnSource::File(globals_path), BuiltinPermissions::new());
+    let mut std_out = std::io::stdout();
+    let mut globals = Globals::new(
+        SpwnSource::File(globals_path),
+        BuiltinPermissions::new(),
+        &mut std_out,
+    );
 
     let mut start_context = FullContext::new();
 
