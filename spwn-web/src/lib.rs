@@ -7,11 +7,22 @@ pub fn init_panics() {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
 }
 
+fn js_array(values: Vec<String>) -> JsValue {
+    return JsValue::from(
+        values
+            .into_iter()
+            .map(|x| JsValue::from_str(&x))
+            .collect::<js_sys::Array>(),
+    );
+}
+
 #[wasm_bindgen]
-pub fn run_spwn(code: &str) -> String {
+pub fn run_spwn(code: &str) -> JsValue {
     let output = spwn::run_spwn(code.to_string(), Vec::new());
-    let (Err(s) | Ok(s)) = output;
-    s
+    js_array(match output {
+        Ok(a) => a.to_vec(),
+        Err(e) => vec![e, String::new()],
+    })
 }
 
 // #[wasm_bindgen]

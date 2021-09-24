@@ -12,3 +12,4 @@ crate-type = ["cdylib"]
 wasm-bindgen = "*"
 console_error_panic_hook = "0.1.6"
 spwn = { path = "../spwn" }
+js-sys = "0.3.55"
