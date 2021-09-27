@@ -15,6 +15,10 @@ SPWN is a programming language that compiles to Geometry Dash levels. What that 
  - Official SPWN documentation - [link](https://spu7nix.net/spwn/#/)
  - Documentation Repository - [link](https://github.com/Spu7Nix/spwn_docs)
  - Official SPWN Discord server - [link](https://discord.gg/qKZAhKXqgw)
+ - SPWN Playground - [link](https://spu7nix.net/spwn/try/)
+
+## Try before you install!
+Try it before you install, using the SPWN Playground link, or by clicking [here](https://spu7nix.net/spwn/try/)! We hope you enjoy it enough to download!
 
 ## Installing - How To Install
 
