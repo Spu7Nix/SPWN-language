@@ -161,7 +161,7 @@ pub enum Token {
     #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)|\$")]
     Symbol,
 
-    #[regex(r"[0-9]+(\.[0-9]+)?")]
+    #[regex(r"[0-9][0-9_]*(\.[0-9][0-9_]*)?")]
     Number,
 
     #[regex(r#"[a-z]?"(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
@@ -2001,7 +2001,7 @@ fn parse_variable(
 
     let value = match first_token {
         // what kind of variable is it?
-        Some(Token::Number) => ast::ValueBody::Number(match tokens.slice().parse() {
+        Some(Token::Number) => ast::ValueBody::Number(match tokens.slice().replace("_","").parse() {
             Ok(n) => n, // its a valid number
             Err(err) => {
                 return Err(SyntaxError::SyntaxError {
