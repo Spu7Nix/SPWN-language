@@ -344,8 +344,9 @@ impl Value {
                     let mut out = String::from("[");
                     for val in a {
                         out += &display_inner(&globals.stored_values[*val])?;
-                        out += ",";
+                        out += ", ";
                     }
+                    out.pop();
                     out.pop();
                     out += "]";
 
