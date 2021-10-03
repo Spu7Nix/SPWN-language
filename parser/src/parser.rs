@@ -757,34 +757,11 @@ pub fn parse_statement(
         Some(Token::For) => {
             //parse for statement
 
-            let symbol = match tokens.next(false) {
-                // check for variable
-                Some(Token::Symbol) => tokens.slice(),
-
-                Some(a) => {
-                    // invalid variable name
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "iterator variable name".to_string(),
-                        found: format!("{}: \"{}\"", a.typ(), tokens.slice()),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    });
-                }
-
-                None => {
-                    // literally no variable, why
-                    return Err(SyntaxError::ExpectedErr {
-                        expected: "iterator variable name".to_string(),
-                        found: "None".to_string(),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    });
-                }
-            };
+            let symbol = parse_expr(tokens, notes, true, true)?;
 
             match tokens.next(false) {
                 // check for an in
-                Some(Token::In) => {}
+                Some(Token::In) => (),
                 a => {
                     // didnt find an in
                     expected!("keyword 'in'".to_string(), tokens, notes, a)
@@ -803,7 +780,7 @@ pub fn parse_statement(
             let body = parse_cmp_stmt(tokens, notes)?; // parse whats in the for loop
 
             ast::StatementBody::For(ast::For {
-                symbol: Intern::new(symbol),
+                symbol,
                 array,
                 body,
             })

@@ -332,7 +332,7 @@ pub struct Macro {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct For {
-    pub symbol: Intern<String>,
+    pub symbol: Expression,
     pub array: Expression,
     pub body: Vec<Statement>,
 }

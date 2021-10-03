@@ -343,7 +343,7 @@ impl SpwnFmt for For {
     fn fmt(&self, ind: Indent) -> String {
         format!(
             "for {} in {} {{\n{}\n{}}}",
-            self.symbol,
+            self.symbol.fmt(ind),
             self.array.fmt(ind),
             CompoundStatement {
                 statements: self.body.clone()
