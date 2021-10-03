@@ -18,7 +18,7 @@ SPWN is a programming language that compiles to Geometry Dash levels. What that 
  - SPWN Playground - [link](https://spu7nix.net/spwn/try/)
 
 ## SPWN Playground
- SPWN Playground is a SPWN compiler built into your browser. You can use it to [try out spwn](https://spu7nix.net/spwn/try/) before you decide to install it.
+ SPWN Playground is a SPWN compiler built into your browser. You can use it to [try out SPWN](https://spu7nix.net/spwn/try/) before you decide to install it.
 
 ## Installing - How To Install
 
