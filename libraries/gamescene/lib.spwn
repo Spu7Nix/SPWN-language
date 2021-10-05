@@ -7,7 +7,7 @@ hidden_group = ?g
 
 -> hidden_group.alpha(0)
 -> follow_x_group.lock_to_player(lock_x = true, lock_y = false)
--> follow_x_group.move(x = 0, y = 5, duration = 0.02)
+-> follow_x_group.move(x = 0, y = 5, duration = 0.01)
 -> follow_y_group.follow_player_y()
 -> hide_player()
 
