@@ -34,6 +34,7 @@ If you would like a pre-compiled package, look below.
 #### Windows
 1. Download the .msi file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
 2. Open the .msi file and follow the install wizard.
+- Note: *If you get a message telling you that SmartScreen protected your PC, press more info, then run anyways.*
 
 #### MacOS
 1. Download the .pkg file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
