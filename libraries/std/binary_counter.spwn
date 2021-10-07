@@ -1,18 +1,17 @@
 #[no_std, cache_output]
 
-number_to_binary = (n: @number, bits: @number) {
-    let digits = []
-    let n = n
-    for i in bits..0 {
-        x = 2^i
-        if n >= x {
-            n -= x
-            digits.push(true)
-        } else {
-            digits.push(false)
-        }
+number_to_binary = (n: @number) {
+    let bits = []
+    let n = n // shadow
+
+    while n > 1 {
+        bits.push(n % 2)
+        n = $.floor(n / 2)
     }
-    return digits.reverse()
+
+    bits.push(n)
+
+    return bits.reverse()
 }
 
 type @binary_counter
