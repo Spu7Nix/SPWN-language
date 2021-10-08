@@ -12,7 +12,7 @@ number_to_binary = (n: @number, digit: @number) {
     bits.push(n)
 
     for i in ..(digit - bits.length){
-        bits.push(false)
+        bits.push(0)
     }
 
     return bits
