@@ -10,7 +10,7 @@ number_to_binary = (n: @number, size: @number) {
     }
 
     bits.push(n)
-    bits += [0] * [size - bits.length]
+    bits += [0] * (size - bits.length)
 
     return bits.reverse()
 }
