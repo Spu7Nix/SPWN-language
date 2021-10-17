@@ -251,5 +251,8 @@ return {
         ANIMATION_SPEED : ok(107, @number),
         LINKED_GROUP : ok(108, @number),
         ACTIVE_TRIGGER: ok(36, @bool),
-    }
+    },
+
+    pi: $.acos(-1),
+    e: (1+1/(10^8))^(10^8),
 }
