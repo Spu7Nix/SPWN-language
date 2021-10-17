@@ -10,6 +10,7 @@ $.assert(!('x'.is_empty()))
 	},
 	substr: #[desc("Gets a substring beginning at the specified start and ending at the specified end.")]
 	(self, start: @number, end: @number) {
+        if self.length == 0 { return self }
 		if start > end { return $.substr(self, end, start); }
 		return $.substr(self, start, end);
 	},
@@ -19,11 +20,11 @@ $.assert('current'.join(['string', ' element', ' join']) == 'currentstring eleme
     ")]
 	(self, list: @array) {
 		let out = "";
-		for i in list {
-			out += @string(i);
-			out += self;
+		for i in ..list.length {
+            if i > 0 {out += self}
+			out += @string(list[i]);
 		}
-		return out.substr(0, out.length-self.length);
+		return out;
 	},
 	split: #[desc("Splits the string by the specified seperator.") example("
 $.assert('a b c'.split(' ') == ['a', 'b', 'c'])
