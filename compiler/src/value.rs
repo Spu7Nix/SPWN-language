@@ -1,7 +1,7 @@
 use crate::builtins::*;
 use crate::compiler::import_module;
 use crate::compiler::merge_all_contexts;
-use crate::compiler::NULL_STORAGE;
+
 use errors::compiler_info::CodeArea;
 use errors::compiler_info::CompilerInfo;
 use errors::create_error;
@@ -15,7 +15,7 @@ use crate::{compiler_types::*, context::*, globals::Globals, leveldata::*, value
 use shared::FileRange;
 //use std::boxed::Box;
 
-use internment::Intern;
+use internment::LocalIntern;
 
 use fnv::FnvHashMap;
 
@@ -32,7 +32,7 @@ pub enum Value {
     Number(f64),
     Bool(bool),
     TriggerFunc(TriggerFunction),
-    Dict(FnvHashMap<Intern<String>, StoredValue>),
+    Dict(FnvHashMap<LocalIntern<String>, StoredValue>),
     Macro(Box<Macro>),
     Str(String),
     Array(Vec<StoredValue>),
@@ -52,8 +52,8 @@ const MAX_DICT_EL_DISPLAY: usize = 10;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
     pub args: Vec<MacroArgDef>,
-    pub def_variables: FnvHashMap<Intern<String>, StoredValue>,
-    pub def_file: Intern<SpwnSource>,
+    pub def_variables: FnvHashMap<LocalIntern<String>, StoredValue>,
+    pub def_file: LocalIntern<SpwnSource>,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Attribute,
     pub arg_pos: FileRange,
@@ -62,7 +62,7 @@ pub struct Macro {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MacroArgDef {
-    pub name: Intern<String>,
+    pub name: LocalIntern<String>,
     pub default: Option<StoredValue>,
     pub attribute: ast::Attribute,
     pub pattern: Option<StoredValue>,
@@ -776,7 +776,7 @@ impl VariableFuncs for ast::Variable {
         mut info: CompilerInfo,
         constant: bool,
     ) -> Result<(), RuntimeError> {
-        contexts.reset_return_vals();
+        contexts.reset_return_vals(globals);
         info.position.pos = self.pos;
 
         use ast::IdClass;
@@ -860,7 +860,7 @@ impl VariableFuncs for ast::Variable {
                 }
                 ast::ValueBody::Symbol(string) => {
                     if string.as_ref() == "$" {
-                        full_context.inner().return_value = 0;
+                        full_context.inner().return_value = globals.BUILTIN_STORAGE;
                     } else {
                         match full_context.inner().get_variable(*string) {
                             Some(value) => full_context.inner().return_value = value,
@@ -1684,7 +1684,7 @@ impl VariableFuncs for ast::Variable {
                                     c.inner().broken = None;
                                 }
                                 None => {
-                                    c.inner().return_value = NULL_STORAGE;
+                                    c.inner().return_value = globals.NULL_STORAGE;
                                 }
                                 _ => (),
                             }
@@ -1910,12 +1910,12 @@ impl VariableFuncs for ast::Variable {
                     macro_to_value(m, full_context, globals, info.clone(), constant)?;
                 }
                 //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
-                ast::ValueBody::Null => full_context.inner().return_value = NULL_STORAGE,
+                ast::ValueBody::Null => full_context.inner().return_value = globals.NULL_STORAGE,
             };
         }
         let mut path_iter = self.path.iter();
         for c in contexts.iter() {
-            (*c.inner()).return_value2 = NULL_STORAGE;
+            (*c.inner()).return_value2 = globals.NULL_STORAGE;
         }
         globals.push_new_preserved();
         for full_context in contexts.iter() {
@@ -2179,7 +2179,7 @@ impl VariableFuncs for ast::Variable {
                                 }
                                 Value::Dict(d) => match &globals.stored_values[index_ptr] {
                                     Value::Str(s) => {
-                                        let intern = Intern::new(s.clone());
+                                        let intern = LocalIntern::new(s.clone());
                                         if !d.contains_key(&intern) {
                                             return Err(RuntimeError::UndefinedErr {
                                                 undefined: s.to_string(),
@@ -2275,7 +2275,7 @@ impl VariableFuncs for ast::Variable {
 
                                                         ObjParam::Epsilon => {
                                                             let mut map = FnvHashMap::<
-                                                                Intern<String>,
+                                                                LocalIntern<String>,
                                                                 StoredValue,
                                                             >::default(
                                                             );
@@ -2756,7 +2756,7 @@ impl VariableFuncs for ast::Variable {
                                     });
                                 }
                                 let stored =
-                                    globals.stored_values.map.get_mut(&current_ptr).unwrap();
+                                    globals.stored_values.map.get_mut(current_ptr).unwrap();
                                 if let Value::Dict(d) = &mut stored.val {
                                     (*d).insert(*m, value);
                                     defined = false;
@@ -2798,14 +2798,14 @@ impl VariableFuncs for ast::Variable {
                                 if let Value::Str(st) =
                                     globals.stored_values[first_context_eval].clone()
                                 {
-                                    let intern = Intern::new(st);
+                                    let intern = LocalIntern::new(st);
                                     match d.get(&intern) {
                                         Some(a) => current_ptr = *a,
                                         None => {
                                             let stored = globals
                                                 .stored_values
                                                 .map
-                                                .get_mut(&current_ptr)
+                                                .get_mut(current_ptr)
                                                 .unwrap();
                                             if !stored.mutable {
                                                 return Err(RuntimeError::MutabilityError {

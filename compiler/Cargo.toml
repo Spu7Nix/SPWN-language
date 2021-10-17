@@ -28,6 +28,8 @@ parser = { path = "../parser" }
 shared = { path = "../shared" }
 errors = { path = "../errors" }
 
+slotmap = "1.0.6"
+
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rand = "0.8.4"

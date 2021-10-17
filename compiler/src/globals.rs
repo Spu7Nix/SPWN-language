@@ -1,5 +1,5 @@
 use errors::RuntimeError;
-use internment::Intern;
+use internment::LocalIntern;
 use shared::BreakType;
 use shared::ImportType;
 use shared::SpwnSource;
@@ -7,8 +7,7 @@ use shared::StoredValue;
 
 ///types and functions used by the compiler
 use crate::builtins::*;
-use crate::compiler::BUILTIN_STORAGE;
-use crate::compiler::NULL_STORAGE;
+
 use crate::context::VariableData;
 use errors::compiler_info::CodeArea;
 
@@ -35,12 +34,11 @@ pub struct Globals<'a> {
     pub closed_blocks: u16,
     pub closed_items: u16,
 
-    pub path: Intern<SpwnSource>,
+    pub path: LocalIntern<SpwnSource>,
 
     pub lowest_y: FnvHashMap<u32, u16>,
     pub stored_values: ValStorage,
-    pub val_id: StoredValue,
-
+    //pub val_id: StoredValue,
     pub type_ids: FnvHashMap<String, (u16, CodeArea)>,
     pub type_id_count: u16,
 
@@ -59,16 +57,19 @@ pub struct Globals<'a> {
 
     pub permissions: BuiltinPermissions,
 
-    pub TYPE_MEMBER_NAME: Intern<String>,
-    pub SELF_MEMBER_NAME: Intern<String>,
-    pub OR_BUILTIN: Intern<String>,
-    pub AND_BUILTIN: Intern<String>,
-    pub ASSIGN_BUILTIN: Intern<String>,
-    pub OBJ_KEY_ID: Intern<String>,
-    pub OBJ_KEY_PATTERN: Intern<String>,
+    pub TYPE_MEMBER_NAME: LocalIntern<String>,
+    pub SELF_MEMBER_NAME: LocalIntern<String>,
+    pub OR_BUILTIN: LocalIntern<String>,
+    pub AND_BUILTIN: LocalIntern<String>,
+    pub ASSIGN_BUILTIN: LocalIntern<String>,
+    pub OBJ_KEY_ID: LocalIntern<String>,
+    pub OBJ_KEY_PATTERN: LocalIntern<String>,
     // the path to a potential executable built-in path
     pub built_in_path: Option<PathBuf>,
     pub std_out: &'a mut dyn Write,
+
+    pub BUILTIN_STORAGE: StoredValue,
+    pub NULL_STORAGE: StoredValue,
 }
 
 impl<'a> Globals<'a> {
@@ -77,7 +78,7 @@ impl<'a> Globals<'a> {
         p: StoredValue,
         info: CompilerInfo,
     ) -> Result<Group, RuntimeError> {
-        match self.stored_values.map.get(&p) {
+        match self.stored_values.map.get(p) {
             Some(val) => Ok(val.fn_context),
             None => Err(RuntimeError::CustomError(errors::create_error(
                 info,
@@ -88,9 +89,9 @@ impl<'a> Globals<'a> {
         }
     }
     pub fn is_mutable(&self, p: StoredValue) -> bool {
-        match self.stored_values.map.get(&p) {
+        match self.stored_values.map.get(p) {
             Some(val) => val.mutable,
-            None => unreachable!("{}", p),
+            None => unreachable!("{:?}", p),
         }
     }
 
@@ -113,7 +114,7 @@ impl<'a> Globals<'a> {
     // }
 
     pub fn get_area(&self, p: StoredValue) -> CodeArea {
-        match self.stored_values.map.get(&p) {
+        match self.stored_values.map.get(p) {
             Some(val) => val.def_area,
             None => unreachable!(),
         }
@@ -142,13 +143,14 @@ impl<'a> Globals<'a> {
         permissions: BuiltinPermissions,
         std_out: &'a mut impl Write,
     ) -> Self {
-        let storage = ValStorage::new();
+        let (storage, builtin_storage, null_storage) = ValStorage::new();
+
         let mut globals = Globals {
             closed_groups: 0,
             closed_colors: 0,
             closed_blocks: 0,
             closed_items: 0,
-            path: Intern::new(path),
+            path: LocalIntern::new(path),
 
             lowest_y: FnvHashMap::default(),
 
@@ -159,7 +161,7 @@ impl<'a> Globals<'a> {
             trigger_order: 0.0,
             uid_counter: 0,
 
-            val_id: storage.map.len() as StoredValue,
+            //val_id: storage.map.len() as StoredValue,
             stored_values: storage,
             func_ids: vec![FunctionId {
                 parent: None,
@@ -175,13 +177,15 @@ impl<'a> Globals<'a> {
             includes: Vec::new(),
 
             permissions,
-            TYPE_MEMBER_NAME: Intern::new(String::from("type")),
-            SELF_MEMBER_NAME: Intern::new(String::from("self")),
-            OR_BUILTIN: Intern::new(String::from("_or_")),
-            AND_BUILTIN: Intern::new(String::from("_and_")),
-            ASSIGN_BUILTIN: Intern::new(String::from("_assign_")),
-            OBJ_KEY_ID: Intern::new(String::from("id")),
-            OBJ_KEY_PATTERN: Intern::new(String::from("pattern")),
+            TYPE_MEMBER_NAME: LocalIntern::new(String::from("type")),
+            SELF_MEMBER_NAME: LocalIntern::new(String::from("self")),
+            BUILTIN_STORAGE: builtin_storage,
+            NULL_STORAGE: null_storage,
+            OR_BUILTIN: LocalIntern::new(String::from("_or_")),
+            AND_BUILTIN: LocalIntern::new(String::from("_and_")),
+            ASSIGN_BUILTIN: LocalIntern::new(String::from("_assign_")),
+            OBJ_KEY_ID: LocalIntern::new(String::from("id")),
+            OBJ_KEY_PATTERN: LocalIntern::new(String::from("pattern")),
             built_in_path: None,
             std_out,
         };
@@ -278,8 +282,8 @@ impl<'a> Globals<'a> {
         //gc
 
         //mark
-        self.stored_values.mark(NULL_STORAGE);
-        self.stored_values.mark(BUILTIN_STORAGE);
+        self.stored_values.mark(self.NULL_STORAGE);
+        self.stored_values.mark(self.BUILTIN_STORAGE);
 
         unsafe {
             let root_context = contexts

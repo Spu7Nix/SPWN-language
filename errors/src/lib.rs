@@ -4,7 +4,7 @@ use compiler_info::{CodeArea, CompilerInfo};
 
 use ariadne::Fmt;
 
-use internment::Intern;
+use internment::LocalIntern;
 use shared::{BreakType, FileRange, SpwnSource};
 
 pub enum RuntimeError {
@@ -456,13 +456,13 @@ impl From<SyntaxError> for ErrorReport {
             } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: Intern::new(file.clone()),
+                    file: LocalIntern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file: Intern::new(file),
+                        file: LocalIntern::new(file),
                     },
                     &format!(
                         "{} {}, {} {}",
@@ -478,13 +478,13 @@ impl From<SyntaxError> for ErrorReport {
             SyntaxError::UnexpectedErr { found, pos, file } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: Intern::new(file.clone()),
+                    file: LocalIntern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file: Intern::new(file),
+                        file: LocalIntern::new(file),
                     },
                     &format!("Unexpected {}", found),
                 )],
@@ -494,13 +494,13 @@ impl From<SyntaxError> for ErrorReport {
             SyntaxError::SyntaxError { message, pos, file } => create_error(
                 CompilerInfo::from_area(CodeArea {
                     pos,
-                    file: Intern::new(file.clone()),
+                    file: LocalIntern::new(file.clone()),
                 }),
                 "Syntax error",
                 &[(
                     CodeArea {
                         pos,
-                        file: Intern::new(file),
+                        file: LocalIntern::new(file),
                     },
                     &message,
                 )],

@@ -1,6 +1,6 @@
 //! Defining all native types (and functions?)
 #![allow(unused_assignments)]
-use internment::Intern;
+use internment::LocalIntern;
 use shared::StoredValue;
 
 use crate::compiler_types::*;
@@ -12,7 +12,7 @@ use fnv::FnvHashMap;
 use parser::ast::ObjectMode;
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::value::*;
 use crate::value_storage::*;
@@ -181,12 +181,12 @@ impl Item {
 impl Value {
     pub fn member(
         &self,
-        member: Intern<String>,
+        member: LocalIntern<String>,
         context: &Context,
         globals: &mut Globals,
         info: CompilerInfo,
     ) -> Option<StoredValue> {
-        let get_impl = |t: u16, m: Intern<String>| match globals.implementations.get(&t) {
+        let get_impl = |t: u16, m: LocalIntern<String>| match globals.implementations.get(&t) {
             Some(imp) => imp.get(&m).map(|mem| mem.0),
             None => None,
         };
@@ -853,7 +853,7 @@ builtins! {
                     context.start_group,
                     CodeArea::new()
                 );
-                response_headers_value.insert(Intern::new(String::from(name.as_str())), header_value);
+                response_headers_value.insert(LocalIntern::new(String::from(name.as_str())), header_value);
             }
 
             let response_headers = store_const_value(
@@ -872,9 +872,9 @@ builtins! {
                 CodeArea::new(),
             );
 
-            output_map.insert(Intern::new(String::from("status")), response_status);
-            output_map.insert(Intern::new(String::from("headers")), response_headers);
-            output_map.insert(Intern::new(String::from("text")), response_text);
+            output_map.insert(LocalIntern::new(String::from("status")), response_status);
+            output_map.insert(LocalIntern::new(String::from("headers")), response_headers);
+            output_map.insert(LocalIntern::new(String::from("text")), response_text);
             Value::Dict(output_map)
         }
         #[cfg(target_arch = "wasm32")]
@@ -1439,9 +1439,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     Value::Array(arr)
                                 },
                                 serde_json::Value::Object(x) => {
-                                    let mut dict: FnvHashMap<Intern<String>, StoredValue> = FnvHashMap::default();
+                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
                                     for (key, value) in x {
-                                        dict.insert(Intern::new(key), store_const_value(parse_json_value(value, globals, context, info), globals, context.start_group, info.position));
+                                        dict.insert(LocalIntern::new(key), store_const_value(parse_json_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
                                     Value::Dict(dict)
                                 },
@@ -1485,9 +1485,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     Value::Array(arr)
                                 },
                                 toml::Value::Table(x) => {
-                                    let mut dict: FnvHashMap<Intern<String>, StoredValue> = FnvHashMap::default();
+                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
                                     for (key, value) in x {
-                                        dict.insert(Intern::new(key), store_const_value(parse_toml_value(value, globals, context, info), globals, context.start_group, info.position));
+                                        dict.insert(LocalIntern::new(key), store_const_value(parse_toml_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
                                     Value::Dict(dict)
                                 },
@@ -1530,9 +1530,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     Value::Array(arr)
                                 },
                                 serde_yaml::Value::Mapping(x) => {
-                                    let mut dict: FnvHashMap<Intern<String>, StoredValue> = FnvHashMap::default();
+                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
                                     for (key, value) in x.iter() {
-                                        dict.insert(Intern::new(key.as_str().unwrap().to_string()), store_const_value(parse_yaml_value(value, globals, context, info), globals, context.start_group, info.position));
+                                        dict.insert(LocalIntern::new(key.as_str().unwrap().to_string()), store_const_value(parse_yaml_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
                                     Value::Dict(dict)
                                 },
@@ -1871,15 +1871,15 @@ $.assert(arr == [1, 2])
     [AssignOp] #[safe = true, desc = "Default implementation of the `=` operator", example = "$._assign_(val, 64)"]
     fn _assign_(mut (a), (b)) {
         a = b;
-        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
+        (*globals.stored_values.map.get_mut(arguments[0]).unwrap()).def_area = info.position;
         Value::Null
     }
     [SwapOp] #[safe = true, desc = "Default implementation of the `<=>` operator", example = "$._swap_(a, b)"]
     fn _swap_(mut (a), mut (b)) {
 
         std::mem::swap(&mut a, &mut b);
-        (*globals.stored_values.map.get_mut(&arguments[0]).unwrap()).def_area = info.position;
-        (*globals.stored_values.map.get_mut(&arguments[1]).unwrap()).def_area = info.position;
+        (*globals.stored_values.map.get_mut(arguments[0]).unwrap()).def_area = info.position;
+        (*globals.stored_values.map.get_mut(arguments[1]).unwrap()).def_area = info.position;
         Value::Null
     }
 
@@ -1900,7 +1900,7 @@ $.assert(arr == [1, 2])
             (Value::Dict(d), Value::Str(b)) => {
 
 
-                Value::Bool(d.get(&Intern::new(b)).is_some())
+                Value::Bool(d.get(&LocalIntern::new(b)).is_some())
             }
 
             (Value::Str(s), Value::Str(s2)) => Value::Bool(s.contains(&*s2)),

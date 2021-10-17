@@ -1,5 +1,5 @@
 use crate::builtins::*;
-use crate::compiler::NULL_STORAGE;
+
 use crate::context::*;
 use crate::globals::Globals;
 use crate::leveldata::*;
@@ -17,13 +17,13 @@ use fnv::FnvHashMap;
 
 use crate::compiler::compile_scope;
 
-use internment::Intern;
+use internment::LocalIntern;
 use shared::StoredValue;
 
 pub type TypeId = u16;
 //                                                               This bool is for if this value
 //                                                               was implemented in the current module
-pub type Implementations = FnvHashMap<TypeId, FnvHashMap<Intern<String>, (StoredValue, bool)>>;
+pub type Implementations = FnvHashMap<TypeId, FnvHashMap<LocalIntern<String>, (StoredValue, bool)>>;
 
 pub type FnIdPtr = usize;
 
@@ -53,11 +53,11 @@ pub fn handle_operator(
     globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals();
+    contexts.reset_return_vals(globals);
     for full_context in contexts.iter() {
         let fn_context = full_context.inner().start_group;
         if let Some(val) = globals.stored_values[value1].clone().member(
-            Intern::new(String::from(macro_name)),
+            LocalIntern::new(String::from(macro_name)),
             full_context.inner(),
             globals,
             info.clone(),
@@ -132,11 +132,11 @@ pub fn handle_unary_operator(
     globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals();
+    contexts.reset_return_vals(globals);
     for full_context in contexts.iter() {
         let context = full_context.inner();
         if let Some(val) = globals.stored_values[value].clone().member(
-            Intern::new(String::from(macro_name)),
+            LocalIntern::new(String::from(macro_name)),
             context,
             globals,
             info.clone(),
@@ -193,7 +193,7 @@ impl EvalExpression for ast::Expression {
         mut info: CompilerInfo,
         constant: bool,
     ) -> Result<(), RuntimeError> {
-        contexts.reset_return_vals();
+        contexts.reset_return_vals(globals);
         let mut vals = self.values.iter();
         let first = vals.next().unwrap();
 
@@ -331,7 +331,7 @@ pub fn execute_macro(
     parent: StoredValue,
     info: CompilerInfo,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals();
+    contexts.reset_return_vals(globals);
     globals.push_new_preserved();
     for context in contexts.with_breaks() {
         for val in context
@@ -379,7 +379,8 @@ pub fn execute_macro(
     //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
-        let mut new_variables: FnvHashMap<Intern<String>, Vec<VariableData>> = Default::default();
+        let mut new_variables: FnvHashMap<LocalIntern<String>, Vec<VariableData>> =
+            Default::default();
         let context = full_context.inner();
 
         let fn_context = context.start_group;
@@ -627,8 +628,8 @@ Should be used like this: value.macro(arguments)",
                             (*context.inner()).return_value = val;
                             val
                         } else {
-                            (*context.inner()).return_value = NULL_STORAGE;
-                            NULL_STORAGE
+                            (*context.inner()).return_value = globals.NULL_STORAGE;
+                            globals.NULL_STORAGE
                         };
                         if let Some(pat) = m.ret_pattern {
                             //dbg!(&globals.stored_values[pat], &globals.stored_values[ret]);
@@ -715,7 +716,7 @@ pub fn eval_dict(
     info: CompilerInfo,
     constant: bool,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals();
+    contexts.reset_return_vals(globals);
     let combinations = all_combinations(
         dict.iter()
             .map(|def| match def {
@@ -736,7 +737,7 @@ pub fn eval_dict(
     }
     for (results, full_context) in combinations {
         let context = full_context.inner();
-        let mut dict_out: FnvHashMap<Intern<String>, StoredValue> = Default::default();
+        let mut dict_out: FnvHashMap<LocalIntern<String>, StoredValue> = Default::default();
         for (expr_index, def) in dict.iter().enumerate() {
             match def {
                 ast::DictDef::Def(d) => {
@@ -801,7 +802,7 @@ impl ToTriggerFunc for ast::CompoundStatement {
         info: CompilerInfo,
         start_group: Option<Group>,
     ) -> Result<(), RuntimeError> {
-        contexts.reset_return_vals();
+        contexts.reset_return_vals(globals);
         for full_context in contexts.iter() {
             let mut prev_context = full_context.clone();
 

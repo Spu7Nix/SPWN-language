@@ -7,3 +7,4 @@ edition = "2018"
 
 [dependencies]
 internment = "0.5.4"
+slotmap = "1.0.6"

@@ -1,5 +1,5 @@
 use errors::RuntimeError;
-use internment::Intern;
+use internment::LocalIntern;
 use shared::{ImportType, SpwnSource, StoredValue};
 
 // tools for generating documentation for SPWN libraries
@@ -46,7 +46,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         &mut std_out,
     );
 
-    let mut start_context = FullContext::new();
+    let mut start_context = FullContext::new(&globals);
 
     // store_value(Value::Builtins, 1, &mut globals, &start_context);
     // store_value(Value::Null, 1, &mut globals, &start_context);
@@ -58,7 +58,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         let p = PathBuf::from(path);
         // let mut new_path = globals.path.as_ref().clone();
         // new_path.push(p.clone());
-        // globals.path = Intern::new(new_path);
+        // globals.path = LocalIntern::new(new_path);
         p.file_stem()
             .expect("invalid module path")
             .to_string_lossy()
@@ -156,7 +156,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                     key,
                     val.iter()
                         .map(|(key, val)| (*key, val.0))
-                        .collect::<FnvHashMap<Intern<String>, StoredValue>>(),
+                        .collect::<FnvHashMap<LocalIntern<String>, StoredValue>>(),
                 )
             })
             .collect();
@@ -189,12 +189,12 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 }
 
 fn document_dict(
-    dict: &FnvHashMap<Intern<String>, StoredValue>,
+    dict: &FnvHashMap<LocalIntern<String>, StoredValue>,
     globals: &mut Globals,
     full_context: &mut FullContext,
 ) -> Result<String, RuntimeError> {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
-    type ValList = Vec<(Intern<String>, StoredValue)>;
+    type ValList = Vec<(LocalIntern<String>, StoredValue)>;
     let mut categories = [
         ("Constructors", ValList::new()),
         ("Macros", ValList::new()),
