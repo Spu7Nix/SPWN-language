@@ -2,7 +2,7 @@
 name = "spwn"
 version = "0.0.7"
 authors = ["Spu7Nix <main@spu7nix.net>"]
-edition = "2018"
+edition = "2021"
 description = "A language for Geometry Dash triggers"
 readme = "README.md"
 homepage = "https://spu7nix.net/spwn/"

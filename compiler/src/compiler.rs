@@ -1783,7 +1783,7 @@ pub fn import_module(
             path.clone(),
             (
                 output_saved.unwrap_or(globals.NULL_STORAGE),
-                impl_saved.unwrap_or_else(FnvHashMap::default),
+                impl_saved.unwrap_or_default(),
             ),
         );
     }
