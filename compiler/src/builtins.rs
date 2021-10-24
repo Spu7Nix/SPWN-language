@@ -734,7 +734,7 @@ builtins! {
                 }
             }
             .as_secs_f64();
-            Value::Number(now as f64)
+            Value::Number(now)
         }
 
         #[cfg(target_arch = "wasm32")]
