@@ -733,7 +733,7 @@ builtins! {
                     })
                 }
             }
-            .as_millis();
+            .as_secs_f64();
             Value::Number(now as f64)
         }
 
