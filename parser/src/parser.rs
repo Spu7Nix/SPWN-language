@@ -1800,7 +1800,7 @@ pub fn str_content(
                                 }
                             };
 
-                            if hex.len() < 2 || hex.len() > 6 {
+                            if hex.len() < 1 || hex.len() > 6 {
                                 return Err(SyntaxError::ExpectedErr {
                                     expected: "2 to 6 hexadecimal characters".to_string(), found: hex.len().to_string(),
                                     pos: tokens.position(), file: notes.file.clone(),
