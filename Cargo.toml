@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "spwn",
-	"minifier",
+    "minifier",
     "parser",
     "shared",
     "errors",
