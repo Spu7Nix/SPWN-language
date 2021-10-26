@@ -1,0 +1,12 @@
+[package]
+name = "minifier"
+version = "0.0.7"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+internment = "0.5.4"
+
+shared = { path = "../shared" }
+parser = { path = "../parser" }

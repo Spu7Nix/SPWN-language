@@ -26,7 +26,7 @@ termcolor = "1.1.2"
 internment = "0.5.4"
 ariadne = "0.1.3" # errors
 
-
+minifier = { path = "../minifier" }
 parser = { path = "../parser" }
 shared = { path = "../shared" }
 errors = { path = "../errors" }

@@ -15,6 +15,9 @@ use optimize::optimize;
 use ::parser::parser::*;
 use builtins::BuiltinPermissions;
 
+use ::minifier::shared::MinifyOptions;
+use ::minifier::minifier::minify;
+
 use shared::SpwnSource;
 use spwn::SpwnCache;
 
@@ -397,6 +400,81 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     //println!("doc {:?}", documentation);
+
+                    Ok(())
+                }
+                "minify" | "m" => {
+                    let script_path = match args_iter.next() {
+                        Some(a) => PathBuf::from(a),
+                        None => return Err(std::boxed::Box::from("Expected script file argument")),
+                    };
+
+                    let mut clear_types = false;
+                    let mut keep = vec![];
+                    let mut console = false;
+                    let mut out = PathBuf::from("minified");
+
+                    while let Some(arg) = args_iter.next() {
+                        match arg.as_ref() {
+                            "--out-dir" | "-o" => {
+                                out = PathBuf::from(
+                                    args_iter.next().cloned().expect("No path provided"),
+                                );
+
+                                if !out.exists() {
+                                    return Err(std::boxed::Box::from("Path does not exist"));
+                                }
+                            }
+                            "--keep" | "-k" => {
+                                keep = args_iter.next().cloned().expect("No list of attributes provided")
+                                    .split(",")
+                                    .map(|k| k.to_string())
+                                    .collect::<Vec<_>>();
+                            }
+                            "--console" | "-c" => {
+                                console = true;
+                            }
+                            "--clear-types" => {
+                                clear_types = true;
+                            }
+                            _ => (),
+                        };
+                    }
+
+                    let opts = MinifyOptions { keep, clear_types };
+
+                    let mut cache = SpwnCache::default();
+                    match cache.fetch(&SpwnSource::File(script_path.clone())) {
+                        Ok(_) => (),
+                        Err(_) => {
+                            return Err(Box::from("File does not exist".to_string()));
+                        }
+                    }
+
+                    let unparsed = fs::read_to_string(script_path.clone())?;
+                    let (statements, notes) = match parse_spwn(
+                        unparsed,
+                        SpwnSource::File(script_path.clone()),
+                        ::compiler::builtins::BUILTIN_NAMES,
+                    ) {
+                        Err(err) => {
+                            create_report(ErrorReport::from(err)).eprint(cache).unwrap();
+                            std::process::exit(ERROR_EXIT_CODE);
+                        }
+                        Ok(p) => p,
+                    };
+
+                    let minified = minify(statements, notes, opts);
+
+                    if !console {
+						fs::create_dir_all("minified")?;
+                        fs::File::create(
+                            out.join(script_path.file_name().unwrap()).with_extension("minified.spwn"),
+                        )?
+                        .write_all(minified.as_bytes())?;
+                    } else {
+                        println!("{}", minified);
+                    }
 
                     Ok(())
                 }

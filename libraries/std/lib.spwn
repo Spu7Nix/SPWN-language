@@ -4,6 +4,7 @@ let constants = import "constants.spwn"
 //type implementations
 import "group.spwn"
 import "color.spwn"
+import "dye.spwn"
 import "item.spwn"
 import "block.spwn"
 import "array.spwn"
@@ -45,6 +46,7 @@ return {
     heapq: @heapq::new,
     complex: @complex::new,
     zip: @zip::new,
+	dye: @dye,
 }
 
 

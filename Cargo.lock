@@ -668,6 +668,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 
 [[package]]
+name = "minifier"
+version = "0.0.7"
+dependencies = [
+ "internment",
+ "parser",
+ "shared",
+]
+
+[[package]]
 name = "mio"
 version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1160,6 +1169,7 @@ dependencies = [
  "errors",
  "internment",
  "levelstring",
+ "minifier",
  "optimizer",
  "parking_lot",
  "parser",
