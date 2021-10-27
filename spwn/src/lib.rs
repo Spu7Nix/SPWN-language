@@ -14,7 +14,7 @@ pub use ::parser::ast;
 use ariadne::Source;
 use errors::create_report;
 use errors::ErrorReport;
-use internment::Intern;
+use internment::LocalIntern;
 use optimizer::optimize;
 
 pub use ::compiler::STD_PATH;
@@ -31,8 +31,6 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-
-use std::io;
 
 pub struct SpwnCache {
     files: HashMap<SpwnSource, Source>,
@@ -72,7 +70,7 @@ impl ariadne::Cache<SpwnSource> for SpwnCache {
 }
 
 pub fn run_spwn(code: String, included: Vec<PathBuf>) -> Result<[String; 2], String> {
-    let source = SpwnSource::String(Intern::new(code.clone()));
+    let source = SpwnSource::String(LocalIntern::new(code.clone()));
     let cache = SpwnCache::default();
     let (statements, notes) = match parse_spwn(code, source.clone(), BUILTIN_NAMES) {
         Ok(a) => a,
@@ -180,7 +178,8 @@ fn run_test() {
     dbg!(run_spwn(
         "$.print('Hello')".to_string(),
         vec![std::env::current_dir().expect("Cannot access current directory")],
-    ));
+    ))
+    .unwrap();
 }
 /*
 

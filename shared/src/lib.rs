@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
-use internment::Intern;
-
-pub type StoredValue = u32; //index to stored value in globals.stored_values
+use internment::LocalIntern;
+use slotmap::new_key_type;
+new_key_type! {
+    pub struct StoredValue;
+} //index to stored value in globals.stored_values
 pub type FileRange = (usize, usize);
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
@@ -27,5 +29,5 @@ pub enum BreakType {
 pub enum SpwnSource {
     File(PathBuf),
     BuiltIn(PathBuf),
-    String(Intern<String>),
+    String(LocalIntern<String>),
 }

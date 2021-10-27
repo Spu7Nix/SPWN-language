@@ -35,6 +35,7 @@ return {
     ..ctrl_flow,
 
     counter: @counter::new,
+    binary_counter: @binary_counter,
     on: @event::on,
     obj_props: constants.obj_props,
     obj_ids: constants.obj_ids,

@@ -1,6 +1,6 @@
 //! Abstract Syntax Tree (AST) type definitions
 
-use internment::Intern;
+use internment::LocalIntern;
 
 use crate::fmt::SpwnFmt;
 use shared::FileRange;
@@ -8,7 +8,7 @@ use shared::ImportType;
 use shared::StoredValue;
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
-    Def((Intern<String>, Expression)),
+    Def((LocalIntern<String>, Expression)),
     Extract(Expression),
 }
 
@@ -73,7 +73,7 @@ pub enum ValueBody {
     Number(f64),
     CmpStmt(CompoundStatement),
     Dictionary(Vec<DictDef>),
-    Symbol(Intern<String>),
+    Symbol(LocalIntern<String>),
     Bool(bool),
     Expression(Expression),
     Str(StrInner),
@@ -236,13 +236,13 @@ impl Default for Attribute {
 }
 
 pub trait CountSymbols {
-    fn symbols(&self) -> fnv::FnvHashSet<Intern<String>>;
+    fn symbols(&self) -> fnv::FnvHashSet<LocalIntern<String>>;
 
-    fn properties(&self) -> fnv::FnvHashSet<Intern<String>> {
+    fn properties(&self) -> fnv::FnvHashSet<LocalIntern<String>> {
         Default::default()
     }
 
-    fn all(&self) -> fnv::FnvHashSet<Intern<String>> {
+    fn all(&self) -> fnv::FnvHashSet<LocalIntern<String>> {
         let mut out = self.symbols();
         out.extend(self.properties());
         out
@@ -251,8 +251,8 @@ pub trait CountSymbols {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Path {
-    Member(Intern<String>),
-    Associated(Intern<String>),
+    Member(LocalIntern<String>),
+    Associated(LocalIntern<String>),
     Index(Expression),
     NSlice(Vec<Slice>),
     Call(Vec<Argument>),
@@ -263,7 +263,7 @@ pub enum Path {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Argument {
-    pub symbol: Option<Intern<String>>,
+    pub symbol: Option<LocalIntern<String>>,
     pub value: Expression,
     pub pos: FileRange,
 }
@@ -314,7 +314,7 @@ pub struct Native {
 }*/
 //     name     def value     props     type ind.     location in file     is reference
 pub type ArgDef = (
-    Intern<String>,
+    LocalIntern<String>,
     Option<Expression>,
     Attribute,
     Option<Expression>,
@@ -405,7 +405,7 @@ pub struct Ternary {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Comprehension {
-    pub symbol: Intern<String>,
+    pub symbol: LocalIntern<String>,
     pub iterator: Expression,
     pub condition: Option<Expression>,
     pub body: Expression,

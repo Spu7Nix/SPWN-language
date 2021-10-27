@@ -1,4 +1,4 @@
-use internment::Intern;
+use internment::LocalIntern;
 use shared::FileRange;
 use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,14 +48,14 @@ impl Default for CompilerInfo {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CodeArea {
-    pub file: Intern<shared::SpwnSource>,
+    pub file: LocalIntern<shared::SpwnSource>,
     pub pos: FileRange,
 }
 
 impl CodeArea {
     pub fn new() -> Self {
         CodeArea {
-            file: Intern::new(shared::SpwnSource::File(PathBuf::new())),
+            file: LocalIntern::new(shared::SpwnSource::File(PathBuf::new())),
             pos: (0, 0),
         }
     }
