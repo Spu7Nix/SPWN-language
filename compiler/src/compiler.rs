@@ -1326,15 +1326,6 @@ fn array_destructure_define(
                                     globals.stored_values[storage] = Value::Array(packed);
                                 }
                                 _ => {
-                                    //cumshitfart
-                                    /*
-destex: &ast::Expression,
-src: &Option<ast::Expression>,
-contexts: &mut FullContext,
-globals: &mut Globals,
-info: &CompilerInfo,
-mutable: bool
-                                    */
                                     if !destructure_check(
                                         &var_val.to_expression(),
                                         &Some(ast::ValueBody::Resolved(val_a[idx]).to_variable((0,0)).to_expression()),
