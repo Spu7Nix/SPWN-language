@@ -244,7 +244,15 @@ fn document_dict(
         Ok(member_doc)
     };
 
-    for list in categories {
+    doc += "<details open><summary>Constructors and Methods</summary>\n\n";
+    for list in &categories {
+        for (key, _val) in list.1.iter() {
+            doc += &format!("- [{}](#{})\n",key,key);
+        }
+    }
+    doc += "\n</details>\n";
+
+    for list in &categories {
         if !list.1.is_empty() {
             doc += &format!("\n## {}:\n", list.0);
 
