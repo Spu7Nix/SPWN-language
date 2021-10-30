@@ -1,3 +1,7 @@
-c = counter(218)
-c.display(45, 45)
-c %= 10
+
+x = [1,2,3]
+x_1 = x.scan(10, (&state, x){
+    state *= x
+    return -state
+})
+$.assert(x_1 == [-10, -20, -60])
