@@ -6,7 +6,6 @@ use internment::LocalIntern;
 use shared::BreakType;
 use shared::ImportType;
 use shared::SpwnSource;
-use shared::StoredValue;
 
 use crate::builtins::*;
 use crate::context::*;
@@ -291,6 +290,7 @@ pub fn compile_scope(
                     globals,
                     &info,
                     def.mutable,
+                    0
                 )?;
             }
             Expr(expr) => expr.eval(contexts, globals, info.clone(), true)?,
@@ -645,28 +645,6 @@ pub fn compile_scope(
                 // skips all broken contexts, so as to not interfere with potential breaks in the following loops
 
                 for full_context in contexts.iter() {
-                    let do_destructure = |full_context: &mut FullContext,
-                                          globals: &mut Globals,
-                                          element: ast::ValueBody|
-                     -> Result<(), RuntimeError> {
-                        if !do_assignment(
-                            i_dest,
-                            &Some(element.to_variable((0, 0)).to_expression()),
-                            full_context,
-                            globals,
-                            &info,
-                            false,
-                        )? {
-                            Err(RuntimeError::CustomError(create_error(
-                                info.clone(),
-                                "Cannot destructure into this expression",
-                                &[],
-                                None,
-                            )))
-                        } else {
-                            Ok(())
-                        }
-                    };
 
                     let (_, val) = full_context.inner_value();
                     globals.push_new_preserved();
@@ -681,7 +659,19 @@ pub fn compile_scope(
                                 // going through the array items
                                 full_context.disable_breaks(BreakType::ContinueLoop);
 
-                                if let Some(single) = maybe_single {
+                                do_assignment(
+                                    &i_dest,
+                                    &Some(ast::ValueBody::Resolved(*element)
+                                        .to_variable(globals.get_area(val).pos)
+                                        .to_expression()),
+                                    full_context,
+                                    globals,
+                                    &info,
+                                    false,
+                                    -1
+                                )?;
+
+                                /*if let Some(single) = maybe_single {
                                     full_context.set_variable_and_clone(
                                         single,
                                         *element,
@@ -696,7 +686,7 @@ pub fn compile_scope(
                                         globals,
                                         ast::ValueBody::Resolved(*element),
                                     )?;
-                                }
+                                }*/
 
                                 compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
@@ -738,7 +728,24 @@ pub fn compile_scope(
                                     );
                                     // reset all variables per context
 
-                                    if let Some(single) = maybe_single {
+                                    let tmp_arr = store_const_value(
+                                        Value::Array(vec![key, val]),
+                                        globals,
+                                        fn_context,
+                                        globals.get_area(v),
+                                    );
+                                    do_assignment(
+                                        &i_dest,
+                                        &Some(ast::ValueBody::Resolved(tmp_arr)
+                                            .to_variable((0, 0))
+                                            .to_expression()),
+                                        c,
+                                        globals,
+                                        &info,
+                                        false,
+                                        -1
+                                    )?;
+                                    /*if let Some(single) = maybe_single {
                                         (*c.inner()).new_variable(
                                             single,
                                             store_const_value(
@@ -750,6 +757,7 @@ pub fn compile_scope(
                                             -1,
                                         );
                                     } else {
+
                                         do_destructure(
                                             c,
                                             globals,
@@ -762,7 +770,7 @@ pub fn compile_scope(
                                                     .to_expression(),
                                             ]),
                                         )?;
-                                    }
+                                    }*/
                                 }
 
                                 compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
@@ -1020,6 +1028,7 @@ fn do_assignment(
     globals: &mut Globals,
     info: &CompilerInfo,
     mutable: bool,
+    scope: i16
 ) -> Result<bool, RuntimeError> {
     if destex.values.len() != 1 || !destex.operators.is_empty() {
         return Err(RuntimeError::CustomError(create_error(
@@ -1041,7 +1050,7 @@ fn do_assignment(
             )));
         }
         if let Some(value) = src {
-            array_destructure_define(arr, value, contexts, globals, info, mutable)?;
+            array_destructure_define(arr, value, contexts, globals, info, mutable, scope)?;
             Ok(true)
         } else {
             Err(RuntimeError::CustomError(create_error(
@@ -1075,7 +1084,7 @@ fn do_assignment(
             false
         };
 
-        let defined = dest.try_define(contexts, globals, &info, mutable)?;
+        let defined = dest.try_define(contexts, globals, &info, mutable, scope)?;
 
         for full_context in contexts.iter() {
             let assign_implemented = globals.stored_values
@@ -1182,8 +1191,6 @@ fn do_assignment(
                                 )?;
                             }
 
-                            // dont remove this camlin
-                            // this is what makes recursion work lmao
                             (true, ast::ValueBody::Macro(m)) => {
                                 assert!(!pre_evaled);
 
@@ -1261,6 +1268,7 @@ fn array_destructure_define(
     globals: &mut Globals,
     info: &CompilerInfo,
     mutable: bool,
+    scope: i16
 ) -> Result<(), RuntimeError> {
     value.eval(contexts, globals, info.clone(), true)?;
     for ctx in contexts.iter() {
@@ -1338,25 +1346,32 @@ fn array_destructure_define(
                                     without_op.operator = None;
 
                                     idx_step = 1 + val_a.len() - arr.len();
-                                    let mut packed = Vec::<StoredValue>::new();
 
-                                    without_op.try_define(expr_ctx, globals, info, mutable)?;
+                                    let astvec = ast::ValueBody::Array(
+                                        (idx..(idx + idx_step)).map(|tmp_idx| {
+                                            /*let cloned = clone_value(
+                                                val_a[tmp_idx],
+                                                globals,
+                                                expr_ctx.inner().start_group,
+                                                !mutable,
+                                                globals.get_area(storage),
+                                            );*/
+                                            ast::ValueBody::Resolved(val_a[tmp_idx])
+                                                .to_variable(without_op.pos)
+                                                .to_expression()
+                                        }).collect())
+                                        .to_variable(without_op.pos)
+                                        .to_expression();
 
-                                    let storage = expr_ctx.inner().return_value2;
-
-                                    (idx..(idx + idx_step)).for_each(|tmp_idx| {
-                                        let cloned = clone_value(
-                                            val_a[tmp_idx],
-                                            globals,
-                                            expr_ctx.inner().start_group,
-                                            !mutable,
-                                            globals.get_area(storage),
-                                        );
-                                        packed.push(cloned);
-                                    });
-                                    //println!("collecting {} items", val_a.len()-var_a.len());
-
-                                    globals.stored_values[storage] = Value::Array(packed);
+                                    do_assignment(
+                                        &without_op.to_expression(),
+                                        &Some(astvec),
+                                        expr_ctx,
+                                        globals,
+                                        info,
+                                        mutable,
+                                        scope
+                                    )?;
                                 }
                                 _ => {
                                     /*
@@ -1367,7 +1382,7 @@ fn array_destructure_define(
                                     info: &CompilerInfo,
                                     mutable: bool
                                                                         */
-                                    if !do_assignment(
+                                    do_assignment(
                                         &var_val.to_expression(),
                                         &Some(
                                             ast::ValueBody::Resolved(val_a[idx])
@@ -1378,8 +1393,9 @@ fn array_destructure_define(
                                         globals,
                                         info,
                                         mutable,
-                                    )? {
-                                        var_val.try_define(expr_ctx, globals, info, mutable)?;
+                                        scope
+                                    )?;// {
+                                        /*var_val.try_define(expr_ctx, globals, info, mutable)?;
                                         let storage = expr_ctx.inner().return_value2;
 
                                         //clone the value so as to not share the reference
@@ -1391,8 +1407,8 @@ fn array_destructure_define(
                                             !mutable,
                                         );
 
-                                        globals.stored_values[storage] = cloned;
-                                    }
+                                        globals.stored_values[storage] = cloned;*/
+                                    //}
                                 }
                             }
                         }
