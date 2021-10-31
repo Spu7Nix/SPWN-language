@@ -254,5 +254,5 @@ return {
     },
 
     pi: $.acos(-1),
-    e: $.exp(1),
+    euler: $.exp(1),
 }
