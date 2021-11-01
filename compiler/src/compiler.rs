@@ -232,57 +232,6 @@ pub fn compile_scope(
         //use crate::fmt::SpwnFmt;
         match &statement.body {
             Definition(def) => {
-                /*let value_is_normalized = if let Some(new_expr) = &src {
-                    new_expr.values.len() == 1
-                        && new_expr.values[0].path.is_empty()
-                        && new_expr.values[0].operator.is_none()
-                } else {
-                    true
-                };
-                let pre_evaled = if let Some(new_expr) = &src {
-                    if value_is_normalized
-                        && matches!(
-                            new_expr.values[0].value.body,
-                            ast::ValueBody::CmpStmt(_) | ast::ValueBody::Macro(_)
-                        )
-                    {
-                        false
-                    } else {
-                        new_expr.eval(contexts, globals, info.clone(), def.mutable)?;
-                        true
-                    }
-                } else {
-                    false
-                };*/
-                // check if its already defined
-                /*if let ast::ValueBody::Array(arr) = &def.symbol.value.body {
-                    if def.symbol.operator.is_some() || !def.symbol.path.is_empty() {
-                        return Err(RuntimeError::CustomError(create_error(
-                            info.clone(),
-                            "Invalid destructure symbol",
-                            &[],
-                            Some("Remove any unary operators or extentions"),
-                        )));
-                    }
-                    if let Some(value) = &src {
-                        array_destructure_define(
-                            arr,
-                            value,
-                            contexts,
-                            globals,
-                            &info,
-                            def.mutable,
-                        )?;
-                    } else {
-                        return Err(RuntimeError::CustomError(create_error(
-                            info.clone(),
-                            "Destructure expressions require a value to destruct",
-                            &[],
-                            None,
-                        )));
-                    }
-                }*/
-
                 do_assignment(
                     &def.symbol.to_expression(),
                     &def.value,
@@ -1029,7 +978,7 @@ fn do_assignment(
     info: &CompilerInfo,
     mutable: bool,
     scope: i16
-) -> Result<bool, RuntimeError> {
+) -> Result<(), RuntimeError> {
     if destex.values.len() != 1 || !destex.operators.is_empty() {
         return Err(RuntimeError::CustomError(create_error(
             info.clone(),
@@ -1040,7 +989,7 @@ fn do_assignment(
     }
     let dest = &destex.values[0];
 
-    if let ast::ValueBody::Array(arr) = &dest.value.body {
+    let destructure_sanitize = |src: &Option<_>, dest: &ast::Variable| -> Result<(), RuntimeError> {
         if dest.operator.is_some() || !dest.path.is_empty() {
             return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
@@ -1049,17 +998,129 @@ fn do_assignment(
                 Some("Remove any unary operators or extentions"),
             )));
         }
-        if let Some(value) = src {
-            array_destructure_define(arr, value, contexts, globals, info, mutable, scope)?;
-            Ok(true)
-        } else {
-            Err(RuntimeError::CustomError(create_error(
+        if let None = src {
+            return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
                 "Destructure expressions require a value to destruct",
                 &[],
                 None,
-            )))
+            )));
         }
+        Ok(())
+    };
+
+    if let ast::ValueBody::Array(arr) = &dest.value.body {
+        destructure_sanitize(src, dest)?;
+
+        array_destructure_define(arr, src.as_ref().unwrap(), contexts, globals, info, mutable, scope)?;
+        Ok(())
+    } else if let ast::ValueBody::Dictionary(kvs) = &dest.value.body {
+        destructure_sanitize(src, dest)?;
+
+        let ranges: Vec<&ast::Expression> = kvs
+                                      .iter()
+                                      .filter_map(|x| match x {ast::DictDef::Extract(d) => Some(d), _ => None})
+                                      .collect();
+
+        if ranges.len() > 1 {
+            let mut area1 = info.position;
+            let mut area2 = info.position;
+            area1.pos = ranges[0].values[0].pos;
+            area2.pos = ranges[1].values[0].pos;
+
+            return Err(RuntimeError::CustomError(create_error(
+                info.clone(),
+                "Cannot spread a destructure multiple times",
+                &[
+                    (area1, "First spread is here"),
+                    (area2, "Attempted to spread again"),
+                ],
+                None,
+            )));
+        }
+
+        src.as_ref().unwrap().eval(contexts, globals, info.clone(), true)?;
+
+        for ctx in contexts.iter() {
+            let evaled_store = ctx.inner().return_value;
+
+            let mut evaled_src = match globals.stored_values[evaled_store].clone() {
+                Value::Dict(d) => d,
+                b => {
+                    return Err(RuntimeError::TypeError {
+                        expected: "dictionary".to_string(),
+                        found: b.get_type_str(globals),
+                        val_def: globals.get_area(evaled_store),
+                        info: info.clone(),
+                    })
+                }
+            };
+
+            let mut collected = Vec::<&LocalIntern<String>>::new();
+            for kv in kvs {
+                match kv {
+                    ast::DictDef::Extract(_) => (),
+                    ast::DictDef::Def((key, value)) => {
+
+                        if !evaled_src.contains_key(key) {
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                &format!("Key '{}' not found", key),
+                                &[],
+                                None,
+                            )));
+                        }
+
+                        collected.push(key);
+                        do_assignment(
+                            &value, 
+                            &Some(stored_to_variable(evaled_src[key], globals).to_expression()),
+                            ctx,
+                            globals,
+                            &info,
+                            mutable,
+                            0
+                        )?;
+                    }
+                }
+            }
+
+            if ranges.len() > 0 {
+                for k in collected {
+                    evaled_src.remove(k);
+                }
+
+                /*let store = store_const_value(
+                    Value::Dict(evaled_src),
+                    globals,
+                    ctx,
+                    globals.get_area(evaled_store),
+                );*/
+                let ast_src = evaled_src
+                                .keys()
+                                .map(|x| 
+                                    ast::DictDef::Def((
+                                        *x, 
+                                        stored_to_variable(evaled_src[x], globals)
+                                            .to_expression()
+                                    )))
+                                .collect();
+
+                do_assignment(
+                    ranges[0],
+                    &Some(ast::ValueBody::Dictionary(ast_src)
+                            .to_variable((0, 0))
+                            .to_expression()),
+                    ctx,
+                    globals,
+                    &info,
+                    mutable,
+                    0
+                )?;
+            }
+        }
+        //panic!("dict destructure moment");
+        Ok(())
     } else { // no destructure here
         let value_is_normalized = if let Some(new_expr) = &src {
             new_expr.values.len() == 1
@@ -1257,7 +1318,7 @@ fn do_assignment(
                 }
             }
         }
-        Ok(true)
+        Ok(())
     }
 }
 
@@ -1385,8 +1446,7 @@ fn array_destructure_define(
                                     do_assignment(
                                         &var_val.to_expression(),
                                         &Some(
-                                            ast::ValueBody::Resolved(val_a[idx])
-                                                .to_variable((0, 0))
+                                            stored_to_variable(val_a[idx], globals)
                                                 .to_expression(),
                                         ),
                                         expr_ctx,

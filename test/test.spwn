@@ -1,6 +1,7 @@
-#[no_std]
+#[no_level]
 
-for [a] in [[1]] {
-}
+let {cum: a, ..sex} = {cum: 5, other: "ok", other2: "---"}
 
-$.print(a)
+
+$.assert(a == 5)
+$.assert(sex == {other: "ok", other2: "---"})

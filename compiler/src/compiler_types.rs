@@ -175,6 +175,10 @@ pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError
     Ok(rounded as i32)
 }
 
+pub fn stored_to_variable(v: StoredValue, globals: &Globals) -> ast::Variable {
+    ast::ValueBody::Resolved(v).to_variable(globals.get_area(v).pos)
+}
+
 pub trait EvalExpression {
     fn eval(
         &self,
