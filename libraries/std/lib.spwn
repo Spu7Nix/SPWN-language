@@ -21,6 +21,7 @@ import "complex.spwn"
 import "zip.spwn"
 import "http.spwn"
 import "vector.spwn"
+import "range.spwn"
 
 general = import "general_triggers.spwn"
 events = import "events.spwn"

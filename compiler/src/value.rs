@@ -791,6 +791,7 @@ pub trait VariableFuncs {
         globals: &mut Globals,
         info: &CompilerInfo,
         mutable: bool,
+        layer: i16
     ) -> Result<DefineResult, RuntimeError>;
 }
 
@@ -2668,6 +2669,7 @@ impl VariableFuncs for ast::Variable {
         globals: &mut Globals,
         info: &CompilerInfo,
         mutable: bool,
+        layer: i16
     ) -> Result<DefineResult, RuntimeError> {
         use ariadne::Fmt;
         use parser::fmt::SpwnFmt;
@@ -2709,7 +2711,7 @@ impl VariableFuncs for ast::Variable {
                         ptr
                     } else {
                         // define or redefine
-                        full_context.inner().new_variable(*a, value, 0);
+                        full_context.inner().new_variable(*a, value, layer);
                         defined = false;
                         value
                     }

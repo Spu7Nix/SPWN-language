@@ -1,12 +1,6 @@
-extract obj_props
+
+let {cum: a, ..sex} = {cum: 5, other: "ok", other2: "---"}
 
 
-let gaga = obj {
-    OBJ_ID: 1,
-    X: 10,
-    Y: 20,
-}
-
-gaga.set(OBJ_ID, 10)
-
-$.print(gaga)
+$.assert(a == 5)
+$.assert(sex == {other: "ok", other2: "---"})
