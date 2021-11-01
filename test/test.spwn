@@ -1,12 +1,11 @@
-extract obj_props
 
 
-let gaga = obj {
-    OBJ_ID: 1,
-    X: 10,
-    Y: 20,
-}
 
-gaga.set(OBJ_ID, 10)
+s = "abac ba labac"
 
-$.print(gaga)
+baba = @regex::new("ba(?=c)")
+found = baba.findall(s)
+$.print(found.map( e => s.substr(e[0],e[1]) ))
+
+
+
