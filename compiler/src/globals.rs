@@ -196,27 +196,27 @@ impl<'a> Globals<'a> {
                 .insert(String::from(name), (id, CodeArea::new()))
         };
 
-        add_type("group", type_id!(group));
-        add_type("color", type_id!(color));
-        add_type("block", type_id!(block));
-        add_type("item", type_id!(item));
-        add_type("number", type_id!(number));
-        add_type("bool", type_id!(bool));
-        add_type("trigger_function", type_id!(trigger_function));
-        add_type("dictionary", type_id!(dictionary));
-        add_type("macro", type_id!(macro));
-        add_type("string", type_id!(string));
-        add_type("array", type_id!(array));
-        add_type("object", type_id!(object));
-        add_type("spwn", type_id!(spwn));
-        add_type("builtin", type_id!(builtin));
-        add_type("type_indicator", type_id!(type_indicator));
-        add_type("NULL", type_id!(NULL));
-        add_type("trigger", type_id!(trigger));
-        add_type("range", type_id!(range));
-        add_type("pattern", type_id!(pattern));
-        add_type("object_key", type_id!(object_key));
-        add_type("epsilon", type_id!(epsilon));
+        add_type("group", 0);
+        add_type("color", 1);
+        add_type("block", 2);
+        add_type("item", 3);
+        add_type("number", 4);
+        add_type("bool", 5);
+        add_type("trigger_function", 6);
+        add_type("dictionary", 7);
+        add_type("macro", 8);
+        add_type("string", 9);
+        add_type("array", 10);
+        add_type("object", 11);
+        add_type("spwn", 12);
+        add_type("builtin", 13);
+        add_type("type_indicator", 14);
+        add_type("NULL", 15);
+        add_type("trigger", 16);
+        add_type("range", 17);
+        add_type("pattern", 18);
+        add_type("object_key", 19);
+        add_type("epsilon", 20);
 
         globals.type_id_count = globals.type_ids.len() as u16;
 
