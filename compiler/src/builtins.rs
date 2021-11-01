@@ -1274,7 +1274,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
             if arguments.is_empty() {
                 Value::Number(rand::thread_rng().gen())
             } else {
-                let val = match convert_type(&globals.stored_values[arguments[0]].clone(), 10, &info, globals, context) {
+                let val = match convert_type(&globals.stored_values[arguments[0]].clone(), type_id!(array), &info, globals, context) {
                     Ok(Value::Array(v)) => v,
                     _ => {
                         return Err(RuntimeError::BuiltinError {
@@ -2064,12 +2064,12 @@ $.assert(arr == [1, 2])
     [EitherOp] #[safe = true, desc = "Default implementation of the `|` operator", example = "$._either_(@number, @counter)"]
     fn _either_((a), (b)) {
         Value::Pattern(Pattern::Either(
-            if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, context)? {
+            if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()
             },
-            if let Value::Pattern(p) = convert_type(&b, 18, &info, globals, context)? {
+            if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()
