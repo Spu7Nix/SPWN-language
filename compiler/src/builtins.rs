@@ -1180,10 +1180,17 @@ $.assert(arr == [1])
             (key, out_val)
         };
 
-        if !o.contains(&(okey, oval.clone())) {
-            o.push((okey, oval))
+        let mut has_key = false;
+        for (i, (k, _)) in o.iter().enumerate() {
+            if *k == okey {
+                has_key = true;
+                o[i].1 = oval.clone();
+                break;
+            }
         }
-
+        if !has_key {
+            o.push((okey, oval));
+        }
 
         Value::Null
     }
