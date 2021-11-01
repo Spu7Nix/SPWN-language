@@ -1,11 +1,8 @@
 
+#[no_level]
+
+let {cum: a, ..sex} = {cum: 5, other: "ok", other2: "---"}
 
 
-s = "abac ba labac"
-
-baba = @regex::new("ba(?=c)")
-found = baba.findall(s)
-$.print(found.map( e => s.substr(e[0],e[1]) ))
-
-
-
+$.assert(a == 5)
+$.assert(sex == {other: "ok", other2: "---"})
