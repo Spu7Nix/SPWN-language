@@ -131,6 +131,32 @@ pub fn value_equality(val1: StoredValue, val2: StoredValue, globals: &Globals) -
     }
 }
 
+macro_rules! type_id {
+    (group) => {0};
+    (color) => {1};
+    (block) => {2};
+    (item) => {3};
+    (number) => {4};
+    (bool) => {5};
+    (trigger_function) => {6};
+    (dictionary) => {7};
+    (macro) => {8};
+    (string) => {9};
+    (array) => {10};
+    (object) => {11};
+    (spwn) => {12};
+    (builtin) => {13};
+    (type_indicator) => {14};
+    (NULL) => {15};
+    (trigger) => {16};
+    (range) => {17};
+    (pattern) => {18};
+    (object_key) => {19};
+    (epsilon) => {20};
+}
+
+pub(crate) use type_id;
+
 impl Value {
     //numeric representation of value
     pub fn to_num(&self, globals: &Globals) -> TypeId {
@@ -200,7 +226,7 @@ impl Value {
         globals: &mut Globals,
         context: &Context,
     ) -> Result<bool, RuntimeError> {
-        let pat = if let Value::Pattern(p) = convert_type(pat_val, 18, info, globals, context)? {
+        let pat = if let Value::Pattern(p) = convert_type(pat_val, type_id!(pattern), info, globals, context)? {
             p
         } else {
             unreachable!()
@@ -529,7 +555,7 @@ pub fn convert_type(
             for el in arr {
                 new_vec.push(match globals.stored_values[*el].clone() {
                     Value::Pattern(p) => p,
-                    a => if let Value::Pattern(p) = convert_type(&a, 18, info, globals, context)? {
+                    a => if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), info, globals, context)? {
                         p
                     } else {
                         unreachable!()

@@ -1180,10 +1180,17 @@ $.assert(arr == [1])
             (key, out_val)
         };
 
-        if !o.contains(&(okey, oval.clone())) {
-            o.push((okey, oval))
+        let mut has_key = false;
+        for (i, (k, _)) in o.iter().enumerate() {
+            if *k == okey {
+                has_key = true;
+                o[i].1 = oval.clone();
+                break;
+            }
         }
-
+        if !has_key {
+            o.push((okey, oval));
+        }
 
         Value::Null
     }
@@ -1267,7 +1274,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
             if arguments.is_empty() {
                 Value::Number(rand::thread_rng().gen())
             } else {
-                let val = match convert_type(&globals.stored_values[arguments[0]].clone(), 10, &info, globals, context) {
+                let val = match convert_type(&globals.stored_values[arguments[0]].clone(), type_id!(array), &info, globals, context) {
                     Ok(Value::Array(v)) => v,
                     _ => {
                         return Err(RuntimeError::BuiltinError {
@@ -1644,12 +1651,12 @@ $.assert(arr == [1, 2])
 
     [Regex] #[safe = true, desc = "Performs a regex operation on a string", example = ""]
     fn regex(#["`mode` can be either \"match\", \"replace\" or \"findall\""](regex): Str, (s): Str, (mode): Str, (replace)) {
-        use regex::Regex;
+        use fancy_regex::Regex;
 
 
             if let Ok(r) = Regex::new(&regex) {
                 match &*mode {
-                    "match" => Value::Bool(r.is_match(&s)),
+                    "match" => Value::Bool(r.is_match(&s).unwrap()),
                     "replace" => {
                         match &globals.stored_values[arguments[3]] {
                             Value::Str(replacer) => {
@@ -1669,9 +1676,12 @@ $.assert(arr == [1, 2])
                         let mut output = Vec::new();
 
                         for i in r.find_iter(&s){
+
+                            let isafe = i.unwrap();
+
                             let mut pair = Vec::new();
-                            let p1 = store_const_value(Value::Number(i.start() as f64), globals, context.start_group, info.position);
-                            let p2 = store_const_value(Value::Number(i.end() as f64), globals, context.start_group, info.position);
+                            let p1 = store_const_value(Value::Number(isafe.start() as f64), globals, context.start_group, info.position);
+                            let p2 = store_const_value(Value::Number(isafe.end() as f64), globals, context.start_group, info.position);
 
                             pair.push(p1);
                             pair.push(p2);
@@ -2054,12 +2064,12 @@ $.assert(arr == [1, 2])
     [EitherOp] #[safe = true, desc = "Default implementation of the `|` operator", example = "$._either_(@number, @counter)"]
     fn _either_((a), (b)) {
         Value::Pattern(Pattern::Either(
-            if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, context)? {
+            if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()
             },
-            if let Value::Pattern(p) = convert_type(&b, 18, &info, globals, context)? {
+            if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()

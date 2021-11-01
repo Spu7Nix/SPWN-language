@@ -1,4 +1,3 @@
-#[no_level]
 
 let {cum: a, ..sex} = {cum: 5, other: "ok", other2: "---"}
 
