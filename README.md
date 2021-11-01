@@ -156,6 +156,13 @@ Here is a list of SPWN command line subcommands and flags. This information can 
 
     --include-path [folder], -i [folder]
     Adds a search path to look for libraries
+    
+    --allow [builtin]
+    Allow use of a builtin
+    
+    --deny [builtin]
+    Deny use of a builtin
+
 
 ###### Examples:
 
