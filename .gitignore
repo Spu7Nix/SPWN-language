@@ -5,3 +5,4 @@ target
 std-docs
 spwn-web/pkg
 spwn-web/ansi_up.js
+*.sublime-workspace
