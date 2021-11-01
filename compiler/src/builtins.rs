@@ -1644,12 +1644,12 @@ $.assert(arr == [1, 2])
 
     [Regex] #[safe = true, desc = "Performs a regex operation on a string", example = ""]
     fn regex(#["`mode` can be either \"match\", \"replace\" or \"findall\""](regex): Str, (s): Str, (mode): Str, (replace)) {
-        use regex::Regex;
+        use fancy_regex::Regex;
 
 
             if let Ok(r) = Regex::new(&regex) {
                 match &*mode {
-                    "match" => Value::Bool(r.is_match(&s)),
+                    "match" => Value::Bool(r.is_match(&s).unwrap()),
                     "replace" => {
                         match &globals.stored_values[arguments[3]] {
                             Value::Str(replacer) => {
@@ -1669,9 +1669,12 @@ $.assert(arr == [1, 2])
                         let mut output = Vec::new();
 
                         for i in r.find_iter(&s){
+
+                            let isafe = i.unwrap();
+
                             let mut pair = Vec::new();
-                            let p1 = store_const_value(Value::Number(i.start() as f64), globals, context.start_group, info.position);
-                            let p2 = store_const_value(Value::Number(i.end() as f64), globals, context.start_group, info.position);
+                            let p1 = store_const_value(Value::Number(isafe.start() as f64), globals, context.start_group, info.position);
+                            let p2 = store_const_value(Value::Number(isafe.end() as f64), globals, context.start_group, info.position);
 
                             pair.push(p1);
                             pair.push(p2);

@@ -1,7 +1,11 @@
 
-x = [1,2,3]
-x_1 = x.scan(10, (&state, x){
-    state *= x
-    return -state
-})
-$.assert(x_1 == [-10, -20, -60])
+
+
+s = "abac ba labac"
+
+baba = @regex::new("ba(?=c)")
+found = baba.findall(s)
+$.print(found.map( e => s.substr(e[0],e[1]) ))
+
+
+
