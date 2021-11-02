@@ -117,7 +117,7 @@ impl Group {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Color {
     pub id: Id,
 }
@@ -892,8 +892,8 @@ builtins! {
 
     [Hash] #[safe = true, desc = "Calculates the numerical hash of a value", example = "$.hash(\"hello\")"] fn hash((n)) { Value::Number( {
         let mut s = DefaultHasher::new();
-        n.hash(&mut s);
-        s.finish()
+        n.hash(&mut s, globals);
+        s.finish() / 1000
     } as f64 ) }
 
     [Sin] #[safe = true, desc = "Calculates the sin of an angle in radians", example = "$.sin(3.1415)"] fn sin((n): Number) { Value::Number(n.sin()) }
@@ -1768,7 +1768,7 @@ $.assert(arr == [1, 2])
                     _ => {
                         return Err(RuntimeError::BuiltinError {
                             message: format!(
-                                "Invalid regex mode \"{}\" in regex {}. Expected \"match\" or \"replace\"",
+                                "Invalid regex mode \"{}\" in regex {}. Expected \"match\", \"replace\", \"find_all\" or \"find_groups\"",
                                 mode, r
                             ),
                             info,

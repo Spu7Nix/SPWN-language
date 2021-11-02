@@ -1,0 +1,530 @@
+#[no_std, cache_output]
+
+type @hashmap
+
+hashmap_apply = {
+    VALUES: 0,
+    KEYS: 1,
+    PAIRS: 2,
+}
+
+DEFAULT_SIZE = 2
+
+impl @hashmap {
+    new: #[
+        constructor,
+        desc('Creates a new empty hashmap')
+        example('let a = @hashmap::new()')
+    ] (slots: @number = DEFAULT_SIZE)
+    {
+        return @hashmap::{
+            list: [[]] * slots,
+            elements: 0
+        }
+    },
+
+    _grow: #[
+        desc('Private function that doubles the hashmap list length')
+    ] (self)
+    {
+        let new_map = @hashmap::new(self.list.length * 2)
+        for i in self.list {
+            for pair in i {
+                new_map.insert(pair[0], pair[1])
+            }
+        }
+        self = new_map
+    },
+
+    _display_: (self) {
+        return 'hashmap { ' + ', '.join(self.pairs(true).map(
+            pair => '{}: {}'.fmt([$._display_(pair.key), $._display_(pair.value)])
+        )) + ' }'
+    },
+    
+    insert: #[
+        desc('Inserts a key/value pair')
+        example('
+let a = hashmap()
+        
+a.insert(3, "a")
+a.insert("key", [1,2])
+')
+    ] (self, key, value)
+    {
+        index = $.hash(key) % self.list.length
+        for el in ..self.list[index].length { // weird bug happened if i looped normally
+            if self.list[index][el][0] == key {
+                self.list[index][el][1] = value
+                return
+            }
+        }
+        self.list[index].push( [key, value] ) // we store key and map cuz comparing equality with hash is faster
+        self.elements += 1
+        if self.elements >= self.list.length {
+            self._grow()
+        }
+    },
+
+    get: #[
+        desc('Gets the value of a key')
+        example('
+let a = hashmap()
+
+a.insert([4, 5], "a")
+
+$.assert(a.get([4,5]) == "a")
+')
+    ] (self, key)
+    {
+        index = $.hash(key) % self.list.length
+        for el in self.list[index] {
+            if el[0] == key {
+                return el[1]
+            }
+        }
+        return null
+    },
+
+    get_pair: #[
+        desc('Gets the value of a key paired with itself')
+        example('
+let a = hashmap()
+
+a.insert([4, 5], "a")
+
+$.assert(a.get_pair([4,5]) == [[4, 5], "a"])
+$.assert(a.get_pair([4,5], true) == {key: [4, 5], value: "a"})
+')
+    ] (self, key, dict = false)
+    {
+        index = $.hash(key) % self.list.length
+        for el in self.list[index] {
+            if el[0] == key {
+                if dict {
+                    return {key: key, value: el[1]}
+                } else {
+                    return [key, el[1]]
+                }
+            }
+        }
+        return null
+    },
+
+    get_key: #[
+        desc('Returns the key of a value, arbitrarily if the value is present more than once')
+        example('
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert(a.get_key(1) == "a")
+')
+    ] (self, value)
+    {
+        for i in self.list {
+            for el in i {
+                if el[1] == value {
+                    return el[0]
+                }
+            }
+        }
+        return null
+    },
+
+    get_keys: #[
+        desc('Returns an array of keys that a value is present at in arbitrary order')
+        example('
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+a.insert("d", 2)
+
+$.assert(a.get_keys(1) == ["a"])
+$.assert(a.get_keys(2) == ["b","d"] || a.get_keys(2) == ["d","b"])
+$.assert(a.get_keys(5) == [])
+')
+    ] (self, value)
+    {
+        let ret_arr = []
+        for i in self.list {
+            for el in i {
+                if el[1] == value {
+                    ret_arr.push(el[0])
+                }
+            }
+        }
+        return ret_arr
+    },
+
+    keys: #[
+        desc('Returns an array of all keys in arbitrary order')
+        example('
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.print(a.keys()) // some permutation of ["a", "b", "c"]
+')
+    ] (self)
+    {
+        let ret_arr = []
+        for i in self.list {
+            for j in i {
+                ret_arr.push(j[0])
+            }
+        }
+        return ret_arr
+    },
+
+    values: #[
+        desc('Returns an array of all values in arbitrary order')
+        example('
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.print(a.values()) // some permutation of [1, 2, 3]
+')
+    ] (self)
+    {
+        let ret_arr = []
+        for i in self.list {
+            for j in i {
+                ret_arr.push(j[1])
+            }
+        }
+        return ret_arr
+    },
+
+    pairs: #[
+        desc('Returns an array of all key/value pairs in arbitrary order')
+        example('
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.print(a.pairs()) // some permutation of [["a", 1], ["b", 2], ["c", 3]]
+')
+    ] (self, dict = false)
+    {
+        let ret_arr = []
+        for i in self.list {
+            for j in i {
+                if dict {
+                    ret_arr.push({key: j[0], value: j[1]})
+                } else {
+                    ret_arr.push([j[0], j[1]])
+                }
+            }
+        }
+        return ret_arr
+    },
+
+    inverted: #[
+        desc('Returns a hashmap with all key/value pairs inverted')
+        example('
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.print(a.inverted().pairs()) // some permutation of [[1, "a"], [2, "b"], [3, "c"]]
+')
+    ] (self)
+    {
+        let new_map = @hashmap::new()
+        for i in self.list {
+            for j in i {
+                new_map.insert(j[1], j[0])
+            }
+        }
+        return new_map
+    },
+
+    clear: #[
+        desc('Clears all pairs, keeping the amount of slots reserved')
+    ] (self)
+    {
+        self = @hashmap::new(self.list.length)
+    },
+
+    has_key: #[
+        desc('Checks if a given key is in the hashmap')
+        example('
+let a = hashmap()
+
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert(a.has_key("b"))
+$.assert(!a.has_key("d"))
+')
+    ] (self, key)
+    {
+        return self.get(key) != null
+    },
+
+    has_value: #[
+        desc('Checks if a given value is in the hashmap')
+        example('
+let a = hashmap()
+
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert(a.has_value(2))
+$.assert(!a.has_value(5))
+')
+    ] (self, value)
+    {
+        return self.get_key(value) != null
+    },
+
+    get_or_insert: #[
+        desc('Gets the value at a key, and if it doesn\'t exist, it inserts one instead')
+        example('
+let a = hashmap()
+
+$.print( a.get_or_insert("a", 1) ) // 1
+$.assert(a.get("a") == 1)
+
+$.print( a.get_or_insert("a", 6) ) // 1
+$.assert(a.get("a") == 1)
+')
+    ] (self, key, or)
+    {
+        get = self.get(key);
+        if get != null {
+            return get
+        }
+        self.insert(key, or)
+        return or
+    },
+
+    is_empty: #[
+        desc('Returns true if the hashmap contains no pairs')
+    ] (self)
+    {
+        return self.elements == 0
+    },
+
+
+    remove: #[
+        desc('Removes the value at a key and returns it')
+        example('
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert(a.has_key("b"))
+$.print( a.remove("b") )
+$.assert(!a.has_key("b"))
+')
+    ] (self, key)
+    {
+        index = $.hash(key) % self.list.length
+        let value = null
+        self.list[index] = self.list[index].filter((el) {
+            if el[0] == key {
+                value = el[1]
+                self.elements -= 1
+                return false
+            }
+            return true
+        })
+        return value
+    },
+    
+    map: #[desc("Calls a defined callback function on each value of the hashmap, and returns a hashmap that contains the results, or modifies in place if specified. Can modify values, keys, or pairs.") example('
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+a.map(v => v*2, in_place = true)
+$.print( a.pairs() ) // some permutation of [["a", 2], ["b", 4], ["c", 6]]
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+a.map(k => k + "!", in_place = true, apply_type = hashmap_apply.KEYS)
+$.print( a.pairs() ) // some permutation of [["a!", 1], ["b!", 2], ["c!", 3]]
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+a.map([k => k + "!", v => v*2], in_place = true, apply_type = hashmap_apply.PAIRS)
+$.print( a.pairs() ) // some permutation of [["a!", 2], ["b!", 4], ["c!", 6]]
+//=================================
+    ')]
+    (self, cb: @macro | [@macro], apply_type: @number = hashmap_apply.VALUES, in_place: @bool = false) {
+        let new_map = @hashmap::new()
+        for [k, v] in self.pairs() {
+            switch apply_type {
+                case hashmap_apply.VALUES: new_map.insert(k, cb(v)),
+                case hashmap_apply.KEYS: new_map.insert(cb(k), v),
+                case hashmap_apply.PAIRS: new_map.insert(cb[0](k), cb[1](v)),
+            }
+        }
+        if !in_place {
+            return new_map;
+        }
+        self = new_map
+    },
+
+    filter: #[desc("Returns a filtered hashmap with only the values, keys, or pairs that meet the condition specified in the callback") example('
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("bb", 2)
+a.insert("ccc", 3)
+
+a.filter(v => v % 2 == 1, in_place = true)
+$.print( a.pairs() ) // some permutation of [["a", 1], ["ccc", 3]]
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("bb", 2)
+a.insert("ccc", 3)
+
+a.filter(k => k.length < 3, in_place = true, apply_type = hashmap_apply.KEYS)
+$.print( a.pairs() ) // some permutation of [["a", 1], ["bb", 2]]
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("bb", 2)
+a.insert("ccc", 3)
+
+a.filter([k => k.length < 3, v => v % 2 == 1], in_place = true, apply_type = hashmap_apply.PAIRS)
+$.print( a.pairs() ) // [["a", 1]]
+//=================================
+    ')]
+    (self, cb: @macro | [@macro], apply_type: @number = hashmap_apply.VALUES, in_place: @bool = false) {
+        let new_map = @hashmap::new()
+        for [k, v] in self.pairs() {
+            if switch apply_type {
+                case hashmap_apply.VALUES: cb(v),
+                case hashmap_apply.KEYS: cb(k),
+                case hashmap_apply.PAIRS: cb[0](k) && cb[1](v),
+            } {
+                new_map.insert(k, v)
+            }
+        }
+        if !in_place {
+            return new_map;
+        }
+        self = new_map
+    },
+
+    any: #[desc("Determines whether the specified callback returns true for any of the values, keys, or pairs in the hashmap") example('
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert( !a.any(v => v < 0) )
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert( a.any(k => k + "razy" == "crazy", apply_type = hashmap_apply.KEYS) )
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert( a.any([k => k == "c", v => v > 2], apply_type = hashmap_apply.PAIRS) )
+//=================================
+    ')]
+    (self, cb: @macro | [@macro], apply_type: @number = hashmap_apply.VALUES) {
+        for [k, v] in self.pairs() {
+            if switch apply_type {
+                case hashmap_apply.VALUES: cb(v),
+                case hashmap_apply.KEYS: cb(k),
+                case hashmap_apply.PAIRS: cb[0](k) && cb[1](v),
+            } {
+                return true
+            }
+        }
+        return false
+    },
+
+    all: #[desc("Determines whether the specified callback returns true for all of the values, keys, or pairs in the hashmap") example('
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert( a.all(v => v < 5) )
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert( !a.all(k => "bcd" has k, apply_type = hashmap_apply.KEYS) )
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+$.assert( a.any([k => (k + @string(a.get(k))).length == 2, v => v > 0], apply_type = hashmap_apply.PAIRS) )
+//=================================
+    ')]
+    (self, cb: @macro | [@macro], apply_type: @number = hashmap_apply.VALUES) {
+        for [k, v] in self.pairs() {
+            if !switch apply_type {
+                case hashmap_apply.VALUES: cb(v),
+                case hashmap_apply.KEYS: cb(k),
+                case hashmap_apply.PAIRS: cb[0](k) && cb[1](v),
+            } {
+                return false
+            }
+        }
+        return true
+    },
+
+}
+
+return {
+    hashmap_apply
+}

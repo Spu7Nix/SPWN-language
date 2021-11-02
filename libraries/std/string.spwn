@@ -166,8 +166,8 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
         blank_regex = "\\{\\}"
         numbered_regex = "\\{\\d+\\}"
 
-        blanks = $.regex(blank_regex, self, 'findall', null)
-        numbered = $.regex(numbered_regex, self, 'findall', null)
+        blanks = $.regex(blank_regex, self, 'find_all', null)
+        numbered = $.regex(numbered_regex, self, 'find_all', null)
 
         if blanks.length != 0 && numbered.length != 0 {
             throw "FormatError: String format must only be either blank {} or numbered {1} {2}"
@@ -211,8 +211,8 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
         return $.regex(re, self, "match", null)
     },
 
-    findall: (self, re: @string) {
-        return $.regex(re, self, "findall", null)
+    find_all: (self, re: @string) {
+        return $.regex(re, self, "find_all", null)
     },
 
     replace: (self, re: @string, replacement: @string) {

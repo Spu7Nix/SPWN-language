@@ -46,12 +46,6 @@ pub enum Value {
     Null,
 }
 
-impl Hash for Value {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        core::mem::discriminant(self).hash(state);
-    }
-}
-
 pub type Slice = (Option<isize>, Option<isize>, Option<isize>);
 
 const MAX_DICT_EL_DISPLAY: usize = 10;
@@ -65,6 +59,24 @@ pub struct Macro {
     pub tag: ast::Attribute,
     pub arg_pos: FileRange,
     pub ret_pattern: Option<StoredValue>,
+}
+
+impl Hash for Macro {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        //self.args.hash(state);
+        for i in &self.def_variables {
+            i.hash(state);
+        }
+        self.def_file.hash(state);
+        //self.body.hash(state);
+        //self.tag.hash(state);
+        self.arg_pos.hash(state);
+        self.ret_pattern.hash(state);
+        /*
+            i omitted the stuff that has ast inside cuz it
+            was too deep of a rabbit hoke to derive Hash for
+        */
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -88,12 +100,12 @@ pub struct MacroArgDef {
 //         }
 //     }
 // }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub struct TriggerFunction {
     pub start_group: Group,
     //pub all_groups: Vec<Group>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub enum Pattern {
     Type(TypeId),
     Array(Vec<Pattern>),
@@ -220,6 +232,47 @@ impl Value {
     //         _ => Vec::new(),
     //     }
     // }
+
+    pub fn hash<H: std::hash::Hasher>(&self, state: &mut H, globals: &Globals) {
+        match self {
+            Value::Group(v) => v.hash(state),
+            Value::Color(v) => v.hash(state),
+            Value::Block(v) => v.hash(state),
+            Value::Item(v) => v.hash(state),
+            Value::Number(v) => ((v * 100000.0) as usize).hash(state),
+            Value::Bool(v) => v.hash(state),
+            Value::TriggerFunc(v) => v.hash(state),
+            Value::Dict(v) => {
+                for (k, el) in v {
+                    k.hash(state);
+                    globals.stored_values[*el].hash(state, globals);
+                }
+            },
+            Value::Macro(v) => v.hash(state),
+            Value::Str(v) => v.hash(state),
+            Value::Array(v) => {
+                for i in v {
+                    globals.stored_values[*i].hash(state, globals);
+                }
+            },
+            Value::Obj(v, m) => {
+                for i in v {
+                    i.hash(state);
+                }
+                m.hash(state);
+            },
+            Value::Builtins => "spwn".hash(state),
+            Value::BuiltinFunction(v) => v.hash(state),
+            Value::TypeIndicator(v) => v.hash(state),
+            Value::Range(s, e, st) => {
+                s.hash(state);
+                e.hash(state);
+                st.hash(state);
+            },
+            Value::Pattern(v) => v.hash(state),
+            Value::Null => "null".hash(state),
+        }
+    }
 
     pub fn get_type_str(&self, globals: &Globals) -> String {
         let t = self.to_num(globals);

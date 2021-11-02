@@ -23,6 +23,7 @@ import "http.spwn"
 import "vector.spwn"
 import "range.spwn"
 
+hashmap = import "hashmap.spwn"
 general = import "general_triggers.spwn"
 events = import "events.spwn"
 ctrl_flow = import "control_flow.spwn"
@@ -45,6 +46,8 @@ return {
     regex: @regex::new,
     heapq: @heapq::new,
     complex: @complex::new,
+    hashmap: @hashmap::new,
+    hashmap_apply: hashmap.hashmap_apply,
     zip: @zip::new,
 }
 

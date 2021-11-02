@@ -1,8 +1,12 @@
 
 
 
+let a = hashmap()
+        
+a.insert(3, "a")
+a.insert("key", [1,2])
+a.insert([5,1,[2]], $)
 
+$.print(a)
+$.print(a.get([1+4,1,[2]]))
 
-$.print(
-    $.hash("bbabagaggdhf")
-)
