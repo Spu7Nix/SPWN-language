@@ -1,7 +1,8 @@
 
 
-re = @regex::new("(?<id>[a-zA-Z_][a-zA-Z0-9_]*)|(?<num>[0-9]+)|(\\+\\+)")
-t = ";gsga 12 5 [++"
 
-$.print('\n'.join(re.find_all(t)))
 
+
+$.print(
+    $.hash("bbabagaggdhf")
+)

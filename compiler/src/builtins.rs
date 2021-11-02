@@ -12,6 +12,8 @@ use fnv::FnvHashMap;
 use parser::ast::ObjectMode;
 
 use std::fs;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Path;
 
 use crate::value::*;
@@ -19,6 +21,8 @@ use crate::value_storage::*;
 
 use std::io::stdout;
 use std::io::Write;
+
+use std::collections::hash_map::DefaultHasher;
 
 // BUILT IN STD
 use include_dir::{include_dir, Dir, File};
@@ -885,6 +889,12 @@ builtins! {
             })
         }
     }
+
+    [Hash] #[safe = true, desc = "Calculates the numerical hash of a value", example = "$.hash(\"hello\")"] fn hash((n)) { Value::Number( {
+        let mut s = DefaultHasher::new();
+        n.hash(&mut s);
+        s.finish()
+    } as f64 ) }
 
     [Sin] #[safe = true, desc = "Calculates the sin of an angle in radians", example = "$.sin(3.1415)"] fn sin((n): Number) { Value::Number(n.sin()) }
     [Cos] #[safe = true, desc = "Calculates the cos of an angle in radians", example = "$.cos(3.1415)"] fn cos((n): Number) { Value::Number(n.cos()) }

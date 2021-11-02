@@ -18,6 +18,7 @@ use shared::FileRange;
 use internment::LocalIntern;
 
 use fnv::FnvHashMap;
+use std::hash::Hash;
 
 
 
@@ -43,6 +44,12 @@ pub enum Value {
     Range(i32, i32, usize), //start, end, step
     Pattern(Pattern),
     Null,
+}
+
+impl Hash for Value {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
 }
 
 pub type Slice = (Option<isize>, Option<isize>, Option<isize>);
