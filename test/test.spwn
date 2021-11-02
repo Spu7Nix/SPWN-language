@@ -1,12 +1,28 @@
-
-
-
+//=================================
 let a = hashmap()
         
-a.insert(3, "a")
-a.insert("key", [1,2])
-a.insert([5,1,[2]], $)
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
 
-$.print(a)
-$.print(a.get([1+4,1,[2]]))
+a.map(v => v*2, in_place = true)
+$.print( a.pairs() ) // some permutation of [["a", 2], ["b", 4], ["c", 6]]
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
 
+a.map(k => k + "!", in_place = true, apply_type = hashmap_apply.KEYS)
+$.print( a.pairs() ) // some permutation of [["a!", 1], ["b!", 2], ["c!", 3]]
+//=================================
+let a = hashmap()
+        
+a.insert("a", 1)
+a.insert("b", 2)
+a.insert("c", 3)
+
+a.map([k => k + "!", v => v*2], in_place = true, apply_type = hashmap_apply.PAIRS)
+$.print( a.pairs() ) // some permutation of [["a!", 2], ["b!", 4], ["c!", 6]]
+//=================================

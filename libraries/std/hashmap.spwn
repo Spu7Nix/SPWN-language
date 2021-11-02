@@ -53,13 +53,13 @@ a.insert("key", [1,2])
     ] (self, key, value)
     {
         index = $.hash(key) % self.list.length
-        for el in ..self.list[index].length { // weird bug happened if i looped normally
-            if self.list[index][el][0] == key {
-                self.list[index][el][1] = value
+        for el in self.list[index] { // weird bug happened if i looped normally
+            if el[0] == key {
+                el[1] = value
                 return
             }
         }
-        self.list[index].push( [key, value] ) // we store key and map cuz comparing equality with hash is faster
+        self.list[index].push( [key, value] )
         self.elements += 1
         if self.elements >= self.list.length {
             self._grow()
