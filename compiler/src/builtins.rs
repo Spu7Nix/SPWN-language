@@ -1650,7 +1650,7 @@ $.assert(arr == [1, 2])
     }
 
     [Regex] #[safe = true, desc = "Performs a regex operation on a string", example = ""]
-    fn regex(#["`mode` can be either \"match\", \"replace\" or \"findall\""](regex): Str, (s): Str, (mode): Str, (replace)) {
+    fn regex(#["`mode` can be either \"match\", \"replace\", \"find_all\" or \"find_groups\""](regex): Str, (s): Str, (mode): Str, (replace)) {
         use fancy_regex::Regex;
 
 
@@ -1672,7 +1672,7 @@ $.assert(arr == [1, 2])
                             }
                         }
                     },
-                    "findall" => {
+                    "find_all" => {
                         let mut output = Vec::new();
 
                         for i in r.find_iter(&s){
@@ -1688,6 +1688,69 @@ $.assert(arr == [1, 2])
 
                             let pair_arr = store_const_value(Value::Array(pair), globals, context.start_group, info.position);
                             output.push(pair_arr);
+                        }
+
+                        Value::Array(output)
+                    },
+                    "find_groups" => {
+                        let mut output = Vec::new();
+
+                        for i in r.captures_iter(&s){
+
+                            let capture = i.unwrap();
+                            
+                            let mut found = false;
+
+                            let mut range = Vec::new();
+                            let mut text = String::new();
+                            let mut group_name = None;
+                            for n in r.capture_names() {
+                                if let Some(name) = n {
+                                    if let Some(m) = capture.name(name) {
+                                        found = true;
+                                        range.push(
+                                            store_const_value(Value::Number(m.start() as f64), globals, context.start_group, info.position)
+                                        );
+                                        range.push(
+                                            store_const_value(Value::Number(m.end() as f64), globals, context.start_group, info.position)
+                                        );
+                                        text = m.as_str().to_string();
+                                        group_name = Some(name.to_string());
+                                    }
+                                }
+                            }
+                            if !found {
+                                for g in 1..r.captures_len() {
+                                    if let Some(m) = capture.get(g) {
+                                        found = true;
+                                        range.push(
+                                            store_const_value(Value::Number(m.start() as f64), globals, context.start_group, info.position)
+                                        );
+                                        range.push(
+                                            store_const_value(Value::Number(m.end() as f64), globals, context.start_group, info.position)
+                                        );
+                                        text = m.as_str().to_string();
+                                    }
+                                }
+                            }
+                            if !found { continue }
+                            
+                            let mut match_map = FnvHashMap::default();
+                            match_map.insert(
+                                LocalIntern::new("range".to_string()),
+                                store_const_value(Value::Array(range), globals, context.start_group, info.position),
+                            );
+                            match_map.insert(
+                                LocalIntern::new("text".to_string()),
+                                store_const_value(Value::Str(text), globals, context.start_group, info.position),
+                            );
+                            match_map.insert(
+                                LocalIntern::new("name".to_string()),
+                                if let Some(n) = group_name {
+                                    store_const_value(Value::Str(n), globals, context.start_group, info.position)
+                                } else { store_const_value(Value::Null, globals, context.start_group, info.position) },
+                            );
+                            output.push(store_const_value(Value::Dict(match_map), globals, context.start_group, info.position));
                         }
 
                         Value::Array(output)

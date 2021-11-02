@@ -1,6 +1,7 @@
 
-let {cum: a, ..sex} = {cum: 5, other: "ok", other2: "---"}
 
+re = @regex::new("(?<id>[a-zA-Z_][a-zA-Z0-9_]*)|(?<num>[0-9]+)|(\\+\\+)")
+t = ";gsga 12 5 [++"
 
-$.assert(a == 5)
-$.assert(sex == {other: "ok", other2: "---"})
+$.print('\n'.join(re.find_all(t)))
+
