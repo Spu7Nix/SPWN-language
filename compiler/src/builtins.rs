@@ -12,6 +12,8 @@ use fnv::FnvHashMap;
 use parser::ast::ObjectMode;
 
 use std::fs;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Path;
 
 use crate::value::*;
@@ -19,6 +21,8 @@ use crate::value_storage::*;
 
 use std::io::stdout;
 use std::io::Write;
+
+use std::collections::hash_map::DefaultHasher;
 
 // BUILT IN STD
 use include_dir::{include_dir, Dir, File};
@@ -113,7 +117,7 @@ impl Group {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Color {
     pub id: Id,
 }
@@ -733,8 +737,8 @@ builtins! {
                     })
                 }
             }
-            .as_secs();
-            Value::Number(now as f64)
+            .as_secs_f64();
+            Value::Number(now)
         }
 
         #[cfg(target_arch = "wasm32")]
@@ -885,6 +889,12 @@ builtins! {
             })
         }
     }
+
+    [Hash] #[safe = true, desc = "Calculates the numerical hash of a value", example = "$.hash(\"hello\")"] fn hash((n)) { Value::Number( {
+        let mut s = DefaultHasher::new();
+        n.hash(&mut s, globals);
+        s.finish() / 1000
+    } as f64 ) }
 
     [Sin] #[safe = true, desc = "Calculates the sin of an angle in radians", example = "$.sin(3.1415)"] fn sin((n): Number) { Value::Number(n.sin()) }
     [Cos] #[safe = true, desc = "Calculates the cos of an angle in radians", example = "$.cos(3.1415)"] fn cos((n): Number) { Value::Number(n.cos()) }
@@ -1180,10 +1190,17 @@ $.assert(arr == [1])
             (key, out_val)
         };
 
-        if !o.contains(&(okey, oval.clone())) {
-            o.push((okey, oval))
+        let mut has_key = false;
+        for (i, (k, _)) in o.iter().enumerate() {
+            if *k == okey {
+                has_key = true;
+                o[i].1 = oval.clone();
+                break;
+            }
         }
-
+        if !has_key {
+            o.push((okey, oval));
+        }
 
         Value::Null
     }
@@ -1265,7 +1282,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
             if arguments.is_empty() {
                 Value::Number(rand::thread_rng().gen())
             } else {
-                let val = match convert_type(&globals.stored_values[arguments[0]].clone(), 10, &info, globals, context) {
+                let val = match convert_type(&globals.stored_values[arguments[0]].clone(), type_id!(array), &info, globals, context) {
                     Ok(Value::Array(v)) => v,
                     _ => {
                         return Err(RuntimeError::BuiltinError {
@@ -1641,13 +1658,13 @@ $.assert(arr == [1, 2])
     }
 
     [Regex] #[safe = true, desc = "Performs a regex operation on a string", example = ""]
-    fn regex(#["`mode` can be either \"match\", \"replace\" or \"findall\""](regex): Str, (s): Str, (mode): Str, (replace)) {
-        use regex::Regex;
+    fn regex(#["`mode` can be either \"match\", \"replace\", \"find_all\" or \"find_groups\""](regex): Str, (s): Str, (mode): Str, (replace)) {
+        use fancy_regex::Regex;
 
 
             if let Ok(r) = Regex::new(&regex) {
                 match &*mode {
-                    "match" => Value::Bool(r.is_match(&s)),
+                    "match" => Value::Bool(r.is_match(&s).unwrap()),
                     "replace" => {
                         match &globals.stored_values[arguments[3]] {
                             Value::Str(replacer) => {
@@ -1663,13 +1680,16 @@ $.assert(arr == [1, 2])
                             }
                         }
                     },
-                    "findall" => {
+                    "find_all" => {
                         let mut output = Vec::new();
 
                         for i in r.find_iter(&s){
+
+                            let isafe = i.unwrap();
+
                             let mut pair = Vec::new();
-                            let p1 = store_const_value(Value::Number(i.start() as f64), globals, context.start_group, info.position);
-                            let p2 = store_const_value(Value::Number(i.end() as f64), globals, context.start_group, info.position);
+                            let p1 = store_const_value(Value::Number(isafe.start() as f64), globals, context.start_group, info.position);
+                            let p2 = store_const_value(Value::Number(isafe.end() as f64), globals, context.start_group, info.position);
 
                             pair.push(p1);
                             pair.push(p2);
@@ -1680,10 +1700,73 @@ $.assert(arr == [1, 2])
 
                         Value::Array(output)
                     },
+                    "find_groups" => {
+                        let mut output = Vec::new();
+
+                        for i in r.captures_iter(&s){
+
+                            let capture = i.unwrap();
+                            
+                            let mut found = false;
+
+                            let mut range = Vec::new();
+                            let mut text = String::new();
+                            let mut group_name = None;
+                            for n in r.capture_names() {
+                                if let Some(name) = n {
+                                    if let Some(m) = capture.name(name) {
+                                        found = true;
+                                        range.push(
+                                            store_const_value(Value::Number(m.start() as f64), globals, context.start_group, info.position)
+                                        );
+                                        range.push(
+                                            store_const_value(Value::Number(m.end() as f64), globals, context.start_group, info.position)
+                                        );
+                                        text = m.as_str().to_string();
+                                        group_name = Some(name.to_string());
+                                    }
+                                }
+                            }
+                            if !found {
+                                for g in 1..r.captures_len() {
+                                    if let Some(m) = capture.get(g) {
+                                        found = true;
+                                        range.push(
+                                            store_const_value(Value::Number(m.start() as f64), globals, context.start_group, info.position)
+                                        );
+                                        range.push(
+                                            store_const_value(Value::Number(m.end() as f64), globals, context.start_group, info.position)
+                                        );
+                                        text = m.as_str().to_string();
+                                    }
+                                }
+                            }
+                            if !found { continue }
+                            
+                            let mut match_map = FnvHashMap::default();
+                            match_map.insert(
+                                LocalIntern::new("range".to_string()),
+                                store_const_value(Value::Array(range), globals, context.start_group, info.position),
+                            );
+                            match_map.insert(
+                                LocalIntern::new("text".to_string()),
+                                store_const_value(Value::Str(text), globals, context.start_group, info.position),
+                            );
+                            match_map.insert(
+                                LocalIntern::new("name".to_string()),
+                                if let Some(n) = group_name {
+                                    store_const_value(Value::Str(n), globals, context.start_group, info.position)
+                                } else { store_const_value(Value::Null, globals, context.start_group, info.position) },
+                            );
+                            output.push(store_const_value(Value::Dict(match_map), globals, context.start_group, info.position));
+                        }
+
+                        Value::Array(output)
+                    },
                     _ => {
                         return Err(RuntimeError::BuiltinError {
                             message: format!(
-                                "Invalid regex mode \"{}\" in regex {}. Expected \"match\" or \"replace\"",
+                                "Invalid regex mode \"{}\" in regex {}. Expected \"match\", \"replace\", \"find_all\" or \"find_groups\"",
                                 mode, r
                             ),
                             info,
@@ -2052,12 +2135,12 @@ $.assert(arr == [1, 2])
     [EitherOp] #[safe = true, desc = "Default implementation of the `|` operator", example = "$._either_(@number, @counter)"]
     fn _either_((a), (b)) {
         Value::Pattern(Pattern::Either(
-            if let Value::Pattern(p) = convert_type(&a, 18, &info, globals, context)? {
+            if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()
             },
-            if let Value::Pattern(p) = convert_type(&b, 18, &info, globals, context)? {
+            if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
                 Box::new(p)
             } else {
                 unreachable!()

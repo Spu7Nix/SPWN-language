@@ -115,7 +115,7 @@ impl ValueBody {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Hash)]
 pub enum ObjectMode {
     Object,
     Trigger,

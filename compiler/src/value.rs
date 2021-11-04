@@ -18,6 +18,7 @@ use shared::FileRange;
 use internment::LocalIntern;
 
 use fnv::FnvHashMap;
+use std::hash::Hash;
 
 
 
@@ -60,6 +61,24 @@ pub struct Macro {
     pub ret_pattern: Option<StoredValue>,
 }
 
+impl Hash for Macro {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        //self.args.hash(state);
+        for i in &self.def_variables {
+            i.hash(state);
+        }
+        self.def_file.hash(state);
+        //self.body.hash(state);
+        //self.tag.hash(state);
+        self.arg_pos.hash(state);
+        self.ret_pattern.hash(state);
+        /*
+            i omitted the stuff that has ast inside cuz it
+            was too deep of a rabbit hoke to derive Hash for
+        */
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct MacroArgDef {
     pub name: LocalIntern<String>,
@@ -81,12 +100,12 @@ pub struct MacroArgDef {
 //         }
 //     }
 // }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub struct TriggerFunction {
     pub start_group: Group,
     //pub all_groups: Vec<Group>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub enum Pattern {
     Type(TypeId),
     Array(Vec<Pattern>),
@@ -130,6 +149,32 @@ pub fn value_equality(val1: StoredValue, val2: StoredValue, globals: &Globals) -
         (a, b) => a == b,
     }
 }
+
+macro_rules! type_id {
+    (group) => {0};
+    (color) => {1};
+    (block) => {2};
+    (item) => {3};
+    (number) => {4};
+    (bool) => {5};
+    (trigger_function) => {6};
+    (dictionary) => {7};
+    (macro) => {8};
+    (string) => {9};
+    (array) => {10};
+    (object) => {11};
+    (spwn) => {12};
+    (builtin) => {13};
+    (type_indicator) => {14};
+    (NULL) => {15};
+    (trigger) => {16};
+    (range) => {17};
+    (pattern) => {18};
+    (object_key) => {19};
+    (epsilon) => {20};
+}
+
+pub(crate) use type_id;
 
 impl Value {
     //numeric representation of value
@@ -188,6 +233,47 @@ impl Value {
     //     }
     // }
 
+    pub fn hash<H: std::hash::Hasher>(&self, state: &mut H, globals: &Globals) {
+        match self {
+            Value::Group(v) => v.hash(state),
+            Value::Color(v) => v.hash(state),
+            Value::Block(v) => v.hash(state),
+            Value::Item(v) => v.hash(state),
+            Value::Number(v) => ((v * 100000.0) as usize).hash(state),
+            Value::Bool(v) => v.hash(state),
+            Value::TriggerFunc(v) => v.hash(state),
+            Value::Dict(v) => {
+                for (k, el) in v {
+                    k.hash(state);
+                    globals.stored_values[*el].hash(state, globals);
+                }
+            },
+            Value::Macro(v) => v.hash(state),
+            Value::Str(v) => v.hash(state),
+            Value::Array(v) => {
+                for i in v {
+                    globals.stored_values[*i].hash(state, globals);
+                }
+            },
+            Value::Obj(v, m) => {
+                for i in v {
+                    i.hash(state);
+                }
+                m.hash(state);
+            },
+            Value::Builtins => "spwn".hash(state),
+            Value::BuiltinFunction(v) => v.hash(state),
+            Value::TypeIndicator(v) => v.hash(state),
+            Value::Range(s, e, st) => {
+                s.hash(state);
+                e.hash(state);
+                st.hash(state);
+            },
+            Value::Pattern(v) => v.hash(state),
+            Value::Null => "null".hash(state),
+        }
+    }
+
     pub fn get_type_str(&self, globals: &Globals) -> String {
         let t = self.to_num(globals);
         find_key_for_value(&globals.type_ids, t).unwrap().clone()
@@ -200,7 +286,7 @@ impl Value {
         globals: &mut Globals,
         context: &Context,
     ) -> Result<bool, RuntimeError> {
-        let pat = if let Value::Pattern(p) = convert_type(pat_val, 18, info, globals, context)? {
+        let pat = if let Value::Pattern(p) = convert_type(pat_val, type_id!(pattern), info, globals, context)? {
             p
         } else {
             unreachable!()
@@ -527,7 +613,7 @@ pub fn convert_type(
             for el in arr {
                 new_vec.push(match globals.stored_values[*el].clone() {
                     Value::Pattern(p) => p,
-                    a => if let Value::Pattern(p) = convert_type(&a, 18, info, globals, context)? {
+                    a => if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), info, globals, context)? {
                         p
                     } else {
                         unreachable!()
