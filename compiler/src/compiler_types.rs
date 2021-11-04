@@ -644,8 +644,8 @@ Should be used like this: value.macro(arguments)",
                                 context.inner(),
                             )? {
                                 return Err(RuntimeError::PatternMismatchError {
-                                    pattern: globals.stored_values[pat].to_str(globals),
-                                    val: globals.stored_values[ret].to_str(globals),
+                                    pattern: globals.stored_values[pat].clone().to_str(globals),
+                                    val: globals.stored_values[ret].clone().to_str(globals),
                                     pat_def: globals.get_area(pat),
                                     val_def: globals.get_area(ret),
                                     info,
@@ -683,29 +683,22 @@ Should be used like this: value.macro(arguments)",
     Ok(())
 }
 
-pub fn all_combinations<'a>(
-    a: Vec<ast::Expression>,
+pub fn reduce_combinations<'a, T, F>(
+    a: Vec<T>,
     contexts: &'a mut FullContext,
-    globals: &mut Globals,
-    info: CompilerInfo,
-    constant: bool,
-) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
+    reduce: F,
+    globals: &mut Globals
+) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> where 
+    F: Fn(&T, &'a mut FullContext, Vec<StoredValue>, &mut Globals) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> 
+{
     globals.push_new_preserved();
 
     let mut out = vec![(Vec::new(), contexts)];
     for expr in a {
         let mut new_out = Vec::new();
         for (list, full_context) in out.into_iter() {
-            expr.eval(full_context, globals, info.clone(), constant)?;
-
-            for full_context in full_context.iter() {
-                let mut new_list = list.clone();
-                new_list.push(full_context.inner().return_value);
-
-                globals.push_preserved_val(full_context.inner().return_value);
-
-                new_out.push((new_list, full_context));
-            }
+            let new_list = reduce(&expr, full_context, list.clone(), globals)?;
+            new_out.extend(new_list);
         }
         out = new_out;
     }
@@ -713,6 +706,35 @@ pub fn all_combinations<'a>(
 
     Ok(out)
 }
+
+pub fn all_combinations<'a>(
+    a: Vec<ast::Expression>,
+    contexts: &'a mut FullContext,
+    globals: &mut Globals,
+    info: CompilerInfo,
+    constant: bool,
+) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
+    reduce_combinations(
+        a, 
+        contexts, 
+        |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
+            e.eval(ctx, globals, info.clone(), constant)?;
+            let mut added = Vec::new();
+
+            for full_context in ctx.iter() {
+                let result = full_context.inner().return_value;
+                let mut updated_list = list.clone();
+
+                updated_list.push(result);
+                globals.push_preserved_val(result);
+                added.push((updated_list, full_context));
+            }
+            Ok(added)
+        }, 
+        globals
+    )
+}
+
 pub fn eval_dict(
     dict: Vec<ast::DictDef>,
     contexts: &mut FullContext,

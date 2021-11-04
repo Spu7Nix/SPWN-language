@@ -1,7 +1,4 @@
-#[no_level]
+#[no_std]
 
-let {cum: a, ..sex} = {cum: 5, other: "ok", other2: "---"}
-
-
-$.assert(a == 5)
-$.assert(sex == {other: "ok", other2: "---"})
+let ok = 5
+let test = [..ok]

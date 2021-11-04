@@ -1960,14 +1960,17 @@ fn parse_variable(
             }
         }
 
-        Some(Token::DotDot) => {
-            first_token = tokens.next(false);
-            Some(ast::UnaryOperator::Range)
-        }
-
         Some(Token::Increment) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Increment)
+        }
+
+        Some(Token::DotDot) => {
+            return Err(SyntaxError::SyntaxError {
+                message: "SPWN no longer supports .. as a unary range operator. Replace with 0.. to fix.".to_string(),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            });
         }
         Some(Token::Decrement) => {
             first_token = tokens.next(false);
@@ -2177,9 +2180,27 @@ fn parse_variable(
                     if tokens.next(false) != Some(Token::ClosingSquareBracket) {
                         tokens.previous();
                         loop {
+                            let mut prefix = None;
+                            let mut test_tokens = tokens.clone();
+
+                            // array prefixes
+                            match tokens.next(false) {
+                                Some(Token::DotDot) => {
+                                    prefix = Some(ast::ArrayPrefix::Collect);
+                                }
+                                _ => {
+                                    tokens.previous_no_ignore(false);
+                                }
+                            }
+
                             let item = parse_expr(tokens, notes, true, true)?;
                             match tokens.next(false) {
                                 Some(Token::For) => {
+                                    if prefix.is_some() {
+                                        let _fail = parse_expr(&mut test_tokens, notes, true, true)?; // guaranteed to fail
+
+                                        unreachable!();
+                                    }
                                     if !arr.is_empty() {
                                         expected!(
                                             "comma (',') or ']'".to_string(),
@@ -2250,7 +2271,10 @@ fn parse_variable(
                                 }
                                 Some(Token::Comma) => {
                                     //accounting for trailing comma
-                                    arr.push(item);
+                                    arr.push(ast::ArrayDef {
+                                        value: item,
+                                        operator: prefix
+                                    });
                                     if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
                                         break;
                                     } else {
@@ -2258,7 +2282,10 @@ fn parse_variable(
                                     }
                                 }
                                 Some(Token::ClosingSquareBracket) => {
-                                    arr.push(item);
+                                    arr.push(ast::ArrayDef {
+                                        value: item,
+                                        operator: prefix
+                                    });
                                     break;
                                 }
                                 a => expected!(
