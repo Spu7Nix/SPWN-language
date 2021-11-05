@@ -21,7 +21,7 @@ pub enum ArrayPrefix {
 #[derive(Clone, PartialEq, Debug)]
 pub struct ArrayDef {
     pub value: Expression,
-    pub operator: Option<ArrayPrefix>
+    pub operator: Option<ArrayPrefix>,
 }
 
 //pub type Comment = (Option<String>, Option<String>);
@@ -179,6 +179,13 @@ pub enum UnaryOperator {
     Minus,
     Increment,
     Decrement,
+
+    EqPattern,
+    NotEqPattern,
+    MorePattern,
+    LessPattern,
+    MoreOrEqPattern,
+    LessOrEqPattern,
 }
 
 #[derive(Clone, PartialEq, Debug)]

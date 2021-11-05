@@ -687,9 +687,15 @@ pub fn reduce_combinations<'a, T, F>(
     a: Vec<T>,
     contexts: &'a mut FullContext,
     globals: &mut Globals,
-    reduce: F
-) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> where 
-    F: Fn(&T, &'a mut FullContext, Vec<StoredValue>, &mut Globals) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> 
+    reduce: F,
+) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError>
+where
+    F: Fn(
+        &T,
+        &'a mut FullContext,
+        Vec<StoredValue>,
+        &mut Globals,
+    ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError>,
 {
     globals.push_new_preserved();
 
@@ -715,23 +721,24 @@ pub fn all_combinations<'a>(
     constant: bool,
 ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
     reduce_combinations(
-        a, 
-        contexts, 
+        a,
+        contexts,
         globals,
-    |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
-        e.eval(ctx, globals, info.clone(), constant)?;
-        let mut added = Vec::new();
+        |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
+            e.eval(ctx, globals, info.clone(), constant)?;
+            let mut added = Vec::new();
 
-        for full_context in ctx.iter() {
-            let result = full_context.inner().return_value;
-            let mut updated_list = list.clone();
+            for full_context in ctx.iter() {
+                let result = full_context.inner().return_value;
+                let mut updated_list = list.clone();
 
-            updated_list.push(result);
-            globals.push_preserved_val(result);
-            added.push((updated_list, full_context));
-        }
-        Ok(added)
-    })
+                updated_list.push(result);
+                globals.push_preserved_val(result);
+                added.push((updated_list, full_context));
+            }
+            Ok(added)
+        },
+    )
 }
 
 pub fn eval_dict(

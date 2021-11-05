@@ -20,8 +20,6 @@ use internment::LocalIntern;
 use fnv::FnvHashMap;
 use std::hash::Hash;
 
-
-
 use errors::RuntimeError;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -110,6 +108,13 @@ pub enum Pattern {
     Type(TypeId),
     Array(Vec<Pattern>),
     Either(Box<Pattern>, Box<Pattern>),
+
+    Eq(StoredValue),
+    NotEq(StoredValue),
+    MoreThan(StoredValue),
+    LessThan(StoredValue),
+    MoreOrEq(StoredValue),
+    LessOrEq(StoredValue),
 }
 
 pub fn value_equality(val1: StoredValue, val2: StoredValue, globals: &Globals) -> bool {
@@ -151,27 +156,69 @@ pub fn value_equality(val1: StoredValue, val2: StoredValue, globals: &Globals) -
 }
 
 macro_rules! type_id {
-    (group) => {0};
-    (color) => {1};
-    (block) => {2};
-    (item) => {3};
-    (number) => {4};
-    (bool) => {5};
-    (trigger_function) => {6};
-    (dictionary) => {7};
-    (macro) => {8};
-    (string) => {9};
-    (array) => {10};
-    (object) => {11};
-    (spwn) => {12};
-    (builtin) => {13};
-    (type_indicator) => {14};
-    (NULL) => {15};
-    (trigger) => {16};
-    (range) => {17};
-    (pattern) => {18};
-    (object_key) => {19};
-    (epsilon) => {20};
+    (group) => {
+        0
+    };
+    (color) => {
+        1
+    };
+    (block) => {
+        2
+    };
+    (item) => {
+        3
+    };
+    (number) => {
+        4
+    };
+    (bool) => {
+        5
+    };
+    (trigger_function) => {
+        6
+    };
+    (dictionary) => {
+        7
+    };
+    (macro) => {
+        8
+    };
+    (string) => {
+        9
+    };
+    (array) => {
+        10
+    };
+    (object) => {
+        11
+    };
+    (spwn) => {
+        12
+    };
+    (builtin) => {
+        13
+    };
+    (type_indicator) => {
+        14
+    };
+    (NULL) => {
+        15
+    };
+    (trigger) => {
+        16
+    };
+    (range) => {
+        17
+    };
+    (pattern) => {
+        18
+    };
+    (object_key) => {
+        19
+    };
+    (epsilon) => {
+        20
+    };
 }
 
 pub(crate) use type_id;
@@ -247,20 +294,20 @@ impl Value {
                     k.hash(state);
                     globals.stored_values[*el].hash(state, globals);
                 }
-            },
+            }
             Value::Macro(v) => v.hash(state),
             Value::Str(v) => v.hash(state),
             Value::Array(v) => {
                 for i in v {
                     globals.stored_values[*i].hash(state, globals);
                 }
-            },
+            }
             Value::Obj(v, m) => {
                 for i in v {
                     i.hash(state);
                 }
                 m.hash(state);
-            },
+            }
             Value::Builtins => "spwn".hash(state),
             Value::BuiltinFunction(v) => v.hash(state),
             Value::TypeIndicator(v) => v.hash(state),
@@ -268,7 +315,7 @@ impl Value {
                 s.hash(state);
                 e.hash(state);
                 st.hash(state);
-            },
+            }
             Value::Pattern(v) => v.hash(state),
             Value::Null => "null".hash(state),
         }
@@ -286,7 +333,9 @@ impl Value {
         globals: &mut Globals,
         context: &Context,
     ) -> Result<bool, RuntimeError> {
-        let pat = if let Value::Pattern(p) = convert_type(pat_val, type_id!(pattern), info, globals, context)? {
+        let pat = if let Value::Pattern(p) =
+            convert_type(pat_val, type_id!(pattern), info, globals, context)?
+        {
             p
         } else {
             unreachable!()
@@ -330,9 +379,22 @@ impl Value {
                     Ok(false)
                 }
             }
+            Pattern::Eq(_) => todo!(),
+            Pattern::NotEq(_) => todo!(),
+            Pattern::MoreThan(_) => todo!(),
+            Pattern::LessThan(_) => todo!(),
+            Pattern::MoreOrEq(_) => todo!(),
+            Pattern::LessOrEq(_) => todo!(),
         }
     }
-    pub fn to_str_full<F, E>(&self, globals: &mut Globals, mut display_inner: F) -> Result<String, E> where F: FnMut(&Self, &mut Globals) -> Result<String, E> {
+    pub fn to_str_full<F, E>(
+        &self,
+        globals: &mut Globals,
+        mut display_inner: F,
+    ) -> Result<String, E>
+    where
+        F: FnMut(&Self, &mut Globals) -> Result<String, E>,
+    {
         Ok(match self {
             Value::Group(g) => {
                 (if let Id::Specific(id) = g.id {
@@ -410,17 +472,23 @@ impl Value {
                     for arg in m.args.iter() {
                         out += &arg.name;
                         if let Some(val) = arg.pattern {
-                            out += &format!(": {}", display_inner(&globals.stored_values[val].clone(), globals)?)
+                            out += &format!(
+                                ": {}",
+                                display_inner(&globals.stored_values[val].clone(), globals)?
+                            )
                         };
                         if let Some(val) = arg.default {
-                            out += &format!(" = {}", display_inner(&globals.stored_values[val].clone(), globals)?)
+                            out += &format!(
+                                " = {}",
+                                display_inner(&globals.stored_values[val].clone(), globals)?
+                            )
                         };
                         out += ", ";
                     }
                     out.pop();
                     out.pop();
                 }
-                out + ") { /* code omitted */ }"
+                out + ") { /* ... */ }"
             }
             Value::Str(s) => format!("'{}'", s),
             Value::Array(a) => {
@@ -448,9 +516,9 @@ impl Value {
                 out += ";";
                 out
             }
-            Value::Builtins => "SPWN".to_string(),
-            Value::BuiltinFunction(n) => format!("<built-in-function: {}>", String::from(*n)),
-            Value::Null => "Null".to_string(),
+            Value::Builtins => "$".to_string(),
+            Value::BuiltinFunction(n) => format!("$.{}", String::from(*n)),
+            Value::Null => "null".to_string(),
             Value::TypeIndicator(id) => format!(
                 "@{}",
                 find_key_for_value(&globals.type_ids, *id)
@@ -479,14 +547,27 @@ impl Value {
                         out
                     }
                 }
+                Pattern::Eq(a) => format!("=={}", globals.stored_values[*a].to_owned().to_str(globals)),
+                Pattern::NotEq(a) => format!("!={}", globals.stored_values[*a].to_owned().to_str(globals)),
+                Pattern::MoreThan(a) => format!(">{}", globals.stored_values[*a].to_owned().to_str(globals)),
+                Pattern::LessThan(a) => format!("<{}", globals.stored_values[*a].to_owned().to_str(globals)),
+                Pattern::MoreOrEq(a) => format!(">={}", globals.stored_values[*a].to_owned().to_str(globals)),
+                Pattern::LessOrEq(a) => format!("<={}", globals.stored_values[*a].to_owned().to_str(globals)),
             },
         })
-    
     }
     pub fn to_str(&self, globals: &mut Globals) -> String {
-        self.to_str_full(globals, |val, globals| -> Result<String, ()> { Ok(val.to_str(globals)) }).unwrap()
+        self.to_str_full(globals, |val, globals| -> Result<String, ()> {
+            Ok(val.to_str(globals))
+        })
+        .unwrap()
     }
-    pub fn display(&self, full_context: &mut FullContext, globals: &mut Globals, info: &CompilerInfo) -> Result<String, RuntimeError> {
+    pub fn display(
+        &self,
+        full_context: &mut FullContext,
+        globals: &mut Globals,
+        info: &CompilerInfo,
+    ) -> Result<String, RuntimeError> {
         display_val(self.clone(), full_context, globals, info)
     }
 }
@@ -757,9 +838,11 @@ pub fn macro_to_value(
 
                     if full_context.inner().start_group != fn_context {
                         return Err(RuntimeError::ContextChangeError {
-                            message: "A macro argument pattern can't change the trigger function context".to_string(),
+                            message:
+                                "A macro argument pattern can't change the trigger function context"
+                                    .to_string(),
                             info,
-                            context_changes: full_context.inner().fn_context_change_stack.clone()
+                            context_changes: full_context.inner().fn_context_change_stack.clone(),
                         });
                     }
 
@@ -781,12 +864,13 @@ pub fn macro_to_value(
 
         let ret_pattern = if let Some(expr) = &m.ret_type {
             expr.eval(full_context, globals, info.clone(), constant)?;
-        
+
             if full_context.inner().start_group != fn_context {
                 return Err(RuntimeError::ContextChangeError {
-                    message: "A macro return pattern can't change the trigger function context".to_string(),
+                    message: "A macro return pattern can't change the trigger function context"
+                        .to_string(),
                     info,
-                    context_changes: full_context.inner().fn_context_change_stack.clone()
+                    context_changes: full_context.inner().fn_context_change_stack.clone(),
                 });
             }
 
@@ -811,7 +895,7 @@ pub fn macro_to_value(
                 def_file: info.position.file,
                 arg_pos: m.arg_pos,
                 tag: m.properties.clone(),
-                ret_pattern
+                ret_pattern,
             })),
             globals,
             full_context.inner().start_group,
@@ -827,7 +911,7 @@ pub fn macro_to_value(
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum DefineResult {
     AlreadyDefined(bool), // bool: redefinable
-    Ok, // wasn't defined before, but is now
+    Ok,                   // wasn't defined before, but is now
 }
 // the actual value comes in context.return_value
 
@@ -849,7 +933,7 @@ pub trait VariableFuncs {
         globals: &mut Globals,
         info: &CompilerInfo,
         mutable: bool,
-        layer: i16
+        layer: i16,
     ) -> Result<DefineResult, RuntimeError>;
 }
 
@@ -1581,9 +1665,9 @@ impl VariableFuncs for ast::Variable {
                     //let combinations = all_combinations(a.iter().map(|ref x| x.value.clone()).collect::<Vec<_>>(), full_context, globals, info.clone(), constant)?;
 
                     let combinations: Vec<(Vec<_>, _)> = reduce_combinations(
-                        a.clone(), 
+                        a.clone(),
                         full_context,
-                        globals, 
+                        globals,
                         |item: &ast::ArrayDef, ctx, list: Vec<StoredValue>, globals| {
                             let mut added = Vec::new();
                             match item.operator {
@@ -1595,31 +1679,42 @@ impl VariableFuncs for ast::Variable {
                                             if expr.values.len() > 1 {
                                                 use parser::fmt::SpwnFmt;
 
-                                                return Err(RuntimeError::CustomError(create_error(
-                                                    info.clone(),
-                                                    "Invalid collection syntax",
-                                                    &[
-                                                        (
+                                                return Err(RuntimeError::CustomError(
+                                                    create_error(
+                                                        info.clone(),
+                                                        "Invalid collection syntax",
+                                                        &[(
                                                             CodeArea {
                                                                 pos: expr.values[1].pos,
-                                                                file: info.position.file
+                                                                file: info.position.file,
                                                             },
-                                                            &format!("Unexpected value `{}`", expr.values[1].fmt(0)),
-                                                        ),
-                                                    ],
-                                                    None,
-                                                )));
+                                                            &format!(
+                                                                "Unexpected value `{}`",
+                                                                expr.values[1].fmt(0)
+                                                            ),
+                                                        )],
+                                                        None,
+                                                    ),
+                                                ));
                                             }
                                             match &expr.values[0].operator {
                                                 None => {
-                                                    expr.eval(ctx, globals, info.clone(), constant)?;
+                                                    expr.eval(
+                                                        ctx,
+                                                        globals,
+                                                        info.clone(),
+                                                        constant,
+                                                    )?;
                                                     for collect_ctx in ctx.iter() {
-                                                        let buckets = match globals.stored_values.move_out(collect_ctx.inner().return_value) {
-                                                            Value::Array(a) => a,
-                                                            _ => unreachable!()
-                                                        };
-                                                        collect_ctx.inner().return_value = globals.NULL_STORAGE;
-
+                                                        let buckets =
+                                                            match globals.stored_values.move_out(
+                                                                collect_ctx.inner().return_value,
+                                                            ) {
+                                                                Value::Array(a) => a,
+                                                                _ => unreachable!(),
+                                                            };
+                                                        collect_ctx.inner().return_value =
+                                                            globals.NULL_STORAGE;
 
                                                         let mut info = info.clone();
 
@@ -1629,17 +1724,18 @@ impl VariableFuncs for ast::Variable {
                                                         if buckets.is_empty() {
                                                             //new_info.position.pos = expr.values[0].pos;
                                                             //new_info.position.pos.0 -= 2;
-                                                            return Err(RuntimeError::CustomError(create_error(
-                                                                info,
-                                                                "Empty collection not allowed",
-                                                                &[],
-                                                                None,
-                                                            )));
+                                                            return Err(RuntimeError::CustomError(
+                                                                create_error(
+                                                                    info,
+                                                                    "Empty collection not allowed",
+                                                                    &[],
+                                                                    None,
+                                                                ),
+                                                            ));
                                                         }
 
                                                         let mut first = true;
                                                         let mut len = 0;
-
 
                                                         let filtered = buckets.iter().map(|x| {
                                                             match globals.stored_values[*x].clone() {
@@ -1692,30 +1788,34 @@ impl VariableFuncs for ast::Variable {
                                                         added.push((updated_list, collect_ctx));
                                                     }
                                                 }
-                                                Some(o) => { // future proofing
+                                                Some(o) => {
+                                                    // future proofing
                                                     use parser::fmt::SpwnFmt;
 
-                                                    return Err(RuntimeError::CustomError(create_error(
-                                                        info.clone(),
-                                                        "Invalid collection syntax",
-                                                        &[
-                                                            (
+                                                    return Err(RuntimeError::CustomError(
+                                                        create_error(
+                                                            info.clone(),
+                                                            "Invalid collection syntax",
+                                                            &[(
                                                                 CodeArea {
                                                                     pos: expr.values[0].pos,
-                                                                    file: info.position.file
+                                                                    file: info.position.file,
                                                                 },
-                                                                &format!("Unexpected operator `{}`", o.fmt(0)),
-                                                            ),
-                                                        ],
-                                                        None,
-                                                    )));
+                                                                &format!(
+                                                                    "Unexpected operator `{}`",
+                                                                    o.fmt(0)
+                                                                ),
+                                                            )],
+                                                            None,
+                                                        ),
+                                                    ));
                                                 }
                                             }
                                             //let buckets = expr.
                                             //let all = all_combinations(arr, )
-                                        },
+                                        }
                                         _ => {
-                                        // ..a
+                                            // ..a
                                             expr.eval(ctx, globals, info.clone(), constant)?;
                                             for expr_context in ctx.iter() {
                                                 let evaled_expr = expr_context.inner().return_value;
@@ -1729,7 +1829,7 @@ impl VariableFuncs for ast::Variable {
                                                         }
                                                         //updated_list.extend(ar);
                                                         added.push((updated_list, expr_context));
-                                                    },
+                                                    }
                                                     a => {
                                                         return Err(RuntimeError::TypeError {
                                                             expected: "array".to_string(),
@@ -1742,7 +1842,7 @@ impl VariableFuncs for ast::Variable {
                                             }
                                         }
                                     }
-                                },
+                                }
                                 _ => {
                                     // a
                                     item.value.eval(ctx, globals, info.clone(), constant)?;
@@ -1758,7 +1858,7 @@ impl VariableFuncs for ast::Variable {
                                 }
                             }
                             Ok(added)
-                        }
+                        },
                     )?;
                     //panic!("fix soon");
 
@@ -2816,47 +2916,25 @@ impl VariableFuncs for ast::Variable {
         if let Some(o) = &self.operator {
             for full_context in contexts.iter() {
                 let val_ptr = full_context.inner().return_value;
-                match o {
-                    UnaryOperator::Minus => {
-                        handle_unary_operator(
-                            val_ptr,
-                            Builtin::NegOp,
-                            full_context,
-                            globals,
-                            &info,
-                        )?
-                    }
 
-                    UnaryOperator::Increment => {
-                        handle_unary_operator(
-                            val_ptr,
-                            Builtin::PreIncrOp,
-                            full_context,
-                            globals,
-                            &info,
-                        )?
-                    }
-
-                    UnaryOperator::Decrement => {
-                        handle_unary_operator(
-                            val_ptr,
-                            Builtin::PreDecrOp,
-                            full_context,
-                            globals,
-                            &info,
-                        )?
-                    }
-
-                    UnaryOperator::Not => {
-                        handle_unary_operator(
-                            val_ptr,
-                            Builtin::NotOp,
-                            full_context,
-                            globals,
-                            &info,
-                        )?
-                    }
-                }
+                handle_unary_operator(
+                    val_ptr,
+                    match o {
+                        UnaryOperator::Minus => Builtin::NegOp,
+                        UnaryOperator::Increment => Builtin::PreIncrOp,
+                        UnaryOperator::Decrement => Builtin::PreDecrOp,
+                        UnaryOperator::Not => Builtin::NotOp,
+                        UnaryOperator::EqPattern => Builtin::EqPatternOp,
+                        UnaryOperator::NotEqPattern => Builtin::NotEqPatternOp,
+                        UnaryOperator::MorePattern => Builtin::MorePatternOp,
+                        UnaryOperator::LessPattern => Builtin::LessPatternOp,
+                        UnaryOperator::MoreOrEqPattern => Builtin::MoreOrEqPatternOp,
+                        UnaryOperator::LessOrEqPattern => Builtin::LessOrEqPatternOp,
+                    },
+                    full_context,
+                    globals,
+                    &info,
+                )?
             }
         }
 
@@ -2897,7 +2975,7 @@ impl VariableFuncs for ast::Variable {
         globals: &mut Globals,
         info: &CompilerInfo,
         mutable: bool,
-        layer: i16
+        layer: i16,
     ) -> Result<DefineResult, RuntimeError> {
         use ariadne::Fmt;
         use parser::fmt::SpwnFmt;
@@ -3225,16 +3303,19 @@ pub fn display_val(
     globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<String, RuntimeError> {
-    
     assert!(matches!(full_context, FullContext::Single(_)));
-    let stored = store_const_value(val, globals, full_context.inner().start_group, Default::default());
+    let stored = store_const_value(
+        val,
+        globals,
+        full_context.inner().start_group,
+        Default::default(),
+    );
 
     handle_unary_operator(stored, Builtin::DisplayOp, full_context, globals, info)?;
-    Ok(match globals.stored_values[full_context.inner().return_value].clone() {
-        Value::Str(s) => s,
-        a => {
-            display_val(a, full_context, globals, info)?
-        }
-    })
-    
+    Ok(
+        match globals.stored_values[full_context.inner().return_value].clone() {
+            Value::Str(s) => s,
+            a => display_val(a, full_context, globals, info)?,
+        },
+    )
 }
