@@ -253,6 +253,6 @@ return {
         ACTIVE_TRIGGER: ok(36, @bool),
     },
 
-    pi: $.acos(-1),
-    euler: $.exp(1),
+    PI: $.acos(-1),
+    EULER: $.exp(1),
 }
