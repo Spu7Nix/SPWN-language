@@ -763,7 +763,7 @@ builtins! {
 
     [Matches] #[safe = true, desc = "Returns `true` if the value matches the pattern, otherwise it returns `false`", example = "$.matches([1, 2, 3], [@number])"]
     fn matches((val), (pattern)) {
-        Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
+        Value::Bool(val.pure_matches_pat(&pattern, &info, globals, context.clone())?)
     }
 
     [B64Encode] #[safe = true, desc = "Returns the input string encoded with base64 encoding (useful for text objects)", example = "$.b64encode(\"hello there\")"]
@@ -1124,7 +1124,7 @@ $.assert(arr == [1])
             }
 
             if let Some(ref pat) = pattern {
-                if !value.matches_pat(pat, &info, globals, context)? {
+                if !value.pure_matches_pat(pat, &info, globals, context.clone())? {
                     return Err(RuntimeError::TypeError {
                         expected: pat.to_str(globals),
                         found: value.get_type_str(globals),

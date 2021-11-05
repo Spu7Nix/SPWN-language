@@ -326,66 +326,125 @@ impl Value {
         find_key_for_value(&globals.type_ids, t).unwrap().clone()
     }
 
+    pub fn pure_matches_pat(
+        &self, 
+        pat_val: &Value,
+        info: &CompilerInfo,
+        globals: &mut Globals,
+        context: Context
+    ) -> Result<bool, RuntimeError> {
+        let mut full_context = FullContext::Single(context); // not part of the full tree, but shouldnt matter, since it shouldnt be changed
+        self.matches_pat(pat_val, info, globals, &mut full_context, false)?;
+        match globals.stored_values[full_context.inner().return_value] {
+            Value::Bool(b) => Ok(b),
+            _ => return Err(RuntimeError::TypeError {
+                expected: "bool".to_string(),
+                found: globals.get_type_str(full_context.inner().return_value),
+                val_def: globals.get_area(full_context.inner().return_value),
+                info: info.clone(),
+            })
+        }
+    }
+
     pub fn matches_pat(
         &self,
         pat_val: &Value,
         info: &CompilerInfo,
         globals: &mut Globals,
-        context: &Context,
-    ) -> Result<bool, RuntimeError> {
-        let pat = if let Value::Pattern(p) =
-            convert_type(pat_val, type_id!(pattern), info, globals, context)?
-        {
-            p
-        } else {
-            unreachable!()
-        };
-        match pat {
-            Pattern::Either(p1, p2) => {
-                Ok(
-                    self.matches_pat(&Value::Pattern(*p1), info, globals, context)?
-                        || self.matches_pat(&Value::Pattern(*p2), info, globals, context)?,
-                )
-            }
-            Pattern::Type(t) => Ok(self.to_num(globals) == t),
-            Pattern::Array(a_pat) => {
-                if let Value::Array(a_val) = self {
-                    match a_pat.len() {
-                        0 => Ok(true),
+        contexts: &mut FullContext,
+        allow_side_effect: bool, // includes context splitting
+    ) -> Result<(), RuntimeError> {
+        for full_context in contexts.iter() {
 
-                        1 => {
-                            for el in a_val {
-                                let val = globals.stored_values[*el].clone();
-                                if !val.matches_pat(
-                                    &Value::Pattern(a_pat[0].clone()),
-                                    info,
-                                    globals,
-                                    context,
-                                )? {
-                                    return Ok(false);
-                                }
-                            }
-                            Ok(true)
+            
+            let pat = if let Value::Pattern(p) =
+                convert_type(pat_val, type_id!(pattern), info, globals, full_context.inner())?
+            {
+                p
+            } else {
+                unreachable!()
+            };
+            match pat {
+                Pattern::Either(p1, p2) => {
+                    self.matches_pat(&Value::Pattern(*p1), info, globals, full_context, allow_side_effect)?;
+                    for full_context in full_context.iter() {
+                        match globals.stored_values[full_context.inner().return_value] {
+                            Value::Bool(b) => if b { 
+                                self.matches_pat(&Value::Pattern(p2.as_ref().clone()), info, globals, full_context, allow_side_effect)? 
+                            },
+                            _ => return Err(RuntimeError::TypeError {
+                                expected: "bool".to_string(),
+                                found: globals.get_type_str(full_context.inner().return_value),
+                                val_def: globals.get_area(full_context.inner().return_value),
+                                info: info.clone(),
+                            })
                         }
-
-                        _ => Err(RuntimeError::CustomError(create_error(
-                            info.clone(),
-                            "arrays with multiple elements cannot be used as patterns (yet)",
-                            &[],
-                            None,
-                        ))),
                     }
-                } else {
-                    Ok(false)
+                    
                 }
+                Pattern::Type(t) => (*full_context.inner()).return_value = store_const_value(Value::Bool(self.to_num(globals) == t), globals, full_context.inner().start_group, info.position),
+                Pattern::Array(a_pat) => {
+                    if let Value::Array(a_val) = self {
+                        match a_pat.len() {
+                            // empty array matches any array pattern
+                            0 => (*full_context.inner()).return_value = store_const_value(Value::Bool(true), globals, full_context.inner().start_group, info.position),
+
+                            1 => {
+                                full_context.reset_return_vals(globals);
+                                for el in a_val {
+                                    for full_context in full_context.iter() {
+                                        if globals.stored_values[full_context.inner().return_value] != Value::Bool(false) {
+                                            let val = globals.stored_values[*el].clone();
+                                            val.matches_pat(
+                                                &Value::Pattern(a_pat[0].clone()),
+                                                info,
+                                                globals,
+                                                full_context,
+                                                allow_side_effect
+                                            )?;
+                                        }
+                                    }
+                                    
+                                }
+                                
+                            }
+
+                            _ => return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                "arrays with multiple elements cannot be used as patterns (yet)",
+                                &[],
+                                None,
+                            ))),
+                        }
+                    } else {
+                        (*full_context.inner()).return_value = store_const_value(Value::Bool(false), globals, full_context.inner().start_group, info.position);
+
+                    }
+                }
+                a => {
+                    // bool operator patterns
+                    let val = store_const_value(self.clone(), globals, full_context.inner().start_group, info.position);
+                    let (builtin, val2) = match a {
+                        Pattern::Eq(v) => (Builtin::EqOp, v),
+                        Pattern::NotEq(v) => (Builtin::NotEqOp, v),
+                        Pattern::MoreThan(v) => (Builtin::MoreThanOp, v),
+                        Pattern::LessThan(v) => (Builtin::LessThanOp, v),
+                        Pattern::MoreOrEq(v) => (Builtin::MoreOrEqOp, v),
+                        Pattern::LessOrEq(v) => (Builtin::LessOrEqOp, v),
+                        _ => unreachable!()
+                    };
+
+
+                    if allow_side_effect {
+                        handle_operator(val, val2, builtin, full_context, globals, info)?;
+                    } else {
+                        built_in_function(builtin, vec![val, val2], info.clone(), globals, full_context)?;
+                    }
+                }
+                
             }
-            Pattern::Eq(_) => todo!(),
-            Pattern::NotEq(_) => todo!(),
-            Pattern::MoreThan(_) => todo!(),
-            Pattern::LessThan(_) => todo!(),
-            Pattern::MoreOrEq(_) => todo!(),
-            Pattern::LessOrEq(_) => todo!(),
         }
+        Ok(())
     }
     pub fn to_str_full<F, E>(
         &self,
@@ -2000,26 +2059,49 @@ impl VariableFuncs for ast::Variable {
                                         let pat_val = globals.stored_values
                                             [full_context.inner().return_value]
                                             .clone();
-                                        let b = globals.stored_values[val1].clone().matches_pat(
+                                        globals.stored_values[val1].clone().matches_pat(
                                             &pat_val,
                                             &info,
                                             globals,
-                                            full_context.inner(),
+                                            full_context,
+                                            true
                                         )?;
 
-                                        if b {
-                                            case.body.eval(
-                                                full_context,
-                                                globals,
-                                                info.clone(),
-                                                constant,
-                                            )?;
-                                            for c in full_context.iter() {
-                                                c.inner().broken = Some((
-                                                    BreakType::Switch(c.inner().return_value),
-                                                    CodeArea::new(),
-                                                ))
-                                            }
+                                        for full_context in full_context.iter() {
+                                            match &globals.stored_values
+                                                [full_context.inner().return_value]
+                                            {
+                                                Value::Bool(b) => {
+                                                    if *b {
+                                                        case.body.eval(
+                                                            full_context,
+                                                            globals,
+                                                            info.clone(),
+                                                            constant,
+                                                        )?;
+                                                        for c in full_context.iter() {
+                                                            c.inner().broken = Some((
+                                                                BreakType::Switch(
+                                                                    c.inner().return_value,
+                                                                ),
+                                                                CodeArea::new(),
+                                                            ))
+                                                        }
+                                                    }
+                                                }
+                                                a => {
+                                                    // if the == operator for that type doesn't output a boolean, it can't be
+                                                    // used in a switch statement
+                                                    return Err(RuntimeError::TypeError {
+                                                        expected: "boolean".to_string(),
+                                                        found: a.get_type_str(globals),
+                                                        val_def: globals.get_area(
+                                                            full_context.inner().return_value,
+                                                        ),
+                                                        info,
+                                                    });
+                                                }
+                                            };
                                         }
                                     }
                                 }
@@ -2186,7 +2268,7 @@ impl VariableFuncs for ast::Variable {
                                     let val = globals.stored_values[o_val].clone();
 
                                     if let Some(pat) = pattern { // check if pattern is actually enforced (not null)
-                                        if !val.matches_pat(&pat.0, &info, globals, context.inner())? {
+                                        if !val.pure_matches_pat(&pat.0, &info, globals, context.inner().clone())? {
                                             return Err(RuntimeError::PatternMismatchError {
                                                 pattern: pat.0.to_str(globals),
                                                 val: val.get_type_str(globals),

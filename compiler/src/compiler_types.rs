@@ -76,7 +76,7 @@ pub fn handle_operator(
                 if let Some(target_typ) = m.args[0].pattern {
                     let pat = &globals.stored_values[target_typ].clone();
 
-                    if !val2.matches_pat(pat, info, globals, full_context.inner())? {
+                    if !val2.pure_matches_pat(pat, info, globals, full_context.inner().clone())? {
                         //if types dont match, act as if there is no macro at all
                         built_in_function(
                             macro_name,
@@ -418,7 +418,7 @@ pub fn execute_macro(
                             let val = globals.stored_values[arg_values[i]].clone();
                             let pat = globals.stored_values[t].clone();
 
-                            if !val.matches_pat(&pat, &info, globals, context)? {
+                            if !val.pure_matches_pat(&pat, &info, globals, context.clone())? {
                                 return Err(RuntimeError::PatternMismatchError {
                                     pattern: pat.to_str(globals),
                                     val: val.get_type_str(globals),
@@ -500,7 +500,7 @@ pub fn execute_macro(
                         let val = globals.stored_values[arg_values[i]].clone();
                         let pat = globals.stored_values[t].clone();
 
-                        if !val.matches_pat(&pat, &info, globals, context)? {
+                        if !val.pure_matches_pat(&pat, &info, globals, context.clone())? {
                             return Err(RuntimeError::PatternMismatchError {
                                 pattern: pat.to_str(globals),
                                 val: val.get_type_str(globals),
@@ -637,11 +637,11 @@ Should be used like this: value.macro(arguments)",
                         };
                         if let Some(pat) = m.ret_pattern {
                             //dbg!(&globals.stored_values[pat], &globals.stored_values[ret]);
-                            if !globals.stored_values[ret].clone().matches_pat(
+                            if !globals.stored_values[ret].clone().pure_matches_pat(
                                 &globals.stored_values[pat].clone(),
                                 &info,
                                 globals,
-                                context.inner(),
+                                context.inner().clone(),
                             )? {
                                 return Err(RuntimeError::PatternMismatchError {
                                     pattern: globals.stored_values[pat].clone().to_str(globals),
