@@ -704,15 +704,15 @@ builtins! {
         for val in arguments.iter() {
             match &globals.stored_values[*val] {
                 Value::Str(s) => out += s,
-                _ => out += &unsafe {
-                    let ctx = full_context.as_mut().unwrap();
+                _ => out += &{
+                    let ctx = FullContext::from_ptr(full_context);
                     handle_unary_operator(*val, Builtin::DisplayOp, ctx, globals, &info)?;
                     let out = ctx.inner().return_value;
                     let val = &globals.stored_values[out];
                     if let Value::Str(s) = val {
                         s.clone()
                     } else {
-                        val.to_str(globals)
+                        val.clone().to_str(globals)
                     }
                 }
             };
@@ -1250,9 +1250,7 @@ $.extend_trigger_func(10g, () {
             }
         ]};
 
-        unsafe {
-            cmp_statement.to_trigger_func(full_context.as_mut().unwrap(), globals, info.clone(), Some(group))?;
-        }
+        cmp_statement.to_trigger_func(FullContext::from_ptr(full_context), globals, info.clone(), Some(group))?;
 
 
 
@@ -2150,17 +2148,12 @@ $.assert(arr == [1, 2])
         ))
     }
     [DisplayOp] #[safe = true, desc = "returns the default value display string for the given value", example = "$._display_(counter()) // \"@counter::{ item: ?i, bits: 16 }\""] fn _display_((a)) {
-        unsafe {
-            let ptr: *mut Globals = globals;
-            Value::Str(a.to_str_full(globals, |val| display_val(val.clone(), full_context.as_mut().unwrap(), ptr, &info))?)
-        }
+        Value::Str(a.to_str_full(globals, |val, globals| display_val(val.clone(), FullContext::from_ptr(full_context), globals, &info))?)
     }
     [Display] #[safe = true, desc = "returns the value display string for the given value", example = "$.display(counter()) // \"counter(?i, bits = 16)\""] fn display((a)) {
-        unsafe {
-            let ctx = full_context.as_mut().unwrap();
-            handle_unary_operator(arguments[0], Builtin::DisplayOp, ctx, globals, &info)?;
-            globals.stored_values[ctx.inner().return_value].clone()
-        }
+        let ctx = FullContext::from_ptr(full_context);
+        handle_unary_operator(arguments[0], Builtin::DisplayOp, ctx, globals, &info)?;
+        globals.stored_values[ctx.inner().return_value].clone()
     }
 
 }

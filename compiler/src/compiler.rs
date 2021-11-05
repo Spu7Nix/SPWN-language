@@ -616,7 +616,7 @@ pub fn compile_scope(
                                     full_context,
                                     globals,
                                     &info,
-                                    false,
+                                    true,
                                     -1
                                 )?;
 
@@ -691,7 +691,7 @@ pub fn compile_scope(
                                         c,
                                         globals,
                                         &info,
-                                        false,
+                                        true,
                                         -1
                                     )?;
                                     /*if let Some(single) = maybe_single {
@@ -901,7 +901,7 @@ pub fn compile_scope(
 
                 e.message.eval(contexts, globals, info.clone(), true)?;
                 for c in contexts.iter() {
-                    let err = globals.stored_values[c.inner().return_value].to_str(globals);
+                    let err = globals.stored_values[c.inner().return_value].clone().to_str(globals);
                     errors.push((info.position, err))
                 }
 
@@ -977,20 +977,36 @@ fn do_assignment(
     globals: &mut Globals,
     info: &CompilerInfo,
     mutable: bool,
-    scope: i16
+    scope: i16,
 ) -> Result<(), RuntimeError> {
-    if destex.values.len() != 1 || !destex.operators.is_empty() {
+    if destex.values.is_empty() {
         return Err(RuntimeError::CustomError(create_error(
             info.clone(),
-            "Cannot destructure into this expression",
+            "Cannot destructure value into empty expression",
             &[],
+            None,
+        )));
+    }
+    if destex.values.len() > 1 || !destex.operators.is_empty() {
+        let mut area = info.position;
+        area.pos = destex.values[1].pos;
+        return Err(RuntimeError::CustomError(create_error(
+            info.clone(),
+            "Cannot destructure value into this expression",
+            &[
+                (area, "Invalid destructure pattern")
+            ],
             None,
         )));
     }
     let dest = &destex.values[0];
 
-    let destructure_sanitize = |src: &Option<_>, dest: &ast::Variable| -> Result<(), RuntimeError> {
-        if dest.operator.is_some() || !dest.path.is_empty() {
+    let destructure_sanitize = |src: &Option<_>| -> Result<(), RuntimeError> {
+        //use parser::fmt::_format2;
+
+        let dst = &destex.values[0];
+
+        if dst.operator.is_some() || !dst.path.is_empty() {
             return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
                 "Invalid destructure symbol",
@@ -1010,12 +1026,11 @@ fn do_assignment(
     };
 
     if let ast::ValueBody::Array(arr) = &dest.value.body {
-        destructure_sanitize(src, dest)?;
-
+        destructure_sanitize(src)?;
         array_destructure_define(arr, src.as_ref().unwrap(), contexts, globals, info, mutable, scope)?;
         Ok(())
     } else if let ast::ValueBody::Dictionary(kvs) = &dest.value.body {
-        destructure_sanitize(src, dest)?;
+        destructure_sanitize(src)?;
 
         let ranges: Vec<&ast::Expression> = kvs
                                       .iter()
@@ -1090,12 +1105,6 @@ fn do_assignment(
                     evaled_src.remove(k);
                 }
 
-                /*let store = store_const_value(
-                    Value::Dict(evaled_src),
-                    globals,
-                    ctx,
-                    globals.get_area(evaled_store),
-                );*/
                 let ast_src = evaled_src
                                 .keys()
                                 .map(|x| 
@@ -1119,7 +1128,6 @@ fn do_assignment(
                 )?;
             }
         }
-        //panic!("dict destructure moment");
         Ok(())
     } else { // no destructure here
         let value_is_normalized = if let Some(new_expr) = &src {
@@ -1201,7 +1209,7 @@ fn do_assignment(
                                 Builtin::AssignOp,
                                 full_context,
                                 globals,
-                                &info,
+                                info,
                             )?;
                         } else {
                             let symbol = ast::ValueBody::Resolved(ptr)
@@ -1323,7 +1331,7 @@ fn do_assignment(
 }
 
 fn array_destructure_define(
-    arr: &[ast::Expression],
+    arr: &Vec<ast::ArrayDef>,
     value: &ast::Expression,
     contexts: &mut FullContext,
     globals: &mut Globals,
@@ -1337,8 +1345,9 @@ fn array_destructure_define(
             Value::Array(val_a) => {
                 let ranges = arr
                     .iter()
-                    .filter(|x| x.values[0].operator == Some(ast::UnaryOperator::Range))
-                    .collect::<Vec<&ast::Expression>>();
+                    .filter(|x| x.operator == Some(ast::ArrayPrefix::Collect))
+                    .map(|x| &x.value)
+                    .collect::<Vec<_>>();
 
                 if ranges.len() > 1 {
                     let mut area1 = info.position;
@@ -1374,58 +1383,34 @@ fn array_destructure_define(
                     loop {
                         let mut idx_step = 1;
                         for expr_ctx in ctx.iter() {
-                            if arr[var_idx].operators.is_empty() && arr[var_idx].values.is_empty() {
-                                use parser::fmt::_format2;
-
+                            if arr[var_idx].value.values.is_empty() {
                                 return Err(RuntimeError::CustomError(create_error(
                                     info.clone(),
-                                    &format!(
-                                        "Cannot destructure value into expression '{}'",
-                                        _format2(&ast::ValueBody::Expression(arr[idx].clone()))
-                                    ),
+                                    "Cannot destructure value into empty expression",
                                     &[],
                                     None,
                                 )));
                             }
-                            let var_val = &arr[var_idx].values[0];
 
-                            /*if !globals.is_mutable(var_val) {
-                                return Err(RuntimeError::CustomError(create_error(
-                                    info.clone(),
-                                    &format!(
-                                        "Cannot destructure into immutable variable '{}'",
-                                        _format2())
-                                    ),
-                                    &[],
-                                    None,
-                                )));
-                            }*/
-
-                            match var_val.operator {
-                                Some(ast::UnaryOperator::Range) => {
-                                    let mut without_op = var_val.clone();
-                                    without_op.operator = None;
-
+                            let the_expr = &arr[var_idx].value;
+                            match arr[var_idx].operator {
+                                Some(ast::ArrayPrefix::Collect) => {
                                     idx_step = 1 + val_a.len() - arr.len();
 
                                     let astvec = ast::ValueBody::Array(
                                         (idx..(idx + idx_step)).map(|tmp_idx| {
-                                            /*let cloned = clone_value(
-                                                val_a[tmp_idx],
-                                                globals,
-                                                expr_ctx.inner().start_group,
-                                                !mutable,
-                                                globals.get_area(storage),
-                                            );*/
-                                            ast::ValueBody::Resolved(val_a[tmp_idx])
-                                                .to_variable(without_op.pos)
-                                                .to_expression()
+                                            ast::ArrayDef {
+                                                value: ast::ValueBody::Resolved(val_a[tmp_idx])
+                                                        .to_variable(the_expr.values[0].pos)
+                                                        .to_expression(),
+                                                operator: None
+                                            }
                                         }).collect())
-                                        .to_variable(without_op.pos)
+                                        .to_variable(the_expr.values[0].pos)
                                         .to_expression();
 
                                     do_assignment(
-                                        &without_op.to_expression(),
+                                        the_expr,
                                         &Some(astvec),
                                         expr_ctx,
                                         globals,
@@ -1435,16 +1420,8 @@ fn array_destructure_define(
                                     )?;
                                 }
                                 _ => {
-                                    /*
-                                    destex: &ast::Expression,
-                                    src: &Option<ast::Expression>,
-                                    contexts: &mut FullContext,
-                                    globals: &mut Globals,
-                                    info: &CompilerInfo,
-                                    mutable: bool
-                                                                        */
                                     do_assignment(
-                                        &var_val.to_expression(),
+                                        the_expr,
                                         &Some(
                                             stored_to_variable(val_a[idx], globals)
                                                 .to_expression(),
@@ -1454,21 +1431,7 @@ fn array_destructure_define(
                                         info,
                                         mutable,
                                         scope
-                                    )?;// {
-                                        /*var_val.try_define(expr_ctx, globals, info, mutable)?;
-                                        let storage = expr_ctx.inner().return_value2;
-
-                                        //clone the value so as to not share the reference
-
-                                        let cloned = clone_and_get_value(
-                                            val_a[idx],
-                                            globals,
-                                            expr_ctx.inner().start_group,
-                                            !mutable,
-                                        );
-
-                                        globals.stored_values[storage] = cloned;*/
-                                    //}
+                                    )?;
                                 }
                             }
                         }

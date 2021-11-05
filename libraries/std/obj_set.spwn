@@ -38,7 +38,7 @@ my_objects = @obj_set::new()
     },
     rotate: #[desc("Applies a single rotation value to all of the objects in this set")]
     (self, deg: @number) {
-        for i in ..self.objects.length {
+        for i in 0..self.objects.length {
             self.objects[i].set(obj_props.ROTATION, deg)
         }
     },

@@ -248,6 +248,15 @@ impl SpwnFmt for (Expression, Expression) {
     }
 }
 
+impl SpwnFmt for ArrayDef {
+    fn fmt(&self, ind: Indent) -> String {
+        match &self.operator {
+            Some(ArrayPrefix::Collect) => format!("..{}", self.value.fmt(ind)),
+            None => self.value.fmt(ind)
+        }
+    }
+}
+
 impl SpwnFmt for ValueBody {
     fn fmt(&self, ind: Indent) -> String {
         use ValueBody::*;
@@ -459,7 +468,6 @@ impl SpwnFmt for UnaryOperator {
         match self {
             UnaryOperator::Not => "!",
             UnaryOperator::Minus => "-",
-            UnaryOperator::Range => "..",
             UnaryOperator::Decrement => "--",
             UnaryOperator::Increment => "++",
         }

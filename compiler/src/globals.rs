@@ -285,15 +285,13 @@ impl<'a> Globals<'a> {
         self.stored_values.mark(self.NULL_STORAGE);
         self.stored_values.mark(self.BUILTIN_STORAGE);
 
-        unsafe {
-            let root_context = contexts
+        //unsafe {
+            let root_context = FullContext::from_ptr(contexts
                 .with_breaks()
                 .next()
                 .unwrap()
                 .inner()
-                .root_context_ptr
-                .as_mut()
-                .unwrap();
+                .root_context_ptr);
 
             for c in root_context.with_breaks() {
                 for stack in c.inner().get_variables().values() {
@@ -323,7 +321,7 @@ impl<'a> Globals<'a> {
                     self.stored_values.mark(*v);
                 }
             }
-        }
+        //}
 
         for (v, imp) in self.prev_imports.values() {
             for imp in imp.values() {

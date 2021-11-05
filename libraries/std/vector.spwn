@@ -141,7 +141,7 @@ impl @vector {
 
     _equal_: (self, other: @vector) {
         self.assert_dims(other)
-        for i in ..self.dims.length {
+        for i in 0..self.dims.length {
             if self.dims[i] != other.dims[i] { return false; }
         }
         return true
@@ -158,7 +158,7 @@ impl @vector {
     dot: (self, other: @vector) {
         self.assert_dims(other)
         let result = 0
-        for i in ..self.dims.length {
+        for i in 0..self.dims.length {
             result += self.dims[i] * other.dims[i]
         }
         return result
@@ -256,7 +256,7 @@ impl @vector {
     max_dim: (self) {
         let max = self.dims[0]
         let max_i = 0
-        for i in ..self.dims.length {
+        for i in 0..self.dims.length {
             if self.dims[i] > max {
                 max = self.dims[i]
                 max_i = i
@@ -267,7 +267,7 @@ impl @vector {
     min_dim: (self) {
         let min = self.dims[0]
         let min_i = 0
-        for i in ..self.dims.length {
+        for i in 0..self.dims.length {
             if self.dims[i] < min {
                 min = self.dims[i]
                 min_i = i

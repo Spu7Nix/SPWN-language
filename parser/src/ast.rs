@@ -12,6 +12,18 @@ pub enum DictDef {
     Extract(Expression),
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum ArrayPrefix {
+    Collect,
+    // future-proofing
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct ArrayDef {
+    pub value: Expression,
+    pub operator: Option<ArrayPrefix>
+}
+
 //pub type Comment = (Option<String>, Option<String>);
 
 #[derive(Clone, PartialEq, Debug)]
@@ -79,7 +91,7 @@ pub enum ValueBody {
     Str(StrInner),
     Import(ImportType, bool),
     Switch(Expression, Vec<Case>),
-    Array(Vec<Expression>),
+    Array(Vec<ArrayDef>),
     ListComp(Comprehension),
     Obj(ObjectLiteral),
     Macro(Macro),
@@ -165,7 +177,6 @@ pub enum Operator {
 pub enum UnaryOperator {
     Not,
     Minus,
-    Range,
     Increment,
     Decrement,
 }

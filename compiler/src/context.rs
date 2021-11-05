@@ -176,6 +176,12 @@ impl FullContext {
     pub fn iter(&mut self) -> ContextIter {
         ContextIter::new(self)
     }
+
+    pub fn from_ptr(ptr: *mut FullContext) -> &'static mut FullContext {
+        unsafe {
+            ptr.as_mut().unwrap()
+        }
+    }
 }
 
 /// Iterator type for a binary tree.
