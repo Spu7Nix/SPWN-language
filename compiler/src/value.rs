@@ -394,9 +394,10 @@ impl Value {
                     }
 
                     let stored_val = display_inner(&globals.stored_values[*val].clone(), globals)?;
-                    out += &format!("{}: {},", key, stored_val);
+                    out += &format!("{}: {}, ", key, stored_val);
                 }
                 if !d.is_empty() {
+                    out.pop();
                     out.pop();
                 }
 
