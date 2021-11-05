@@ -686,8 +686,8 @@ Should be used like this: value.macro(arguments)",
 pub fn reduce_combinations<'a, T, F>(
     a: Vec<T>,
     contexts: &'a mut FullContext,
-    reduce: F,
-    globals: &mut Globals
+    globals: &mut Globals,
+    reduce: F
 ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> where 
     F: Fn(&T, &'a mut FullContext, Vec<StoredValue>, &mut Globals) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> 
 {
@@ -717,22 +717,21 @@ pub fn all_combinations<'a>(
     reduce_combinations(
         a, 
         contexts, 
-        |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
-            e.eval(ctx, globals, info.clone(), constant)?;
-            let mut added = Vec::new();
+        globals,
+    |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
+        e.eval(ctx, globals, info.clone(), constant)?;
+        let mut added = Vec::new();
 
-            for full_context in ctx.iter() {
-                let result = full_context.inner().return_value;
-                let mut updated_list = list.clone();
+        for full_context in ctx.iter() {
+            let result = full_context.inner().return_value;
+            let mut updated_list = list.clone();
 
-                updated_list.push(result);
-                globals.push_preserved_val(result);
-                added.push((updated_list, full_context));
-            }
-            Ok(added)
-        }, 
-        globals
-    )
+            updated_list.push(result);
+            globals.push_preserved_val(result);
+            added.push((updated_list, full_context));
+        }
+        Ok(added)
+    })
 }
 
 pub fn eval_dict(

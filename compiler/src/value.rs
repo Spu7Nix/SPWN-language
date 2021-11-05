@@ -1580,33 +1580,164 @@ impl VariableFuncs for ast::Variable {
                 ast::ValueBody::Array(a) => {
                     //let combinations = all_combinations(a.iter().map(|ref x| x.value.clone()).collect::<Vec<_>>(), full_context, globals, info.clone(), constant)?;
 
-                    let combinations: Vec<(_, _)> = reduce_combinations(
+                    let combinations: Vec<(Vec<_>, _)> = reduce_combinations(
                         a.clone(), 
-                        full_context, 
+                        full_context,
+                        globals, 
                         |item: &ast::ArrayDef, ctx, list: Vec<StoredValue>, globals| {
                             let mut added = Vec::new();
                             match item.operator {
                                 Some(ast::ArrayPrefix::Collect) => {
                                     let expr = &item.value;
-                                    if expr.values.len() == 1 && matches!(expr.values[0].value.body, ast::ValueBody::Array(_)) {
-                                        // ..[a, b]
+                                    match &expr.values[0].value.body {
+                                        ast::ValueBody::Array(_) => {
+                                            // ..[a, b]
+                                            if expr.values.len() > 1 {
+                                                use parser::fmt::SpwnFmt;
 
-                                    } else {
+                                                return Err(RuntimeError::CustomError(create_error(
+                                                    info.clone(),
+                                                    "Invalid collection syntax",
+                                                    &[
+                                                        (
+                                                            CodeArea {
+                                                                pos: expr.values[1].pos,
+                                                                file: info.position.file
+                                                            },
+                                                            &format!("Unexpected value `{}`", expr.values[1].fmt(0)),
+                                                        ),
+                                                    ],
+                                                    None,
+                                                )));
+                                            }
+                                            match &expr.values[0].operator {
+                                                None => {
+                                                    expr.eval(ctx, globals, info.clone(), constant)?;
+                                                    for collect_ctx in ctx.iter() {
+                                                        let buckets = match globals.stored_values.move_out(collect_ctx.inner().return_value) {
+                                                            Value::Array(a) => a,
+                                                            _ => unreachable!()
+                                                        };
+                                                        collect_ctx.inner().return_value = globals.NULL_STORAGE;
+
+
+                                                        let mut info = info.clone();
+
+                                                        info.position.pos = expr.values[0].pos;
+                                                        info.position.pos.0 -= 2;
+
+                                                        if buckets.is_empty() {
+                                                            //new_info.position.pos = expr.values[0].pos;
+                                                            //new_info.position.pos.0 -= 2;
+                                                            return Err(RuntimeError::CustomError(create_error(
+                                                                info,
+                                                                "Empty collection not allowed",
+                                                                &[],
+                                                                None,
+                                                            )));
+                                                        }
+
+                                                        let mut first = true;
+                                                        let mut len = 0;
+
+
+                                                        let filtered = buckets.iter().map(|x| {
+                                                            match globals.stored_values[*x].clone() {
+                                                                Value::Array(b) => {
+                                                                    if first {
+                                                                        len = b.len();
+                                                                        first = false;
+                                                                    }
+
+                                                                    if b.len() != len {
+                                                                        return Err(RuntimeError::CustomError(create_error(
+                                                                            info.clone(),
+                                                                            &format!("Expected array of length {}, found length {}", len, b.len()),
+                                                                            &[
+                                                                                (
+                                                                                    globals.get_area(*x),
+                                                                                    &format!("List should be length {}", len)
+                                                                                )
+                                                                            ],
+                                                                            None,
+                                                                        )));
+                                                                    }
+                                                                    Ok(b)
+                                                                },
+                                                                a => Err(RuntimeError::TypeError {
+                                                                        expected: "array".to_string(),
+                                                                        found: a.get_type_str(globals),
+                                                                        val_def: globals.get_area(*x),
+                                                                        info: info.clone(),
+                                                                    })
+                                                            }
+                                                        }).collect::<Result<Vec<_>, _>>()?;
+
+                                                        let mut updated_list = list.clone();
+
+                                                        for idx in 0..len {
+                                                            let mut zip_list = Vec::new();
+                                                            for bucket in &filtered {
+                                                                zip_list.push(bucket[idx]);
+                                                            }
+                                                            let zip_val = store_val_m(
+                                                                Value::Array(zip_list),
+                                                                globals,
+                                                                collect_ctx.inner().start_group,
+                                                                true,
+                                                                info.position,
+                                                            );
+                                                            updated_list.push(zip_val);
+                                                        }
+                                                        added.push((updated_list, collect_ctx));
+                                                    }
+                                                }
+                                                Some(o) => { // future proofing
+                                                    use parser::fmt::SpwnFmt;
+
+                                                    return Err(RuntimeError::CustomError(create_error(
+                                                        info.clone(),
+                                                        "Invalid collection syntax",
+                                                        &[
+                                                            (
+                                                                CodeArea {
+                                                                    pos: expr.values[0].pos,
+                                                                    file: info.position.file
+                                                                },
+                                                                &format!("Unexpected operator `{}`", o.fmt(0)),
+                                                            ),
+                                                        ],
+                                                        None,
+                                                    )));
+                                                }
+                                            }
+                                            //let buckets = expr.
+                                            //let all = all_combinations(arr, )
+                                        },
+                                        _ => {
                                         // ..a
-                                        expr.eval(ctx, globals, info.clone(), constant)?;
-                                        for expr_context in ctx.iter() {
-                                            let evaled_expr = expr_context.inner().return_value;
-                                            match &globals.stored_values[evaled_expr] {
-                                                Value::Array(ar) => {
+                                            expr.eval(ctx, globals, info.clone(), constant)?;
+                                            for expr_context in ctx.iter() {
+                                                let evaled_expr = expr_context.inner().return_value;
 
-                                                },
-                                                a => {
-                                                    return Err(RuntimeError::TypeError {
-                                                        expected: "array".to_string(),
-                                                        found: a.get_type_str(globals),
-                                                        val_def: globals.get_area(evaled_expr),
-                                                        info: info.clone(),
-                                                    })
+                                                match globals.stored_values[evaled_expr].clone() {
+                                                    Value::Array(ar) => {
+                                                        let mut updated_list = list.clone();
+                                                        for to_add in ar {
+                                                            updated_list.push(to_add);
+                                                            globals.push_preserved_val(to_add);
+                                                        }
+                                                        //updated_list.extend(ar);
+                                                        added.push((updated_list, expr_context));
+                                                    },
+                                                    a => {
+                                                        return Err(RuntimeError::TypeError {
+                                                            expected: "array".to_string(),
+                                                            found: a.get_type_str(globals),
+                                                            val_def: globals.get_area(evaled_expr),
+                                                            info: info.clone(),
+                                                        })
+                                                    }
                                                 }
                                             }
                                         }
@@ -1627,24 +1758,22 @@ impl VariableFuncs for ast::Variable {
                                 }
                             }
                             Ok(added)
-                        },
-                        globals,
+                        }
                     )?;
                     //panic!("fix soon");
 
                     for (arr, fc) in combinations {
                         fc.inner().return_value = store_const_value(
                             Value::Array(
-                                arr.iter()
-                                    .enumerate()
-                                    .map(|(i, v)| {
+                                arr.into_iter()
+                                    .map(|v| {
                                         clone_value(
-                                            *v,
+                                            v,
                                             globals,
                                             fc.inner().start_group,
                                             true, // will be changed
                                             CodeArea {
-                                                pos: a[i].value.get_pos(),
+                                                pos: globals.get_area(v).pos,
                                                 ..info.position
                                             },
                                         )
