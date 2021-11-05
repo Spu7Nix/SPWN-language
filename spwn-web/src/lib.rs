@@ -1,4 +1,4 @@
-use std::{panic, path::Path};
+use std::panic;
 
 use wasm_bindgen::prelude::*;
 
@@ -8,12 +8,12 @@ pub fn init_panics() {
 }
 
 fn js_array(values: Vec<String>) -> JsValue {
-    return JsValue::from(
+    JsValue::from(
         values
             .into_iter()
             .map(|x| JsValue::from_str(&x))
             .collect::<js_sys::Array>(),
-    );
+    )
 }
 
 #[wasm_bindgen]

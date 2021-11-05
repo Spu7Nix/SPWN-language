@@ -1,7 +1,7 @@
 use crate::builtins::*;
 use crate::compiler::import_module;
 use crate::compiler::merge_all_contexts;
-use crate::compiler::NULL_STORAGE;
+
 use errors::compiler_info::CodeArea;
 use errors::compiler_info::CompilerInfo;
 use errors::create_error;
@@ -15,9 +15,10 @@ use crate::{compiler_types::*, context::*, globals::Globals, leveldata::*, value
 use shared::FileRange;
 //use std::boxed::Box;
 
-use internment::Intern;
+use internment::LocalIntern;
 
 use fnv::FnvHashMap;
+use std::hash::Hash;
 
 
 
@@ -32,7 +33,7 @@ pub enum Value {
     Number(f64),
     Bool(bool),
     TriggerFunc(TriggerFunction),
-    Dict(FnvHashMap<Intern<String>, StoredValue>),
+    Dict(FnvHashMap<LocalIntern<String>, StoredValue>),
     Macro(Box<Macro>),
     Str(String),
     Array(Vec<StoredValue>),
@@ -52,17 +53,35 @@ const MAX_DICT_EL_DISPLAY: usize = 10;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
     pub args: Vec<MacroArgDef>,
-    pub def_variables: FnvHashMap<Intern<String>, StoredValue>,
-    pub def_file: Intern<SpwnSource>,
+    pub def_variables: FnvHashMap<LocalIntern<String>, StoredValue>,
+    pub def_file: LocalIntern<SpwnSource>,
     pub body: Vec<ast::Statement>,
     pub tag: ast::Attribute,
     pub arg_pos: FileRange,
     pub ret_pattern: Option<StoredValue>,
 }
 
+impl Hash for Macro {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        //self.args.hash(state);
+        for i in &self.def_variables {
+            i.hash(state);
+        }
+        self.def_file.hash(state);
+        //self.body.hash(state);
+        //self.tag.hash(state);
+        self.arg_pos.hash(state);
+        self.ret_pattern.hash(state);
+        /*
+            i omitted the stuff that has ast inside cuz it
+            was too deep of a rabbit hoke to derive Hash for
+        */
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct MacroArgDef {
-    pub name: Intern<String>,
+    pub name: LocalIntern<String>,
     pub default: Option<StoredValue>,
     pub attribute: ast::Attribute,
     pub pattern: Option<StoredValue>,
@@ -81,12 +100,12 @@ pub struct MacroArgDef {
 //         }
 //     }
 // }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub struct TriggerFunction {
     pub start_group: Group,
     //pub all_groups: Vec<Group>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub enum Pattern {
     Type(TypeId),
     Array(Vec<Pattern>),
@@ -130,6 +149,32 @@ pub fn value_equality(val1: StoredValue, val2: StoredValue, globals: &Globals) -
         (a, b) => a == b,
     }
 }
+
+macro_rules! type_id {
+    (group) => {0};
+    (color) => {1};
+    (block) => {2};
+    (item) => {3};
+    (number) => {4};
+    (bool) => {5};
+    (trigger_function) => {6};
+    (dictionary) => {7};
+    (macro) => {8};
+    (string) => {9};
+    (array) => {10};
+    (object) => {11};
+    (spwn) => {12};
+    (builtin) => {13};
+    (type_indicator) => {14};
+    (NULL) => {15};
+    (trigger) => {16};
+    (range) => {17};
+    (pattern) => {18};
+    (object_key) => {19};
+    (epsilon) => {20};
+}
+
+pub(crate) use type_id;
 
 impl Value {
     //numeric representation of value
@@ -188,6 +233,47 @@ impl Value {
     //     }
     // }
 
+    pub fn hash<H: std::hash::Hasher>(&self, state: &mut H, globals: &Globals) {
+        match self {
+            Value::Group(v) => v.hash(state),
+            Value::Color(v) => v.hash(state),
+            Value::Block(v) => v.hash(state),
+            Value::Item(v) => v.hash(state),
+            Value::Number(v) => ((v * 100000.0) as usize).hash(state),
+            Value::Bool(v) => v.hash(state),
+            Value::TriggerFunc(v) => v.hash(state),
+            Value::Dict(v) => {
+                for (k, el) in v {
+                    k.hash(state);
+                    globals.stored_values[*el].hash(state, globals);
+                }
+            },
+            Value::Macro(v) => v.hash(state),
+            Value::Str(v) => v.hash(state),
+            Value::Array(v) => {
+                for i in v {
+                    globals.stored_values[*i].hash(state, globals);
+                }
+            },
+            Value::Obj(v, m) => {
+                for i in v {
+                    i.hash(state);
+                }
+                m.hash(state);
+            },
+            Value::Builtins => "spwn".hash(state),
+            Value::BuiltinFunction(v) => v.hash(state),
+            Value::TypeIndicator(v) => v.hash(state),
+            Value::Range(s, e, st) => {
+                s.hash(state);
+                e.hash(state);
+                st.hash(state);
+            },
+            Value::Pattern(v) => v.hash(state),
+            Value::Null => "null".hash(state),
+        }
+    }
+
     pub fn get_type_str(&self, globals: &Globals) -> String {
         let t = self.to_num(globals);
         find_key_for_value(&globals.type_ids, t).unwrap().clone()
@@ -200,7 +286,7 @@ impl Value {
         globals: &mut Globals,
         context: &Context,
     ) -> Result<bool, RuntimeError> {
-        let pat = if let Value::Pattern(p) = convert_type(pat_val, 18, info, globals, context)? {
+        let pat = if let Value::Pattern(p) = convert_type(pat_val, type_id!(pattern), info, globals, context)? {
             p
         } else {
             unreachable!()
@@ -246,7 +332,7 @@ impl Value {
             }
         }
     }
-    pub fn to_str_full<F, E>(&self, globals: &Globals, mut display_inner: F) -> Result<String, E> where F: FnMut(&Self) -> Result<String, E> {
+    pub fn to_str_full<F, E>(&self, globals: &mut Globals, mut display_inner: F) -> Result<String, E> where F: FnMut(&Self, &mut Globals) -> Result<String, E> {
         Ok(match self {
             Value::Group(g) => {
                 (if let Id::Specific(id) = g.id {
@@ -291,8 +377,8 @@ impl Value {
 
                 let mut d = dict_in.clone();
                 if let Some(n) = d.get(&globals.TYPE_MEMBER_NAME) {
-                    let val = &globals.stored_values[*n];
-                    out += &display_inner(val)?;
+                    let val = globals.stored_values[*n].clone();
+                    out += &display_inner(&val, globals)?;
                     d.remove(&globals.TYPE_MEMBER_NAME);
                     out += "::";
                 }
@@ -307,7 +393,7 @@ impl Value {
                         break;
                     }
 
-                    let stored_val = display_inner(&globals.stored_values[*val])?;
+                    let stored_val = display_inner(&globals.stored_values[*val].clone(), globals)?;
                     out += &format!("{}: {},", key, stored_val);
                 }
                 if !d.is_empty() {
@@ -324,10 +410,10 @@ impl Value {
                     for arg in m.args.iter() {
                         out += &arg.name;
                         if let Some(val) = arg.pattern {
-                            out += &format!(": {}", display_inner(&globals.stored_values[val])?)
+                            out += &format!(": {}", display_inner(&globals.stored_values[val].clone(), globals)?)
                         };
                         if let Some(val) = arg.default {
-                            out += &format!(" = {}", display_inner(&globals.stored_values[val])?)
+                            out += &format!(" = {}", display_inner(&globals.stored_values[val].clone(), globals)?)
                         };
                         out += ", ";
                     }
@@ -343,7 +429,7 @@ impl Value {
                 } else {
                     let mut out = String::from("[");
                     for val in a {
-                        out += &display_inner(&globals.stored_values[*val])?;
+                        out += &display_inner(&globals.stored_values[*val].clone(), globals)?;
                         out += ", ";
                     }
                     out.pop();
@@ -375,8 +461,8 @@ impl Value {
                 Pattern::Type(t) => Value::TypeIndicator(*t).to_str(globals),
                 Pattern::Either(p1, p2) => format!(
                     "{} | {}",
-                    display_inner(&Value::Pattern(*p1.clone()))?,
-                    display_inner(&Value::Pattern(*p2.clone()))?
+                    display_inner(&Value::Pattern(*p1.clone()), globals)?,
+                    display_inner(&Value::Pattern(*p2.clone()), globals)?
                 ),
                 Pattern::Array(a) => {
                     if a.is_empty() {
@@ -397,13 +483,11 @@ impl Value {
         })
     
     }
-    pub fn to_str(&self, globals: &Globals) -> String {
-        self.to_str_full(globals, |val| -> Result<String, ()> { Ok(val.to_str(globals)) }).unwrap()
+    pub fn to_str(&self, globals: &mut Globals) -> String {
+        self.to_str_full(globals, |val, globals| -> Result<String, ()> { Ok(val.to_str(globals)) }).unwrap()
     }
     pub fn display(&self, full_context: &mut FullContext, globals: &mut Globals, info: &CompilerInfo) -> Result<String, RuntimeError> {
-        unsafe {
-            display_val(self.clone(), full_context, globals, info)
-        }
+        display_val(self.clone(), full_context, globals, info)
     }
 }
 
@@ -529,7 +613,7 @@ pub fn convert_type(
             for el in arr {
                 new_vec.push(match globals.stored_values[*el].clone() {
                     Value::Pattern(p) => p,
-                    a => if let Value::Pattern(p) = convert_type(&a, 18, info, globals, context)? {
+                    a => if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), info, globals, context)? {
                         p
                     } else {
                         unreachable!()
@@ -765,6 +849,7 @@ pub trait VariableFuncs {
         globals: &mut Globals,
         info: &CompilerInfo,
         mutable: bool,
+        layer: i16
     ) -> Result<DefineResult, RuntimeError>;
 }
 
@@ -776,7 +861,7 @@ impl VariableFuncs for ast::Variable {
         mut info: CompilerInfo,
         constant: bool,
     ) -> Result<(), RuntimeError> {
-        contexts.reset_return_vals();
+        contexts.reset_return_vals(globals);
         info.position.pos = self.pos;
 
         use ast::IdClass;
@@ -860,7 +945,7 @@ impl VariableFuncs for ast::Variable {
                 }
                 ast::ValueBody::Symbol(string) => {
                     if string.as_ref() == "$" {
-                        full_context.inner().return_value = 0;
+                        full_context.inner().return_value = globals.BUILTIN_STORAGE;
                     } else {
                         match full_context.inner().get_variable(*string) {
                             Some(value) => full_context.inner().return_value = value,
@@ -1493,22 +1578,202 @@ impl VariableFuncs for ast::Variable {
                 }
 
                 ast::ValueBody::Array(a) => {
-                    let combinations =
-                        all_combinations(a.clone(), full_context, globals, info.clone(), constant)?;
+                    //let combinations = all_combinations(a.iter().map(|ref x| x.value.clone()).collect::<Vec<_>>(), full_context, globals, info.clone(), constant)?;
+
+                    let combinations: Vec<(Vec<_>, _)> = reduce_combinations(
+                        a.clone(), 
+                        full_context,
+                        globals, 
+                        |item: &ast::ArrayDef, ctx, list: Vec<StoredValue>, globals| {
+                            let mut added = Vec::new();
+                            match item.operator {
+                                Some(ast::ArrayPrefix::Collect) => {
+                                    let expr = &item.value;
+                                    match &expr.values[0].value.body {
+                                        ast::ValueBody::Array(_) => {
+                                            // ..[a, b]
+                                            if expr.values.len() > 1 {
+                                                use parser::fmt::SpwnFmt;
+
+                                                return Err(RuntimeError::CustomError(create_error(
+                                                    info.clone(),
+                                                    "Invalid collection syntax",
+                                                    &[
+                                                        (
+                                                            CodeArea {
+                                                                pos: expr.values[1].pos,
+                                                                file: info.position.file
+                                                            },
+                                                            &format!("Unexpected value `{}`", expr.values[1].fmt(0)),
+                                                        ),
+                                                    ],
+                                                    None,
+                                                )));
+                                            }
+                                            match &expr.values[0].operator {
+                                                None => {
+                                                    expr.eval(ctx, globals, info.clone(), constant)?;
+                                                    for collect_ctx in ctx.iter() {
+                                                        let buckets = match globals.stored_values.move_out(collect_ctx.inner().return_value) {
+                                                            Value::Array(a) => a,
+                                                            _ => unreachable!()
+                                                        };
+                                                        collect_ctx.inner().return_value = globals.NULL_STORAGE;
+
+
+                                                        let mut info = info.clone();
+
+                                                        info.position.pos = expr.values[0].pos;
+                                                        info.position.pos.0 -= 2;
+
+                                                        if buckets.is_empty() {
+                                                            //new_info.position.pos = expr.values[0].pos;
+                                                            //new_info.position.pos.0 -= 2;
+                                                            return Err(RuntimeError::CustomError(create_error(
+                                                                info,
+                                                                "Empty collection not allowed",
+                                                                &[],
+                                                                None,
+                                                            )));
+                                                        }
+
+                                                        let mut first = true;
+                                                        let mut len = 0;
+
+
+                                                        let filtered = buckets.iter().map(|x| {
+                                                            match globals.stored_values[*x].clone() {
+                                                                Value::Array(b) => {
+                                                                    if first {
+                                                                        len = b.len();
+                                                                        first = false;
+                                                                    }
+
+                                                                    if b.len() != len {
+                                                                        return Err(RuntimeError::CustomError(create_error(
+                                                                            info.clone(),
+                                                                            &format!("Expected array of length {}, found length {}", len, b.len()),
+                                                                            &[
+                                                                                (
+                                                                                    globals.get_area(*x),
+                                                                                    &format!("List should be length {}", len)
+                                                                                )
+                                                                            ],
+                                                                            None,
+                                                                        )));
+                                                                    }
+                                                                    Ok(b)
+                                                                },
+                                                                a => Err(RuntimeError::TypeError {
+                                                                        expected: "array".to_string(),
+                                                                        found: a.get_type_str(globals),
+                                                                        val_def: globals.get_area(*x),
+                                                                        info: info.clone(),
+                                                                    })
+                                                            }
+                                                        }).collect::<Result<Vec<_>, _>>()?;
+
+                                                        let mut updated_list = list.clone();
+
+                                                        for idx in 0..len {
+                                                            let mut zip_list = Vec::new();
+                                                            for bucket in &filtered {
+                                                                zip_list.push(bucket[idx]);
+                                                            }
+                                                            let zip_val = store_val_m(
+                                                                Value::Array(zip_list),
+                                                                globals,
+                                                                collect_ctx.inner().start_group,
+                                                                true,
+                                                                info.position,
+                                                            );
+                                                            updated_list.push(zip_val);
+                                                        }
+                                                        added.push((updated_list, collect_ctx));
+                                                    }
+                                                }
+                                                Some(o) => { // future proofing
+                                                    use parser::fmt::SpwnFmt;
+
+                                                    return Err(RuntimeError::CustomError(create_error(
+                                                        info.clone(),
+                                                        "Invalid collection syntax",
+                                                        &[
+                                                            (
+                                                                CodeArea {
+                                                                    pos: expr.values[0].pos,
+                                                                    file: info.position.file
+                                                                },
+                                                                &format!("Unexpected operator `{}`", o.fmt(0)),
+                                                            ),
+                                                        ],
+                                                        None,
+                                                    )));
+                                                }
+                                            }
+                                            //let buckets = expr.
+                                            //let all = all_combinations(arr, )
+                                        },
+                                        _ => {
+                                        // ..a
+                                            expr.eval(ctx, globals, info.clone(), constant)?;
+                                            for expr_context in ctx.iter() {
+                                                let evaled_expr = expr_context.inner().return_value;
+
+                                                match globals.stored_values[evaled_expr].clone() {
+                                                    Value::Array(ar) => {
+                                                        let mut updated_list = list.clone();
+                                                        for to_add in ar {
+                                                            updated_list.push(to_add);
+                                                            globals.push_preserved_val(to_add);
+                                                        }
+                                                        //updated_list.extend(ar);
+                                                        added.push((updated_list, expr_context));
+                                                    },
+                                                    a => {
+                                                        return Err(RuntimeError::TypeError {
+                                                            expected: "array".to_string(),
+                                                            found: a.get_type_str(globals),
+                                                            val_def: globals.get_area(evaled_expr),
+                                                            info: info.clone(),
+                                                        })
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                _ => {
+                                    // a
+                                    item.value.eval(ctx, globals, info.clone(), constant)?;
+
+                                    for full_context in ctx.iter() {
+                                        let result = full_context.inner().return_value;
+                                        let mut updated_list = list.clone();
+
+                                        updated_list.push(result);
+                                        globals.push_preserved_val(result);
+                                        added.push((updated_list, full_context));
+                                    }
+                                }
+                            }
+                            Ok(added)
+                        }
+                    )?;
+                    //panic!("fix soon");
 
                     for (arr, fc) in combinations {
                         fc.inner().return_value = store_const_value(
                             Value::Array(
-                                arr.iter()
-                                    .enumerate()
-                                    .map(|(i, v)| {
+                                arr.into_iter()
+                                    .map(|v| {
                                         clone_value(
-                                            *v,
+                                            v,
                                             globals,
                                             fc.inner().start_group,
                                             true, // will be changed
                                             CodeArea {
-                                                pos: a[i].get_pos(),
+                                                pos: globals.get_area(v).pos,
                                                 ..info.position
                                             },
                                         )
@@ -1684,7 +1949,7 @@ impl VariableFuncs for ast::Variable {
                                     c.inner().broken = None;
                                 }
                                 None => {
-                                    c.inner().return_value = NULL_STORAGE;
+                                    c.inner().return_value = globals.NULL_STORAGE;
                                 }
                                 _ => (),
                             }
@@ -1910,12 +2175,12 @@ impl VariableFuncs for ast::Variable {
                     macro_to_value(m, full_context, globals, info.clone(), constant)?;
                 }
                 //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
-                ast::ValueBody::Null => full_context.inner().return_value = NULL_STORAGE,
+                ast::ValueBody::Null => full_context.inner().return_value = globals.NULL_STORAGE,
             };
         }
         let mut path_iter = self.path.iter();
         for c in contexts.iter() {
-            (*c.inner()).return_value2 = NULL_STORAGE;
+            (*c.inner()).return_value2 = globals.NULL_STORAGE;
         }
         globals.push_new_preserved();
         for full_context in contexts.iter() {
@@ -2179,7 +2444,7 @@ impl VariableFuncs for ast::Variable {
                                 }
                                 Value::Dict(d) => match &globals.stored_values[index_ptr] {
                                     Value::Str(s) => {
-                                        let intern = Intern::new(s.clone());
+                                        let intern = LocalIntern::new(s.clone());
                                         if !d.contains_key(&intern) {
                                             return Err(RuntimeError::UndefinedErr {
                                                 undefined: s.to_string(),
@@ -2275,7 +2540,7 @@ impl VariableFuncs for ast::Variable {
 
                                                         ObjParam::Epsilon => {
                                                             let mut map = FnvHashMap::<
-                                                                Intern<String>,
+                                                                LocalIntern<String>,
                                                                 StoredValue,
                                                             >::default(
                                                             );
@@ -2591,16 +2856,6 @@ impl VariableFuncs for ast::Variable {
                             &info,
                         )?
                     }
-
-                    UnaryOperator::Range => {
-                        handle_unary_operator(
-                            val_ptr,
-                            Builtin::UnaryRangeOp,
-                            full_context,
-                            globals,
-                            &info,
-                        )?
-                    }
                 }
             }
         }
@@ -2642,6 +2897,7 @@ impl VariableFuncs for ast::Variable {
         globals: &mut Globals,
         info: &CompilerInfo,
         mutable: bool,
+        layer: i16
     ) -> Result<DefineResult, RuntimeError> {
         use ariadne::Fmt;
         use parser::fmt::SpwnFmt;
@@ -2683,7 +2939,7 @@ impl VariableFuncs for ast::Variable {
                         ptr
                     } else {
                         // define or redefine
-                        full_context.inner().new_variable(*a, value, 0);
+                        full_context.inner().new_variable(*a, value, layer);
                         defined = false;
                         value
                     }
@@ -2756,7 +3012,7 @@ impl VariableFuncs for ast::Variable {
                                     });
                                 }
                                 let stored =
-                                    globals.stored_values.map.get_mut(&current_ptr).unwrap();
+                                    globals.stored_values.map.get_mut(current_ptr).unwrap();
                                 if let Value::Dict(d) = &mut stored.val {
                                     (*d).insert(*m, value);
                                     defined = false;
@@ -2798,14 +3054,14 @@ impl VariableFuncs for ast::Variable {
                                 if let Value::Str(st) =
                                     globals.stored_values[first_context_eval].clone()
                                 {
-                                    let intern = Intern::new(st);
+                                    let intern = LocalIntern::new(st);
                                     match d.get(&intern) {
                                         Some(a) => current_ptr = *a,
                                         None => {
                                             let stored = globals
                                                 .stored_values
                                                 .map
-                                                .get_mut(&current_ptr)
+                                                .get_mut(current_ptr)
                                                 .unwrap();
                                             if !stored.mutable {
                                                 return Err(RuntimeError::MutabilityError {
@@ -2963,23 +3219,21 @@ impl VariableFuncs for ast::Variable {
     }
 }
 
-#[allow(clippy::missing_safety_doc)]
-pub unsafe fn display_val(
+pub fn display_val(
     val: Value,
     full_context: &mut FullContext,
-    globals: *mut Globals,
+    globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<String, RuntimeError> {
     
     assert!(matches!(full_context, FullContext::Single(_)));
-    let new_globals = globals.as_mut().unwrap();
-    let stored = store_const_value(val, new_globals, full_context.inner().start_group, Default::default());
+    let stored = store_const_value(val, globals, full_context.inner().start_group, Default::default());
 
-    handle_unary_operator(stored, Builtin::DisplayOp, full_context, new_globals, info)?;
-    Ok(match &new_globals.stored_values[full_context.inner().return_value] {
-        Value::Str(s) => s.clone(),
+    handle_unary_operator(stored, Builtin::DisplayOp, full_context, globals, info)?;
+    Ok(match globals.stored_values[full_context.inner().return_value].clone() {
+        Value::Str(s) => s,
         a => {
-            display_val(a.clone(), full_context, globals, info)?
+            display_val(a, full_context, globals, info)?
         }
     })
     

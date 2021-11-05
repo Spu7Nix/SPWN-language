@@ -5,6 +5,7 @@ use crate::compiler_types::FunctionId;
 use crate::context::Context;
 use fnv::{FnvHashMap, FnvHashSet};
 use parser::ast::ObjectMode;
+use std::hash::Hash;
 
 pub struct TriggerOrder(f32);
 
@@ -19,6 +20,22 @@ pub enum ObjParam {
     Text(String),
     GroupList(Vec<Group>),
     Epsilon,
+}
+
+impl Hash for ObjParam {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            ObjParam::Group(v) => v.hash(state),
+            ObjParam::Color(v) => v.hash(state),
+            ObjParam::Block(v) => v.hash(state),
+            ObjParam::Item(v) => v.hash(state),
+            ObjParam::Number(v) => ((*v * 100000.0) as usize).hash(state),
+            ObjParam::Bool(v) => v.hash(state),
+            ObjParam::Text(v) => v.hash(state),
+            ObjParam::GroupList(v) => v.hash(state),
+            ObjParam::Epsilon => "epsilon".hash(state),
+        }
+    }
 }
 
 impl std::cmp::PartialOrd for GdObj {

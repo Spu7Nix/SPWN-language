@@ -1,4 +1,5 @@
 use shared::StoredValue;
+use slotmap::SlotMap;
 
 ///types and functions used by the compiler
 use crate::builtins::*;
@@ -9,13 +10,10 @@ use crate::globals::Globals;
 use crate::value::*;
 
 use core::panic;
-use fnv::FnvHashMap;
-
-use crate::compiler::{BUILTIN_STORAGE, NULL_STORAGE};
 
 #[derive(Debug)]
 pub struct ValStorage {
-    pub map: FnvHashMap<StoredValue, StoredValData>,
+    pub map: SlotMap<StoredValue, StoredValData>,
     pub preserved_stack: Vec<Vec<StoredValue>>,
     pub prev_value_count: u32,
 }
@@ -40,22 +38,31 @@ impl std::ops::Index<StoredValue> for ValStorage {
     fn index(&self, i: StoredValue) -> &Self::Output {
         &self
             .map
-            .get(&i)
-            .unwrap_or_else(|| panic!("index {} not found", i))
+            .get(i)
+            .unwrap_or_else(|| panic!("index {:?} not found", i))
             .val
     }
 }
 
 impl std::ops::IndexMut<StoredValue> for ValStorage {
     fn index_mut(&mut self, i: StoredValue) -> &mut Self::Output {
-        &mut self.map.get_mut(&i).unwrap().val
+        &mut self.map.get_mut(i).unwrap().val
     }
 }
 
 impl ValStorage {
+
+    pub fn move_out(&mut self, i: StoredValue) -> Value {
+        self
+            .map
+            .remove(i)
+            .unwrap_or_else(|| panic!("index {:?} not found", i))
+            .val
+    }
+    
     pub fn mark(&mut self, root: StoredValue) {
         if !self.marked(root) {
-            (*self.map.get_mut(&root).unwrap()).marked = true;
+            (*self.map.get_mut(root).unwrap()).marked = true;
             match self[root].clone() {
                 Value::Array(a) => {
                     for e in a.iter() {
@@ -95,46 +102,41 @@ impl ValStorage {
 
     fn marked(&self, root: StoredValue) -> bool {
         self.map
-            .get(&root)
-            .unwrap_or_else(|| panic!("Could not find {}", root))
+            .get(root)
+            .unwrap_or_else(|| panic!("Could not find {:?}", root))
             .marked
     }
 
-    pub fn new() -> Self {
-        ValStorage {
-            map: vec![
-                (
-                    BUILTIN_STORAGE,
-                    StoredValData {
-                        val: Value::Builtins,
-                        fn_context: Group::new(0),
-                        mutable: false,
-                        def_area: CodeArea::new(),
-                        marked: false,
-                    },
-                ),
-                (
-                    NULL_STORAGE,
-                    StoredValData {
-                        val: Value::Null,
-                        fn_context: Group::new(0),
-                        mutable: false,
-                        def_area: CodeArea::new(),
-                        marked: false,
-                    },
-                ),
-            ]
-            .iter()
-            .cloned()
-            .collect(),
-            preserved_stack: Vec::new(),
-            prev_value_count: 100,
-        }
+    pub fn new() -> (Self, StoredValue, StoredValue) {
+        let mut map = SlotMap::with_key();
+        let builtin_storage = map.insert(StoredValData {
+            val: Value::Builtins,
+            fn_context: Group::new(0),
+            mutable: false,
+            def_area: CodeArea::new(),
+            marked: false,
+        });
+        let null_storage = map.insert(StoredValData {
+            val: Value::Null,
+            fn_context: Group::new(0),
+            mutable: false,
+            def_area: CodeArea::new(),
+            marked: false,
+        });
+        (
+            ValStorage {
+                map,
+                preserved_stack: Vec::new(),
+                prev_value_count: 100,
+            },
+            builtin_storage,
+            null_storage,
+        )
     }
 
     pub fn set_mutability(&mut self, index: StoredValue, mutable: bool) {
         if !mutable || !matches!(self[index], Value::Macro(_)) {
-            (*self.map.get_mut(&index).unwrap()).mutable = mutable;
+            (*self.map.get_mut(index).unwrap()).mutable = mutable;
         }
 
         match self[index].clone() {
@@ -175,11 +177,6 @@ impl ValStorage {
     // }
 }
 
-impl Default for ValStorage {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 // pub fn store_value(
 //     val: Value,
 //     lifetime: u16,
@@ -302,21 +299,13 @@ pub fn clone_value(
     //do the thing
     //bing bang
     //profit
-    let new_index = globals.val_id;
-    //println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
-
-    (*globals).stored_values.map.insert(
-        new_index,
-        StoredValData {
-            val: old_val,
-            fn_context,
-            mutable: !constant,
-            def_area: area,
-            marked: false,
-        },
-    );
-    (*globals).val_id += 1;
-    new_index
+    (*globals).stored_values.map.insert(StoredValData {
+        val: old_val,
+        fn_context,
+        mutable: !constant,
+        def_area: area,
+        marked: false,
+    })
 }
 
 pub fn clone_value_preserve_area(
@@ -331,22 +320,14 @@ pub fn clone_value_preserve_area(
     //do the thing
     //bing bang
     //profit
-    let new_index = globals.val_id;
-    ////println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
+    (*globals).stored_values.map.insert(StoredValData {
+        val: old_val,
+        fn_context,
+        mutable: !constant,
 
-    (*globals).stored_values.map.insert(
-        new_index,
-        StoredValData {
-            val: old_val,
-            fn_context,
-            mutable: !constant,
-
-            def_area: globals.get_area(index),
-            marked: false,
-        },
-    );
-    (*globals).val_id += 1;
-    new_index
+        def_area: globals.get_area(index),
+        marked: false,
+    })
 }
 
 // pub fn clone_value_to(
@@ -385,26 +366,13 @@ pub fn store_const_value(
     fn_context: Group,
     area: CodeArea,
 ) -> StoredValue {
-    let index = globals.val_id;
-    // println!(
-    //     "2index: {}, value: {}, area: {:?}",
-    //     index,
-    //     val.to_str(&globals),
-    //     area
-    // );
-
-    (*globals).stored_values.map.insert(
-        index,
-        StoredValData {
-            val,
-            fn_context,
-            mutable: false,
-            def_area: area,
-            marked: false,
-        },
-    );
-    (*globals).val_id += 1;
-    index
+    (*globals).stored_values.map.insert(StoredValData {
+        val,
+        fn_context,
+        mutable: false,
+        def_area: area,
+        marked: false,
+    })
 }
 
 pub fn store_val_m(
@@ -414,18 +382,11 @@ pub fn store_val_m(
     constant: bool,
     area: CodeArea,
 ) -> StoredValue {
-    let index = globals.val_id;
-
-    (*globals).stored_values.map.insert(
-        index,
-        StoredValData {
-            val,
-            fn_context,
-            mutable: !constant,
-            def_area: area,
-            marked: false,
-        },
-    );
-    (*globals).val_id += 1;
-    index
+    (*globals).stored_values.map.insert(StoredValData {
+        val,
+        fn_context,
+        mutable: !constant,
+        def_area: area,
+        marked: false,
+    })
 }

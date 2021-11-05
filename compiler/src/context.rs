@@ -9,10 +9,8 @@ use errors::compiler_info::CodeArea;
 //use std::boxed::Box;
 use fnv::FnvHashMap;
 
-use internment::Intern;
+use internment::LocalIntern;
 use shared::{BreakType, StoredValue};
-
-use crate::compiler::NULL_STORAGE;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VariableData {
@@ -29,7 +27,7 @@ pub struct Context {
     pub start_group: Group,
     pub func_id: FnIdPtr,
     pub fn_context_change_stack: Vec<CodeArea>,
-    variables: FnvHashMap<Intern<String>, Vec<VariableData>>,
+    variables: FnvHashMap<LocalIntern<String>, Vec<VariableData>>,
     pub return_value: StoredValue,
     pub return_value2: StoredValue,
     pub root_context_ptr: *mut FullContext,
@@ -42,8 +40,8 @@ pub enum FullContext {
 }
 
 impl FullContext {
-    pub fn new() -> Self {
-        let mut new = FullContext::Single(Context::new());
+    pub fn new(globals: &Globals) -> Self {
+        let mut new = FullContext::Single(Context::new(globals));
         new.inner().root_context_ptr = &mut new;
         new
     }
@@ -113,17 +111,17 @@ impl FullContext {
         // all_removed
     }
 
-    pub fn reset_return_vals(&mut self) {
+    pub fn reset_return_vals(&mut self, globals: &Globals) {
         for c in self.with_breaks() {
             let c = c.inner();
-            (*c).return_value = NULL_STORAGE;
-            (*c).return_value2 = NULL_STORAGE;
+            (*c).return_value = globals.NULL_STORAGE;
+            (*c).return_value2 = globals.NULL_STORAGE;
         }
     }
 
     pub fn set_variable_and_clone(
         &mut self,
-        name: Intern<String>,
+        name: LocalIntern<String>,
         val: StoredValue,
         layer: i16,
         constant: bool,
@@ -143,7 +141,7 @@ impl FullContext {
 
     pub fn set_variable_and_store(
         &mut self,
-        name: Intern<String>,
+        name: LocalIntern<String>,
         val: Value,
         layer: i16,
         constant: bool,
@@ -178,11 +176,11 @@ impl FullContext {
     pub fn iter(&mut self) -> ContextIter {
         ContextIter::new(self)
     }
-}
 
-impl Default for FullContext {
-    fn default() -> Self {
-        Self::new()
+    pub fn from_ptr(ptr: *mut FullContext) -> &'static mut FullContext {
+        unsafe {
+            ptr.as_mut().unwrap()
+        }
     }
 }
 
@@ -298,7 +296,7 @@ impl<'a> Iterator for ContextIterWithBreaks<'a> {
 }
 
 impl Context {
-    fn new() -> Context {
+    fn new(globals: &Globals) -> Context {
         Context {
             start_group: Group::new(0),
             //spawn_triggered: false,
@@ -310,8 +308,8 @@ impl Context {
             broken: None,
 
             fn_context_change_stack: Vec::new(),
-            return_value: NULL_STORAGE,
-            return_value2: NULL_STORAGE,
+            return_value: globals.NULL_STORAGE,
+            return_value2: globals.NULL_STORAGE,
             root_context_ptr: std::ptr::null_mut(),
         }
     }
@@ -326,11 +324,11 @@ impl Context {
         self.func_id = globals.func_ids.len() - 1;
     }
 
-    pub fn get_variable(&self, name: Intern<String>) -> Option<StoredValue> {
+    pub fn get_variable(&self, name: LocalIntern<String>) -> Option<StoredValue> {
         self.variables.get(&name).map(|a| a.last().unwrap().val)
     }
 
-    pub fn is_redefinable(&self, name: Intern<String>) -> Option<bool> {
+    pub fn is_redefinable(&self, name: LocalIntern<String>) -> Option<bool> {
         self.variables
             .get(&name)
             .map(|a| a.last().unwrap().redefinable)
@@ -338,7 +336,7 @@ impl Context {
 
     fn new_variable_full(
         &mut self,
-        name: Intern<String>,
+        name: LocalIntern<String>,
         val: StoredValue,
         layer: i16,
         redefinable: bool,
@@ -362,20 +360,25 @@ impl Context {
         }
     }
 
-    pub fn new_variable(&mut self, name: Intern<String>, val: StoredValue, layer: i16) {
+    pub fn new_variable(&mut self, name: LocalIntern<String>, val: StoredValue, layer: i16) {
         self.new_variable_full(name, val, layer, false)
     }
 
     // only used in extract statements
-    pub fn new_redefinable_variable(&mut self, name: Intern<String>, val: StoredValue, layer: i16) {
+    pub fn new_redefinable_variable(
+        &mut self,
+        name: LocalIntern<String>,
+        val: StoredValue,
+        layer: i16,
+    ) {
         self.new_variable_full(name, val, layer, true)
     }
 
-    pub fn get_variables(&self) -> &FnvHashMap<Intern<String>, Vec<VariableData>> {
+    pub fn get_variables(&self) -> &FnvHashMap<LocalIntern<String>, Vec<VariableData>> {
         &self.variables
     }
 
-    pub fn set_all_variables(&mut self, vars: FnvHashMap<Intern<String>, Vec<VariableData>>) {
+    pub fn set_all_variables(&mut self, vars: FnvHashMap<LocalIntern<String>, Vec<VariableData>>) {
         (*self).variables = vars;
     }
 }

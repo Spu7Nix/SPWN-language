@@ -18,7 +18,7 @@ use shared::SpwnSource;
 use std::path::PathBuf;
 
 use errors::SyntaxError;
-use internment::Intern;
+use internment::LocalIntern;
 //use ast::ValueLiteral;
 use logos::Lexer;
 use logos::Logos;
@@ -1296,7 +1296,7 @@ fn parse_dict(
 ) -> Result<Vec<ast::DictDef>, SyntaxError> {
     let mut defs = Vec::<ast::DictDef>::new();
 
-    let mut defined_members = FnvHashMap::<Intern<String>, FileRange>::default();
+    let mut defined_members = FnvHashMap::<LocalIntern<String>, FileRange>::default();
 
     loop {
         match tokens.next(false) {
@@ -1311,10 +1311,10 @@ fn parse_dict(
                     s
                 };
 
-                let symbol = Intern::new(symbol);
+                let symbol = LocalIntern::new(symbol);
 
                 if let Some(range) = defined_members.get(&symbol) {
-                    let file = Intern::new(notes.file.clone());
+                    let file = LocalIntern::new(notes.file.clone());
                     return Err(SyntaxError::CustomError(create_error(
                         CompilerInfo::from_area(CodeArea {
                             file,
@@ -1489,7 +1489,7 @@ fn parse_args(
                     None => unreachable!(),
                 };
                 let start = tokens.position().0;
-                let symbol = Some(Intern::new(tokens.slice()));
+                let symbol = Some(LocalIntern::new(tokens.slice()));
                 tokens.next(false);
                 let value = parse_expr(tokens, notes, true, true)?;
                 let end = tokens.position().1;
@@ -1572,7 +1572,7 @@ fn parse_arg_def(
             _ => false,
         };
 
-        let symbol = Intern::new(tokens.slice());
+        let symbol = LocalIntern::new(tokens.slice());
         let start = tokens.position().0;
 
         args.push(match tokens.next(false) {
@@ -1960,14 +1960,17 @@ fn parse_variable(
             }
         }
 
-        Some(Token::DotDot) => {
-            first_token = tokens.next(false);
-            Some(ast::UnaryOperator::Range)
-        }
-
         Some(Token::Increment) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Increment)
+        }
+
+        Some(Token::DotDot) => {
+            return Err(SyntaxError::SyntaxError {
+                message: "SPWN no longer supports .. as a unary range operator. Replace with 0.. to fix.".to_string(),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            });
         }
         Some(Token::Decrement) => {
             first_token = tokens.next(false);
@@ -1978,17 +1981,19 @@ fn parse_variable(
 
     let value = match first_token {
         // what kind of variable is it?
-        Some(Token::Number) => ast::ValueBody::Number(match tokens.slice().replace("_","").parse() {
-            Ok(n) => n, // its a valid number
-            Err(err) => {
-                return Err(SyntaxError::SyntaxError {
-                    message: format!("Error when parsing number: {}", err),
+        Some(Token::Number) => {
+            ast::ValueBody::Number(match tokens.slice().replace("_", "").parse() {
+                Ok(n) => n, // its a valid number
+                Err(err) => {
+                    return Err(SyntaxError::SyntaxError {
+                        message: format!("Error when parsing number: {}", err),
 
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                });
-            }
-        }),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+            })
+        }
         Some(Token::StringLiteral) => {
             // is a string
 
@@ -2038,7 +2043,7 @@ fn parse_variable(
         Some(Token::Null) => ast::ValueBody::Null,
         Some(Token::SelfVal) => ast::ValueBody::SelfVal,
         Some(Token::Symbol) => {
-            let symbol = Intern::new(tokens.slice());
+            let symbol = LocalIntern::new(tokens.slice());
 
             match tokens.next(false) {
                 Some(Token::ThickArrow) => {
@@ -2175,9 +2180,27 @@ fn parse_variable(
                     if tokens.next(false) != Some(Token::ClosingSquareBracket) {
                         tokens.previous();
                         loop {
+                            let mut prefix = None;
+                            let mut test_tokens = tokens.clone();
+
+                            // array prefixes
+                            match tokens.next(false) {
+                                Some(Token::DotDot) => {
+                                    prefix = Some(ast::ArrayPrefix::Collect);
+                                }
+                                _ => {
+                                    tokens.previous_no_ignore(false);
+                                }
+                            }
+
                             let item = parse_expr(tokens, notes, true, true)?;
                             match tokens.next(false) {
                                 Some(Token::For) => {
+                                    if prefix.is_some() {
+                                        let _fail = parse_expr(&mut test_tokens, notes, true, true)?; // guaranteed to fail
+
+                                        unreachable!();
+                                    }
                                     if !arr.is_empty() {
                                         expected!(
                                             "comma (',') or ']'".to_string(),
@@ -2237,7 +2260,7 @@ fn parse_variable(
 
                                             potential_listcomp = Some(ast::Comprehension {
                                                 body: item,
-                                                symbol: Intern::new(tok_name),
+                                                symbol: LocalIntern::new(tok_name),
                                                 iterator: iter,
                                                 condition: potential_condition,
                                             });
@@ -2248,7 +2271,10 @@ fn parse_variable(
                                 }
                                 Some(Token::Comma) => {
                                     //accounting for trailing comma
-                                    arr.push(item);
+                                    arr.push(ast::ArrayDef {
+                                        value: item,
+                                        operator: prefix
+                                    });
                                     if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
                                         break;
                                     } else {
@@ -2256,7 +2282,10 @@ fn parse_variable(
                                     }
                                 }
                                 Some(Token::ClosingSquareBracket) => {
-                                    arr.push(item);
+                                    arr.push(ast::ArrayDef {
+                                        value: item,
+                                        operator: prefix
+                                    });
                                     break;
                                 }
                                 a => expected!(
@@ -2442,14 +2471,14 @@ fn parse_variable(
             Some(Token::OpenBracket) => path.push(ast::Path::Call(parse_args(tokens, notes)?)),
             Some(Token::Period) => match tokens.next(false) {
                 Some(Token::Symbol) | Some(Token::Type) => {
-                    path.push(ast::Path::Member(Intern::new(tokens.slice())))
+                    path.push(ast::Path::Member(LocalIntern::new(tokens.slice())))
                 }
                 a => expected!("member name".to_string(), tokens, notes, a),
             },
 
             Some(Token::DoubleColon) => match tokens.next(false) {
                 Some(Token::Symbol) | Some(Token::Type) => {
-                    path.push(ast::Path::Associated(Intern::new(tokens.slice())))
+                    path.push(ast::Path::Associated(LocalIntern::new(tokens.slice())))
                 }
                 Some(Token::OpenCurlyBracket) => {
                     path.push(ast::Path::Constructor(parse_dict(tokens, notes)?))

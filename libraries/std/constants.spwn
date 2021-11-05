@@ -251,5 +251,8 @@ return {
         ANIMATION_SPEED : ok(107, @number),
         LINKED_GROUP : ok(108, @number),
         ACTIVE_TRIGGER: ok(36, @bool),
-    }
+    },
+
+    PI: $.acos(-1),
+    EULER: $.exp(1),
 }

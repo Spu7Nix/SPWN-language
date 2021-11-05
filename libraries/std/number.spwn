@@ -9,6 +9,10 @@ impl @number {
     (self, min: @number, max: @number){
         return $.min($.max(self,min),max);
     },
+    is_finite: #[desc("Checks if the number is finite") example("$.assert((0/0).is_finite()) == false")]
+    (self){
+        return self - self == 0
+    },
 }
 
 

@@ -1,5 +1,5 @@
 use crate::builtins::*;
-use crate::compiler::NULL_STORAGE;
+
 use crate::context::*;
 use crate::globals::Globals;
 use crate::leveldata::*;
@@ -17,13 +17,13 @@ use fnv::FnvHashMap;
 
 use crate::compiler::compile_scope;
 
-use internment::Intern;
+use internment::LocalIntern;
 use shared::StoredValue;
 
 pub type TypeId = u16;
 //                                                               This bool is for if this value
 //                                                               was implemented in the current module
-pub type Implementations = FnvHashMap<TypeId, FnvHashMap<Intern<String>, (StoredValue, bool)>>;
+pub type Implementations = FnvHashMap<TypeId, FnvHashMap<LocalIntern<String>, (StoredValue, bool)>>;
 
 pub type FnIdPtr = usize;
 
@@ -53,11 +53,11 @@ pub fn handle_operator(
     globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals();
+    contexts.reset_return_vals(globals);
     for full_context in contexts.iter() {
         let fn_context = full_context.inner().start_group;
         if let Some(val) = globals.stored_values[value1].clone().member(
-            Intern::new(String::from(macro_name)),
+            LocalIntern::new(String::from(macro_name)),
             full_context.inner(),
             globals,
             info.clone(),
@@ -132,11 +132,11 @@ pub fn handle_unary_operator(
     globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals();
+    contexts.reset_return_vals(globals);
     for full_context in contexts.iter() {
         let context = full_context.inner();
         if let Some(val) = globals.stored_values[value].clone().member(
-            Intern::new(String::from(macro_name)),
+            LocalIntern::new(String::from(macro_name)),
             context,
             globals,
             info.clone(),
@@ -175,6 +175,10 @@ pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError
     Ok(rounded as i32)
 }
 
+pub fn stored_to_variable(v: StoredValue, globals: &Globals) -> ast::Variable {
+    ast::ValueBody::Resolved(v).to_variable(globals.get_area(v).pos)
+}
+
 pub trait EvalExpression {
     fn eval(
         &self,
@@ -193,7 +197,7 @@ impl EvalExpression for ast::Expression {
         mut info: CompilerInfo,
         constant: bool,
     ) -> Result<(), RuntimeError> {
-        contexts.reset_return_vals();
+        contexts.reset_return_vals(globals);
         let mut vals = self.values.iter();
         let first = vals.next().unwrap();
 
@@ -331,7 +335,7 @@ pub fn execute_macro(
     parent: StoredValue,
     info: CompilerInfo,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals();
+    contexts.reset_return_vals(globals);
     globals.push_new_preserved();
     for context in contexts.with_breaks() {
         for val in context
@@ -379,7 +383,8 @@ pub fn execute_macro(
     //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
-        let mut new_variables: FnvHashMap<Intern<String>, Vec<VariableData>> = Default::default();
+        let mut new_variables: FnvHashMap<LocalIntern<String>, Vec<VariableData>> =
+            Default::default();
         let context = full_context.inner();
 
         let fn_context = context.start_group;
@@ -627,8 +632,8 @@ Should be used like this: value.macro(arguments)",
                             (*context.inner()).return_value = val;
                             val
                         } else {
-                            (*context.inner()).return_value = NULL_STORAGE;
-                            NULL_STORAGE
+                            (*context.inner()).return_value = globals.NULL_STORAGE;
+                            globals.NULL_STORAGE
                         };
                         if let Some(pat) = m.ret_pattern {
                             //dbg!(&globals.stored_values[pat], &globals.stored_values[ret]);
@@ -639,8 +644,8 @@ Should be used like this: value.macro(arguments)",
                                 context.inner(),
                             )? {
                                 return Err(RuntimeError::PatternMismatchError {
-                                    pattern: globals.stored_values[pat].to_str(globals),
-                                    val: globals.stored_values[ret].to_str(globals),
+                                    pattern: globals.stored_values[pat].clone().to_str(globals),
+                                    val: globals.stored_values[ret].clone().to_str(globals),
                                     pat_def: globals.get_area(pat),
                                     val_def: globals.get_area(ret),
                                     info,
@@ -678,29 +683,22 @@ Should be used like this: value.macro(arguments)",
     Ok(())
 }
 
-pub fn all_combinations<'a>(
-    a: Vec<ast::Expression>,
+pub fn reduce_combinations<'a, T, F>(
+    a: Vec<T>,
     contexts: &'a mut FullContext,
     globals: &mut Globals,
-    info: CompilerInfo,
-    constant: bool,
-) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
+    reduce: F
+) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> where 
+    F: Fn(&T, &'a mut FullContext, Vec<StoredValue>, &mut Globals) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> 
+{
     globals.push_new_preserved();
 
     let mut out = vec![(Vec::new(), contexts)];
     for expr in a {
         let mut new_out = Vec::new();
         for (list, full_context) in out.into_iter() {
-            expr.eval(full_context, globals, info.clone(), constant)?;
-
-            for full_context in full_context.iter() {
-                let mut new_list = list.clone();
-                new_list.push(full_context.inner().return_value);
-
-                globals.push_preserved_val(full_context.inner().return_value);
-
-                new_out.push((new_list, full_context));
-            }
+            let new_list = reduce(&expr, full_context, list.clone(), globals)?;
+            new_out.extend(new_list);
         }
         out = new_out;
     }
@@ -708,6 +706,34 @@ pub fn all_combinations<'a>(
 
     Ok(out)
 }
+
+pub fn all_combinations<'a>(
+    a: Vec<ast::Expression>,
+    contexts: &'a mut FullContext,
+    globals: &mut Globals,
+    info: CompilerInfo,
+    constant: bool,
+) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
+    reduce_combinations(
+        a, 
+        contexts, 
+        globals,
+    |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
+        e.eval(ctx, globals, info.clone(), constant)?;
+        let mut added = Vec::new();
+
+        for full_context in ctx.iter() {
+            let result = full_context.inner().return_value;
+            let mut updated_list = list.clone();
+
+            updated_list.push(result);
+            globals.push_preserved_val(result);
+            added.push((updated_list, full_context));
+        }
+        Ok(added)
+    })
+}
+
 pub fn eval_dict(
     dict: Vec<ast::DictDef>,
     contexts: &mut FullContext,
@@ -715,7 +741,7 @@ pub fn eval_dict(
     info: CompilerInfo,
     constant: bool,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals();
+    contexts.reset_return_vals(globals);
     let combinations = all_combinations(
         dict.iter()
             .map(|def| match def {
@@ -736,7 +762,7 @@ pub fn eval_dict(
     }
     for (results, full_context) in combinations {
         let context = full_context.inner();
-        let mut dict_out: FnvHashMap<Intern<String>, StoredValue> = Default::default();
+        let mut dict_out: FnvHashMap<LocalIntern<String>, StoredValue> = Default::default();
         for (expr_index, def) in dict.iter().enumerate() {
             match def {
                 ast::DictDef::Def(d) => {
@@ -801,7 +827,7 @@ impl ToTriggerFunc for ast::CompoundStatement {
         info: CompilerInfo,
         start_group: Option<Group>,
     ) -> Result<(), RuntimeError> {
-        contexts.reset_return_vals();
+        contexts.reset_return_vals(globals);
         for full_context in contexts.iter() {
             let mut prev_context = full_context.clone();
 

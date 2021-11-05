@@ -444,7 +444,7 @@ c %= 10
     (self, num: @number | @counter) {
         out = @counter::new(0, bits = self.bits)
         self.divide(num, remainder = out)
-        self.reset(0, bits = self.bits)
+        self.reset()
         out.add_to([self])
     },
 

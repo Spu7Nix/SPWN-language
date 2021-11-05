@@ -5,15 +5,31 @@ type @vector
 
 impl @vector {
     new: #[constructor] ( dims: [@number] ) {
-        return @vector::{
-            dims
+        if dims.length < 1 {
+            throw "Cannot create a vector with less than 1 dimension"
         }
+        return switch dims.length {
+            case 2: @vector::{ dims, x: dims[0], y: dims[1] }
+            case 3: @vector::{ dims, x: dims[0], y: dims[1], z: dims[2] }
+            case 4: @vector::{ dims, x: dims[0], y: dims[1], z: dims[2], w: dims[3] }
+            else: @vector::{ dims }
+        }
+    },
+    new2: #[constructor] ( x: @number, y: @number ) {
+        return @vector::{ dims: [x,y], x, y }
+    },
+    new3: #[constructor] ( x: @number, y: @number, z: @number ) {
+        return @vector::{ dims: [x,y,z], x, y, z }
     },
 
     assert_dims: #[desc("Asserts if the vectors have the same number of dimensions")] (self, other: @vector) {
         if self.dims.length != other.dims.length {
             throw "Vectors must have the same amount of dimensions"
         }
+    },
+
+    _display_: (self) {
+        return '(' + ", ".join(self.dims) + ')'
     },
 
     _plus_: (self, other: @vector) {
@@ -125,7 +141,7 @@ impl @vector {
 
     _equal_: (self, other: @vector) {
         self.assert_dims(other)
-        for i in ..self.dims.length {
+        for i in 0..self.dims.length {
             if self.dims[i] != other.dims[i] { return false; }
         }
         return true
@@ -142,7 +158,7 @@ impl @vector {
     dot: (self, other: @vector) {
         self.assert_dims(other)
         let result = 0
-        for i in ..self.dims.length {
+        for i in 0..self.dims.length {
             result += self.dims[i] * other.dims[i]
         }
         return result
@@ -240,7 +256,7 @@ impl @vector {
     max_dim: (self) {
         let max = self.dims[0]
         let max_i = 0
-        for i in ..self.dims.length {
+        for i in 0..self.dims.length {
             if self.dims[i] > max {
                 max = self.dims[i]
                 max_i = i
@@ -251,7 +267,7 @@ impl @vector {
     min_dim: (self) {
         let min = self.dims[0]
         let min_i = 0
-        for i in ..self.dims.length {
+        for i in 0..self.dims.length {
             if self.dims[i] < min {
                 min = self.dims[i]
                 min_i = i
@@ -282,6 +298,16 @@ impl @vector {
         } else {
             throw "Rotating a vector around another works only for 3D vectors"
         }
+    },
+    rotated_2d: (self, angle: @number) {
+        if self.dims.length == 2 {
+            return @vector::new([
+                self.x * $.cos(angle) - self.y * $.sin(angle),
+                self.x * $.sin(angle) + self.y * $.cos(angle),
+            ])
+        } else {
+            throw "Rotating a vector in 2D works only for 2D vectors 😳"
+        } 
     },
     slerp: (self, other: @vector, t: @number) {
         self.assert_dims(other)
