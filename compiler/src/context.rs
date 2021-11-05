@@ -178,9 +178,7 @@ impl FullContext {
     }
 
     pub fn from_ptr(ptr: *mut FullContext) -> &'static mut FullContext {
-        unsafe {
-            ptr.as_mut().unwrap()
-        }
+        unsafe { ptr.as_mut().unwrap() }
     }
 }
 

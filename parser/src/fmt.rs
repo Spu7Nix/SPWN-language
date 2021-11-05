@@ -252,7 +252,7 @@ impl SpwnFmt for ArrayDef {
     fn fmt(&self, ind: Indent) -> String {
         match &self.operator {
             Some(ArrayPrefix::Collect) => format!("..{}", self.value.fmt(ind)),
-            None => self.value.fmt(ind)
+            None => self.value.fmt(ind),
         }
     }
 }
@@ -470,6 +470,12 @@ impl SpwnFmt for UnaryOperator {
             UnaryOperator::Minus => "-",
             UnaryOperator::Decrement => "--",
             UnaryOperator::Increment => "++",
+            UnaryOperator::EqPattern => "==",
+            UnaryOperator::NotEqPattern => "!=",
+            UnaryOperator::MorePattern => ">",
+            UnaryOperator::LessPattern => "<",
+            UnaryOperator::MoreOrEqPattern => ">=",
+            UnaryOperator::LessOrEqPattern => "<=",
         }
         .to_string()
     }

@@ -1967,7 +1967,9 @@ fn parse_variable(
 
         Some(Token::DotDot) => {
             return Err(SyntaxError::SyntaxError {
-                message: "SPWN no longer supports .. as a unary range operator. Replace with 0.. to fix.".to_string(),
+                message:
+                    "SPWN no longer supports .. as a unary range operator. Replace with 0.. to fix."
+                        .to_string(),
                 pos: tokens.position(),
                 file: notes.file.clone(),
             });
@@ -1975,6 +1977,31 @@ fn parse_variable(
         Some(Token::Decrement) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Decrement)
+        }
+        Some(Token::Equal) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::EqPattern)
+        }
+        Some(Token::NotEqual) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::NotEqPattern)
+        }
+        Some(Token::MoreThan) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::MorePattern)
+        }
+        Some(Token::LessThan) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::LessPattern)
+        }
+
+        Some(Token::MoreOrEqual) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::MoreOrEqPattern)
+        }
+        Some(Token::LessOrEqual) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::LessOrEqPattern)
         }
         _ => None,
     };
@@ -2197,7 +2224,8 @@ fn parse_variable(
                             match tokens.next(false) {
                                 Some(Token::For) => {
                                     if prefix.is_some() {
-                                        let _fail = parse_expr(&mut test_tokens, notes, true, true)?; // guaranteed to fail
+                                        let _fail =
+                                            parse_expr(&mut test_tokens, notes, true, true)?; // guaranteed to fail
 
                                         unreachable!();
                                     }
@@ -2273,7 +2301,7 @@ fn parse_variable(
                                     //accounting for trailing comma
                                     arr.push(ast::ArrayDef {
                                         value: item,
-                                        operator: prefix
+                                        operator: prefix,
                                     });
                                     if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
                                         break;
@@ -2284,7 +2312,7 @@ fn parse_variable(
                                 Some(Token::ClosingSquareBracket) => {
                                     arr.push(ast::ArrayDef {
                                         value: item,
-                                        operator: prefix
+                                        operator: prefix,
                                     });
                                     break;
                                 }

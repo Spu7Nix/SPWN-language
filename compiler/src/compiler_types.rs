@@ -76,7 +76,7 @@ pub fn handle_operator(
                 if let Some(target_typ) = m.args[0].pattern {
                     let pat = &globals.stored_values[target_typ].clone();
 
-                    if !val2.matches_pat(pat, info, globals, full_context.inner())? {
+                    if !val2.pure_matches_pat(pat, info, globals, full_context.inner().clone())? {
                         //if types dont match, act as if there is no macro at all
                         built_in_function(
                             macro_name,
@@ -418,7 +418,7 @@ pub fn execute_macro(
                             let val = globals.stored_values[arg_values[i]].clone();
                             let pat = globals.stored_values[t].clone();
 
-                            if !val.matches_pat(&pat, &info, globals, context)? {
+                            if !val.pure_matches_pat(&pat, &info, globals, context.clone())? {
                                 return Err(RuntimeError::PatternMismatchError {
                                     pattern: pat.to_str(globals),
                                     val: val.get_type_str(globals),
@@ -500,7 +500,7 @@ pub fn execute_macro(
                         let val = globals.stored_values[arg_values[i]].clone();
                         let pat = globals.stored_values[t].clone();
 
-                        if !val.matches_pat(&pat, &info, globals, context)? {
+                        if !val.pure_matches_pat(&pat, &info, globals, context.clone())? {
                             return Err(RuntimeError::PatternMismatchError {
                                 pattern: pat.to_str(globals),
                                 val: val.get_type_str(globals),
@@ -637,11 +637,11 @@ Should be used like this: value.macro(arguments)",
                         };
                         if let Some(pat) = m.ret_pattern {
                             //dbg!(&globals.stored_values[pat], &globals.stored_values[ret]);
-                            if !globals.stored_values[ret].clone().matches_pat(
+                            if !globals.stored_values[ret].clone().pure_matches_pat(
                                 &globals.stored_values[pat].clone(),
                                 &info,
                                 globals,
-                                context.inner(),
+                                context.inner().clone(),
                             )? {
                                 return Err(RuntimeError::PatternMismatchError {
                                     pattern: globals.stored_values[pat].clone().to_str(globals),
@@ -687,9 +687,15 @@ pub fn reduce_combinations<'a, T, F>(
     a: Vec<T>,
     contexts: &'a mut FullContext,
     globals: &mut Globals,
-    reduce: F
-) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> where 
-    F: Fn(&T, &'a mut FullContext, Vec<StoredValue>, &mut Globals) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> 
+    reduce: F,
+) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError>
+where
+    F: Fn(
+        &T,
+        &'a mut FullContext,
+        Vec<StoredValue>,
+        &mut Globals,
+    ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError>,
 {
     globals.push_new_preserved();
 
@@ -715,23 +721,24 @@ pub fn all_combinations<'a>(
     constant: bool,
 ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
     reduce_combinations(
-        a, 
-        contexts, 
+        a,
+        contexts,
         globals,
-    |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
-        e.eval(ctx, globals, info.clone(), constant)?;
-        let mut added = Vec::new();
+        |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
+            e.eval(ctx, globals, info.clone(), constant)?;
+            let mut added = Vec::new();
 
-        for full_context in ctx.iter() {
-            let result = full_context.inner().return_value;
-            let mut updated_list = list.clone();
+            for full_context in ctx.iter() {
+                let result = full_context.inner().return_value;
+                let mut updated_list = list.clone();
 
-            updated_list.push(result);
-            globals.push_preserved_val(result);
-            added.push((updated_list, full_context));
-        }
-        Ok(added)
-    })
+                updated_list.push(result);
+                globals.push_preserved_val(result);
+                added.push((updated_list, full_context));
+            }
+            Ok(added)
+        },
+    )
 }
 
 pub fn eval_dict(

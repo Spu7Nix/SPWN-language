@@ -763,7 +763,7 @@ builtins! {
 
     [Matches] #[safe = true, desc = "Returns `true` if the value matches the pattern, otherwise it returns `false`", example = "$.matches([1, 2, 3], [@number])"]
     fn matches((val), (pattern)) {
-        Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
+        Value::Bool(val.pure_matches_pat(&pattern, &info, globals, context.clone())?)
     }
 
     [B64Encode] #[safe = true, desc = "Returns the input string encoded with base64 encoding (useful for text objects)", example = "$.b64encode(\"hello there\")"]
@@ -1124,7 +1124,7 @@ $.assert(arr == [1])
             }
 
             if let Some(ref pat) = pattern {
-                if !value.matches_pat(pat, &info, globals, context)? {
+                if !value.pure_matches_pat(pat, &info, globals, context.clone())? {
                     return Err(RuntimeError::TypeError {
                         expected: pat.to_str(globals),
                         found: value.get_type_str(globals),
@@ -1706,7 +1706,7 @@ $.assert(arr == [1, 2])
                         for i in r.captures_iter(&s){
 
                             let capture = i.unwrap();
-                            
+
                             let mut found = false;
 
                             let mut range = Vec::new();
@@ -1742,7 +1742,7 @@ $.assert(arr == [1, 2])
                                 }
                             }
                             if !found { continue }
-                            
+
                             let mut match_map = FnvHashMap::default();
                             match_map.insert(
                                 LocalIntern::new("range".to_string()),
@@ -1843,9 +1843,25 @@ $.assert(arr == [1, 2])
     fn _negate_((a): Number) { Value::Number(-a)}
     [NotOp] #[safe = true, desc = "Default implementation of the `!b` operator", example = "$._not_(b)"]
     fn _not_((a): Bool) { Value::Bool(!a)}
-    [UnaryRangeOp] #[safe = true, desc = "Default implementation of the `..n` operator", example = "$._unary_range_(n)"]
-    fn _unary_range_((a): Number) { Value::Range(0, convert_to_int(a, &info)?, 1)}
+    // [UnaryRangeOp] #[safe = true, desc = "Default implementation of the `..n` operator", example = "$._unary_range_(n)"]
+    // fn _unary_range_((a): Number) { Value::Range(0, convert_to_int(a, &info)?, 1)}
+    [EqPatternOp] #[safe = true, desc = "Default implementation of the `==a` operator", example = "$._eq_pattern_(a)"]
+    fn _eq_pattern_((a)) { Value::Pattern(Pattern::Eq(store_const_value(a, globals, context.start_group, info.position))) }
 
+    [NotEqPatternOp] #[safe = true, desc = "Default implementation of the `!=a` operator", example = "$._not_eq_pattern_(a)"]
+    fn _not_eq_pattern_((a)) { Value::Pattern(Pattern::NotEq(store_const_value(a, globals, context.start_group, info.position))) }
+
+    [MorePatternOp] #[safe = true, desc = "Default implementation of the `>a` operator", example = "$._more_pattern_(a)"]
+    fn _more_pattern_((a)) { Value::Pattern(Pattern::MoreThan(store_const_value(a, globals, context.start_group, info.position))) }
+
+    [LessPatternOp] #[safe = true, desc = "Default implementation of the `<a` operator", example = "$._less_pattern_(a)"]
+    fn _less_pattern_((a)) { Value::Pattern(Pattern::LessThan(store_const_value(a, globals, context.start_group, info.position))) }
+
+    [MoreOrEqPatternOp] #[safe = true, desc = "Default implementation of the `>=a` operator", example = "$._more_or_eq_pattern_(a)"]
+    fn _more_or_eq_pattern_((a)) { Value::Pattern(Pattern::MoreOrEq(store_const_value(a, globals, context.start_group, info.position))) }
+
+    [LessOrEqPatternOp] #[safe = true, desc = "Default implementation of the `<=a` operator", example = "$._less_or_eq_pattern_(a)"]
+    fn _less_or_eq_pattern_((a)) { Value::Pattern(Pattern::LessOrEq(store_const_value(a, globals, context.start_group, info.position))) }
     // operators
     [OrOp] #[safe = true, desc = "Default implementation of the `||` operator", example = "	$._or_(true, false)"]
     fn _or_((a): Bool, (b): Bool) { Value::Bool(a || b) }
