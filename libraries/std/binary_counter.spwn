@@ -1,6 +1,6 @@
 #[no_std, cache_output]
 
-number_to_binary = (n: @number) {
+number_to_binary = (n: @number, size: @number) {
     let bits = []
     let n = n // shadow
 
@@ -10,6 +10,7 @@ number_to_binary = (n: @number) {
     }
 
     bits.push(n)
+    bits += [0] * (size - bits.length)
 
     return bits.reverse()
 }
