@@ -10,8 +10,12 @@ $.assert(!('x'.is_empty()))
 	},
 	substr: #[desc("Gets a substring beginning at the specified start and ending at the specified end.")]
 	(self, start: @number, end: @number) {
-        if self.length == 0 { return self }
-		if start > end { return $.substr(self, end, start); }
+		let start = start.constrain(0,self.length)
+		let end = end.constrain(0,self.length)
+		if start == end { return '' }
+		if start > end {
+			return $.substr(self, end, start).reverse(); // we do a little trolling
+		}
 		return $.substr(self, start, end);
 	},
 	join: #[desc("Joins a list using the string.") example("

@@ -36,6 +36,9 @@ return {
     ..events,
     ..ctrl_flow,
 
+    pi: constants.pi,
+    euler: constants.euler,
+
     counter: @counter::new,
     binary_counter: @binary_counter,
     on: @event::on,

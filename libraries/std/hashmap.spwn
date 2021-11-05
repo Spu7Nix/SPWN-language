@@ -15,19 +15,23 @@ impl @hashmap {
         constructor,
         desc('Creates a new empty hashmap')
         example('let a = @hashmap::new()')
-    ] (slots: @number = DEFAULT_SIZE)
-    {
-        return @hashmap::{
+    ] (from: @dictionary = {}, slots: @number = DEFAULT_SIZE)
+    {   
+        let new_map = @hashmap::{
             list: [[]] * slots,
             elements: 0
         }
+        for [k, v] in from.items() {
+            new_map.insert(k, v)
+        }
+        return new_map
     },
 
     _grow: #[
         desc('Private function that doubles the hashmap list length')
     ] (self)
     {
-        let new_map = @hashmap::new(self.list.length * 2)
+        let new_map = @hashmap::new(slots = self.list.length * 2)
         for i in self.list {
             for pair in i {
                 new_map.insert(pair[0], pair[1])
@@ -53,9 +57,9 @@ a.insert("key", [1,2])
     ] (self, key, value)
     {
         index = $.hash(key) % self.list.length
-        for el in self.list[index] { // weird bug happened if i looped normally
+        for [i, el] in self.list[index].enumerate() { // weird bug happened if i looped normally
             if el[0] == key {
-                el[1] = value
+                self.list[index][i][1] = value
                 return
             }
         }
@@ -257,7 +261,7 @@ $.print(a.inverted().pairs()) // some permutation of [[1, "a"], [2, "b"], [3, "c
         desc('Clears all pairs, keeping the amount of slots reserved')
     ] (self)
     {
-        self = @hashmap::new(self.list.length)
+        self = @hashmap::new(slots = self.list.length)
     },
 
     has_key: #[
