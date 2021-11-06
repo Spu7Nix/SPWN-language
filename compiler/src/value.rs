@@ -107,7 +107,9 @@ pub struct TriggerFunction {
 pub enum Pattern {
     Type(TypeId),
     Array(Vec<Pattern>),
+
     Either(Box<Pattern>, Box<Pattern>),
+    Both(Box<Pattern>, Box<Pattern>),
 
     Eq(StoredValue),
     NotEq(StoredValue),
@@ -369,6 +371,23 @@ impl Value {
                     self.matches_pat(&Value::Pattern(*p1), info, globals, full_context, allow_side_effect)?;
                     for full_context in full_context.iter() {
                         match globals.stored_values[full_context.inner().return_value] {
+                            Value::Bool(b) => if !b { 
+                                self.matches_pat(&Value::Pattern(p2.as_ref().clone()), info, globals, full_context, allow_side_effect)? 
+                            },
+                            _ => return Err(RuntimeError::TypeError {
+                                expected: "bool".to_string(),
+                                found: globals.get_type_str(full_context.inner().return_value),
+                                val_def: globals.get_area(full_context.inner().return_value),
+                                info: info.clone(),
+                            })
+                        }
+                    }
+                    
+                }
+                Pattern::Both(p1, p2) => {
+                    self.matches_pat(&Value::Pattern(*p1), info, globals, full_context, allow_side_effect)?;
+                    for full_context in full_context.iter() {
+                        match globals.stored_values[full_context.inner().return_value] {
                             Value::Bool(b) => if b { 
                                 self.matches_pat(&Value::Pattern(p2.as_ref().clone()), info, globals, full_context, allow_side_effect)? 
                             },
@@ -515,9 +534,10 @@ impl Value {
                     }
 
                     let stored_val = display_inner(&globals.stored_values[*val].clone(), globals)?;
-                    out += &format!("{}: {},", key, stored_val);
+                    out += &format!("{}: {}, ", key, stored_val);
                 }
                 if !d.is_empty() {
+                    out.pop();
                     out.pop();
                 }
 
@@ -588,6 +608,11 @@ impl Value {
                 Pattern::Type(t) => Value::TypeIndicator(*t).to_str(globals),
                 Pattern::Either(p1, p2) => format!(
                     "{} | {}",
+                    display_inner(&Value::Pattern(*p1.clone()), globals)?,
+                    display_inner(&Value::Pattern(*p2.clone()), globals)?
+                ),
+                Pattern::Both(p1, p2) => format!(
+                    "{} & {}",
                     display_inner(&Value::Pattern(*p1.clone()), globals)?,
                     display_inner(&Value::Pattern(*p2.clone()), globals)?
                 ),

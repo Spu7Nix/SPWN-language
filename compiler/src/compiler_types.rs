@@ -290,6 +290,8 @@ impl EvalExpression for ast::Expression {
                         NotEqual => handle_operator(acum_val, val, NotEqOp, c2, globals, &info)?,
 
                         Either => handle_operator(acum_val, val, EitherOp, c2, globals, &info)?,
+                        Both => handle_operator(acum_val, val, BothOp, c2, globals, &info)?,
+                        
                         Range => handle_operator(acum_val, val, RangeOp, c2, globals, &info)?,
                         //MUTABLE ONLY
                         //ADD CHECk

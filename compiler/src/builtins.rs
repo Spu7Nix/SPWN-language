@@ -2166,6 +2166,23 @@ $.assert(arr == [1, 2])
             },
         ))
     }
+
+    [BothOp] #[safe = true, desc = "Default implementation of the `&` operator", example = "$._both_(@number, @counter)"]
+    fn _both_((a), (b)) {
+        Value::Pattern(Pattern::Both(
+            if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
+                Box::new(p)
+            } else {
+                unreachable!()
+            },
+            if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
+                Box::new(p)
+            } else {
+                unreachable!()
+            },
+        ))
+    }
+
     [DisplayOp] #[safe = true, desc = "returns the default value display string for the given value", example = "$._display_(counter()) // \"@counter::{ item: ?i, bits: 16 }\""] fn _display_((a)) {
         Value::Str(a.to_str_full(globals, |val, globals| display_val(val.clone(), FullContext::from_ptr(full_context), globals, &info))?)
     }

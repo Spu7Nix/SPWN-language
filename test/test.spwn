@@ -1,6 +1,14 @@
 
-if a is < 100 {
-    $.print("yes")
-} else {
-    $.print("no")
+
+
+for i in 0..20 {
+    $.print(
+        i, ": ",
+        switch i {
+            ==2 | ==10: "a",
+            >=7 & <15: "b",
+            (==16 | ==19) & >17: "c",
+            else: "uwu"
+        }
+    )
 }
