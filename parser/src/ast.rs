@@ -158,6 +158,7 @@ pub enum Operator {
     Modulo,
 
     Either,
+    Both,
 
     Assign,
     Add,

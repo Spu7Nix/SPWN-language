@@ -300,7 +300,7 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either
+            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either | Ampersand
             | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap => "operator",
             Symbol => "identifier",
             Number => "number literal",
@@ -310,7 +310,7 @@ impl Token {
 
             Comma | OpenCurlyBracket | ClosingCurlyBracket | OpenSquareBracket
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
-            | Period | DotDot | At | Hash | Arrow | ThickArrow | Ampersand => "terminator",
+            | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
 
@@ -916,32 +916,33 @@ pub fn parse_statement(
 fn operator_precedence(op: &ast::Operator) -> u8 {
     use ast::Operator::*;
     match op {
-        As => 10,
-        Power => 9,
+        As => 12,
+        Power => 11,
 
-        Either => 8,
+        Both => 10,
+        Either => 9,
 
-        Modulo => 7,
-        Star => 7,
-        Slash => 7,
-        IntDividedBy => 7,
+        Modulo => 8,
+        Star => 8,
+        Slash => 8,
+        IntDividedBy => 8,
 
-        Plus => 6,
-        Minus => 6,
+        Plus => 7,
+        Minus => 7,
 
-        Range => 5,
+        Range => 6,
 
-        MoreOrEqual => 4,
-        LessOrEqual => 4,
-        More => 3,
-        Less => 3,
+        MoreOrEqual => 5,
+        LessOrEqual => 5,
+        More => 4,
+        Less => 4,
 
-        Equal => 2,
-        Has => 2,
-        NotEqual => 2,
+        Equal => 3,
+        Has => 3,
+        NotEqual => 3,
 
+        And => 2,
         Or => 1,
-        And => 1,
 
         Assign => 0,
         Add => 0,
@@ -966,7 +967,7 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     if expr.operators.len() <= 1 {
         expr
     } else {
-        let mut lowest = 10;
+        let mut lowest = 12;
 
         for op in &expr.operators {
             let p = operator_precedence(op);
@@ -1273,7 +1274,9 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Slash => Some(ast::Operator::Slash),
         Token::IntDividedBy => Some(ast::Operator::IntDividedBy),
         Token::Modulo => Some(ast::Operator::Modulo),
+
         Token::Either => Some(ast::Operator::Either),
+        Token::Ampersand => Some(ast::Operator::Both),
 
         Token::Assign => Some(ast::Operator::Assign),
         Token::Add => Some(ast::Operator::Add),

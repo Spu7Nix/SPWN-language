@@ -455,6 +455,7 @@ impl SpwnFmt for Operator {
             Operator::As => "as",
             Operator::Has => "has",
             Operator::Either => "|",
+            Operator::Both => "&",
             Operator::Exponate => "^=",
             Operator::Modulate => "%=",
             Operator::Swap => "<=>",
