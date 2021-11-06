@@ -318,6 +318,7 @@ impl EvalExpression for ast::Expression {
                         IntDivide => {
                             handle_operator(acum_val, val, IntdivideOp, c2, globals, &info)?
                         }
+                        Is => todo!(),
                     };
                 }
             }

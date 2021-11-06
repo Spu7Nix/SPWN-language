@@ -416,7 +416,7 @@ macro_rules! builtins {
                 example = $example:expr$(,)?
             ]
 
-            fn $name:ident(
+            $([[$raw:ident]])? fn $name:ident(
                 $(#[$argdesc:literal])?
                 $(
                     $(
@@ -551,7 +551,10 @@ macro_rules! builtins {
                                     arg_index += 1;
                                 )+
                             )?
-                            (*$context).return_value = store_const_value(out, $globals, $context.start_group, $info.position);
+                            if stringify!($($raw)?) != "RAW" {
+                                (*$context).return_value = store_const_value(out, $globals, $context.start_group, $info.position);
+                            }
+
 
                         }
                     )+
@@ -762,8 +765,8 @@ builtins! {
     }
 
     [Matches] #[safe = true, desc = "Returns `true` if the value matches the pattern, otherwise it returns `false`", example = "$.matches([1, 2, 3], [@number])"]
-    fn matches((val), (pattern)) {
-        Value::Bool(val.pure_matches_pat(&pattern, &info, globals, context.clone())?)
+    [[RAW]] fn matches((val), (pattern)) {
+        val.matches_pat(&pattern, &info, globals, unsafe { full_context.as_mut().unwrap() }, true)?
     }
 
     [B64Encode] #[safe = true, desc = "Returns the input string encoded with base64 encoding (useful for text objects)", example = "$.b64encode(\"hello there\")"]
@@ -2169,6 +2172,7 @@ $.assert(arr == [1, 2])
     [Display] #[safe = true, desc = "returns the value display string for the given value", example = "$.display(counter()) // \"counter(?i, bits = 16)\""] fn display((a)) {
         let ctx = FullContext::from_ptr(full_context);
         handle_unary_operator(arguments[0], Builtin::DisplayOp, ctx, globals, &info)?;
+        // add error on context split?
         globals.stored_values[ctx.inner().return_value].clone()
     }
 

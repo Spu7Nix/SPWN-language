@@ -1,6 +1,5 @@
-#[no_std]
-a = 10
-if $.matches(a, <100) {
+
+if a is < 100 {
     $.print("yes")
 } else {
     $.print("no")

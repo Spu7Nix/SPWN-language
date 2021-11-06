@@ -938,6 +938,7 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
 
         Equal => 2,
         Has => 2,
+        Is => 2,
         NotEqual => 2,
 
         Or => 1,
