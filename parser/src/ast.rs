@@ -145,6 +145,7 @@ pub enum Operator {
     Equal,
     NotEqual,
     Range,
+    Is,
     MoreOrEqual,
     LessOrEqual,
     More,

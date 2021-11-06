@@ -83,6 +83,9 @@ pub enum Token {
     #[token("==")]
     Equal,
 
+    #[token("is")]
+    Is,
+
     #[token("!=")]
     NotEqual,
 
@@ -300,8 +303,10 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either | Ampersand
-            | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap => "operator",
+            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either
+            | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is => {
+                "operator"
+            }
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -940,6 +945,7 @@ fn operator_precedence(op: &ast::Operator) -> u8 {
         Equal => 3,
         Has => 3,
         NotEqual => 3,
+        Is => 3,
 
         And => 2,
         Or => 1,
@@ -1289,6 +1295,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Swap => Some(ast::Operator::Swap),
         Token::Has => Some(ast::Operator::Has),
         Token::As => Some(ast::Operator::As),
+        Token::Is => Some(ast::Operator::Is),
         _ => None,
     }
 }
