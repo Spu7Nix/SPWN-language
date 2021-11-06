@@ -404,6 +404,15 @@ macro_rules! builtin_arg_mut_check {
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) ($($arg_name:ident),*)$(: $arg_type:ident)?) => {};
 }
 
+macro_rules! raw_check {
+    ($globals:ident, $context:ident, $info:ident, $out:ident) => {
+        (*$context).return_value =
+            store_const_value($out, $globals, $context.start_group, $info.position);
+    };
+
+    (#RAW $globals:ident, $context:ident, $info:ident, $out:ident) => {};
+}
+
 macro_rules! builtins {
 
     {
@@ -536,7 +545,7 @@ macro_rules! builtins {
                                 }
                             )?
 
-                            let out = $body;
+                            let _out = $body;
 
                             $(
 
@@ -551,9 +560,9 @@ macro_rules! builtins {
                                     arg_index += 1;
                                 )+
                             )?
-                            if stringify!($($raw)?) != "RAW" {
-                                (*$context).return_value = store_const_value(out, $globals, $context.start_group, $info.position);
-                            }
+
+                            raw_check!($(#$raw)? $globals, $context, $info, _out);
+
 
 
                         }
@@ -764,10 +773,7 @@ builtins! {
         Value::Str(text_io::read!("{}\n"))
     }
 
-    [Matches] #[safe = true, desc = "Returns `true` if the value matches the pattern, otherwise it returns `false`", example = "$.matches([1, 2, 3], [@number])"]
-    [[RAW]] fn matches((val), (pattern)) {
-        val.matches_pat(&pattern, &info, globals, unsafe { full_context.as_mut().unwrap() }, true)?
-    }
+
 
     [B64Encode] #[safe = true, desc = "Returns the input string encoded with base64 encoding (useful for text objects)", example = "$.b64encode(\"hello there\")"]
     fn b64encode((s): Str) {
@@ -1883,6 +1889,12 @@ $.assert(arr == [1, 2])
 
     [EqOp] #[safe = true, desc = "Default implementation of the `==` operator", example = "$._equal_(\"hello\", \"hello\")"]
     fn _equal_((a), (b)) { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
+
+    [IsOp] #[safe = true, desc = "Default implementation of the `is` operator", example = "$._is_([1, 2, 3], [@number])"]
+    [[RAW]] fn _is_((val), (pattern)) {
+        val.matches_pat(&pattern, &info, globals, unsafe { full_context.as_mut().unwrap() }, true)?
+    }
+
     [NotEqOp] #[safe = true, desc = "Default implementation of the `!=` operator", example = "$._not_equal_(\"hello\", \"bye\")"]
     fn _not_equal_((a), (b)) { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
 

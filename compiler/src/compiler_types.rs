@@ -189,6 +189,47 @@ pub trait EvalExpression {
     ) -> Result<(), RuntimeError>;
 }
 
+impl From<ast::Operator> for Builtin {
+    fn from(op: ast::Operator) -> Self {
+        use ast::Operator::*;
+        use Builtin::*;
+        match op {
+            Or => OrOp,
+            And => AndOp,
+            More => MoreThanOp,
+            Less => LessThanOp,
+            MoreOrEqual => MoreOrEqOp,
+            LessOrEqual => LessOrEqOp,
+            Slash => DividedByOp,
+            IntDividedBy => IntdividedByOp,
+            Star => TimesOp,
+            Modulo => ModOp,
+            Power => PowOp,
+            Plus => PlusOp,
+            Minus => MinusOp,
+            Equal => EqOp,
+            NotEqual => NotEqOp,
+            Either => EitherOp,
+            Both => BothOp,
+            Range => RangeOp,
+            //MUTABLE ONLY
+            //ADD CHECk
+            Assign => AssignOp,
+            Swap => SwapOp,
+            As => AsOp,
+            Has => HasOp,
+            ast::Operator::Add => AddOp,
+            Subtract => SubtractOp,
+            Multiply => MultiplyOp,
+            Exponate => ExponateOp,
+            Modulate => ModulateOp,
+            Divide => DivideOp,
+            IntDivide => IntdivideOp,
+            Is => IsOp,
+        }
+    }
+}
+
 impl EvalExpression for ast::Expression {
     fn eval(
         &self,
@@ -212,8 +253,6 @@ impl EvalExpression for ast::Expression {
             info.position.pos = (start_pos, end_pos);
             //every value in acum will be operated with the value of var in the corresponding context
             for full_context in contexts.iter() {
-                use ast::Operator::*;
-
                 //only eval the first one on Or and And
                 let (or_overwritten, and_overwritten) =
                     if let Some(imp) = globals.implementations.get(&5) {
@@ -228,7 +267,7 @@ impl EvalExpression for ast::Expression {
 
                 globals.push_preserved_val(acum_val);
 
-                if self.operators[i] == Or
+                if self.operators[i] == ast::Operator::Or
                     && !or_overwritten
                     && globals.stored_values[acum_val] == Value::Bool(true)
                 {
@@ -240,7 +279,7 @@ impl EvalExpression for ast::Expression {
                     );
                     full_context.inner().return_value = stored;
                     continue;
-                } else if self.operators[i] == And
+                } else if self.operators[i] == ast::Operator::And
                     && !and_overwritten
                     && globals.stored_values[acum_val] == Value::Bool(false)
                 {
@@ -260,68 +299,7 @@ impl EvalExpression for ast::Expression {
                 for c2 in full_context.iter() {
                     //let val_fn_context = globals.get_val_fn_context(val, info.clone());
                     let val = c2.inner().return_value;
-
-                    use Builtin::*;
-                    match self.operators[i] {
-                        Or => handle_operator(acum_val, val, OrOp, c2, globals, &info)?,
-                        And => handle_operator(acum_val, val, AndOp, c2, globals, &info)?,
-                        More => handle_operator(acum_val, val, MoreThanOp, c2, globals, &info)?,
-                        Less => handle_operator(acum_val, val, LessThanOp, c2, globals, &info)?,
-                        MoreOrEqual => {
-                            handle_operator(acum_val, val, MoreOrEqOp, c2, globals, &info)?
-                        }
-                        LessOrEqual => {
-                            handle_operator(acum_val, val, LessOrEqOp, c2, globals, &info)?
-                        }
-                        Slash => handle_operator(acum_val, val, DividedByOp, c2, globals, &info)?,
-
-                        IntDividedBy => {
-                            handle_operator(acum_val, val, IntdividedByOp, c2, globals, &info)?
-                        }
-
-                        Star => handle_operator(acum_val, val, TimesOp, c2, globals, &info)?,
-
-                        Modulo => handle_operator(acum_val, val, ModOp, c2, globals, &info)?,
-
-                        Power => handle_operator(acum_val, val, PowOp, c2, globals, &info)?,
-                        Plus => handle_operator(acum_val, val, PlusOp, c2, globals, &info)?,
-                        Minus => handle_operator(acum_val, val, MinusOp, c2, globals, &info)?,
-                        Equal => handle_operator(acum_val, val, EqOp, c2, globals, &info)?,
-                        NotEqual => handle_operator(acum_val, val, NotEqOp, c2, globals, &info)?,
-
-                        Either => handle_operator(acum_val, val, EitherOp, c2, globals, &info)?,
-                        Both => handle_operator(acum_val, val, BothOp, c2, globals, &info)?,
-                        
-                        Range => handle_operator(acum_val, val, RangeOp, c2, globals, &info)?,
-                        //MUTABLE ONLY
-                        //ADD CHECk
-                        Assign => handle_operator(acum_val, val, AssignOp, c2, globals, &info)?,
-
-                        Swap => handle_operator(acum_val, val, SwapOp, c2, globals, &info)?,
-
-                        As => handle_operator(acum_val, val, AsOp, c2, globals, &info)?,
-
-                        Has => handle_operator(acum_val, val, HasOp, c2, globals, &info)?,
-
-                        ast::Operator::Add => {
-                            handle_operator(acum_val, val, AddOp, c2, globals, &info)?
-                        }
-
-                        Subtract => handle_operator(acum_val, val, SubtractOp, c2, globals, &info)?,
-
-                        Multiply => handle_operator(acum_val, val, MultiplyOp, c2, globals, &info)?,
-
-                        Exponate => handle_operator(acum_val, val, ExponateOp, c2, globals, &info)?,
-
-                        Modulate => handle_operator(acum_val, val, ModulateOp, c2, globals, &info)?,
-
-                        Divide => handle_operator(acum_val, val, DivideOp, c2, globals, &info)?,
-
-                        IntDivide => {
-                            handle_operator(acum_val, val, IntdivideOp, c2, globals, &info)?
-                        }
-                        Is => todo!(),
-                    };
+                    handle_operator(acum_val, val, self.operators[i].into(), c2, globals, &info)?;
                 }
             }
             start_pos = var.pos.0;
