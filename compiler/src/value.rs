@@ -673,19 +673,19 @@ pub fn convert_type(
 
     Ok(match (val, typ) {
         
-        (Value::Number(n), 0) => Value::Group(Group::new(*n as u16)),
-        (Value::Number(n), 1) => Value::Color(Color::new(*n as u16)),
-        (Value::Number(n), 2) => Value::Block(Block::new(*n as u16)),
-        (Value::Number(n), 3) => Value::Item(Item::new(*n as u16)),
-        (Value::Number(n), 4) => Value::Number(*n),
-        (Value::Number(n), 5) => Value::Bool(*n != 0.0),
+        (Value::Number(n), type_id!(group)) => Value::Group(Group::new(*n as u16)),
+        (Value::Number(n), type_id!(color)) => Value::Color(Color::new(*n as u16)),
+        (Value::Number(n), type_id!(block)) => Value::Block(Block::new(*n as u16)),
+        (Value::Number(n), type_id!(item)) => Value::Item(Item::new(*n as u16)),
+        (Value::Number(n), type_id!(number)) => Value::Number(*n),
+        (Value::Number(n), type_id!(bool)) => Value::Bool(*n != 0.0),
 
             
         
 
         
 
-        (Value::Group(g), 4) => Value::Number(match g.id {
+        (Value::Group(g), type_id!(number)) => Value::Number(match g.id {
             Id::Specific(n) => n as f64,
             _ => return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
@@ -697,7 +697,7 @@ pub fn convert_type(
         }),
         
 
-        (Value::Color(g), 4) => Value::Number(match g.id {
+        (Value::Color(g), type_id!(number)) => Value::Number(match g.id {
             Id::Specific(n) => n as f64,
             _ => return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
@@ -708,7 +708,7 @@ pub fn convert_type(
             
         }),
 
-        (Value::Block(g), 4) => Value::Number(match g.id {
+        (Value::Block(g), type_id!(number)) => Value::Number(match g.id {
             Id::Specific(n) => n as f64,
             _ => return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
@@ -719,7 +719,7 @@ pub fn convert_type(
             
         }),
 
-        (Value::Item(g), 4) => Value::Number(match g.id {
+        (Value::Item(g), type_id!(number)) => Value::Number(match g.id {
             Id::Specific(n) => n as f64,
             _ => return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
@@ -732,15 +732,15 @@ pub fn convert_type(
 
     
 
-        (Value::Bool(b),4) => Value::Number(if *b { 1.0 } else { 0.0 }),
+        (Value::Bool(b), type_id!(number)) => Value::Number(if *b { 1.0 } else { 0.0 }),
         
 
     
 
-        (Value::TriggerFunc(f),0) => Value::Group(f.start_group),
+        (Value::TriggerFunc(f), type_id!(group)) => Value::Group(f.start_group),
             
 
-        (Value::Range(start, end, step), 10) => {
+        (Value::Range(start, end, step), type_id!(array)) => {
             Value::Array(if start < end {
                 (*start..*end).step_by(*step).map(|x|
                     store_const_value(Value::Number(x as f64),  globals, context.start_group, info.position)).collect::<Vec<StoredValue>>()
@@ -751,7 +751,7 @@ pub fn convert_type(
         },
 
     
-        (Value::Str(s), 4) => {
+        (Value::Str(s), type_id!(number)) => {
             let out: std::result::Result<f64, _> = s.parse();
             match out {
                 Ok(n) => Value::Number(n),
@@ -766,13 +766,13 @@ pub fn convert_type(
                 }
             }
         },
-        (Value::Str(s), 10) => {
+        (Value::Str(s), type_id!(array)) => {
             Value::Array(s.chars().map(|x| store_const_value(Value::Str(x.to_string()),  globals, context.start_group, info.position)).collect::<Vec<StoredValue>>())
         },
         
 
     
-        (Value::Array(arr), 18) => {
+        (Value::Array(arr), type_id!(pattern)) => {
             // pattern
             let mut new_vec = Vec::new();
             for el in arr {
@@ -790,7 +790,7 @@ pub fn convert_type(
 
         
     
-        (Value::TypeIndicator(t),18) => {
+        (Value::TypeIndicator(t), type_id!(pattern)) => {
 
             Value::Pattern(Pattern::Type(*t))
         }
