@@ -27,7 +27,16 @@ use std::collections::hash_map::DefaultHasher;
 // BUILT IN STD
 use include_dir::{include_dir, Dir, File};
 
+#[cfg(not(debug_assertions))]
 const STANDARD_LIBS: Dir = include_dir!("../libraries");
+
+// dont import std when in dev mode
+#[cfg(debug_assertions)]
+const STANDARD_LIBS: Dir = Dir {
+    path: "",
+    files: &[],
+    dirs: &[],
+};
 
 pub fn get_lib_file<'a, S: AsRef<Path>>(path: S) -> Option<File<'a>> {
     get_file(&STANDARD_LIBS, path.as_ref())
@@ -494,6 +503,7 @@ macro_rules! builtins {
             $globals: &mut Globals,
             contexts: &mut FullContext,
         ) -> Result<(), RuntimeError> {
+            #![allow(unused_variables)]
             if !$globals.permissions.is_allowed(func) {
                 if !$globals.permissions.is_safe(func) {
                     return Err(RuntimeError::BuiltinError {

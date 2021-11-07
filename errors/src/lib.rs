@@ -302,7 +302,7 @@ impl From<RuntimeError> for ErrorReport {
                     ),
                     (
                         info.position,
-                        &format!("Expected {}, found {}", pattern.fg(a), val.fg(b)),
+                        &format!("This {} is not {}", val.fg(a), pattern.fg(b)),
                     ),
                 ],
                 None,
