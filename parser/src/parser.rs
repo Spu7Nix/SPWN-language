@@ -249,9 +249,8 @@ pub enum Token {
     #[token("switch")]
     Switch,
 
-    #[token("case")]
-    Case,
-
+    // #[token("case")]
+    // Case,
     #[token("break")]
     Break,
 
@@ -320,7 +319,7 @@ impl Token {
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch
             | While => "keyword",
             //Comment | MultiCommentStart | MultiCommentEnd => "comment",
             StatementSeparator => "statement separator",
@@ -1055,31 +1054,6 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
                         if tokens.next(false) != Some(Token::Comma) {
                             // for error formatting
                             tokens.previous();
-                        }
-                    }
-                    a => expected!("':'".to_string(), tokens, notes, a),
-                }
-            }
-            Some(Token::Case) => {
-                if default_enabled {
-                    return Err(SyntaxError::SyntaxError {
-                        message: "cannot have more cases after 'else' field".to_string(),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    });
-                }
-                let val = parse_expr(tokens, notes, false, true)?;
-                match tokens.next(false) {
-                    Some(Token::Colon) => {
-                        let expr = parse_expr(tokens, notes, false, true)?; // parse whats after the :
-                        cases.push(ast::Case {
-                            typ: ast::CaseType::Value(val),
-                            body: expr,
-                        });
-
-                        if tokens.next(false) != Some(Token::Comma) {
-                            // for error formatting
-                            tokens.previous_no_ignore(false);
                         }
                     }
                     a => expected!("':'".to_string(), tokens, notes, a),

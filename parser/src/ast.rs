@@ -365,7 +365,7 @@ pub struct While {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum CaseType {
-    Value(Expression),
+    //Value(Expression),
     Pattern(Expression),
     Default,
 }

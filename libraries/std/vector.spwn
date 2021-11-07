@@ -9,9 +9,9 @@ impl @vector {
             throw "Cannot create a vector with less than 1 dimension"
         }
         return switch dims.length {
-            case 2: @vector::{ dims, x: dims[0], y: dims[1] }
-            case 3: @vector::{ dims, x: dims[0], y: dims[1], z: dims[2] }
-            case 4: @vector::{ dims, x: dims[0], y: dims[1], z: dims[2], w: dims[3] }
+            ==2: @vector::{ dims, x: dims[0], y: dims[1] }
+            ==3: @vector::{ dims, x: dims[0], y: dims[1], z: dims[2] }
+            ==4: @vector::{ dims, x: dims[0], y: dims[1], z: dims[2], w: dims[3] }
             else: @vector::{ dims }
         }
     },

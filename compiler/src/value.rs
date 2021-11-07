@@ -2220,58 +2220,6 @@ impl VariableFuncs for ast::Variable {
 
                         for case in cases {
                             match &case.typ {
-                                ast::CaseType::Value(v) => {
-                                    v.eval(full_context, globals, info.clone(), constant)?;
-                                    for full_context in full_context.iter() {
-                                        let val2 = full_context.inner().return_value;
-                                        handle_operator(
-                                            val1,
-                                            val2,
-                                            Builtin::EqOp,
-                                            full_context,
-                                            globals,
-                                            &info,
-                                        )?;
-
-                                        // lets loop through all those result values
-                                        for full_context in full_context.iter() {
-                                            match &globals.stored_values
-                                                [full_context.inner().return_value]
-                                            {
-                                                Value::Bool(b) => {
-                                                    if *b {
-                                                        case.body.eval(
-                                                            full_context,
-                                                            globals,
-                                                            info.clone(),
-                                                            constant,
-                                                        )?;
-                                                        for c in full_context.iter() {
-                                                            c.inner().broken = Some((
-                                                                BreakType::Switch(
-                                                                    c.inner().return_value,
-                                                                ),
-                                                                CodeArea::new(),
-                                                            ))
-                                                        }
-                                                    }
-                                                }
-                                                a => {
-                                                    // if the == operator for that type doesn't output a boolean, it can't be
-                                                    // used in a switch statement
-                                                    return Err(RuntimeError::TypeError {
-                                                        expected: "boolean".to_string(),
-                                                        found: a.get_type_str(globals),
-                                                        val_def: globals.get_area(
-                                                            full_context.inner().return_value,
-                                                        ),
-                                                        info,
-                                                    });
-                                                }
-                                            };
-                                        }
-                                    }
-                                }
                                 ast::CaseType::Pattern(p) => {
                                     p.eval(full_context, globals, info.clone(), constant)?;
 
