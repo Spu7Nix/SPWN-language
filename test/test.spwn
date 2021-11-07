@@ -1,12 +1,9 @@
 
 
-
-c = counter(1i)
+c = [counter(1i), counter(2i), counter(3i)]
 
 wait(1)
 
-if c is >4 & <10 {
+if c != [1, 2, 3] {
     10g.move(10, 0, 0.5)
 }
-
-

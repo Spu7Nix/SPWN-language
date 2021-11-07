@@ -1888,15 +1888,28 @@ $.assert(arr == [1, 2])
     fn _less_or_equal_((a): Number, (b): Number) { Value::Bool(a <= b) }
 
     [EqOp] #[safe = true, desc = "Default implementation of the `==` operator", example = "$._equal_(\"hello\", \"hello\")"]
-    fn _equal_((a), (b)) { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
+    [[RAW]] fn _equal_((a), (b)) {
+        default_value_equality(arguments[0], arguments[1], globals, unsafe { full_context.as_mut().unwrap() }, &info)?;
+    }
 
     [IsOp] #[safe = true, desc = "Default implementation of the `is` operator", example = "$._is_([1, 2, 3], [@number])"]
     [[RAW]] fn _is_((val), (pattern)) {
-        val.matches_pat(&pattern, &info, globals, unsafe { full_context.as_mut().unwrap() }, true)?
+        val.matches_pat(&pattern, &info, globals, unsafe { full_context.as_mut().unwrap() }, true)?;
     }
 
     [NotEqOp] #[safe = true, desc = "Default implementation of the `!=` operator", example = "$._not_equal_(\"hello\", \"bye\")"]
-    fn _not_equal_((a), (b)) { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
+    [[RAW]] fn _not_equal_((a), (b)) {
+        let contexts = unsafe { full_context.as_mut().unwrap() };
+        default_value_equality(arguments[0], arguments[1], globals, contexts, &info)?;
+        // negate
+        for c in contexts.iter() {
+            if let Value::Bool(b) = &mut globals.stored_values[c.inner().return_value] {
+                *b = !(*b);
+            } else {
+                unreachable!() // unchecked?
+            }
+        }
+    }
 
     [DividedByOp] #[safe = true, desc = "Default implementation of the `/` operator", example = "$._divided_by_(64, 8)"]
     fn _divided_by_((a): Number, (b): Number) { Value::Number(a / b) }
@@ -2001,7 +2014,8 @@ $.assert(arr == [1, 2])
             (Value::Array(ar), _) => {
                 let mut out = false;
                 for v in ar.clone() {
-                    if value_equality(v, arguments[1], globals) {
+                    // use custom == impl?
+                    if strict_value_equality(v, arguments[1], globals) {
                         out = true;
                         break;
                     }
@@ -2010,8 +2024,7 @@ $.assert(arr == [1, 2])
             }
 
             (Value::Dict(d), Value::Str(b)) => {
-
-
+                // use custom == impl?
                 Value::Bool(d.get(&LocalIntern::new(b)).is_some())
             }
 
