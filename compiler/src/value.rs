@@ -120,13 +120,27 @@ pub enum Pattern {
     LessOrEq(StoredValue),
 }
 
-pub fn default_value_equality(val1: StoredValue, val2: StoredValue, globals: &mut Globals, contexts: &mut FullContext, info: &CompilerInfo) -> Result<(), RuntimeError> {
+pub fn default_value_equality(
+    val1: StoredValue,
+    val2: StoredValue,
+    globals: &mut Globals,
+    contexts: &mut FullContext,
+    info: &CompilerInfo,
+) -> Result<(), RuntimeError> {
     let set_return_bool = |b: bool, globals: &mut Globals, contexts: &mut FullContext| {
         for c in contexts.iter() {
-            c.inner().return_value = store_const_value(Value::Bool(b), globals, c.inner().start_group, info.position);
+            c.inner().return_value = store_const_value(
+                Value::Bool(b),
+                globals,
+                c.inner().start_group,
+                info.position,
+            );
         }
     };
-    match (globals.stored_values[val1].clone(), globals.stored_values[val2].clone()) {
+    match (
+        globals.stored_values[val1].clone(),
+        globals.stored_values[val2].clone(),
+    ) {
         // IDEA: check the cheap values for equality before checking custom implementations
         (Value::Array(a1), Value::Array(a2)) => {
             if a1.len() != a2.len() {
@@ -140,12 +154,12 @@ pub fn default_value_equality(val1: StoredValue, val2: StoredValue, globals: &mu
             for i in 0..a1.len() {
                 for full_context in contexts.iter() {
                     // skip contexts where the return is already false
-                    if globals.stored_values[full_context.inner().return_value] == Value::Bool(true) {
+                    if globals.stored_values[full_context.inner().return_value] == Value::Bool(true)
+                    {
                         handle_operator(a1[i], a2[i], Builtin::EqOp, full_context, globals, info)?;
                     }
                 }
             }
-            
         }
         (Value::Dict(d1), Value::Dict(d2)) => {
             if d1.len() != d2.len() {
@@ -153,7 +167,9 @@ pub fn default_value_equality(val1: StoredValue, val2: StoredValue, globals: &mu
                 return Ok(());
             }
             // check all keys are equal
-            if d1.keys().cloned().collect::<FnvHashSet<_>>() == d2.keys().cloned().collect::<FnvHashSet<_>>() {
+            if d1.keys().cloned().collect::<FnvHashSet<_>>()
+                == d2.keys().cloned().collect::<FnvHashSet<_>>()
+            {
                 set_return_bool(false, globals, contexts);
                 return Ok(());
             }
@@ -164,15 +180,15 @@ pub fn default_value_equality(val1: StoredValue, val2: StoredValue, globals: &mu
             for key in d1.keys() {
                 let val1 = d1[key];
                 let val2 = d2[key];
-                    
+
                 for full_context in contexts.iter() {
                     // skip contexts where the return is already false
-                    if globals.stored_values[full_context.inner().return_value] == Value::Bool(true) {
+                    if globals.stored_values[full_context.inner().return_value] == Value::Bool(true)
+                    {
                         handle_operator(val1, val2, Builtin::EqOp, full_context, globals, info)?;
                     }
-                }   
+                }
             }
-            
         }
         (Value::Pattern(p1), Value::Pattern(p2)) => {
             use Pattern::*;
@@ -182,7 +198,9 @@ pub fn default_value_equality(val1: StoredValue, val2: StoredValue, globals: &mu
                 | (MoreThan(a), MoreThan(b))
                 | (LessThan(a), LessThan(b))
                 | (MoreOrEq(a), MoreOrEq(b))
-                | (LessOrEq(a), LessOrEq(b)) => handle_operator(a, b, Builtin::EqOp, contexts, globals, info)?,
+                | (LessOrEq(a), LessOrEq(b)) => {
+                    handle_operator(a, b, Builtin::EqOp, contexts, globals, info)?
+                }
                 (a, b) => set_return_bool(a == b, globals, contexts),
             }
         }
@@ -597,6 +615,26 @@ impl Value {
                     if allow_side_effect {
                         handle_operator(val, val2, builtin, full_context, globals, info)?;
                     } else {
+                        if globals.stored_values[val]
+                            .clone()
+                            .member(
+                                LocalIntern::new(String::from(builtin)),
+                                full_context.inner(),
+                                globals,
+                                info.clone(),
+                            )
+                            .is_some()
+                        {
+                            return Err(RuntimeError::CustomError(
+                                create_error(
+                                    info.clone(), 
+                                    "Custom implementations are not allowed for a pattern in this position", 
+                                    &[], 
+                                    None
+                                )
+                            ));
+                        }
+
                         built_in_function(
                             builtin,
                             vec![val, val2],

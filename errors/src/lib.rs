@@ -42,6 +42,7 @@ pub enum RuntimeError {
     CustomError(ErrorReport),
 
     BuiltinError {
+        builtin: String,
         message: String,
         info: CompilerInfo,
     },
@@ -309,9 +310,13 @@ impl From<RuntimeError> for ErrorReport {
 
             RuntimeError::CustomError(report) => report,
 
-            RuntimeError::BuiltinError { message, info } => create_error(
+            RuntimeError::BuiltinError {
+                message,
+                info,
+                builtin,
+            } => create_error(
                 info.clone(),
-                "Error when using built-in function",
+                &format!("Error when using built-in function: {}", builtin),
                 &[(info.position, &message)],
                 None,
             ),

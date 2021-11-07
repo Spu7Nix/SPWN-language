@@ -1,9 +1,3 @@
+m = (a: >2) => a * 2
 
-
-c = [counter(1i), counter(2i), counter(3i)]
-
-wait(1)
-
-if c != [1, 2, 3] {
-    10g.move(10, 0, 0.5)
-}
+m("Hello")
