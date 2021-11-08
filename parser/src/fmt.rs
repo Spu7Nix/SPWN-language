@@ -439,7 +439,6 @@ impl SpwnFmt for Id {
 impl SpwnFmt for Operator {
     fn fmt(&self, _ind: Indent) -> String {
         match self {
-            Operator::Nullish => "??",
             Operator::Or => "||",
             Operator::And => "&&",
             Operator::Equal => "==",

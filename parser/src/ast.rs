@@ -158,8 +158,6 @@ pub enum Operator {
     Minus,
     Modulo,
 
-    Nullish,
-
     Either,
     Both,
 
