@@ -919,50 +919,48 @@ pub fn parse_statement(
     })
 }
 
-fn operator_precedence(op: &ast::Operator) -> u8 {
-    use ast::Operator::*;
-    match op {
-        As => 12,
-        Power => 11,
-
-        Both => 10,
-        Either => 9,
-
-        Modulo => 8,
-        Star => 8,
-        Slash => 8,
-        IntDividedBy => 8,
-
-        Plus => 7,
-        Minus => 7,
-
-        Range => 6,
-
-        MoreOrEqual => 5,
-        LessOrEqual => 5,
-        More => 4,
-        Less => 4,
-
-        Equal => 3,
-        Has => 3,
-        NotEqual => 3,
-        Is => 3,
-
-        And => 2,
-        Or => 1,
 
 
-        Assign => 0,
-        Add => 0,
-        Subtract => 0,
-        Multiply => 0,
-        Divide => 0,
-        IntDivide => 0,
-        Exponate => 0,
-        Modulate => 0,
-        Swap => 0,
+macro_rules! op_precedence {
+    {
+        $p_f:expr => $($op_f:ident)+,
+        $(
+            $p:expr => $($op:ident)+,
+        )*
+    } => {
+        fn operator_precedence(op: &ast::Operator) -> u8 {
+            use ast::Operator::*;
+            match op {
+                $(
+                    $(
+                        $op => $p,
+                    )+
+                )*
+                $(
+                    $op_f => $p_f,
+                )+
+            }
+        }
+        const HIGHEST_PRECEDENCE: u8 = $p_f;
     }
 }
+
+op_precedence!{ // make sure the highest precedence is at the top
+    12 => As,
+    11 => Power,
+    10 => Both,
+    9 => Either,
+    8 => Modulo Star Slash IntDividedBy,
+    7 => Plus Minus,
+    6 => Range,
+    5 => LessOrEqual MoreOrEqual,
+    4 => Less More,
+    3 => Is NotEqual Has Equal,
+    2 => And,
+    1 => Or,
+    0 => Assign Add Subtract Multiply Divide IntDivide Exponate Modulate Swap,
+}
+
 
 fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     for val in &mut expr.values {
@@ -975,12 +973,12 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     if expr.operators.len() <= 1 {
         expr
     } else {
-        let mut lowest = 12;
+        let mut highest = HIGHEST_PRECEDENCE;
 
         for op in &expr.operators {
             let p = operator_precedence(op);
-            if p < lowest {
-                lowest = p
+            if p < highest {
+                highest = p
             };
         }
 
@@ -990,7 +988,7 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
         };
 
         for (i, op) in expr.operators.iter().enumerate().rev() {
-            if operator_precedence(op) == lowest {
+            if operator_precedence(op) == highest {
                 new_expr.operators.push(*op);
                 new_expr.values.push(if i == expr.operators.len() - 1 {
                     expr.values.last().unwrap().clone()

@@ -25,7 +25,7 @@ use std::io::Write;
 use std::collections::hash_map::DefaultHasher;
 
 // BUILT IN STD
-use include_dir::{include_dir, Dir, File};
+use include_dir::{Dir, File};
 
 #[cfg(not(debug_assertions))]
 const STANDARD_LIBS: Dir = include_dir!("../libraries");
