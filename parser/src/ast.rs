@@ -423,6 +423,7 @@ pub struct Ternary {
     pub condition: Expression,
     pub if_expr: Expression,
     pub else_expr: Expression,
+    pub is_pattern: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]

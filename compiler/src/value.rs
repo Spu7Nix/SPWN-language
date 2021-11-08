@@ -611,7 +611,7 @@ impl Value {
                         Pattern::LessOrEq(v) => (Builtin::LessOrEqOp, v),
                         _ => unreachable!(),
                     };
-
+                    
                     if allow_side_effect {
                         handle_operator(val, val2, builtin, full_context, globals, info)?;
                     } else {
@@ -2189,18 +2189,23 @@ impl VariableFuncs for ast::Variable {
                 }
 
                 ast::ValueBody::Ternary(t) => {
+                    
+                    globals.push_new_preserved();
+
                     t.condition
                         .eval(full_context, globals, info.clone(), constant)?;
 
+                    globals.push_preserved_val(full_context.inner().return_value);
+
                     for context in full_context.iter() {
                         // through every conditional context
-                        match &globals.stored_values[context.inner().return_value] {
-                            Value::Bool(b) => {
+                        match (t.is_pattern, &globals.stored_values[context.inner().return_value]) {
+                            (false, Value::Bool(b)) => {
                                 let answer = if *b { &t.if_expr } else { &t.else_expr };
 
                                 answer.eval(context, globals, info.clone(), constant)?;
                             }
-                            a => {
+                            (false, a) => {
                                 return Err(RuntimeError::TypeError {
                                     expected: "boolean".to_string(),
                                     found: a.get_type_str(globals),
@@ -2208,8 +2213,38 @@ impl VariableFuncs for ast::Variable {
                                     info,
                                 })
                             }
+                            (true, p) => {
+                                let p = p.clone();
+
+                                t.if_expr.eval(context, globals, info.clone(), constant)?;
+
+                                for context in context.iter() {
+                                    let if_val_id = context.inner().return_value;
+                                    globals.push_preserved_val(if_val_id);
+                                    let if_val = globals.stored_values[if_val_id].clone();
+                                    
+                                    if_val.matches_pat(
+                                        &p,
+                                        &info,
+                                        globals,
+                                        context,
+                                        true
+                                    )?;
+                                    for context in context.iter() {
+                                        match &globals.stored_values[context.inner().return_value] {
+                                            Value::Bool(b) => if *b {
+                                                context.inner().return_value = if_val_id;
+                                            } else { t.else_expr.eval(context, globals, info.clone(), constant)?; },
+                                            _ => unreachable!(), // idk do i error here
+                                        }
+                                    }
+                                }
+
+                            }
                         }
                     }
+
+                    globals.pop_preserved();
                 }
 
                 ast::ValueBody::Switch(expr, cases) => {

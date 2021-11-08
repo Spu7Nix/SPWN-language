@@ -1,6 +1,11 @@
 
 
+$.print(4 if is >5 else "aaa")
+$.print(7 if is >5 else "aaa")
 
-$.print(2 ?? 5)
-$.print(null ?? 5)
+nullish_moment = (a, b) {
+    return a if is !=null else b
+}
 
+$.print(nullish_moment(null,3))
+$.print(nullish_moment(5,3))

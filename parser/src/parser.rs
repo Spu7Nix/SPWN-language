@@ -1147,6 +1147,12 @@ fn parse_expr(
     let express = fix_precedence(ast::Expression { values, operators }); //pemdas and stuff
     match tokens.next(true) {
         Some(Token::If) => {
+            
+            let is_pattern = match tokens.next(true) {
+                Some(Token::Is) => true,
+                _ => {tokens.previous(); false}
+            };
+
             // oooh ternaries
 
             // remove any = from the ternary and place into a separate stack
@@ -1212,6 +1218,7 @@ fn parse_expr(
                     operators: tern_operators,
                 },
                 else_expr: do_else,
+                is_pattern
             };
 
             let ternval_literal = ast::ValueLiteral {
