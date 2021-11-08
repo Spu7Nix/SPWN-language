@@ -416,6 +416,35 @@ impl<'a> Tokens<'a> {
         }
     }
 
+    fn next_if<F>(&mut self, predicate: F, ss: bool) -> Option<Token>
+        where F: FnOnce(Token) -> bool
+    {
+        match self.next(ss) {
+            Some(t) => {
+                if !predicate(t) {
+                    self.previous();
+                    None
+                } else {
+                    Some(t)
+                }
+            }
+            None => None,
+        }   
+    }
+
+    fn next_while<'s: 'a, F: 'static>(&'s mut self, mut predicate: F) -> impl Iterator<Item = Token> + 's
+        where F: FnMut(Token) -> bool,
+    {
+        let mut taken = self.iter.clone().take_while(move |x| predicate(*x));
+
+        let count = taken.by_ref().count();
+        for _ in 0..count {
+            self.inner_next();
+        }
+
+        taken
+    }
+
     fn previous(&mut self) -> Option<Token> {
         /*self.index += 1;
         let len = self.stack.len();
@@ -433,6 +462,22 @@ impl<'a> Tokens<'a> {
             None
         }*/
         self.previous_no_ignore(false)
+    }
+
+    fn previous_if<F>(&mut self, closure_expr: F) -> Option<Token>
+        where F: FnOnce(Token) -> bool
+    {
+        match self.previous() {
+            Some(t) => {
+                if !closure_expr(t) {
+                    self.inner_next();
+                    None
+                } else {
+                    Some(t)
+                }
+            }
+            None => None,
+        }   
     }
 
     fn previous_no_ignore(&mut self, ss: bool) -> Option<Token> {
@@ -458,6 +503,7 @@ impl<'a> Tokens<'a> {
         } else {
             self.stack[len - self.index - 1].0
         }
+
     }
 
     fn slice(&self) -> String {
@@ -481,7 +527,6 @@ impl<'a> Tokens<'a> {
         self.stack[self.stack.len() - self.index - 1].2.clone()
     }*/
 }
-
 //type TokenList = Peekable<Lexer<Token>>;
 
 const STATEMENT_SEPARATOR_DESC: &str = "Statement separator (line-break or ';')";
