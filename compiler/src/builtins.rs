@@ -25,7 +25,7 @@ use std::io::Write;
 use std::collections::hash_map::DefaultHasher;
 
 // BUILT IN STD
-use include_dir::{include_dir, Dir, File};
+use include_dir::{Dir, File};
 
 #[cfg(not(debug_assertions))]
 const STANDARD_LIBS: Dir = include_dir!("../libraries");
@@ -1928,6 +1928,7 @@ $.assert(arr == [1, 2])
     fn _or_((a): Bool, (b): Bool) { Value::Bool(a || b) }
     [AndOp] #[safe = true, desc = "Default implementation of the `&&` operator", example = "$._and_(true, true)"]
     fn _and_((a): Bool, (b): Bool) { Value::Bool(a && b) }
+
 
     [MoreThanOp] #[safe = true, desc = "Default implementation of the `>` operator", example = "$._more_than_(100, 50)"]
     fn _more_than_((a): Number, (b): Number) { Value::Bool(a > b) }
