@@ -1929,6 +1929,14 @@ $.assert(arr == [1, 2])
     [AndOp] #[safe = true, desc = "Default implementation of the `&&` operator", example = "$._and_(true, true)"]
     fn _and_((a): Bool, (b): Bool) { Value::Bool(a && b) }
 
+    [NullishOp] #[safe = true, desc = "Default implementation of the `??` operator", example = "$._nullish_(null, 4)"]
+    fn _nullish_((a), (b)) {
+        match a {
+            Value::Null => b,
+            _ => a,
+        }
+    }
+
     [MoreThanOp] #[safe = true, desc = "Default implementation of the `>` operator", example = "$._more_than_(100, 50)"]
     fn _more_than_((a): Number, (b): Number) { Value::Bool(a > b) }
     [LessThanOp] #[safe = true, desc = "Default implementation of the `<` operator", example = "$._less_than_(50, 100)"]

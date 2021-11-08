@@ -44,7 +44,7 @@ macro_rules! expected {
 }
 
 pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Result<(), SyntaxError> {
-    if name.starts_with('_') && name.ends_with('_') {
+    if name.len() > 1 && name.starts_with('_') && name.ends_with('_') {
         if notes.builtins.contains(name) {
             Ok(())
         } else {
@@ -130,6 +130,9 @@ pub enum Token {
 
     #[token("!")]
     Exclamation,
+
+    #[token("??")]
+    DoubleQuestion,
 
     #[token("=")]
     Assign,
@@ -303,7 +306,8 @@ impl Token {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
             | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either
-            | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is => {
+            | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is
+            | DoubleQuestion => {
                 "operator"
             }
             Symbol => "identifier",
@@ -920,34 +924,36 @@ pub fn parse_statement(
 fn operator_precedence(op: &ast::Operator) -> u8 {
     use ast::Operator::*;
     match op {
-        As => 12,
-        Power => 11,
+        As => 13,
+        Power => 12,
 
-        Both => 10,
-        Either => 9,
+        Both => 11,
+        Either => 10,
 
-        Modulo => 8,
-        Star => 8,
-        Slash => 8,
-        IntDividedBy => 8,
+        Modulo => 9,
+        Star => 9,
+        Slash => 9,
+        IntDividedBy => 9,
 
-        Plus => 7,
-        Minus => 7,
+        Plus => 8,
+        Minus => 8,
 
-        Range => 6,
+        Range => 7,
 
-        MoreOrEqual => 5,
-        LessOrEqual => 5,
-        More => 4,
-        Less => 4,
+        MoreOrEqual => 6,
+        LessOrEqual => 6,
+        More => 5,
+        Less => 5,
 
-        Equal => 3,
-        Has => 3,
-        NotEqual => 3,
-        Is => 3,
+        Equal => 4,
+        Has => 4,
+        NotEqual => 4,
+        Is => 4,
 
-        And => 2,
-        Or => 1,
+        And => 3,
+        Or => 2,
+
+        Nullish => 1,
 
         Assign => 0,
         Add => 0,
@@ -972,7 +978,7 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     if expr.operators.len() <= 1 {
         expr
     } else {
-        let mut lowest = 12;
+        let mut lowest = 13;
 
         for op in &expr.operators {
             let p = operator_precedence(op);
@@ -1239,6 +1245,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
     // its just a giant match statement
     match token {
         Token::DotDot => Some(ast::Operator::Range),
+        Token::DoubleQuestion => Some(ast::Operator::Nullish),
         Token::Or => Some(ast::Operator::Or),
         Token::And => Some(ast::Operator::And),
         Token::Equal => Some(ast::Operator::Equal),

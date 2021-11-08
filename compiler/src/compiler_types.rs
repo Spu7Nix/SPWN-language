@@ -194,6 +194,7 @@ impl From<ast::Operator> for Builtin {
         use ast::Operator::*;
         use Builtin::*;
         match op {
+            Nullish => NullishOp,
             Or => OrOp,
             And => AndOp,
             More => MoreThanOp,
@@ -254,14 +255,15 @@ impl EvalExpression for ast::Expression {
             //every value in acum will be operated with the value of var in the corresponding context
             for full_context in contexts.iter() {
                 //only eval the first one on Or and And
-                let (or_overwritten, and_overwritten) =
+                let (or_overwritten, and_overwritten, nullish_overwritten) =
                     if let Some(imp) = globals.implementations.get(&5) {
                         (
                             imp.get(&globals.OR_BUILTIN).is_some(),
                             imp.get(&globals.AND_BUILTIN).is_some(),
+                            imp.get(&globals.NULLISH_BUILTIN).is_some(),
                         )
                     } else {
-                        (false, false)
+                        (false, false, false)
                     };
                 let acum_val = full_context.inner().return_value;
 
@@ -285,6 +287,18 @@ impl EvalExpression for ast::Expression {
                 {
                     let stored = store_const_value(
                         Value::Bool(false),
+                        globals,
+                        full_context.inner().start_group,
+                        CodeArea::new(),
+                    );
+                    full_context.inner().return_value = stored;
+                    continue;
+                } else if self.operators[i] == ast::Operator::Nullish
+                    && !nullish_overwritten
+                    && globals.stored_values[acum_val] != Value::Null
+                {
+                    let stored = store_const_value(
+                        globals.stored_values[acum_val].clone(),
                         globals,
                         full_context.inner().start_group,
                         CodeArea::new(),
