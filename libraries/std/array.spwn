@@ -152,7 +152,7 @@ $.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
             }
             return output;
         } else {
-            for i in ..self.length {
+            for i in 0..self.length {
                 self[i] = cb(self[i])
             }
         }
@@ -164,12 +164,12 @@ $.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
     (self, cb: @macro, in_place: @bool = false) {
         if !in_place {
             let output = [];
-            for i in ..self.length {
+            for i in 0..self.length {
                 output.push(cb(self[i],i));
             }
             return output;
         } else {
-            for i in ..self.length {
+            for i in 0..self.length {
                 self[i] = cb(self[i],i)
             }
         }
@@ -178,7 +178,7 @@ $.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
 arr = [1, 2, 3, 4, 5]
 $.assert(arr.filter(el => el > 3) == [4, 5])
     ")]
-    (self, cb: @macro) {
+    (self, cb: @macro, in_place: @bool = false) {
         let output = [];
         for iter in self {
             let r = cb(iter);
@@ -188,7 +188,10 @@ $.assert(arr.filter(el => el > 3) == [4, 5])
                 output.push(iter)
             }
         }
-        return output
+        if !in_place {
+            return output
+        }
+        self = output
     },
     reduce: #[desc("Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
     example("
@@ -349,9 +352,9 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         ')]
     (self, #[desc("Return the pair as a dictionary")] dict: @bool = false) {
         if dict {
-            return @array(..self.length).map(i => {index: i, value: self[i]})
+            return @array(0..self.length).map(i => {index: i, value: self[i]})
         }
-        return @array(..self.length).map(i => [i, self[i]])
+        return @array(0..self.length).map(i => [i, self[i]])
     },
 
     split: #[desc("Splits the array on the indicies") example("

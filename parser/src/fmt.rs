@@ -248,6 +248,15 @@ impl SpwnFmt for (Expression, Expression) {
     }
 }
 
+impl SpwnFmt for ArrayDef {
+    fn fmt(&self, ind: Indent) -> String {
+        match &self.operator {
+            Some(ArrayPrefix::Collect) => format!("..{}", self.value.fmt(ind)),
+            None => self.value.fmt(ind),
+        }
+    }
+}
+
 impl SpwnFmt for ValueBody {
     fn fmt(&self, ind: Indent) -> String {
         use ValueBody::*;
@@ -446,9 +455,11 @@ impl SpwnFmt for Operator {
             Operator::As => "as",
             Operator::Has => "has",
             Operator::Either => "|",
+            Operator::Both => "&",
             Operator::Exponate => "^=",
             Operator::Modulate => "%=",
             Operator::Swap => "<=>",
+            Operator::Is => "is",
         }
         .to_string()
     }
@@ -459,9 +470,14 @@ impl SpwnFmt for UnaryOperator {
         match self {
             UnaryOperator::Not => "!",
             UnaryOperator::Minus => "-",
-            UnaryOperator::Range => "..",
             UnaryOperator::Decrement => "--",
             UnaryOperator::Increment => "++",
+            UnaryOperator::EqPattern => "==",
+            UnaryOperator::NotEqPattern => "!=",
+            UnaryOperator::MorePattern => ">",
+            UnaryOperator::LessPattern => "<",
+            UnaryOperator::MoreOrEqPattern => ">=",
+            UnaryOperator::LessOrEqPattern => "<=",
         }
         .to_string()
     }

@@ -1,6 +1,6 @@
 #[no_std, cache_output]
 
-number_to_binary = (n: @number) {
+number_to_binary = (n: @number, size: @number) {
     let bits = []
     let n = n // shadow
 
@@ -10,6 +10,7 @@ number_to_binary = (n: @number) {
     }
 
     bits.push(n)
+    bits += [0] * (size - bits.length)
 
     return bits.reverse()
 }
@@ -21,7 +22,7 @@ impl @binary_counter {
     new: #[constructor] (from: @number = 0, bits: @number = 16) {
         digits = number_to_binary(from, bits)
         let data = []
-        for i in ..bits {
+        for i in 0..bits {
             data.push(@counter::new(digits[i], bits = 1))
         }
         carry = @counter::new(0, bits = 1)
@@ -33,7 +34,7 @@ impl @binary_counter {
     _as_: (self, typ: @type_indicator) {
         if typ == @counter {
             c = @counter::new()
-            for i in ..self.data.length {
+            for i in 0..self.data.length {
                 self.data[i].item.if_is(EQUAL_TO, 1, !{
                     c.add(2^i)
                 })
@@ -56,7 +57,7 @@ impl @binary_counter {
     },
 
     copy_to: (self, target: @counter | [@counter] | @binary_counter | [@binary_counter]) {
-        for i in ..self.data.length {
+        for i in 0..self.data.length {
             self.data[i].item.if_is(EQUAL_TO, 1, !{
                 if target.type == @array {
                     for t in target {
@@ -71,7 +72,7 @@ impl @binary_counter {
     },
 
     add_to: (self, target: @counter | [@counter]) {
-        for i in ..self.data.length {
+        for i in 0..self.data.length {
             self.data[i].item.if_is(EQUAL_TO, 1, !{
                 
                 if target.type == @array {
@@ -96,7 +97,7 @@ impl @binary_counter {
     add: (self, num: @number | @binary_counter) {
         if num.type == @number {
             bin = number_to_binary(num, self.data.length)
-            for i in ..self.data.length {
+            for i in 0..self.data.length {
                 -> if bin[i] && counter() == 0 {
                     self.data[i] += 1
                 }
@@ -110,7 +111,7 @@ impl @binary_counter {
                 }
             }
         } else if num.type == @binary_counter {
-            for i in ..self.data.length {
+            for i in 0..self.data.length {
                 -> if num.data[i] == 1 {
                     self.data[i] += 1
                 }
@@ -140,7 +141,7 @@ impl @binary_counter {
             bin = num.data
         }
 
-        for i in ..self.data.length {
+        for i in 0..self.data.length {
             -> if self.data[i] == 1 {
                 -> if bin[i] == 0 {
                     self.data[i] -= 1
@@ -197,7 +198,7 @@ impl @binary_counter {
                 move(i)
             }
         } else if n < 0 {
-            for i in ..(-n) {
+            for i in 0..(-n) {
                 -> if self.data[i] == 1 {
                     self.data[i] -= 1
                 }

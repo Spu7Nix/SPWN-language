@@ -83,6 +83,9 @@ pub enum Token {
     #[token("==")]
     Equal,
 
+    #[token("is")]
+    Is,
+
     #[token("!=")]
     NotEqual,
 
@@ -246,9 +249,8 @@ pub enum Token {
     #[token("switch")]
     Switch,
 
-    #[token("case")]
-    Case,
-
+    // #[token("case")]
+    // Case,
     #[token("break")]
     Break,
 
@@ -301,7 +303,9 @@ impl Token {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
             | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either
-            | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap => "operator",
+            | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is => {
+                "operator"
+            }
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -310,12 +314,12 @@ impl Token {
 
             Comma | OpenCurlyBracket | ClosingCurlyBracket | OpenSquareBracket
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
-            | Period | DotDot | At | Hash | Arrow | ThickArrow | Ampersand => "terminator",
+            | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch
             | While => "keyword",
             //Comment | MultiCommentStart | MultiCommentEnd => "comment",
             StatementSeparator => "statement separator",
@@ -916,32 +920,34 @@ pub fn parse_statement(
 fn operator_precedence(op: &ast::Operator) -> u8 {
     use ast::Operator::*;
     match op {
-        As => 10,
-        Power => 9,
+        As => 12,
+        Power => 11,
 
-        Either => 8,
+        Both => 10,
+        Either => 9,
 
-        Modulo => 7,
-        Star => 7,
-        Slash => 7,
-        IntDividedBy => 7,
+        Modulo => 8,
+        Star => 8,
+        Slash => 8,
+        IntDividedBy => 8,
 
-        Plus => 6,
-        Minus => 6,
+        Plus => 7,
+        Minus => 7,
 
-        Range => 5,
+        Range => 6,
 
-        MoreOrEqual => 4,
-        LessOrEqual => 4,
-        More => 3,
-        Less => 3,
+        MoreOrEqual => 5,
+        LessOrEqual => 5,
+        More => 4,
+        Less => 4,
 
-        Equal => 2,
-        Has => 2,
-        NotEqual => 2,
+        Equal => 3,
+        Has => 3,
+        NotEqual => 3,
+        Is => 3,
 
+        And => 2,
         Or => 1,
-        And => 1,
 
         Assign => 0,
         Add => 0,
@@ -966,7 +972,7 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     if expr.operators.len() <= 1 {
         expr
     } else {
-        let mut lowest = 10;
+        let mut lowest = 12;
 
         for op in &expr.operators {
             let p = operator_precedence(op);
@@ -1048,31 +1054,6 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
                         if tokens.next(false) != Some(Token::Comma) {
                             // for error formatting
                             tokens.previous();
-                        }
-                    }
-                    a => expected!("':'".to_string(), tokens, notes, a),
-                }
-            }
-            Some(Token::Case) => {
-                if default_enabled {
-                    return Err(SyntaxError::SyntaxError {
-                        message: "cannot have more cases after 'else' field".to_string(),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    });
-                }
-                let val = parse_expr(tokens, notes, false, true)?;
-                match tokens.next(false) {
-                    Some(Token::Colon) => {
-                        let expr = parse_expr(tokens, notes, false, true)?; // parse whats after the :
-                        cases.push(ast::Case {
-                            typ: ast::CaseType::Value(val),
-                            body: expr,
-                        });
-
-                        if tokens.next(false) != Some(Token::Comma) {
-                            // for error formatting
-                            tokens.previous_no_ignore(false);
                         }
                     }
                     a => expected!("':'".to_string(), tokens, notes, a),
@@ -1273,7 +1254,9 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Slash => Some(ast::Operator::Slash),
         Token::IntDividedBy => Some(ast::Operator::IntDividedBy),
         Token::Modulo => Some(ast::Operator::Modulo),
+
         Token::Either => Some(ast::Operator::Either),
+        Token::Ampersand => Some(ast::Operator::Both),
 
         Token::Assign => Some(ast::Operator::Assign),
         Token::Add => Some(ast::Operator::Add),
@@ -1286,6 +1269,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Swap => Some(ast::Operator::Swap),
         Token::Has => Some(ast::Operator::Has),
         Token::As => Some(ast::Operator::As),
+        Token::Is => Some(ast::Operator::Is),
         _ => None,
     }
 }
@@ -2016,18 +2000,48 @@ fn parse_variable(
             }
         }
 
-        Some(Token::DotDot) => {
-            first_token = tokens.next(false);
-            Some(ast::UnaryOperator::Range)
-        }
-
         Some(Token::Increment) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Increment)
         }
+
+        Some(Token::DotDot) => {
+            return Err(SyntaxError::SyntaxError {
+                message:
+                    "SPWN no longer supports .. as a unary range operator. Replace with 0.. to fix."
+                        .to_string(),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            });
+        }
         Some(Token::Decrement) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Decrement)
+        }
+        Some(Token::Equal) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::EqPattern)
+        }
+        Some(Token::NotEqual) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::NotEqPattern)
+        }
+        Some(Token::MoreThan) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::MorePattern)
+        }
+        Some(Token::LessThan) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::LessPattern)
+        }
+
+        Some(Token::MoreOrEqual) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::MoreOrEqPattern)
+        }
+        Some(Token::LessOrEqual) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::LessOrEqPattern)
         }
         _ => None,
     };
@@ -2233,9 +2247,28 @@ fn parse_variable(
                     if tokens.next(false) != Some(Token::ClosingSquareBracket) {
                         tokens.previous();
                         loop {
+                            let mut prefix = None;
+                            let mut test_tokens = tokens.clone();
+
+                            // array prefixes
+                            match tokens.next(false) {
+                                Some(Token::DotDot) => {
+                                    prefix = Some(ast::ArrayPrefix::Collect);
+                                }
+                                _ => {
+                                    tokens.previous_no_ignore(false);
+                                }
+                            }
+
                             let item = parse_expr(tokens, notes, true, true)?;
                             match tokens.next(false) {
                                 Some(Token::For) => {
+                                    if prefix.is_some() {
+                                        let _fail =
+                                            parse_expr(&mut test_tokens, notes, true, true)?; // guaranteed to fail
+
+                                        unreachable!();
+                                    }
                                     if !arr.is_empty() {
                                         expected!(
                                             "comma (',') or ']'".to_string(),
@@ -2306,7 +2339,10 @@ fn parse_variable(
                                 }
                                 Some(Token::Comma) => {
                                     //accounting for trailing comma
-                                    arr.push(item);
+                                    arr.push(ast::ArrayDef {
+                                        value: item,
+                                        operator: prefix,
+                                    });
                                     if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
                                         break;
                                     } else {
@@ -2314,7 +2350,10 @@ fn parse_variable(
                                     }
                                 }
                                 Some(Token::ClosingSquareBracket) => {
-                                    arr.push(item);
+                                    arr.push(ast::ArrayDef {
+                                        value: item,
+                                        operator: prefix,
+                                    });
                                     break;
                                 }
                                 a => expected!(

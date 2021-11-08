@@ -274,16 +274,16 @@ impl @complex {
 				c_string += " - "
 			}
 			c_string += switch $.abs(self.im) {
-				case 0: ""
-				case 1: "i"
-				else: ($.abs(self.im) as @string) + "i"
+				==0: "",
+				==1: "i",
+				else: ($.abs(self.im) as @string) + "i",
 			} 
         } else {
 			c_string += switch self.im {
-				case 0: ""
-				case 1: "i"
-				case -1: "-i"
-				else: (self.im as @string) + "i"
+				==0: "",
+				==1: "i",
+				==(-1): "-i",
+				else: (self.im as @string) + "i",
 			}
 		}
         return c_string

@@ -7,7 +7,7 @@ impl @zip {
     (iter1: @array | @string | @dictionary, iter2: @array | @string | @dictionary) {
         let iters = [iter1, iter2]
 
-        for i in ..2 {
+        for i in 0..2 {
             if iters[i].type == @dictionary {
                 let ret = []
                 for el in iters[i] {
@@ -39,7 +39,7 @@ $.assert(@zip::new(x, y) as @dict == {a: 'x', b: 'y', c: 'z'})
         }
 
         let ret_dict = {}
-        for i in ..self.iter1.length {
+        for i in 0..self.iter1.length {
             ret_dict.set(self.iter1[i] as @string, self.iter2[i])
         }
 

@@ -285,45 +285,45 @@ impl<'a> Globals<'a> {
         self.stored_values.mark(self.NULL_STORAGE);
         self.stored_values.mark(self.BUILTIN_STORAGE);
 
-        unsafe {
-            let root_context = contexts
+        //unsafe {
+        let root_context = FullContext::from_ptr(
+            contexts
                 .with_breaks()
                 .next()
                 .unwrap()
                 .inner()
-                .root_context_ptr
-                .as_mut()
-                .unwrap();
+                .root_context_ptr,
+        );
 
-            for c in root_context.with_breaks() {
-                for stack in c.inner().get_variables().values() {
-                    for VariableData { val: v, .. } in stack.iter() {
-                        self.stored_values.mark(*v);
-                    }
-                }
-
-                match c.inner().broken {
-                    Some((BreakType::Macro(Some(v), _), _)) | Some((BreakType::Switch(v), _)) => {
-                        self.stored_values.mark(v);
-                    }
-                    _ => (),
-                }
-
-                // for split contexts
-                self.stored_values.mark(c.inner().return_value);
-                self.stored_values.mark(c.inner().return_value2);
-            }
-            for s in self.stored_values.preserved_stack.clone() {
-                for v in s {
-                    self.stored_values.mark(v);
-                }
-            }
-            for imp in self.implementations.values() {
-                for (v, _) in imp.values() {
+        for c in root_context.with_breaks() {
+            for stack in c.inner().get_variables().values() {
+                for VariableData { val: v, .. } in stack.iter() {
                     self.stored_values.mark(*v);
                 }
             }
+
+            match c.inner().broken {
+                Some((BreakType::Macro(Some(v), _), _)) | Some((BreakType::Switch(v), _)) => {
+                    self.stored_values.mark(v);
+                }
+                _ => (),
+            }
+
+            // for split contexts
+            self.stored_values.mark(c.inner().return_value);
+            self.stored_values.mark(c.inner().return_value2);
         }
+        for s in self.stored_values.preserved_stack.clone() {
+            for v in s {
+                self.stored_values.mark(v);
+            }
+        }
+        for imp in self.implementations.values() {
+            for (v, _) in imp.values() {
+                self.stored_values.mark(*v);
+            }
+        }
+        //}
 
         for (v, imp) in self.prev_imports.values() {
             for imp in imp.values() {

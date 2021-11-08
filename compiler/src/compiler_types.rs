@@ -76,7 +76,7 @@ pub fn handle_operator(
                 if let Some(target_typ) = m.args[0].pattern {
                     let pat = &globals.stored_values[target_typ].clone();
 
-                    if !val2.matches_pat(pat, info, globals, full_context.inner())? {
+                    if !val2.pure_matches_pat(pat, info, globals, full_context.inner().clone())? {
                         //if types dont match, act as if there is no macro at all
                         built_in_function(
                             macro_name,
@@ -189,6 +189,47 @@ pub trait EvalExpression {
     ) -> Result<(), RuntimeError>;
 }
 
+impl From<ast::Operator> for Builtin {
+    fn from(op: ast::Operator) -> Self {
+        use ast::Operator::*;
+        use Builtin::*;
+        match op {
+            Or => OrOp,
+            And => AndOp,
+            More => MoreThanOp,
+            Less => LessThanOp,
+            MoreOrEqual => MoreOrEqOp,
+            LessOrEqual => LessOrEqOp,
+            Slash => DividedByOp,
+            IntDividedBy => IntdividedByOp,
+            Star => TimesOp,
+            Modulo => ModOp,
+            Power => PowOp,
+            Plus => PlusOp,
+            Minus => MinusOp,
+            Equal => EqOp,
+            NotEqual => NotEqOp,
+            Either => EitherOp,
+            Both => BothOp,
+            Range => RangeOp,
+            //MUTABLE ONLY
+            //ADD CHECk
+            Assign => AssignOp,
+            Swap => SwapOp,
+            As => AsOp,
+            Has => HasOp,
+            ast::Operator::Add => AddOp,
+            Subtract => SubtractOp,
+            Multiply => MultiplyOp,
+            Exponate => ExponateOp,
+            Modulate => ModulateOp,
+            Divide => DivideOp,
+            IntDivide => IntdivideOp,
+            Is => IsOp,
+        }
+    }
+}
+
 impl EvalExpression for ast::Expression {
     fn eval(
         &self,
@@ -212,8 +253,6 @@ impl EvalExpression for ast::Expression {
             info.position.pos = (start_pos, end_pos);
             //every value in acum will be operated with the value of var in the corresponding context
             for full_context in contexts.iter() {
-                use ast::Operator::*;
-
                 //only eval the first one on Or and And
                 let (or_overwritten, and_overwritten) =
                     if let Some(imp) = globals.implementations.get(&5) {
@@ -228,7 +267,7 @@ impl EvalExpression for ast::Expression {
 
                 globals.push_preserved_val(acum_val);
 
-                if self.operators[i] == Or
+                if self.operators[i] == ast::Operator::Or
                     && !or_overwritten
                     && globals.stored_values[acum_val] == Value::Bool(true)
                 {
@@ -240,7 +279,7 @@ impl EvalExpression for ast::Expression {
                     );
                     full_context.inner().return_value = stored;
                     continue;
-                } else if self.operators[i] == And
+                } else if self.operators[i] == ast::Operator::And
                     && !and_overwritten
                     && globals.stored_values[acum_val] == Value::Bool(false)
                 {
@@ -260,65 +299,7 @@ impl EvalExpression for ast::Expression {
                 for c2 in full_context.iter() {
                     //let val_fn_context = globals.get_val_fn_context(val, info.clone());
                     let val = c2.inner().return_value;
-
-                    use Builtin::*;
-                    match self.operators[i] {
-                        Or => handle_operator(acum_val, val, OrOp, c2, globals, &info)?,
-                        And => handle_operator(acum_val, val, AndOp, c2, globals, &info)?,
-                        More => handle_operator(acum_val, val, MoreThanOp, c2, globals, &info)?,
-                        Less => handle_operator(acum_val, val, LessThanOp, c2, globals, &info)?,
-                        MoreOrEqual => {
-                            handle_operator(acum_val, val, MoreOrEqOp, c2, globals, &info)?
-                        }
-                        LessOrEqual => {
-                            handle_operator(acum_val, val, LessOrEqOp, c2, globals, &info)?
-                        }
-                        Slash => handle_operator(acum_val, val, DividedByOp, c2, globals, &info)?,
-
-                        IntDividedBy => {
-                            handle_operator(acum_val, val, IntdividedByOp, c2, globals, &info)?
-                        }
-
-                        Star => handle_operator(acum_val, val, TimesOp, c2, globals, &info)?,
-
-                        Modulo => handle_operator(acum_val, val, ModOp, c2, globals, &info)?,
-
-                        Power => handle_operator(acum_val, val, PowOp, c2, globals, &info)?,
-                        Plus => handle_operator(acum_val, val, PlusOp, c2, globals, &info)?,
-                        Minus => handle_operator(acum_val, val, MinusOp, c2, globals, &info)?,
-                        Equal => handle_operator(acum_val, val, EqOp, c2, globals, &info)?,
-                        NotEqual => handle_operator(acum_val, val, NotEqOp, c2, globals, &info)?,
-
-                        Either => handle_operator(acum_val, val, EitherOp, c2, globals, &info)?,
-                        Range => handle_operator(acum_val, val, RangeOp, c2, globals, &info)?,
-                        //MUTABLE ONLY
-                        //ADD CHECk
-                        Assign => handle_operator(acum_val, val, AssignOp, c2, globals, &info)?,
-
-                        Swap => handle_operator(acum_val, val, SwapOp, c2, globals, &info)?,
-
-                        As => handle_operator(acum_val, val, AsOp, c2, globals, &info)?,
-
-                        Has => handle_operator(acum_val, val, HasOp, c2, globals, &info)?,
-
-                        ast::Operator::Add => {
-                            handle_operator(acum_val, val, AddOp, c2, globals, &info)?
-                        }
-
-                        Subtract => handle_operator(acum_val, val, SubtractOp, c2, globals, &info)?,
-
-                        Multiply => handle_operator(acum_val, val, MultiplyOp, c2, globals, &info)?,
-
-                        Exponate => handle_operator(acum_val, val, ExponateOp, c2, globals, &info)?,
-
-                        Modulate => handle_operator(acum_val, val, ModulateOp, c2, globals, &info)?,
-
-                        Divide => handle_operator(acum_val, val, DivideOp, c2, globals, &info)?,
-
-                        IntDivide => {
-                            handle_operator(acum_val, val, IntdivideOp, c2, globals, &info)?
-                        }
-                    };
+                    handle_operator(acum_val, val, self.operators[i].into(), c2, globals, &info)?;
                 }
             }
             start_pos = var.pos.0;
@@ -418,16 +399,27 @@ pub fn execute_macro(
                             let val = globals.stored_values[arg_values[i]].clone();
                             let pat = globals.stored_values[t].clone();
 
-                            if !val.matches_pat(&pat, &info, globals, context)? {
+                            let arg_def_info = info.clone().with_area(CodeArea {
+                                pos: arg_def.position,
+                                file: m.def_file,
+                            });
+
+                            if !val.pure_matches_pat(
+                                &pat,
+                                &arg_def_info,
+                                globals,
+                                context.clone(),
+                            )? {
+                                let arg_info = info.clone().with_area(CodeArea {
+                                    pos: arg.pos,
+                                    ..info.position
+                                });
                                 return Err(RuntimeError::PatternMismatchError {
                                     pattern: pat.to_str(globals),
                                     val: val.get_type_str(globals),
                                     val_def: globals.get_area(arg_values[i]),
                                     pat_def: globals.get_area(t),
-                                    info: info.clone().with_area(CodeArea {
-                                        pos: arg.pos,
-                                        ..info.position
-                                    }),
+                                    info: arg_info,
                                 });
                             }
                         };
@@ -499,17 +491,22 @@ pub fn execute_macro(
                     if let Some(t) = m.args[def_index].pattern {
                         let val = globals.stored_values[arg_values[i]].clone();
                         let pat = globals.stored_values[t].clone();
+                        let arg_def_info = info.clone().with_area(CodeArea {
+                            pos: m.args[def_index].position,
+                            file: m.def_file,
+                        });
 
-                        if !val.matches_pat(&pat, &info, globals, context)? {
+                        if !val.pure_matches_pat(&pat, &arg_def_info, globals, context.clone())? {
+                            let arg_info = info.clone().with_area(CodeArea {
+                                pos: arg.pos,
+                                ..info.position
+                            });
                             return Err(RuntimeError::PatternMismatchError {
                                 pattern: pat.to_str(globals),
                                 val: val.get_type_str(globals),
                                 val_def: globals.get_area(arg_values[i]),
                                 pat_def: globals.get_area(t),
-                                info: info.clone().with_area(CodeArea {
-                                    pos: arg.pos,
-                                    ..info.position
-                                }),
+                                info: arg_info,
                             });
                         }
                     };
@@ -637,15 +634,15 @@ Should be used like this: value.macro(arguments)",
                         };
                         if let Some(pat) = m.ret_pattern {
                             //dbg!(&globals.stored_values[pat], &globals.stored_values[ret]);
-                            if !globals.stored_values[ret].clone().matches_pat(
+                            if !globals.stored_values[ret].clone().pure_matches_pat(
                                 &globals.stored_values[pat].clone(),
                                 &info,
                                 globals,
-                                context.inner(),
+                                context.inner().clone(),
                             )? {
                                 return Err(RuntimeError::PatternMismatchError {
-                                    pattern: globals.stored_values[pat].to_str(globals),
-                                    val: globals.stored_values[ret].to_str(globals),
+                                    pattern: globals.stored_values[pat].clone().to_str(globals),
+                                    val: globals.stored_values[ret].clone().to_str(globals),
                                     pat_def: globals.get_area(pat),
                                     val_def: globals.get_area(ret),
                                     info,
@@ -683,29 +680,28 @@ Should be used like this: value.macro(arguments)",
     Ok(())
 }
 
-pub fn all_combinations<'a>(
-    a: Vec<ast::Expression>,
+pub fn reduce_combinations<'a, T, F>(
+    a: Vec<T>,
     contexts: &'a mut FullContext,
     globals: &mut Globals,
-    info: CompilerInfo,
-    constant: bool,
-) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
+    reduce: F,
+) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError>
+where
+    F: Fn(
+        &T,
+        &'a mut FullContext,
+        Vec<StoredValue>,
+        &mut Globals,
+    ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError>,
+{
     globals.push_new_preserved();
 
     let mut out = vec![(Vec::new(), contexts)];
     for expr in a {
         let mut new_out = Vec::new();
         for (list, full_context) in out.into_iter() {
-            expr.eval(full_context, globals, info.clone(), constant)?;
-
-            for full_context in full_context.iter() {
-                let mut new_list = list.clone();
-                new_list.push(full_context.inner().return_value);
-
-                globals.push_preserved_val(full_context.inner().return_value);
-
-                new_out.push((new_list, full_context));
-            }
+            let new_list = reduce(&expr, full_context, list.clone(), globals)?;
+            new_out.extend(new_list);
         }
         out = new_out;
     }
@@ -713,6 +709,35 @@ pub fn all_combinations<'a>(
 
     Ok(out)
 }
+
+pub fn all_combinations<'a>(
+    a: Vec<ast::Expression>,
+    contexts: &'a mut FullContext,
+    globals: &mut Globals,
+    info: CompilerInfo,
+    constant: bool,
+) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError> {
+    reduce_combinations(
+        a,
+        contexts,
+        globals,
+        |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
+            e.eval(ctx, globals, info.clone(), constant)?;
+            let mut added = Vec::new();
+
+            for full_context in ctx.iter() {
+                let result = full_context.inner().return_value;
+                let mut updated_list = list.clone();
+
+                updated_list.push(result);
+                globals.push_preserved_val(result);
+                added.push((updated_list, full_context));
+            }
+            Ok(added)
+        },
+    )
+}
+
 pub fn eval_dict(
     dict: Vec<ast::DictDef>,
     contexts: &mut FullContext,

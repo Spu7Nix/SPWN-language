@@ -17,8 +17,12 @@ impl @regex {
         let t_rep = to_replace;
         return $.regex(self.regex, t_rep, "replace", replacer)
     },
-    findall: #[desc("Regex find all matche indices of the string argument")]
+    find_all: #[desc("Regex find all matching indices of the string argument")]
     (self, match: @string) {
-        return $.regex(self.regex, match, "findall", null)
+        return $.regex(self.regex, match, "find_all", null)
+    },
+    find_groups: #[desc("Regex find all groups of the string argument, their range, text, and name")]
+    (self, match: @string) {
+        return $.regex(self.regex, match, "find_groups", null)
     }
 }

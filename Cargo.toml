@@ -12,5 +12,6 @@ members = [
     "spwn-web",
 ]
 
-[profile.release]
-debug = true
+[profile.dev]
+debug-assertions = true
+opt-level = 2
