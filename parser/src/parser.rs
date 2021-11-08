@@ -464,12 +464,12 @@ impl<'a> Tokens<'a> {
         self.previous_no_ignore(false)
     }
 
-    fn previous_if<F>(&mut self, closure_expr: F) -> Option<Token>
+    fn previous_if<F>(&mut self, predicate: F) -> Option<Token>
         where F: FnOnce(Token) -> bool
     {
         match self.previous() {
             Some(t) => {
-                if !closure_expr(t) {
+                if !predicate(t) {
                     self.inner_next();
                     None
                 } else {
