@@ -251,7 +251,8 @@ impl SpwnFmt for (Expression, Expression) {
 impl SpwnFmt for ArrayDef {
     fn fmt(&self, ind: Indent) -> String {
         match &self.operator {
-            Some(ArrayPrefix::Collect) => format!("..{}", self.value.fmt(ind)),
+            Some(ArrayPrefix::Collect) => format!("*{}", self.value.fmt(ind)),
+            Some(ArrayPrefix::Spread) => format!("..{}", self.value.fmt(ind)),
             None => self.value.fmt(ind),
         }
     }
@@ -282,12 +283,21 @@ impl SpwnFmt for ValueBody {
             TypeIndicator(x) => format!("@{}", x),
             Null => "null".to_string(),
             SelfVal => "self".to_string(),
-            Ternary(t) => format!(
-                "{} if {} else {}",
-                t.if_expr.fmt(ind),
-                t.condition.fmt(ind),
-                t.else_expr.fmt(ind)
-            ),
+            Ternary(t) => if !t.is_pattern {
+                format!(
+                    "{} if is {} else {}",
+                    t.if_expr.fmt(ind),
+                    t.condition.fmt(ind),
+                    t.else_expr.fmt(ind)
+                )
+            } else {
+                format!(
+                    "{} if {} else {}",
+                    t.if_expr.fmt(ind),
+                    t.condition.fmt(ind),
+                    t.else_expr.fmt(ind)
+                )
+            }
             ListComp(c) => format!(
                 "{} for {} in {}",
                 c.body.fmt(ind),

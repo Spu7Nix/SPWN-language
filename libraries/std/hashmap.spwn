@@ -389,9 +389,9 @@ $.print( a.pairs() ) // some permutation of [["a!", 2], ["b!", 4], ["c!", 6]]
         let new_map = @hashmap::new()
         for [k, v] in self.pairs() {
             switch apply_type {
-                case hashmap_apply.VALUES: new_map.insert(k, cb(v)),
-                case hashmap_apply.KEYS: new_map.insert(cb(k), v),
-                case hashmap_apply.PAIRS: new_map.insert(cb[0](k), cb[1](v)),
+                ==hashmap_apply.VALUES: new_map.insert(k, cb(v)),
+                ==hashmap_apply.KEYS: new_map.insert(cb(k), v),
+                ==hashmap_apply.PAIRS: new_map.insert(cb[0](k), cb[1](v)),
             }
         }
         if !in_place {
@@ -434,9 +434,9 @@ $.print( a.pairs() ) // [["a", 1]]
         let new_map = @hashmap::new()
         for [k, v] in self.pairs() {
             if switch apply_type {
-                case hashmap_apply.VALUES: cb(v),
-                case hashmap_apply.KEYS: cb(k),
-                case hashmap_apply.PAIRS: cb[0](k) && cb[1](v),
+                ==hashmap_apply.VALUES: cb(v),
+                ==hashmap_apply.KEYS: cb(k),
+                ==hashmap_apply.PAIRS: cb[0](k) && cb[1](v),
             } {
                 new_map.insert(k, v)
             }
@@ -477,9 +477,9 @@ $.assert( a.any([k => k == "c", v => v > 2], apply_type = hashmap_apply.PAIRS) )
     (self, cb: @macro | [@macro], apply_type: @number = hashmap_apply.VALUES) {
         for [k, v] in self.pairs() {
             if switch apply_type {
-                case hashmap_apply.VALUES: cb(v),
-                case hashmap_apply.KEYS: cb(k),
-                case hashmap_apply.PAIRS: cb[0](k) && cb[1](v),
+                ==hashmap_apply.VALUES: cb(v),
+                ==hashmap_apply.KEYS: cb(k),
+                ==hashmap_apply.PAIRS: cb[0](k) && cb[1](v),
             } {
                 return true
             }
@@ -517,9 +517,9 @@ $.assert( a.any([k => (k + @string(a.get(k))).length == 2, v => v > 0], apply_ty
     (self, cb: @macro | [@macro], apply_type: @number = hashmap_apply.VALUES) {
         for [k, v] in self.pairs() {
             if !switch apply_type {
-                case hashmap_apply.VALUES: cb(v),
-                case hashmap_apply.KEYS: cb(k),
-                case hashmap_apply.PAIRS: cb[0](k) && cb[1](v),
+                ==hashmap_apply.VALUES: cb(v),
+                ==hashmap_apply.KEYS: cb(k),
+                ==hashmap_apply.PAIRS: cb[0](k) && cb[1](v),
             } {
                 return false
             }

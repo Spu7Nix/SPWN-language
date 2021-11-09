@@ -456,16 +456,16 @@ roll_groups = 70g..170g
 insert_bf_cmd = (ch: @string, offset: [@number], group: @group) {
 
     blockid = switch ch {
-        case ">": RIGHT,//increment the data pointer (to point to the next cell to the right).
-        case "<": LEFT,	//decrement the data pointer (to point to the next cell to the left).
-        case "+": INCR,	//increment (increase by one) the byte at the data pointer.
-        case "-": DECR,	//decrement (decrease by one) the byte at the data pointer.
-        case ".": DOT,	//output the byte at the data pointer.
-        case ",": INPUT,//accept one byte of input, storing its value in the byte at the data pointer.
-        case "[": OPEN,
-        case "]": CLOSE,
-        case "end": END,
-        case "no\nop": NOOP,
+        ==">": RIGHT,//increment the data pointer (to point to the next cell to the right).
+        =="<": LEFT,	//decrement the data pointer (to point to the next cell to the left).
+        =="+": INCR,	//increment (increase by one) the byte at the data pointer.
+        =="-": DECR,	//decrement (decrease by one) the byte at the data pointer.
+        ==".": DOT,	//output the byte at the data pointer.
+        ==",": INPUT,//accept one byte of input, storing its value in the byte at the data pointer.
+        =="[": OPEN,
+        =="]": CLOSE,
+        =="end": END,
+        =="no\nop": NOOP,
 
     }
 

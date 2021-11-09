@@ -57,10 +57,10 @@ impl @textdisplay {
                 })
 
                 cblock = switch order[ch] {
-                    case "I": wincon[0],
-                    case "N": wincon[1],
-                    case "C": wincon[2],
-                    case "O": wincon[3],
+                    =="I": wincon[0],
+                    =="N": wincon[1],
+                    =="C": wincon[2],
+                    =="O": wincon[3],
                     else: null
                 }
                 //$.print(order[ch], cblock)

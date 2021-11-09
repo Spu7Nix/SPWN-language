@@ -25,9 +25,18 @@ use std::io::Write;
 use std::collections::hash_map::DefaultHasher;
 
 // BUILT IN STD
-use include_dir::{include_dir, Dir, File};
+use include_dir::{Dir, File};
 
+#[cfg(not(debug_assertions))]
 const STANDARD_LIBS: Dir = include_dir!("../libraries");
+
+// dont import std when in dev mode
+#[cfg(debug_assertions)]
+const STANDARD_LIBS: Dir = Dir {
+    path: "",
+    files: &[],
+    dirs: &[],
+};
 
 pub fn get_lib_file<'a, S: AsRef<Path>>(path: S) -> Option<File<'a>> {
     get_file(&STANDARD_LIBS, path.as_ref())
@@ -56,9 +65,10 @@ fn get_file<'a>(dir: &'a Dir, path: &Path) -> Option<File<'a>> {
 use errors::compiler_info::{CodeArea, CompilerInfo};
 
 macro_rules! arg_length {
-    ($info:expr , $count:expr, $args:expr , $message:expr) => {
+    ($info:expr , $count:expr, $args:expr , $message:expr, $builtin:ident) => {
         if $args.len() != $count {
             return Err(RuntimeError::BuiltinError {
+                $builtin,
                 message: $message,
                 info: $info,
             });
@@ -301,21 +311,21 @@ use std::str::FromStr;
 
 macro_rules! typed_argument_check {
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident)  ($($arg_name:ident),*)) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident)  ($($arg_name:ident),*)) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
         let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], $globals, $context.start_group, true);
     };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) mut ($($arg_name:ident),*)) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) mut ($($arg_name:ident),*)) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
         let ( $(mut $arg_name),*) = $globals.stored_values[$arguments[$arg_index]].clone();
     };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) ($($arg_name:ident),*): $arg_type:ident) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) ($($arg_name:ident),*): $arg_type:ident) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
@@ -325,6 +335,7 @@ macro_rules! typed_argument_check {
 
             a => {
                 return Err(RuntimeError::BuiltinError {
+                    $builtin,
                     message: format!(
                         "Expected {} for argument {}, found {}",
                         stringify!($arg_type),
@@ -337,7 +348,7 @@ macro_rules! typed_argument_check {
         };
     };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
@@ -346,6 +357,7 @@ macro_rules! typed_argument_check {
 
             a => {
                 return Err(RuntimeError::BuiltinError {
+                    $builtin,
                     message: format!(
                         "Expected {} for argument {}, found {}",
                         stringify!($arg_type),
@@ -416,7 +428,7 @@ macro_rules! raw_check {
 macro_rules! builtins {
 
     {
-        ($arguments:ident, $info:ident, $globals:ident, $context:ident, $full_context:ident)
+        ($arguments:ident, $info:ident, $globals:ident, $context:ident, $full_context:ident, $builtin:ident)
         $(
             [$variant:ident]
             #[
@@ -491,14 +503,17 @@ macro_rules! builtins {
             $globals: &mut Globals,
             contexts: &mut FullContext,
         ) -> Result<(), RuntimeError> {
+            #![allow(unused_variables)]
             if !$globals.permissions.is_allowed(func) {
                 if !$globals.permissions.is_safe(func) {
                     return Err(RuntimeError::BuiltinError {
+                        builtin: String::from(func),
                         message: format!("This built-in function requires an explicit `--allow {}` flag when running the script", String::from(func)),
                         $info,
                     })
                 } else {
                     return Err(RuntimeError::BuiltinError {
+                        builtin: String::from(func),
                         message: String::from("This built-in function was denied permission to run"),
                         $info,
                     })
@@ -511,12 +526,15 @@ macro_rules! builtins {
                     $(
                         Builtin::$variant => {
 
+                            let $builtin = stringify!($name).to_string();
+
                             $(
                                 #[allow(unused_assignments)]
                                 let mut arg_index = 0;
                                 $(
                                     if arg_index >= $arguments.len() {
                                         return Err(RuntimeError::BuiltinError {
+                                            builtin: stringify!($name).to_string(),
                                             message: String::from(
                                                 "Too few arguments provided",
                                             ),
@@ -529,7 +547,7 @@ macro_rules! builtins {
                                         ($($arg_name),*)$(: $arg_type)?
                                     );
                                     typed_argument_check!(
-                                        ($globals, arg_index, $arguments, $info, $context) $($mut)?
+                                        ($globals, arg_index, $arguments, $info, $context, $builtin) $($mut)?
                                         ($($arg_name),*)$(: $arg_type)?
                                     );
 
@@ -537,6 +555,7 @@ macro_rules! builtins {
                                 )+
                                 if arg_index < $arguments.len() - 1 {
                                     return Err(RuntimeError::BuiltinError {
+                                        builtin: stringify!($name).to_string(),
                                         message: String::from(
                                             "Too many arguments provided",
                                         ),
@@ -696,12 +715,13 @@ macro_rules! builtins {
 }
 
 builtins! {
-    (arguments, info, globals, context, full_context)
+    (arguments, info, globals, context, full_context, builtin)
 
     [Assert] #[safe = true, desc = "Throws an error if the argument is not `true`", example = "$.assert(true)"]
     fn assert((b): Bool) {
         if !b {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: String::from("Assertion failed"),
                 info,
             });
@@ -738,12 +758,13 @@ builtins! {
     fn time(#["none"]) {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            arg_length!(info, 0, arguments, "Expected no arguments".to_string());
+            arg_length!(info, 0, arguments, "Expected no arguments".to_string(), builtin);
             use std::time::SystemTime;
             let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                 Ok(time) => time,
                 Err(e) => {
                     return Err(RuntimeError::BuiltinError {
+                        builtin,
                         message: format!("System time error: {}", e),
                         info,
                     })
@@ -759,7 +780,7 @@ builtins! {
 
     [SpwnVersion] #[safe = true, desc = "Gets the current version of spwn", example = "$.spwn_version()"]
     fn spwn_version(#["none"]) {
-        arg_length!(info, 0, arguments, "Expected no arguments".to_string());
+        arg_length!(info, 0, arguments, "Expected no arguments".to_string(), builtin);
 
         Value::Str(env!("CARGO_PKG_VERSION").to_string())
     }
@@ -787,6 +808,7 @@ builtins! {
             Ok(s) => s,
             Err(e) => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!("Base 64 error: {}", e),
                     info,
                 })
@@ -806,6 +828,7 @@ builtins! {
                     Ok(hname) => hname,
                     Err(_) => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: format!("Could not convert header name: '{}'", name),
                             info
                         })
@@ -827,6 +850,7 @@ builtins! {
                 "head" => client.head(&url),
                 _ => {
                     return Err(RuntimeError::BuiltinError {
+                        builtin,
                         message: format!("Request type not supported: '{}'", method),
                         info
                     })
@@ -840,6 +864,7 @@ builtins! {
                     Ok(resp) => resp,
                     Err(_) => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: format!("Could not make request to: '{}'", url),
                             info
                         })
@@ -949,6 +974,7 @@ $.add(obj {
     fn add(#["The object or trigger to add"]) {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: "Expected 1 argument".to_string(),
                 info,
             });
@@ -986,7 +1012,8 @@ $.add(obj {
         match mode {
             ObjectMode::Object => {
                 if !ignore_context && context.start_group.id != Id::Specific(0) {
-                    return Err(RuntimeError::BuiltinError { // objects cant be added dynamically, of course
+                    return Err(RuntimeError::BuiltinError {
+                        builtin, // objects cant be added dynamically, of course
                         message: String::from(
                             "you cannot add an obj type object at runtime"),
                         info
@@ -1235,6 +1262,7 @@ $.extend_trigger_func(10g, () {
             Value::TriggerFunc(f) => f.start_group,
             a => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!(
                         "Expected group or trigger function, found {}",
                         a.to_str(globals)
@@ -1283,6 +1311,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
             use rand::Rng;
             if arguments.len() > 2 {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: "Expected up to 2 arguments".to_string(),
                     info,
                 });
@@ -1295,6 +1324,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                     Ok(Value::Array(v)) => v,
                     _ => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: format!("Expected type that can be converted to @array for argument 1, found type {}", globals.get_type_str(arguments[0])),
                             info,
                         });
@@ -1321,6 +1351,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                         },
                         _ => {
                             return Err(RuntimeError::BuiltinError {
+                                builtin,
                                 message: format!("Expected number, found {}", globals.get_type_str(arguments[1])),
                                 info,
                             });
@@ -1363,6 +1394,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
     fn readfile(#["Path of file to read, and the format it's in (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"]) {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: String::from("Expected 1 or 2 arguments, the path to the file and the data format (default: utf-8)"),
                 info,
             });
@@ -1377,6 +1409,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             s
                         } else {
                             return Err(RuntimeError::BuiltinError {
+                                builtin,
                                 message:
                                     "Data format needs to be a string (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"
                                         .to_string(),
@@ -1390,6 +1423,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
 
                 if !path.exists() {
                     return Err(RuntimeError::BuiltinError {
+                        builtin,
                         message: "Path doesn't exist".to_string(),
                         info,
                     });
@@ -1402,6 +1436,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1415,6 +1450,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1434,6 +1470,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1443,6 +1480,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(value) => value,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem parsing JSON: {}", e),
                                     info,
                                 });
@@ -1479,6 +1517,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1488,6 +1527,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(value) => value,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem parsing toml: {}", e),
                                     info,
                                 });
@@ -1525,6 +1565,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1534,6 +1575,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(value) => value,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem parsing toml: {}", e),
                                     info,
                                 });
@@ -1566,6 +1608,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                     }
                     _ => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: "Invalid data format ( use \"text\", \"bin\", \"json\", \"toml\" or \"yaml\" )"
                                 .to_string(),
                             info,
@@ -1575,6 +1618,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
             }
             _ => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: "Path needs to be a string".to_string(),
                     info,
                 });
@@ -1591,6 +1635,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
             Ok(_) => (),
             Err(e) => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!("Error when writing to file: {}", e),
                     info,
                 });
@@ -1619,6 +1664,7 @@ $.assert(arr == [1, 2])
             },
             _ => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!("Expected array or string, found @{}", typ),
                     info,
                 })
@@ -1632,12 +1678,14 @@ $.assert(arr == [1, 2])
         let end_index = end_index as usize;
         if start_index >= end_index {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: "Start index is larger than end index".to_string(),
                 info,
             });
         }
         if end_index > val.len() {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: "End index is larger than string".to_string(),
                 info,
             });
@@ -1659,6 +1707,7 @@ $.assert(arr == [1, 2])
             Value::Str(s) => Value::Str(s.remove(index as usize).to_string()),
             _ => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!("Expected array or string, found @{}", typ),
                     info,
                 })
@@ -1682,6 +1731,7 @@ $.assert(arr == [1, 2])
                             _ => {
                                 return Err(
                                     RuntimeError::BuiltinError {
+                                        builtin,
                                         message: format!("Invalid or missing replacer. Expected @string, found @{}", &globals.get_type_str(arguments[3])),
                                         info
                                     }
@@ -1774,6 +1824,7 @@ $.assert(arr == [1, 2])
                     },
                     _ => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: format!(
                                 "Invalid regex mode \"{}\" in regex {}. Expected \"match\", \"replace\", \"find_all\" or \"find_groups\"",
                                 mode, r
@@ -1784,6 +1835,7 @@ $.assert(arr == [1, 2])
                 }
             } else {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: "Failed to build regex (invalid syntax)".to_string(),
                     info,
                 });
@@ -1876,6 +1928,7 @@ $.assert(arr == [1, 2])
     fn _or_((a): Bool, (b): Bool) { Value::Bool(a || b) }
     [AndOp] #[safe = true, desc = "Default implementation of the `&&` operator", example = "$._and_(true, true)"]
     fn _and_((a): Bool, (b): Bool) { Value::Bool(a && b) }
+
 
     [MoreThanOp] #[safe = true, desc = "Default implementation of the `>` operator", example = "$._more_than_(100, 50)"]
     fn _more_than_((a): Number, (b): Number) { Value::Bool(a > b) }
@@ -2054,6 +2107,7 @@ $.assert(arr == [1, 2])
                 let id = d.get(&globals.OBJ_KEY_ID);
                 if id == None {
                     return Err(RuntimeError::BuiltinError {
+                        builtin,
                         // object_key has an ID member for the key basically
                         message: "object key has no 'id' member".to_string(),
                         info,

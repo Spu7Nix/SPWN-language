@@ -15,6 +15,7 @@ pub enum DictDef {
 #[derive(Clone, PartialEq, Debug)]
 pub enum ArrayPrefix {
     Collect,
+    Spread,
     // future-proofing
 }
 
@@ -365,7 +366,7 @@ pub struct While {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum CaseType {
-    Value(Expression),
+    //Value(Expression),
     Pattern(Expression),
     Default,
 }
@@ -421,6 +422,7 @@ pub struct Ternary {
     pub condition: Expression,
     pub if_expr: Expression,
     pub else_expr: Expression,
+    pub is_pattern: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]

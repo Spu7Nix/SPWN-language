@@ -131,10 +131,10 @@ impl @voxel {
         part_2.toggle_off()
 
         new_face_normal = switch [direction, vert] {
-            case [1, false]: [1, 0, 0],
-            case [-1, false]: [-1, 0, 0],
-            case [1, true]: [0, 1, 0],
-            case [-1, true]: [0, -1, 0],
+            ==[1, false]: [1, 0, 0],
+            ==[-1, false]: [-1, 0, 0],
+            ==[1, true]: [0, 1, 0],
+            ==[-1, true]: [0, -1, 0],
         }
 
         front_color_variant1 = get_lighting([0, 0, 1], 0)

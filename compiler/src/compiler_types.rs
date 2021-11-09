@@ -399,16 +399,27 @@ pub fn execute_macro(
                             let val = globals.stored_values[arg_values[i]].clone();
                             let pat = globals.stored_values[t].clone();
 
-                            if !val.pure_matches_pat(&pat, &info, globals, context.clone())? {
+                            let arg_def_info = info.clone().with_area(CodeArea {
+                                pos: arg_def.position,
+                                file: m.def_file,
+                            });
+
+                            if !val.pure_matches_pat(
+                                &pat,
+                                &arg_def_info,
+                                globals,
+                                context.clone(),
+                            )? {
+                                let arg_info = info.clone().with_area(CodeArea {
+                                    pos: arg.pos,
+                                    ..info.position
+                                });
                                 return Err(RuntimeError::PatternMismatchError {
                                     pattern: pat.to_str(globals),
                                     val: val.get_type_str(globals),
                                     val_def: globals.get_area(arg_values[i]),
                                     pat_def: globals.get_area(t),
-                                    info: info.clone().with_area(CodeArea {
-                                        pos: arg.pos,
-                                        ..info.position
-                                    }),
+                                    info: arg_info,
                                 });
                             }
                         };
@@ -480,17 +491,22 @@ pub fn execute_macro(
                     if let Some(t) = m.args[def_index].pattern {
                         let val = globals.stored_values[arg_values[i]].clone();
                         let pat = globals.stored_values[t].clone();
+                        let arg_def_info = info.clone().with_area(CodeArea {
+                            pos: m.args[def_index].position,
+                            file: m.def_file,
+                        });
 
-                        if !val.pure_matches_pat(&pat, &info, globals, context.clone())? {
+                        if !val.pure_matches_pat(&pat, &arg_def_info, globals, context.clone())? {
+                            let arg_info = info.clone().with_area(CodeArea {
+                                pos: arg.pos,
+                                ..info.position
+                            });
                             return Err(RuntimeError::PatternMismatchError {
                                 pattern: pat.to_str(globals),
                                 val: val.get_type_str(globals),
                                 val_def: globals.get_area(arg_values[i]),
                                 pat_def: globals.get_area(t),
-                                info: info.clone().with_area(CodeArea {
-                                    pos: arg.pos,
-                                    ..info.position
-                                }),
+                                info: arg_info,
                             });
                         }
                     };
