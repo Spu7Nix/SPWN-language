@@ -1950,7 +1950,7 @@ impl VariableFuncs for ast::Variable {
                                                         let buckets =
                                                             match globals.stored_values.move_out(
                                                                 collect_ctx.inner().return_value,
-                                                            ) {
+                                                            ).val {
                                                                 Value::Array(a) => a,
                                                                 _ => unreachable!(),
                                                             };
