@@ -3,6 +3,7 @@
 use errors::create_error;
 use internment::LocalIntern;
 
+
 use shared::BreakType;
 use shared::ImportType;
 use shared::SpwnSource;
@@ -40,11 +41,12 @@ pub fn compile_spwn(
     included_paths: Vec<PathBuf>,
     notes: ParseNotes,
     permissions: BuiltinPermissions,
+    initial_level: String,
     std_out: &mut impl Write,
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
 
-    let mut globals = Globals::new(source.clone(), permissions, std_out);
+    let mut globals = Globals::new(source.clone(), permissions, initial_level, std_out);
     globals.includes = included_paths;
 
     let print_with_color = |a: &str, color| println!("{}", a.fg(color));
@@ -1427,7 +1429,7 @@ fn array_destructure_define(
             Value::Array(val_a) => {
                 let ranges = arr
                     .iter()
-                    .filter(|x| x.operator == Some(ast::ArrayPrefix::Collect))
+                    .filter(|x| matches!(x.operator, Some(ast::ArrayPrefix::Collect | ast::ArrayPrefix::Spread)))
                     .map(|x| &x.value)
                     .collect::<Vec<_>>();
 
@@ -1476,7 +1478,7 @@ fn array_destructure_define(
 
                             let the_expr = &arr[var_idx].value;
                             match arr[var_idx].operator {
-                                Some(ast::ArrayPrefix::Collect) => {
+                                Some(ast::ArrayPrefix::Collect | ast::ArrayPrefix::Spread) => {
                                     idx_step = 1 + val_a.len() - arr.len();
 
                                     /*let astvec = ast::ValueBody::Array(

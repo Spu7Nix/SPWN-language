@@ -196,26 +196,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         None
                     };
-                    let mut std_out = std::io::stdout();
-                    let mut compiled = match compiler::compile_spwn(
-                        statements,
-                        SpwnSource::File(script_path),
-                        included_paths,
-                        notes,
-                        permissions,
-                        &mut std_out,
-                    ) {
-                        Err(err) => {
-                            create_report(ErrorReport::from(err)).eprint(cache).unwrap();
-                            std::process::exit(ERROR_EXIT_CODE);
-                        }
-                        Ok(p) => p,
-                    };
 
-                    //dbg!(&compiled.prev_imports);
-
-                    if !compile_only {
-                        let level_string = if let Some(gd_path) = &gd_path {
+                    let level_string = if !compile_only {
+                        if let Some(gd_path) = &gd_path {
                             print_with_color("Reading savefile...", Color::Cyan);
                             let mut file = fs::File::open(gd_path)?;
                             let mut file_content = Vec::new();
@@ -241,7 +224,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             level_string
                         } else {
                             String::new()
-                        };
+                        }
+                    } else {
+                        String::new()
+                    };
+                    let mut std_out = std::io::stdout();
+                    let mut compiled = match compiler::compile_spwn(
+                        statements,
+                        SpwnSource::File(script_path),
+                        included_paths,
+                        notes,
+                        permissions,
+                        level_string.clone(),
+                        &mut std_out,
+                    ) {
+                        Err(err) => {
+                            create_report(ErrorReport::from(err)).eprint(cache).unwrap();
+                            std::process::exit(ERROR_EXIT_CODE);
+                        }
+                        Ok(p) => p,
+                    };
+
+                    //dbg!(&compiled.prev_imports);
+
+                    if !compile_only {
                         let mut reserved = optimize::ReservedIds {
                             object_groups: Default::default(),
                             trigger_groups: Default::default(),

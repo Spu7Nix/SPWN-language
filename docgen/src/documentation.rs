@@ -43,6 +43,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     let mut globals = Globals::new(
         SpwnSource::File(globals_path),
         BuiltinPermissions::new(),
+        String::from(""),
         &mut std_out,
     );
 

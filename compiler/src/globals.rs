@@ -44,6 +44,7 @@ pub struct Globals<'a> {
 
     pub func_ids: Vec<FunctionId>,
     pub objects: Vec<GdObj>,
+    pub initial_string: String,
 
     pub prev_imports: FnvHashMap<ImportType, (StoredValue, Implementations)>,
 
@@ -69,7 +70,7 @@ pub struct Globals<'a> {
     pub std_out: &'a mut dyn Write,
 
     pub BUILTIN_STORAGE: StoredValue,
-    pub NULL_STORAGE: StoredValue,
+    pub NULL_STORAGE: StoredValue
 }
 
 impl<'a> Globals<'a> {
@@ -141,6 +142,7 @@ impl<'a> Globals<'a> {
     pub fn new(
         path: SpwnSource,
         permissions: BuiltinPermissions,
+        initial_string: String,
         std_out: &'a mut impl Write,
     ) -> Self {
         let (storage, builtin_storage, null_storage) = ValStorage::new();
@@ -169,6 +171,7 @@ impl<'a> Globals<'a> {
                 obj_list: Vec::new(),
             }],
             objects: Vec::new(),
+            initial_string,
             implementations: FnvHashMap::default(),
             sync_groups: vec![SyncGroup {
                 parts: vec![0],

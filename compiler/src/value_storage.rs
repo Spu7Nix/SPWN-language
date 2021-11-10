@@ -141,6 +141,7 @@ impl ValStorage {
             def_area: CodeArea::new(),
             marked: false,
         });
+
         (
             ValStorage {
                 map,

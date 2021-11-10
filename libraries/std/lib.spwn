@@ -18,10 +18,11 @@ import "regex.spwn"
 import "number.spwn"
 import "heapq.spwn"
 import "complex.spwn"
-import "zip.spwn"
+//import "zip.spwn" TODO: remove entirely
 import "http.spwn"
-import "vector.spwn"
+//import "vector.spwn" TODO: remove entirely
 import "range.spwn"
+import "level_info.spwn"
 
 hashmap = import "hashmap.spwn"
 general = import "general_triggers.spwn"
@@ -51,7 +52,8 @@ return {
     complex: @complex::new,
     hashmap: @hashmap::new,
     hashmap_apply: hashmap.hashmap_apply,
-    zip: @zip::new,
+    level_info: @level_info,
+    //zip: @zip::new,
 }
 
 

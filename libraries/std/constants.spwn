@@ -18,6 +18,8 @@ ok = (id: @number, pat: @pattern | @type_indicator) {
     return @object_key::{id, pattern: pat}
 }
 
+
+
 @easing_type::_display_ = (self) {
     return switch self.id {
         ==0: "NONE",
@@ -194,7 +196,7 @@ return {
         PULSE_HSV : ok(48, @bool),
         COPIED_COLOR_HVS : ok(49, @string),
         COPIED_COLOR_ID : ok(50, @color),
-        TARGET : ok(51, @color | @group | @trigger_function),
+        TARGET : ok(51, @color | @group | @trigger_function | @number),
         TARGET_TYPE : ok(52, @number),
         YELLOW_TELEPORTATION_PORTAL_DISTANCE: ok(54, @number),
         ACTIVATE_GROUP : ok(56, @bool),

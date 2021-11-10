@@ -1251,6 +1251,7 @@ $.assert($.mutability(mut))
         Value::Bool(globals.can_mutate(arguments[0]))
     }
 
+
     [ExtendTriggerFunc] #[safe = true, desc = "Executes a macro in a specific trigger function context", example = "
 $.extend_trigger_func(10g, () {
     11g.move(10, 0, 0.5) // will add a move trigger in group 10
@@ -1390,6 +1391,17 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
     }
 
+    [ReadLevel] #[safe = true, desc = "Returns the level string of the level being written to, or nothing if there is no output level", example = "level_string = $.read_level()"]
+    fn level_string() {
+        if !arguments.is_empty() {
+            return Err(RuntimeError::BuiltinError {
+                builtin,
+                message: String::from("Expected 0 arguments"),
+                info,
+            });
+        }
+        Value::Str(globals.initial_string.clone())
+    }
     [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local system (uses the current directory as base for relative paths)", example = "data = $.readfile(\"file.txt\")"]
     fn readfile(#["Path of file to read, and the format it's in (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"]) {
         if arguments.is_empty() || arguments.len() > 2 {
@@ -1942,17 +1954,17 @@ $.assert(arr == [1, 2])
 
     [EqOp] #[safe = true, desc = "Default implementation of the `==` operator", example = "$._equal_(\"hello\", \"hello\")"]
     [[RAW]] fn _equal_((a), (b)) {
-        default_value_equality(arguments[0], arguments[1], globals, unsafe { full_context.as_mut().unwrap() }, &info)?;
+        default_value_equality(arguments[0], arguments[1], globals, FullContext::from_ptr(full_context), &info)?;
     }
 
     [IsOp] #[safe = true, desc = "Default implementation of the `is` operator", example = "$._is_([1, 2, 3], [@number])"]
     [[RAW]] fn _is_((val), (pattern)) {
-        val.matches_pat(&pattern, &info, globals, unsafe { full_context.as_mut().unwrap() }, true)?;
+        val.matches_pat(&pattern, &info, globals, FullContext::from_ptr(full_context), true)?;
     }
 
     [NotEqOp] #[safe = true, desc = "Default implementation of the `!=` operator", example = "$._not_equal_(\"hello\", \"bye\")"]
     [[RAW]] fn _not_equal_((a), (b)) {
-        let contexts = unsafe { full_context.as_mut().unwrap() };
+        let contexts = FullContext::from_ptr(full_context);
         default_value_equality(arguments[0], arguments[1], globals, contexts, &info)?;
         // negate
         for c in contexts.iter() {
