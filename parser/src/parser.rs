@@ -1009,9 +1009,9 @@ macro_rules! op_precedence {
 
 op_precedence!{ // make sure the highest precedence is at the top
     12, Left => As,
-    11, Right => Power,
-    10, Left => Both,
-    9, Left => Either,
+    11, Left => Both,
+    10, Left => Either,
+    9, Right => Power,
     8, Left => Modulo Star Slash IntDividedBy,
     7, Left => Plus Minus,
     6, Left => Range,
