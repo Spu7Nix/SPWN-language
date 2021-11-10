@@ -970,9 +970,9 @@ pub fn parse_statement(
 
 macro_rules! op_precedence {
     {
-        $p_f:expr => $($op_f:ident)+,
+        $p_f:expr, $a_f:ident => $($op_f:ident)+,
         $(
-            $p:expr => $($op:ident)+,
+            $p:expr, $a:ident => $($op:ident)+,
         )*
     } => {
         fn operator_precedence(op: &ast::Operator) -> u8 {
@@ -988,24 +988,41 @@ macro_rules! op_precedence {
                 )+
             }
         }
+        pub enum OpAssociativity {
+            Left,
+            Right,
+        }
+        fn operator_associativity(op: &ast::Operator) -> OpAssociativity {
+            use ast::Operator::*;
+            match op {
+                $(
+                    $(
+                        $op => OpAssociativity::$a,
+                    )+
+                )*
+                $(
+                    $op_f => OpAssociativity::$a_f,
+                )+
+            }
+        }
         const HIGHEST_PRECEDENCE: u8 = $p_f;
     }
 }
 
 op_precedence!{ // make sure the highest precedence is at the top
-    12 => As,
-    11 => Power,
-    10 => Both,
-    9 => Either,
-    8 => Modulo Star Slash IntDividedBy,
-    7 => Plus Minus,
-    6 => Range,
-    5 => LessOrEqual MoreOrEqual,
-    4 => Less More,
-    3 => Is NotEqual Has Equal,
-    2 => And,
-    1 => Or,
-    0 => Assign Add Subtract Multiply Divide IntDivide Exponate Modulate Swap,
+    12, Left => As,
+    11, Left => Both,
+    10, Left => Either,
+    9, Right => Power,
+    8, Left => Modulo Star Slash IntDividedBy,
+    7, Left => Plus Minus,
+    6, Left => Range,
+    5, Left => LessOrEqual MoreOrEqual,
+    4, Left => Less More,
+    3, Left => Is NotEqual Has Equal,
+    2, Left => And,
+    1, Left => Or,
+    0, Right => Assign Add Subtract Multiply Divide IntDivide Exponate Modulate Swap,
 }
 
 
@@ -1020,12 +1037,14 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     if expr.operators.len() <= 1 {
         expr
     } else {
-        let mut highest = HIGHEST_PRECEDENCE;
+        let mut lowest = HIGHEST_PRECEDENCE;
+        let mut assoc = OpAssociativity::Left;
 
         for op in &expr.operators {
             let p = operator_precedence(op);
-            if p < highest {
-                highest = p
+            if p < lowest {
+                lowest = p;
+                assoc = operator_associativity(op);
             };
         }
 
@@ -1034,10 +1053,15 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
             values: Vec::new(),
         };
 
-        for (i, op) in expr.operators.iter().enumerate().rev() {
-            if operator_precedence(op) == highest {
+        let op_loop: Vec<(usize, &Operator)> = if let OpAssociativity::Left = assoc { expr.operators.iter().enumerate().rev().collect() }
+        else { expr.operators.iter().enumerate().collect() };
+
+        for (i, op) in op_loop {
+
+            if operator_precedence(op) == lowest {
                 new_expr.operators.push(*op);
-                new_expr.values.push(if i == expr.operators.len() - 1 {
+
+                let val1 = if i == expr.operators.len() - 1 {
                     expr.values.last().unwrap().clone()
                 } else {
                     // expr.operators[(i + 1)..].to_vec(),
@@ -1047,8 +1071,9 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
                         values: expr.values[(i + 1)..].to_vec(),
                     })
                     .to_variable()
-                });
-                new_expr.values.push(if i == 0 {
+                };
+
+                let val2 = if i == 0 {
                     expr.values[0].clone()
                 } else {
                     fix_precedence(ast::Expression {
@@ -1056,14 +1081,16 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
                         values: expr.values[..(i + 1)].to_vec(),
                     })
                     .to_variable()
-                });
+                };
+
+                new_expr.values.push(val1);
+                new_expr.values.push(val2);
 
                 break;
             }
         }
         new_expr.operators.reverse();
         new_expr.values.reverse();
-
         new_expr
     }
 }
@@ -2256,13 +2283,22 @@ fn parse_variable(
                                 _ => {tokens.previous_no_ignore(false);},
                             }
 
-                            let mut slice_next = "".to_string();
-                            tokens.next_if(|_, tokens| {
-                                slice_next = tokens.slice(); 
+                            //let mut tok_next = None;
+
+                            let mut tmp_tokens = tokens.clone();
+                            /*tmp_tokens.next_if(|a, _| {
+                                tok_next = Some(a); 
                                 false
-                            }, false);
+                            }, false);*/
 
                             let item = parse_expr(tokens, notes, true, true)?;
+
+                            let single_ident =
+                                item.values.len() == 1 &&
+                                item.values[0].operator == None &&
+                                item.values[0].path.len() == 0 &&
+                                matches!(item.values[0].value.body, ast::ValueBody::Symbol(_));
+
                             match tokens.next(false) {
                                 Some(Token::For) => {
                                     if prefix.is_some() {
@@ -2341,8 +2377,15 @@ fn parse_variable(
                                 }
                                 t @ Some(Token::Comma | Token::ClosingSquareBracket) => {
                                     //accounting for trailing comma
+                                    tmp_tokens.next(false);
 
-                                    
+                                    match (single_ident, &prefix) {
+                                        (true, &Some(ast::ArrayPrefix::Collect)) => 
+                                            expected!("array or dictionary".to_string(), tmp_tokens, notes, tmp_tokens.current()),
+                                        (false, &Some(ast::ArrayPrefix::Spread)) =>
+                                            expected!("identifier".to_string(), tmp_tokens, notes, tmp_tokens.current()),
+                                        (_, _) => (),
+                                    }
                                     arr.push(ast::ArrayDef {
                                         value: item,
                                         operator: prefix,
