@@ -1950,11 +1950,11 @@ impl VariableFuncs for ast::Variable {
                         |item: &ast::ArrayDef, ctx, list: Vec<StoredValue>, globals| {
                             let mut added = Vec::new();
                             match item.operator {
-                                Some(ast::ArrayPrefix::Collect) => {
+                                Some(ast::ArrayPrefix::Collect | ast::ArrayPrefix::Spread) => {
                                     let expr = &item.value;
                                     match &expr.values[0].value.body {
                                         ast::ValueBody::Array(_) => {
-                                            // ..[a, b]
+                                            // *[a, b]
                                             if expr.values.len() > 1 {
                                                 use parser::fmt::SpwnFmt;
 

@@ -59,6 +59,8 @@ pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Resul
     }
 }
 
+type TokenPos = usize;
+
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
 pub enum Token {
     //OPERATORS
@@ -352,7 +354,7 @@ pub struct Tokens<'a> {
     stack: Vec<(Option<Token>, String, core::ops::Range<usize>)>,
     line_breaks: Vec<u32>,
     //index 0 = element of iter / last element in stack
-    index: usize,
+    index: TokenPos,
 }
 
 impl<'a> Tokens<'a> {
@@ -417,11 +419,11 @@ impl<'a> Tokens<'a> {
     }
 
     fn next_if<F>(&mut self, predicate: F, ss: bool) -> Option<Token>
-        where F: FnOnce(Token) -> bool
+        where F: FnOnce(Token, &Tokens) -> bool
     {
         match self.next(ss) {
             Some(t) => {
-                if !predicate(t) {
+                if !predicate(t, self) {
                     self.previous();
                     None
                 } else {
@@ -2254,6 +2256,12 @@ fn parse_variable(
                                 _ => {tokens.previous_no_ignore(false);},
                             }
 
+                            let mut slice_next = "".to_string();
+                            tokens.next_if(|_, tokens| {
+                                slice_next = tokens.slice(); 
+                                false
+                            }, false);
+
                             let item = parse_expr(tokens, notes, true, true)?;
                             match tokens.next(false) {
                                 Some(Token::For) => {
@@ -2331,24 +2339,20 @@ fn parse_variable(
                                         a => expected!("identifier".to_string(), tokens, notes, a),
                                     }
                                 }
-                                Some(Token::Comma) => {
+                                t @ Some(Token::Comma | Token::ClosingSquareBracket) => {
                                     //accounting for trailing comma
+
+                                    
                                     arr.push(ast::ArrayDef {
                                         value: item,
                                         operator: prefix,
                                     });
-                                    if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
+
+                                    if t == Some(Token::ClosingSquareBracket) || tokens.next(false) == Some(Token::ClosingSquareBracket) {
                                         break;
                                     } else {
                                         tokens.previous();
                                     }
-                                }
-                                Some(Token::ClosingSquareBracket) => {
-                                    arr.push(ast::ArrayDef {
-                                        value: item,
-                                        operator: prefix,
-                                    });
-                                    break;
                                 }
                                 a => expected!(
                                     "comma (','), ']', or 'for'".to_string(),

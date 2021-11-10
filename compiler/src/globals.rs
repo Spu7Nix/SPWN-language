@@ -280,7 +280,7 @@ impl<'a> Globals<'a> {
 
     pub fn collect_garbage(&mut self, contexts: &mut FullContext) {
         //gc
-        println!("debug gc");
+
         //mark
         self.stored_values.mark(self.NULL_STORAGE);
         self.stored_values.mark(self.BUILTIN_STORAGE);
