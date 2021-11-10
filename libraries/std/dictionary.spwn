@@ -130,5 +130,16 @@ $.assert(wares.contains(5))
 	")]
 	(self, value) {
 		return self.values().contains(value)
-	}
+	},
+		map: #[desc("Calls a defined callback function on each key-value pair of a dictionary, and returns an array that contains the results.") example("
+	dict = {key1: 0, key2: 1, key3: 2}
+	$.assert(dict.map((k, v) => k[v]) == ['k', 'e', 'y'])
+		")]
+		(self, cb: @macro) {
+			let output = [];
+			for iter in self {
+				output.push(cb(iter[0], iter[1]));
+			}
+			return output;
+		},
 }

@@ -12,6 +12,19 @@ pub enum DictDef {
     Extract(Expression),
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub enum ArrayPrefix {
+    Collect,
+    Spread,
+    // future-proofing
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct ArrayDef {
+    pub value: Expression,
+    pub operator: Option<ArrayPrefix>,
+}
+
 //pub type Comment = (Option<String>, Option<String>);
 
 #[derive(Clone, PartialEq, Debug)]
@@ -79,7 +92,7 @@ pub enum ValueBody {
     Str(StrInner),
     Import(ImportType, bool),
     Switch(Expression, Vec<Case>),
-    Array(Vec<Expression>),
+    Array(Vec<ArrayDef>),
     ListComp(Comprehension),
     Obj(ObjectLiteral),
     Macro(Macro),
@@ -103,7 +116,7 @@ impl ValueBody {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Hash)]
 pub enum ObjectMode {
     Object,
     Trigger,
@@ -133,6 +146,7 @@ pub enum Operator {
     Equal,
     NotEqual,
     Range,
+    Is,
     MoreOrEqual,
     LessOrEqual,
     More,
@@ -146,6 +160,7 @@ pub enum Operator {
     Modulo,
 
     Either,
+    Both,
 
     Assign,
     Add,
@@ -165,9 +180,15 @@ pub enum Operator {
 pub enum UnaryOperator {
     Not,
     Minus,
-    Range,
     Increment,
     Decrement,
+
+    EqPattern,
+    NotEqPattern,
+    MorePattern,
+    LessPattern,
+    MoreOrEqPattern,
+    LessOrEqPattern,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -345,7 +366,7 @@ pub struct While {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum CaseType {
-    Value(Expression),
+    //Value(Expression),
     Pattern(Expression),
     Default,
 }
@@ -401,6 +422,7 @@ pub struct Ternary {
     pub condition: Expression,
     pub if_expr: Expression,
     pub else_expr: Expression,
+    pub is_pattern: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]

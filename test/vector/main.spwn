@@ -1,4 +1,4 @@
 
 
-let a = @vector::new([4,1,-2])
-$.print(a.map(el => el * 2))
+let a = @vector::new([4,1,-2,6])
+$.print(a.z)

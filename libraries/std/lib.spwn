@@ -18,11 +18,13 @@ import "regex.spwn"
 import "number.spwn"
 import "heapq.spwn"
 import "complex.spwn"
-import "zip.spwn"
+//import "zip.spwn" TODO: remove entirely
 import "http.spwn"
-import "vector.spwn"
+//import "vector.spwn" TODO: remove entirely
 import "range.spwn"
+import "level_info.spwn"
 
+hashmap = import "hashmap.spwn"
 general = import "general_triggers.spwn"
 events = import "events.spwn"
 ctrl_flow = import "control_flow.spwn"
@@ -35,6 +37,9 @@ return {
     ..events,
     ..ctrl_flow,
 
+    PI: constants.PI,
+    EULER: constants.EULER,
+
     counter: @counter::new,
     binary_counter: @binary_counter,
     on: @event::on,
@@ -45,7 +50,10 @@ return {
     regex: @regex::new,
     heapq: @heapq::new,
     complex: @complex::new,
-    zip: @zip::new,
+    hashmap: @hashmap::new,
+    hashmap_apply: hashmap.hashmap_apply,
+    level_info: @level_info,
+    //zip: @zip::new,
 }
 
 

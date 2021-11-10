@@ -10,8 +10,12 @@ $.assert(!('x'.is_empty()))
 	},
 	substr: #[desc("Gets a substring beginning at the specified start and ending at the specified end.")]
 	(self, start: @number, end: @number) {
-        if self.length == 0 { return self }
-		if start > end { return $.substr(self, end, start); }
+		let start = start.constrain(0,self.length)
+		let end = end.constrain(0,self.length)
+		if start == end { return '' }
+		if start > end {
+			return $.substr(self, end, start).reverse(); // we do a little trolling
+		}
 		return $.substr(self, start, end);
 	},
 	join: #[desc("Joins a list using the string.") example("
@@ -20,7 +24,7 @@ $.assert('current'.join(['string', ' element', ' join']) == 'currentstring eleme
     ")]
 	(self, list: @array) {
 		let out = "";
-		for i in ..list.length {
+		for i in 0..list.length {
             if i > 0 {out += self}
 			out += @string(list[i]);
 		}
@@ -68,7 +72,7 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
 	reverse: #[desc("Reverses the string.")]
 	(self) {
 		let ret_str = ""
-        for i in ..self.length {
+        for i in 0..self.length {
             ret_str += self[self.length - 1 - i]
         }
         return ret_str
@@ -121,7 +125,7 @@ $.assert(str2.l_trim() == 'pog  __')
         // scan left
         let begin = 0
 
-        for i in ..self.length {
+        for i in 0..self.length {
             if tokenlist.contains(self[i]) {
                 continue
             } else {
@@ -166,8 +170,8 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
         blank_regex = "\\{\\}"
         numbered_regex = "\\{\\d+\\}"
 
-        blanks = $.regex(blank_regex, self, 'findall', null)
-        numbered = $.regex(numbered_regex, self, 'findall', null)
+        blanks = $.regex(blank_regex, self, 'find_all', null)
+        numbered = $.regex(numbered_regex, self, 'find_all', null)
 
         if blanks.length != 0 && numbered.length != 0 {
             throw "FormatError: String format must only be either blank {} or numbered {1} {2}"
@@ -185,7 +189,7 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
 
             splitted = self.split("{}")
 
-            for i in ..args.length {
+            for i in 0..args.length {
                 ret_str += splitted[i] + (args[i] as @string)
             }
             ret_str += splitted[-1]
@@ -196,7 +200,7 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
 
             ret_str = self
 
-            for i in ..args.length {
+            for i in 0..args.length {
                 ret_str = $.regex("\\{" + i as @string + "\\}", ret_str, "replace", args[i] as @string)
             }
             
@@ -211,8 +215,8 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
         return $.regex(re, self, "match", null)
     },
 
-    findall: (self, re: @string) {
-        return $.regex(re, self, "findall", null)
+    find_all: (self, re: @string) {
+        return $.regex(re, self, "find_all", null)
     },
 
     replace: (self, re: @string, replacement: @string) {

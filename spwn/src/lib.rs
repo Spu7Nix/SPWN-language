@@ -91,6 +91,7 @@ pub fn run_spwn(code: String, included: Vec<PathBuf>) -> Result<[String; 2], Str
         included,
         notes,
         Default::default(),
+        "".to_string(),
         &mut std_out,
     ) {
         Ok(a) => a,

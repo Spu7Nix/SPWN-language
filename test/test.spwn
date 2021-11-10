@@ -1,6 +1,1 @@
-#[no_std]
-
-for [a] in [[1]] {
-}
-
-$.print(a)
+$.print(level_info::objects)

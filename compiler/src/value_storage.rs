@@ -51,6 +51,16 @@ impl std::ops::IndexMut<StoredValue> for ValStorage {
 }
 
 impl ValStorage {
+    pub fn move_out(&mut self, i: StoredValue) -> StoredValData {
+        self.map
+            .remove(i)
+            .unwrap_or_else(|| panic!("index {:?} not found", i))
+    }
+
+    pub fn move_in(&mut self, i: StoredValue, v: StoredValData) {
+        self.map[i] = v;
+    }
+
     pub fn mark(&mut self, root: StoredValue) {
         if !self.marked(root) {
             (*self.map.get_mut(root).unwrap()).marked = true;
@@ -86,8 +96,25 @@ impl ValStorage {
                         self.mark(*v)
                     }
                 }
+                Value::Pattern(p) => self.mark_pattern(p),
                 _ => (),
             };
+        }
+    }
+
+    fn mark_pattern(&mut self, p: Pattern) {
+        match p {
+            Pattern::Either(a, b) | Pattern::Both(a, b) => {
+                self.mark_pattern(*a);
+                self.mark_pattern(*b);
+            }
+            Pattern::Eq(a) => self.mark(a),
+            Pattern::NotEq(a) => self.mark(a),
+            Pattern::MoreThan(a) => self.mark(a),
+            Pattern::LessThan(a) => self.mark(a),
+            Pattern::MoreOrEq(a) => self.mark(a),
+            Pattern::LessOrEq(a) => self.mark(a),
+            _ => (),
         }
     }
 
@@ -114,6 +141,7 @@ impl ValStorage {
             def_area: CodeArea::new(),
             marked: false,
         });
+
         (
             ValStorage {
                 map,

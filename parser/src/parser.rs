@@ -44,7 +44,7 @@ macro_rules! expected {
 }
 
 pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Result<(), SyntaxError> {
-    if name.starts_with('_') && name.ends_with('_') {
+    if name.len() > 1 && name.starts_with('_') && name.ends_with('_') {
         if notes.builtins.contains(name) {
             Ok(())
         } else {
@@ -58,6 +58,8 @@ pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Resul
         Ok(())
     }
 }
+
+type TokenPos = usize;
 
 #[derive(Logos, Debug, PartialEq, Copy, Clone)]
 pub enum Token {
@@ -82,6 +84,9 @@ pub enum Token {
 
     #[token("==")]
     Equal,
+
+    #[token("is")]
+    Is,
 
     #[token("!=")]
     NotEqual,
@@ -127,6 +132,7 @@ pub enum Token {
 
     #[token("!")]
     Exclamation,
+
 
     #[token("=")]
     Assign,
@@ -246,9 +252,8 @@ pub enum Token {
     #[token("switch")]
     Switch,
 
-    #[token("case")]
-    Case,
-
+    // #[token("case")]
+    // Case,
     #[token("break")]
     Break,
 
@@ -301,7 +306,10 @@ impl Token {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
             | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either
-            | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap => "operator",
+            | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is
+            => {
+                "operator"
+            }
             Symbol => "identifier",
             Number => "number literal",
             StringLiteral => "string literal",
@@ -310,12 +318,12 @@ impl Token {
 
             Comma | OpenCurlyBracket | ClosingCurlyBracket | OpenSquareBracket
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
-            | Period | DotDot | At | Hash | Arrow | ThickArrow | Ampersand => "terminator",
+            | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
 
             Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | Case
+            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch
             | While => "keyword",
             //Comment | MultiCommentStart | MultiCommentEnd => "comment",
             StatementSeparator => "statement separator",
@@ -346,7 +354,7 @@ pub struct Tokens<'a> {
     stack: Vec<(Option<Token>, String, core::ops::Range<usize>)>,
     line_breaks: Vec<u32>,
     //index 0 = element of iter / last element in stack
-    index: usize,
+    index: TokenPos,
 }
 
 impl<'a> Tokens<'a> {
@@ -410,6 +418,35 @@ impl<'a> Tokens<'a> {
         }
     }
 
+    fn next_if<F>(&mut self, predicate: F, ss: bool) -> Option<Token>
+        where F: FnOnce(Token, &Tokens) -> bool
+    {
+        match self.next(ss) {
+            Some(t) => {
+                if !predicate(t, self) {
+                    self.previous();
+                    None
+                } else {
+                    Some(t)
+                }
+            }
+            None => None,
+        }   
+    }
+
+    fn next_while<'s: 'a, F: 'static>(&'s mut self, mut predicate: F) -> impl Iterator<Item = Token> + 's
+        where F: FnMut(Token) -> bool,
+    {
+        let mut taken = self.iter.clone().take_while(move |x| predicate(*x));
+
+        let count = taken.by_ref().count();
+        for _ in 0..count {
+            self.inner_next();
+        }
+
+        taken
+    }
+
     fn previous(&mut self) -> Option<Token> {
         /*self.index += 1;
         let len = self.stack.len();
@@ -427,6 +464,22 @@ impl<'a> Tokens<'a> {
             None
         }*/
         self.previous_no_ignore(false)
+    }
+
+    fn previous_if<F>(&mut self, predicate: F) -> Option<Token>
+        where F: FnOnce(Token) -> bool
+    {
+        match self.previous() {
+            Some(t) => {
+                if !predicate(t) {
+                    self.inner_next();
+                    None
+                } else {
+                    Some(t)
+                }
+            }
+            None => None,
+        }   
     }
 
     fn previous_no_ignore(&mut self, ss: bool) -> Option<Token> {
@@ -452,6 +505,7 @@ impl<'a> Tokens<'a> {
         } else {
             self.stack[len - self.index - 1].0
         }
+
     }
 
     fn slice(&self) -> String {
@@ -475,7 +529,6 @@ impl<'a> Tokens<'a> {
         self.stack[self.stack.len() - self.index - 1].2.clone()
     }*/
 }
-
 //type TokenList = Peekable<Lexer<Token>>;
 
 const STATEMENT_SEPARATOR_DESC: &str = "Statement separator (line-break or ';')";
@@ -913,47 +966,65 @@ pub fn parse_statement(
     })
 }
 
-fn operator_precedence(op: &ast::Operator) -> u8 {
-    use ast::Operator::*;
-    match op {
-        As => 10,
-        Power => 9,
 
-        Either => 8,
 
-        Modulo => 7,
-        Star => 7,
-        Slash => 7,
-        IntDividedBy => 7,
-
-        Plus => 6,
-        Minus => 6,
-
-        Range => 5,
-
-        MoreOrEqual => 4,
-        LessOrEqual => 4,
-        More => 3,
-        Less => 3,
-
-        Equal => 2,
-        Has => 2,
-        NotEqual => 2,
-
-        Or => 1,
-        And => 1,
-
-        Assign => 0,
-        Add => 0,
-        Subtract => 0,
-        Multiply => 0,
-        Divide => 0,
-        IntDivide => 0,
-        Exponate => 0,
-        Modulate => 0,
-        Swap => 0,
+macro_rules! op_precedence {
+    {
+        $p_f:expr, $a_f:ident => $($op_f:ident)+,
+        $(
+            $p:expr, $a:ident => $($op:ident)+,
+        )*
+    } => {
+        fn operator_precedence(op: &ast::Operator) -> u8 {
+            use ast::Operator::*;
+            match op {
+                $(
+                    $(
+                        $op => $p,
+                    )+
+                )*
+                $(
+                    $op_f => $p_f,
+                )+
+            }
+        }
+        pub enum OpAssociativity {
+            Left,
+            Right,
+        }
+        fn operator_associativity(op: &ast::Operator) -> OpAssociativity {
+            use ast::Operator::*;
+            match op {
+                $(
+                    $(
+                        $op => OpAssociativity::$a,
+                    )+
+                )*
+                $(
+                    $op_f => OpAssociativity::$a_f,
+                )+
+            }
+        }
+        const HIGHEST_PRECEDENCE: u8 = $p_f;
     }
 }
+
+op_precedence!{ // make sure the highest precedence is at the top
+    12, Left => As,
+    11, Left => Both,
+    10, Left => Either,
+    9, Right => Power,
+    8, Left => Modulo Star Slash IntDividedBy,
+    7, Left => Plus Minus,
+    6, Left => Range,
+    5, Left => LessOrEqual MoreOrEqual,
+    4, Left => Less More,
+    3, Left => Is NotEqual Has Equal,
+    2, Left => And,
+    1, Left => Or,
+    0, Right => Assign Add Subtract Multiply Divide IntDivide Exponate Modulate Swap,
+}
+
 
 fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     for val in &mut expr.values {
@@ -966,12 +1037,14 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     if expr.operators.len() <= 1 {
         expr
     } else {
-        let mut lowest = 10;
+        let mut lowest = HIGHEST_PRECEDENCE;
+        let mut assoc = OpAssociativity::Left;
 
         for op in &expr.operators {
             let p = operator_precedence(op);
             if p < lowest {
-                lowest = p
+                lowest = p;
+                assoc = operator_associativity(op);
             };
         }
 
@@ -980,10 +1053,15 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
             values: Vec::new(),
         };
 
-        for (i, op) in expr.operators.iter().enumerate().rev() {
+        let op_loop: Vec<(usize, &Operator)> = if let OpAssociativity::Left = assoc { expr.operators.iter().enumerate().rev().collect() }
+        else { expr.operators.iter().enumerate().collect() };
+
+        for (i, op) in op_loop {
+
             if operator_precedence(op) == lowest {
                 new_expr.operators.push(*op);
-                new_expr.values.push(if i == expr.operators.len() - 1 {
+
+                let val1 = if i == expr.operators.len() - 1 {
                     expr.values.last().unwrap().clone()
                 } else {
                     // expr.operators[(i + 1)..].to_vec(),
@@ -993,8 +1071,9 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
                         values: expr.values[(i + 1)..].to_vec(),
                     })
                     .to_variable()
-                });
-                new_expr.values.push(if i == 0 {
+                };
+
+                let val2 = if i == 0 {
                     expr.values[0].clone()
                 } else {
                     fix_precedence(ast::Expression {
@@ -1002,14 +1081,16 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
                         values: expr.values[..(i + 1)].to_vec(),
                     })
                     .to_variable()
-                });
+                };
+
+                new_expr.values.push(val1);
+                new_expr.values.push(val2);
 
                 break;
             }
         }
         new_expr.operators.reverse();
         new_expr.values.reverse();
-
         new_expr
     }
 }
@@ -1048,31 +1129,6 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
                         if tokens.next(false) != Some(Token::Comma) {
                             // for error formatting
                             tokens.previous();
-                        }
-                    }
-                    a => expected!("':'".to_string(), tokens, notes, a),
-                }
-            }
-            Some(Token::Case) => {
-                if default_enabled {
-                    return Err(SyntaxError::SyntaxError {
-                        message: "cannot have more cases after 'else' field".to_string(),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    });
-                }
-                let val = parse_expr(tokens, notes, false, true)?;
-                match tokens.next(false) {
-                    Some(Token::Colon) => {
-                        let expr = parse_expr(tokens, notes, false, true)?; // parse whats after the :
-                        cases.push(ast::Case {
-                            typ: ast::CaseType::Value(val),
-                            body: expr,
-                        });
-
-                        if tokens.next(false) != Some(Token::Comma) {
-                            // for error formatting
-                            tokens.previous_no_ignore(false);
                         }
                     }
                     a => expected!("':'".to_string(), tokens, notes, a),
@@ -1160,6 +1216,12 @@ fn parse_expr(
     let express = fix_precedence(ast::Expression { values, operators }); //pemdas and stuff
     match tokens.next(true) {
         Some(Token::If) => {
+            
+            let is_pattern = match tokens.next(true) {
+                Some(Token::Is) => true,
+                _ => {tokens.previous(); false}
+            };
+
             // oooh ternaries
 
             // remove any = from the ternary and place into a separate stack
@@ -1225,6 +1287,7 @@ fn parse_expr(
                     operators: tern_operators,
                 },
                 else_expr: do_else,
+                is_pattern
             };
 
             let ternval_literal = ast::ValueLiteral {
@@ -1273,7 +1336,9 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Slash => Some(ast::Operator::Slash),
         Token::IntDividedBy => Some(ast::Operator::IntDividedBy),
         Token::Modulo => Some(ast::Operator::Modulo),
+
         Token::Either => Some(ast::Operator::Either),
+        Token::Ampersand => Some(ast::Operator::Both),
 
         Token::Assign => Some(ast::Operator::Assign),
         Token::Add => Some(ast::Operator::Add),
@@ -1286,6 +1351,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Swap => Some(ast::Operator::Swap),
         Token::Has => Some(ast::Operator::Has),
         Token::As => Some(ast::Operator::As),
+        Token::Is => Some(ast::Operator::Is),
         _ => None,
     }
 }
@@ -1960,18 +2026,48 @@ fn parse_variable(
             }
         }
 
-        Some(Token::DotDot) => {
-            first_token = tokens.next(false);
-            Some(ast::UnaryOperator::Range)
-        }
-
         Some(Token::Increment) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Increment)
         }
+
+        Some(Token::DotDot) => {
+            return Err(SyntaxError::SyntaxError {
+                message:
+                    "SPWN no longer supports .. as a unary range operator. Replace with 0.. to fix."
+                        .to_string(),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            });
+        }
         Some(Token::Decrement) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Decrement)
+        }
+        Some(Token::Equal) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::EqPattern)
+        }
+        Some(Token::NotEqual) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::NotEqPattern)
+        }
+        Some(Token::MoreThan) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::MorePattern)
+        }
+        Some(Token::LessThan) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::LessPattern)
+        }
+
+        Some(Token::MoreOrEqual) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::MoreOrEqPattern)
+        }
+        Some(Token::LessOrEqual) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::LessOrEqPattern)
         }
         _ => None,
     };
@@ -2177,9 +2273,40 @@ fn parse_variable(
                     if tokens.next(false) != Some(Token::ClosingSquareBracket) {
                         tokens.previous();
                         loop {
+                            let mut prefix = None;
+                            let mut test_tokens = tokens.clone();
+
+                            // array prefixes
+                            match tokens.next(false) {
+                                Some(Token::DotDot) => prefix = Some(ast::ArrayPrefix::Spread),
+                                Some(Token::Star) => prefix = Some(ast::ArrayPrefix::Collect),
+                                _ => {tokens.previous_no_ignore(false);},
+                            }
+
+                            //let mut tok_next = None;
+
+                            let mut tmp_tokens = tokens.clone();
+                            /*tmp_tokens.next_if(|a, _| {
+                                tok_next = Some(a); 
+                                false
+                            }, false);*/
+
                             let item = parse_expr(tokens, notes, true, true)?;
+
+                            let single_ident =
+                                item.values.len() == 1 &&
+                                item.values[0].operator == None &&
+                                item.values[0].path.len() == 0 &&
+                                matches!(item.values[0].value.body, ast::ValueBody::Symbol(_));
+
                             match tokens.next(false) {
                                 Some(Token::For) => {
+                                    if prefix.is_some() {
+                                        let _fail =
+                                            parse_expr(&mut test_tokens, notes, true, true)?; // guaranteed to fail
+
+                                        unreachable!();
+                                    }
                                     if !arr.is_empty() {
                                         expected!(
                                             "comma (',') or ']'".to_string(),
@@ -2248,18 +2375,27 @@ fn parse_variable(
                                         a => expected!("identifier".to_string(), tokens, notes, a),
                                     }
                                 }
-                                Some(Token::Comma) => {
+                                t @ Some(Token::Comma | Token::ClosingSquareBracket) => {
                                     //accounting for trailing comma
-                                    arr.push(item);
-                                    if let Some(Token::ClosingSquareBracket) = tokens.next(false) {
+                                    tmp_tokens.next(false);
+
+                                    match (single_ident, &prefix) {
+                                        (true, &Some(ast::ArrayPrefix::Collect)) => 
+                                            expected!("array or dictionary".to_string(), tmp_tokens, notes, tmp_tokens.current()),
+                                        (false, &Some(ast::ArrayPrefix::Spread)) =>
+                                            expected!("identifier".to_string(), tmp_tokens, notes, tmp_tokens.current()),
+                                        (_, _) => (),
+                                    }
+                                    arr.push(ast::ArrayDef {
+                                        value: item,
+                                        operator: prefix,
+                                    });
+
+                                    if t == Some(Token::ClosingSquareBracket) || tokens.next(false) == Some(Token::ClosingSquareBracket) {
                                         break;
                                     } else {
                                         tokens.previous();
                                     }
-                                }
-                                Some(Token::ClosingSquareBracket) => {
-                                    arr.push(item);
-                                    break;
                                 }
                                 a => expected!(
                                     "comma (','), ']', or 'for'".to_string(),

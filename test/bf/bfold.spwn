@@ -12,14 +12,14 @@ insert_bf_script = (str: @string, offset: [@number]) {
     let index = 0
     for ch in str {
         blockid = switch ch {
-            case ">": RIGHT,//increment the data pointer (to point to the next cell to the right).
-            case "<": LEFT,	//decrement the data pointer (to point to the next cell to the left).
-            case "+": INCR,	//increment (increase by one) the byte at the data pointer.
-            case "-": DECR,	//decrement (decrease by one) the byte at the data pointer.
-            case ".": DOT	//output the byte at the data pointer.
-            //case ",": 	//accept one byte of input, storing its value in the byte at the data pointer.
-            case "[": OPEN,	
-            case "]": CLOSE,
+            ==">": RIGHT,//increment the data pointer (to point to the next cell to the right).
+            =="<": LEFT,	//decrement the data pointer (to point to the next cell to the left).
+            =="+": INCR,	//increment (increase by one) the byte at the data pointer.
+            =="-": DECR,	//decrement (decrease by one) the byte at the data pointer.
+            ==".": DOT	//output the byte at the data pointer.
+            //==",": 	//accept one byte of input, storing its value in the byte at the data pointer.
+            =="[": OPEN,	
+            =="]": CLOSE,
             else: null 
         }
         if blockid != null {

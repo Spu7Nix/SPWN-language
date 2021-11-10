@@ -154,20 +154,11 @@ use libflate::{gzip, zlib};
 use std::io::Read;
 
 fn xor(data: Vec<u8>, key: u8) -> Vec<u8> {
-    let mut new_data = Vec::new();
-
-    for b in data {
-        //let new_byte = u64::from(b).pow(key);
-        new_data.push(b ^ key)
-    }
-    new_data
+    data.into_iter().map(|b| b ^ key).collect()
 }
 fn base_64_decrypt(encoded: Vec<u8>) -> Vec<u8> {
-    let mut new_data = encoded;
-    while new_data.len() % 4 != 0 {
-        new_data.push(b'=')
-    }
-    base64::decode(String::from_utf8(new_data).unwrap().as_str()).unwrap()
+    let l = encoded.len();
+    base64::decode(String::from_utf8([encoded, b"=".repeat(l % 4)].concat()).unwrap().as_str()).unwrap()
 }
 
 use quick_xml::events::{BytesText, Event};
