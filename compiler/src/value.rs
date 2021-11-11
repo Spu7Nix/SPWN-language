@@ -821,12 +821,12 @@ impl Value {
             Value::Pattern(p) => match p {
                 Pattern::Type(t) => Value::TypeIndicator(*t).to_str(globals),
                 Pattern::Either(p1, p2) => format!(
-                    "{} | {}",
+                    "({} | {})",
                     display_inner(&Value::Pattern(*p1.clone()), globals)?,
                     display_inner(&Value::Pattern(*p2.clone()), globals)?
                 ),
                 Pattern::Both(p1, p2) => format!(
-                    "{} & {}",
+                    "({} & {})",
                     display_inner(&Value::Pattern(*p1.clone()), globals)?,
                     display_inner(&Value::Pattern(*p2.clone()), globals)?
                 ),

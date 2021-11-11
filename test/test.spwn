@@ -1,23 +1,10 @@
-#[no_std]
+extract obj_props
 
 
 
+gaga = (a) -> @number {
+    return 2*a
+}
 
-$.print(4i is !(@number | @group))
-$.print(4 is !(@number | @group))
-$.print(4g is !(@number | @group))
-
-$.print(4 is !@string)
-$.print("a" is !@string)
-
-$.print(2 is !(<4))
-$.print(7 is !(<4))
-
-$.print(1 is >2 & !(>5))
-$.print(3 is >2 & !(>5))
-$.print(37 is >2 & !(>5))
-
-$.print(!@number)
-$.print(!false)
-$.print(!3)
+$.print(gaga(3))
 

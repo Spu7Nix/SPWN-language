@@ -6,9 +6,9 @@ extract constants.obj_props
 extract constants.comparisons
 
 wait = #[desc("Adds a delay before the next triggers") example("
-BG.set(255, 0, 0) // turn background red
+BG.set(rgb8(255, 0, 0)) // turn background red
 wait(2) // wait 2 seconds
-BG.set(0, 255, 0) // turn background green
+BG.set(rgb8(0, 255, 0)) // turn background green
 ")] (
 	#[desc("Delay time in seconds (leave empty for minimum delay)")]
 	time: @number | @epsilon = @epsilon::{}
@@ -27,9 +27,9 @@ BG.set(0, 255, 0) // turn background green
 
 }
 call_with_delay = #[desc("Call a function after a delay") example("
-BG.set(255, 0, 0) // turn background red
+BG.set(rgb8(255, 0, 0)) // turn background red
 call_with_delay(2, !{
-	BG.set(0, 255, 0) // turn background green 2 seconds later
+	BG.set(rgb8(0, 255, 0)) // turn background green 2 seconds later
 })
 ")] (
 	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{},

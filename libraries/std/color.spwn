@@ -27,7 +27,7 @@ for color in 1c..10c {
             TRIGGER_RED: c.r8(),
             TRIGGER_GREEN: c.g8(),
             TRIGGER_BLUE: c.b8(),
-            OPACITY: c.a8(),
+            OPACITY: c.a(),
             BLENDING: blending,
             TARGET_COLOR: self,
             36: 1,

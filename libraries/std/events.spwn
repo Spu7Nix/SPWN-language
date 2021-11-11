@@ -68,7 +68,7 @@ return {
 
     collision: #[desc("Implementation of the collision trigger (returns an event)") example("
 [[handle(collision(1b, 2b))]] !{
-    BG.set(0, 0, 0)
+    BG.set(rgb(0, 0, 0))
 }
     ")] (
         #[desc("Block A ID")] a: @block,
@@ -90,7 +90,7 @@ return {
 
     collision_exit: #[desc("Returns an event for when a collision exits") example("
 [[handle(collision_exit(1b, 2b))]] !{
-    BG.set(0, 0, 0)
+    BG.set(rgb(0, 0, 0))
 }
     ")] (
         #[desc("Block A ID")] a: @block,
@@ -112,7 +112,7 @@ return {
 
     death: #[desc("Returns an event for when the player dies") example("
 [[handle(death())]] !{
-    BG.set(0, 0, 0)
+    BG.set(rgb(0, 0, 0))
 }
     ")] (){
         return @event::{
@@ -126,7 +126,7 @@ return {
 
     count: #[desc("Implementation of a count trigger (returns an event)") example("
 [[handle(count(4i, 3))]] !{
-    BG.set(0, 0, 0)
+    BG.set(rgb(0, 0, 0))
 }
     ")] (it: @item, hits: @number, multi: @bool = true) {
         return @event::{
