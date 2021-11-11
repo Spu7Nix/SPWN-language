@@ -1,1 +1,8 @@
-$.print(level_info::objects)
+
+
+
+
+nullish = (a, b) => a if is !=null else b
+
+$.print(nullish(1,5))
+$.print(nullish(null,5))
