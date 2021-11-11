@@ -108,6 +108,9 @@ impl ValStorage {
                 self.mark_pattern(*a);
                 self.mark_pattern(*b);
             }
+            Pattern::Not(a) => {
+                self.mark_pattern(*a);
+            }
             Pattern::Eq(a) => self.mark(a),
             Pattern::NotEq(a) => self.mark(a),
             Pattern::MoreThan(a) => self.mark(a),

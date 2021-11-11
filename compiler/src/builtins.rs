@@ -1915,7 +1915,21 @@ $.assert(arr == [1, 2])
     [NegOp] #[safe = true, desc = "Default implementation of the `-n` operator", example = "$._negate_(n)"]
     fn _negate_((a): Number) { Value::Number(-a)}
     [NotOp] #[safe = true, desc = "Default implementation of the `!b` operator", example = "$._not_(b)"]
-    fn _not_((a): Bool) { Value::Bool(!a)}
+    fn _not_((a)) {
+        match a {
+            Value::Bool(b) => Value::Bool(!b),
+            Value::Pattern(p) => Value::Pattern(Pattern::Not(Box::new(p))),
+            Value::TypeIndicator(t) => Value::Pattern(Pattern::Not(Box::new(Pattern::Type(t)))),
+            _ => {
+                return Err(RuntimeError::TypeError {
+                    expected: "boolean or pattern".to_string(),
+                    found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[0]),
+                    info,
+                });
+            }
+        }
+    }
     // [UnaryRangeOp] #[safe = true, desc = "Default implementation of the `..n` operator", example = "$._unary_range_(n)"]
     // fn _unary_range_((a): Number) { Value::Range(0, convert_to_int(a, &info)?, 1)}
     [EqPatternOp] #[safe = true, desc = "Default implementation of the `==a` operator", example = "$._eq_pattern_(a)"]

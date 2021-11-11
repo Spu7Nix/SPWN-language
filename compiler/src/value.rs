@@ -111,6 +111,9 @@ pub enum Pattern {
 
     Either(Box<Pattern>, Box<Pattern>),
     Both(Box<Pattern>, Box<Pattern>),
+    Not(Box<Pattern>),
+
+    Any,
 
     Eq(StoredValue),
     NotEq(StoredValue),
@@ -537,9 +540,37 @@ impl Value {
                         }
                     }
                 }
+                Pattern::Not(p) => {
+                    self.matches_pat(
+                        &Value::Pattern(*p),
+                        info,
+                        globals,
+                        full_context,
+                        allow_side_effect,
+                    )?;
+                    match globals.stored_values[(*full_context.inner()).return_value] {
+                        Value::Bool(b) => {
+                            (*full_context.inner()).return_value = store_const_value(
+                                Value::Bool(!b),
+                                globals,
+                                full_context.inner().start_group,
+                                info.position,
+                            )
+                        },
+                        _ => unreachable!(),
+                    }
+                }
                 Pattern::Type(t) => {
                     (*full_context.inner()).return_value = store_const_value(
                         Value::Bool(self.to_num(globals) == t),
+                        globals,
+                        full_context.inner().start_group,
+                        info.position,
+                    )
+                }
+                Pattern::Any => {
+                    (*full_context.inner()).return_value = store_const_value(
+                        Value::Bool(true),
                         globals,
                         full_context.inner().start_group,
                         info.position,
@@ -799,6 +830,10 @@ impl Value {
                     display_inner(&Value::Pattern(*p1.clone()), globals)?,
                     display_inner(&Value::Pattern(*p2.clone()), globals)?
                 ),
+                Pattern::Not(p) => format!(
+                    "!{}",
+                    display_inner(&Value::Pattern(*p.clone()), globals)?,
+                ),
                 Pattern::Array(a) => {
                     if a.is_empty() {
                         "[]".to_string()
@@ -831,6 +866,9 @@ impl Value {
                 }
                 Pattern::LessOrEq(a) => {
                     format!("<={}", globals.stored_values[*a].to_owned().to_str(globals))
+                }
+                Pattern::Any => {
+                    "_".to_string()
                 }
             },
         })
@@ -1309,6 +1347,13 @@ impl VariableFuncs for ast::Variable {
                 ast::ValueBody::Symbol(string) => {
                     if string.as_ref() == "$" {
                         full_context.inner().return_value = globals.BUILTIN_STORAGE;
+                    } else if string.as_ref() == "_" {
+                        full_context.inner().return_value = store_const_value(
+                            Value::Pattern(Pattern::Any),
+                            globals,
+                            full_context.inner().start_group,
+                            info.position,
+                        );
                     } else {
                         match full_context.inner().get_variable(*string) {
                             Some(value) => full_context.inner().return_value = value,
