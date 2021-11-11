@@ -4,36 +4,42 @@ extract import "constants.spwn"
 
 type @level_info;
 let lvlstr = $.split_str($.level_string(), ";").map(x => $.split_str(x, ","))
-let [*[obj_keys, obj_values]] = lvlstr[1:2:-1].map(x => [x[:2:], x[1:2:]])
-let obj_list = obj_keys.map_index((x, i) => [*[x, obj_values[i]]])
-impl @level_info {
-    objects: () {
-        let prop_map = {}
-        obj_props.map((k, v) => prop_map.set(v.id as @string, v.pattern))
+if lvlstr.length == 0 {
+	impl @level_info {
+    	objects: []
+    }	
+} else {
+	let [*[obj_keys, obj_values]] = lvlstr[1:2:-1].map(x => [x[:2:], x[1:2:]])
+	let obj_list = obj_keys.map_index((x, i) => [*[x, obj_values[i]]])
+	impl @level_info {
+	    objects: () {
+	        let prop_map = {}
+	        obj_props.map((k, v) => prop_map.set(v.id as @string, v.pattern))
 
-        let objs = []
-        for object in obj_list {
-            let new_obj = obj {};
-            for pair in object {
-                let casted;
-                if pair[0] == "57" {
-                    casted = pair[1].split(",").map(x => @number(x) as @group)
-                } else if pair[0] == "63" || pair[0] == "51" { 
-                    casted = pair[1] as @number
-                } else if prop_map[pair[0]] == @bool {
-                    casted = pair[1] == "1"
-                } else if prop_map[pair[0]]::{} is (@color|@group|@block|@item) {
-                    casted = @number(pair[1]) as prop_map[pair[0]]
-                } else {
-                    casted = pair[1] as prop_map[pair[0]]
-                }
-                $.edit_obj(new_obj, pair[0] as @number, casted)
-            }
-            objs.push(new_obj);
-        }
+	        let objs = []
+	        for object in obj_list {
+	            let new_obj = obj {};
+	            for pair in object {
+	                let casted;
+	                if pair[0] == "57" {
+	                    casted = pair[1].split(",").map(x => @number(x) as @group)
+	                } else if pair[0] == "63" || pair[0] == "51" { 
+	                    casted = pair[1] as @number
+	                } else if prop_map[pair[0]] == @bool {
+	                    casted = pair[1] == "1"
+	                } else if prop_map[pair[0]]::{} is (@color|@group|@block|@item) {
+	                    casted = @number(pair[1]) as prop_map[pair[0]]
+	                } else {
+	                    casted = pair[1] as prop_map[pair[0]]
+	                }
+	                $.edit_obj(new_obj, pair[0] as @number, casted)
+	            }
+	            objs.push(new_obj);
+	        }
 
-        return objs;
-    }()
+	        return objs;
+	    }()
+	}
 }
 
 
