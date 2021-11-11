@@ -25,6 +25,7 @@ import "range.spwn"
 import "level_info.spwn"
 
 hashmap = import "hashmap.spwn"
+chroma = import "chroma.spwn"
 general = import "general_triggers.spwn"
 events = import "events.spwn"
 ctrl_flow = import "control_flow.spwn"
@@ -52,6 +53,11 @@ return {
     complex: @complex::new,
     hashmap: @hashmap::new,
     hashmap_apply: hashmap.hashmap_apply,
+    rgb: @chroma::from_rgb,
+    rgb8: @chroma::from_rgb8,
+    hsv: @chroma::from_hsv,
+    hsv2: @chroma::from_hsv2,
+    blend_modes: chroma.BLEND_MODES,
     level_info: @level_info,
     //zip: @zip::new,
 }

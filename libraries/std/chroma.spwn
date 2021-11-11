@@ -1,5 +1,6 @@
-type @chroma
+#[no_std, cache_output]
 
+type @chroma
 
 rgb_to_hsv = (r, g, b) {
     max = [r, g, b].max()
@@ -12,15 +13,15 @@ rgb_to_hsv = (r, g, b) {
             min2 = [r, g, b].min()
             [r, g, b] = [r, g, b].map(x => x.map(min2, 255, 0, 255))
             if r == 255 {
-                return $.round(g.map(0,255,0,60) if g > 0 else b.map(0,255,360,300))
+                return $.floor(g.map(0,255,0,60) if g > 0 else b.map(0,255,360,300))
             } else if g == 255 {
-                return $.round(r.map(0,255,120,60) if r > 0 else b.map(0,255,120,180))
+                return $.floor(r.map(0,255,120,60) if r > 0 else b.map(0,255,120,180))
             } else {
-                return $.round(r.map(0,255,240,300) if r > 0 else g.map(0,255,240,180))
+                return $.floor(r.map(0,255,240,300) if r > 0 else g.map(0,255,240,180))
             }
         } (),
-        $.round(min.map(max, 0, 0, 100)),
-        $.round(max.map(0, 255, 0, 100))
+        $.floor(min.map(max, 0, 0, 100)) if min != max else 0,
+        $.floor(max.map(0, 255, 0, 100))
     ]
 }
 
@@ -77,8 +78,17 @@ hex_to_rgb = (s) {
     }
 }
 
-rgb_to_hex = (r, g, b) {
-
+rgb_to_hex = (r, g, b, a) {
+    return (
+        value_hex[r/%16] +
+        value_hex[r%16] +
+        value_hex[g/%16] +
+        value_hex[g%16] +
+        value_hex[b/%16] +
+        value_hex[b%16] +
+        value_hex[a/%16] +
+        value_hex[a%16]
+    )
 }
 
 type @blend_mode
@@ -113,12 +123,21 @@ curve = (a1, a2) {
 
 // 0-1 values, color 1 is the overlay
 blend_rgb = (r1, g1, b1, a1, r2, g2, b2, a2, mode) {
+    if a1 == 0 {
+        return [r2, g2, b2, a2]
+    }
+    if a2 == 0 {
+        return [r1, g1, b1, a1]
+    }
     let op_col = [
         mode.func(r2, r1) * a1 + r2 * (1 - a1),
         mode.func(g2, g1) * a1 + g2 * (1 - a1),
         mode.func(b2, b1) * a1 + b2 * (1 - a1),
     ]
     [t, a] = curve(a1, a2)
+    if a2 == 1 {
+        return op_col + [a]
+    }
     op_col = [
         t.map(a1, 1, op_col[0], r1),
         t.map(a1, 1, op_col[1], g1),
@@ -130,12 +149,17 @@ blend_rgb = (r1, g1, b1, a1, r2, g2, b2, a2, mode) {
 
 impl @chroma {
 
-    from_rgb: (r: @number, g: @number, b: @number, a: @number = 1) {
+    from_rgb: #[
+        desc('Creatss a new chroma from rgb values (0-1)')
+        example('
+orange = @chroma::from_rgb(1, 0.5, 0)
+')
+    ] (r: @number, g: @number, b: @number, a: @number = 1) {
         if ! ( [r, g, b, a] is [>=0 & <=1] ) {
             throw "RGB values must be between 0 and 1"
         }
         [_r, _g, _b, _a] = [r, g, b, a]
-        [_r8, _g8, _b8, _a8] = [r, g, b, a].map(x => x * 255)
+        [_r8, _g8, _b8, _a8] = [r, g, b, a].map(x => $.floor(x * 255))
         [_h360, _s100, _v100] = rgb_to_hsv(_r8, _g8, _b8)
         [_h, _s, _v] = [_h360 / 360, _s100 / 100, _v100 / 100]
         return @chroma::{
@@ -147,11 +171,16 @@ impl @chroma {
         }
     },
 
-    from_rgb8: (r: @number, g: @number, b: @number, a: @number = 255) {
+    from_rgb8: #[
+        desc('Creatss a new chroma from 8-bit rgb values (0-255)')
+        example('
+cyan = @chroma::from_rgb(0, 255, 255)
+')
+    ] (r: @number, g: @number, b: @number, a: @number = 255) {
         if ! ( [r, g, b, a] is [>=0 & <=255] ) {
             throw "8-bit RGB values must be between 0 and 1"
         }
-        [_r8, _g8, _b8, _a8] = [r, g, b, a]
+        [_r8, _g8, _b8, _a8] = [r, g, b, a].map(x => $.floor(x))
         [_r, _g, _b, _a] = [r, g, b, a].map(x => x / 255)
         [_h360, _s100, _v100] = rgb_to_hsv(_r8, _g8, _b8)
         [_h, _s, _v] = [_h360 / 360, _s100 / 100, _v100 / 100]
@@ -164,7 +193,12 @@ impl @chroma {
         }
     },
 
-    from_hsv: (h: @number, s: @number, v: @number, a: @number = 1) {
+    from_hsv: #[
+        desc('Creatss a new chroma from hsv values (0-1)')
+        example('
+blue = @chroma::from_hsv(2/3, 1, 1)
+')
+    ] (h: @number, s: @number, v: @number, a: @number = 1) {
         if ! ( [h, s, v, a] is [>=0 & <=1] ) {
             throw "HSV values must be between 0 and 1"
         }
@@ -181,7 +215,12 @@ impl @chroma {
         }
     },
 
-    from_hsv2: (h: @number, s: @number, v: @number, a: @number = 100) {
+    from_hsv2: #[
+        desc('Creatss a new chroma from hsv values (0-360, 0-100, 0-100)')
+        example('
+yellow = @chroma::from_hsv2(60, 100, 100)
+')
+    ] (h: @number, s: @number, v: @number, a: @number = 100) {
         if ! ( h is >=0 & <=360 ) {
             throw "Hue value must be between 0 and 360"
         }
@@ -201,7 +240,14 @@ impl @chroma {
         }
     },
 
-    from_hex: (s: @string) {
+    from_hex: #[
+        desc('Creatss a new chroma from a hex string')
+        example('
+white = @chroma::from_hex("ffffff")
+black = @chroma::from_hex("#000000")
+semitransparent_gray = @chroma::from_hex("7f7f7fee")
+')
+    ] (s: @string) {
         [_r8, _g8, _b8, _a8] = hex_to_rgb(s)
         [_r, _g, _b, _a] = [_r8, _g8, _b8, _a8].map(x => x / 255)
         [_h360, _s100, _v100] = rgb_to_hsv(_r8, _g8, _b8)
@@ -221,11 +267,18 @@ impl @chroma {
             =="rgb8": "rgb8({}, {}, {}, {})".fmt([self._r8, self._g8, self._b8, self._a8]),
             =="hsv": "hsv({}, {}, {}, {})".fmt([self._h, self._s, self._v, self._a]),
             =="hsv2": "hsv2({}, {}, {}, {})".fmt([self._h360, self._s100, self._v100, self._a100]),
-            =="hsv2": "hsv2({}, {}, {}, {})".fmt([self._h360, self._s100, self._v100, self._a100]),
+            =="hex": "hex('#{}')".fmt([rgb_to_hex(self._r8, self._g8, self._b8, self._a8)]),
         }
     },
 
-    r: (self, v: @number = null) {
+    r: #[
+        desc('Gets or sets a chroma\'s red value')
+        example('
+let a = rgb(1,1,1)
+$.print(a.r()) // gets the value
+a.r(0.5) // sets the value
+')
+    ] (self, v: @number = null) {
         if v == null { return self._r }
         self = @chroma::from_rgb(v, self._g, self._b, self._a)
     },
@@ -242,7 +295,14 @@ impl @chroma {
         self = @chroma::from_rgb(self._r, self._g, self._b, v)
     },
     
-    r8: (self, v: @number = null) {
+    r8: #[
+        desc('Gets or sets a chroma\'s 8-bit red value')
+        example('
+let a = rgb(1,1,1)
+$.print(a.r8()) // gets the value
+a.r8(127) // sets the value
+')
+    ] (self, v: @number = null) {
         if v == null { return self._r8 }
         self = @chroma::from_rgb8(v, self._g8, self._b8, self._a8)
     },
@@ -259,7 +319,14 @@ impl @chroma {
         self = @chroma::from_rgb8(self._r8, self._g8, self._b8, v)
     },
     
-    h: (self, v: @number = null) {
+    h: #[
+        desc('Gets or sets a chroma\'s hue value')
+        example('
+let a = rgb(1,1,1)
+$.print(a.h()) // gets the value
+a.h(1/3) // sets the value
+')
+    ] (self, v: @number = null) {
         if v == null { return self._h }
         self = @chroma::from_hsv(v, self._s, self._v, self._a)
     },
@@ -289,24 +356,30 @@ impl @chroma {
         self = @chroma::from_hsv2(self._h360, self._s100, self._v100, v)
     },
 
-    rgb: (self) {
+    rgb: #[desc('Returns an array of the chroma\'s RGB values')] 
+    (self) {
         return [self._r, self._g, self._b]
     },
-    rgba: (self) {
+    rgba: #[desc('Returns an array of the chroma\'s RGBA values')] 
+    (self) {
         [self._r, self._g, self._b, self._a]
     },
 
-    rgb8: (self) {
+    rgb8: #[desc('Returns an array of the chroma\'s 8-bit RGB values')] 
+    (self) {
         return [self._r8, self._g8, self._b8]
     },
-    rgba8: (self) {
+    rgba8: #[desc('Returns an array of the chroma\'s 8-bit RGBA values')] 
+    (self) {
         return [self._r8, self._g8, self._b8, self._a8]
     },
     
-    hsv: (self) {
+    hsv: #[desc('Returns an array of the chroma\'s HSV values')] 
+    (self) {
         return [self._h, self._s, self._v]
     },
-    hsva: (self) {
+    hsva: #[desc('Returns an array of the chroma\'s HSVA values')] 
+    (self) {
         return [self._h, self._s, self._v, self._a]
     },
 
@@ -317,7 +390,22 @@ impl @chroma {
         return [self._h360, self._s100, self._v100, self._a100]
     },
 
-    over: (self, o: @chroma, mode: @blend_mode = BLEND_MODES.normal) {
+    hex: #[desc('Returns a string of the chroma\'s hex code')] 
+    (self) {
+        return rgb_to_hex(self._r8, self._g8, self._b8, self._a8)
+    },
+
+    over: #[
+        desc('Blends this chroma with another chroma as if layered above it')
+        example('
+a = rgb(1,0.5,1)
+b = rgb(0,0.5,1)
+
+c = a.over(b, blend_modes.multiply)
+
+$.assert(c.rgb() == [0, 0.25, 1])
+')
+    ] (self, o: @chroma, mode: @blend_mode = BLEND_MODES.normal) {
         [r, g, b, a] = blend_rgb(
             self._r,
             self._g,
@@ -332,7 +420,17 @@ impl @chroma {
         return @chroma::from_rgb(r, g, b, a)
     },
 
-    under: (self, o: @chroma, mode: @blend_mode = BLEND_MODES.normal) {
+    under: #[
+        desc('Blends this chroma with another chroma as if layered under it')
+        example('
+a = rgb(1,0.5,1)
+b = rgb(0,0.5,1)
+
+c = a.under(b, blend_modes.normal)
+
+$.assert(c.rgb() == [0, 0.5, 1])
+')
+    ] (self, o: @chroma, mode: @blend_mode = BLEND_MODES.normal) {
         [r, g, b, a] = blend_rgb(
             o._r,
             o._g,
@@ -350,8 +448,5 @@ impl @chroma {
 }
 
 return {
-    rgb_to_hsv,
-    hsv_to_rgb,
     BLEND_MODES,
-    hex_to_rgb
 }

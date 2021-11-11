@@ -787,7 +787,7 @@ b = c as @bool
 c = counter(2)
 
 on(c.reaches(10), !{
-    BG.pulse(0, 255, 0, fade_out = 0.5) // will pulse each time the counter becomes 10
+    BG.pulse(rgb8(0, 255, 0), fade_out = 0.5) // will pulse each time the counter becomes 10
 })
     ")] (self, #[desc("Value to reach")] value: @number) {
         return self.item.count(value)

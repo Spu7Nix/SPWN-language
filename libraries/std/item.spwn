@@ -19,7 +19,7 @@ impl @item {
     if_is:
     #[desc("Implementation of the instant count trigger") example("
 10i.if_is(EQUAL_TO, 5, !{
-    BG.pulse(255, 0, 0, fade_out = 0.5)
+    BG.pulse(rgb8(255, 0, 0), fade_out = 0.5)
 })
     ")]
     (
@@ -41,7 +41,7 @@ impl @item {
     count:
     #[desc("Implementation of the count trigger (-> returns an event for when an item reaches a certain value)") example("
 on(10i.count(100), !{
-    BG.pulse(0, 255, 0, fade_out = 0.5) // will pulse each time item ID 10 becomes 100
+    BG.pulse(rgb8(0, 255, 0), fade_out = 0.5) // will pulse each time item ID 10 becomes 100
 })
     ")]
     (

@@ -1,8 +1,17 @@
 
 
 
+hi = counter(1i)
 
-nullish = (a, b) => a if is !=null else b
+wait(2)
 
-$.print(nullish(1,5))
-$.print(nullish(null,5))
+let col = hsv2(hi.to_const(0..3)*120, 75, 75)
+BG.set(col, 0.5)
+
+wait(2)
+let col = col //context shite
+col.v100(25)
+BG.set(col, 0.5)
+
+
+
