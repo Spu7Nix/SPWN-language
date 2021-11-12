@@ -79,7 +79,7 @@ $.assert(wares == {
 })
 	")]
 	(self, key: @string, val) {
-		if self has key {
+		if key in self {
 			self[key] = val
 		} else {
 			let self[key] = val
@@ -96,7 +96,7 @@ $.assert(wares.get('peanuts') == 5)
 $.assert(wares.get('silver', default = 42) == 42)
 	")]
 	(self, key: @string, default = @dict_not_found::{}) {
-		if self has key {
+		if key in self {
 			return self[key]
 		} else {
 			if default.type == @dict_not_found {

@@ -980,7 +980,7 @@ pub fn compile_scope(
     Ok(())
 }
 
-fn do_assignment(
+pub fn do_assignment(
     destex: &ast::Expression,
     src: &Option<ast::Expression>,
     contexts: &mut FullContext,

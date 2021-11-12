@@ -1,4 +1,5 @@
 use crate::builtins::*;
+use crate::compiler::do_assignment;
 use crate::compiler::import_module;
 use crate::compiler::merge_all_contexts;
 
@@ -121,6 +122,7 @@ pub enum Pattern {
     LessThan(StoredValue),
     MoreOrEq(StoredValue),
     LessOrEq(StoredValue),
+    In(StoredValue),
 }
 
 pub fn default_value_equality(
@@ -201,7 +203,8 @@ pub fn default_value_equality(
                 | (MoreThan(a), MoreThan(b))
                 | (LessThan(a), LessThan(b))
                 | (MoreOrEq(a), MoreOrEq(b))
-                | (LessOrEq(a), LessOrEq(b)) => {
+                | (LessOrEq(a), LessOrEq(b))
+                | (In(a), In(b)) => {
                     handle_operator(a, b, Builtin::EqOp, contexts, globals, info)?
                 }
                 (a, b) => set_return_bool(a == b, globals, contexts),
@@ -254,7 +257,8 @@ pub fn strict_value_equality(val1: StoredValue, val2: StoredValue, globals: &Glo
                 | (MoreThan(a), MoreThan(b))
                 | (LessThan(a), LessThan(b))
                 | (MoreOrEq(a), MoreOrEq(b))
-                | (LessOrEq(a), LessOrEq(b)) => strict_value_equality(*a, *b, globals),
+                | (LessOrEq(a), LessOrEq(b)) 
+                | (In(a), In(b)) => strict_value_equality(*a, *b, globals),
                 _ => p1 == p2,
             }
         }
@@ -640,6 +644,7 @@ impl Value {
                         Pattern::LessThan(v) => (Builtin::LessThanOp, v),
                         Pattern::MoreOrEq(v) => (Builtin::MoreOrEqOp, v),
                         Pattern::LessOrEq(v) => (Builtin::LessOrEqOp, v),
+                        Pattern::In(v) => (Builtin::InOp, v),
                         _ => unreachable!(),
                     };
                     
@@ -866,6 +871,9 @@ impl Value {
                 }
                 Pattern::LessOrEq(a) => {
                     format!("<={}", globals.stored_values[*a].to_owned().to_str(globals))
+                }
+                Pattern::In(a) => {
+                    format!("in {}", globals.stored_values[*a].to_owned().to_str(globals))
                 }
                 Pattern::Any => {
                     "_".to_string()
@@ -3260,6 +3268,7 @@ impl VariableFuncs for ast::Variable {
                         UnaryOperator::LessPattern => Builtin::LessPatternOp,
                         UnaryOperator::MoreOrEqPattern => Builtin::MoreOrEqPatternOp,
                         UnaryOperator::LessOrEqPattern => Builtin::LessOrEqPatternOp,
+                        UnaryOperator::InPattern => Builtin::InPatternOp,
                     },
                     full_context,
                     globals,

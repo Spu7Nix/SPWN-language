@@ -217,7 +217,7 @@ impl From<ast::Operator> for Builtin {
             Assign => AssignOp,
             Swap => SwapOp,
             As => AsOp,
-            Has => HasOp,
+            In => InOp,
             ast::Operator::Add => AddOp,
             Subtract => SubtractOp,
             Multiply => MultiplyOp,

@@ -463,7 +463,7 @@ impl SpwnFmt for Operator {
             Operator::Divide => "/=",
             Operator::IntDivide => "/%=",
             Operator::As => "as",
-            Operator::Has => "has",
+            Operator::In => "in",
             Operator::Either => "|",
             Operator::Both => "&",
             Operator::Exponate => "^=",
@@ -488,6 +488,7 @@ impl SpwnFmt for UnaryOperator {
             UnaryOperator::LessPattern => "<",
             UnaryOperator::MoreOrEqPattern => ">=",
             UnaryOperator::LessOrEqPattern => "<=",
+            UnaryOperator::InPattern => "in",
         }
         .to_string()
     }

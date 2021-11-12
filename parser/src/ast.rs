@@ -169,7 +169,7 @@ pub enum Operator {
     Divide,
     IntDivide,
     As,
-    Has,
+    In,
 
     Exponate,
     Modulate,
@@ -189,6 +189,7 @@ pub enum UnaryOperator {
     LessPattern,
     MoreOrEqPattern,
     LessOrEqPattern,
+    InPattern,
 }
 
 #[derive(Clone, PartialEq, Debug)]

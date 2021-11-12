@@ -3,6 +3,7 @@
 extract import "constants.spwn"
 
 type @level_info;
+/*
 let lvlstr = $.split_str($.level_string(), ";").map(x => $.split_str(x, ","))
 if lvlstr.length == 0 {
 	impl @level_info {
@@ -42,5 +43,5 @@ if lvlstr.length == 0 {
 	}
 }
 
-
+*/
 return {}

@@ -1949,6 +1949,9 @@ $.assert(arr == [1, 2])
 
     [LessOrEqPatternOp] #[safe = true, desc = "Default implementation of the `<=a` operator", example = "$._less_or_eq_pattern_(a)"]
     fn _less_or_eq_pattern_((a)) { Value::Pattern(Pattern::LessOrEq(store_const_value(a, globals, context.start_group, info.position))) }
+    
+    [InPatternOp] #[safe = true, desc = "Default implementation of the `in a` operator", example = "$._in_pattern_(a)"]
+    fn _in_pattern_((a)) { Value::Pattern(Pattern::In(store_const_value(a, globals, context.start_group, info.position))) }
     // operators
     [OrOp] #[safe = true, desc = "Default implementation of the `||` operator", example = "	$._or_(true, false)"]
     fn _or_((a): Bool, (b): Bool) { Value::Bool(a || b) }
@@ -2087,14 +2090,14 @@ $.assert(arr == [1, 2])
         Value::Null
     }
 
-    [HasOp] #[safe = true, desc = "Default implementation of the `has` operator", example = "$._has_([1,2,3], 2)"]
-    fn _has_((a), (b)) {
+    [InOp] #[safe = true, desc = "Default implementation of the `in` operator", example = "$._in_(2, [1,2,3])"]
+    fn _in_((a), (b)) {
         match (a, b) {
-            (Value::Array(ar), _) => {
+            (_, Value::Array(ar)) => {
                 let mut out = false;
                 for v in ar.clone() {
                     // use custom == impl?
-                    if strict_value_equality(v, arguments[1], globals) {
+                    if strict_value_equality(v, arguments[0], globals) {
                         out = true;
                         break;
                     }
@@ -2102,19 +2105,19 @@ $.assert(arr == [1, 2])
                 Value::Bool(out)
             }
 
-            (Value::Dict(d), Value::Str(b)) => {
+            (Value::Str(b), Value::Dict(d)) => {
                 // use custom == impl?
                 Value::Bool(d.get(&LocalIntern::new(b)).is_some())
             }
 
-            (Value::Str(s), Value::Str(s2)) => Value::Bool(s.contains(&*s2)),
+            (Value::Str(s), Value::Str(s2)) => Value::Bool(s2.contains(&*s)),
 
-            (Value::Obj(o, _m), Value::Number(n)) => {
+            (Value::Number(n), Value::Obj(o, _m)) => {
                 let obj_has: bool = o.iter().any(|k| k.0 == n as u16);
                 Value::Bool(obj_has)
             }
 
-            (Value::Obj(o, _m), Value::Dict(d)) => {
+            (Value::Dict(d), Value::Obj(o, _m)) => {
                 let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
 
                 if gotten_type == None
@@ -2124,8 +2127,8 @@ $.assert(arr == [1, 2])
                     // 19 = object_key??
                     return Err(RuntimeError::TypeError {
                         expected: "either @number or @object_key".to_string(),
-                        found: globals.get_type_str(arguments[1]),
-                        val_def: globals.get_area(arguments[1]),
+                        found: globals.get_type_str(arguments[0]),
+                        val_def: globals.get_area(arguments[0]),
                         info,
                     });
                 }
@@ -2155,29 +2158,29 @@ $.assert(arr == [1, 2])
                 Value::Bool(obj_has)
             }
 
-            (Value::Obj(_, _), _) => {
+            (_, Value::Obj(_, _)) => {
                 return Err(RuntimeError::TypeError {
                     expected: "@number or @object_key".to_string(),
-                    found: globals.get_type_str(arguments[1]),
-                    val_def: globals.get_area(arguments[1]),
+                    found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[0]),
                     info,
                 })
             }
 
-            (Value::Str(_), _) => {
+            (_, Value::Str(_)) => {
                 return Err(RuntimeError::TypeError {
                     expected: "string to compare".to_string(),
-                    found: globals.get_type_str(arguments[1]),
-                    val_def: globals.get_area(arguments[1]),
+                    found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[0]),
                     info,
                 })
             }
 
-            (Value::Dict(_), _) => {
+            (_, Value::Dict(_)) => {
                 return Err(RuntimeError::TypeError {
                     expected: "string as key".to_string(),
-                    found: globals.get_type_str(arguments[1]),
-                    val_def: globals.get_area(arguments[1]),
+                    found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[0]),
                     info,
                 })
             }
@@ -2185,8 +2188,8 @@ $.assert(arr == [1, 2])
             _ => {
                 return Err(RuntimeError::TypeError {
                     expected: "array, dictionary, object, or string".to_string(),
-                    found: globals.get_type_str(arguments[0]),
-                    val_def: globals.get_area(arguments[1]),
+                    found: globals.get_type_str(arguments[1]),
+                    val_def: globals.get_area(arguments[0]),
                     info,
                 })
             }

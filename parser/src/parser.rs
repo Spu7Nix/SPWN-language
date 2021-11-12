@@ -3,6 +3,7 @@ use crate::ast;
 use pest::Parser;
 use pest_derive::Parser;*/
 
+use crate::ast::Expression;
 use crate::ast::Operator;
 use crate::ast::StrInner;
 use crate::ast::StringFlags;
@@ -126,9 +127,6 @@ pub enum Token {
 
     #[token("/%")]
     IntDividedBy,
-
-    #[token("has")]
-    Has,
 
     #[token("!")]
     Exclamation,
@@ -305,7 +303,7 @@ impl Token {
         match self {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
-            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | Has | Either
+            | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | In | Either
             | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is
             => {
                 "operator"
@@ -810,7 +808,7 @@ pub fn parse_statement(
         Some(Token::For) => {
             //parse for statement
 
-            let symbol = parse_expr(tokens, notes, true, true)?;
+            let symbol = parse_variable(tokens, notes, true)?.to_expression();
 
             match tokens.next(false) {
                 // check for an in
@@ -1019,7 +1017,7 @@ op_precedence!{ // make sure the highest precedence is at the top
     6, Left => Range,
     5, Left => LessOrEqual MoreOrEqual,
     4, Left => Less More,
-    3, Left => Is NotEqual Has Equal,
+    3, Left => Is NotEqual In Equal,
     2, Left => And,
     1, Left => Or,
     0, Right => Assign Add Subtract Multiply Divide IntDivide Exponate Modulate Swap,
@@ -1349,7 +1347,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::Exponate => Some(ast::Operator::Exponate),
         Token::Modulate => Some(ast::Operator::Modulate),
         Token::Swap => Some(ast::Operator::Swap),
-        Token::Has => Some(ast::Operator::Has),
+        Token::In => Some(ast::Operator::In),
         Token::As => Some(ast::Operator::As),
         Token::Is => Some(ast::Operator::Is),
         _ => None,
@@ -2069,6 +2067,11 @@ fn parse_variable(
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::LessOrEqPattern)
         }
+
+        Some(Token::In) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::InPattern)
+        }
         _ => None,
     };
 
@@ -2374,6 +2377,7 @@ fn parse_variable(
                                         }
                                         a => expected!("identifier".to_string(), tokens, notes, a),
                                     }
+                                    
                                 }
                                 t @ Some(Token::Comma | Token::ClosingSquareBracket) => {
                                     //accounting for trailing comma

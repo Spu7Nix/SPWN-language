@@ -15,7 +15,7 @@ impl @object {
 			[@group]: groups
 		};
 
-		if self has obj_props.GROUPS {
+		if obj_props.GROUPS in self {
 
 			grps += switch self[obj_props.GROUPS] {
 				@group: [self[obj_props.GROUPS]],

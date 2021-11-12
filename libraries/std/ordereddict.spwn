@@ -3,7 +3,7 @@
 new_wo_key = (dict, key) {
 	let new = {}
 	for k in dict.keys() {
-		if k != key || !(key has k) {
+		if k != key || !(k in key) {
 			new.set(k, dict[k])
 		}
 	}
@@ -120,7 +120,7 @@ impl @ordereddict {
 		keys: @number|@string | [@number|@string],
 	) {
 		let new = @ordereddict::new()
-		new._dict = self._dict.filter(k => !(keys has k[0]))
+		new._dict = self._dict.filter(k => !(k[0] in keys))
 		new._update_map()
 		return new
 	},
@@ -166,7 +166,7 @@ impl @ordereddict {
 		self,
 		key: @number|@string
 	) {
-		return self._map.keys() has b64e(key)
+		return b64e(key) in self._map.keys()
 	},
 
 	_as_: (self, type_indicator) {

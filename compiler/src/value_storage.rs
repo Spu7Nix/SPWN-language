@@ -117,6 +117,7 @@ impl ValStorage {
             Pattern::LessThan(a) => self.mark(a),
             Pattern::MoreOrEq(a) => self.mark(a),
             Pattern::LessOrEq(a) => self.mark(a),
+            Pattern::In(a) => self.mark(a),
             _ => (),
         }
     }

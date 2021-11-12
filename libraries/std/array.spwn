@@ -49,7 +49,7 @@ fruit = ['apple', 'banana', 'mango']
 $.assert(fruit.contains('banana'))
     ")]
     (self, el) {
-		return self has el
+		return el in self
 	},
     index: #[desc("Gets the index of an element (if it doesn't exist, `null` is returned)") example("
 fruit = ['apple', 'banana', 'mango']

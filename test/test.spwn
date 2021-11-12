@@ -1,10 +1,14 @@
-extract obj_props
 
 
 
-gaga = (a) -> @number {
-    return 2*a
+a = (x: in "abc") {
+    $.print(x)
 }
 
-$.print(gaga(3))
+a("a")
+a("ab")
+
+bruh = "abc"
+
+$.print("d" in bruh)
 

@@ -39,7 +39,7 @@ hsv_to_rgb = (h, s, v) {
 }
 
 hex_value = (c) {
-    if '0123456789' has c {
+    if c in '0123456789' {
         return @number(c)
     }
     return switch c {
