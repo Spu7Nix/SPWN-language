@@ -1,4 +1,4 @@
-// utility macroes
+// utility macros
 #[no_std, cache_output]
 -> return {
     create_range_macro: (typ: @type_indicator) {

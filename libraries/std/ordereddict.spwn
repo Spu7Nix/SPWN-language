@@ -10,8 +10,8 @@ new_wo_key = (dict, key) {
 	return new
 }
 
-b64e = $.b64encode
-b64d = $.b64decode
+b64e = (x) => $.b64encode($.display(x))
+b64d = (x) => $.b64decode($.display(x))
 
 type @ordereddict
 impl @ordereddict {
@@ -89,6 +89,15 @@ impl @ordereddict {
 		return self._dict.map(v => v[0])
 	},
 
+	has_key: #[desc("Check the orderded dictionary's keys to see if it has a given key.")]
+	 (
+		self,
+		#[desc("The to look for.")]
+		key: @number|@string
+	) {
+		return b64e(key) in self._map.keys()
+	},
+
 	values: #[desc("Returns the values of the ordered dictionary.")]
 	(self) {
 		return self._dict.map(v => v[1])
@@ -162,13 +171,6 @@ impl @ordereddict {
 		return self._dict == other._dict
 	},
 
-	_has_: (
-		self,
-		key: @number|@string
-	) {
-		return b64e(key) in self._map.keys()
-	},
-
 	_as_: (self, type_indicator) {
 		if type_indicator == @string {
 			return "ordereddict::{" + ", ".join(self._dict.map(v => "{}: {}".fmt([v[0], v[1]]))) + "}"
@@ -189,10 +191,3 @@ impl @ordereddict {
 		}
 	},
 }
-
-return {
-	ordereddict: @ordereddict
-}
-
-
-

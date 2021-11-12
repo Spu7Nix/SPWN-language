@@ -23,6 +23,7 @@ import "http.spwn"
 //import "vector.spwn" TODO: remove entirely
 import "range.spwn"
 import "level_info.spwn"
+import "ordereddict.spwn"
 
 hashmap = import "hashmap.spwn"
 chroma = import "chroma.spwn"
@@ -59,6 +60,7 @@ return {
     hsv2: @chroma::from_hsv2,
     blend_modes: chroma.BLEND_MODES,
     level_info: @level_info,
+	ordereddict: @ordereddict,
     //zip: @zip::new,
 }
 

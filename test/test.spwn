@@ -1,14 +1,5 @@
+let a = @ordereddict::new();
+a.set(1, "test")
 
-
-
-a = (x: in "abc") {
-    $.print(x)
-}
-
-a("a")
-a("ab")
-
-bruh = "abc"
-
-$.print("d" in bruh)
-
+$.print(a.has_key(1));
+$.print(a.has_key("aa"))
