@@ -1,5 +1,4 @@
 use crate::builtins::*;
-use crate::compiler::do_assignment;
 use crate::compiler::import_module;
 use crate::compiler::merge_all_contexts;
 
@@ -124,6 +123,54 @@ pub enum Pattern {
     LessOrEq(StoredValue),
     In(StoredValue),
 }
+
+impl Pattern {
+    pub fn in_pat(
+        &self,
+        p: &Pattern,
+        globals: &Globals
+    ) -> Result<bool, RuntimeError> {
+        Ok( match (self, p) {
+            (_, Pattern::Any) => true,
+            (Pattern::Any, _) => false,
+
+            (_, Pattern::Not(a)) => !(self.in_pat(a, globals)?),
+            (Pattern::Not(a), _) => !(a.in_pat(p, globals)?),
+
+            (Pattern::Either(a, b), _) => (a.in_pat(p, globals)?) && (b.in_pat(p, globals)?),
+            (Pattern::Both(a, b), _) =>
+                Pattern::Not(Box::new(
+                    Pattern::Either(
+                        Box::new(Pattern::Not(a.clone())),
+                        Box::new(Pattern::Not(b.clone())),
+                    )
+                )).in_pat(p, globals)?,
+
+            (Pattern::Type(a), Pattern::Type(b)) => a == b,
+
+            (Pattern::Eq(a), Pattern::Eq(b)) |
+            (Pattern::NotEq(a), Pattern::NotEq(b)) |
+            (Pattern::MoreThan(a), Pattern::MoreThan(b)) |
+            (Pattern::LessThan(a), Pattern::LessThan(b)) |
+            (Pattern::MoreOrEq(a), Pattern::MoreOrEq(b)) |
+            (Pattern::LessOrEq(a), Pattern::LessOrEq(b)) |
+            (Pattern::In(a), Pattern::In(b)) => strict_value_equality(*a, *b, globals),
+
+            (Pattern::Array(a), Pattern::Array(b)) => match (a.len(), b.len()) {
+                (0, 0) => true,
+                (1, 1) => a[0].in_pat(&b[0], globals)?,
+                _ => false,
+            }
+            
+            (_, Pattern::Both(a, b)) => self.in_pat(a, globals)? && self.in_pat(b, globals)?,
+            (_, Pattern::Either(a, b)) => self.in_pat(a, globals)? || self.in_pat(b, globals)?,
+            
+            _ => false,
+
+        } )
+    }
+}
+
 
 pub fn default_value_equality(
     val1: StoredValue,

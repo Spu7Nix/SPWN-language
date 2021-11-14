@@ -2092,7 +2092,7 @@ $.assert(arr == [1, 2])
 
     [InOp] #[safe = true, desc = "Default implementation of the `in` operator", example = "$._in_(2, [1,2,3])"]
     fn _in_((a), (b)) {
-        match (a, b) {
+        match (a.clone(), b.clone()) {
             (_, Value::Array(ar)) => {
                 let mut out = false;
                 for v in ar.clone() {
@@ -2184,6 +2184,34 @@ $.assert(arr == [1, 2])
                     info,
                 })
             }
+
+            (Value::Pattern(p1), _) => Value::Bool(
+                if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
+                    p1.in_pat(&p, globals)?
+                } else {
+                    unreachable!()
+                }
+            ),
+            
+            (_, Value::Pattern(p2)) => Value::Bool(
+                if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
+                    p.in_pat(&p2, globals)?
+                } else {
+                    unreachable!()
+                }
+            ),
+
+            (Value::TypeIndicator(_), Value::TypeIndicator(_)) => Value::Bool(
+                if let (Value::Pattern(p1), Value::Pattern(p2)) = (
+                    convert_type(&a, type_id!(pattern), &info, globals, context)?,
+                    convert_type(&b, type_id!(pattern), &info, globals, context)?,
+                ) {
+                    p1.in_pat(&p2, globals)?
+                } else {
+                    unreachable!()
+                }
+            ),
+            
 
             _ => {
                 return Err(RuntimeError::TypeError {
