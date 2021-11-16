@@ -15,7 +15,6 @@ import "counter.spwn"
 import "fileio.spwn"
 import "regex.spwn"
 import "number.spwn"
-import "complex.spwn"
 import "http.spwn"
 import "range.spwn"
 import "level_info.spwn"
@@ -37,14 +36,12 @@ return {
     EULER: constants.EULER,
 
     counter: @counter::new,
-    binary_counter: @binary_counter,
     on: @event::on,
     obj_props: constants.obj_props,
     obj_ids: constants.obj_ids,
     open: @file::new,
     obj_set: @obj_set::new,
     regex: @regex::new,
-    complex: @complex::new,
     rgb: @chroma::from_rgb,
     rgb8: @chroma::from_rgb8,
     hsv: @chroma::from_hsv,
