@@ -82,7 +82,7 @@ Let it compile and you're good to go
 2. Unzip the .zip file
 3. Install rust if you haven't already
 4. Open the unzipped folder in the terminal
-5. Run `cargo build --release`
+5. Run `cargo build`
 6. Compiled binary is placed in `target/release`
 
 ## Using SPWN - Setup
