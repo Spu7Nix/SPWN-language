@@ -1,7 +1,7 @@
 use std::path::{PathBuf};
 use std::fs;
 
-use std::env::temp_dir;
+
 use git2::{Repository};
 
 use crate::error::PckpError;
@@ -63,7 +63,7 @@ impl Package {
 		match &self.internal {
 			PackageType::Local(root) => {
 				for x in &root.dependencies {
-				    x.install(&root.name, path.clone())?;
+				    x.install(&root.name, path.clone(), false)?;
 				}
 				Ok(())
 			},
@@ -78,7 +78,7 @@ impl Package {
 			PackageType::External(d) => d.version.clone()
 		}
 	}
-	pub fn install(&self, parent_name: &str, path: PathBuf) -> Result<(), PckpError> {
+	pub fn install(&self, parent_name: &str, path: PathBuf, ignore_version: bool) -> Result<(), PckpError> {
 		match &self.internal {
 			PackageType::Local(p) => {
 				/*for folder in &p.paths {
@@ -98,7 +98,11 @@ impl Package {
 				if !version_info.iter().any(|(n, v)| n == &p.name && v == &p.version) {
 					println!("Installing {}", p.name);
 					
-					let new_path = format!("{}@{}", p.name, p.version);
+					let new_path = if ignore_version {
+						p.name.to_string()
+					} else {
+						format!("{}@{}", p.name, p.version)
+					};
 					dest.push(new_path.to_string());
 
 					for folder in &p.paths {
@@ -112,7 +116,7 @@ impl Package {
 				}
 
 				for dep in &p.dependencies {
-					dep.install(&p.name, path.clone())?;
+					dep.install(&p.name, path.clone(), false)?;
 				}
 
 				export_version(version_info, &version_file);
@@ -121,8 +125,7 @@ impl Package {
 			PackageType::External(d) => {
 				let source_url = d.source.to_string(parent_name.to_string())?;
 
-				let mut tmp_path: PathBuf = temp_dir();
-				tmp_path.push("pckp_tmp");
+				let tmp_path = PathBuf::from(".pckp_tmp");
 
 				if tmp_path.exists() {
 					fs_dir::remove(&tmp_path).unwrap();
@@ -155,7 +158,7 @@ impl Package {
 					return Err(PckpError::custom(format!("Package at {} does not have config file", source_url), Some(parent_name.to_string())))
 				};
 
-				local_package.install(parent_name, path)
+				local_package.install(parent_name, path, d.version == "latest")
 				//todo!("download and stuff");
 			}
 		}

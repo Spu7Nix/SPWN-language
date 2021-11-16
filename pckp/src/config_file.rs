@@ -147,7 +147,15 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
 
                 let mut folders = Vec::new();
 
-                match ensure_variant!(ymap, "list" = Array, "folders"? from "root")? {
+                let f_list = ensure_variant!(ymap, "list" = Array, "folders"? from "root");
+                let f_str = ensure_variant!(ymap, "string" = String, "folders"? from "root");
+
+                let folders_maybe = match (f_list, f_str) {
+                    (_, Ok(b)) => Ok(b.map(|x| vec![Yaml::String(x.to_string())])),
+                    (a, _) => a.map(|x| x.map(|y| y.clone()))
+                }?;
+
+                match folders_maybe {
                     Some(folds) => {
                         for v in folds {
                             folders.push(match v.clone() {

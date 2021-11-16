@@ -252,8 +252,9 @@ pub fn compile_scope(
                 for full_context in contexts.iter() {
                     let (context, val) = full_context.inner_value();
                     let fn_context = context.start_group;
+
                     match globals.stored_values[val].clone() {
-                        Value::Dict(d) => {
+                        Value::Dict(ref d) => {
                             let iter = d.iter().map(|(k, v)| {
                                 (
                                     *k,

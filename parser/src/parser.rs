@@ -319,7 +319,7 @@ impl Token {
 
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
 
-            Return | Implement | For | In | ErrorStatement | If | Else | Object | Trigger
+            Return | Implement | For | ErrorStatement | If | Else | Object | Trigger
             | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch
             | While => "keyword",
             //Comment | MultiCommentStart | MultiCommentEnd => "comment",
@@ -919,7 +919,7 @@ pub fn parse_statement(
             if tokens.next(false) == Some(Token::Exclamation) {
                 //call
                 ast::StatementBody::Call(ast::Call {
-                    function: expr.values[0].clone(),
+                    function: expr.values.remove(0)
                 })
             } else {
                 // expression statement
@@ -1222,7 +1222,7 @@ fn parse_expr(
             // oooh ternaries
 
             // remove any = from the ternary and place into a separate stack
-            let mut old_values = express.values.clone();
+            let mut old_values = express.values;
             let mut old_operators = express.operators;
 
             let mut tern_values = Vec::<ast::Variable>::new();
@@ -1921,7 +1921,7 @@ fn parse_macro(
                     path: Vec::new(),
                     operator: None,
                     pos: (arg_start, arg_end),
-                    tag: properties.clone(),
+                    tag: properties,
                 };
 
                 let mut new_args = Vec::new();
