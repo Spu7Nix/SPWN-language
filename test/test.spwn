@@ -1,13 +1,1 @@
-type @a
-type @b
-type @c
-type @d
-type @e
-
-
-$.print(@a in @a | @b)
-$.print(@a in @b | @c)
-$.print(@a in @a & @b)
-$.print(@a & @b in @a)
-$.print(@pattern([@a & @b]) in @pattern([@a]))
-$.print(@pattern([@a]) & @c in @pattern([@a | @b]))
+import "pckp_libraries/pckp_example@1.0.0"
