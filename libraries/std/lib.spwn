@@ -15,15 +15,11 @@ import "counter.spwn"
 import "fileio.spwn"
 import "regex.spwn"
 import "number.spwn"
-import "heapq.spwn"
 import "complex.spwn"
-//import "zip.spwn" TODO: remove entirely
 import "http.spwn"
-//import "vector.spwn" TODO: remove entirely
 import "range.spwn"
 import "level_info.spwn"
 
-hashmap = import "hashmap.spwn"
 chroma = import "chroma.spwn"
 general = import "general_triggers.spwn"
 events = import "events.spwn"
@@ -48,17 +44,13 @@ return {
     open: @file::new,
     obj_set: @obj_set::new,
     regex: @regex::new,
-    heapq: @heapq::new,
     complex: @complex::new,
-    hashmap: @hashmap::new,
-    hashmap_apply: hashmap.hashmap_apply,
     rgb: @chroma::from_rgb,
     rgb8: @chroma::from_rgb8,
     hsv: @chroma::from_hsv,
     hsv2: @chroma::from_hsv2,
     blend_modes: chroma.BLEND_MODES,
     level_info: @level_info,
-    //zip: @zip::new,
 }
 
 
