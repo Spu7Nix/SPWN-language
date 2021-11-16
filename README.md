@@ -110,7 +110,7 @@ Let it compile and you're good to go
 3. Install rust if you haven't already
 4. Open the unzipped folder in the terminal
 5. Run `cargo build`
-6. Compiled binary is placed in `target/release`
+6. Compiled binary is placed in `target/debug`
 
 ## Using SPWN
 
