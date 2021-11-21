@@ -1,1 +1,4 @@
-import "pckp_libraries/pckp_example"
+#[no_std]
+
+
+$.print((()-><0|>1=>1)())

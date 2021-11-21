@@ -737,7 +737,7 @@ builtins! {
             match &globals.stored_values[*val] {
                 Value::Str(s) => out += s,
                 _ => out += &{
-                    let ctx = FullContext::from_ptr(full_context);
+                    let ctx = unsafe { FullContext::from_ptr(full_context) };
                     handle_unary_operator(*val, Builtin::DisplayOp, ctx, globals, &info)?;
                     let out = ctx.inner().return_value;
                     let val = &globals.stored_values[out];
@@ -1288,7 +1288,7 @@ $.extend_trigger_func(10g, () {
             }
         ]};
 
-        cmp_statement.to_trigger_func(FullContext::from_ptr(full_context), globals, info.clone(), Some(group))?;
+        cmp_statement.to_trigger_func(unsafe { FullContext::from_ptr(full_context) }, globals, info.clone(), Some(group))?;
 
 
 
@@ -1949,7 +1949,7 @@ $.assert(arr == [1, 2])
 
     [LessOrEqPatternOp] #[safe = true, desc = "Default implementation of the `<=a` operator", example = "$._less_or_eq_pattern_(a)"]
     fn _less_or_eq_pattern_((a)) { Value::Pattern(Pattern::LessOrEq(store_const_value(a, globals, context.start_group, info.position))) }
-    
+
     [InPatternOp] #[safe = true, desc = "Default implementation of the `in a` operator", example = "$._in_pattern_(a)"]
     fn _in_pattern_((a)) { Value::Pattern(Pattern::In(store_const_value(a, globals, context.start_group, info.position))) }
     // operators
@@ -1971,17 +1971,17 @@ $.assert(arr == [1, 2])
 
     [EqOp] #[safe = true, desc = "Default implementation of the `==` operator", example = "$._equal_(\"hello\", \"hello\")"]
     [[RAW]] fn _equal_((a), (b)) {
-        default_value_equality(arguments[0], arguments[1], globals, FullContext::from_ptr(full_context), &info)?;
+        default_value_equality(arguments[0], arguments[1], globals, unsafe { FullContext::from_ptr(full_context) }, &info)?;
     }
 
     [IsOp] #[safe = true, desc = "Default implementation of the `is` operator", example = "$._is_([1, 2, 3], [@number])"]
     [[RAW]] fn _is_((val), (pattern)) {
-        val.matches_pat(&pattern, &info, globals, FullContext::from_ptr(full_context), true)?;
+        val.matches_pat(&pattern, &info, globals, unsafe { FullContext::from_ptr(full_context) }, true)?;
     }
 
     [NotEqOp] #[safe = true, desc = "Default implementation of the `!=` operator", example = "$._not_equal_(\"hello\", \"bye\")"]
     [[RAW]] fn _not_equal_((a), (b)) {
-        let contexts = FullContext::from_ptr(full_context);
+        let contexts = unsafe { FullContext::from_ptr(full_context) };
         default_value_equality(arguments[0], arguments[1], globals, contexts, &info)?;
         // negate
         for c in contexts.iter() {
@@ -2192,7 +2192,7 @@ $.assert(arr == [1, 2])
                     unreachable!()
                 }
             ),
-            
+
             (_, Value::Pattern(p2)) => Value::Bool(
                 if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
                     p.in_pat(&p2, globals)?
@@ -2211,7 +2211,7 @@ $.assert(arr == [1, 2])
                     unreachable!()
                 }
             ),
-            
+
 
             _ => {
                 return Err(RuntimeError::TypeError {
@@ -2320,10 +2320,10 @@ $.assert(arr == [1, 2])
     }
 
     [DisplayOp] #[safe = true, desc = "returns the default value display string for the given value", example = "$._display_(counter()) // \"@counter::{ item: ?i, bits: 16 }\""] fn _display_((a)) {
-        Value::Str(a.to_str_full(globals, |val, globals| display_val(val.clone(), FullContext::from_ptr(full_context), globals, &info))?)
+        Value::Str(a.to_str_full(globals, |val, globals| display_val(val.clone(), unsafe { FullContext::from_ptr(full_context) }, globals, &info) )?)
     }
     [Display] #[safe = true, desc = "returns the value display string for the given value", example = "$.display(counter()) // \"counter(?i, bits = 16)\""] fn display((a)) {
-        let ctx = FullContext::from_ptr(full_context);
+        let ctx = unsafe { FullContext::from_ptr(full_context) };
         handle_unary_operator(arguments[0], Builtin::DisplayOp, ctx, globals, &info)?;
         // add error on context split?
         globals.stored_values[ctx.inner().return_value].clone()

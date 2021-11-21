@@ -632,6 +632,7 @@ Should be used like this: value.macro(arguments)",
                             (*context.inner()).return_value = globals.NULL_STORAGE;
                             globals.NULL_STORAGE
                         };
+                        (*context.inner()).broken = None;
                         if let Some(pat) = m.ret_pattern {
                             //dbg!(&globals.stored_values[pat], &globals.stored_values[ret]);
                             if !globals.stored_values[ret].clone().pure_matches_pat(
@@ -660,7 +661,7 @@ Should be used like this: value.macro(arguments)",
                         });
                     }
                 }
-                (*context.inner()).broken = None;
+
                 out_contexts.push(context.clone());
             }
         }

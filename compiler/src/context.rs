@@ -176,9 +176,9 @@ impl FullContext {
     pub fn iter(&mut self) -> ContextIter {
         ContextIter::new(self)
     }
-
-    pub fn from_ptr(ptr: *mut FullContext) -> &'static mut FullContext {
-        unsafe { ptr.as_mut().unwrap() }
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn from_ptr(ptr: *mut FullContext) -> &'static mut FullContext {
+        ptr.as_mut().unwrap()
     }
 }
 

@@ -60,6 +60,7 @@ pub struct Macro {
     pub ret_pattern: Option<StoredValue>,
 }
 
+#[allow(clippy::derive_hash_xor_eq)]
 impl Hash for Macro {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         //self.args.hash(state);
@@ -493,15 +494,10 @@ impl Value {
     ) -> Result<bool, RuntimeError> {
         let mut full_context = FullContext::Single(context); // not part of the full tree, but shouldnt matter, since it shouldnt be changed
         self.matches_pat(pat_val, info, globals, &mut full_context, false)?;
-        match globals.stored_values[full_context.inner().return_value] {
-            Value::Bool(b) => Ok(b),
-            _ => {
-                return Err(RuntimeError::TypeError {
-                    expected: "bool".to_string(),
-                    found: globals.get_type_str(full_context.inner().return_value),
-                    val_def: globals.get_area(full_context.inner().return_value),
-                    info: info.clone(),
-                })
+        match &globals.stored_values[full_context.inner().return_value] {
+            Value::Bool(b) => Ok(*b),
+            a => {
+                panic!("Expected bool, got {}", a.clone().to_str(globals));
             }
         }
     }
@@ -617,7 +613,7 @@ impl Value {
                         globals,
                         full_context.inner().start_group,
                         info.position,
-                    )
+                    );
                 }
                 Pattern::Any => {
                     (*full_context.inner()).return_value = store_const_value(
@@ -641,6 +637,8 @@ impl Value {
                             }
 
                             1 => {
+
+                                // TODO: make sure it always sets the return value
                                 full_context.reset_return_vals(globals);
                                 for el in a_val {
                                     for full_context in full_context.iter() {

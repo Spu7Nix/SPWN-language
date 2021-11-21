@@ -130,7 +130,6 @@ pub enum Token {
     #[token("!")]
     Exclamation,
 
-
     #[token("=")]
     Assign,
 
@@ -303,8 +302,7 @@ impl Token {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
             | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | In | Either
-            | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is
-            => {
+            | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is => {
                 "operator"
             }
             Symbol => "identifier",
@@ -319,9 +317,10 @@ impl Token {
 
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
 
-            Return | Implement | For | ErrorStatement | If | Else | Object | Trigger
-            | Import | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch
-            | While => "keyword",
+            Return | Implement | For | ErrorStatement | If | Else | Object | Trigger | Import
+            | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | While => {
+                "keyword"
+            }
             //Comment | MultiCommentStart | MultiCommentEnd => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -416,7 +415,8 @@ impl<'a> Tokens<'a> {
     }
 
     fn next_if<F>(&mut self, predicate: F, ss: bool) -> Option<Token>
-        where F: FnOnce(Token, &Tokens) -> bool
+    where
+        F: FnOnce(Token, &Tokens) -> bool,
     {
         match self.next(ss) {
             Some(t) => {
@@ -428,11 +428,15 @@ impl<'a> Tokens<'a> {
                 }
             }
             None => None,
-        }   
+        }
     }
 
-    fn next_while<'s: 'a, F: 'static>(&'s mut self, mut predicate: F) -> impl Iterator<Item = Token> + 's
-        where F: FnMut(Token) -> bool,
+    fn next_while<'s: 'a, F: 'static>(
+        &'s mut self,
+        mut predicate: F,
+    ) -> impl Iterator<Item = Token> + 's
+    where
+        F: FnMut(Token) -> bool,
     {
         let mut taken = self.iter.clone().take_while(move |x| predicate(*x));
 
@@ -464,7 +468,8 @@ impl<'a> Tokens<'a> {
     }
 
     fn previous_if<F>(&mut self, predicate: F) -> Option<Token>
-        where F: FnOnce(Token) -> bool
+    where
+        F: FnOnce(Token) -> bool,
     {
         match self.previous() {
             Some(t) => {
@@ -476,7 +481,7 @@ impl<'a> Tokens<'a> {
                 }
             }
             None => None,
-        }   
+        }
     }
 
     fn previous_no_ignore(&mut self, ss: bool) -> Option<Token> {
@@ -502,7 +507,6 @@ impl<'a> Tokens<'a> {
         } else {
             self.stack[len - self.index - 1].0
         }
-
     }
 
     fn slice(&self) -> String {
@@ -919,7 +923,7 @@ pub fn parse_statement(
             if tokens.next(false) == Some(Token::Exclamation) {
                 //call
                 ast::StatementBody::Call(ast::Call {
-                    function: expr.values.remove(0)
+                    function: expr.values.remove(0),
                 })
             } else {
                 // expression statement
@@ -963,8 +967,6 @@ pub fn parse_statement(
     })
 }
 
-
-
 macro_rules! op_precedence {
     {
         $p_f:expr, $a_f:ident => $($op_f:ident)+,
@@ -1006,7 +1008,7 @@ macro_rules! op_precedence {
     }
 }
 
-op_precedence!{ // make sure the highest precedence is at the top
+op_precedence! { // make sure the highest precedence is at the top
     12, Left => As,
     11, Left => Both,
     10, Left => Either,
@@ -1021,7 +1023,6 @@ op_precedence!{ // make sure the highest precedence is at the top
     1, Left => Or,
     0, Right => Assign Add Subtract Multiply Divide IntDivide Exponate Modulate Swap,
 }
-
 
 fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
     for val in &mut expr.values {
@@ -1050,11 +1051,13 @@ fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
             values: Vec::new(),
         };
 
-        let op_loop: Vec<(usize, &Operator)> = if let OpAssociativity::Left = assoc { expr.operators.iter().enumerate().rev().collect() }
-        else { expr.operators.iter().enumerate().collect() };
+        let op_loop: Vec<(usize, &Operator)> = if let OpAssociativity::Left = assoc {
+            expr.operators.iter().enumerate().rev().collect()
+        } else {
+            expr.operators.iter().enumerate().collect()
+        };
 
         for (i, op) in op_loop {
-
             if operator_precedence(op) == lowest {
                 new_expr.operators.push(*op);
 
@@ -1213,10 +1216,12 @@ fn parse_expr(
     let express = fix_precedence(ast::Expression { values, operators }); //pemdas and stuff
     match tokens.next(true) {
         Some(Token::If) => {
-            
             let is_pattern = match tokens.next(true) {
                 Some(Token::Is) => true,
-                _ => {tokens.previous(); false}
+                _ => {
+                    tokens.previous();
+                    false
+                }
             };
 
             // oooh ternaries
@@ -1284,7 +1289,7 @@ fn parse_expr(
                     operators: tern_operators,
                 },
                 else_expr: do_else,
-                is_pattern
+                is_pattern,
             };
 
             let ternval_literal = ast::ValueLiteral {
@@ -2282,24 +2287,25 @@ fn parse_variable(
                             match tokens.next(false) {
                                 Some(Token::DotDot) => prefix = Some(ast::ArrayPrefix::Spread),
                                 Some(Token::Star) => prefix = Some(ast::ArrayPrefix::Collect),
-                                _ => {tokens.previous_no_ignore(false);},
+                                _ => {
+                                    tokens.previous_no_ignore(false);
+                                }
                             }
 
                             //let mut tok_next = None;
 
                             let mut tmp_tokens = tokens.clone();
                             /*tmp_tokens.next_if(|a, _| {
-                                tok_next = Some(a); 
+                                tok_next = Some(a);
                                 false
                             }, false);*/
 
                             let item = parse_expr(tokens, notes, true, true)?;
 
-                            let single_ident =
-                                item.values.len() == 1 &&
-                                item.values[0].operator == None &&
-                                item.values[0].path.len() == 0 &&
-                                matches!(item.values[0].value.body, ast::ValueBody::Symbol(_));
+                            let single_ident = item.values.len() == 1
+                                && item.values[0].operator == None
+                                && item.values[0].path.is_empty()
+                                && matches!(item.values[0].value.body, ast::ValueBody::Symbol(_));
 
                             match tokens.next(false) {
                                 Some(Token::For) => {
@@ -2376,17 +2382,24 @@ fn parse_variable(
                                         }
                                         a => expected!("identifier".to_string(), tokens, notes, a),
                                     }
-                                    
                                 }
                                 t @ Some(Token::Comma | Token::ClosingSquareBracket) => {
                                     //accounting for trailing comma
                                     tmp_tokens.next(false);
 
                                     match (single_ident, &prefix) {
-                                        (true, &Some(ast::ArrayPrefix::Collect)) => 
-                                            expected!("array or dictionary".to_string(), tmp_tokens, notes, tmp_tokens.current()),
-                                        (false, &Some(ast::ArrayPrefix::Spread)) =>
-                                            expected!("identifier".to_string(), tmp_tokens, notes, tmp_tokens.current()),
+                                        (true, &Some(ast::ArrayPrefix::Collect)) => expected!(
+                                            "array or dictionary".to_string(),
+                                            tmp_tokens,
+                                            notes,
+                                            tmp_tokens.current()
+                                        ),
+                                        (false, &Some(ast::ArrayPrefix::Spread)) => expected!(
+                                            "identifier".to_string(),
+                                            tmp_tokens,
+                                            notes,
+                                            tmp_tokens.current()
+                                        ),
                                         (_, _) => (),
                                     }
                                     arr.push(ast::ArrayDef {
@@ -2394,7 +2407,9 @@ fn parse_variable(
                                         operator: prefix,
                                     });
 
-                                    if t == Some(Token::ClosingSquareBracket) || tokens.next(false) == Some(Token::ClosingSquareBracket) {
+                                    if t == Some(Token::ClosingSquareBracket)
+                                        || tokens.next(false) == Some(Token::ClosingSquareBracket)
+                                    {
                                         break;
                                     } else {
                                         tokens.previous();

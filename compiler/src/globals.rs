@@ -70,7 +70,7 @@ pub struct Globals<'a> {
     pub std_out: &'a mut dyn Write,
 
     pub BUILTIN_STORAGE: StoredValue,
-    pub NULL_STORAGE: StoredValue
+    pub NULL_STORAGE: StoredValue,
 }
 
 impl<'a> Globals<'a> {
@@ -288,14 +288,16 @@ impl<'a> Globals<'a> {
         self.stored_values.mark(self.NULL_STORAGE);
         self.stored_values.mark(self.BUILTIN_STORAGE);
 
-        let root_context = FullContext::from_ptr(
-            contexts
-                .with_breaks()
-                .next()
-                .unwrap()
-                .inner()
-                .root_context_ptr,
-        );
+        let root_context = unsafe {
+            FullContext::from_ptr(
+                contexts
+                    .with_breaks()
+                    .next()
+                    .unwrap()
+                    .inner()
+                    .root_context_ptr,
+            )
+        };
 
         for c in root_context.with_breaks() {
             for stack in c.inner().get_variables().values() {
