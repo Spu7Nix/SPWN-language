@@ -6,7 +6,7 @@ DEFAULT_BITS = 16
 type @counter
 
 reset_counter = (
-    c, for_each: @macro = (n){}
+    c, for_each: @number -> @NULL = (n){}
 ){
 
     for i in c.bits..0 {
@@ -107,7 +107,7 @@ a.add_to(b)
         self,
         #[desc("Counter(s) to add to")] items: [@counter | @item] | @counter | @item,
         #[desc("Multiplier for the value added")] factor: @number = 1,
-        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @macro = (n){}
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @number -> @NULL = (n){}
     ) {
         for i in self.bits..0 {
             x = 2^i
@@ -157,7 +157,7 @@ b.subtract_from(a)
         self,
         #[desc("Counter(s) to subtract from")] items: [@counter | @item] | @counter | @item,
         #[desc("Multiplier for the value subtracted")] factor: @number = 1,
-        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @macro = (n){}
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @number -> @NULL = (n){}
     ) {
         for i in self.bits..0 {
             x = 2^i
@@ -289,7 +289,7 @@ c.reset()
     ")]
     (
         self,
-        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @macro = (n){}
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @number -> @NULL = (n){}
     ){
 
         reset_counter(self, for_each)
@@ -303,7 +303,7 @@ c.reset_negative()
     ")]
     (
         self,
-        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @macro = (n){}
+        #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @number -> @NULL = (n){}
     ){
 
         for i in self.bits..0 {
@@ -757,7 +757,7 @@ c.to_const_enclosed(0..10, (c_const) {
     ")] (
         self,
         #[desc("Array or range of possible output values")] range: [@number] | @range,
-        #[desc("Closure where you can use the const value, should take the value as the first argument")] closure: @macro,
+        #[desc("Closure where you can use the const value, should take the value as the first argument")] closure: @number -> @NULL,
 
     ) {
         -> () {

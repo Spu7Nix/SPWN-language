@@ -2034,10 +2034,20 @@ fn try_parse_macro(
             })
         }
 
-        Err(_) => match parse_macro_def(tokens, notes) {
-            Ok(mac) => Ok(mac),
-            Err(e) => Err(e),
-        },
+        Err(_) => {
+            let mut test_tokens = tokens.clone();
+            match parse_macro_def(&mut test_tokens, notes) {
+                Ok(v) => {
+                    (*tokens) = test_tokens;
+                    Ok(v)
+                }
+                Err(e) => match try_parse_macro_pattern(tokens, notes) {
+                    Ok(pat) => Ok(ast::ValueBody::MacroPattern(pat)),
+                    // return macro error, since its more likely that they were trying to make a normal macro
+                    Err(_) => Err(e),
+                },
+            }
+        }
     };
 }
 

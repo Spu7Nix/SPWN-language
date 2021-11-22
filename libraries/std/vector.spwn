@@ -219,7 +219,7 @@ impl @vector {
 
     },
 
-    map: (self, cb: @macro) {
+    map: (self, cb: _ -> _) {
         return @vector::new( self.dims.map(cb) )
     },
 

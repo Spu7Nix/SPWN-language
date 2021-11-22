@@ -136,7 +136,7 @@ for_loop(0..10, (i) {
 	")]
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
-	#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: @macro,
+	#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: _ -> @NULL, // supposed to be @counter -> @NULL, but @counter isnt defined lol
         #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
         #[desc("Whether to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true,
     ) {
@@ -173,8 +173,8 @@ while_loop(() => c > 4, () {
 // c is now 3
 	")]
 	(
-		#[desc("While loop condition, should -> return a boolean")] expr: @macro,
-		#[desc("Macro of the code that gets looped")] code: @macro,
+		#[desc("While loop condition, should return a boolean")] expr: () -> @bool,
+		#[desc("Macro of the code that gets looped")] code: () -> @NULL,
 		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
 	) {
 		func = !{
@@ -199,8 +199,8 @@ do_while_loop(() => c > 10, () {
 // c is now 2
 	")]
 	(
-		#[desc("While loop condition, should -> return a boolean")] expr: @macro,
-		#[desc("Macro of the code that gets looped")] code: @macro,
+		#[desc("While loop condition, should -> return a boolean")] expr: () -> @bool,
+		#[desc("Macro of the code that gets looped")] code: () -> @NULL,
 		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
 	) {
 		func = !{

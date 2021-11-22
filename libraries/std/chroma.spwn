@@ -93,7 +93,7 @@ rgb_to_hex = (r, g, b, a) {
 
 type @blend_mode
 
-blend_mode = (func: @macro) {
+blend_mode = (func: (@number, @number) -> @number) {
     return @blend_mode::{func: (b, o) => func(b, o).constrain(0,1)}
 }
 

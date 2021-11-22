@@ -16,7 +16,7 @@ $.assert(arr.max() == 4)
 arr = ['abc', 'b', 'abdc']
 $.assert(arr.max(key = (el: @string) => el.length) == 'abdc')
     ")]
-    (self, key: @macro = (el) => el) {
+    (self, key: _ -> _ = (el) => el) {
         let highest = self[0]
 
         for el in self {
@@ -34,7 +34,7 @@ $.assert(arr.min() == 1)
 arr = ['abc', 'b', 'abdc']
 $.assert(arr.min(key = (el: @string) => el.length) == 'b')
     ")]
-    (self, key: @macro = (el) => el) {
+    (self, key: _ -> _ = (el) => el) {
         let lowest = self[0]
 
         for el in self {
@@ -144,7 +144,7 @@ $.assert(arr.remove(3) == [1, 2, 4, 5])
 arr = [1, 2, 3, 4, 5]
 $.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
     ")]
-    (self, cb: @macro, in_place: @bool = false) {
+    (self, cb: _ -> _, in_place: @bool = false) {
         if !in_place {
             let output = [];
             for iter in self {
@@ -161,7 +161,7 @@ $.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
 arr = [1, 2, 3, 4, 5]
 $.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
     ")]
-    (self, cb: @macro, in_place: @bool = false) {
+    (self, cb: (_, @number) -> _, in_place: @bool = false) {
         if !in_place {
             let output = [];
             for i in 0..self.length {
@@ -178,7 +178,7 @@ $.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
 arr = [1, 2, 3, 4, 5]
 $.assert(arr.filter(el => el > 3) == [4, 5])
     ")]
-    (self, cb: @macro, in_place: @bool = false) {
+    (self, cb: _ -> @bool, in_place: @bool = false) {
         let output = [];
         for iter in self {
             let r = cb(iter);
@@ -199,7 +199,7 @@ arr = [1, 2, 3, 4, 5]
 sum = arr.reduce((acum, el) => acum + el)
 $.assert(sum == 15)
     ")]
-    (self, cb: @macro) {
+    (self, cb: (_, _) -> _) {
         let acum = self[0];
         for iter in 1..self.length {
             acum = cb(acum, self[iter]);
@@ -212,7 +212,7 @@ $.assert(arr.any())
 arr2 = [1, 2, 3, 1, 4, -1, 7]
 $.assert(arr2.any(el => el < 0)) // checks if the array contains any negative elements
     ")]
-    (self, map: @macro = (a) => @bool(a)) {
+    (self, map: _ -> @bool = (a) => @bool(a)) {
         for item in self {
             if map(item) {
                 return true
@@ -226,7 +226,7 @@ $.assert(arr.all())
 arr2 = [1, 2, 3, 1, 4, 7]
 $.assert(arr2.all(el => el > 0)) // checks if the array contains only positive elements
     ")]
-    (self, map: @macro = (a) => @bool(a)) {
+    (self, map: _ -> @bool = (a) => @bool(a)) {
         for item in self {
             if !map(item) {
                 return false
@@ -243,7 +243,7 @@ $.assert(arr.sum() == 15)
     },
 
     _partition: #[desc("Private function needed for .sort()")]
-    (self, low: @number, high: @number, comp: @macro = (a, b) => a <= b) {
+    (self, low: @number, high: @number, comp: (_, _) -> @bool = (a, b) => a <= b) {
         pivot = self[high]
         let i = low - 1
 
@@ -271,7 +271,7 @@ let arr = [5, 1, 5, 3, 2]
 arr.sort(comp = (a, b) => a >= b)
 $.assert(arr == [5, 5, 3, 2, 1])
     ")]
-    (self, begin: @number = 0, end: @number = -1, comp: @macro = (a, b) => a <= b) {
+    (self, begin: @number = 0, end: @number = -1, comp: (_, _) -> @bool = (a, b) => a <= b) {
 
         // when end == -1, that means the end of the array, but comparing to -1 doesnt work so switch it back to legnth - 1
         let new_end = end
@@ -296,7 +296,7 @@ $.assert(arr.sorted() == [1, 2, 3, 5, 5])
 $.assert(arr.sorted(begin = 2, end = 4) == [5, 1, 2, 3, 5])
 $.assert(arr.sorted(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
     ")]
-    (self, begin: @number = 0, end: @number = -1, comp: @macro = (a, b) => a <= b) {
+    (self, begin: @number = 0, end: @number = -1, comp: (_, _) -> @bool = (a, b) => a <= b) {
         let new_arr = self
         new_arr.sort(begin,end,comp)
 
@@ -384,7 +384,7 @@ x_1 = x.scan(10, (&state, x){
 })
 $.assert(x_1 == [-10, -20, -60])
 ")]
-    (self, state, closure: @macro) {
+    (self, state, closure: (_, _) -> _) { // TODO: add & in macro patterns
         let state = state
         let ret_arr = []
 

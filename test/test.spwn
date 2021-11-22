@@ -1,12 +1,5 @@
 #[no_level]
 
-let @array::reduce = (self, f: (_, _) -> _) {
-    let acum = self[0]
-    for i in 1..self.length {
-        acum = f(acum, self[i])
-    }
-    return acum
-}
 
 
 list = ["hello", " ", "world", "!"]
