@@ -123,6 +123,11 @@ pub enum Pattern {
     MoreOrEq(StoredValue),
     LessOrEq(StoredValue),
     In(StoredValue),
+
+    Macro {
+        args: Vec<Pattern>, 
+        ret: Box<Pattern>
+    }
 }
 
 impl Pattern {
@@ -165,7 +170,7 @@ impl Pattern {
             
             (_, Pattern::Both(a, b)) => self.in_pat(a, globals)? && self.in_pat(b, globals)?,
             (_, Pattern::Either(a, b)) => self.in_pat(a, globals)? || self.in_pat(b, globals)?,
-            
+            // TODO: macro patterns??
             _ => false,
 
         } )
@@ -674,6 +679,58 @@ impl Value {
                         );
                     }
                 }
+                Pattern::Macro { args, ret } => {
+                    if let Value::Macro(m) = self {
+                        if m.args.len() != args.len() {
+                            (*full_context.inner()).return_value = store_const_value(
+                                Value::Bool(false),
+                                globals,
+                                full_context.inner().start_group,
+                                info.position,
+                            );
+                        } else {
+                            let mut is_matching = true;
+                            for (i, m_arg) in m.args.iter().enumerate() {
+                                if let Some(pat_stored) = m_arg.pattern {
+                                    match &convert_type(&globals.stored_values[pat_stored].clone(), type_id!(pattern), info, globals, full_context.inner())?  {
+                                        Value::Pattern(p) => {
+                                            let matches = args[i].in_pat(p, globals)?;
+                                            if !matches {
+                                                is_matching = false;
+                                                break;
+                                            }
+                                        },
+                                        _ => unreachable!()
+                                    }
+                                }
+                            }
+                            if is_matching {
+                                if let Some(ret_stored) = m.ret_pattern {
+                                    match &convert_type(&globals.stored_values[ret_stored].clone(), type_id!(pattern), info, globals, full_context.inner())? {
+                                        Value::Pattern(p) => {
+                                            is_matching = (*ret).in_pat(p, globals)?;
+                                            
+                                        },
+                                        _ => unreachable!()
+                                    }
+                                }
+                            }
+                            (*full_context.inner()).return_value = store_const_value(
+                                Value::Bool(is_matching),
+                                globals,
+                                full_context.inner().start_group,
+                                info.position,
+                            );
+                        }
+                    } else {
+                        (*full_context.inner()).return_value = store_const_value(
+                            Value::Bool(false),
+                            globals,
+                            full_context.inner().start_group,
+                            info.position,
+                        );
+                    }
+                }
                 a => {
                     // bool operator patterns
                     let val = store_const_value(
@@ -922,6 +979,20 @@ impl Value {
                 }
                 Pattern::Any => {
                     "_".to_string()
+                }
+                Pattern::Macro { args, ret } => {
+                    let mut out = String::from("(");
+                    if !args.is_empty() {
+                        for arg in args.iter() {
+                            out += &display_inner(&Value::Pattern(arg.clone()), globals)?;
+                            out += ", ";
+                        }
+                        out.pop();
+                        out.pop();
+                    }
+                    out += ") -> ";
+                    out += &display_inner(&Value::Pattern(*ret.clone()), globals)?;
+                    out
                 }
             },
         })
@@ -2659,6 +2730,42 @@ impl VariableFuncs for ast::Variable {
                 }
                 //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
                 ast::ValueBody::Null => full_context.inner().return_value = globals.NULL_STORAGE,
+                ast::ValueBody::MacroPattern(ast::MacroPattern { args, ret }) => {
+                    let mut args = args.clone();
+                    args.push(ret.clone());
+                    let combinations = all_combinations(args, full_context, globals, info.clone(), constant)?;
+                    for (args, fc) in combinations {
+                        let mut patterns = Vec::new();
+                        // get all the arg values and convert to patterns
+                        for arg in args {
+                            let pat_val = convert_type(&globals.stored_values[arg].clone(), type_id!(pattern), &info, globals, fc.inner())?;
+                            match pat_val {
+                                Value::Pattern(p) => {
+                                    patterns.push(p);
+                                }
+                                a => {
+                                    return Err(RuntimeError::TypeError {
+                                        expected: "pattern".to_string(),
+                                        found: a.get_type_str(globals),
+                                        val_def: globals.get_area(arg),
+                                        info,
+                                    })
+                                }
+                            }
+                        }
+                        let ret = Box::new(patterns.pop().unwrap());
+                        
+                        fc.inner().return_value = store_const_value(
+                            Value::Pattern(Pattern::Macro{
+                                args: patterns, ret
+                            }),
+                            globals,
+                            fc.inner().start_group,
+                            info.position,
+                        )
+                    }
+
+                },
             };
         }
         let mut path_iter = self.path.iter();

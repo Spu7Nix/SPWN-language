@@ -1,4 +1,14 @@
-#[no_std]
+#[no_level]
+
+let @array::reduce = (self, f: (_, _) -> _) {
+    let acum = self[0]
+    for i in 1..self.length {
+        acum = f(acum, self[i])
+    }
+    return acum
+}
 
 
-$.print((()-><0|>1=>1)())
+list = ["hello", " ", "world", "!"]
+
+$.print(list.reduce((a, b, c) => a + b))

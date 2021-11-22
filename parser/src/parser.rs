@@ -1877,7 +1877,44 @@ fn check_if_slice(mut tokens: Tokens, notes: &mut ParseNotes) -> Result<bool, Sy
     }
 }
 
-fn parse_macro(
+fn try_parse_macro_pattern(
+    tokens: &mut Tokens,
+    notes: &mut ParseNotes,
+) -> Result<ast::MacroPattern, SyntaxError> {
+    let mut args = Vec::new();
+    let start = tokens.position();
+
+    loop {
+        match tokens.next(false) {
+            Some(Token::ClosingBracket) => break,
+            Some(_) => {
+                tokens.previous();
+                args.push(parse_expr(tokens, notes, false, true)?);
+                match tokens.next(false) {
+                    Some(Token::Comma) => (),
+                    Some(Token::ClosingBracket) => break,
+                    a => expected!("either ',' or ')'".to_string(), tokens, notes, a),
+                }
+            }
+            None => {
+                return Err(SyntaxError::SyntaxError {
+                    message: "Couldn't find matching ')' for this '('".to_string(),
+                    pos: start,
+                    file: notes.file.clone(),
+                })
+            }
+        };
+    }
+
+    let ret = match tokens.next(true) {
+        Some(Token::Arrow) => parse_expr(tokens, notes, false, true)?,
+        a => expected!("'->'".to_string(), tokens, notes, a),
+    };
+
+    Ok(ast::MacroPattern { args, ret })
+}
+
+fn try_parse_macro(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
     properties: ast::Attribute,
@@ -1971,7 +2008,20 @@ fn parse_macro(
                         ast::ValueBody::Expression(expr)
                     }
                 },
-                Some(Token::Comma) => parse_macro_def(tokens, notes)?,
+                Some(Token::Comma) => {
+                    let mut test_tokens = tokens.clone();
+                    match parse_macro_def(&mut test_tokens, notes) {
+                        Ok(v) => {
+                            (*tokens) = test_tokens;
+                            v
+                        }
+                        Err(e) => match try_parse_macro_pattern(tokens, notes) {
+                            Ok(pat) => ast::ValueBody::MacroPattern(pat),
+                            // return macro error, since its more likely that they were trying to make a normal macro
+                            Err(_) => return Err(e),
+                        },
+                    }
+                }
                 Some(Token::Colon) => parse_macro_def(tokens, notes)?,
                 a => {
                     return Err(SyntaxError::ExpectedErr {
@@ -1986,7 +2036,7 @@ fn parse_macro(
 
         Err(_) => match parse_macro_def(tokens, notes) {
             Ok(mac) => Ok(mac),
-            Err(e) => return Err(e),
+            Err(e) => Err(e),
         },
     };
 }
@@ -2205,7 +2255,7 @@ fn parse_variable(
                                 Some(Token::OpenBracket) => {
                                     // its a decorator on a macro
                                     *tokens = test_tokens;
-                                    potential_macro = Some(parse_macro(
+                                    potential_macro = Some(try_parse_macro(
                                         tokens,
                                         notes,
                                         properties.clone(),
@@ -2483,7 +2533,7 @@ fn parse_variable(
 
         Some(Token::OpenBracket) => {
             if allow_macro_def {
-                parse_macro(tokens, notes, properties.clone(), None)?
+                try_parse_macro(tokens, notes, properties.clone(), None)?
             } else {
                 let expr = parse_expr(tokens, notes, true, true)?;
                 match tokens.next(false) {
@@ -2634,8 +2684,39 @@ fn parse_variable(
         }
     }
     tokens.previous_no_ignore(false);
-
     let (_, end_pos) = tokens.position();
+    let val = ast::Variable {
+        operator,
+        value: ast::ValueLiteral { body: value },
+        pos: (start_pos, end_pos),
+        //comment: (preceding_comment, comment_after),
+        path,
+        tag: properties,
+    };
+
+    let val = match tokens.next(true) {
+        Some(Token::Arrow) => {
+            let ret = parse_expr(tokens, notes, false, false)?;
+            let (_, end_pos) = tokens.position();
+
+            let args = vec![val.to_expression()];
+
+            ast::Variable {
+                operator: None,
+                value: ast::ValueLiteral {
+                    body: ast::ValueBody::MacroPattern(ast::MacroPattern { args, ret }),
+                },
+                pos: (start_pos, end_pos),
+                //comment: (preceding_comment, comment_after),
+                path: Vec::new(),
+                tag: ast::Attribute::new(),
+            }
+        }
+        _ => {
+            tokens.previous_no_ignore(false);
+            val
+        }
+    };
 
     // let comment_after = if check_for_comments {
     //     check_for_comment(tokens)
@@ -2647,12 +2728,5 @@ fn parse_variable(
         println!("current token after val post comment: {}: ", tokens.slice());
     }*/
 
-    Ok(ast::Variable {
-        operator,
-        value: ast::ValueLiteral { body: value },
-        pos: (start_pos, end_pos),
-        //comment: (preceding_comment, comment_after),
-        path,
-        tag: properties,
-    })
+    Ok(val)
 }

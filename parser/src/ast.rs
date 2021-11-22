@@ -98,9 +98,16 @@ pub enum ValueBody {
     Macro(Macro),
     Resolved(StoredValue),
     TypeIndicator(String),
+    MacroPattern(MacroPattern),
     SelfVal,
     Ternary(Ternary),
     Null,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MacroPattern {
+    pub args: Vec<Expression>,
+    pub ret: Expression,
 }
 
 impl ValueBody {
