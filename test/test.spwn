@@ -1,7 +1,11 @@
 #[no_level]
 
+uwu = 0b1010 // 10
+owo = 0x0a0a // 2570
 
+$.print(uwu)
+$.print(owo)
 
-list = ["hello", " ", "world", "!"]
+// list = ["hello", " ", "world", "!"]
 
-$.print(list.reduce((a, b, c) => a + b))
+// $.print(list.reduce((a, b, c) => a + b))
