@@ -612,7 +612,7 @@ pub fn compile_scope(
                                 full_context.disable_breaks(BreakType::ContinueLoop);
 
                                 do_assignment(
-                                    &i_dest,
+                                    i_dest,
                                     &Some(
                                         ast::ValueBody::Resolved(*element)
                                             .to_variable(globals.get_area(val).pos)
@@ -690,7 +690,7 @@ pub fn compile_scope(
                                         globals.get_area(v),
                                     );
                                     do_assignment(
-                                        &i_dest,
+                                        i_dest,
                                         &Some(
                                             ast::ValueBody::Resolved(tmp_arr)
                                                 .to_variable((0, 0))
@@ -1024,7 +1024,7 @@ pub fn do_assignment(
                 Some("Remove any unary operators or extentions"),
             )));
         }
-        if let None = src {
+        if src.is_none() {
             return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
                 "Destructure expressions require a value to destruct",
@@ -1086,7 +1086,7 @@ pub fn do_assignment(
         };
 
         let defined = if concat != Some(false) {
-            dest.try_define(contexts, globals, &info, mutable, scope)?
+            dest.try_define(contexts, globals, info, mutable, scope)?
         } else {
 
             for f_c in contexts.iter() {
@@ -1302,7 +1302,7 @@ pub fn do_assignment(
 }
 
 fn dict_destructure_define(
-    kvs: &Vec<ast::DictDef>,
+    kvs: &[ast::DictDef],
     info: &CompilerInfo,
     src: &Option<ast::Expression>,
     contexts: &mut FullContext,
@@ -1367,11 +1367,11 @@ fn dict_destructure_define(
 
                     collected.push(key);
                     do_assignment(
-                        &value,
+                        value,
                         &Some(stored_to_variable(evaled_src[key], globals).to_expression()),
                         ctx,
                         globals,
-                        &info,
+                        info,
                         mutable,
                         0,
                         concat
@@ -1380,7 +1380,7 @@ fn dict_destructure_define(
             }
         }
 
-        if ranges.len() > 0 {
+        if !ranges.is_empty() {
             for k in collected {
                 evaled_src.remove(k);
             }
@@ -1404,7 +1404,7 @@ fn dict_destructure_define(
                 ),
                 ctx,
                 globals,
-                &info,
+                info,
                 mutable,
                 0,
                 concat
@@ -1415,7 +1415,7 @@ fn dict_destructure_define(
 }
 
 fn array_destructure_define(
-    arr: &Vec<ast::ArrayDef>,
+    arr: &[ast::ArrayDef],
     value: &ast::Expression,
     contexts: &mut FullContext,
     globals: &mut Globals,
@@ -1496,11 +1496,11 @@ fn array_destructure_define(
                                     .to_expression();*/
 
                                     let mut overwrite = true;
-                                    for i in idx..(idx + idx_step) {
 
+                                    for stored_value in val_a.iter().skip(idx).take(idx_step) {
                                         do_assignment(
                                             the_expr,
-                                            &Some(ast::ValueBody::Resolved(val_a[i])
+                                            &Some(ast::ValueBody::Resolved(*stored_value)
                                                     .to_variable(the_expr.values[0].pos)
                                                     .to_expression()
                                             ),
