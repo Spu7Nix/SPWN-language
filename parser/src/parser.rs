@@ -1852,10 +1852,37 @@ pub fn str_content(
             chars.next();
 
             out.1 = StringFlags::Raw.into();
+            out.0 = chars.collect()
+        }
+        'u' => {
+            chars.next();
 
-            for c in chars {
-                out.0.push(c);
+            out.1 = StringFlags::Unindent.into();
+
+            while let Some(c) = chars.next() {
+                out.0.push(if c == '\\' {
+                    match chars.next() {
+                        Some('n') => '\n',
+                        Some('r') => '\r',
+                        Some('t') => '\t',
+                        Some('"') => '\"',
+                        Some('\'') => '\'',
+                        Some('\\') => '\\',
+                        Some(a) => {
+                            return Err(SyntaxError::SyntaxError {
+                                message: format!("Invalid escape: \\{}", a),
+                                pos: tokens.position(),
+                                file: notes.file.clone(),
+                            })
+                        }
+                        None => unreachable!(),
+                    }
+                } else {
+                    c
+                });
             }
+
+            out.0 = out.0.trim().to_string();
         }
         _ => {
             return Err(SyntaxError::SyntaxError {
