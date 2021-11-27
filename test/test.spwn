@@ -1,10 +1,12 @@
 #[no_level]
 
 uwu = 0b1010 // 10
-owo = 0x0a0a // 2570
+owo = 0x0a   // 10
+qwq = 0o12   // 10
 
 $.print(uwu)
 $.print(owo)
+$.print(qwq)
 
 // list = ["hello", " ", "world", "!"]
 
