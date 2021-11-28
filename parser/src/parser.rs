@@ -1852,9 +1852,56 @@ pub fn str_content(
             chars.next();
 
             out.1 = StringFlags::Raw.into();
+            out.0 = chars.collect()
+        }
+        'u' => {
+            chars.next();
 
-            for c in chars {
-                out.0.push(c);
+            out.1 = StringFlags::Unindent.into();
+
+            let mut out_str = String::new(); 
+
+            while let Some(c) = chars.next() {
+                out_str.push(if c == '\\' {
+                    match chars.next() {
+                        Some('n') => '\n',
+                        Some('r') => '\r',
+                        Some('t') => '\t',
+                        Some('"') => '\"',
+                        Some('\'') => '\'',
+                        Some('\\') => '\\',
+                        Some(a) => {
+                            return Err(SyntaxError::SyntaxError {
+                                message: format!("Invalid escape: \\{}", a),
+                                pos: tokens.position(),
+                                file: notes.file.clone(),
+                            })
+                        }
+                        None => unreachable!(),
+                    }
+                } else {
+                    c
+                });
+            }
+
+            out_str = out_str.replace("\t", "    ");
+
+            if !out_str.starts_with('\n') {
+                return Err(SyntaxError::SyntaxError {
+                    message: "Strings with the u flag must start with a newline".into(),
+                    pos: tokens.position(),
+                    file: notes.file.clone(),
+                })
+            }
+
+            let mut lines = out_str.lines().filter(|line| line.len() > 0);
+
+            let min_indent = lines.clone().map(|line| line.chars().take_while(|a| *a == ' ').count()).min().unwrap_or_else(|| unreachable!());
+
+            while let Some(line) = lines.next() {
+                if line.chars().take(min_indent).all(|c| c == ' ') {
+                    out.0 += &format!("{}\n", &line[min_indent..]);
+                }
             }
         }
         _ => {

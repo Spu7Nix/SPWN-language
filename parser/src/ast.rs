@@ -144,6 +144,7 @@ pub struct StrInner {
 #[derive(Clone, PartialEq, Debug)]
 pub enum StringFlags {
     Raw,
+    Unindent
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
