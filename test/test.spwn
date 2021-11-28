@@ -5,9 +5,9 @@ owo = "0x0a" as @number   // 10
 qwq = "0o12" as @number   // 10
 
 foo = u"
-foo
-bar
-baz
+    foo
+        bar
+    baz
 "
 
 $.print(foo, " ", foo.type)

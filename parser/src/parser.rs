@@ -1859,8 +1859,10 @@ pub fn str_content(
 
             out.1 = StringFlags::Unindent.into();
 
+            let mut out_str = String::new(); 
+
             while let Some(c) = chars.next() {
-                out.0.push(if c == '\\' {
+                out_str.push(if c == '\\' {
                     match chars.next() {
                         Some('n') => '\n',
                         Some('r') => '\r',
@@ -1882,7 +1884,18 @@ pub fn str_content(
                 });
             }
 
-            out.0 = out.0.trim().to_string();
+            out_str = out_str.replace("\t", "    ");
+
+            let mut lines = out_str.lines();
+            lines.next();
+
+            let min_indent = lines.clone().map(|line| line.chars().take_while(|a| *a == ' ').count()).min().unwrap_or_else(|| unreachable!());
+
+            while let Some(line) = lines.next() {
+                if line.chars().take(min_indent).all(|c| c == ' ') {
+                    out.0 += &format!("{}\n", &line[min_indent..]);
+                }
+            }
         }
         _ => {
             return Err(SyntaxError::SyntaxError {
