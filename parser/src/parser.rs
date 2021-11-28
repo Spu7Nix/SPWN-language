@@ -1886,6 +1886,14 @@ pub fn str_content(
 
             out_str = out_str.replace("\t", "    ");
 
+            if !out_str.starts_with('\n') {
+                return Err(SyntaxError::SyntaxError {
+                    message: "Strings with the u flag must start with a newline".into(),
+                    pos: tokens.position(),
+                    file: notes.file.clone(),
+                })
+            }
+
             let mut lines = out_str.lines();
             lines.next();
 
