@@ -1894,8 +1894,7 @@ pub fn str_content(
                 })
             }
 
-            let mut lines = out_str.lines();
-            lines.next();
+            let mut lines = out_str.lines().filter(|line| line.len() > 0);
 
             let min_indent = lines.clone().map(|line| line.chars().take_while(|a| *a == ' ').count()).min().unwrap_or_else(|| unreachable!());
 

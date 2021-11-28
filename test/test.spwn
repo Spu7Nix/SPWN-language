@@ -4,7 +4,9 @@ uwu = "0b1010" as @number // 10
 owo = "0x0a" as @number   // 10
 qwq = "0o12" as @number   // 10
 
-foo = u"foo
+foo = u"
+
+    foo
         bar
     baz
 "
