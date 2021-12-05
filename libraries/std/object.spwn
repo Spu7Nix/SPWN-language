@@ -2,7 +2,7 @@
 extract import "constants.spwn"
 impl @object {
 	set: (self, key: @object_key, value) {
-		$.edit_obj(self, key, value);
+		$.edit_obj(self, key, value);
 	},
 	with: (self, key: @object_key, value) {
 		let new_obj = self
@@ -13,18 +13,18 @@ impl @object {
 		let grps = switch groups {
 			@group: [groups],
 			[@group]: groups
-		};
+		};
 
 		if obj_props.GROUPS in self {
 
 			grps += switch self[obj_props.GROUPS] {
 				@group: [self[obj_props.GROUPS]],
 				[@group]: self[obj_props.GROUPS]
-			};
+			};
 		}
-		self.set(obj_props.GROUPS, grps);
+		self.set(obj_props.GROUPS, grps);
 	},
 	add: (self) {
-		$.add(self);
+		$.add(self);
 	}
 }

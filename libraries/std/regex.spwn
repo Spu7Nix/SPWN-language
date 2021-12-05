@@ -14,7 +14,7 @@ impl @regex {
     },
     replace: #[desc("Regex replace the contents of a string")]
     (self, to_replace: @string, replacer: @string) {
-        let t_rep = to_replace;
+        let t_rep = to_replace;
         return $.regex(self.regex, t_rep, "replace", replacer)
     },
     find_all: #[desc("Regex find all matching indices of the string argument")]

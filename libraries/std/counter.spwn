@@ -92,7 +92,7 @@ points.display(75, 75)
             ITEM: self.item,
             COLOR: 1c,
             GROUPS: 999g
-        });
+        });
     },
 
     add_to:
@@ -704,7 +704,7 @@ c1 <=> c2
 // c1 is now 42, c2 is now 23
     ")]
     (self, num: @counter) {
-        swap_tmp = @counter::new(0, bits = self.bits, reset = false);
+        swap_tmp = @counter::new(0, bits = self.bits, reset = false);
         self.add_to(swap_tmp)
         num.add_to(self)
         swap_tmp.add_to(num)

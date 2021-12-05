@@ -48,7 +48,7 @@ type @bytedisplay
 impl @bytedisplay {
     new: (offset: [@number]) {
         1c.set(255, 255, 255)
-        //order = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[ ]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+        //order = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[ ]^_`abcdefghijklmnopqrstuvwxyz{|}~"
         order = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         let list = []
         for ch in order {

@@ -20,140 +20,140 @@
     content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
   <style type="text/css">
     body {
-      margin: 2%;
-      padding: 2%;
-      background-color: #0c0d11;
-      color: white;
-      font-family: 'Source Code Pro', monospace;
-      font-size: 25px;
-      font-weight: 400;
+      margin: 2%;
+      padding: 2%;
+      background-color: #0c0d11;
+      color: white;
+      font-family: 'Source Code Pro', monospace;
+      font-size: 25px;
+      font-weight: 400;
     }
 
 
     .codejar-linenumbers {
-      background-color: transparent;
+      background-color: transparent;
     }
 
     #console {
-      line-height: 20px;
-      color: white;
-      background: black;
-      overflow-wrap: break-word;
-      border-radius: 6px;
+      line-height: 20px;
+      color: white;
+      background: black;
+      overflow-wrap: break-word;
+      border-radius: 6px;
 
-      padding: 10px;
-      font-size: 20px;
-      min-height: 100px;
-      max-height: 500px;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      white-space: -moz-pre-wrap;
-      white-space: -pre-wrap;
-      white-space: -o-pre-wrap;
-      word-wrap: break-word;
+      padding: 10px;
+      font-size: 20px;
+      min-height: 100px;
+      max-height: 500px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      white-space: -moz-pre-wrap;
+      white-space: -pre-wrap;
+      white-space: -o-pre-wrap;
+      word-wrap: break-word;
 
     }
 
     #code {
-      border-radius: 6px;
-      box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -2px rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -2px rgba(0, 0, 0, 0.2);
 
-      min-height: 100px;
-      height: 340px;
-      letter-spacing: normal;
-      line-height: 40px;
-      padding: 10px;
-      tab-size: 4;
-      background-color: #121318;
-      color: white;
+      min-height: 100px;
+      height: 340px;
+      letter-spacing: normal;
+      line-height: 40px;
+      padding: 10px;
+      tab-size: 4;
+      background-color: #121318;
+      color: white;
     }
 
     #bottom {
-      width: 100%;
-      overflow: hidden;
-      text-align: center;
+      width: 100%;
+      overflow: hidden;
+      text-align: center;
     }
 
     #logo {
-      margin: 0px;
-      padding: 0px;
-      width: 30%;
-      height: auto;
+      margin: 0px;
+      padding: 0px;
+      width: 30%;
+      height: auto;
     }
 
     #levelstring {
-      background-color: rgb(19, 24, 31);
-      color: white;
-      font-family: monospace;
-      overflow-wrap: anywhere;
-      padding: 10px;
-      font-size: 20px;
-      line-height: 25px;
-      border-radius: 14px;
-      max-height: 200px;
-      overflow: auto;
+      background-color: rgb(19, 24, 31);
+      color: white;
+      font-family: monospace;
+      overflow-wrap: anywhere;
+      padding: 10px;
+      font-size: 20px;
+      line-height: 25px;
+      border-radius: 14px;
+      max-height: 200px;
+      overflow: auto;
     }
 
     #levelstringspoiler {
-      background-color: rgb(40, 48, 59);
-      border-radius: 0px 14px 0px 14px;
-      float: left;
+      background-color: rgb(40, 48, 59);
+      border-radius: 0px 14px 0px 14px;
+      float: left;
       
-      border: solid rgba(255, 255, 255, 0.4) 2px;
-      width: 30%;
-      transition: all 0.1s ease-in-out 0s;
-      min-height: 60px;
-      line-height: 60px;
-      font-size: 30px;
-      text-align: center;
-      transition: all 500ms linear;
+      border: solid rgba(255, 255, 255, 0.4) 2px;
+      width: 30%;
+      transition: all 0.1s ease-in-out 0s;
+      min-height: 60px;
+      line-height: 60px;
+      font-size: 30px;
+      text-align: center;
+      transition: all 500ms linear;
     }
 
     #run_button {
-      background: #551c1c;
-      font-family: 'Source Code Pro', monospace;
-      color: #ffffff;
-      font-size: 40px;
-      letter-spacing: 0em;
-      font-weight: 400;
-      padding: 3px 20px;
-      border: solid rgba(255, 255, 255, 0.4) 2px;
-      width: 30%;
-      height: 60px;
+      background: #551c1c;
+      font-family: 'Source Code Pro', monospace;
+      color: #ffffff;
+      font-size: 40px;
+      letter-spacing: 0em;
+      font-weight: 400;
+      padding: 3px 20px;
+      border: solid rgba(255, 255, 255, 0.4) 2px;
+      width: 30%;
+      height: 60px;
 
 
-      border-radius: 0px 14px 0px 14px;
+      border-radius: 0px 14px 0px 14px;
 
-      transition: all 0.1s ease-in-out 0s;
-      float: right;
+      transition: all 0.1s ease-in-out 0s;
+      float: right;
     }
 
     #run_button:hover {
-      background: #101324;
+      background: #101324;
 
-      border-radius: 14px 0px 14px 0px;
+      border-radius: 14px 0px 14px 0px;
       
-      transition: all 0.1s ease-in-out 0s; 
+      transition: all 0.1s ease-in-out 0s; 
     }
 
     ::-webkit-scrollbar {
-      width: 12px;
-      height: 12px;
+      width: 12px;
+      height: 12px;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: #425250;
-      border-radius: 5px;
+      background: #425250;
+      border-radius: 5px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: #966969;
+      background: #966969;
     }
 
     ::-webkit-scrollbar-track {
-      background: #1C2226;
-      border-radius: 5px;
-      box-shadow: inset 0px 0px 0px 0px #F0F0F0;
+      background: #1C2226;
+      border-radius: 5px;
+      box-shadow: inset 0px 0px 0px 0px #F0F0F0;
     }
   </style>
 </head>
@@ -205,36 +205,36 @@ while_loop(() => true, () {
 `.trim()
       )
 
-      import init, {run_spwn,init_panics} from "./pkg/spwn_web.js";
+      import init, {run_spwn,init_panics} from "./pkg/spwn_web.js";
       init()
         .then(() => {
-          init_panics();
-          document.getElementById("run_button").addEventListener("click", run_code);
-        });
+          init_panics();
+          document.getElementById("run_button").addEventListener("click", run_code);
+        });
 
       function run_code() {
-        let code = jar.toString();
+        let code = jar.toString();
           
         let [txt, levelstring] = run_spwn(code)
         
-        let ansi_up = new AnsiUp;
+        let ansi_up = new AnsiUp;
 
-        let html = ansi_up.ansi_to_html(txt);
+        let html = ansi_up.ansi_to_html(txt);
 
-        let cdiv = document.getElementById("console");
+        let cdiv = document.getElementById("console");
 
-        cdiv.innerHTML = html;
+        cdiv.innerHTML = html;
 
-        let ls = document.getElementById("levelstring");
+        let ls = document.getElementById("levelstring");
 
         if (levelstring.length > 0) {
-          let container = document.getElementById("levelstringspoiler");
-          container.style.color = '#943c3c';
+          let container = document.getElementById("levelstringspoiler");
+          container.style.color = '#943c3c';
           // change the background color back (with a delay equal to transition length)
-          setTimeout(() => { container.style.color = 'white'; }, 500);
+          setTimeout(() => { container.style.color = 'white'; }, 500);
         }
 
-        ls.innerHTML = levelstring;
+        ls.innerHTML = levelstring;
       }
     </script>
 

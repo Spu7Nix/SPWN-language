@@ -18,12 +18,12 @@ my_objects = @obj_set::new()
     },
     is_empty: #[desc("Returns true if this set contains no objects, false otherwise.") example("$.assert(@obj_set::new().is_empty())")]
     (self) {
-        return self.objects.is_empty();
+        return self.objects.is_empty();
     },
     // ! The append builtin is broken at the moment, mutability is not preserved
     push: #[desc("Add new objects to the set")]
     (self, object: @object) {
-        let to_push = object;
+        let to_push = object;
         $.append(self.objects, to_push)
     },
     add: #[desc("Add all the objects in the set to the game")]
@@ -34,7 +34,7 @@ my_objects = @obj_set::new()
     },
     copy: #[desc("Create a copy of all the objects in this set as a new set")]
     (self) {
-        return self;
+        return self;
     },
     rotate: #[desc("Applies a single rotation value to all of the objects in this set")]
     (self, deg: @number) {

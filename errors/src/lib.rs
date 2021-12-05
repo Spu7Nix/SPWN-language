@@ -1,11 +1,11 @@
-pub mod compiler_info;
+pub mod compiler_info;
 
-use compiler_info::{CodeArea, CompilerInfo};
+use compiler_info::{CodeArea, CompilerInfo};
 
-use ariadne::Fmt;
+use ariadne::Fmt;
 
-use internment::LocalIntern;
-use shared::{BreakType, FileRange, SpwnSource};
+use internment::LocalIntern;
+use shared::{BreakType, FileRange, SpwnSource};
 
 pub enum RuntimeError {
     UndefinedErr {
@@ -84,15 +84,15 @@ impl RainbowColorGenerator {
     }
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> ariadne::Color {
-        self.h += 20.0;
-        self.h %= 360.0;
+        self.h += 20.0;
+        self.h %= 360.0;
 
-        let hsl = *self;
+        let hsl = *self;
 
-        let c = (1.0 - (hsl.b * 2.0 - 1.0).abs()) * hsl.s;
-        let h = hsl.h / 60.0;
-        let x = c * (1.0 - (h % 2.0 - 1.0).abs());
-        let m = hsl.b - c * 0.5;
+        let c = (1.0 - (hsl.b * 2.0 - 1.0).abs()) * hsl.s;
+        let h = hsl.h / 60.0;
+        let x = c * (1.0 - (h % 2.0 - 1.0).abs());
+        let m = hsl.b - c * 0.5;
 
         let (red, green, blue) = if h >= 0.0 && h < 0.0 {
             (c, x, 0.0)
@@ -106,7 +106,7 @@ impl RainbowColorGenerator {
             (x, 0.0, c)
         } else {
             (c, 0.0, x)
-        };
+        };
 
         ariadne::Color::RGB(
             ((red + m) * 255.0) as u8,
@@ -116,15 +116,15 @@ impl RainbowColorGenerator {
     }
 }
 pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
-    use ariadne::{Config, Label, Report, ReportKind};
+    use ariadne::{Config, Label, Report, ReportKind};
 
-    let info = rep.info;
-    let message = rep.message;
-    let labels = rep.labels;
-    let note = rep.note;
-    let position = info.position;
+    let info = rep.info;
+    let message = rep.message;
+    let labels = rep.labels;
+    let note = rep.note;
+    let position = info.position;
 
-    let mut colors = RainbowColorGenerator::new(0.0, 1.5, 0.8);
+    let mut colors = RainbowColorGenerator::new(0.0, 1.5, 0.8);
 
     let mut report = Report::build(
         ReportKind::Error,
@@ -132,11 +132,11 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
         position.pos.0,
     )
     .with_config(Config::default().with_cross_gap(true))
-    .with_message(message.clone());
+    .with_message(message.clone());
 
-    let mut i = 1;
+    let mut i = 1;
     for area in info.call_stack {
-        let color = colors.next();
+        let color = colors.next();
         report = report.with_label(
             Label::new(area)
                 .with_order(i)
@@ -146,44 +146,44 @@ pub fn create_report(rep: ErrorReport) -> ariadne::Report<CodeArea> {
                 ))
                 .with_color(color)
                 .with_priority(1),
-        );
-        i += 1;
+        );
+        i += 1;
     }
 
     if labels.is_empty() || !labels.iter().any(|(a, _)| a == &position) {
-        let color = colors.next();
+        let color = colors.next();
         report = report.with_label(
             Label::new(position)
                 .with_order(i)
                 .with_color(color)
                 .with_message(message)
                 .with_priority(2),
-        );
+        );
     }
     if i == 1 && labels.len() == 1 {
-        let color = colors.next();
+        let color = colors.next();
         report = report.with_label(
             Label::new(labels[0].0)
                 .with_message(labels[0].1.clone())
                 .with_order(i)
                 .with_color(color)
                 .with_priority(2),
-        );
+        );
     } else if !labels.is_empty() {
         for (area, label) in labels {
-            let color = colors.next();
+            let color = colors.next();
             report = report.with_label(
                 Label::new(area)
                     .with_message(&format!("{}: {}", i.to_string().fg(color), label))
                     .with_order(i)
                     .with_color(color)
                     .with_priority(2),
-            );
-            i += 1;
+            );
+            i += 1;
         }
     }
     if let Some(note) = note {
-        report = report.with_note(note);
+        report = report.with_note(note);
     }
     report.finish()
 }
@@ -230,9 +230,9 @@ pub struct ErrorReport {
 
 impl From<RuntimeError> for ErrorReport {
     fn from(err: RuntimeError) -> ErrorReport {
-        let mut colors = RainbowColorGenerator::new(120.0, 1.5, 0.8);
-        let a = colors.next();
-        let b = colors.next();
+        let mut colors = RainbowColorGenerator::new(120.0, 1.5, 0.8);
+        let a = colors.next();
+        let b = colors.next();
 
         match err {
             RuntimeError::UndefinedErr {
@@ -249,16 +249,16 @@ impl From<RuntimeError> for ErrorReport {
                 None,
             ),
             RuntimeError::PackageSyntaxError { err, info } => {
-                let syntax_error = ErrorReport::from(err);
-                let mut labels = vec![(info.position, "Error when parsing this library/module")];
-                labels.extend(syntax_error.labels.iter().map(|(a, b)| (*a, b.as_str())));
+                let syntax_error = ErrorReport::from(err);
+                let mut labels = vec![(info.position, "Error when parsing this library/module")];
+                labels.extend(syntax_error.labels.iter().map(|(a, b)| (*a, b.as_str())));
                 create_error(info, &syntax_error.message, &labels, None)
             }
 
             RuntimeError::PackageError { err, info } => {
-                let syntax_error = ErrorReport::from(*err);
-                let mut labels = vec![(info.position, "Error when running this library/module")];
-                labels.extend(syntax_error.labels.iter().map(|(a, b)| (*a, b.as_str())));
+                let syntax_error = ErrorReport::from(*err);
+                let mut labels = vec![(info.position, "Error when running this library/module")];
+                labels.extend(syntax_error.labels.iter().map(|(a, b)| (*a, b.as_str())));
                 create_error(info, &syntax_error.message, &labels, None)
             }
 
@@ -337,28 +337,28 @@ impl From<RuntimeError> for ErrorReport {
                 info,
                 context_changes,
             } => {
-                let mut labels = vec![(val_def, "Value was defined here")];
+                let mut labels = vec![(val_def, "Value was defined here")];
 
                 #[allow(clippy::comparison_chain)]
                 if context_changes.len() == 1 {
                     labels.push((
                         context_changes[0],
                         "New trigger function context was defined here",
-                    ));
+                    ));
                 } else if context_changes.len() > 1 {
-                    labels.push((*context_changes.last().unwrap(), "Context was changed here"));
+                    labels.push((*context_changes.last().unwrap(), "Context was changed here"));
 
                     for change in context_changes[1..(context_changes.len() - 1)].iter().rev() {
-                        labels.push((*change, "This changes the context inside the macro"));
+                        labels.push((*change, "This changes the context inside the macro"));
                     }
 
                     labels.push((
                         context_changes[0],
                         "New trigger function context was defined here",
-                    ));
+                    ));
                 }
 
-                labels.push((info.position, "Attempted to change value here"));
+                labels.push((info.position, "Attempted to change value here"));
 
                 create_error(
                     info,
@@ -373,25 +373,25 @@ impl From<RuntimeError> for ErrorReport {
                 info,
                 context_changes,
             } => {
-                let mut labels = Vec::new();
+                let mut labels = Vec::new();
 
                 #[allow(clippy::comparison_chain)]
                 if context_changes.len() == 1 {
                     labels.push((
                         context_changes[0],
                         "New trigger function context was defined here",
-                    ));
+                    ));
                 } else if context_changes.len() > 1 {
-                    labels.push((*context_changes.last().unwrap(), "Context was changed here"));
+                    labels.push((*context_changes.last().unwrap(), "Context was changed here"));
 
                     for change in context_changes[1..(context_changes.len() - 1)].iter().rev() {
-                        labels.push((*change, "This changes the context inside the macro"));
+                        labels.push((*change, "This changes the context inside the macro"));
                     }
 
                     labels.push((
                         context_changes[0],
                         "New trigger function context was defined here",
-                    ));
+                    ));
                 }
 
                 create_error(info, &message, &labels, None)
@@ -451,9 +451,9 @@ pub enum SyntaxError {
 impl From<SyntaxError> for ErrorReport {
     fn from(err: SyntaxError) -> ErrorReport {
         //write!(f, "SuperErrorSideKick is here!")
-        let mut colors = RainbowColorGenerator::new(60.0, 1.0, 0.8);
-        let a = colors.next();
-        let b = colors.next();
+        let mut colors = RainbowColorGenerator::new(60.0, 1.0, 0.8);
+        let a = colors.next();
+        let b = colors.next();
         match err {
             SyntaxError::ExpectedErr {
                 expected,

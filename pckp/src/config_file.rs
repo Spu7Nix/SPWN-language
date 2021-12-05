@@ -1,14 +1,14 @@
-use std::path::Path;
-use std::path::PathBuf;
-use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
+use std::fs;
 
-use yaml_rust::{YamlLoader, Yaml};
-use path_absolutize::*;
+use yaml_rust::{YamlLoader, Yaml};
+use path_absolutize::*;
 
-use crate::package::{Package, Dependency, DependencySource};
-use crate::error::PckpError;
+use crate::package::{Package, Dependency, DependencySource};
+use crate::error::PckpError;
 
-pub const CONFIG_NAME: &str = "pckp.yaml";
+pub const CONFIG_NAME: &str = "pckp.yaml";
 
 #[allow(dead_code)]
 struct MarkerPub {
@@ -26,7 +26,7 @@ impl ScanErrorPub {
     fn from(pri: yaml_rust::scanner::ScanError) -> Self {
         return unsafe {
              std::mem::transmute(pri)
-        }; // this is horrible ik
+        }; // this is horrible ik
     }
 }
 
@@ -82,7 +82,7 @@ macro_rules! ensure_variant {
             Yaml::$variant(a) => Ok(a),
             _ => Err(PckpError::config(format!("Expected key '{}' to be of type {:?}", $key, $variant_name), $val.cfg.clone(), None))
         }
-    };
+    };
 
     ($val:expr, $variant_name:tt = $variant:ident, $key:tt or $key2:tt from $parent:tt, enum $src:expr, $src2:expr) => {
         match $val.get_or_else($key, |v| match v.internal.get(&Yaml::from_str($key2)) {
@@ -92,7 +92,7 @@ macro_rules! ensure_variant {
             Yaml::$variant(a) => if $val.get($parent, $key).is_ok() {Ok($src(a))} else {Ok($src2(a))},
             _ => Err(PckpError::config(format!("Expected key '{}' to be of type {:?}", if $val.get($parent, $key).is_ok() {$key} else {$key2}, $variant_name), $val.cfg.clone(), None))
         }
-    };
+    };
 
     ($val:expr, $variant_name:tt = $variant:ident, $key:tt? from $parent:tt) => {
         match $val.internal.get(&Yaml::from_str($key)) {
@@ -104,14 +104,14 @@ macro_rules! ensure_variant {
 }
 
 pub fn get_config(opath: Option<PathBuf>) -> PathBuf {
-    let mut path = opath.unwrap_or(PathBuf::new());
-    path.push(CONFIG_NAME);
+    let mut path = opath.unwrap_or(PathBuf::new());
+    path.push(CONFIG_NAME);
     path
 }
 
 fn check_invalid(n: &str) -> Option<char> {
-    let mut b = [0; 4];
-    let potential_invalid: Vec<char> = n.chars().filter(|x| !String::from("qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLXCVBNM_-.0123456789").contains(&*x.encode_utf8(&mut b))).collect();
+    let mut b = [0; 4];
+    let potential_invalid: Vec<char> = n.chars().filter(|x| !String::from("qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLXCVBNM_-.0123456789").contains(&*x.encode_utf8(&mut b))).collect();
 
     potential_invalid.first().map(|x| *x)
 }
@@ -124,36 +124,36 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                 let yaml = match YamlLoader::load_from_str(&s) {
                     Ok(y) => y,
                     Err(e) => {
-                        let public = ScanErrorPub::from(e);
+                        let public = ScanErrorPub::from(e);
 
                         return Err(PckpError::config(public.info, cfg, Some((public.mark.line, public.mark.col))))
                     }
-                };
+                };
                 if yaml.len() == 0 {
                     return Err(PckpError::config("Config file must include a package name".to_string(), cfg, None))
                 }
 
-                let ymap = YamlMap::from_hash("root", &yaml[0], &cfg)?;
+                let ymap = YamlMap::from_hash("root", &yaml[0], &cfg)?;
 
-                let package_name = ensure_variant!(ymap, "string" = String, "name" from "root")?;
-                let version = ensure_variant!(ymap, "string" = String, "version" from "root")?;
+                let package_name = ensure_variant!(ymap, "string" = String, "name" from "root")?;
+                let version = ensure_variant!(ymap, "string" = String, "version" from "root")?;
 
                 if let Some(bad) = check_invalid(&package_name) {
-                    return Err(PckpError::config(format!("Invalid character {} in package name {}", bad, package_name), cfg, None));
+                    return Err(PckpError::config(format!("Invalid character {} in package name {}", bad, package_name), cfg, None));
                 }
                 if let Some(bad) = check_invalid(&version) {
-                    return Err(PckpError::config(format!("Invalid character {} for version {} of package {}", bad, version, package_name), cfg, None));
+                    return Err(PckpError::config(format!("Invalid character {} for version {} of package {}", bad, version, package_name), cfg, None));
                 }
 
-                let mut folders = Vec::new();
+                let mut folders = Vec::new();
 
-                let f_list = ensure_variant!(ymap, "list" = Array, "folders"? from "root");
-                let f_str = ensure_variant!(ymap, "string" = String, "folders"? from "root");
+                let f_list = ensure_variant!(ymap, "list" = Array, "folders"? from "root");
+                let f_str = ensure_variant!(ymap, "string" = String, "folders"? from "root");
 
                 let folders_maybe = match (f_list, f_str) {
                     (_, Ok(b)) => Ok(b.map(|x| vec![Yaml::String(x.to_string())])),
                     (a, _) => a.map(|x| x.map(|y| y.clone()))
-                }?;
+                }?;
 
                 match folders_maybe {
                     Some(folds) => {
@@ -162,19 +162,19 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                                 Yaml::String(a) => {
                                     match Path::new(&a).absolutize_virtually(cfg.parent().unwrap().as_os_str().to_str().unwrap()) {
                                         Ok(p) => {
-                                            let s = PathBuf::from(p.to_str().unwrap());
+                                            let s = PathBuf::from(p.to_str().unwrap());
                                             if !s.exists() {
                                                 return Err(PckpError::config(
                                                     format!("Cannot access folder '{}' which doesn't exist", a),
                                                     cfg.clone(),
                                                     None
-                                                ));
+                                                ));
                                             } else if !s.is_dir() {
                                                 return Err(PckpError::config(
                                                     format!("Expected '{}' to be a folder", a),
                                                     cfg.clone(),
                                                     None
-                                                ));
+                                                ));
                                             }
                                             s
                                         },
@@ -192,7 +192,7 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                                         None
                                     )
                                 )
-                            });
+                            });
                         }
                         ()
                     },
@@ -213,7 +213,7 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                                             })
                                         },
                                         Yaml::Hash(h) => {
-                                            let dmap = YamlMap::from_hash("dependencies", &Yaml::Hash(h.clone()), &cfg)?;
+                                            let dmap = YamlMap::from_hash("dependencies", &Yaml::Hash(h.clone()), &cfg)?;
 
                                             Ok(Dependency {
 
@@ -244,7 +244,7 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                                 }]
                             },
                             Yaml::Hash(h) => {
-                                let dmap = YamlMap::from_hash("dependencies", &Yaml::Hash(h.clone()), &cfg)?;
+                                let dmap = YamlMap::from_hash("dependencies", &Yaml::Hash(h.clone()), &cfg)?;
 
                                 vec![Dependency {
 
@@ -270,12 +270,12 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                     None => Vec::new()
                 }.into_iter()
                  .map(|dep| Package::dependency(dep))
-                 .collect::<Vec<_>>();
+                 .collect::<Vec<_>>();
 
-                return Ok(Some(Package::local(package_name, version, folders, depends)));
+                return Ok(Some(Package::local(package_name, version, folders, depends)));
             },
             Err(_) => {
-                return Err(PckpError::config("Could not open configuration file".to_string(), cfg, None));
+                return Err(PckpError::config("Could not open configuration file".to_string(), cfg, None));
             }
         }
     } else {

@@ -1,29 +1,29 @@
 // tools for automatically formatting spwn files
 
-use crate::ast::*;
+use crate::ast::*;
 
 pub trait SpwnFmt {
-    fn fmt(&self, ind: Indent) -> String;
+    fn fmt(&self, ind: Indent) -> String;
 }
 
-type Indent = u16;
+type Indent = u16;
 
 fn tabs(mut num: Indent) -> String {
-    let mut out = String::new();
+    let mut out = String::new();
     while num > 4 {
-        out += "\t";
-        num -= 4;
+        out += "\t";
+        num -= 4;
     }
 
     for _ in 0..num {
-        out += " ";
+        out += " ";
     }
 
     out
 }
 
 pub fn _format(input: Vec<Statement>) -> String {
-    let mut out = String::new();
+    let mut out = String::new();
     for s in input {
         out += &s.fmt(0)
     }
@@ -36,18 +36,18 @@ pub fn _format2(input: &ValueBody) -> String {
 
 fn element_list(elements: &[impl SpwnFmt], open: char, closing: char, ind: Indent) -> String {
     if elements.is_empty() {
-        return format!("{}{}", open, closing);
+        return format!("{}{}", open, closing);
     }
 
-    let mut elem_text = Vec::<String>::new();
-    let mut sum = 0;
+    let mut elem_text = Vec::<String>::new();
+    let mut sum = 0;
 
-    let last = elements.len() - 1;
+    let last = elements.len() - 1;
 
     for (_i, el) in elements.iter().enumerate() {
-        let text = el.fmt(0);
+        let text = el.fmt(0);
 
-        sum += text.lines().next().unwrap().len();
+        sum += text.lines().next().unwrap().len();
 
         elem_text.push(text)
     }
@@ -62,42 +62,42 @@ fn element_list(elements: &[impl SpwnFmt], open: char, closing: char, ind: Inden
                 sum > 100
             }
         })
-    };
+    };
 
     if vertical {
-        let mut out = format!("{}\n", open);
+        let mut out = format!("{}\n", open);
 
         for el in &elem_text {
             for line in el.lines() {
-                out += &format!("{}{}\n", tabs(ind + 4), line);
+                out += &format!("{}{}\n", tabs(ind + 4), line);
             }
-            out.pop();
-            out += ",\n";
+            out.pop();
+            out += ",\n";
         }
         /*if elements.len() == 1 {
-            out.pop();
-            out.pop();
-            out += "\n";
+            out.pop();
+            out.pop();
+            out += "\n";
         }*/
 
         out + &format!("{}{}", tabs(ind), closing)
     } else {
-        let mut out = format!("{}", open);
-        let last_elem = elem_text.pop().unwrap();
-        let iter = elem_text.iter();
+        let mut out = format!("{}", open);
+        let last_elem = elem_text.pop().unwrap();
+        let iter = elem_text.iter();
 
         for el in iter {
-            out += &format!("{}, ", el);
+            out += &format!("{}, ", el);
         }
 
-        let mut last_elem_lines = last_elem.lines();
-        out += last_elem_lines.next().unwrap();
+        let mut last_elem_lines = last_elem.lines();
+        out += last_elem_lines.next().unwrap();
 
         for line in last_elem_lines {
-            out += &format!("\n{}{}", tabs(ind), line);
+            out += &format!("\n{}{}", tabs(ind), line);
         }
 
-        out.push(closing);
+        out.push(closing);
         out
     }
 }
@@ -113,7 +113,7 @@ impl SpwnFmt for DictDef {
 
 // fn trim_start_tabs(string: &str) -> (&str, Indent) {
 //     //https://doc.rust-lang.org/src/core/str/mod.rs.html#4082-4090
-//     let mut ind = 0;
+//     let mut ind = 0;
 //     for (i, c) in string.chars().enumerate() {
 //         match c {
 //             '\t' => ind += 4,
@@ -125,21 +125,21 @@ impl SpwnFmt for DictDef {
 // }
 
 // fn indent_comment(comment: &str, ind: Indent) -> String {
-//     let mut in_comment = false;
-//     let mut current_off = 0;
-//     let mut out = String::new();
+//     let mut in_comment = false;
+//     let mut current_off = 0;
+//     let mut out = String::new();
 //     for line in comment.lines() {
-//         let (trimmed, ind_offset) = trim_start_tabs(line);
+//         let (trimmed, ind_offset) = trim_start_tabs(line);
 //         if !in_comment {
 //             if trimmed.starts_with("//") {
-//                 out += &format!("{}{}\r\n", tabs(ind), trimmed);
+//                 out += &format!("{}{}\r\n", tabs(ind), trimmed);
 //             } else if trimmed.starts_with("/*") {
-//                 in_comment = true;
-//                 current_off = ind_offset;
-//                 out += &format!("{}{}\r\n", tabs(ind), trimmed);
+//                 in_comment = true;
+//                 current_off = ind_offset;
+//                 out += &format!("{}{}\r\n", tabs(ind), trimmed);
 //             }
 //         } else {
-//             out += &format!("{}{}\r\n", tabs(ind_offset - current_off), trimmed);
+//             out += &format!("{}{}\r\n", tabs(ind_offset - current_off), trimmed);
 //         }
 
 //         if line.trim_end().ends_with("*/") {
@@ -151,7 +151,7 @@ impl SpwnFmt for DictDef {
 
 /*#[cfg(test)]
 mod tests {
-    use super::*;
+    use super::*;
     #[test]
     fn test() {
         println!(
@@ -188,30 +188,30 @@ mod tests {
 
 impl SpwnFmt for Statement {
     fn fmt(&self, ind: Indent) -> String {
-        let mut out = String::new();
+        let mut out = String::new();
         // if let Some(comment) = &self.comment.0 {
-        //     //out += "[stmt pre]";
+        //     //out += "[stmt pre]";
 
-        //     out += &indent_comment(comment, ind);
+        //     out += &indent_comment(comment, ind);
         //     //
         //     if !comment.ends_with('\n') {
-        //         out += "\n";
+        //         out += "\n";
         //     }
-        //     out += &tabs(ind);
+        //     out += &tabs(ind);
         // }
         out += &if self.arrow {
             format!("-> {}\n", self.body.fmt(ind))
         } else {
             format!("{}\n", self.body.fmt(ind))
-        };
+        };
         // if let Some(comment) = &self.comment.1 {
         //     if !comment.starts_with('\n') {
-        //         out += "\n";
+        //         out += "\n";
         //     }
 
-        //     //out += &tabs(ind);
-        //     //out += "[stmt post]";
-        //     out += &indent_comment(comment, ind);
+        //     //out += &tabs(ind);
+        //     //out += "[stmt post]";
+        //     out += &indent_comment(comment, ind);
         // }
         out
     }
@@ -260,7 +260,7 @@ impl SpwnFmt for ArrayDef {
 
 impl SpwnFmt for ValueBody {
     fn fmt(&self, ind: Indent) -> String {
-        use ValueBody::*;
+        use ValueBody::*;
         match self {
             Id(x) => x.fmt(ind),
             Number(x) => format!("{}", x),
@@ -378,34 +378,34 @@ impl SpwnFmt for For {
 
 impl SpwnFmt for Variable {
     fn fmt(&self, ind: Indent) -> String {
-        let mut out = String::new();
+        let mut out = String::new();
 
         // if let Some(comment) = &self.comment.0 {
-        //     //out += "[var pre]";
-        //     out += &indent_comment(comment, ind);
+        //     //out += "[var pre]";
+        //     out += &indent_comment(comment, ind);
 
         //     if comment.ends_with('\n') {
-        //         out += &tabs(ind);
+        //         out += &tabs(ind);
         //     }
         // }
 
         if let Some(op) = &self.operator {
-            out += &op.fmt(ind);
+            out += &op.fmt(ind);
         }
 
-        out += &self.value.fmt(ind);
+        out += &self.value.fmt(ind);
 
         for p in &self.path {
-            out += &p.fmt(ind).to_string();
+            out += &p.fmt(ind).to_string();
         }
 
         // if let Some(comment) = &self.comment.1 {
-        //     //out += "[var post]";
+        //     //out += "[var post]";
 
-        //     out += &indent_comment(comment, ind);
+        //     out += &indent_comment(comment, ind);
 
         //     /*if comment.ends_with("\n") {
-        //         out += &tabs(ind);
+        //         out += &tabs(ind);
         //     }*/
         // }
 
@@ -415,16 +415,16 @@ impl SpwnFmt for Variable {
 
 impl SpwnFmt for Expression {
     fn fmt(&self, ind: Indent) -> String {
-        let mut out = String::new();
+        let mut out = String::new();
         for (i, op) in self.operators.iter().enumerate() {
             if let Operator::Range = op {
-                out += &format!("{}{}", self.values[i].fmt(ind), (*op).fmt(ind));
+                out += &format!("{}{}", self.values[i].fmt(ind), (*op).fmt(ind));
             } else {
-                out += &format!("{} {} ", self.values[i].fmt(ind), (*op).fmt(ind));
+                out += &format!("{} {} ", self.values[i].fmt(ind), (*op).fmt(ind));
             }
         }
 
-        out += &self.values.last().unwrap().fmt(ind);
+        out += &self.values.last().unwrap().fmt(ind);
 
         out
     }
@@ -520,22 +520,22 @@ impl SpwnFmt for Error {
 
 fn trim_newline(s: &mut String) {
     if s.ends_with('\n') {
-        s.pop();
+        s.pop();
         if s.ends_with('\r') {
-            s.pop();
+            s.pop();
         }
     }
 }
 
 impl SpwnFmt for CompoundStatement {
     fn fmt(&self, ind: Indent) -> String {
-        let mut out = String::new();
+        let mut out = String::new();
 
         for s in &self.statements {
-            out += &format!("{}{}", tabs(ind), s.fmt(ind));
+            out += &format!("{}{}", tabs(ind), s.fmt(ind));
         }
 
-        trim_newline(&mut out);
+        trim_newline(&mut out);
 
         out
     }
@@ -557,7 +557,7 @@ impl SpwnFmt for If {
             }
             .fmt(ind + 4),
             tabs(ind)
-        );
+        );
 
         if let Some(body) = &self.else_body {
             out += &format!(
@@ -567,7 +567,7 @@ impl SpwnFmt for If {
                 }
                 .fmt(ind + 4),
                 tabs(ind)
-            );
+            );
         }
 
         out
@@ -576,16 +576,16 @@ impl SpwnFmt for If {
 
 impl SpwnFmt for ArgDef {
     fn fmt(&self, ind: Indent) -> String {
-        let (name, value, tag, typ, _, _) = self;
+        let (name, value, tag, typ, _, _) = self;
 
-        let mut out = tag.fmt(ind);
-        out += name;
+        let mut out = tag.fmt(ind);
+        out += name;
         if let Some(expr) = typ {
-            out += &format!(": {}", expr.fmt(ind));
+            out += &format!(": {}", expr.fmt(ind));
         }
 
         if let Some(expr) = value {
-            out += &format!(" = {}", expr.fmt(ind));
+            out += &format!(" = {}", expr.fmt(ind));
         }
         out
     }
@@ -593,12 +593,12 @@ impl SpwnFmt for ArgDef {
 
 impl SpwnFmt for Macro {
     fn fmt(&self, ind: Indent) -> String {
-        let mut out = String::new();
+        let mut out = String::new();
 
-        out += &self.properties.fmt(ind);
+        out += &self.properties.fmt(ind);
 
-        out += &element_list(&self.args, '(', ')', ind);
-        out += &format!(" {{\n{}\n{}}}", &self.body.fmt(ind + 4), tabs(ind));
+        out += &element_list(&self.args, '(', ')', ind);
+        out += &format!(" {{\n{}\n{}}}", &self.body.fmt(ind + 4), tabs(ind));
         out
     }
 }
@@ -612,10 +612,10 @@ impl SpwnFmt for (String, Vec<Argument>) {
 impl SpwnFmt for Attribute {
     fn fmt(&self, ind: Indent) -> String {
         if self.tags.is_empty() {
-            return String::new();
+            return String::new();
         }
 
-        let text = String::from("#") + &element_list(&self.tags, '[', ']', ind);
+        let text = String::from("#") + &element_list(&self.tags, '[', ']', ind);
         if text.len() > 60 {
             text + "\n" + &tabs(ind)
         } else {

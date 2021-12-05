@@ -1,11 +1,11 @@
 //! Abstract Syntax Tree (AST) type definitions
 
-use internment::LocalIntern;
+use internment::LocalIntern;
 
-use crate::fmt::SpwnFmt;
-use shared::FileRange;
-use shared::ImportType;
-use shared::StoredValue;
+use crate::fmt::SpwnFmt;
+use shared::FileRange;
+use shared::ImportType;
+use shared::StoredValue;
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
     Def((LocalIntern<String>, Expression)),
@@ -25,7 +25,7 @@ pub struct ArrayDef {
     pub operator: Option<ArrayPrefix>,
 }
 
-//pub type Comment = (Option<String>, Option<String>);
+//pub type Comment = (Option<String>, Option<String>);
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Statement {
@@ -220,7 +220,7 @@ impl Attribute {
     pub fn get(&self, t: &str) -> Option<Vec<Argument>> {
         for (key, args) in &self.tags {
             if t == key {
-                return Some(args.clone());
+                return Some(args.clone());
             }
         }
         None
@@ -266,15 +266,15 @@ impl Default for Attribute {
 }
 
 pub trait CountSymbols {
-    fn symbols(&self) -> fnv::FnvHashSet<LocalIntern<String>>;
+    fn symbols(&self) -> fnv::FnvHashSet<LocalIntern<String>>;
 
     fn properties(&self) -> fnv::FnvHashSet<LocalIntern<String>> {
         Default::default()
     }
 
     fn all(&self) -> fnv::FnvHashSet<LocalIntern<String>> {
-        let mut out = self.symbols();
-        out.extend(self.properties());
+        let mut out = self.symbols();
+        out.extend(self.properties());
         out
     }
 }
@@ -350,7 +350,7 @@ pub type ArgDef = (
     Option<Expression>,
     FileRange,
     bool,
-);
+);
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
     pub args: Vec<ArgDef>,
@@ -410,7 +410,7 @@ impl Variable {
     pub fn to_expression(&self) -> Expression {
         if let ValueBody::Expression(e) = &self.value.body {
             if self.path.is_empty() {
-                return e.to_owned();
+                return e.to_owned();
             }
         }
         Expression {
@@ -455,8 +455,8 @@ impl Expression {
     }
 
     pub fn get_pos(&self) -> FileRange {
-        let start = self.values.first().unwrap().pos.0;
-        let end = self.values.last().unwrap().pos.1;
+        let start = self.values.first().unwrap().pos.0;
+        let end = self.values.last().unwrap().pos.1;
         (start, end)
     }
 }

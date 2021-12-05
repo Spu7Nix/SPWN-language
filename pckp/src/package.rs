@@ -1,15 +1,15 @@
-use std::fs;
-use std::path::PathBuf;
+use std::fs;
+use std::path::PathBuf;
 
-use git2::Repository;
+use git2::Repository;
 
-use crate::config_file::{config_to_package, get_config};
-use crate::error::PckpError;
-use crate::version::{export_version, get_version_file, import_version};
+use crate::config_file::{config_to_package, get_config};
+use crate::error::PckpError;
+use crate::version::{export_version, get_version_file, import_version};
 
-use fs_extra::dir as fs_dir;
+use fs_extra::dir as fs_dir;
 
-pub const PACKAGE_DIR: &str = "pckp_libraries";
+pub const PACKAGE_DIR: &str = "pckp_libraries";
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum DependencySource {
@@ -69,7 +69,7 @@ impl Package {
         match &self.internal {
             PackageType::Local(root) => {
                 for x in &root.dependencies {
-                    x.install(&root.name, path.clone(), false)?;
+                    x.install(&root.name, path.clone(), false)?;
                 }
                 Ok(())
             }
@@ -96,53 +96,53 @@ impl Package {
                     // folder guaranteed to exist from config parser
 
                 }*/
-                let mut dest = path.to_path_buf();
-                dest.push(PACKAGE_DIR);
+                let mut dest = path.to_path_buf();
+                dest.push(PACKAGE_DIR);
 
                 if !dest.exists() {
-                    fs::create_dir(&dest).unwrap();
+                    fs::create_dir(&dest).unwrap();
                 }
 
-                let version_file = get_version_file(path.clone());
-                let mut version_info = import_version(&version_file);
+                let version_file = get_version_file(path.clone());
+                let mut version_info = import_version(&version_file);
 
                 if !version_info
                     .iter()
                     .any(|(n, v)| n == &p.name && v == &p.version)
                 {
-                    println!("Installing {}", p.name);
+                    println!("Installing {}", p.name);
 
                     let new_path = if ignore_version {
                         p.name.to_string()
                     } else {
                         format!("{}@{}", p.name, p.version)
-                    };
-                    dest.push(new_path.to_string());
+                    };
+                    dest.push(new_path.to_string());
 
                     for folder in &p.paths {
-                        let mut opts = fs_dir::CopyOptions::new();
-                        opts.content_only = true;
-                        fs_dir::copy(folder, &dest, &opts).unwrap();
+                        let mut opts = fs_dir::CopyOptions::new();
+                        opts.content_only = true;
+                        fs_dir::copy(folder, &dest, &opts).unwrap();
                     }
 
-                    version_info.push((p.name.clone(), p.version.clone()));
-                    //println!("package {:#?}", p);
+                    version_info.push((p.name.clone(), p.version.clone()));
+                    //println!("package {:#?}", p);
                 }
 
                 for dep in &p.dependencies {
-                    dep.install(&p.name, path.clone(), false)?;
+                    dep.install(&p.name, path.clone(), false)?;
                 }
 
-                export_version(version_info, &version_file);
+                export_version(version_info, &version_file);
                 Ok(())
             }
             PackageType::External(d) => {
-                let source_url = d.source.to_string(parent_name.to_string())?;
+                let source_url = d.source.to_string(parent_name.to_string())?;
 
-                let tmp_path = PathBuf::from(".pckp_tmp");
+                let tmp_path = PathBuf::from(".pckp_tmp");
 
                 if tmp_path.exists() {
-                    fs_dir::remove(&tmp_path).unwrap();
+                    fs_dir::remove(&tmp_path).unwrap();
                 }
                 let repo = match Repository::clone(&source_url, &tmp_path) {
                     Ok(repo) => repo,
@@ -152,7 +152,7 @@ impl Package {
                             Some(parent_name.to_string()),
                         ))
                     }
-                };
+                };
 
                 if d.version != "latest" {
                     let tag_object =
@@ -167,23 +167,23 @@ impl Package {
                                     Some(parent_name.to_string()),
                                 ))
                             }
-                        };
+                        };
 
-                    repo.checkout_tree(&tag_object, None).unwrap();
+                    repo.checkout_tree(&tag_object, None).unwrap();
                 }
 
-                let cfg_dir = get_config(Some(tmp_path));
+                let cfg_dir = get_config(Some(tmp_path));
                 let local_package = if cfg_dir.exists() {
                     config_to_package(cfg_dir)?.unwrap()
                 } else {
                     return Err(PckpError::custom(
                         format!("Package at {} does not have config file", source_url),
                         Some(parent_name.to_string()),
-                    ));
-                };
+                    ));
+                };
 
                 local_package.install(parent_name, path, d.version == "latest")
-                //todo!("download and stuff");
+                //todo!("download and stuff");
             }
         }
     }

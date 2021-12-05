@@ -1,7 +1,7 @@
 #[no_std, cache_output]
 import "array.spwn"
 
-type @dict_not_found;
+type @dict_not_found;
 
 impl @dictionary {
 	is_empty: #[desc("Returns true if there are no entries in the dictionary, false otherwise.") example("
@@ -13,9 +13,9 @@ $.assert(dict.is_empty())
 		// so this 'loop' will get skipped over if empty,
 		// or otherwise early exit on the first entry if not
 		for kv in self {
-			return false;
+			return false;
 		}
-		return true;
+		return true;
 	},
 	keys: #[desc("Gets the dictionary's keys.") example("
 wares = {
@@ -136,10 +136,10 @@ $.assert(wares.contains(5))
 	$.assert(dict.map((k, v) => k[v]) == ['k', 'e', 'y'])
 		")]
 		(self, cb: _ -> _) {
-			let output = [];
+			let output = [];
 			for iter in self {
-				output.push(cb(iter[0], iter[1]));
+				output.push(cb(iter[0], iter[1]));
 			}
-			return output;
+			return output;
 		},
 }

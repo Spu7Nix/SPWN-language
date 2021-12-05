@@ -1,14 +1,14 @@
-extract obj_props;
+extract obj_props;
 
-type @binaryCalculator;
+type @binaryCalculator;
 
 impl @binaryCalculator {
 
     new: (bits: @number, x: @number, y: @number) {
-        let bitCounters = [];
+        let bitCounters = [];
 
         for i in ..bits {
-            item = ?i;
+            item = ?i;
 
             $.add(obj {
                 OBJ_ID: 1615,
@@ -16,9 +16,9 @@ impl @binaryCalculator {
                 Y: y,
                 ITEM: item,
                 GROUPS: 999g
-            });
+            });
 
-            bitCounters.push(counter(item));
+            bitCounters.push(counter(item));
         }
 
         return @binaryCalculator::{
@@ -26,37 +26,37 @@ impl @binaryCalculator {
         }
     },
     binaryToDecimal: (self, target: @counter) {
-        target = 0;
-        wait(1);
+        target = 0;
+        wait(1);
 
         for i in ..self.bitCounters.length {
             if self.bitCounters[self.bitCounters.length - 1 - i] as @bool {
-                target += 2 ^ i;
+                target += 2 ^ i;
             }
         }
     },
     decimalToBinary: (self, source: @counter, calcSpeed: @number = 5) {
-        let tempcounters = [];
+        let tempcounters = [];
 
         for i in ..self.bitCounters.length {
-            tempcounters.push(counter());
+            tempcounters.push(counter());
         }
 
-        source.copy_to(tempcounters);
+        source.copy_to(tempcounters);
 
         for i in ..self.bitCounters.length {
             -> () {
-                tempcounters[i].divide(2 ^ i);
-                tempcounters[i].divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i]);
-            }();
+                tempcounters[i].divide(2 ^ i);
+                tempcounters[i].divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i]);
+            }();
         }
     },
     prettyDecimalToBinary: (self, source: @counter, calcSpeed: @number = 10) {
         for i in ..self.bitCounters.length {
-            source.divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i]);
+            source.divide(2, remainder = self.bitCounters[self.bitCounters.length - 1 - i]);
         }
 
-        self.binaryToDecimal(source);
+        self.binaryToDecimal(source);
     }
 }
 

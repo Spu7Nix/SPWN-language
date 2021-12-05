@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::PathBuf;
 
 // replace this with spwn's error system
 
@@ -37,30 +37,30 @@ impl PckpError {
 					format!(" in package '{}'", pkg)
 				} else {
 					String::new()
-				};
+				};
 
 				let note = if let Some(n) = &note {
 					format!("\nNote: {}", n)
 				} else {
 					String::new()
-				};
+				};
 
-				return format!("PckpError{}: {}{}", ipkg, message, note);
+				return format!("PckpError{}: {}{}", ipkg, message, note);
 			},
 			PckpError::ConfigError {message, note, pos, file} => {
 				let note = if let Some(n) = &note {
 					format!("\nNote: {}", n)
 				} else {
 					String::new()
-				};
+				};
 
 				let ps = if let Some(p) = &pos {
 					format!(" on line {} column {}", p.0, p.1)
 				} else {
 					String::new()
-				};
+				};
 
-				return format!("PckpConfigError: {}\nError located in file {}{}{}", message, file.clone().into_os_string().into_string().unwrap(), ps, note);
+				return format!("PckpConfigError: {}\nError located in file {}{}{}", message, file.clone().into_os_string().into_string().unwrap(), ps, note);
 			}
 		}
 	}

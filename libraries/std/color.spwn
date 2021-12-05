@@ -33,7 +33,7 @@ for color in 1c..10c {
             36: 1,
         })
         wait(duration)
-    }, //1,899,2,285,3,105,36,1,7,255,8,255,9,255,10,0.5,35,0;
+    }, //1,899,2,285,3,105,36,1,7,255,8,255,9,255,10,0.5,35,0;
 
     pulse_hsv: #[desc("Implementation of the pulse trigger for colors with hsv") example("BG.pulse_hsv(180, 1, 1, fade_out = 0.5) // pulses the background with the complementary color")]
     (

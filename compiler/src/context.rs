@@ -1,16 +1,16 @@
-use crate::builtins::*;
-use crate::compiler_types::*;
-use crate::globals::Globals;
-use crate::leveldata::*;
-use crate::value::{strict_value_equality, Value};
-use crate::value_storage::{clone_value, store_val_m};
-use errors::compiler_info::CodeArea;
+use crate::builtins::*;
+use crate::compiler_types::*;
+use crate::globals::Globals;
+use crate::leveldata::*;
+use crate::value::{strict_value_equality, Value};
+use crate::value_storage::{clone_value, store_val_m};
+use errors::compiler_info::CodeArea;
 
-//use std::boxed::Box;
-use fnv::FnvHashMap;
+//use std::boxed::Box;
+use fnv::FnvHashMap;
 
-use internment::LocalIntern;
-use shared::{BreakType, StoredValue};
+use internment::LocalIntern;
+use shared::{BreakType, StoredValue};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VariableData {
@@ -41,8 +41,8 @@ pub enum FullContext {
 
 impl FullContext {
     pub fn new(globals: &Globals) -> Self {
-        let mut new = FullContext::Single(Context::new(globals));
-        new.inner().root_context_ptr = &mut new;
+        let mut new = FullContext::Single(Context::new(globals));
+        new.inner().root_context_ptr = &mut new;
         new
     }
     pub fn inner(&mut self) -> &mut Context {
@@ -53,13 +53,13 @@ impl FullContext {
     }
 
     pub fn inner_value(&mut self) -> (&mut Context, StoredValue) {
-        let context = self.inner();
-        let val = context.return_value;
+        let context = self.inner();
+        let val = context.return_value;
         (context, val)
     }
 
     pub fn stack(list: &mut impl Iterator<Item = Self>) -> Option<Self> {
-        let first = list.next()?;
+        let first = list.next()?;
         match Self::stack(list) {
             Some(second) => Some(FullContext::Split(first.into(), second.into())),
             None => Some(first),
@@ -70,7 +70,7 @@ impl FullContext {
         for context in self.with_breaks() {
             for stack in context.inner().variables.values_mut() {
                 for VariableData { layers, .. } in stack.iter_mut() {
-                    *layers += 1;
+                    *layers += 1;
                 }
             }
         }
@@ -79,21 +79,21 @@ impl FullContext {
         for context in self.with_breaks() {
             for stack in context.inner().variables.values_mut() {
                 for VariableData { layers, .. } in stack.iter_mut() {
-                    *layers -= 1;
+                    *layers -= 1;
                 }
             }
 
             for stack in context.inner().variables.values_mut() {
                 if stack.last().unwrap().layers < 0 {
-                    stack.pop();
+                    stack.pop();
                 }
             }
             context.inner().variables.retain(|_, s| !s.is_empty())
         }
-        // let mut removed = FnvHashSet::new();
+        // let mut removed = FnvHashSet::new();
         // for context in self.with_breaks() {
         //     for (_, layers) in context.inner().variables.values_mut() {
-        //         *layers -= 1;
+        //         *layers -= 1;
         //     }
         //     removed.extend(context.inner().variables.values().filter_map(|(v, l)| {
         //         if *l < 0 {
@@ -101,21 +101,21 @@ impl FullContext {
         //         } else {
         //             None
         //         }
-        //     }));
+        //     }));
         //     context.inner().variables.retain(|_, (_, l)| *l >= 0)
         // }
-        // let mut all_removed = FnvHashSet::new();
+        // let mut all_removed = FnvHashSet::new();
         // for v in removed {
-        //     all_removed.extend(get_all_ptrs_used(v, globals));
+        //     all_removed.extend(get_all_ptrs_used(v, globals));
         // }
         // all_removed
     }
 
     pub fn reset_return_vals(&mut self, globals: &Globals) {
         for c in self.with_breaks() {
-            let c = c.inner();
-            (*c).return_value = globals.NULL_STORAGE;
-            (*c).return_value2 = globals.NULL_STORAGE;
+            let c = c.inner();
+            (*c).return_value = globals.NULL_STORAGE;
+            (*c).return_value2 = globals.NULL_STORAGE;
         }
     }
 
@@ -130,12 +130,12 @@ impl FullContext {
     ) {
         for c in self.iter() {
             // reset all variables per context
-            let fn_context = c.inner().start_group;
+            let fn_context = c.inner().start_group;
             (*c.inner()).new_variable(
                 name,
                 clone_value(val, globals, fn_context, constant, area),
                 layer,
-            );
+            );
         }
     }
 
@@ -150,12 +150,12 @@ impl FullContext {
     ) {
         for c in self.iter() {
             // reset all variables per context
-            let fn_context = c.inner().start_group;
+            let fn_context = c.inner().start_group;
             (*c.inner()).new_variable(
                 name,
                 store_val_m(val.clone(), globals, fn_context, constant, area),
                 layer,
-            );
+            );
         }
     }
 
@@ -163,7 +163,7 @@ impl FullContext {
         for fc in self.with_breaks() {
             if let Some((b, _)) = &mut fc.inner().broken {
                 if std::mem::discriminant(b) == std::mem::discriminant(&breaktype) {
-                    (*fc.inner()).broken = None;
+                    (*fc.inner()).broken = None;
                 }
             }
         }
@@ -199,8 +199,8 @@ impl<'a> ContextIter<'a> {
         let mut iter = ContextIter {
             right_nodes: vec![],
             current_node: None,
-        };
-        iter.add_left_subtree(node);
+        };
+        iter.add_left_subtree(node);
         iter
     }
 
@@ -211,12 +211,12 @@ impl<'a> ContextIter<'a> {
         loop {
             match node {
                 FullContext::Split(left, right) => {
-                    self.right_nodes.push(&mut **right);
-                    node = &mut **left;
+                    self.right_nodes.push(&mut **right);
+                    node = &mut **left;
                 }
                 val @ FullContext::Single(_) => {
-                    self.current_node = Some(val);
-                    break;
+                    self.current_node = Some(val);
+                    break;
                 }
             }
         }
@@ -228,8 +228,8 @@ impl<'a> ContextIterWithBreaks<'a> {
         let mut iter = ContextIterWithBreaks {
             right_nodes: vec![],
             current_node: None,
-        };
-        iter.add_left_subtree(node);
+        };
+        iter.add_left_subtree(node);
         iter
     }
 
@@ -240,12 +240,12 @@ impl<'a> ContextIterWithBreaks<'a> {
         loop {
             match node {
                 FullContext::Split(left, right) => {
-                    self.right_nodes.push(&mut **right);
-                    node = &mut **left;
+                    self.right_nodes.push(&mut **right);
+                    node = &mut **left;
                 }
                 val @ FullContext::Single(_) => {
-                    self.current_node = Some(val);
-                    break;
+                    self.current_node = Some(val);
+                    break;
                 }
             }
         }
@@ -253,16 +253,16 @@ impl<'a> ContextIterWithBreaks<'a> {
 }
 
 impl<'a> Iterator for ContextIter<'a> {
-    type Item = &'a mut FullContext;
+    type Item = &'a mut FullContext;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Get the item we're going to return.
-        let result = self.current_node.take();
+        let result = self.current_node.take();
 
         // Now add the next left subtree
         // (this is the "recursive call")
         if let Some(node) = self.right_nodes.pop() {
-            self.add_left_subtree(node);
+            self.add_left_subtree(node);
         }
         match result {
             Some(c) => {
@@ -278,16 +278,16 @@ impl<'a> Iterator for ContextIter<'a> {
 }
 
 impl<'a> Iterator for ContextIterWithBreaks<'a> {
-    type Item = &'a mut FullContext;
+    type Item = &'a mut FullContext;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Get the item we're going to return.
-        let result = self.current_node.take();
+        let result = self.current_node.take();
 
         // Now add the next left subtree
         // (this is the "recursive call")
         if let Some(node) = self.right_nodes.pop() {
-            self.add_left_subtree(node);
+            self.add_left_subtree(node);
         }
         result
     }
@@ -317,9 +317,9 @@ impl Context {
             parent: Some(self.func_id),
             obj_list: Vec::new(),
             width: None,
-        });
+        });
 
-        self.func_id = globals.func_ids.len() - 1;
+        self.func_id = globals.func_ids.len() - 1;
     }
 
     pub fn get_variable(&self, name: LocalIntern<String>) -> Option<StoredValue> {
@@ -353,7 +353,7 @@ impl Context {
                         layers: layer,
                         redefinable,
                     }],
-                );
+                );
             }
         }
     }
@@ -377,7 +377,7 @@ impl Context {
     }
 
     pub fn set_all_variables(&mut self, vars: FnvHashMap<LocalIntern<String>, Vec<VariableData>>) {
-        (*self).variables = vars;
+        (*self).variables = vars;
     }
 }
 
@@ -387,72 +387,72 @@ pub fn merge_contexts(
     globals: &mut Globals,
     check_return_vals: bool,
 ) -> bool {
-    let mut mergable_ind = Vec::<usize>::new();
-    let mut ref_c = 0;
+    let mut mergable_ind = Vec::<usize>::new();
+    let mut ref_c = 0;
     loop {
         if ref_c >= contexts.len() {
-            return false;
+            return false;
         }
         for (i, c) in contexts.iter().enumerate() {
             if i == ref_c {
-                continue;
+                continue;
             }
-            let ref_c = &contexts[ref_c];
+            let ref_c = &contexts[ref_c];
 
             if (ref_c.broken == None) != (c.broken == None) {
-                continue;
+                continue;
             }
-            let mut not_eq = false;
+            let mut not_eq = false;
 
             if check_return_vals
                 && !strict_value_equality(c.return_value, ref_c.return_value, globals)
             {
-                not_eq = true;
+                not_eq = true;
             } else {
                 //check variables are equal
                 for (key, stack) in &c.variables {
                     for (i, VariableData { val, .. }) in stack.iter().enumerate() {
                         if !strict_value_equality(ref_c.variables[key][i].val, *val, globals) {
-                            not_eq = true;
-                            break;
+                            not_eq = true;
+                            break;
                         }
                     }
                 }
             }
 
             if not_eq {
-                continue;
+                continue;
             }
             //check implementations are equal
             // for (key, val) in &c.implementations {
             //     for (key2, val) in val {
             //         if globals.stored_values[ref_c.implementations[key][key2]] != globals.stored_values[*val] {
-            //             not_eq = true;
-            //             break;
+            //             not_eq = true;
+            //             break;
             //         }
             //     }
             // }
             // if not_eq {
-            //     continue;
+            //     continue;
             // }
 
             //everything is equal, add to list
-            mergable_ind.push(i);
+            mergable_ind.push(i);
         }
         if mergable_ind.is_empty() {
-            ref_c += 1;
+            ref_c += 1;
         } else {
-            break;
+            break;
         }
     }
 
-    let new_group = Group::next_free(&mut globals.closed_groups);
+    let new_group = Group::next_free(&mut globals.closed_groups);
     //add spawn triggers
     let mut add_spawn_trigger = |context: &Context| {
-        let mut params = FnvHashMap::default();
-        params.insert(51, ObjParam::Group(new_group));
-        params.insert(1, ObjParam::Number(1268.0));
-        (*globals).trigger_order += 1.0;
+        let mut params = FnvHashMap::default();
+        params.insert(51, ObjParam::Group(new_group));
+        params.insert(1, ObjParam::Number(1268.0));
+        (*globals).trigger_order += 1.0;
 
         (*globals).func_ids[context.func_id].obj_list.push((
             GdObj {
@@ -463,17 +463,17 @@ pub fn merge_contexts(
             .context_parameters(context),
             TriggerOrder(globals.trigger_order),
         ))
-    };
-    add_spawn_trigger(&contexts[ref_c]);
+    };
+    add_spawn_trigger(&contexts[ref_c]);
     for i in mergable_ind.iter() {
         add_spawn_trigger(&contexts[*i])
     }
 
-    (*contexts)[ref_c].start_group = new_group;
-    (*contexts)[ref_c].next_fn_id(globals);
+    (*contexts)[ref_c].start_group = new_group;
+    (*contexts)[ref_c].next_fn_id(globals);
 
     for i in mergable_ind.iter().rev() {
-        (*contexts).swap_remove(*i);
+        (*contexts).swap_remove(*i);
     }
 
     true

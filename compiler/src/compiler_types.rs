@@ -1,36 +1,36 @@
-use crate::builtins::*;
+use crate::builtins::*;
 
-use crate::context::*;
-use crate::globals::Globals;
-use crate::leveldata::*;
-use crate::value::*;
-use errors::compiler_info::CodeArea;
-use errors::{create_error, RuntimeError};
+use crate::context::*;
+use crate::globals::Globals;
+use crate::leveldata::*;
+use crate::value::*;
+use errors::compiler_info::CodeArea;
+use errors::{create_error, RuntimeError};
 ///types and functions used by the compiler
-use parser::ast;
-use shared::BreakType;
+use parser::ast;
+use shared::BreakType;
 
-//use std::boxed::Box;
-use crate::value_storage::*;
-use errors::compiler_info::CompilerInfo;
-use fnv::FnvHashMap;
+//use std::boxed::Box;
+use crate::value_storage::*;
+use errors::compiler_info::CompilerInfo;
+use fnv::FnvHashMap;
 
-use crate::compiler::compile_scope;
+use crate::compiler::compile_scope;
 
-use internment::LocalIntern;
-use shared::StoredValue;
+use internment::LocalIntern;
+use shared::StoredValue;
 
-pub type TypeId = u16;
+pub type TypeId = u16;
 //                                                               This bool is for if this value
 //                                                               was implemented in the current module
-pub type Implementations = FnvHashMap<TypeId, FnvHashMap<LocalIntern<String>, (StoredValue, bool)>>;
+pub type Implementations = FnvHashMap<TypeId, FnvHashMap<LocalIntern<String>, (StoredValue, bool)>>;
 
-pub type FnIdPtr = usize;
+pub type FnIdPtr = usize;
 
-//pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
+//pub type Returns = SmallVec<[(StoredValue, Context); CONTEXT_MAX]>;
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub struct TriggerOrder(pub f64);
+pub struct TriggerOrder(pub f64);
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionId {
     pub parent: Option<usize>, //index of parent id, if none it is a top-level id
@@ -39,7 +39,7 @@ pub struct FunctionId {
     pub obj_list: Vec<(GdObj, TriggerOrder)>, //list of objects in this function id, + their order id
 }
 
-pub type SyncPartId = usize;
+pub type SyncPartId = usize;
 pub struct SyncGroup {
     pub parts: Vec<SyncPartId>,
     pub groups_used: Vec<ArbitraryId>, // groups that are already used by this sync group, and can be reused in later parts
@@ -53,9 +53,9 @@ pub fn handle_operator(
     globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals(globals);
+    contexts.reset_return_vals(globals);
     for full_context in contexts.iter() {
-        let fn_context = full_context.inner().start_group;
+        let fn_context = full_context.inner().start_group;
         if let Some(val) = globals.stored_values[value1].clone().member(
             LocalIntern::new(String::from(macro_name)),
             full_context.inner(),
@@ -69,12 +69,12 @@ pub fn handle_operator(
                         "Expected at least one argument in operator macro",
                         &[],
                         None,
-                    )));
+                    )));
                 }
-                let val2 = globals.stored_values[value2].clone();
+                let val2 = globals.stored_values[value2].clone();
 
                 if let Some(target_typ) = m.args[0].pattern {
-                    let pat = &globals.stored_values[target_typ].clone();
+                    let pat = &globals.stored_values[target_typ].clone();
 
                     if !val2.pure_matches_pat(pat, info, globals, full_context.inner().clone())? {
                         //if types dont match, act as if there is no macro at all
@@ -84,7 +84,7 @@ pub fn handle_operator(
                             info.clone(),
                             globals,
                             full_context,
-                        )?;
+                        )?;
                     }
                 }
 
@@ -102,7 +102,7 @@ pub fn handle_operator(
                     globals,
                     value1,
                     info.clone(),
-                )?;
+                )?;
             } else {
                 built_in_function(
                     macro_name,
@@ -110,7 +110,7 @@ pub fn handle_operator(
                     info.clone(),
                     globals,
                     full_context,
-                )?;
+                )?;
             }
         } else {
             built_in_function(
@@ -119,7 +119,7 @@ pub fn handle_operator(
                 info.clone(),
                 globals,
                 full_context,
-            )?;
+            )?;
         }
     }
     Ok(())
@@ -132,9 +132,9 @@ pub fn handle_unary_operator(
     globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals(globals);
+    contexts.reset_return_vals(globals);
     for full_context in contexts.iter() {
-        let context = full_context.inner();
+        let context = full_context.inner();
         if let Some(val) = globals.stored_values[value].clone().member(
             LocalIntern::new(String::from(macro_name)),
             context,
@@ -148,29 +148,29 @@ pub fn handle_unary_operator(
                         "Expected at least one argument in operator macro",
                         &[],
                         None,
-                    )));
+                    )));
                 }
 
-                execute_macro((*m, Vec::new()), full_context, globals, value, info.clone())?;
+                execute_macro((*m, Vec::new()), full_context, globals, value, info.clone())?;
             } else {
-                built_in_function(macro_name, vec![value], info.clone(), globals, full_context)?;
+                built_in_function(macro_name, vec![value], info.clone(), globals, full_context)?;
             }
         } else {
-            built_in_function(macro_name, vec![value], info.clone(), globals, full_context)?;
+            built_in_function(macro_name, vec![value], info.clone(), globals, full_context)?;
         }
     }
     Ok(())
 }
 
 pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError> {
-    let rounded = num.round();
+    let rounded = num.round();
     if (num - rounded).abs() > 0.000000001 {
         return Err(RuntimeError::CustomError(create_error(
             info.clone(),
             &format!("expected integer, found {}", num),
             &[],
             None,
-        )));
+        )));
     }
     Ok(rounded as i32)
 }
@@ -186,13 +186,13 @@ pub trait EvalExpression {
         globals: &mut Globals,
         info: CompilerInfo,
         constant: bool,
-    ) -> Result<(), RuntimeError>;
+    ) -> Result<(), RuntimeError>;
 }
 
 impl From<ast::Operator> for Builtin {
     fn from(op: ast::Operator) -> Self {
-        use ast::Operator::*;
-        use Builtin::*;
+        use ast::Operator::*;
+        use Builtin::*;
         match op {
             Or => OrOp,
             And => AndOp,
@@ -238,19 +238,19 @@ impl EvalExpression for ast::Expression {
         mut info: CompilerInfo,
         constant: bool,
     ) -> Result<(), RuntimeError> {
-        contexts.reset_return_vals(globals);
-        let mut vals = self.values.iter();
-        let first = vals.next().unwrap();
+        contexts.reset_return_vals(globals);
+        let mut vals = self.values.iter();
+        let first = vals.next().unwrap();
 
-        globals.push_new_preserved();
+        globals.push_new_preserved();
 
-        first.to_value(contexts, globals, info.clone(), constant)?;
+        first.to_value(contexts, globals, info.clone(), constant)?;
 
-        let mut start_pos = first.pos.0;
+        let mut start_pos = first.pos.0;
 
         for (i, var) in vals.enumerate() {
-            let end_pos = var.pos.1;
-            info.position.pos = (start_pos, end_pos);
+            let end_pos = var.pos.1;
+            info.position.pos = (start_pos, end_pos);
             //every value in acum will be operated with the value of var in the corresponding context
             for full_context in contexts.iter() {
                 //only eval the first one on Or and And
@@ -262,10 +262,10 @@ impl EvalExpression for ast::Expression {
                         )
                     } else {
                         (false, false)
-                    };
-                let acum_val = full_context.inner().return_value;
+                    };
+                let acum_val = full_context.inner().return_value;
 
-                globals.push_preserved_val(acum_val);
+                globals.push_preserved_val(acum_val);
 
                 if self.operators[i] == ast::Operator::Or
                     && !or_overwritten
@@ -276,9 +276,9 @@ impl EvalExpression for ast::Expression {
                         globals,
                         full_context.inner().start_group,
                         CodeArea::new(),
-                    );
-                    full_context.inner().return_value = stored;
-                    continue;
+                    );
+                    full_context.inner().return_value = stored;
+                    continue;
                 } else if self.operators[i] == ast::Operator::And
                     && !and_overwritten
                     && globals.stored_values[acum_val] == Value::Bool(false)
@@ -288,23 +288,23 @@ impl EvalExpression for ast::Expression {
                         globals,
                         full_context.inner().start_group,
                         CodeArea::new(),
-                    );
-                    full_context.inner().return_value = stored;
-                    continue;
+                    );
+                    full_context.inner().return_value = stored;
+                    continue;
                 }
 
                 //what the value in acum becomes
-                var.to_value(full_context, globals, info.clone(), constant)?;
+                var.to_value(full_context, globals, info.clone(), constant)?;
 
                 for c2 in full_context.iter() {
-                    //let val_fn_context = globals.get_val_fn_context(val, info.clone());
-                    let val = c2.inner().return_value;
-                    handle_operator(acum_val, val, self.operators[i].into(), c2, globals, &info)?;
+                    //let val_fn_context = globals.get_val_fn_context(val, info.clone());
+                    let val = c2.inner().return_value;
+                    handle_operator(acum_val, val, self.operators[i].into(), c2, globals, &info)?;
                 }
             }
-            start_pos = var.pos.0;
+            start_pos = var.pos.0;
         }
-        globals.pop_preserved();
+        globals.pop_preserved();
         Ok(())
     }
 }
@@ -316,8 +316,8 @@ pub fn execute_macro(
     parent: StoredValue,
     info: CompilerInfo,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals(globals);
-    globals.push_new_preserved();
+    contexts.reset_return_vals(globals);
+    globals.push_new_preserved();
     for context in contexts.with_breaks() {
         for val in context
             .inner()
@@ -345,7 +345,7 @@ pub fn execute_macro(
     // dbg!(
     //     &m.args,
     //     globals.stored_values.preserved_stack.last().unwrap()
-    // );
+    // );
 
     let combinations = all_combinations(
         args.iter().map(|x| x.value.clone()).collect(),
@@ -353,7 +353,7 @@ pub fn execute_macro(
         globals,
         info.clone(),
         true,
-    )?;
+    )?;
 
     for (arg_values, _) in &combinations {
         for val in arg_values {
@@ -361,14 +361,14 @@ pub fn execute_macro(
         }
     }
 
-    //dbg!(&combinations);
+    //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
         let mut new_variables: FnvHashMap<LocalIntern<String>, Vec<VariableData>> =
-            Default::default();
-        let context = full_context.inner();
+            Default::default();
+        let context = full_context.inner();
 
-        let fn_context = context.start_group;
+        let fn_context = context.start_group;
 
         new_variables.extend(m.def_variables.iter().map(|(a, b)| {
             (
@@ -379,7 +379,7 @@ pub fn execute_macro(
                     redefinable: false,
                 }],
             )
-        }));
+        }));
 
         //parse each argument given into a local macro variable
         //index of arg if no arg is specified
@@ -387,22 +387,22 @@ pub fn execute_macro(
             1
         } else {
             0
-        };
+        };
         for (i, arg) in args.iter().enumerate() {
             match &arg.symbol {
                 Some(name) => {
-                    let arg_def = m.args.iter().enumerate().find(|e| e.1.name == *name);
+                    let arg_def = m.args.iter().enumerate().find(|e| e.1.name == *name);
                     if let Some((_arg_i, arg_def)) = arg_def {
                         //type check!!
                         //maybe make type check function
                         if let Some(t) = arg_def.pattern {
-                            let val = globals.stored_values[arg_values[i]].clone();
-                            let pat = globals.stored_values[t].clone();
+                            let val = globals.stored_values[arg_values[i]].clone();
+                            let pat = globals.stored_values[t].clone();
 
                             let arg_def_info = info.clone().with_area(CodeArea {
                                 pos: arg_def.position,
                                 file: m.def_file,
-                            });
+                            });
 
                             if !val.pure_matches_pat(
                                 &pat,
@@ -413,16 +413,16 @@ pub fn execute_macro(
                                 let arg_info = info.clone().with_area(CodeArea {
                                     pos: arg.pos,
                                     ..info.position
-                                });
+                                });
                                 return Err(RuntimeError::PatternMismatchError {
                                     pattern: pat.to_str(globals),
                                     val: val.get_type_str(globals),
                                     val_def: globals.get_area(arg_values[i]),
                                     pat_def: globals.get_area(t),
                                     info: arg_info,
-                                });
+                                });
                             }
-                        };
+                        };
                         if arg_def.as_ref {
                             new_variables.insert(
                                 *name,
@@ -431,7 +431,7 @@ pub fn execute_macro(
                                     layers: -1,
                                     redefinable: false,
                                 }],
-                            );
+                            );
                         } else {
                             new_variables.insert(
                                 arg_def.name,
@@ -449,7 +449,7 @@ pub fn execute_macro(
                                     layers: -1,
                                     redefinable: false,
                                 }],
-                            );
+                            );
                         }
                     } else {
                         return Err(RuntimeError::UndefinedErr {
@@ -459,7 +459,7 @@ pub fn execute_macro(
                                 ..info.position
                             }),
                             desc: "macro argument".to_string(),
-                        });
+                        });
                     }
                 }
                 None => {
@@ -482,34 +482,34 @@ pub fn execute_macro(
                                 (info.position, "Received too many arguments here"),
                             ],
                             None,
-                        )));
+                        )));
                     }
 
-                    //dbg!(&m.args[def_index]);
+                    //dbg!(&m.args[def_index]);
 
                     //type check!!
                     if let Some(t) = m.args[def_index].pattern {
-                        let val = globals.stored_values[arg_values[i]].clone();
-                        let pat = globals.stored_values[t].clone();
+                        let val = globals.stored_values[arg_values[i]].clone();
+                        let pat = globals.stored_values[t].clone();
                         let arg_def_info = info.clone().with_area(CodeArea {
                             pos: m.args[def_index].position,
                             file: m.def_file,
-                        });
+                        });
 
                         if !val.pure_matches_pat(&pat, &arg_def_info, globals, context.clone())? {
                             let arg_info = info.clone().with_area(CodeArea {
                                 pos: arg.pos,
                                 ..info.position
-                            });
+                            });
                             return Err(RuntimeError::PatternMismatchError {
                                 pattern: pat.to_str(globals),
                                 val: val.get_type_str(globals),
                                 val_def: globals.get_area(arg_values[i]),
                                 pat_def: globals.get_area(t),
                                 info: arg_info,
-                            });
+                            });
                         }
-                    };
+                    };
                     if m.args[def_index].as_ref {
                         new_variables.insert(
                             m.args[def_index].name,
@@ -518,7 +518,7 @@ pub fn execute_macro(
                                 layers: -1,
                                 redefinable: false,
                             }],
-                        );
+                        );
                     } else {
                         new_variables.insert(
                             m.args[def_index].name,
@@ -536,14 +536,14 @@ pub fn execute_macro(
                                 layers: -1,
                                 redefinable: false,
                             }],
-                        );
+                        );
                     }
-                    def_index += 1;
+                    def_index += 1;
                 }
             }
         }
         //insert defaults and check non-optional arguments
-        let mut m_args_iter = m.args.iter();
+        let mut m_args_iter = m.args.iter();
         if !m.args.is_empty() && m.args[0].name == globals.SELF_MEMBER_NAME {
             if globals.stored_values[parent] == Value::Null {
                 return Err(RuntimeError::CustomError(create_error(
@@ -553,7 +553,7 @@ This macro requires a parent (a \"self\" value), but it seems to have been calle
 Should be used like this: value.macro(arguments)",
                         &[(CodeArea {pos: m.args[0].position, file: m.def_file }, "Macro defined as taking a 'self' argument here"), (info.position, "Called alone here")],
                         None,
-                    )));
+                    )));
             }
             //self doesn't need to be cloned, as it is a reference (kinda)
             new_variables.insert(
@@ -563,8 +563,8 @@ Should be used like this: value.macro(arguments)",
                     layers: -1,
                     redefinable: false,
                 }],
-            );
-            m_args_iter.next();
+            );
+            m_args_iter.next();
         }
         for arg in m_args_iter {
             if let std::collections::hash_map::Entry::Vacant(e) = new_variables.entry(arg.name) {
@@ -583,7 +583,7 @@ Should be used like this: value.macro(arguments)",
                             ),
                             layers: -1,
                             redefinable: false,
-                        }]);
+                        }]);
                     }
 
                     None => {
@@ -595,46 +595,46 @@ Should be used like this: value.macro(arguments)",
                                     (info.position, "Argument not provided here")
                                 ],
                                 None,
-                            )));
+                            )));
                     }
                 }
             }
         }
 
-        let prev_vars = full_context.inner().get_variables().clone();
+        let prev_vars = full_context.inner().get_variables().clone();
 
-        (*full_context.inner()).set_all_variables(new_variables);
+        (*full_context.inner()).set_all_variables(new_variables);
 
-        let mut new_info = info.clone();
+        let mut new_info = info.clone();
 
         new_info.add_to_call_stack(CodeArea {
             file: m.def_file,
             pos: (0, 0),
-        });
+        });
 
-        let stored_path = globals.path;
-        (*globals).path = m.def_file;
-        compile_scope(&m.body, full_context, globals, new_info)?;
+        let stored_path = globals.path;
+        (*globals).path = m.def_file;
+        compile_scope(&m.body, full_context, globals, new_info)?;
 
-        (*globals).path = stored_path;
+        (*globals).path = stored_path;
 
-        let mut out_contexts = Vec::new();
+        let mut out_contexts = Vec::new();
         for context in full_context.with_breaks() {
-            (*context.inner()).set_all_variables(prev_vars.clone());
+            (*context.inner()).set_all_variables(prev_vars.clone());
 
             if let Some((r, i)) = (*context.inner()).broken {
                 match r {
                     BreakType::Macro(v, _) => {
                         let ret = if let Some(val) = v {
-                            (*context.inner()).return_value = val;
+                            (*context.inner()).return_value = val;
                             val
                         } else {
-                            (*context.inner()).return_value = globals.NULL_STORAGE;
+                            (*context.inner()).return_value = globals.NULL_STORAGE;
                             globals.NULL_STORAGE
-                        };
-                        (*context.inner()).broken = None;
+                        };
+                        (*context.inner()).broken = None;
                         if let Some(pat) = m.ret_pattern {
-                            //dbg!(&globals.stored_values[pat], &globals.stored_values[ret]);
+                            //dbg!(&globals.stored_values[pat], &globals.stored_values[ret]);
                             if !globals.stored_values[ret].clone().pure_matches_pat(
                                 &globals.stored_values[pat].clone(),
                                 &info,
@@ -647,7 +647,7 @@ Should be used like this: value.macro(arguments)",
                                     pat_def: globals.get_area(pat),
                                     val_def: globals.get_area(ret),
                                     info,
-                                });
+                                });
                             }
                         }
                     }
@@ -658,26 +658,26 @@ Should be used like this: value.macro(arguments)",
                             broke: i,
                             dropped: info.position,
                             reason: "the macro ended".to_string(),
-                        });
+                        });
                     }
                 }
 
-                out_contexts.push(context.clone());
+                out_contexts.push(context.clone());
             }
         }
-        //dbg!(out_contexts.len(), info.position);
+        //dbg!(out_contexts.len(), info.position);
         if !out_contexts.is_empty() {
-            *full_context = FullContext::stack(&mut out_contexts.into_iter()).unwrap();
+            *full_context = FullContext::stack(&mut out_contexts.into_iter()).unwrap();
         }
 
         for c in full_context.iter() {
             if c.inner().start_group != fn_context {
-                c.inner().fn_context_change_stack.push(info.position);
+                c.inner().fn_context_change_stack.push(info.position);
             }
         }
     }
 
-    globals.pop_preserved();
+    globals.pop_preserved();
     Ok(())
 }
 
@@ -695,18 +695,18 @@ where
         &mut Globals,
     ) -> Result<Vec<(Vec<StoredValue>, &'a mut FullContext)>, RuntimeError>,
 {
-    globals.push_new_preserved();
+    globals.push_new_preserved();
 
-    let mut out = vec![(Vec::new(), contexts)];
+    let mut out = vec![(Vec::new(), contexts)];
     for expr in a {
-        let mut new_out = Vec::new();
+        let mut new_out = Vec::new();
         for (list, full_context) in out.into_iter() {
-            let new_list = reduce(&expr, full_context, list.clone(), globals)?;
-            new_out.extend(new_list);
+            let new_list = reduce(&expr, full_context, list.clone(), globals)?;
+            new_out.extend(new_list);
         }
-        out = new_out;
+        out = new_out;
     }
-    globals.pop_preserved();
+    globals.pop_preserved();
 
     Ok(out)
 }
@@ -723,16 +723,16 @@ pub fn all_combinations<'a>(
         contexts,
         globals,
         |e: &ast::Expression, ctx, list: Vec<StoredValue>, globals| {
-            e.eval(ctx, globals, info.clone(), constant)?;
-            let mut added = Vec::new();
+            e.eval(ctx, globals, info.clone(), constant)?;
+            let mut added = Vec::new();
 
             for full_context in ctx.iter() {
-                let result = full_context.inner().return_value;
-                let mut updated_list = list.clone();
+                let result = full_context.inner().return_value;
+                let mut updated_list = list.clone();
 
-                updated_list.push(result);
-                globals.push_preserved_val(result);
-                added.push((updated_list, full_context));
+                updated_list.push(result);
+                globals.push_preserved_val(result);
+                added.push((updated_list, full_context));
             }
             Ok(added)
         },
@@ -746,7 +746,7 @@ pub fn eval_dict(
     info: CompilerInfo,
     constant: bool,
 ) -> Result<(), RuntimeError> {
-    contexts.reset_return_vals(globals);
+    contexts.reset_return_vals(globals);
     let combinations = all_combinations(
         dict.iter()
             .map(|def| match def {
@@ -758,16 +758,16 @@ pub fn eval_dict(
         globals,
         info.clone(),
         constant,
-    )?;
-    globals.push_new_preserved();
+    )?;
+    globals.push_new_preserved();
     for (arg_values, _) in &combinations {
         for val in arg_values {
             globals.push_preserved_val(*val)
         }
     }
     for (results, full_context) in combinations {
-        let context = full_context.inner();
-        let mut dict_out: FnvHashMap<LocalIntern<String>, StoredValue> = Default::default();
+        let context = full_context.inner();
+        let mut dict_out: FnvHashMap<LocalIntern<String>, StoredValue> = Default::default();
         for (expr_index, def) in dict.iter().enumerate() {
             match def {
                 ast::DictDef::Def(d) => {
@@ -780,7 +780,7 @@ pub fn eval_dict(
                             !globals.is_mutable(results[expr_index]),
                             info.position,
                         ),
-                    );
+                    );
                 }
                 ast::DictDef::Extract(_) => {
                     let val = clone_and_get_value(
@@ -788,7 +788,7 @@ pub fn eval_dict(
                         globals,
                         context.start_group,
                         !globals.is_mutable(results[expr_index]),
-                    );
+                    );
                     dict_out.extend(match val.clone() {
                         Value::Dict(d) => d.clone(),
                         a => {
@@ -799,18 +799,18 @@ pub fn eval_dict(
                                 info,
                             })
                         }
-                    });
+                    });
                 }
-            };
+            };
         }
         context.return_value = store_const_value(
             Value::Dict(dict_out),
             globals,
             context.start_group,
             info.position,
-        );
+        );
     }
-    globals.pop_preserved();
+    globals.pop_preserved();
     Ok(())
 }
 
@@ -821,7 +821,7 @@ pub trait ToTriggerFunc {
         globals: &mut Globals,
         info: CompilerInfo,
         start_group: Option<Group>,
-    ) -> Result<(), RuntimeError>;
+    ) -> Result<(), RuntimeError>;
 }
 
 impl ToTriggerFunc for ast::CompoundStatement {
@@ -832,29 +832,29 @@ impl ToTriggerFunc for ast::CompoundStatement {
         info: CompilerInfo,
         start_group: Option<Group>,
     ) -> Result<(), RuntimeError> {
-        contexts.reset_return_vals(globals);
+        contexts.reset_return_vals(globals);
         for full_context in contexts.iter() {
-            let mut prev_context = full_context.clone();
+            let mut prev_context = full_context.clone();
 
             //pick a start group
             let start_group = if let Some(g) = start_group {
                 g
             } else {
                 Group::next_free(&mut globals.closed_groups)
-            };
+            };
 
-            full_context.inner().next_fn_id(globals);
-            full_context.inner().start_group = start_group;
-            full_context.inner().fn_context_change_stack = vec![info.position];
+            full_context.inner().next_fn_id(globals);
+            full_context.inner().start_group = start_group;
+            full_context.inner().fn_context_change_stack = vec![info.position];
 
-            compile_scope(&self.statements, full_context, globals, info.clone())?;
+            compile_scope(&self.statements, full_context, globals, info.clone())?;
 
-            let mut carried_breaks = Vec::new();
+            let mut carried_breaks = Vec::new();
 
             for c in full_context.with_breaks() {
                 if let Some((r, i)) = c.inner().broken {
                     if let BreakType::Macro(_, true) = r {
-                        carried_breaks.push(c.clone());
+                        carried_breaks.push(c.clone());
                     } else {
                         return Err(RuntimeError::BreakNeverUsedError {
                             breaktype: r,
@@ -862,7 +862,7 @@ impl ToTriggerFunc for ast::CompoundStatement {
                             broke: i,
                             dropped: info.position,
                             reason: "it's inside a trigger function".to_string(),
-                        });
+                        });
                     }
                 }
             }
@@ -872,7 +872,7 @@ impl ToTriggerFunc for ast::CompoundStatement {
                 globals,
                 prev_context.inner().start_group,
                 info.position,
-            );
+            );
 
             if !carried_breaks.is_empty() {
                 prev_context = FullContext::Split(
@@ -880,9 +880,9 @@ impl ToTriggerFunc for ast::CompoundStatement {
                     FullContext::stack(&mut carried_breaks.into_iter())
                         .unwrap()
                         .into(),
-                );
+                );
             }
-            *full_context = prev_context;
+            *full_context = prev_context;
         }
 
         //(TriggerFunction { start_group }, inner_returns)

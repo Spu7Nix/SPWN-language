@@ -1,3 +1,3 @@
-pub mod ast;
-pub mod fmt;
-pub mod parser;
+pub mod ast;
+pub mod fmt;
+pub mod parser;

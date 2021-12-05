@@ -1,39 +1,39 @@
 //! Tools for compiling SPWN into GD object strings
 
-use errors::create_error;
-use internment::LocalIntern;
+use errors::create_error;
+use internment::LocalIntern;
 
 
-use shared::BreakType;
-use shared::ImportType;
-use shared::SpwnSource;
+use shared::BreakType;
+use shared::ImportType;
+use shared::SpwnSource;
 
-use crate::builtins::*;
-use crate::context::*;
-use errors::compiler_info::CodeArea;
-use errors::compiler_info::CompilerInfo;
-use parser::ast;
+use crate::builtins::*;
+use crate::context::*;
+use errors::compiler_info::CodeArea;
+use errors::compiler_info::CompilerInfo;
+use parser::ast;
 
-use crate::globals::Globals;
-use crate::leveldata::*;
-use crate::value::*;
-use crate::value_storage::*;
-use crate::STD_PATH;
-use fnv::FnvHashMap;
+use crate::globals::Globals;
+use crate::leveldata::*;
+use crate::value::*;
+use crate::value_storage::*;
+use crate::STD_PATH;
+use fnv::FnvHashMap;
 
-use std::io::Write;
-use std::mem;
+use std::io::Write;
+use std::mem;
 
-use errors::RuntimeError;
+use errors::RuntimeError;
 
-use parser::parser::ParseNotes;
-use std::fs;
-use std::path::PathBuf;
+use parser::parser::ParseNotes;
+use std::fs;
+use std::path::PathBuf;
 
-use crate::compiler_types::*;
+use crate::compiler_types::*;
 
-use ariadne::Color as TColor;
-use ariadne::Fmt;
+use ariadne::Color as TColor;
+use ariadne::Fmt;
 
 pub fn compile_spwn(
     statements: Vec<ast::Statement>,
@@ -46,10 +46,10 @@ pub fn compile_spwn(
 ) -> Result<Globals, RuntimeError> {
     //variables that get changed throughout the compiling
 
-    let mut globals = Globals::new(source.clone(), permissions, initial_level, std_out);
-    globals.includes = included_paths;
+    let mut globals = Globals::new(source.clone(), permissions, initial_level, std_out);
+    globals.includes = included_paths;
 
-    let print_with_color = |a: &str, color| println!("{}", a.fg(color));
+    let print_with_color = |a: &str, color| println!("{}", a.fg(color));
 
     // if statements.is_empty() {
     //     return Err(RuntimeError::CustomError(create_error(
@@ -60,26 +60,26 @@ pub fn compile_spwn(
     //         "this script is empty",
     //         &[],
     //         None,
-    //     )));
+    //     )));
     // }
-    let mut start_context = FullContext::new(&globals);
+    let mut start_context = FullContext::new(&globals);
     //store at pos 0
-    // store_value(Value::Builtins, 1, &mut globals, &start_context);
-    // store_value(Value::Null, 1, &mut globals, &start_context);
+    // store_value(Value::Builtins, 1, &mut globals, &start_context);
+    // store_value(Value::Null, 1, &mut globals, &start_context);
 
     let start_info = CompilerInfo {
         ..CompilerInfo::from_area(errors::compiler_info::CodeArea {
             file: LocalIntern::new(source.clone()),
             pos: (0, 0),
         })
-    };
-    use std::time::Instant;
+    };
+    use std::time::Instant;
 
-    //println!("Importing standard library...");
-    print_with_color("Building script ...", TColor::Cyan);
-    print_with_color("———————————————————————————\n", TColor::White);
+    //println!("Importing standard library...");
+    print_with_color("Building script ...", TColor::Cyan);
+    print_with_color("———————————————————————————\n", TColor::White);
     #[cfg(not(target_arch = "wasm32"))]
-    let start_time = Instant::now();
+    let start_time = Instant::now();
 
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
         import_module(
@@ -88,7 +88,7 @@ pub fn compile_spwn(
             &mut globals,
             start_info.clone(),
             false,
-        )?;
+        )?;
 
         if let FullContext::Split(_, _) = start_context {
             return Err(RuntimeError::CustomError(create_error(
@@ -96,7 +96,7 @@ pub fn compile_spwn(
                 "The standard library can not split the context",
                 &[],
                 None,
-            )));
+            )));
         }
 
         if let Value::Dict(d) = &globals.stored_values[start_context.inner().return_value] {
@@ -109,15 +109,15 @@ pub fn compile_spwn(
                 "The standard library must return a dictionary",
                 &[],
                 None,
-            )));
+            )));
         }
     }
 
-    compile_scope(&statements, &mut start_context, &mut globals, start_info)?;
+    compile_scope(&statements, &mut start_context, &mut globals, start_info)?;
     if !statements.is_empty() {
         for fc in start_context.with_breaks() {
-            let c = fc.inner();
-            let end_pos = statements.last().unwrap().pos.1;
+            let c = fc.inner();
+            let end_pos = statements.last().unwrap().pos.1;
             if let Some((r, i)) = c.broken {
                 return Err(RuntimeError::BreakNeverUsedError {
                     breaktype: r,
@@ -128,12 +128,12 @@ pub fn compile_spwn(
                         file: LocalIntern::new(source),
                     },
                     reason: "the program ended".to_string(),
-                });
+                });
             }
         }
     }
 
-    print_with_color("———————————————————————————\n", TColor::White);
+    print_with_color("———————————————————————————\n", TColor::White);
 
     /*  Build Timing ----------------------------------------------------- **
         New build timing changes the unit form milliseconds, to seconds,
@@ -142,26 +142,26 @@ pub fn compile_spwn(
     #[cfg(not(target_arch = "wasm32"))]
     {
         // Define the different units
-        let build_time_secs = start_time.elapsed().as_secs();
-        let build_time_millis = start_time.elapsed().as_millis();
-        let build_time_mins = build_time_secs / 60;
+        let build_time_secs = start_time.elapsed().as_secs();
+        let build_time_millis = start_time.elapsed().as_millis();
+        let build_time_mins = build_time_secs / 60;
 
         // Check which unit to unit to use
         if build_time_millis < 1000 {
             print_with_color(
                 &format!("Built in {} milliseconds!", build_time_millis),
                 TColor::Green,
-            );
+            );
         } else if build_time_millis < 60000 {
             print_with_color(
                 &format!("Built in {} seconds!", build_time_secs),
                 TColor::Green,
-            );
+            );
         } else {
             print_with_color(
                 &format!("Built in {} minutes!", build_time_mins),
                 TColor::Green,
-            );
+            );
         }
     }
 
@@ -170,7 +170,7 @@ pub fn compile_spwn(
     Ok(globals)
 }
 
-use crate::compiler_types::EvalExpression;
+use crate::compiler_types::EvalExpression;
 
 pub fn compile_scope(
     statements: &[ast::Statement],
@@ -179,38 +179,38 @@ pub fn compile_scope(
     mut info: CompilerInfo,
 ) -> Result<(), RuntimeError> {
     if contexts.iter().next().is_none() {
-        return Ok(());
+        return Ok(());
     }
-    contexts.enter_scope();
-    contexts.reset_return_vals(globals);
+    contexts.enter_scope();
+    contexts.reset_return_vals(globals);
 
     for statement in statements.iter() {
         //find out what kind of statement this is
-        //let start_time = Instant::now();
+        //let start_time = Instant::now();
 
-        //print_error_intro(info.pos, &info.current_file);
+        //print_error_intro(info.pos, &info.current_file);
 
-        //println!("{}", statement.fmt(0));
+        //println!("{}", statement.fmt(0));
 
         // println!(
         //     "{} -> Compiling a statement in {} contexts",
         //     info.path.join(">"),
         //     contexts.len()
-        // );
-        info.position.pos = statement.pos;
+        // );
+        info.position.pos = statement.pos;
 
         // println!(
         //     "{}:0:{}",
         //     info.position.file.to_string_lossy(),
         //     info.position.pos.0
-        // );
-        use ast::StatementBody::*;
+        // );
+        use ast::StatementBody::*;
 
         let stored_context = if statement.arrow {
-            let mut stored = Vec::new();
-            globals.push_new_preserved();
+            let mut stored = Vec::new();
+            globals.push_new_preserved();
             for c in contexts.with_breaks() {
-                stored.push(c.clone());
+                stored.push(c.clone());
                 for v in c.inner().get_variables().values() {
                     for VariableData { val: v, .. } in v {
                         globals.push_preserved_val(*v)
@@ -224,14 +224,14 @@ pub fn compile_scope(
                 }
             }
             // TODO: preserve these
-            *contexts = FullContext::stack(&mut contexts.iter().map(|c| c.clone())).unwrap();
+            *contexts = FullContext::stack(&mut contexts.iter().map(|c| c.clone())).unwrap();
             Some(stored)
         } else {
             None
-        };
+        };
 
-        //println!("{}:{}:{}", info.current_file.to_string_lossy(), info.pos.0.0, info.pos.0.1);
-        //use crate::fmt::SpwnFmt;
+        //println!("{}:{}:{}", info.current_file.to_string_lossy(), info.pos.0.0, info.pos.0.1);
+        //use crate::fmt::SpwnFmt;
         match &statement.body {
             Definition(def) => {
                 do_assignment(
@@ -243,15 +243,15 @@ pub fn compile_scope(
                     def.mutable,
                     0,
                     None
-                )?;
+                )?;
             }
             Expr(expr) => expr.eval(contexts, globals, info.clone(), true)?,
 
             Extract(val) => {
-                val.eval(contexts, globals, info.clone(), true)?;
+                val.eval(contexts, globals, info.clone(), true)?;
                 for full_context in contexts.iter() {
-                    let (context, val) = full_context.inner_value();
-                    let fn_context = context.start_group;
+                    let (context, val) = full_context.inner_value();
+                    let fn_context = context.start_group;
 
                     match globals.stored_values[val].clone() {
                         Value::Dict(ref d) => {
@@ -267,9 +267,9 @@ pub fn compile_scope(
                                     ),
                                     0,
                                 )
-                            });
+                            });
                             for (a, b, c) in iter {
-                                context.new_redefinable_variable(a, b, c);
+                                context.new_redefinable_variable(a, b, c);
                             }
                         }
                         Value::Builtins => {
@@ -279,13 +279,13 @@ pub fn compile_scope(
                                     globals,
                                     fn_context,
                                     info.position,
-                                );
+                                );
 
                                 context.new_redefinable_variable(
                                     LocalIntern::new(String::from(*name)),
                                     p,
                                     0,
-                                );
+                                );
                             }
                         }
                         a => {
@@ -302,7 +302,7 @@ pub fn compile_scope(
 
             TypeDef(name) => {
                 //initialize type
-                let already = globals.type_ids.get(name);
+                let already = globals.type_ids.get(name);
                 if let Some(t) = already {
                     if t.1 != info.position {
                         return Err(RuntimeError::CustomError(create_error(
@@ -313,13 +313,13 @@ pub fn compile_scope(
                                 (info.position, "Attempted to redefine here"),
                             ],
                             None,
-                        )));
+                        )));
                     }
                 } else {
-                    (*globals).type_id_count += 1;
+                    (*globals).type_id_count += 1;
                     (*globals)
                         .type_ids
-                        .insert(name.clone(), (globals.type_id_count, info.position));
+                        .insert(name.clone(), (globals.type_id_count, info.position));
                 }
                 //Value::TypeIndicator(globals.type_id_count)
             }
@@ -327,9 +327,9 @@ pub fn compile_scope(
             If(if_stmt) => {
                 if_stmt
                     .condition
-                    .eval(contexts, globals, info.clone(), true)?;
+                    .eval(contexts, globals, info.clone(), true)?;
                 for full_context in contexts.iter() {
-                    let (_, val) = full_context.inner_value();
+                    let (_, val) = full_context.inner_value();
                     match &globals.stored_values[val] {
                         Value::Bool(b) => {
                             //internal if statement
@@ -339,14 +339,14 @@ pub fn compile_scope(
                                     full_context,
                                     globals,
                                     info.clone(),
-                                )?;
+                                )?;
                             } else {
                                 match &if_stmt.else_body {
                                     Some(body) => {
-                                        compile_scope(body, full_context, globals, info.clone())?;
+                                        compile_scope(body, full_context, globals, info.clone())?;
                                     }
                                     None => (),
-                                };
+                                };
                             }
                         }
                         a => {
@@ -362,7 +362,7 @@ pub fn compile_scope(
             }
 
             Impl(imp) => {
-                let message = "cannot run impl statement in a trigger function context, consider moving it to the start of your script.".to_string();
+                let message = "cannot run impl statement in a trigger function context, consider moving it to the start of your script.".to_string();
 
                 if let FullContext::Single(c) = &contexts {
                     if c.start_group.id != Id::Specific(0) {
@@ -370,7 +370,7 @@ pub fn compile_scope(
                             message,
                             info,
                             context_changes: c.fn_context_change_stack.clone(),
-                        });
+                        });
                     }
                 } else {
                     return Err(RuntimeError::CustomError(create_error(
@@ -378,10 +378,10 @@ pub fn compile_scope(
                         "impl cannot run in a split context",
                         &[],
                         None,
-                    )));
+                    )));
                 }
 
-                imp.symbol.to_value(contexts, globals, info.clone(), true)?;
+                imp.symbol.to_value(contexts, globals, info.clone(), true)?;
 
                 if let FullContext::Split(_, _) = contexts {
                     return Err(RuntimeError::CustomError(create_error(
@@ -389,28 +389,28 @@ pub fn compile_scope(
                         "impl statements with context-splitting values are not allowed",
                         &[],
                         None,
-                    )));
+                    )));
                 }
 
-                let (c, typ) = contexts.inner_value();
+                let (c, typ) = contexts.inner_value();
 
                 if c.start_group.id != Id::Specific(0) {
                     return Err(RuntimeError::ContextChangeError {
                         message: "impl type changes the context".to_string(),
                         info,
                         context_changes: c.fn_context_change_stack.clone(),
-                    });
+                    });
                 }
                 match globals.stored_values[typ].clone() {
                     Value::TypeIndicator(s) => {
-                        eval_dict(imp.members.clone(), contexts, globals, info.clone(), true)?;
+                        eval_dict(imp.members.clone(), contexts, globals, info.clone(), true)?;
                         if let FullContext::Split(_, _) = contexts {
                             return Err(RuntimeError::CustomError(create_error(
                                 info,
                                 "impl statements with context-splitting values are not allowed",
                                 &[],
                                 None,
-                            )));
+                            )));
                         }
                         //Returns inside impl values dont really make sense do they
                         if contexts.inner().broken.is_some() {
@@ -419,9 +419,9 @@ pub fn compile_scope(
                                 "you can't use return from inside an impl statement value",
                                 &[],
                                 None,
-                            )));
+                            )));
                         }
-                        let (_, val) = contexts.inner_value();
+                        let (_, val) = contexts.inner_value();
 
                         // make this not ugly, future me
 
@@ -429,7 +429,7 @@ pub fn compile_scope(
                             match globals.implementations.get_mut(&s) {
                                 Some(implementation) => {
                                     for (key, val) in d.iter() {
-                                        (*implementation).insert(*key, (*val, true));
+                                        (*implementation).insert(*key, (*val, true));
                                     }
                                 }
                                 None => {
@@ -438,11 +438,11 @@ pub fn compile_scope(
                                         d.iter()
                                             .map(|(key, value)| (*key, (*value, true)))
                                             .collect(),
-                                    );
+                                    );
                                 }
                             }
                         } else {
-                            unreachable!();
+                            unreachable!();
                         }
                     }
                     a => {
@@ -455,19 +455,19 @@ pub fn compile_scope(
                     }
                 }
 
-                //println!("{:?}", new_contexts[0].implementations);
+                //println!("{:?}", new_contexts[0].implementations);
             }
             Call(call) => {
                 /*for context in &mut contexts {
-                    context.x += 1;
+                    context.x += 1;
                 }*/
                 call.function
-                    .to_value(contexts, globals, info.clone(), true)?;
+                    .to_value(contexts, globals, info.clone(), true)?;
 
-                //let mut obj_list = Vec::<GDObj>::new();
+                //let mut obj_list = Vec::<GDObj>::new();
                 for full_context in contexts.iter() {
-                    let (context, func) = full_context.inner_value();
-                    let mut params = FnvHashMap::default();
+                    let (context, func) = full_context.inner_value();
+                    let mut params = FnvHashMap::default();
                     params.insert(
                         51,
                         match &globals.stored_values[func] {
@@ -482,9 +482,9 @@ pub fn compile_scope(
                                 })
                             }
                         },
-                    );
-                    params.insert(1, ObjParam::Number(1268.0));
-                    (*globals).trigger_order += 1.0;
+                    );
+                    params.insert(1, ObjParam::Number(1268.0));
+                    (*globals).trigger_order += 1.0;
 
                     (*globals).func_ids[context.func_id].obj_list.push((
                         GdObj {
@@ -500,12 +500,12 @@ pub fn compile_scope(
 
             While(w) => {
                 for full_context in contexts.iter() {
-                    let fn_context = full_context.inner().start_group;
+                    let fn_context = full_context.inner().start_group;
                     loop {
-                        full_context.disable_breaks(BreakType::ContinueLoop);
+                        full_context.disable_breaks(BreakType::ContinueLoop);
 
                         w.condition
-                            .eval(full_context, globals, info.clone(), true)?;
+                            .eval(full_context, globals, info.clone(), true)?;
 
                         if let FullContext::Split(_, _) = full_context {
                             return Err(RuntimeError::CustomError(create_error(
@@ -513,7 +513,7 @@ pub fn compile_scope(
                                 "While loop condition can not split the context",
                                 &[],
                                 Some("Consider using a runtime while loop"),
-                            )));
+                            )));
                         }
 
                         if full_context.inner().start_group != fn_context {
@@ -521,32 +521,32 @@ pub fn compile_scope(
                                 message: "While loop condition can not change the trigger function context (consider using a runtime while loop)".to_string(),
                                 info,
                                 context_changes: full_context.inner().fn_context_change_stack.clone()
-                            });
+                            });
                         }
 
                         if let Value::Bool(b) =
                             globals.stored_values[full_context.inner().return_value]
                         {
                             if b {
-                                compile_scope(&w.body, full_context, globals, info.clone())?;
+                                compile_scope(&w.body, full_context, globals, info.clone())?;
                                 if let FullContext::Split(_, _) = full_context {
                                     return Err(RuntimeError::CustomError(create_error(
                                         info,
                                         "While loop body can not split the context (consider using a runtime while loop)",
                                         &[],
                                         Some("Consider using a runtime while loop"),
-                                    )));
+                                    )));
                                 }
                                 if full_context.inner().start_group != fn_context {
                                     return Err(RuntimeError::ContextChangeError {
                                         message: "While loop body can not change the trigger function context".to_string(),
                                         info,
                                         context_changes: full_context.inner().fn_context_change_stack.clone()
-                                    });
+                                    });
                                 }
                             } else {
                                 full_context.inner().broken =
-                                    Some((BreakType::Loop, CodeArea::new()));
+                                    Some((BreakType::Loop, CodeArea::new()));
                             }
                         } else {
                             return Err(RuntimeError::TypeError {
@@ -554,23 +554,23 @@ pub fn compile_scope(
                                 found: globals.get_type_str(full_context.inner().return_value),
                                 val_def: globals.get_area(full_context.inner().return_value),
                                 info,
-                            });
+                            });
                         }
 
                         let all_breaks = full_context.with_breaks().all(|fc| {
                             !matches!(fc.inner().broken, Some((BreakType::ContinueLoop, _)) | None)
-                        });
+                        });
                         if all_breaks {
-                            break;
+                            break;
                         }
                     }
-                    full_context.disable_breaks(BreakType::Loop);
-                    full_context.disable_breaks(BreakType::ContinueLoop);
+                    full_context.disable_breaks(BreakType::Loop);
+                    full_context.disable_breaks(BreakType::ContinueLoop);
                 }
             }
 
             For(f) => {
-                f.array.eval(contexts, globals, info.clone(), true)?;
+                f.array.eval(contexts, globals, info.clone(), true)?;
                 /*
                 Before going further you should probably understand what contexts mean.
                 A "context", in SPWN, is like a parallel universe. Each context is nearly
@@ -580,8 +580,8 @@ pub fn compile_scope(
                 of contexts, one for each possible value from the conversion. All of the branched contexts
                 will be evaluated in isolation to each other.
                 */
-                let i_dest = &f.symbol;
-                let mut maybe_single: Option<LocalIntern<String>> = None;
+                let i_dest = &f.symbol;
+                let mut maybe_single: Option<LocalIntern<String>> = None;
                 if i_dest.operators.is_empty()
                     && i_dest.values.len() == 1
                     && i_dest.values[0].path.is_empty()
@@ -589,18 +589,18 @@ pub fn compile_scope(
                     && matches!(i_dest.values[0].value.body, ast::ValueBody::Symbol(_))
                 {
                     if let ast::ValueBody::Symbol(single) = i_dest.values[0].value.body {
-                        maybe_single = Some(single);
+                        maybe_single = Some(single);
                     } else {
-                        unreachable!();
+                        unreachable!();
                     }
                 }
 
                 // skips all broken contexts, so as to not interfere with potential breaks in the following loops
 
                 for full_context in contexts.iter() {
-                    let (_, val) = full_context.inner_value();
-                    globals.push_new_preserved();
-                    globals.push_preserved_val(val);
+                    let (_, val) = full_context.inner_value();
+                    globals.push_new_preserved();
+                    globals.push_preserved_val(val);
 
                     match globals.stored_values[val].clone() {
                         // what are we iterating
@@ -609,7 +609,7 @@ pub fn compile_scope(
 
                             for element in &arr {
                                 // going through the array items
-                                full_context.disable_breaks(BreakType::ContinueLoop);
+                                full_context.disable_breaks(BreakType::ContinueLoop);
 
                                 do_assignment(
                                     i_dest,
@@ -624,7 +624,7 @@ pub fn compile_scope(
                                     true,
                                     -1,
                                     None
-                                )?;
+                                )?;
 
                                 /*if let Some(single) = maybe_single {
                                     full_context.set_variable_and_clone(
@@ -634,26 +634,26 @@ pub fn compile_scope(
                                         true,
                                         globals,
                                         globals.get_area(*element),
-                                    );
+                                    );
                                 } else {
                                     do_destructure(
                                         full_context,
                                         globals,
                                         ast::ValueBody::Resolved(*element),
-                                    )?;
+                                    )?;
                                 }*/
 
-                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
+                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
                                 let all_breaks = full_context.with_breaks().all(|fc| {
                                     !matches!(
                                         fc.inner().broken,
                                         Some((BreakType::ContinueLoop, _)) | None
                                     )
-                                });
+                                });
 
                                 if all_breaks {
-                                    break;
+                                    break;
                                 }
                             }
 
@@ -663,24 +663,24 @@ pub fn compile_scope(
                             // its a dict!
                             for (k, v) in d {
                                 // going through the dict items
-                                full_context.disable_breaks(BreakType::ContinueLoop);
+                                full_context.disable_breaks(BreakType::ContinueLoop);
 
                                 for c in full_context.iter() {
-                                    let fn_context = c.inner().start_group;
+                                    let fn_context = c.inner().start_group;
                                     let key = store_val_m(
                                         Value::Str(k.as_ref().clone()),
                                         globals,
                                         fn_context,
                                         true,
                                         globals.get_area(v),
-                                    );
+                                    );
                                     let val = clone_value(
                                         v,
                                         globals,
                                         fn_context,
                                         true,
                                         globals.get_area(v),
-                                    );
+                                    );
                                     // reset all variables per context
 
                                     let tmp_arr = store_const_value(
@@ -688,7 +688,7 @@ pub fn compile_scope(
                                         globals,
                                         fn_context,
                                         globals.get_area(v),
-                                    );
+                                    );
                                     do_assignment(
                                         i_dest,
                                         &Some(
@@ -702,7 +702,7 @@ pub fn compile_scope(
                                         true,
                                         -1,
                                         None
-                                    )?;
+                                    )?;
                                     /*if let Some(single) = maybe_single {
                                         (*c.inner()).new_variable(
                                             single,
@@ -713,7 +713,7 @@ pub fn compile_scope(
                                                 globals.get_area(v),
                                             ),
                                             -1,
-                                        );
+                                        );
                                     } else {
 
                                         do_destructure(
@@ -727,28 +727,28 @@ pub fn compile_scope(
                                                     .to_variable((0, 0))
                                                     .to_expression(),
                                             ]),
-                                        )?;
+                                        )?;
                                     }*/
                                 }
 
-                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
+                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
                                 let all_breaks = full_context.with_breaks().all(|fc| {
                                     !matches!(
                                         fc.inner().broken,
                                         Some((BreakType::ContinueLoop, _)) | None
                                     )
-                                });
+                                });
 
                                 if all_breaks {
-                                    break;
+                                    break;
                                 }
                             }
                         }
                         Value::Str(s) => {
                             for ch in s.chars() {
                                 // going through the array items
-                                full_context.disable_breaks(BreakType::ContinueLoop);
+                                full_context.disable_breaks(BreakType::ContinueLoop);
                                 if let Some(single) = maybe_single {
                                     full_context.set_variable_and_store(
                                         single,
@@ -757,40 +757,40 @@ pub fn compile_scope(
                                         true,
                                         globals,
                                         info.position,
-                                    );
+                                    );
                                 } else {
                                     return Err(RuntimeError::CustomError(create_error(
                                         info.clone(),
                                         "Cannot destructure string",
                                         &[],
                                         None,
-                                    )));
+                                    )));
                                 }
 
-                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
+                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
                                 let all_breaks = full_context.with_breaks().all(|fc| {
                                     !matches!(
                                         fc.inner().broken,
                                         Some((BreakType::ContinueLoop, _)) | None
                                     )
-                                });
+                                });
 
                                 if all_breaks {
-                                    break;
+                                    break;
                                 }
                             }
                         }
 
                         Value::Range(start, end, step) => {
-                            let mut normal = (start..end).step_by(step);
-                            let mut rev = (end..start).step_by(step).rev();
+                            let mut normal = (start..end).step_by(step);
+                            let mut rev = (end..start).step_by(step).rev();
                             let range: &mut dyn Iterator<Item = i32> =
-                                if start < end { &mut normal } else { &mut rev };
+                                if start < end { &mut normal } else { &mut rev };
 
                             for num in range {
                                 // going through the array items
-                                full_context.disable_breaks(BreakType::ContinueLoop);
+                                full_context.disable_breaks(BreakType::ContinueLoop);
                                 if let Some(single) = maybe_single {
                                     full_context.set_variable_and_store(
                                         single,
@@ -799,31 +799,31 @@ pub fn compile_scope(
                                         true,
                                         globals,
                                         info.position,
-                                    );
+                                    );
                                 } else {
                                     return Err(RuntimeError::CustomError(create_error(
                                         info.clone(),
                                         "Cannot destructure range",
                                         &[],
                                         None,
-                                    )));
+                                    )));
                                 }
 
-                                //dbg!(full_context.with_breaks().count());
+                                //dbg!(full_context.with_breaks().count());
 
-                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
+                                compile_scope(&f.body, full_context, globals, info.clone())?; // eval the stuff
 
-                                //dbg!(full_context.with_breaks().count());
+                                //dbg!(full_context.with_breaks().count());
 
                                 let all_breaks = full_context.with_breaks().all(|fc| {
                                     !matches!(
                                         fc.inner().broken,
                                         Some((BreakType::ContinueLoop, _)) | None
                                     )
-                                });
+                                });
 
                                 if all_breaks {
-                                    break;
+                                    break;
                                 }
                             }
                         }
@@ -837,25 +837,25 @@ pub fn compile_scope(
                             })
                         }
                     }
-                    full_context.disable_breaks(BreakType::Loop);
-                    full_context.disable_breaks(BreakType::ContinueLoop);
-                    globals.pop_preserved();
+                    full_context.disable_breaks(BreakType::Loop);
+                    full_context.disable_breaks(BreakType::ContinueLoop);
+                    globals.pop_preserved();
                 }
             }
             Break => {
                 //set all contexts to broken
                 for c in contexts.iter() {
-                    (*c.inner()).broken = Some((BreakType::Loop, info.position));
+                    (*c.inner()).broken = Some((BreakType::Loop, info.position));
                 }
-                break;
+                break;
             }
 
             Continue => {
                 //set all contexts to broken
                 for c in contexts.iter() {
-                    (*c.inner()).broken = Some((BreakType::ContinueLoop, info.position));
+                    (*c.inner()).broken = Some((BreakType::ContinueLoop, info.position));
                 }
-                break;
+                break;
             }
 
             Return(return_val) => {
@@ -864,7 +864,7 @@ pub fn compile_scope(
                     //     *full_context = FullContext::Split(
                     //         full_context.clone().into(),
                     //         full_context.clone().into(),
-                    //     );
+                    //     );
                     //     if let FullContext::Split(_, c) = full_context {
                     //         &mut **c
                     //     } else {
@@ -872,12 +872,12 @@ pub fn compile_scope(
                     //     }
                     // } else {
                     //     full_context
-                    // };
+                    // };
                     match return_val {
                         Some(val) => {
-                            val.eval(full_context, globals, info.clone(), true)?;
+                            val.eval(full_context, globals, info.clone(), true)?;
                             for context in full_context.iter() {
-                                let return_val = context.inner().return_value;
+                                let return_val = context.inner().return_value;
                                 context.inner().broken = Some((
                                     BreakType::Macro(
                                         Some(clone_value(
@@ -890,54 +890,54 @@ pub fn compile_scope(
                                         statement.arrow,
                                     ),
                                     info.position,
-                                ));
+                                ));
                             }
                         }
 
                         None => {
                             full_context.inner().broken =
-                                Some((BreakType::Macro(None, statement.arrow), info.position));
+                                Some((BreakType::Macro(None, statement.arrow), info.position));
                         }
-                    };
+                    };
                 }
                 if !statement.arrow {
-                    break;
+                    break;
                 }
             }
 
             Error(e) => {
-                let mut errors = Vec::new();
+                let mut errors = Vec::new();
 
-                e.message.eval(contexts, globals, info.clone(), true)?;
+                e.message.eval(contexts, globals, info.clone(), true)?;
                 for c in contexts.iter() {
                     let err = globals.stored_values[c.inner().return_value]
                         .clone()
-                        .to_str(globals);
+                        .to_str(globals);
                     errors.push((info.position, err))
                 }
 
-                let mut new_errors = Vec::new();
+                let mut new_errors = Vec::new();
                 for (area, msg) in errors.iter() {
                     new_errors.push((*area, msg.as_str()))
                 }
 
-                let err = create_error(info, "Runtime Error", &new_errors, None);
+                let err = create_error(info, "Runtime Error", &new_errors, None);
 
-                return Err(RuntimeError::CustomError(err));
+                return Err(RuntimeError::CustomError(err));
             }
         }
 
-        contexts.reset_return_vals(globals);
+        contexts.reset_return_vals(globals);
 
         if let Some(c) = stored_context {
-            globals.pop_preserved();
+            globals.pop_preserved();
             //resetting the context if async
-            let mut list = c;
+            let mut list = c;
 
             for context in contexts.with_breaks() {
                 if let Some((r, i)) = context.inner().broken {
                     if let BreakType::Macro(_, true) = r {
-                        list.push(context.clone());
+                        list.push(context.clone());
                     } else {
                         return Err(RuntimeError::BreakNeverUsedError {
                             breaktype: r,
@@ -945,18 +945,18 @@ pub fn compile_scope(
                             broke: i,
                             dropped: info.position,
                             reason: "it's inside an arrow statement".to_string(),
-                        });
+                        });
                     }
                 }
             }
-            *contexts = FullContext::stack(&mut list.into_iter()).unwrap();
+            *contexts = FullContext::stack(&mut list.into_iter()).unwrap();
         }
 
         //try to merge contexts
-        merge_all_contexts(contexts, globals, false);
+        merge_all_contexts(contexts, globals, false);
 
         if contexts.iter().next().is_none() {
-            break;
+            break;
         }
 
         /*println!(
@@ -964,19 +964,19 @@ pub fn compile_scope(
             path,
             statement_type,
             start_time.elapsed().as_millis(),
-        );*/
+        );*/
 
         let increase =
-            globals.stored_values.map.len() as i32 - globals.stored_values.prev_value_count as i32;
+            globals.stored_values.map.len() as i32 - globals.stored_values.prev_value_count as i32;
 
         if increase > 5000 {
-            globals.collect_garbage(contexts);
+            globals.collect_garbage(contexts);
         }
     }
 
     // TODO: get rid of lifetimes
 
-    contexts.exit_scope();
+    contexts.exit_scope();
 
     Ok(())
 }
@@ -997,24 +997,24 @@ pub fn do_assignment(
             "Cannot destructure value into empty expression",
             &[],
             None,
-        )));
+        )));
     }
     if destex.values.len() > 1 || !destex.operators.is_empty() {
-        let mut area = info.position;
-        area.pos = destex.values[1].pos;
+        let mut area = info.position;
+        area.pos = destex.values[1].pos;
         return Err(RuntimeError::CustomError(create_error(
             info.clone(),
             "Cannot destructure value into this expression",
             &[(area, "Invalid destructure pattern")],
             None,
-        )));
+        )));
     }
-    let dest = &destex.values[0];
+    let dest = &destex.values[0];
 
     let destructure_sanitize = |src: &Option<_>| -> Result<(), RuntimeError> {
-        //use parser::fmt::_format2;
+        //use parser::fmt::_format2;
 
-        let dst = &destex.values[0];
+        let dst = &destex.values[0];
 
         if dst.operator.is_some() || !dst.path.is_empty() {
             return Err(RuntimeError::CustomError(create_error(
@@ -1022,7 +1022,7 @@ pub fn do_assignment(
                 "Invalid destructure symbol",
                 &[],
                 Some("Remove any unary operators or extentions"),
-            )));
+            )));
         }
         if src.is_none() {
             return Err(RuntimeError::CustomError(create_error(
@@ -1030,13 +1030,13 @@ pub fn do_assignment(
                 "Destructure expressions require a value to destruct",
                 &[],
                 None,
-            )));
+            )));
         }
         Ok(())
-    };
+    };
 
     if let ast::ValueBody::Array(arr) = &dest.value.body {
-        destructure_sanitize(src)?;
+        destructure_sanitize(src)?;
         array_destructure_define(
             arr,
             src.as_ref().unwrap(),
@@ -1046,10 +1046,10 @@ pub fn do_assignment(
             mutable,
             scope,
             concat
-        )?;
+        )?;
         Ok(())
     } else if let ast::ValueBody::Dictionary(kvs) = &dest.value.body {
-        destructure_sanitize(src)?;
+        destructure_sanitize(src)?;
         dict_destructure_define(
             kvs, 
             info, 
@@ -1058,7 +1058,7 @@ pub fn do_assignment(
             globals, 
             mutable, 
             concat
-        )?;
+        )?;
         Ok(())
     } else {
         // no destructure here
@@ -1068,7 +1068,7 @@ pub fn do_assignment(
                 && new_expr.values[0].operator.is_none()
         } else {
             true
-        };
+        };
         let pre_evaled = if let Some(new_expr) = &src {
             if value_is_normalized
                 && matches!(
@@ -1078,32 +1078,32 @@ pub fn do_assignment(
             {
                 false
             } else {
-                new_expr.eval(contexts, globals, info.clone(), mutable)?;
+                new_expr.eval(contexts, globals, info.clone(), mutable)?;
                 true
             }
         } else {
             false
-        };
+        };
 
         let defined = if concat != Some(false) {
             dest.try_define(contexts, globals, info, mutable, scope)?
         } else {
 
             for f_c in contexts.iter() {
-                let tmp = f_c.inner().return_value;
-                dest.to_value(f_c, globals, info.clone(), false)?;
-                f_c.inner().return_value2 = f_c.inner().return_value;
-                f_c.inner().return_value = tmp;
+                let tmp = f_c.inner().return_value;
+                dest.to_value(f_c, globals, info.clone(), false)?;
+                f_c.inner().return_value2 = f_c.inner().return_value;
+                f_c.inner().return_value = tmp;
             }
 
             DefineResult::Ok
-        };
+        };
 
         for full_context in contexts.iter() {
 
             let (defined, storage) = 
                 if let Some(overwrite) = concat {
-                    let initial_storage = full_context.inner().return_value2;
+                    let initial_storage = full_context.inner().return_value2;
                     if overwrite {
                         let stub = store_val_m(
                             Value::Null,
@@ -1111,8 +1111,8 @@ pub fn do_assignment(
                             full_context.inner().start_group,
                             false,
                             info.position,
-                        );
-                        globals.stored_values[initial_storage] = Value::Array(vec![stub]);
+                        );
+                        globals.stored_values[initial_storage] = Value::Array(vec![stub]);
 
                         (DefineResult::Ok, stub)
                     } else {
@@ -1122,7 +1122,7 @@ pub fn do_assignment(
                             full_context.inner().start_group,
                             false,
                             info.position,
-                        );
+                        );
 
                         match &mut globals.stored_values[initial_storage] {
                             Value::Array(a) => a.push(stub),
@@ -1133,9 +1133,9 @@ pub fn do_assignment(
                         (DefineResult::Ok, stub)
                     }
                 } else {
-                    let storage = full_context.inner().return_value2;
+                    let storage = full_context.inner().return_value2;
                     (defined, storage)
-                };
+                };
 
             let assign_implemented = globals.stored_values[full_context.inner().return_value]
                 .clone()
@@ -1145,7 +1145,7 @@ pub fn do_assignment(
                     globals,
                     info.clone(),
                 )
-                .is_some();
+                .is_some();
 
             match (defined, mutable, assign_implemented) {
                 (DefineResult::AlreadyDefined(false), false, false) // something is already defined
@@ -1163,8 +1163,8 @@ pub fn do_assignment(
                             )
                             .is_none()
                     {
-                        use parser::fmt::SpwnFmt;
-                        let symbol = SpwnFmt::fmt(dest, 0);
+                        use parser::fmt::SpwnFmt;
+                        let symbol = SpwnFmt::fmt(dest, 0);
                         return Err(RuntimeError::CustomError(create_error(
                             info.clone(),
                             &format!("This constant `{}` is already defined", symbol),
@@ -1176,7 +1176,7 @@ pub fn do_assignment(
                                 (info.position, "Attempted to redefine it here"),
                             ],
                             None,
-                        )));
+                        )));
                     }
 
                     if let Some(value) = &src {
@@ -1188,21 +1188,21 @@ pub fn do_assignment(
                                 full_context,
                                 globals,
                                 info,
-                            )?;
+                            )?;
                         } else {
                             let symbol = ast::ValueBody::Resolved(storage)
-                                .to_variable(dest.pos);
+                                .to_variable(dest.pos);
                             let mut expr = ast::Expression {
                                 values: Vec::with_capacity(value.values.len() + 1),
                                 operators: Vec::with_capacity(
                                     value.operators.len() + 1,
                                 ),
-                            };
-                            expr.values.push(symbol);
-                            expr.operators.push(ast::Operator::Assign);
-                            expr.values.extend(value.values.clone());
-                            expr.operators.extend(value.operators.iter().copied());
-                            expr.eval(full_context, globals, info.clone(), true)?;
+                            };
+                            expr.values.push(symbol);
+                            expr.operators.push(ast::Operator::Assign);
+                            expr.values.extend(value.values.clone());
+                            expr.operators.extend(value.operators.iter().copied());
+                            expr.eval(full_context, globals, info.clone(), true)?;
                         }
                     } else {
                         unreachable!()
@@ -1213,29 +1213,29 @@ pub fn do_assignment(
                         match (value_is_normalized, &new_expr.values[0].value.body) {
                             (true, ast::ValueBody::CmpStmt(f)) => {
                                 //to account for recursion
-                                assert!(!pre_evaled);
+                                assert!(!pre_evaled);
 
                                 //pick a start group
                                 let start_group =
-                                    Group::next_free(&mut globals.closed_groups);
+                                    Group::next_free(&mut globals.closed_groups);
                                 //store value
                                 globals.stored_values[storage] =
-                                    Value::TriggerFunc(TriggerFunction { start_group });
+                                    Value::TriggerFunc(TriggerFunction { start_group });
 
                                 full_context.inner().fn_context_change_stack =
-                                    vec![info.position];
-                                //new_info.last_context_change_stack = vec![info.position.clone()];
+                                    vec![info.position];
+                                //new_info.last_context_change_stack = vec![info.position.clone()];
 
                                 f.to_trigger_func(
                                     full_context,
                                     globals,
                                     info.clone(),
                                     Some(start_group),
-                                )?;
+                                )?;
                             }
 
                             (true, ast::ValueBody::Macro(m)) => {
-                                assert!(!pre_evaled);
+                                assert!(!pre_evaled);
 
                                 macro_to_value(
                                     m,
@@ -1243,9 +1243,9 @@ pub fn do_assignment(
                                     globals,
                                     info.clone(),
                                     !mutable,
-                                )?;
+                                )?;
 
-                                let (context, val) = full_context.inner_value();
+                                let (context, val) = full_context.inner_value();
 
                                 //clone the value so as to not share the reference
 
@@ -1254,21 +1254,21 @@ pub fn do_assignment(
                                     globals,
                                     context.start_group,
                                     !mutable,
-                                );
+                                );
 
-                                globals.stored_values[storage] = cloned;
+                                globals.stored_values[storage] = cloned;
                             }
 
                             _ => {
-                                assert!(pre_evaled);
+                                assert!(pre_evaled);
                                 // dbg!(
                                 //     &defined,
                                 //     &mutable,
                                 //     &same_module,
                                 //     &assign_implemented
-                                // );
+                                // );
 
-                                let ctx = full_context.inner();
+                                let ctx = full_context.inner();
 
                                 if !mutable {
                                     (*globals
@@ -1279,7 +1279,7 @@ pub fn do_assignment(
                                     .def_area = CodeArea {
                                         file: info.position.file,
                                         pos: src.as_ref().unwrap().get_pos(),
-                                    };
+                                    };
                                 }
                                 //clone the value so as to not share the reference
 
@@ -1288,9 +1288,9 @@ pub fn do_assignment(
                                     globals,
                                     ctx.start_group,
                                     !mutable,
-                                );
+                                );
 
-                                globals.stored_values[storage] = cloned;
+                                globals.stored_values[storage] = cloned;
                             }
                         }
                     }
@@ -1316,12 +1316,12 @@ fn dict_destructure_define(
             ast::DictDef::Extract(d) => Some(d),
             _ => None,
         })
-        .collect();
+        .collect();
     if ranges.len() > 1 {
-        let mut area1 = info.position;
-        let mut area2 = info.position;
-        area1.pos = ranges[0].values[0].pos;
-        area2.pos = ranges[1].values[0].pos;
+        let mut area1 = info.position;
+        let mut area2 = info.position;
+        area1.pos = ranges[0].values[0].pos;
+        area2.pos = ranges[1].values[0].pos;
 
         return Err(RuntimeError::CustomError(create_error(
             info.clone(),
@@ -1331,13 +1331,13 @@ fn dict_destructure_define(
                 (area2, "Attempted to spread again"),
             ],
             None,
-        )));
+        )));
     }
     src.as_ref()
         .unwrap()
-        .eval(contexts, globals, info.clone(), true)?;
+        .eval(contexts, globals, info.clone(), true)?;
     for ctx in contexts.iter() {
-        let evaled_store = ctx.inner().return_value;
+        let evaled_store = ctx.inner().return_value;
 
         let mut evaled_src = match globals.stored_values[evaled_store].clone() {
             Value::Dict(d) => d,
@@ -1349,9 +1349,9 @@ fn dict_destructure_define(
                     info: info.clone(),
                 })
             }
-        };
+        };
 
-        let mut collected = Vec::<&LocalIntern<String>>::new();
+        let mut collected = Vec::<&LocalIntern<String>>::new();
         for kv in kvs {
             match kv {
                 ast::DictDef::Extract(_) => (),
@@ -1362,10 +1362,10 @@ fn dict_destructure_define(
                             &format!("Key '{}' not found", key),
                             &[],
                             None,
-                        )));
+                        )));
                     }
 
-                    collected.push(key);
+                    collected.push(key);
                     do_assignment(
                         value,
                         &Some(stored_to_variable(evaled_src[key], globals).to_expression()),
@@ -1375,14 +1375,14 @@ fn dict_destructure_define(
                         mutable,
                         0,
                         concat
-                    )?;
+                    )?;
                 }
             }
         }
 
         if !ranges.is_empty() {
             for k in collected {
-                evaled_src.remove(k);
+                evaled_src.remove(k);
             }
 
             let ast_src = evaled_src
@@ -1393,7 +1393,7 @@ fn dict_destructure_define(
                         stored_to_variable(evaled_src[x], globals).to_expression(),
                     ))
                 })
-                .collect();
+                .collect();
 
             do_assignment(
                 ranges[0],
@@ -1408,7 +1408,7 @@ fn dict_destructure_define(
                 mutable,
                 0,
                 concat
-            )?;
+            )?;
         }
     }
     Ok(())
@@ -1424,7 +1424,7 @@ fn array_destructure_define(
     scope: i16,
     concat: Option<bool>,
 ) -> Result<(), RuntimeError> {
-    value.eval(contexts, globals, info.clone(), true)?;
+    value.eval(contexts, globals, info.clone(), true)?;
     for ctx in contexts.iter() {
         match globals.stored_values[ctx.inner().return_value].clone() {
             Value::Array(val_a) => {
@@ -1432,13 +1432,13 @@ fn array_destructure_define(
                     .iter()
                     .filter(|x| matches!(x.operator, Some(ast::ArrayPrefix::Collect | ast::ArrayPrefix::Spread)))
                     .map(|x| &x.value)
-                    .collect::<Vec<_>>();
+                    .collect::<Vec<_>>();
 
                 if ranges.len() > 1 {
-                    let mut area1 = info.position;
-                    let mut area2 = info.position;
-                    area1.pos = ranges[0].values[0].pos;
-                    area2.pos = ranges[1].values[0].pos;
+                    let mut area1 = info.position;
+                    let mut area2 = info.position;
+                    area1.pos = ranges[0].values[0].pos;
+                    area2.pos = ranges[1].values[0].pos;
 
                     return Err(RuntimeError::CustomError(create_error(
                         info.clone(),
@@ -1448,7 +1448,7 @@ fn array_destructure_define(
                             (area2, "Attempted to spread again"),
                         ],
                         None,
-                    )));
+                    )));
                 }
 
                 if (arr.len() < val_a.len() && ranges.is_empty()) || arr.len() > val_a.len() {
@@ -1461,12 +1461,12 @@ fn array_destructure_define(
                         ),
                         &[],
                         None,
-                    )));
+                    )));
                 } else {
-                    let mut idx: usize = 0;
-                    let mut var_idx: usize = 0;
+                    let mut idx: usize = 0;
+                    let mut var_idx: usize = 0;
                     loop {
-                        let mut idx_step = 1;
+                        let mut idx_step = 1;
                         for expr_ctx in ctx.iter() {
                             if arr[var_idx].value.values.is_empty() {
                                 return Err(RuntimeError::CustomError(create_error(
@@ -1474,13 +1474,13 @@ fn array_destructure_define(
                                     "Cannot destructure value into empty expression",
                                     &[],
                                     None,
-                                )));
+                                )));
                             }
 
-                            let the_expr = &arr[var_idx].value;
+                            let the_expr = &arr[var_idx].value;
                             match arr[var_idx].operator {
                                 Some(ast::ArrayPrefix::Collect | ast::ArrayPrefix::Spread) => {
-                                    idx_step = 1 + val_a.len() - arr.len();
+                                    idx_step = 1 + val_a.len() - arr.len();
 
                                     /*let astvec = ast::ValueBody::Array(
                                         (idx..(idx + idx_step))
@@ -1493,9 +1493,9 @@ fn array_destructure_define(
                                             .collect(),
                                     )
                                     .to_variable(the_expr.values[0].pos)
-                                    .to_expression();*/
+                                    .to_expression();*/
 
-                                    let mut overwrite = true;
+                                    let mut overwrite = true;
 
                                     for stored_value in val_a.iter().skip(idx).take(idx_step) {
                                         do_assignment(
@@ -1510,8 +1510,8 @@ fn array_destructure_define(
                                             mutable,
                                             scope,
                                             Some(overwrite)
-                                        )?;
-                                        overwrite = false;
+                                        )?;
+                                        overwrite = false;
                                     }
                                 }
                                 _ => {
@@ -1526,15 +1526,15 @@ fn array_destructure_define(
                                         mutable,
                                         scope,
                                         concat
-                                    )?;
+                                    )?;
                                 }
                             }
                         }
 
-                        idx += idx_step;
-                        var_idx += 1;
+                        idx += idx_step;
+                        var_idx += 1;
                         if idx >= val_a.len() {
-                            break;
+                            break;
                         }
                     }
                 }
@@ -1558,8 +1558,8 @@ pub fn merge_all_contexts(
     check_return_vals: bool,
 ) {
     if let FullContext::Split(_, _) = contexts {
-        let mut broken = Vec::new();
-        let mut not_broken = Vec::new();
+        let mut broken = Vec::new();
+        let mut not_broken = Vec::new();
         for c in contexts.with_breaks() {
             if c.inner().broken.is_some() {
                 broken.push(c.inner().clone())
@@ -1571,14 +1571,14 @@ pub fn merge_all_contexts(
         if not_broken.len() > 1 {
             loop {
                 if !merge_contexts(&mut not_broken, globals, check_return_vals) {
-                    break;
+                    break;
                 }
             }
 
-            broken.extend(not_broken);
+            broken.extend(not_broken);
 
             *contexts =
-                FullContext::stack(&mut broken.into_iter().map(FullContext::Single)).unwrap();
+                FullContext::stack(&mut broken.into_iter().map(FullContext::Single)).unwrap();
         }
     }
 }
@@ -1588,7 +1588,7 @@ fn merge_impl(target: &mut Implementations, source: &Implementations) {
         match target.get_mut(key) {
             Some(target_imp) => (*target_imp).extend(imp.iter().map(|x| (*x.0, *x.1))),
             None => {
-                (*target).insert(*key, imp.clone());
+                (*target).insert(*key, imp.clone());
             }
         }
     }
@@ -1610,31 +1610,31 @@ pub fn get_import_path(
                     "Path is built in",
                     &[],
                     None,
-                )));
+                )));
             }
             .parent()
             .expect("Your file must be in a folder to import modules!")
-            .join(&p);
+            .join(&p);
             if !p.exists() {
                 return Err(RuntimeError::CustomError(create_error(
                     info,
                     &format!("Couldn't find module file ({})", p.to_string_lossy()),
                     &[],
                     None,
-                )));
-            };
+                )));
+            };
             p
         }
 
         ImportType::Lib(name) => {
-            let mut outpath = globals.includes[0].clone();
-            let mut found = false;
+            let mut outpath = globals.includes[0].clone();
+            let mut found = false;
 
             for path in &globals.includes {
                 if path.join("libraries").join(name).exists() {
-                    outpath = path.to_path_buf();
-                    found = true;
-                    break;
+                    outpath = path.to_path_buf();
+                    found = true;
+                    break;
                 }
             }
 
@@ -1650,18 +1650,18 @@ pub fn get_import_path(
                             format!("Not found in {}", p.to_string_lossy()),
                         )
                     })
-                    .collect::<Vec<_>>();
-                let mut new_labels = Vec::new();
+                    .collect::<Vec<_>>();
+                let mut new_labels = Vec::new();
 
                 for (area, text) in labels.iter() {
-                    new_labels.push((*area, text.as_str()));
+                    new_labels.push((*area, text.as_str()));
                 }
                 return Err(RuntimeError::CustomError(create_error(
                     info,
                     "Unable to find library folder",
                     &new_labels,
                     None,
-                )));
+                )));
             }
         }
         // .parent()
@@ -1680,35 +1680,35 @@ pub fn import_module(
 ) -> Result<(), RuntimeError> {
     if !forced {
         if let Some(ret) = globals.prev_imports.get(path).cloned() {
-            merge_impl(&mut globals.implementations, &ret.1);
+            merge_impl(&mut globals.implementations, &ret.1);
             for c in contexts.iter() {
-                c.inner().return_value = ret.0;
+                c.inner().return_value = ret.0;
             }
-            return Ok(());
+            return Ok(());
         }
     }
     let built_in_path = match path {
         ImportType::Script(a) => {
             if let Some(mut p) = globals.built_in_path.clone() {
-                p.push(a);
+                p.push(a);
                 p
             } else {
                 a.clone()
             }
         }
         ImportType::Lib(a) => {
-            let mut p = PathBuf::from(a);
-            p.push("lib.spwn");
+            let mut p = PathBuf::from(a);
+            p.push("lib.spwn");
             p
         }
-    };
+    };
 
-    let stored_built_in_path = globals.built_in_path.clone();
+    let stored_built_in_path = globals.built_in_path.clone();
     #[cfg(not(target_arch = "wasm32"))]
     let (unparsed, module_path) = match get_import_path(path, globals, info.clone()) {
         Err(err) => {
             if let Some(file) = get_lib_file(&built_in_path) {
-                (*globals).built_in_path = Some(built_in_path.parent().unwrap().to_path_buf());
+                (*globals).built_in_path = Some(built_in_path.parent().unwrap().to_path_buf());
                 (
                     file.contents_utf8()
                         .expect("Bad built-in library file")
@@ -1716,14 +1716,14 @@ pub fn import_module(
                     SpwnSource::BuiltIn(built_in_path),
                 )
             } else {
-                return Err(err);
+                return Err(err);
             }
         }
         Ok(mut module_path) => {
             if module_path.is_dir() {
-                module_path = module_path.join("lib.spwn");
+                module_path = module_path.join("lib.spwn");
             } else if module_path.is_file() && module_path.extension().is_none() {
-                module_path.set_extension("spwn");
+                module_path.set_extension("spwn");
             }
             if let Some(ext) = module_path.extension() {
                 if ext != "spwn" {
@@ -1735,7 +1735,7 @@ pub fn import_module(
                         ),
                         &[],
                         None,
-                    )));
+                    )));
                 }
             }
 
@@ -1751,18 +1751,18 @@ pub fn import_module(
                             ),
                             &[(info.position, &format!("{}", e))],
                             None,
-                        )));
+                        )));
                     }
                 },
                 SpwnSource::File(module_path),
             )
         }
-    };
+    };
 
     #[cfg(target_arch = "wasm32")]
     let (unparsed, module_path) = match get_lib_file(&built_in_path) {
         Some(file) => {
-            (*globals).built_in_path = Some(built_in_path.parent().unwrap().to_path_buf());
+            (*globals).built_in_path = Some(built_in_path.parent().unwrap().to_path_buf());
             (
                 file.contents_utf8()
                     .expect("Bad built-in library file")
@@ -1773,40 +1773,40 @@ pub fn import_module(
         None => {
             panic!("file {:?} not found", built_in_path)
         }
-    };
+    };
 
     let (parsed, notes) =
         match parser::parser::parse_spwn(unparsed, module_path.clone(), BUILTIN_NAMES) {
             Ok(p) => p,
             Err(err) => return Err(RuntimeError::PackageSyntaxError { err, info }),
-        };
+        };
 
-    let mut start_context = FullContext::new(globals);
+    let mut start_context = FullContext::new(globals);
 
-    globals.push_new_preserved();
+    globals.push_new_preserved();
     for c in contexts.with_breaks() {
         for stack in c.inner().get_variables().values() {
             for VariableData { val: v, .. } in stack.iter() {
-                globals.push_preserved_val(*v);
+                globals.push_preserved_val(*v);
             }
         }
     }
 
-    let mut stored_impl = None;
+    let mut stored_impl = None;
     if let ImportType::Lib(_) = path {
-        let mut impl_vals = Vec::new();
+        let mut impl_vals = Vec::new();
         for imp in globals.implementations.values() {
             for (v, _) in imp.values() {
-                impl_vals.push(*v);
+                impl_vals.push(*v);
             }
         }
         for v in impl_vals {
-            globals.push_preserved_val(v);
+            globals.push_preserved_val(v);
         }
-        let mut stored = FnvHashMap::default();
+        let mut stored = FnvHashMap::default();
 
-        mem::swap(&mut stored, &mut globals.implementations);
-        stored_impl = Some(stored);
+        mem::swap(&mut stored, &mut globals.implementations);
+        stored_impl = Some(stored);
     }
 
     if !notes.tag.tags.iter().any(|x| x.0 == "no_std") {
@@ -1816,7 +1816,7 @@ pub fn import_module(
             globals,
             info.clone(),
             false,
-        )?;
+        )?;
 
         if let FullContext::Split(_, _) = start_context {
             return Err(RuntimeError::CustomError(create_error(
@@ -1824,7 +1824,7 @@ pub fn import_module(
                 "The standard library can not split the context",
                 &[],
                 None,
-            )));
+            )));
         }
 
         if let Value::Dict(d) = &globals.stored_values[start_context.inner().return_value] {
@@ -1837,21 +1837,21 @@ pub fn import_module(
                 "The standard library must return a dictionary",
                 &[],
                 None,
-            )));
+            )));
         }
     }
 
-    let stored_path = globals.path;
+    let stored_path = globals.path;
 
-    (*globals).path = LocalIntern::new(module_path);
+    (*globals).path = LocalIntern::new(module_path);
 
-    let mut new_info = info.clone();
+    let mut new_info = info.clone();
 
-    new_info.position.file = (*globals).path;
-    new_info.position.pos = (0, 0);
+    new_info.position.file = (*globals).path;
+    new_info.position.pos = (0, 0);
 
     if let ImportType::Lib(l) = path {
-        new_info.current_module = l.clone();
+        new_info.current_module = l.clone();
     }
 
     match compile_scope(&parsed, &mut start_context, globals, new_info) {
@@ -1862,21 +1862,21 @@ pub fn import_module(
                 info,
             })
         }
-    };
+    };
 
-    globals.pop_preserved();
+    globals.pop_preserved();
 
-    let save_value = notes.tag.tags.iter().any(|x| x.0 == "cache_output");
-    let mut out_values = 0;
-    let mut output_saved = None;
-    let mut impl_saved = None;
+    let save_value = notes.tag.tags.iter().any(|x| x.0 == "cache_output");
+    let mut out_values = 0;
+    let mut output_saved = None;
+    let mut impl_saved = None;
 
     for fc in start_context.with_breaks() {
-        let c = fc.inner();
+        let c = fc.inner();
         if let Some((r, i)) = c.broken {
             if let BreakType::Macro(v, _) = r {
                 for full_context in contexts.iter() {
-                    let fn_context = full_context.inner().start_group;
+                    let fn_context = full_context.inner().start_group;
                     (*full_context).inner().return_value = match v {
                         Some(v) => {
                             if save_value {
@@ -1886,15 +1886,15 @@ pub fn import_module(
                                         "Cannot cache a context splitting library",
                                         &[],
                                         None,
-                                    )));
+                                    )));
                                 }
-                                output_saved = Some(v);
+                                output_saved = Some(v);
                             }
-                            out_values += 1;
+                            out_values += 1;
                             clone_value(v, globals, fn_context, true, info.position)
                         }
                         None => globals.NULL_STORAGE,
-                    };
+                    };
                 }
             } else {
                 return Err(RuntimeError::BreakNeverUsedError {
@@ -1903,39 +1903,39 @@ pub fn import_module(
                     broke: i,
                     dropped: info.position,
                     reason: "the file ended".to_string(),
-                });
+                });
             }
         }
     }
-    (*globals).path = stored_path;
-    (*globals).built_in_path = stored_built_in_path;
+    (*globals).path = stored_path;
+    (*globals).built_in_path = stored_built_in_path;
 
     if let Some(stored_impl) = stored_impl {
         //change and delete from impls
-        let mut to_be_deleted = Vec::new();
+        let mut to_be_deleted = Vec::new();
         for (k1, imp) in &mut globals.implementations {
             for (k2, (_, in_scope)) in imp {
                 if *in_scope {
-                    (*in_scope) = false;
+                    (*in_scope) = false;
                 } else {
-                    to_be_deleted.push((*k1, *k2));
+                    to_be_deleted.push((*k1, *k2));
                 }
                 // globals
                 //     .stored_values
-                //     .increment_single_lifetime(*val, 1, &mut FnvHashSet::new());
+                //     .increment_single_lifetime(*val, 1, &mut FnvHashSet::new());
             }
         }
         for (k1, k2) in to_be_deleted {
-            (*globals).implementations.get_mut(&k1).unwrap().remove(&k2);
+            (*globals).implementations.get_mut(&k1).unwrap().remove(&k2);
         }
         if save_value {
-            impl_saved = Some(globals.implementations.clone());
+            impl_saved = Some(globals.implementations.clone());
         }
 
         //merge impls
-        merge_impl(&mut globals.implementations, &stored_impl);
+        merge_impl(&mut globals.implementations, &stored_impl);
     } else if save_value {
-        impl_saved = Some(globals.implementations.clone());
+        impl_saved = Some(globals.implementations.clone());
     }
 
     if save_value {
@@ -1945,13 +1945,13 @@ pub fn import_module(
                 output_saved.unwrap_or(globals.NULL_STORAGE),
                 impl_saved.unwrap_or_default(),
             ),
-        );
+        );
     }
 
     Ok(())
 }
 
-// const ID_MAX: u16 = 999;
+// const ID_MAX: u16 = 999;
 
 // pub fn next_free(
 //     ids: &mut Vec<u16>,
@@ -1960,11 +1960,11 @@ pub fn import_module(
 // ) -> Result<ID, RuntimeError> {
 //     for i in 1..ID_MAX {
 //         if !ids.contains(&i) {
-//             (*ids).push(i);
-//             return Ok(i);
+//             (*ids).push(i);
+//             return Ok(i);
 //         }
 //     }
 
 //     Err(RuntimeError::IDError { id_class, info })
-//     //panic!("All ids of this type are used up!");
+//     //panic!("All ids of this type are used up!");
 // }

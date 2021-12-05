@@ -1,30 +1,30 @@
-use errors::RuntimeError;
-use internment::LocalIntern;
-use shared::BreakType;
-use shared::ImportType;
-use shared::SpwnSource;
-use shared::StoredValue;
+use errors::RuntimeError;
+use internment::LocalIntern;
+use shared::BreakType;
+use shared::ImportType;
+use shared::SpwnSource;
+use shared::StoredValue;
 
 ///types and functions used by the compiler
-use crate::builtins::*;
+use crate::builtins::*;
 
-use crate::context::VariableData;
-use errors::compiler_info::CodeArea;
+use crate::context::VariableData;
+use errors::compiler_info::CodeArea;
 
-use crate::context::FullContext;
-use crate::leveldata::GdObj;
+use crate::context::FullContext;
+use crate::leveldata::GdObj;
 
-use crate::compiler_types::*;
-use crate::value::*;
+use crate::compiler_types::*;
+use crate::value::*;
 
-use fnv::FnvHashMap;
+use fnv::FnvHashMap;
 
-//use std::boxed::Box;
-use crate::value_storage::*;
-use errors::compiler_info::CompilerInfo;
+//use std::boxed::Box;
+use crate::value_storage::*;
+use errors::compiler_info::CompilerInfo;
 
-use std::io::Write;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::PathBuf;
 
 #[allow(non_snake_case)]
 pub struct Globals<'a> {
@@ -122,7 +122,7 @@ impl<'a> Globals<'a> {
     }
 
     pub fn get_type_str(&self, p: StoredValue) -> String {
-        let val = &self.stored_values[p];
+        let val = &self.stored_values[p];
         let typ = match val {
             Value::Dict(d) => {
                 if let Some(s) = d.get(&self.TYPE_MEMBER_NAME) {
@@ -135,7 +135,7 @@ impl<'a> Globals<'a> {
                 }
             }
             _ => val.to_num(self),
-        };
+        };
         find_key_for_value(&self.type_ids, typ).unwrap().clone()
     }
 
@@ -145,7 +145,7 @@ impl<'a> Globals<'a> {
         initial_string: String,
         std_out: &'a mut impl Write,
     ) -> Self {
-        let (storage, builtin_storage, null_storage) = ValStorage::new();
+        let (storage, builtin_storage, null_storage) = ValStorage::new();
 
         let mut globals = Globals {
             closed_groups: 0,
@@ -191,86 +191,86 @@ impl<'a> Globals<'a> {
             OBJ_KEY_PATTERN: LocalIntern::new(String::from("pattern")),
             built_in_path: None,
             std_out,
-        };
+        };
 
         let mut add_type = |name: &str, id: u16| {
             globals
                 .type_ids
                 .insert(String::from(name), (id, CodeArea::new()))
-        };
+        };
 
-        add_type("group", 0);
-        add_type("color", 1);
-        add_type("block", 2);
-        add_type("item", 3);
-        add_type("number", 4);
-        add_type("bool", 5);
-        add_type("trigger_function", 6);
-        add_type("dictionary", 7);
-        add_type("macro", 8);
-        add_type("string", 9);
-        add_type("array", 10);
-        add_type("object", 11);
-        add_type("spwn", 12);
-        add_type("builtin", 13);
-        add_type("type_indicator", 14);
-        add_type("NULL", 15);
-        add_type("trigger", 16);
-        add_type("range", 17);
-        add_type("pattern", 18);
-        add_type("object_key", 19);
-        add_type("epsilon", 20);
+        add_type("group", 0);
+        add_type("color", 1);
+        add_type("block", 2);
+        add_type("item", 3);
+        add_type("number", 4);
+        add_type("bool", 5);
+        add_type("trigger_function", 6);
+        add_type("dictionary", 7);
+        add_type("macro", 8);
+        add_type("string", 9);
+        add_type("array", 10);
+        add_type("object", 11);
+        add_type("spwn", 12);
+        add_type("builtin", 13);
+        add_type("type_indicator", 14);
+        add_type("NULL", 15);
+        add_type("trigger", 16);
+        add_type("range", 17);
+        add_type("pattern", 18);
+        add_type("object_key", 19);
+        add_type("epsilon", 20);
 
-        globals.type_id_count = globals.type_ids.len() as u16;
+        globals.type_id_count = globals.type_ids.len() as u16;
 
         globals
     }
 
     // pub fn clean_up(&mut self, full_context: &mut FullContext, mut removed: FnvHashSet<usize>) {
-    //     let mut used_values = FnvHashSet::new();
+    //     let mut used_values = FnvHashSet::new();
 
     //     // for l in self.implementations.values() {
     //     //     for (v, _) in l.values() {
-    //     //         used_values.insert(*v);
+    //     //         used_values.insert(*v);
     //     //     }
     //     // }
     //     for c in full_context.with_breaks() {
-    //         used_values.extend(c.inner().variables.iter().map(|(_, (a, _))| *a));
-    //         // used_values.insert(c.inner().return_value);
-    //         // used_values.insert(c.inner().return_value2);
+    //         used_values.extend(c.inner().variables.iter().map(|(_, (a, _))| *a));
+    //         // used_values.insert(c.inner().return_value);
+    //         // used_values.insert(c.inner().return_value2);
     //         match c.inner().broken {
     //             Some((BreakType::Macro(Some(v), _), _)) => {
-    //                 used_values.insert(v);
+    //                 used_values.insert(v);
     //             }
     //             Some((BreakType::Switch(v), _)) => {
-    //                 used_values.insert(v);
+    //                 used_values.insert(v);
     //             }
     //             _ => (),
-    //         };
+    //         };
     //     }
-    //     let mut all_used_values = FnvHashSet::new();
+    //     let mut all_used_values = FnvHashSet::new();
     //     for v in used_values {
-    //         all_used_values.extend(get_all_ptrs_used(v, self));
+    //         all_used_values.extend(get_all_ptrs_used(v, self));
     //     }
 
     //     // for v in all_used_values.iter() {
-    //     //     dbg!(v, self.stored_values[*v].clone());
+    //     //     dbg!(v, self.stored_values[*v].clone());
     //     // }
-    //     all_used_values.insert(BUILTIN_STORAGE);
-    //     all_used_values.insert(NULL_STORAGE);
+    //     all_used_values.insert(BUILTIN_STORAGE);
+    //     all_used_values.insert(NULL_STORAGE);
 
-    //     removed.retain(|a| !all_used_values.contains(a));
+    //     removed.retain(|a| !all_used_values.contains(a));
 
     //     self.stored_values
     //         .map
-    //         .retain(|a, _| -> bool { !removed.contains(a) });
+    //         .retain(|a, _| -> bool { !removed.contains(a) });
     // }
     pub fn push_new_preserved(&mut self) {
-        self.stored_values.preserved_stack.push(Vec::new());
+        self.stored_values.preserved_stack.push(Vec::new());
     }
 
     pub fn pop_preserved(&mut self) {
-        self.stored_values.preserved_stack.pop();
+        self.stored_values.preserved_stack.pop();
     }
 
     pub fn push_preserved_val(&mut self, val: StoredValue) {
@@ -278,15 +278,15 @@ impl<'a> Globals<'a> {
             .preserved_stack
             .last_mut()
             .unwrap()
-            .push(val);
+            .push(val);
     }
 
     pub fn collect_garbage(&mut self, contexts: &mut FullContext) {
         //gc
 
         //mark
-        self.stored_values.mark(self.NULL_STORAGE);
-        self.stored_values.mark(self.BUILTIN_STORAGE);
+        self.stored_values.mark(self.NULL_STORAGE);
+        self.stored_values.mark(self.BUILTIN_STORAGE);
 
         let root_context = unsafe {
             FullContext::from_ptr(
@@ -297,34 +297,34 @@ impl<'a> Globals<'a> {
                     .inner()
                     .root_context_ptr,
             )
-        };
+        };
 
         for c in root_context.with_breaks() {
             for stack in c.inner().get_variables().values() {
                 for VariableData { val: v, .. } in stack.iter() {
-                    self.stored_values.mark(*v);
+                    self.stored_values.mark(*v);
                 }
             }
 
             match c.inner().broken {
                 Some((BreakType::Macro(Some(v), _), _)) | Some((BreakType::Switch(v), _)) => {
-                    self.stored_values.mark(v);
+                    self.stored_values.mark(v);
                 }
                 _ => (),
             }
 
             // for split contexts
-            self.stored_values.mark(c.inner().return_value);
-            self.stored_values.mark(c.inner().return_value2);
+            self.stored_values.mark(c.inner().return_value);
+            self.stored_values.mark(c.inner().return_value2);
         }
         for s in self.stored_values.preserved_stack.clone() {
             for v in s {
-                self.stored_values.mark(v);
+                self.stored_values.mark(v);
             }
         }
         for imp in self.implementations.values() {
             for (v, _) in imp.values() {
-                self.stored_values.mark(*v);
+                self.stored_values.mark(*v);
             }
         }
         //}
@@ -332,17 +332,17 @@ impl<'a> Globals<'a> {
         for (v, imp) in self.prev_imports.values() {
             for imp in imp.values() {
                 for (v, _) in imp.values() {
-                    self.stored_values.mark(*v);
+                    self.stored_values.mark(*v);
                 }
             }
 
-            self.stored_values.mark(*v);
+            self.stored_values.mark(*v);
         }
-        //dbg!(&self.stored_values.map);
+        //dbg!(&self.stored_values.map);
 
         //sweep
-        self.stored_values.sweep();
+        self.stored_values.sweep();
 
-        self.stored_values.prev_value_count = self.stored_values.map.len() as u32;
+        self.stored_values.prev_value_count = self.stored_values.map.len() as u32;
     }
 }

@@ -1,15 +1,15 @@
-use shared::StoredValue;
-use slotmap::SlotMap;
+use shared::StoredValue;
+use slotmap::SlotMap;
 
 ///types and functions used by the compiler
-use crate::builtins::*;
+use crate::builtins::*;
 
-use errors::compiler_info::CodeArea;
+use errors::compiler_info::CodeArea;
 
-use crate::globals::Globals;
-use crate::value::*;
+use crate::globals::Globals;
+use crate::value::*;
 
-use core::panic;
+use core::panic;
 
 #[derive(Debug)]
 pub struct ValStorage {
@@ -33,7 +33,7 @@ pub struct StoredValData {
 // shallower scope => lifetime--
 
 impl std::ops::Index<StoredValue> for ValStorage {
-    type Output = Value;
+    type Output = Value;
 
     fn index(&self, i: StoredValue) -> &Self::Output {
         &self
@@ -58,12 +58,12 @@ impl ValStorage {
     }
 
     pub fn move_in(&mut self, i: StoredValue, v: StoredValData) {
-        self.map[i] = v;
+        self.map[i] = v;
     }
 
     pub fn mark(&mut self, root: StoredValue) {
         if !self.marked(root) {
-            (*self.map.get_mut(root).unwrap()).marked = true;
+            (*self.map.get_mut(root).unwrap()).marked = true;
             match self[root].clone() {
                 Value::Array(a) => {
                     for e in a.iter() {
@@ -98,18 +98,18 @@ impl ValStorage {
                 }
                 Value::Pattern(p) => self.mark_pattern(p),
                 _ => (),
-            };
+            };
         }
     }
 
     fn mark_pattern(&mut self, p: Pattern) {
         match p {
             Pattern::Either(a, b) | Pattern::Both(a, b) => {
-                self.mark_pattern(*a);
-                self.mark_pattern(*b);
+                self.mark_pattern(*a);
+                self.mark_pattern(*b);
             }
             Pattern::Not(a) => {
-                self.mark_pattern(*a);
+                self.mark_pattern(*a);
             }
             Pattern::Eq(a) => self.mark(a),
             Pattern::NotEq(a) => self.mark(a),
@@ -130,21 +130,21 @@ impl ValStorage {
     }
 
     pub fn new() -> (Self, StoredValue, StoredValue) {
-        let mut map = SlotMap::with_key();
+        let mut map = SlotMap::with_key();
         let builtin_storage = map.insert(StoredValData {
             val: Value::Builtins,
             fn_context: Group::new(0),
             mutable: false,
             def_area: CodeArea::new(),
             marked: false,
-        });
+        });
         let null_storage = map.insert(StoredValData {
             val: Value::Null,
             fn_context: Group::new(0),
             mutable: false,
             def_area: CodeArea::new(),
             marked: false,
-        });
+        });
 
         (
             ValStorage {
@@ -159,29 +159,29 @@ impl ValStorage {
 
     pub fn set_mutability(&mut self, index: StoredValue, mutable: bool) {
         if !mutable || !matches!(self[index], Value::Macro(_)) {
-            (*self.map.get_mut(index).unwrap()).mutable = mutable;
+            (*self.map.get_mut(index).unwrap()).mutable = mutable;
         }
 
         match self[index].clone() {
             Value::Array(a) => {
                 for e in a {
-                    self.set_mutability(e, mutable);
+                    self.set_mutability(e, mutable);
                 }
             }
             Value::Dict(a) => {
                 for (_, e) in a {
-                    self.set_mutability(e, mutable);
+                    self.set_mutability(e, mutable);
                 }
             }
             Value::Macro(_) => (),
             _ => (),
-        };
+        };
     }
 
     pub fn sweep(&mut self) {
-        self.map.retain(|_, a| a.marked);
+        self.map.retain(|_, a| a.marked);
         for v in self.map.values_mut() {
-            (*v).marked = false;
+            (*v).marked = false;
         }
     }
 
@@ -192,7 +192,7 @@ impl ValStorage {
     //         } else {
     //             true
     //         }
-    //     });
+    //     });
     // }
 
     // pub fn get_lifetime(&self, index: usize) -> u16 {
@@ -207,9 +207,9 @@ impl ValStorage {
 //     context: &Context,
 //     area: CodeArea,
 // ) -> StoredValue {
-//     let index = globals.val_id;
-//     let mutable = !matches!(val, Value::Macro(_));
-//     ////println!("index: {}, value: {}", index, val.to_str(&globals));
+//     let index = globals.val_id;
+//     let mutable = !matches!(val, Value::Macro(_));
+//     ////println!("index: {}, value: {}", index, val.to_str(&globals));
 //     (*globals).stored_values.map.insert(
 //         index,
 //         StoredValData {
@@ -219,8 +219,8 @@ impl ValStorage {
 //             lifetime,
 //             def_area: area,
 //         },
-//     );
-//     (*globals).val_id += 1;
+//     );
+//     (*globals).val_id += 1;
 //     index
 // }
 
@@ -230,7 +230,7 @@ pub fn clone_and_get_value(
     fn_context: Group,
     constant: bool,
 ) -> Value {
-    let mut old_val = globals.stored_values[index].clone();
+    let mut old_val = globals.stored_values[index].clone();
 
     match &mut old_val {
         Value::Array(arr) => {
@@ -238,7 +238,7 @@ pub fn clone_and_get_value(
                 arr.iter()
                     .map(|x| clone_value_preserve_area(*x, globals, fn_context, constant))
                     .collect(),
-            );
+            );
         }
 
         Value::Dict(arr) => {
@@ -251,17 +251,17 @@ pub fn clone_and_get_value(
                         )
                     })
                     .collect(),
-            );
+            );
         }
 
         Value::Macro(m) => {
             for arg in &mut m.args {
                 if let Some(def_val) = &mut arg.default {
-                    (*def_val) = clone_value_preserve_area(*def_val, globals, fn_context, constant);
+                    (*def_val) = clone_value_preserve_area(*def_val, globals, fn_context, constant);
                 }
 
                 if let Some(pat_val) = &mut arg.pattern {
-                    (*pat_val) = clone_value_preserve_area(*pat_val, globals, fn_context, constant);
+                    (*pat_val) = clone_value_preserve_area(*pat_val, globals, fn_context, constant);
                 }
             }
 
@@ -270,12 +270,12 @@ pub fn clone_and_get_value(
             // }
         }
         _ => (),
-    };
+    };
 
     old_val
 }
 // pub fn get_all_ptrs_used(index: usize, globals: &mut Globals) -> Vec<usize> {
-//     let mut out = vec![index];
+//     let mut out = vec![index];
 //     match globals.stored_values[index].clone() {
 //         Value::Array(arr) => {
 //             for v in arr {
@@ -292,20 +292,20 @@ pub fn clone_and_get_value(
 //         Value::Macro(m) => {
 //             for arg in &m.args {
 //                 if let Some(def_val) = &arg.1 {
-//                     out.extend(get_all_ptrs_used(*def_val, globals));
+//                     out.extend(get_all_ptrs_used(*def_val, globals));
 //                 }
 
 //                 if let Some(def_val) = &arg.3 {
-//                     out.extend(get_all_ptrs_used(*def_val, globals));
+//                     out.extend(get_all_ptrs_used(*def_val, globals));
 //                 }
 //             }
 
 //             for (_, (v, _)) in m.def_context.variables.iter() {
-//                 out.extend(get_all_ptrs_used(*v, globals));
+//                 out.extend(get_all_ptrs_used(*v, globals));
 //             }
 //         }
 //         _ => (),
-//     };
+//     };
 //     out
 // }
 
@@ -316,7 +316,7 @@ pub fn clone_value(
     constant: bool,
     area: CodeArea,
 ) -> StoredValue {
-    let old_val = clone_and_get_value(index, globals, fn_context, constant);
+    let old_val = clone_and_get_value(index, globals, fn_context, constant);
 
     //clone all inner values
     //do the thing
@@ -337,7 +337,7 @@ pub fn clone_value_preserve_area(
     fn_context: Group,
     constant: bool,
 ) -> StoredValue {
-    let old_val = clone_and_get_value(index, globals, fn_context, constant);
+    let old_val = clone_and_get_value(index, globals, fn_context, constant);
 
     //clone all inner values
     //do the thing
@@ -362,14 +362,14 @@ pub fn clone_value_preserve_area(
 //     constant: bool,
 //     area: CodeArea,
 // ) {
-//     let old_val = clone_and_get_value(index, lifetime, globals, fn_context, constant, area.clone());
+//     let old_val = clone_and_get_value(index, lifetime, globals, fn_context, constant, area.clone());
 
 //     //clone all inner values
 //     //do the thing
 //     //bing bang
 //     //profit
-//     let new_index = to;
-//     ////println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
+//     let new_index = to;
+//     ////println!("1index: {}, value: {}", new_index, old_val.to_str(&globals));
 
 //     (*globals).stored_values.map.insert(
 //         new_index,
@@ -380,7 +380,7 @@ pub fn clone_value_preserve_area(
 //             lifetime,
 //             def_area: area,
 //         },
-//     );
+//     );
 // }
 
 pub fn store_const_value(

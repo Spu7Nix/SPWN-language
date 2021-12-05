@@ -1,11 +1,11 @@
-use std::path::PathBuf;
+use std::path::PathBuf;
 
-use internment::LocalIntern;
-use slotmap::new_key_type;
+use internment::LocalIntern;
+use slotmap::new_key_type;
 new_key_type! {
-    pub struct StoredValue;
+    pub struct StoredValue;
 } //index to stored value in globals.stored_values
-pub type FileRange = (usize, usize);
+pub type FileRange = (usize, usize);
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
 pub enum ImportType {

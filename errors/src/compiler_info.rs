@@ -1,6 +1,6 @@
-use internment::LocalIntern;
-use shared::FileRange;
-use std::path::PathBuf;
+use internment::LocalIntern;
+use shared::FileRange;
+use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompilerInfo {
     pub depth: u8,
@@ -35,8 +35,8 @@ impl CompilerInfo {
     }
 
     pub fn add_to_call_stack(&mut self, new: CodeArea) {
-        self.call_stack.push(self.position);
-        self.position = new;
+        self.call_stack.push(self.position);
+        self.position = new;
     }
 }
 
@@ -66,10 +66,10 @@ impl Default for CodeArea {
         Self::new()
     }
 }
-use ariadne::Span;
+use ariadne::Span;
 
 impl Span for CodeArea {
-    type SourceId = shared::SpwnSource;
+    type SourceId = shared::SpwnSource;
 
     fn source(&self) -> &Self::SourceId {
         &self.file

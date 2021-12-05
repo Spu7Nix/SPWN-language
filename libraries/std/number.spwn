@@ -3,11 +3,11 @@
 impl @number {
     map: #[desc("Maps a number linearily from one interval to another") example("$.assert(2.map(1, 4, 5, 11) == 7)")]
     (self, istart: @number, istop: @number, ostart: @number, ostop: @number) {
-        return ostart + (ostop - ostart) * ((self - istart) / (istop - istart));
+        return ostart + (ostop - ostart) * ((self - istart) / (istop - istart));
     },
     constrain: #[desc("Constrains a number between two numbers") example("$.assert(2.constrain(7,10) == 7)")]
     (self, min: @number, max: @number){
-        return $.min($.max(self,min),max);
+        return $.min($.max(self,min),max);
     },
     is_finite: #[desc("Checks if the number is finite") example("$.assert((0/0).is_finite()) == false")]
     (self){

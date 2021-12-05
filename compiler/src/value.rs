@@ -1,27 +1,27 @@
-use crate::builtins::*;
-use crate::compiler::import_module;
-use crate::compiler::merge_all_contexts;
+use crate::builtins::*;
+use crate::compiler::import_module;
+use crate::compiler::merge_all_contexts;
 
-use errors::compiler_info::CodeArea;
-use errors::compiler_info::CompilerInfo;
-use errors::create_error;
-use fnv::FnvHashSet;
-use parser::ast;
-use shared::BreakType;
-use shared::SpwnSource;
-use shared::StoredValue;
-use slyce::Slice as Slyce;
+use errors::compiler_info::CodeArea;
+use errors::compiler_info::CompilerInfo;
+use errors::create_error;
+use fnv::FnvHashSet;
+use parser::ast;
+use shared::BreakType;
+use shared::SpwnSource;
+use shared::StoredValue;
+use slyce::Slice as Slyce;
 
-use crate::{compiler_types::*, context::*, globals::Globals, leveldata::*, value_storage::*};
-use shared::FileRange;
-//use std::boxed::Box;
+use crate::{compiler_types::*, context::*, globals::Globals, leveldata::*, value_storage::*};
+use shared::FileRange;
+//use std::boxed::Box;
 
-use internment::LocalIntern;
+use internment::LocalIntern;
 
-use fnv::FnvHashMap;
-use std::hash::Hash;
+use fnv::FnvHashMap;
+use std::hash::Hash;
 
-use errors::RuntimeError;
+use errors::RuntimeError;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -45,9 +45,9 @@ pub enum Value {
     Null,
 }
 
-pub type Slice = (Option<isize>, Option<isize>, Option<isize>);
+pub type Slice = (Option<isize>, Option<isize>, Option<isize>);
 
-const MAX_DICT_EL_DISPLAY: usize = 10;
+const MAX_DICT_EL_DISPLAY: usize = 10;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Macro {
@@ -63,15 +63,15 @@ pub struct Macro {
 #[allow(clippy::derive_hash_xor_eq)]
 impl Hash for Macro {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        //self.args.hash(state);
+        //self.args.hash(state);
         for i in &self.def_variables {
-            i.hash(state);
+            i.hash(state);
         }
-        self.def_file.hash(state);
-        //self.body.hash(state);
-        //self.tag.hash(state);
-        self.arg_pos.hash(state);
-        self.ret_pattern.hash(state);
+        self.def_file.hash(state);
+        //self.body.hash(state);
+        //self.tag.hash(state);
+        self.arg_pos.hash(state);
+        self.ret_pattern.hash(state);
         /*
             i omitted the stuff that has ast inside cuz it
             was too deep of a rabbit hoke to derive Hash for
@@ -90,10 +90,10 @@ pub struct MacroArgDef {
 }
 // impl Macro {
 //     pub fn get_arg_area(&self) -> CodeArea {
-//         assert!(!self.args.is_empty());
-//         let first = self.args.first().unwrap().4;
-//         let last = self.args.last().unwrap().4;
-//         assert_eq!(first.file, last.file);
+//         assert!(!self.args.is_empty());
+//         let first = self.args.first().unwrap().4;
+//         let last = self.args.last().unwrap().4;
+//         assert_eq!(first.file, last.file);
 //         CodeArea {
 //             pos: (first.pos.0, last.pos.1),
 //             file: first.file,
@@ -192,9 +192,9 @@ pub fn default_value_equality(
                 globals,
                 c.inner().start_group,
                 info.position,
-            );
+            );
         }
-    };
+    };
     match (
         globals.stored_values[val1].clone(),
         globals.stored_values[val2].clone(),
@@ -202,54 +202,54 @@ pub fn default_value_equality(
         // IDEA: check the cheap values for equality before checking custom implementations
         (Value::Array(a1), Value::Array(a2)) => {
             if a1.len() != a2.len() {
-                set_return_bool(false, globals, contexts);
-                return Ok(());
+                set_return_bool(false, globals, contexts);
+                return Ok(());
             }
 
             // set all return values to true to true
-            set_return_bool(true, globals, contexts);
+            set_return_bool(true, globals, contexts);
 
             for i in 0..a1.len() {
                 for full_context in contexts.iter() {
                     // skip contexts where the return is already false
                     if globals.stored_values[full_context.inner().return_value] == Value::Bool(true)
                     {
-                        handle_operator(a1[i], a2[i], Builtin::EqOp, full_context, globals, info)?;
+                        handle_operator(a1[i], a2[i], Builtin::EqOp, full_context, globals, info)?;
                     }
                 }
             }
         }
         (Value::Dict(d1), Value::Dict(d2)) => {
             if d1.len() != d2.len() {
-                set_return_bool(false, globals, contexts);
-                return Ok(());
+                set_return_bool(false, globals, contexts);
+                return Ok(());
             }
             // check all keys are equal
             if d1.keys().cloned().collect::<FnvHashSet<_>>()
                 == d2.keys().cloned().collect::<FnvHashSet<_>>()
             {
-                set_return_bool(false, globals, contexts);
-                return Ok(());
+                set_return_bool(false, globals, contexts);
+                return Ok(());
             }
 
             // set all return values to true to true
-            set_return_bool(true, globals, contexts);
+            set_return_bool(true, globals, contexts);
 
             for key in d1.keys() {
-                let val1 = d1[key];
-                let val2 = d2[key];
+                let val1 = d1[key];
+                let val2 = d2[key];
 
                 for full_context in contexts.iter() {
                     // skip contexts where the return is already false
                     if globals.stored_values[full_context.inner().return_value] == Value::Bool(true)
                     {
-                        handle_operator(val1, val2, Builtin::EqOp, full_context, globals, info)?;
+                        handle_operator(val1, val2, Builtin::EqOp, full_context, globals, info)?;
                     }
                 }
             }
         }
         (Value::Pattern(p1), Value::Pattern(p2)) => {
-            use Pattern::*;
+            use Pattern::*;
             match (p1, p2) {
                 (Eq(a), Eq(b))
                 | (NotEq(a), NotEq(b))
@@ -264,7 +264,7 @@ pub fn default_value_equality(
             }
         }
         (a, b) => set_return_bool(a == b, globals, contexts),
-    };
+    };
     Ok(())
 }
 
@@ -272,38 +272,38 @@ pub fn strict_value_equality(val1: StoredValue, val2: StoredValue, globals: &Glo
     match (&globals.stored_values[val1], &globals.stored_values[val2]) {
         (Value::Array(a1), Value::Array(a2)) => {
             if a1.len() != a2.len() {
-                return false;
+                return false;
             }
 
             for i in 0..a1.len() {
                 if !strict_value_equality(a1[i], a2[i], globals) {
-                    return false;
+                    return false;
                 }
             }
             true
         }
         (Value::Dict(d1), Value::Dict(d2)) => {
             if d1.len() != d2.len() {
-                return false;
+                return false;
             }
 
             for key in d1.keys() {
                 if let Some(val1) = d2.get(key) {
                     if let Some(val2) = d1.get(key) {
                         if !strict_value_equality(*val1, *val2, globals) {
-                            return false;
+                            return false;
                         }
                     } else {
                         unreachable!()
                     }
                 } else {
-                    return false;
+                    return false;
                 }
             }
             true
         }
         (Value::Pattern(p1), Value::Pattern(p2)) => {
-            use Pattern::*;
+            use Pattern::*;
             match (p1, p2) {
                 (Eq(a), Eq(b))
                 | (NotEq(a), NotEq(b))
@@ -322,70 +322,70 @@ pub fn strict_value_equality(val1: StoredValue, val2: StoredValue, globals: &Glo
 macro_rules! type_id {
     (group) => {
         0
-    };
+    };
     (color) => {
         1
-    };
+    };
     (block) => {
         2
-    };
+    };
     (item) => {
         3
-    };
+    };
     (number) => {
         4
-    };
+    };
     (bool) => {
         5
-    };
+    };
     (trigger_function) => {
         6
-    };
+    };
     (dictionary) => {
         7
-    };
+    };
     (macro) => {
         8
-    };
+    };
     (string) => {
         9
-    };
+    };
     (array) => {
         10
-    };
+    };
     (object) => {
         11
-    };
+    };
     (spwn) => {
         12
-    };
+    };
     (builtin) => {
         13
-    };
+    };
     (type_indicator) => {
         14
-    };
+    };
     (NULL) => {
         15
-    };
+    };
     (trigger) => {
         16
-    };
+    };
     (range) => {
         17
-    };
+    };
     (pattern) => {
         18
-    };
+    };
     (object_key) => {
         19
-    };
+    };
     (epsilon) => {
         20
-    };
+    };
 }
 
-pub(crate) use type_id;
+pub(crate) use type_id;
 
 impl Value {
     //numeric representation of value
@@ -432,11 +432,11 @@ impl Value {
     //         }
     //         Value::Macro(m) => {
 
-    //             let mut out = Vec::new();
-    //             out.extend(m.args.iter().filter_map(|a| a.1));
-    //             out.extend(m.args.iter().filter_map(|a| a.3));
+    //             let mut out = Vec::new();
+    //             out.extend(m.args.iter().filter_map(|a| a.1));
+    //             out.extend(m.args.iter().filter_map(|a| a.3));
 
-    //             out.extend(m.def_variables.values());
+    //             out.extend(m.def_variables.values());
 
     //             out
     //         }
@@ -455,30 +455,30 @@ impl Value {
             Value::TriggerFunc(v) => v.hash(state),
             Value::Dict(v) => {
                 for (k, el) in v {
-                    k.hash(state);
-                    globals.stored_values[*el].hash(state, globals);
+                    k.hash(state);
+                    globals.stored_values[*el].hash(state, globals);
                 }
             }
             Value::Macro(v) => v.hash(state),
             Value::Str(v) => v.hash(state),
             Value::Array(v) => {
                 for i in v {
-                    globals.stored_values[*i].hash(state, globals);
+                    globals.stored_values[*i].hash(state, globals);
                 }
             }
             Value::Obj(v, m) => {
                 for i in v {
-                    i.hash(state);
+                    i.hash(state);
                 }
-                m.hash(state);
+                m.hash(state);
             }
             Value::Builtins => "spwn".hash(state),
             Value::BuiltinFunction(v) => v.hash(state),
             Value::TypeIndicator(v) => v.hash(state),
             Value::Range(s, e, st) => {
-                s.hash(state);
-                e.hash(state);
-                st.hash(state);
+                s.hash(state);
+                e.hash(state);
+                st.hash(state);
             }
             Value::Pattern(v) => v.hash(state),
             Value::Null => "null".hash(state),
@@ -486,7 +486,7 @@ impl Value {
     }
 
     pub fn get_type_str(&self, globals: &Globals) -> String {
-        let t = self.to_num(globals);
+        let t = self.to_num(globals);
         find_key_for_value(&globals.type_ids, t).unwrap().clone()
     }
 
@@ -497,12 +497,12 @@ impl Value {
         globals: &mut Globals,
         context: Context,
     ) -> Result<bool, RuntimeError> {
-        let mut full_context = FullContext::Single(context); // not part of the full tree, but shouldnt matter, since it shouldnt be changed
-        self.matches_pat(pat_val, info, globals, &mut full_context, false)?;
+        let mut full_context = FullContext::Single(context); // not part of the full tree, but shouldnt matter, since it shouldnt be changed
+        self.matches_pat(pat_val, info, globals, &mut full_context, false)?;
         match &globals.stored_values[full_context.inner().return_value] {
             Value::Bool(b) => Ok(*b),
             a => {
-                panic!("Expected bool, got {}", a.clone().to_str(globals));
+                panic!("Expected bool, got {}", a.clone().to_str(globals));
             }
         }
     }
@@ -526,7 +526,7 @@ impl Value {
                 p
             } else {
                 unreachable!()
-            };
+            };
             match pat {
                 Pattern::Either(p1, p2) => {
                     self.matches_pat(
@@ -535,7 +535,7 @@ impl Value {
                         globals,
                         full_context,
                         allow_side_effect,
-                    )?;
+                    )?;
                     for full_context in full_context.iter() {
                         match globals.stored_values[full_context.inner().return_value] {
                             Value::Bool(b) => {
@@ -567,7 +567,7 @@ impl Value {
                         globals,
                         full_context,
                         allow_side_effect,
-                    )?;
+                    )?;
                     for full_context in full_context.iter() {
                         match globals.stored_values[full_context.inner().return_value] {
                             Value::Bool(b) => {
@@ -599,7 +599,7 @@ impl Value {
                         globals,
                         full_context,
                         allow_side_effect,
-                    )?;
+                    )?;
                     match globals.stored_values[(*full_context.inner()).return_value] {
                         Value::Bool(b) => {
                             (*full_context.inner()).return_value = store_const_value(
@@ -618,7 +618,7 @@ impl Value {
                         globals,
                         full_context.inner().start_group,
                         info.position,
-                    );
+                    );
                 }
                 Pattern::Any => {
                     (*full_context.inner()).return_value = store_const_value(
@@ -644,20 +644,20 @@ impl Value {
                             1 => {
 
                                 // TODO: make sure it always sets the return value
-                                full_context.reset_return_vals(globals);
+                                full_context.reset_return_vals(globals);
                                 for el in a_val {
                                     for full_context in full_context.iter() {
                                         if globals.stored_values[full_context.inner().return_value]
                                             != Value::Bool(false)
                                         {
-                                            let val = globals.stored_values[*el].clone();
+                                            let val = globals.stored_values[*el].clone();
                                             val.matches_pat(
                                                 &Value::Pattern(a_pat[0].clone()),
                                                 info,
                                                 globals,
                                                 full_context,
                                                 allow_side_effect,
-                                            )?;
+                                            )?;
                                         }
                                     }
                                 }
@@ -676,7 +676,7 @@ impl Value {
                             globals,
                             full_context.inner().start_group,
                             info.position,
-                        );
+                        );
                     }
                 }
                 Pattern::Macro { args, ret } => {
@@ -687,17 +687,17 @@ impl Value {
                                 globals,
                                 full_context.inner().start_group,
                                 info.position,
-                            );
+                            );
                         } else {
-                            let mut is_matching = true;
+                            let mut is_matching = true;
                             for (i, m_arg) in m.args.iter().enumerate() {
                                 if let Some(pat_stored) = m_arg.pattern {
                                     match &convert_type(&globals.stored_values[pat_stored].clone(), type_id!(pattern), info, globals, full_context.inner())?  {
                                         Value::Pattern(p) => {
-                                            let matches = args[i].in_pat(p, globals)?;
+                                            let matches = args[i].in_pat(p, globals)?;
                                             if !matches {
-                                                is_matching = false;
-                                                break;
+                                                is_matching = false;
+                                                break;
                                             }
                                         },
                                         _ => unreachable!()
@@ -708,7 +708,7 @@ impl Value {
                                 if let Some(ret_stored) = m.ret_pattern {
                                     match &convert_type(&globals.stored_values[ret_stored].clone(), type_id!(pattern), info, globals, full_context.inner())? {
                                         Value::Pattern(p) => {
-                                            is_matching = (*ret).in_pat(p, globals)?;
+                                            is_matching = (*ret).in_pat(p, globals)?;
                                             
                                         },
                                         _ => unreachable!()
@@ -720,7 +720,7 @@ impl Value {
                                 globals,
                                 full_context.inner().start_group,
                                 info.position,
-                            );
+                            );
                         }
                     } else {
                         (*full_context.inner()).return_value = store_const_value(
@@ -728,7 +728,7 @@ impl Value {
                             globals,
                             full_context.inner().start_group,
                             info.position,
-                        );
+                        );
                     }
                 }
                 a => {
@@ -738,7 +738,7 @@ impl Value {
                         globals,
                         full_context.inner().start_group,
                         info.position,
-                    );
+                    );
                     let (builtin, val2) = match a {
                         Pattern::Eq(v) => (Builtin::EqOp, v),
                         Pattern::NotEq(v) => (Builtin::NotEqOp, v),
@@ -748,10 +748,10 @@ impl Value {
                         Pattern::LessOrEq(v) => (Builtin::LessOrEqOp, v),
                         Pattern::In(v) => (Builtin::InOp, v),
                         _ => unreachable!(),
-                    };
+                    };
                     
                     if allow_side_effect {
-                        handle_operator(val, val2, builtin, full_context, globals, info)?;
+                        handle_operator(val, val2, builtin, full_context, globals, info)?;
                     } else {
                         if globals.stored_values[val]
                             .clone()
@@ -770,7 +770,7 @@ impl Value {
                                     &[], 
                                     None
                                 )
-                            ));
+                            ));
                         }
 
                         built_in_function(
@@ -779,7 +779,7 @@ impl Value {
                             info.clone(),
                             globals,
                             full_context,
-                        )?;
+                        )?;
                     }
                 }
             }
@@ -834,59 +834,59 @@ impl Value {
                 }
             }
             Value::Dict(dict_in) => {
-                let mut out = String::new();
+                let mut out = String::new();
 
-                let mut d = dict_in.clone();
+                let mut d = dict_in.clone();
                 if let Some(n) = d.get(&globals.TYPE_MEMBER_NAME) {
-                    let val = globals.stored_values[*n].clone();
-                    out += &display_inner(&val, globals)?;
-                    d.remove(&globals.TYPE_MEMBER_NAME);
-                    out += "::";
+                    let val = globals.stored_values[*n].clone();
+                    out += &display_inner(&val, globals)?;
+                    d.remove(&globals.TYPE_MEMBER_NAME);
+                    out += "::";
                 }
-                out += "{";
-                let mut d_iter = d.iter();
+                out += "{";
+                let mut d_iter = d.iter();
                 for (count, (key, val)) in (&mut d_iter).enumerate() {
                     if count > MAX_DICT_EL_DISPLAY {
-                        let left = d_iter.count();
+                        let left = d_iter.count();
                         if left > 0 {
-                            out += &format!("... ({} more)  ", left);
+                            out += &format!("... ({} more)  ", left);
                         }
-                        break;
+                        break;
                     }
 
-                    let stored_val = display_inner(&globals.stored_values[*val].clone(), globals)?;
-                    out += &format!("{}: {}, ", key, stored_val);
+                    let stored_val = display_inner(&globals.stored_values[*val].clone(), globals)?;
+                    out += &format!("{}: {}, ", key, stored_val);
                 }
                 if !d.is_empty() {
-                    out.pop();
-                    out.pop();
+                    out.pop();
+                    out.pop();
                 }
 
-                out += "}"; //why do i have to do this twice? idk
+                out += "}"; //why do i have to do this twice? idk
 
                 out
             }
             Value::Macro(m) => {
-                let mut out = String::from("(");
+                let mut out = String::from("(");
                 if !m.args.is_empty() {
                     for arg in m.args.iter() {
-                        out += &arg.name;
+                        out += &arg.name;
                         if let Some(val) = arg.pattern {
                             out += &format!(
                                 ": {}",
                                 display_inner(&globals.stored_values[val].clone(), globals)?
                             )
-                        };
+                        };
                         if let Some(val) = arg.default {
                             out += &format!(
                                 " = {}",
                                 display_inner(&globals.stored_values[val].clone(), globals)?
                             )
-                        };
-                        out += ", ";
+                        };
+                        out += ", ";
                     }
-                    out.pop();
-                    out.pop();
+                    out.pop();
+                    out.pop();
                 }
                 out + ") { /* ... */ }"
             }
@@ -895,25 +895,25 @@ impl Value {
                 if a.is_empty() {
                     "[]".to_string()
                 } else {
-                    let mut out = String::from("[");
+                    let mut out = String::from("[");
                     for val in a {
-                        out += &display_inner(&globals.stored_values[*val].clone(), globals)?;
-                        out += ", ";
+                        out += &display_inner(&globals.stored_values[*val].clone(), globals)?;
+                        out += ", ";
                     }
-                    out.pop();
-                    out.pop();
-                    out += "]";
+                    out.pop();
+                    out.pop();
+                    out += "]";
 
                     out
                 }
             }
             Value::Obj(o, _) => {
-                let mut out = String::new();
+                let mut out = String::new();
                 for (key, val) in o {
-                    out += &format!("{},{},", key, val);
+                    out += &format!("{},{},", key, val);
                 }
-                out.pop();
-                out += ";";
+                out.pop();
+                out += ";";
                 out
             }
             Value::Builtins => "$".to_string(),
@@ -945,13 +945,13 @@ impl Value {
                     if a.is_empty() {
                         "[]".to_string()
                     } else {
-                        let mut out = String::from("[");
+                        let mut out = String::from("[");
                         for p in a {
-                            out += &Value::Pattern(p.clone()).to_str(globals);
-                            out += ",";
+                            out += &Value::Pattern(p.clone()).to_str(globals);
+                            out += ",";
                         }
-                        out.pop();
-                        out += "]";
+                        out.pop();
+                        out += "]";
 
                         out
                     }
@@ -981,17 +981,17 @@ impl Value {
                     "_".to_string()
                 }
                 Pattern::Macro { args, ret } => {
-                    let mut out = String::from("(");
+                    let mut out = String::from("(");
                     if !args.is_empty() {
                         for arg in args.iter() {
-                            out += &display_inner(&Value::Pattern(arg.clone()), globals)?;
-                            out += ", ";
+                            out += &display_inner(&Value::Pattern(arg.clone()), globals)?;
+                            out += ", ";
                         }
-                        out.pop();
-                        out.pop();
+                        out.pop();
+                        out.pop();
                     }
-                    out += ") -> ";
-                    out += &display_inner(&Value::Pattern(*ret.clone()), globals)?;
+                    out += ") -> ";
+                    out += &display_inner(&Value::Pattern(*ret.clone()), globals)?;
                     out
                 }
             },
@@ -1021,11 +1021,11 @@ pub fn convert_type(
     context: &Context,
 ) -> Result<Value, RuntimeError> {
     if val.to_num(globals) == typ {
-        return Ok(val.clone());
+        return Ok(val.clone());
     }
 
     if typ == 9 {
-        return Ok(Value::Str(val.to_str(globals)));
+        return Ok(Value::Str(val.to_str(globals)));
     }
 
     Ok(match (val, typ) {
@@ -1142,7 +1142,7 @@ pub fn convert_type(
                     }
                 }
                 _ => {
-                    let out: std::result::Result<f64, _> = s.parse();
+                    let out: std::result::Result<f64, _> = s.parse();
                     match out {
                         Ok(n) => Value::Number(n),
                         _ => {
@@ -1166,7 +1166,7 @@ pub fn convert_type(
     
         (Value::Array(arr), type_id!(pattern)) => {
             // pattern
-            let mut new_vec = Vec::new();
+            let mut new_vec = Vec::new();
             for el in arr {
                 new_vec.push(match globals.stored_values[*el].clone() {
                     Value::Pattern(p) => p,
@@ -1221,18 +1221,18 @@ pub fn slice_array(
     info: CompilerInfo,
     context: &Context,
 ) -> Result<Vec<StoredValue>, RuntimeError> {
-    let mut slices = slices_;
+    let mut slices = slices_;
 
-    let current_slice = slices.pop().unwrap();
+    let current_slice = slices.pop().unwrap();
     let s = Slyce {
         start: current_slice.0.into(),
         end: current_slice.1.into(),
         step: current_slice.2,
-    };
+    };
 
-    let sliced = s.apply(input).copied().collect::<Vec<_>>();
+    let sliced = s.apply(input).copied().collect::<Vec<_>>();
 
-    let mut result = Vec::<StoredValue>::new();
+    let mut result = Vec::<StoredValue>::new();
 
     for i in &sliced {
         if !slices.is_empty() {
@@ -1246,26 +1246,26 @@ pub fn slice_array(
                         "Cannot slice nonconforming multidimensional array",
                         &[],
                         None,
-                    )));
+                    )));
                 }
-            };
+            };
 
             let stored_arr = store_const_value(
                 Value::Array(val),
                 globals,
                 context.start_group,
                 info.position,
-            );
-            result.push(stored_arr);
+            );
+            result.push(stored_arr);
         } else {
-            return Ok(sliced);
+            return Ok(sliced);
         }
     }
     Ok(result)
 }
 
-use crate::compiler_types::EvalExpression;
-use crate::compiler_types::ToTriggerFunc;
+use crate::compiler_types::EvalExpression;
+use crate::compiler_types::ToTriggerFunc;
 
 pub fn macro_to_value(
     m: &ast::Macro,
@@ -1275,23 +1275,23 @@ pub fn macro_to_value(
     //mut define_new: bool,
     constant: bool,
 ) -> Result<(), RuntimeError> {
-    globals.push_new_preserved();
+    globals.push_new_preserved();
     // todo: add check for context split on pattern and default vals
     for full_context in contexts.iter() {
-        let fn_context = full_context.inner().start_group;
-        let mut args: Vec<MacroArgDef> = Vec::new();
+        let fn_context = full_context.inner().start_group;
+        let mut args: Vec<MacroArgDef> = Vec::new();
 
         for (name, default, attr, pat, pos, as_ref) in m.args.iter() {
             let def_val = match default {
                 Some(e) => {
-                    e.eval(full_context, globals, info.clone(), constant)?;
+                    e.eval(full_context, globals, info.clone(), constant)?;
 
                     if full_context.inner().start_group != fn_context {
                         return Err(RuntimeError::ContextChangeError {
                             message: "A macro argument default value can't change the trigger function context".to_string(),
                             info,
                             context_changes: full_context.inner().fn_context_change_stack.clone()
-                        });
+                        });
                     }
 
                     let out = clone_value(
@@ -1300,17 +1300,17 @@ pub fn macro_to_value(
                         full_context.inner().start_group,
                         true,
                         info.position,
-                    );
+                    );
 
-                    globals.push_preserved_val(out);
+                    globals.push_preserved_val(out);
 
                     Some(out)
                 }
                 None => None,
-            };
+            };
             let pat = match pat {
                 Some(e) => {
-                    e.eval(full_context, globals, info.clone(), constant)?;
+                    e.eval(full_context, globals, info.clone(), constant)?;
 
                     if full_context.inner().start_group != fn_context {
                         return Err(RuntimeError::ContextChangeError {
@@ -1319,15 +1319,15 @@ pub fn macro_to_value(
                                     .to_string(),
                             info,
                             context_changes: full_context.inner().fn_context_change_stack.clone(),
-                        });
+                        });
                     }
 
-                    globals.push_preserved_val(full_context.inner().return_value);
+                    globals.push_preserved_val(full_context.inner().return_value);
 
                     Some(full_context.inner().return_value)
                 }
                 None => None,
-            };
+            };
             args.push(MacroArgDef {
                 name: *name,
                 default: def_val,
@@ -1335,11 +1335,11 @@ pub fn macro_to_value(
                 pattern: pat,
                 position: *pos,
                 as_ref: *as_ref,
-            });
+            });
         }
 
         let ret_pattern = if let Some(expr) = &m.ret_type {
-            expr.eval(full_context, globals, info.clone(), constant)?;
+            expr.eval(full_context, globals, info.clone(), constant)?;
 
             if full_context.inner().start_group != fn_context {
                 return Err(RuntimeError::ContextChangeError {
@@ -1347,16 +1347,16 @@ pub fn macro_to_value(
                         .to_string(),
                     info,
                     context_changes: full_context.inner().fn_context_change_stack.clone(),
-                });
+                });
             }
 
-            let out = full_context.inner().return_value;
+            let out = full_context.inner().return_value;
 
-            globals.push_preserved_val(out);
+            globals.push_preserved_val(out);
             Some(out)
         } else {
             None
-        };
+        };
 
         full_context.inner().return_value = store_const_value(
             Value::Macro(Box::new(Macro {
@@ -1376,10 +1376,10 @@ pub fn macro_to_value(
             globals,
             full_context.inner().start_group,
             info.position,
-        );
+        );
     }
 
-    globals.pop_preserved();
+    globals.pop_preserved();
 
     Ok(())
 }
@@ -1399,9 +1399,9 @@ pub trait VariableFuncs {
         globals: &mut Globals,
         info: CompilerInfo,
         constant: bool,
-    ) -> Result<(), RuntimeError>;
+    ) -> Result<(), RuntimeError>;
 
-    //fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool;
+    //fn is_undefinable(&self, context: &Context, globals: &mut Globals, dstruct_allowed: bool) -> bool;
 
     fn try_define(
         &self,
@@ -1410,7 +1410,7 @@ pub trait VariableFuncs {
         info: &CompilerInfo,
         mutable: bool,
         layer: i16,
-    ) -> Result<DefineResult, RuntimeError>;
+    ) -> Result<DefineResult, RuntimeError>;
 }
 
 impl VariableFuncs for ast::Variable {
@@ -1421,10 +1421,10 @@ impl VariableFuncs for ast::Variable {
         mut info: CompilerInfo,
         constant: bool,
     ) -> Result<(), RuntimeError> {
-        contexts.reset_return_vals(globals);
-        info.position.pos = self.pos;
+        contexts.reset_return_vals(globals);
+        info.position.pos = self.pos;
 
-        use ast::IdClass;
+        use ast::IdClass;
         for full_context in contexts.iter() {
             match &self.value.body {
                 ast::ValueBody::Resolved(r) => full_context.inner().return_value = *r,
@@ -1436,7 +1436,7 @@ impl VariableFuncs for ast::Variable {
                             undefined: globals.SELF_MEMBER_NAME.to_string(),
                             desc: "variable".to_string(),
                             info,
-                        });
+                        });
                     }
                 }
                 ast::ValueBody::Id(id) => {
@@ -1505,37 +1505,37 @@ impl VariableFuncs for ast::Variable {
                 }
                 ast::ValueBody::Symbol(string) => {
                     if string.as_ref() == "$" {
-                        full_context.inner().return_value = globals.BUILTIN_STORAGE;
+                        full_context.inner().return_value = globals.BUILTIN_STORAGE;
                     } else if string.as_ref() == "_" {
                         full_context.inner().return_value = store_const_value(
                             Value::Pattern(Pattern::Any),
                             globals,
                             full_context.inner().start_group,
                             info.position,
-                        );
+                        );
                     } else {
                         match full_context.inner().get_variable(*string) {
                             Some(value) => full_context.inner().return_value = value,
                             None => {
-                                let mut similar_names = Vec::new();
-                                let mut extracts = Vec::new();
+                                let mut similar_names = Vec::new();
+                                let mut extracts = Vec::new();
                                 for (name, v) in full_context.inner().get_variables() {
-                                    let dist = distance::damerau_levenshtein(name, string);
+                                    let dist = distance::damerau_levenshtein(name, string);
                                     if distance::damerau_levenshtein(name, string) < 3 {
-                                        similar_names.push((name.to_string(), dist));
+                                        similar_names.push((name.to_string(), dist));
                                     }
-                                    let val = v.last().unwrap().val;
+                                    let val = v.last().unwrap().val;
 
                                     if let Value::Dict(d) = &globals.stored_values[val] {
                                         for key in d.keys() {
                                             if key == string {
-                                                extracts.push(name.to_string());
-                                                break;
+                                                extracts.push(name.to_string());
+                                                break;
                                             }
                                         }
 
                                         similar_names.extend(d.keys().filter_map(|key| {
-                                            let dist = distance::damerau_levenshtein(key, string);
+                                            let dist = distance::damerau_levenshtein(key, string);
                                             if dist < 2 {
                                                 Some((format!("{}.{}", name, key), dist + 1))
                                             } else {
@@ -1546,17 +1546,17 @@ impl VariableFuncs for ast::Variable {
                                 }
                                 for key in crate::builtins::BUILTIN_NAMES {
                                     if *key == string.as_str() {
-                                        extracts.push("$".to_string());
-                                        break;
+                                        extracts.push("$".to_string());
+                                        break;
                                     }
                                 }
                                 for key in crate::builtins::BUILTIN_NAMES {
-                                    let dist = distance::damerau_levenshtein(key, string);
+                                    let dist = distance::damerau_levenshtein(key, string);
                                     if dist < 3 {
-                                        similar_names.push((format!("$.{}", key), dist + 1));
+                                        similar_names.push((format!("$.{}", key), dist + 1));
                                     }
                                 }
-                                similar_names.sort_by_key(|a| a.1);
+                                similar_names.sort_by_key(|a| a.1);
                                 let msg = &format!(
                                     "Maybe you meant {}{}",
                                     match similar_names.len() {
@@ -1581,13 +1581,13 @@ impl VariableFuncs for ast::Variable {
                                     } else {
                                         "?".to_string()
                                     }
-                                );
+                                );
 
                                 let note: Option<&str> = if similar_names.is_empty() {
                                     None
                                 } else {
                                     Some(msg)
-                                };
+                                };
                                 return Err(RuntimeError::CustomError(create_error(
                                     info.clone(),
                                     &format!("`{}` is not defined in this scope", string),
@@ -1599,7 +1599,7 @@ impl VariableFuncs for ast::Variable {
                                         &format!("`{}` is not defined", string),
                                     )],
                                     note,
-                                )));
+                                )));
                             }
                         }
                     }
@@ -1614,23 +1614,23 @@ impl VariableFuncs for ast::Variable {
                 }
 
                 ast::ValueBody::ListComp(comp) => {
-                    globals.push_new_preserved();
+                    globals.push_new_preserved();
                     comp.iterator
-                        .eval(full_context, globals, info.clone(), true)?;
+                        .eval(full_context, globals, info.clone(), true)?;
 
-                    let i_name = comp.symbol;
+                    let i_name = comp.symbol;
 
                     for context in full_context.iter() {
-                        let (_, val) = context.inner_value();
+                        let (_, val) = context.inner_value();
 
-                        globals.push_preserved_val(val);
+                        globals.push_preserved_val(val);
 
                         context.inner().return_value = store_const_value(
                             Value::Array(vec![]),
                             globals,
                             context.inner().start_group,
                             info.position,
-                        );
+                        );
 
                         match globals.stored_values[val].clone() {
                             // what are we iterating
@@ -1645,22 +1645,22 @@ impl VariableFuncs for ast::Variable {
                                         true,
                                         globals,
                                         globals.get_area(element),
-                                    );
+                                    );
 
                                     for con_iter in context.iter() {
-                                        con_iter.enter_scope(); // mini scope sandwich
+                                        con_iter.enter_scope(); // mini scope sandwich
 
                                         let item_list = globals.stored_values
                                             [con_iter.inner().return_value]
-                                            .clone();
+                                            .clone();
 
                                         match &comp.condition {
                                             Some(cond) => {
-                                                cond.eval(con_iter, globals, info.clone(), true)?;
+                                                cond.eval(con_iter, globals, info.clone(), true)?;
                                                 for cond_ctx in con_iter.iter() {
                                                     globals.push_preserved_val(
                                                         cond_ctx.inner().return_value,
-                                                    );
+                                                    );
                                                     match &globals.stored_values
                                                         [cond_ctx.inner().return_value]
                                                     {
@@ -1671,10 +1671,10 @@ impl VariableFuncs for ast::Variable {
                                                                     globals,
                                                                     info.clone(),
                                                                     true,
-                                                                )?;
+                                                                )?;
                                                                 for expr_ctx in cond_ctx.iter() {
                                                                     let mut local_list =
-                                                                        item_list.clone();
+                                                                        item_list.clone();
                                                                     if let Value::Array(ref mut a) =
                                                                         local_list
                                                                     {
@@ -1682,9 +1682,9 @@ impl VariableFuncs for ast::Variable {
                                                                             expr_ctx
                                                                                 .inner()
                                                                                 .return_value,
-                                                                        );
+                                                                        );
                                                                     } else {
-                                                                        unreachable!();
+                                                                        unreachable!();
                                                                     }
 
                                                                     expr_ctx.inner().return_value =
@@ -1695,12 +1695,12 @@ impl VariableFuncs for ast::Variable {
                                                                                 .inner()
                                                                                 .start_group,
                                                                             info.position,
-                                                                        );
+                                                                        );
                                                                     globals.push_preserved_val(
                                                                         expr_ctx
                                                                             .inner()
                                                                             .return_value,
-                                                                    );
+                                                                    );
                                                                 }
                                                             } else {
                                                                 cond_ctx.inner().return_value =
@@ -1711,10 +1711,10 @@ impl VariableFuncs for ast::Variable {
                                                                             .inner()
                                                                             .start_group,
                                                                         info.position,
-                                                                    );
+                                                                    );
                                                                 globals.push_preserved_val(
                                                                     cond_ctx.inner().return_value,
-                                                                );
+                                                                );
                                                             }
                                                         }
                                                         a => {
@@ -1734,13 +1734,13 @@ impl VariableFuncs for ast::Variable {
                                                     globals,
                                                     info.clone(),
                                                     true,
-                                                )?;
+                                                )?;
                                                 for expr_ctx in con_iter.iter() {
-                                                    let mut local_list = item_list.clone();
+                                                    let mut local_list = item_list.clone();
                                                     if let Value::Array(ref mut a) = local_list {
-                                                        a.push(expr_ctx.inner().return_value);
+                                                        a.push(expr_ctx.inner().return_value);
                                                     } else {
-                                                        unreachable!();
+                                                        unreachable!();
                                                     }
 
                                                     expr_ctx.inner().return_value =
@@ -1749,39 +1749,39 @@ impl VariableFuncs for ast::Variable {
                                                             globals,
                                                             expr_ctx.inner().start_group,
                                                             info.position,
-                                                        );
+                                                        );
                                                     globals.push_preserved_val(
                                                         expr_ctx.inner().return_value,
-                                                    );
+                                                    );
                                                 }
                                             }
                                         }
 
-                                        con_iter.exit_scope();
+                                        con_iter.exit_scope();
                                     }
                                 }
-                                //println!("{:?}", out);
+                                //println!("{:?}", out);
                             }
                             Value::Dict(d) => {
                                 // its a dict!
 
                                 for (k, v) in d {
                                     for c in context.iter() {
-                                        let fn_context = c.inner().start_group;
+                                        let fn_context = c.inner().start_group;
                                         let key = store_val_m(
                                             Value::Str(k.as_ref().clone()),
                                             globals,
                                             fn_context,
                                             true,
                                             globals.get_area(v),
-                                        );
+                                        );
                                         let val = clone_value(
                                             v,
                                             globals,
                                             fn_context,
                                             true,
                                             globals.get_area(v),
-                                        );
+                                        );
                                         // reset all variables per context
                                         (*c.inner()).new_variable(
                                             i_name,
@@ -1792,19 +1792,19 @@ impl VariableFuncs for ast::Variable {
                                                 globals.get_area(v),
                                             ),
                                             -1,
-                                        );
+                                        );
                                     }
 
                                     for con_iter in context.iter() {
-                                        con_iter.enter_scope(); // mini scope sandwich
+                                        con_iter.enter_scope(); // mini scope sandwich
 
                                         let item_list = globals.stored_values
                                             [con_iter.inner().return_value]
-                                            .clone();
+                                            .clone();
 
                                         match &comp.condition {
                                             Some(cond) => {
-                                                cond.eval(con_iter, globals, info.clone(), true)?;
+                                                cond.eval(con_iter, globals, info.clone(), true)?;
                                                 for cond_ctx in con_iter.iter() {
                                                     match &globals.stored_values
                                                         [cond_ctx.inner().return_value]
@@ -1816,10 +1816,10 @@ impl VariableFuncs for ast::Variable {
                                                                     globals,
                                                                     info.clone(),
                                                                     true,
-                                                                )?;
+                                                                )?;
                                                                 for expr_ctx in cond_ctx.iter() {
                                                                     let mut local_list =
-                                                                        item_list.clone();
+                                                                        item_list.clone();
                                                                     if let Value::Array(ref mut a) =
                                                                         local_list
                                                                     {
@@ -1827,9 +1827,9 @@ impl VariableFuncs for ast::Variable {
                                                                             expr_ctx
                                                                                 .inner()
                                                                                 .return_value,
-                                                                        );
+                                                                        );
                                                                     } else {
-                                                                        unreachable!();
+                                                                        unreachable!();
                                                                     }
 
                                                                     expr_ctx.inner().return_value =
@@ -1840,7 +1840,7 @@ impl VariableFuncs for ast::Variable {
                                                                                 .inner()
                                                                                 .start_group,
                                                                             info.position,
-                                                                        );
+                                                                        );
                                                                 }
                                                             } else {
                                                                 cond_ctx.inner().return_value =
@@ -1851,7 +1851,7 @@ impl VariableFuncs for ast::Variable {
                                                                             .inner()
                                                                             .start_group,
                                                                         info.position,
-                                                                    );
+                                                                    );
                                                             }
                                                         }
                                                         a => {
@@ -1871,13 +1871,13 @@ impl VariableFuncs for ast::Variable {
                                                     globals,
                                                     info.clone(),
                                                     true,
-                                                )?;
+                                                )?;
                                                 for expr_ctx in con_iter.iter() {
-                                                    let mut local_list = item_list.clone();
+                                                    let mut local_list = item_list.clone();
                                                     if let Value::Array(ref mut a) = local_list {
-                                                        a.push(expr_ctx.inner().return_value);
+                                                        a.push(expr_ctx.inner().return_value);
                                                     } else {
-                                                        unreachable!();
+                                                        unreachable!();
                                                     }
 
                                                     expr_ctx.inner().return_value =
@@ -1886,12 +1886,12 @@ impl VariableFuncs for ast::Variable {
                                                             globals,
                                                             expr_ctx.inner().start_group,
                                                             info.position,
-                                                        );
+                                                        );
                                                 }
                                             }
                                         }
 
-                                        con_iter.exit_scope();
+                                        con_iter.exit_scope();
                                     }
                                 }
                             }
@@ -1904,18 +1904,18 @@ impl VariableFuncs for ast::Variable {
                                         true,
                                         globals,
                                         info.position,
-                                    );
+                                    );
 
                                     for con_iter in context.iter() {
-                                        con_iter.enter_scope(); // mini scope sandwich
+                                        con_iter.enter_scope(); // mini scope sandwich
 
                                         let item_list = globals.stored_values
                                             [con_iter.inner().return_value]
-                                            .clone();
+                                            .clone();
 
                                         match &comp.condition {
                                             Some(cond) => {
-                                                cond.eval(con_iter, globals, info.clone(), true)?;
+                                                cond.eval(con_iter, globals, info.clone(), true)?;
                                                 for cond_ctx in con_iter.iter() {
                                                     match &globals.stored_values
                                                         [cond_ctx.inner().return_value]
@@ -1927,10 +1927,10 @@ impl VariableFuncs for ast::Variable {
                                                                     globals,
                                                                     info.clone(),
                                                                     true,
-                                                                )?;
+                                                                )?;
                                                                 for expr_ctx in cond_ctx.iter() {
                                                                     let mut local_list =
-                                                                        item_list.clone();
+                                                                        item_list.clone();
                                                                     if let Value::Array(ref mut a) =
                                                                         local_list
                                                                     {
@@ -1938,9 +1938,9 @@ impl VariableFuncs for ast::Variable {
                                                                             expr_ctx
                                                                                 .inner()
                                                                                 .return_value,
-                                                                        );
+                                                                        );
                                                                     } else {
-                                                                        unreachable!();
+                                                                        unreachable!();
                                                                     }
 
                                                                     expr_ctx.inner().return_value =
@@ -1951,7 +1951,7 @@ impl VariableFuncs for ast::Variable {
                                                                                 .inner()
                                                                                 .start_group,
                                                                             info.position,
-                                                                        );
+                                                                        );
                                                                 }
                                                             } else {
                                                                 cond_ctx.inner().return_value =
@@ -1962,7 +1962,7 @@ impl VariableFuncs for ast::Variable {
                                                                             .inner()
                                                                             .start_group,
                                                                         info.position,
-                                                                    );
+                                                                    );
                                                             }
                                                         }
                                                         a => {
@@ -1982,13 +1982,13 @@ impl VariableFuncs for ast::Variable {
                                                     globals,
                                                     info.clone(),
                                                     true,
-                                                )?;
+                                                )?;
                                                 for expr_ctx in con_iter.iter() {
-                                                    let mut local_list = item_list.clone();
+                                                    let mut local_list = item_list.clone();
                                                     if let Value::Array(ref mut a) = local_list {
-                                                        a.push(expr_ctx.inner().return_value);
+                                                        a.push(expr_ctx.inner().return_value);
                                                     } else {
-                                                        unreachable!();
+                                                        unreachable!();
                                                     }
 
                                                     expr_ctx.inner().return_value =
@@ -1997,21 +1997,21 @@ impl VariableFuncs for ast::Variable {
                                                             globals,
                                                             expr_ctx.inner().start_group,
                                                             info.position,
-                                                        );
+                                                        );
                                                 }
                                             }
                                         }
 
-                                        con_iter.exit_scope();
+                                        con_iter.exit_scope();
                                     }
                                 }
                             }
 
                             Value::Range(start, end, step) => {
-                                let mut normal = (start..end).step_by(step);
-                                let mut rev = (end..start).step_by(step).rev();
+                                let mut normal = (start..end).step_by(step);
+                                let mut rev = (end..start).step_by(step).rev();
                                 let range: &mut dyn Iterator<Item = i32> =
-                                    if start < end { &mut normal } else { &mut rev };
+                                    if start < end { &mut normal } else { &mut rev };
 
                                 for num in range {
                                     context.set_variable_and_store(
@@ -2021,18 +2021,18 @@ impl VariableFuncs for ast::Variable {
                                         true,
                                         globals,
                                         info.position,
-                                    );
+                                    );
 
                                     for con_iter in context.iter() {
-                                        con_iter.enter_scope(); // mini scope sandwich
+                                        con_iter.enter_scope(); // mini scope sandwich
 
                                         let item_list = globals.stored_values
                                             [con_iter.inner().return_value]
-                                            .clone();
+                                            .clone();
 
                                         match &comp.condition {
                                             Some(cond) => {
-                                                cond.eval(con_iter, globals, info.clone(), true)?;
+                                                cond.eval(con_iter, globals, info.clone(), true)?;
                                                 for cond_ctx in con_iter.iter() {
                                                     match &globals.stored_values
                                                         [cond_ctx.inner().return_value]
@@ -2044,10 +2044,10 @@ impl VariableFuncs for ast::Variable {
                                                                     globals,
                                                                     info.clone(),
                                                                     true,
-                                                                )?;
+                                                                )?;
                                                                 for expr_ctx in cond_ctx.iter() {
                                                                     let mut local_list =
-                                                                        item_list.clone();
+                                                                        item_list.clone();
                                                                     if let Value::Array(ref mut a) =
                                                                         local_list
                                                                     {
@@ -2055,9 +2055,9 @@ impl VariableFuncs for ast::Variable {
                                                                             expr_ctx
                                                                                 .inner()
                                                                                 .return_value,
-                                                                        );
+                                                                        );
                                                                     } else {
-                                                                        unreachable!();
+                                                                        unreachable!();
                                                                     }
 
                                                                     expr_ctx.inner().return_value =
@@ -2068,7 +2068,7 @@ impl VariableFuncs for ast::Variable {
                                                                                 .inner()
                                                                                 .start_group,
                                                                             info.position,
-                                                                        );
+                                                                        );
                                                                 }
                                                             } else {
                                                                 cond_ctx.inner().return_value =
@@ -2079,7 +2079,7 @@ impl VariableFuncs for ast::Variable {
                                                                             .inner()
                                                                             .start_group,
                                                                         info.position,
-                                                                    );
+                                                                    );
                                                             }
                                                         }
                                                         a => {
@@ -2099,13 +2099,13 @@ impl VariableFuncs for ast::Variable {
                                                     globals,
                                                     info.clone(),
                                                     true,
-                                                )?;
+                                                )?;
                                                 for expr_ctx in con_iter.iter() {
-                                                    let mut local_list = item_list.clone();
+                                                    let mut local_list = item_list.clone();
                                                     if let Value::Array(ref mut a) = local_list {
-                                                        a.push(expr_ctx.inner().return_value);
+                                                        a.push(expr_ctx.inner().return_value);
                                                     } else {
-                                                        unreachable!();
+                                                        unreachable!();
                                                     }
 
                                                     expr_ctx.inner().return_value =
@@ -2114,12 +2114,12 @@ impl VariableFuncs for ast::Variable {
                                                             globals,
                                                             expr_ctx.inner().start_group,
                                                             info.position,
-                                                        );
+                                                        );
                                                 }
                                             }
                                         }
 
-                                        con_iter.exit_scope();
+                                        con_iter.exit_scope();
                                     }
                                 }
                             }
@@ -2139,28 +2139,28 @@ impl VariableFuncs for ast::Variable {
                             globals,
                             context.inner().start_group,
                             info.position
-                        );*/
+                        );*/
                     }
-                    globals.pop_preserved();
+                    globals.pop_preserved();
                 }
 
                 ast::ValueBody::Array(a) => {
-                    //let combinations = all_combinations(a.iter().map(|ref x| x.value.clone()).collect::<Vec<_>>(), full_context, globals, info.clone(), constant)?;
+                    //let combinations = all_combinations(a.iter().map(|ref x| x.value.clone()).collect::<Vec<_>>(), full_context, globals, info.clone(), constant)?;
 
                     let combinations: Vec<(Vec<_>, _)> = reduce_combinations(
                         a.clone(),
                         full_context,
                         globals,
                         |item: &ast::ArrayDef, ctx, list: Vec<StoredValue>, globals| {
-                            let mut added = Vec::new();
+                            let mut added = Vec::new();
                             match item.operator {
                                 Some(ast::ArrayPrefix::Collect | ast::ArrayPrefix::Spread) => {
-                                    let expr = &item.value;
+                                    let expr = &item.value;
                                     match &expr.values[0].value.body {
                                         ast::ValueBody::Array(_) => {
                                             // *[a, b]
                                             if expr.values.len() > 1 {
-                                                use parser::fmt::SpwnFmt;
+                                                use parser::fmt::SpwnFmt;
 
                                                 return Err(RuntimeError::CustomError(
                                                     create_error(
@@ -2178,7 +2178,7 @@ impl VariableFuncs for ast::Variable {
                                                         )],
                                                         None,
                                                     ),
-                                                ));
+                                                ));
                                             }
                                             match &expr.values[0].operator {
                                                 None => {
@@ -2187,7 +2187,7 @@ impl VariableFuncs for ast::Variable {
                                                         globals,
                                                         info.clone(),
                                                         constant,
-                                                    )?;
+                                                    )?;
                                                     for collect_ctx in ctx.iter() {
                                                         let buckets =
                                                             match globals.stored_values.move_out(
@@ -2195,18 +2195,18 @@ impl VariableFuncs for ast::Variable {
                                                             ).val {
                                                                 Value::Array(a) => a,
                                                                 _ => unreachable!(),
-                                                            };
+                                                            };
                                                         collect_ctx.inner().return_value =
-                                                            globals.NULL_STORAGE;
+                                                            globals.NULL_STORAGE;
 
-                                                        let mut info = info.clone();
+                                                        let mut info = info.clone();
 
-                                                        info.position.pos = expr.values[0].pos;
-                                                        info.position.pos.0 -= 2;
+                                                        info.position.pos = expr.values[0].pos;
+                                                        info.position.pos.0 -= 2;
 
                                                         if buckets.is_empty() {
-                                                            //new_info.position.pos = expr.values[0].pos;
-                                                            //new_info.position.pos.0 -= 2;
+                                                            //new_info.position.pos = expr.values[0].pos;
+                                                            //new_info.position.pos.0 -= 2;
                                                             return Err(RuntimeError::CustomError(
                                                                 create_error(
                                                                     info,
@@ -2214,18 +2214,18 @@ impl VariableFuncs for ast::Variable {
                                                                     &[],
                                                                     None,
                                                                 ),
-                                                            ));
+                                                            ));
                                                         }
 
-                                                        let mut first = true;
-                                                        let mut len = 0;
+                                                        let mut first = true;
+                                                        let mut len = 0;
 
                                                         let filtered = buckets.iter().map(|x| {
                                                             match globals.stored_values[*x].clone() {
                                                                 Value::Array(b) => {
                                                                     if first {
-                                                                        len = b.len();
-                                                                        first = false;
+                                                                        len = b.len();
+                                                                        first = false;
                                                                     }
 
                                                                     if b.len() != len {
@@ -2239,7 +2239,7 @@ impl VariableFuncs for ast::Variable {
                                                                                 )
                                                                             ],
                                                                             None,
-                                                                        )));
+                                                                        )));
                                                                     }
                                                                     Ok(b)
                                                                 },
@@ -2250,14 +2250,14 @@ impl VariableFuncs for ast::Variable {
                                                                         info: info.clone(),
                                                                     })
                                                             }
-                                                        }).collect::<Result<Vec<_>, _>>()?;
+                                                        }).collect::<Result<Vec<_>, _>>()?;
 
-                                                        let mut updated_list = list.clone();
+                                                        let mut updated_list = list.clone();
 
                                                         for idx in 0..len {
-                                                            let mut zip_list = Vec::new();
+                                                            let mut zip_list = Vec::new();
                                                             for bucket in &filtered {
-                                                                zip_list.push(bucket[idx]);
+                                                                zip_list.push(bucket[idx]);
                                                             }
                                                             let zip_val = store_val_m(
                                                                 Value::Array(zip_list),
@@ -2265,15 +2265,15 @@ impl VariableFuncs for ast::Variable {
                                                                 collect_ctx.inner().start_group,
                                                                 true,
                                                                 info.position,
-                                                            );
-                                                            updated_list.push(zip_val);
+                                                            );
+                                                            updated_list.push(zip_val);
                                                         }
-                                                        added.push((updated_list, collect_ctx));
+                                                        added.push((updated_list, collect_ctx));
                                                     }
                                                 }
                                                 Some(o) => {
                                                     // future proofing
-                                                    use parser::fmt::SpwnFmt;
+                                                    use parser::fmt::SpwnFmt;
 
                                                     return Err(RuntimeError::CustomError(
                                                         create_error(
@@ -2291,7 +2291,7 @@ impl VariableFuncs for ast::Variable {
                                                             )],
                                                             None,
                                                         ),
-                                                    ));
+                                                    ));
                                                 }
                                             }
                                             //let buckets = expr.
@@ -2299,19 +2299,19 @@ impl VariableFuncs for ast::Variable {
                                         }
                                         _ => {
                                             // ..a
-                                            expr.eval(ctx, globals, info.clone(), constant)?;
+                                            expr.eval(ctx, globals, info.clone(), constant)?;
                                             for expr_context in ctx.iter() {
-                                                let evaled_expr = expr_context.inner().return_value;
+                                                let evaled_expr = expr_context.inner().return_value;
 
                                                 match globals.stored_values[evaled_expr].clone() {
                                                     Value::Array(ar) => {
-                                                        let mut updated_list = list.clone();
+                                                        let mut updated_list = list.clone();
                                                         for to_add in ar {
-                                                            updated_list.push(to_add);
-                                                            globals.push_preserved_val(to_add);
+                                                            updated_list.push(to_add);
+                                                            globals.push_preserved_val(to_add);
                                                         }
-                                                        //updated_list.extend(ar);
-                                                        added.push((updated_list, expr_context));
+                                                        //updated_list.extend(ar);
+                                                        added.push((updated_list, expr_context));
                                                     }
                                                     a => {
                                                         return Err(RuntimeError::TypeError {
@@ -2328,22 +2328,22 @@ impl VariableFuncs for ast::Variable {
                                 }
                                 _ => {
                                     // a
-                                    item.value.eval(ctx, globals, info.clone(), constant)?;
+                                    item.value.eval(ctx, globals, info.clone(), constant)?;
 
                                     for full_context in ctx.iter() {
-                                        let result = full_context.inner().return_value;
-                                        let mut updated_list = list.clone();
+                                        let result = full_context.inner().return_value;
+                                        let mut updated_list = list.clone();
 
-                                        updated_list.push(result);
-                                        globals.push_preserved_val(result);
-                                        added.push((updated_list, full_context));
+                                        updated_list.push(result);
+                                        globals.push_preserved_val(result);
+                                        added.push((updated_list, full_context));
                                     }
                                 }
                             }
                             Ok(added)
                         },
-                    )?;
-                    //panic!("fix soon");
+                    )?;
+                    //panic!("fix soon");
 
                     for (arr, fc) in combinations {
                         fc.inner().return_value = store_const_value(
@@ -2370,8 +2370,8 @@ impl VariableFuncs for ast::Variable {
                     }
                 }
                 ast::ValueBody::Import(i, f) => {
-                    //let mut new_contexts = context.clone();
-                    import_module(i, full_context, globals, info.clone(), *f)?;
+                    //let mut new_contexts = context.clone();
+                    import_module(i, full_context, globals, info.clone(), *f)?;
                 }
 
                 ast::ValueBody::TypeIndicator(name) => {
@@ -2387,27 +2387,27 @@ impl VariableFuncs for ast::Variable {
                                 undefined: name.clone(),
                                 info,
                                 desc: "type".to_string(),
-                            });
+                            });
                         }
-                    };
+                    };
                 }
 
                 ast::ValueBody::Ternary(t) => {
                     
-                    globals.push_new_preserved();
+                    globals.push_new_preserved();
 
                     t.condition
-                        .eval(full_context, globals, info.clone(), constant)?;
+                        .eval(full_context, globals, info.clone(), constant)?;
 
-                    globals.push_preserved_val(full_context.inner().return_value);
+                    globals.push_preserved_val(full_context.inner().return_value);
 
                     for context in full_context.iter() {
                         // through every conditional context
                         match (t.is_pattern, &globals.stored_values[context.inner().return_value]) {
                             (false, Value::Bool(b)) => {
-                                let answer = if *b { &t.if_expr } else { &t.else_expr };
+                                let answer = if *b { &t.if_expr } else { &t.else_expr };
 
-                                answer.eval(context, globals, info.clone(), constant)?;
+                                answer.eval(context, globals, info.clone(), constant)?;
                             }
                             (false, a) => {
                                 return Err(RuntimeError::TypeError {
@@ -2418,14 +2418,14 @@ impl VariableFuncs for ast::Variable {
                                 })
                             }
                             (true, p) => {
-                                let p = p.clone();
+                                let p = p.clone();
 
-                                t.if_expr.eval(context, globals, info.clone(), constant)?;
+                                t.if_expr.eval(context, globals, info.clone(), constant)?;
 
                                 for context in context.iter() {
-                                    let if_val_id = context.inner().return_value;
-                                    globals.push_preserved_val(if_val_id);
-                                    let if_val = globals.stored_values[if_val_id].clone();
+                                    let if_val_id = context.inner().return_value;
+                                    globals.push_preserved_val(if_val_id);
+                                    let if_val = globals.stored_values[if_val_id].clone();
                                     
                                     if_val.matches_pat(
                                         &p,
@@ -2433,12 +2433,12 @@ impl VariableFuncs for ast::Variable {
                                         globals,
                                         context,
                                         true
-                                    )?;
+                                    )?;
                                     for context in context.iter() {
                                         match &globals.stored_values[context.inner().return_value] {
                                             Value::Bool(b) => if *b {
-                                                context.inner().return_value = if_val_id;
-                                            } else { t.else_expr.eval(context, globals, info.clone(), constant)?; },
+                                                context.inner().return_value = if_val_id;
+                                            } else { t.else_expr.eval(context, globals, info.clone(), constant)?; },
                                             _ => unreachable!(), // idk do i error here
                                         }
                                     }
@@ -2448,31 +2448,31 @@ impl VariableFuncs for ast::Variable {
                         }
                     }
 
-                    globals.pop_preserved();
+                    globals.pop_preserved();
                 }
 
                 ast::ValueBody::Switch(expr, cases) => {
-                    expr.eval(full_context, globals, info.clone(), constant)?;
+                    expr.eval(full_context, globals, info.clone(), constant)?;
 
                     for full_context in full_context.iter() {
-                        let val1 = full_context.inner().return_value;
+                        let val1 = full_context.inner().return_value;
 
                         for case in cases {
                             match &case.typ {
                                 ast::CaseType::Pattern(p) => {
-                                    p.eval(full_context, globals, info.clone(), constant)?;
+                                    p.eval(full_context, globals, info.clone(), constant)?;
 
                                     for full_context in full_context.iter() {
                                         let pat_val = globals.stored_values
                                             [full_context.inner().return_value]
-                                            .clone();
+                                            .clone();
                                         globals.stored_values[val1].clone().matches_pat(
                                             &pat_val,
                                             &info,
                                             globals,
                                             full_context,
                                             true,
-                                        )?;
+                                        )?;
 
                                         for full_context in full_context.iter() {
                                             match &globals.stored_values
@@ -2485,7 +2485,7 @@ impl VariableFuncs for ast::Variable {
                                                             globals,
                                                             info.clone(),
                                                             constant,
-                                                        )?;
+                                                        )?;
                                                         for c in full_context.iter() {
                                                             c.inner().broken = Some((
                                                                 BreakType::Switch(
@@ -2506,9 +2506,9 @@ impl VariableFuncs for ast::Variable {
                                                             full_context.inner().return_value,
                                                         ),
                                                         info,
-                                                    });
+                                                    });
                                                 }
-                                            };
+                                            };
                                         }
                                     }
                                 }
@@ -2521,7 +2521,7 @@ impl VariableFuncs for ast::Variable {
                                         globals,
                                         info.clone(),
                                         constant,
-                                    )?;
+                                    )?;
                                     for c in full_context.iter() {
                                         c.inner().broken = Some((
                                             BreakType::Switch(c.inner().return_value),
@@ -2534,11 +2534,11 @@ impl VariableFuncs for ast::Variable {
                         for c in full_context.with_breaks() {
                             match c.inner().broken {
                                 Some((BreakType::Switch(v), _)) => {
-                                    c.inner().return_value = v;
-                                    c.inner().broken = None;
+                                    c.inner().return_value = v;
+                                    c.inner().broken = None;
                                 }
                                 None => {
-                                    c.inner().return_value = globals.NULL_STORAGE;
+                                    c.inner().return_value = globals.NULL_STORAGE;
                                 }
                                 _ => (),
                             }
@@ -2548,33 +2548,33 @@ impl VariableFuncs for ast::Variable {
                 ast::ValueBody::Obj(o) => {
                     // parsing an obj
 
-                    let mut all_expr: Vec<ast::Expression> = Vec::new(); // all expressions
+                    let mut all_expr: Vec<ast::Expression> = Vec::new(); // all expressions
 
                     for prop in &o.props {
                         // iterate through obj properties
 
-                        all_expr.push(prop.0.clone()); // this is the object key expression
-                        all_expr.push(prop.1.clone()); // this is the object value expression
+                        all_expr.push(prop.0.clone()); // this is the object key expression
+                        all_expr.push(prop.1.clone()); // this is the object value expression
                     }
-                    let new_info = info.clone();
+                    let new_info = info.clone();
 
                     let combinations =
-                        all_combinations(all_expr, full_context, globals, new_info, constant)?; // evaluate all expressions gathered
+                        all_combinations(all_expr, full_context, globals, new_info, constant)?; // evaluate all expressions gathered
 
                     for (expressions, context) in combinations {
-                        let mut obj: Vec<(u16, ObjParam)> = Vec::new();
+                        let mut obj: Vec<(u16, ObjParam)> = Vec::new();
                         for i in 0..(o.props.len()) {
-                            let o_key = expressions[i * 2];
-                            let o_val = expressions[i * 2 + 1];
+                            let o_key = expressions[i * 2];
+                            let o_val = expressions[i * 2 + 1];
                             // hopefully self explanatory
 
-                            let disallowed_message = "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead";
+                            let disallowed_message = "You are not allowed to set the group ID(s) or the spawn triggered state of a @trigger. Use obj instead";
 
                             let (key, pattern) = match &globals.stored_values[o_key] {
                                 // key = int of the id, pattern = what type should be expected from the value
                                 Value::Number(n) => {
                                     // number, i have no clue why people would use this over an obj_key
-                                    let out = convert_to_int(*n, &info)? as u16;
+                                    let out = convert_to_int(*n, &info)? as u16;
 
                                     if o.mode == ast::ObjectMode::Trigger
                                         && (out == 57 || out == 62)
@@ -2584,14 +2584,14 @@ impl VariableFuncs for ast::Variable {
                                             disallowed_message,
                                             &[],
                                             None,
-                                        )));
+                                        )));
                                     }
 
                                     (out, None)
                                 }
                                 Value::Dict(d) => {
                                     // this is specifically for object_key dicts
-                                    let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
+                                    let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
                                     if gotten_type == None
                                         || globals.stored_values[*gotten_type.unwrap()]
                                             != Value::TypeIndicator(19)
@@ -2602,32 +2602,32 @@ impl VariableFuncs for ast::Variable {
                                             found: globals.get_type_str(o_key),
                                             val_def: globals.get_area(o_key),
                                             info,
-                                        });
+                                        });
                                     }
-                                    let id = d.get(&globals.OBJ_KEY_ID);
+                                    let id = d.get(&globals.OBJ_KEY_ID);
                                     if id == None {
                                         return Err(RuntimeError::CustomError(create_error(
                                             info,
                                             "object key has no 'id' member",
                                             &[],
                                             None,
-                                        )));
+                                        )));
                                     }
-                                    let pattern = d.get(&globals.OBJ_KEY_PATTERN);
+                                    let pattern = d.get(&globals.OBJ_KEY_PATTERN);
                                     if pattern == None {
                                         return Err(RuntimeError::CustomError(create_error(
                                             info,
                                             "object key has no 'pattern' member",
                                             &[],
                                             None,
-                                        )));
+                                        )));
                                     }
 
                                     (
                                         match &globals.stored_values[*id.unwrap()] {
                                             // check if the ID is actually an int. it should be
                                             Value::Number(n) => {
-                                                let out = convert_to_int(*n, &info)? as u16;
+                                                let out = convert_to_int(*n, &info)? as u16;
 
                                                 if o.mode == ast::ObjectMode::Trigger
                                                     && (out == 57 || out == 62)
@@ -2640,7 +2640,7 @@ impl VariableFuncs for ast::Variable {
                                                             &[],
                                                             None,
                                                         ),
-                                                    ));
+                                                    ));
                                                 }
                                                 out
                                             }
@@ -2667,12 +2667,12 @@ impl VariableFuncs for ast::Variable {
                                         info,
                                     })
                                 }
-                            };
+                            };
 
                             obj.push((
                                 key,
                                 {   // parse the value
-                                    let val = globals.stored_values[o_val].clone();
+                                    let val = globals.stored_values[o_val].clone();
 
                                     if let Some(pat) = pattern { // check if pattern is actually enforced (not null)
                                         if !val.pure_matches_pat(&pat.0, &info, globals, context.inner().clone())? {
@@ -2682,7 +2682,7 @@ impl VariableFuncs for ast::Variable {
                                                 val_def: globals.get_area(o_val),
                                                 pat_def: globals.get_area(pat.1),
                                                 info
-                                            });
+                                            });
                                             
                                         }
                                     }
@@ -2694,7 +2694,7 @@ impl VariableFuncs for ast::Variable {
                                         ),
                                         &[],
                                         None,
-                                    )));
+                                    )));
 
                                     match &val { // its just converting value to objparam basic level stuff
                                         Value::Number(n) => {
@@ -2712,7 +2712,7 @@ impl VariableFuncs for ast::Variable {
                                         Value::Bool(b) => ObjParam::Bool(*b),
 
                                         Value::Array(a) => ObjParam::GroupList({
-                                            let mut out = Vec::new();
+                                            let mut out = Vec::new();
                                             for s in a {
                                                 out.push(match globals.stored_values[*s] {
                                                     Value::Group(g) => g,
@@ -2733,17 +2733,17 @@ impl VariableFuncs for ast::Variable {
                                                     if t == 20 { // type indicator number 20 is epsilon ig
                                                         ObjParam::Epsilon
                                                     } else {
-                                                        return err;
+                                                        return err;
                                                     }
                                                 } else {
-                                                    return err;
+                                                    return err;
                                                 }
                                             } else {
-                                                return err;
+                                                return err;
                                             }
                                         }
                                         _ => {
-                                            return err;
+                                            return err;
                                         }
                                     }
 
@@ -2756,27 +2756,27 @@ impl VariableFuncs for ast::Variable {
                             globals,
                             context.inner().start_group,
                             info.position,
-                        );
+                        );
                     }
                 }
 
                 ast::ValueBody::Macro(m) => {
-                    macro_to_value(m, full_context, globals, info.clone(), constant)?;
+                    macro_to_value(m, full_context, globals, info.clone(), constant)?;
                 }
                 //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
                 ast::ValueBody::Null => full_context.inner().return_value = globals.NULL_STORAGE,
                 ast::ValueBody::MacroPattern(ast::MacroPattern { args, ret }) => {
-                    let mut args = args.clone();
-                    args.push(ret.clone());
-                    let combinations = all_combinations(args, full_context, globals, info.clone(), constant)?;
+                    let mut args = args.clone();
+                    args.push(ret.clone());
+                    let combinations = all_combinations(args, full_context, globals, info.clone(), constant)?;
                     for (args, fc) in combinations {
-                        let mut patterns = Vec::new();
+                        let mut patterns = Vec::new();
                         // get all the arg values and convert to patterns
                         for arg in args {
-                            let pat_val = convert_type(&globals.stored_values[arg].clone(), type_id!(pattern), &info, globals, fc.inner())?;
+                            let pat_val = convert_type(&globals.stored_values[arg].clone(), type_id!(pattern), &info, globals, fc.inner())?;
                             match pat_val {
                                 Value::Pattern(p) => {
-                                    patterns.push(p);
+                                    patterns.push(p);
                                 }
                                 a => {
                                     return Err(RuntimeError::TypeError {
@@ -2788,7 +2788,7 @@ impl VariableFuncs for ast::Variable {
                                 }
                             }
                         }
-                        let ret = Box::new(patterns.pop().unwrap());
+                        let ret = Box::new(patterns.pop().unwrap());
                         
                         fc.inner().return_value = store_const_value(
                             Value::Pattern(Pattern::Macro{
@@ -2801,31 +2801,31 @@ impl VariableFuncs for ast::Variable {
                     }
 
                 },
-            };
+            };
         }
-        let mut path_iter = self.path.iter();
+        let mut path_iter = self.path.iter();
         for c in contexts.iter() {
-            (*c.inner()).return_value2 = globals.NULL_STORAGE;
+            (*c.inner()).return_value2 = globals.NULL_STORAGE;
         }
-        globals.push_new_preserved();
+        globals.push_new_preserved();
         for full_context in contexts.iter() {
-            globals.push_preserved_val(full_context.inner().return_value);
+            globals.push_preserved_val(full_context.inner().return_value);
         }
 
         for p in &mut path_iter {
             // if !defined {
-            //     use crate::fmt::SpwnFmt;
+            //     use crate::fmt::SpwnFmt;
             //     return Err(RuntimeError::RuntimeError {
             //         message: format!("Cannot run {} on an undefined value", p.fmt(0)),
             //         info,
-            //     });
+            //     });
             // }
             match &p {
                 ast::Path::Member(m) => {
                     for full_context in contexts.iter() {
-                        let v = full_context.inner().return_value;
-                        (*full_context.inner()).return_value2 = v;
-                        let val = globals.stored_values[v].clone(); // this is the object we are getting member of
+                        let v = full_context.inner().return_value;
+                        (*full_context.inner()).return_value2 = v;
+                        let val = globals.stored_values[v].clone(); // this is the object we are getting member of
 
                         (*full_context.inner()).return_value =
                             match val.member(*m, full_context.inner(), globals, info.clone()) {
@@ -2835,17 +2835,17 @@ impl VariableFuncs for ast::Variable {
                                         undefined: m.as_ref().clone(),
                                         info,
                                         desc: "member".to_string(),
-                                    });
+                                    });
                                 }
-                            };
+                            };
                     }
                 }
 
                 ast::Path::Associated(a) => {
                     for full_context in contexts.iter() {
-                        let v = full_context.inner().return_value;
-                        (*full_context.inner()).return_value2 = v;
-                        let val = globals.stored_values[v].clone(); // this is the object we are getting member of
+                        let v = full_context.inner().return_value;
+                        (*full_context.inner()).return_value2 = v;
+                        let val = globals.stored_values[v].clone(); // this is the object we are getting member of
                         (*full_context.inner()).return_value = match &val {
                             Value::TypeIndicator(t) => match globals.implementations.get(t) {
                                 Some(imp) => match imp.get(a) {
@@ -2859,29 +2859,29 @@ impl VariableFuncs for ast::Variable {
                                                         "Cannot access method (macro with a \"self\" argument) using \"::\"",
                                                         &[],
                                                         None,
-                                                    )));
+                                                    )));
                                             }
                                         }
                                         *val
                                     }
                                     None => {
                                         let type_name =
-                                            find_key_for_value(&globals.type_ids, *t).unwrap();
+                                            find_key_for_value(&globals.type_ids, *t).unwrap();
                                         return Err(RuntimeError::UndefinedErr {
                                             undefined: a.as_ref().clone(),
                                             info,
                                             desc: format!("associated member of @{}", type_name),
-                                        });
+                                        });
                                     }
                                 },
                                 None => {
                                     let type_name =
-                                        find_key_for_value(&globals.type_ids, *t).unwrap();
+                                        find_key_for_value(&globals.type_ids, *t).unwrap();
                                     return Err(RuntimeError::UndefinedErr {
                                         undefined: a.as_ref().clone(),
                                         info,
                                         desc: format!("associated member of @{}", type_name),
-                                    });
+                                    });
                                 }
                             },
                             a => {
@@ -2892,13 +2892,13 @@ impl VariableFuncs for ast::Variable {
                                     info,
                                 })
                             }
-                        };
+                        };
                     }
                 }
 
                 ast::Path::NSlice(slices) => {
                     //TODO: nslice
-                    let mut expr_vec = Vec::<ast::Expression>::new();
+                    let mut expr_vec = Vec::<ast::Expression>::new();
 
                     for slice in slices {
                         let null_expr = ast::Expression {
@@ -2913,16 +2913,16 @@ impl VariableFuncs for ast::Variable {
                                 path: Vec::new(),
                                 tag: ast::Attribute::new(),
                             }],
-                        };
-                        expr_vec.push(slice.left.clone().unwrap_or_else(|| null_expr.clone()));
-                        expr_vec.push(slice.right.clone().unwrap_or_else(|| null_expr.clone()));
-                        expr_vec.push(slice.step.clone().unwrap_or_else(|| null_expr.clone()));
+                        };
+                        expr_vec.push(slice.left.clone().unwrap_or_else(|| null_expr.clone()));
+                        expr_vec.push(slice.right.clone().unwrap_or_else(|| null_expr.clone()));
+                        expr_vec.push(slice.step.clone().unwrap_or_else(|| null_expr.clone()));
                     }
 
                     for full_context in contexts.iter() {
-                        let val_ptr = full_context.inner().return_value;
-                        (*full_context.inner()).return_value2 = val_ptr;
-                        let val = globals.stored_values[val_ptr].clone(); // this is the object we are indexing
+                        let val_ptr = full_context.inner().return_value;
+                        (*full_context.inner()).return_value2 = val_ptr;
+                        let val = globals.stored_values[val_ptr].clone(); // this is the object we are indexing
 
                         let combinations = all_combinations(
                             expr_vec.clone(),
@@ -2930,9 +2930,9 @@ impl VariableFuncs for ast::Variable {
                             globals,
                             info.clone(),
                             true,
-                        )?;
+                        )?;
 
-                        let mut sorted_nslices = Vec::<(Vec<Slice>, &mut FullContext)>::new();
+                        let mut sorted_nslices = Vec::<(Vec<Slice>, &mut FullContext)>::new();
                         let conv_slice = |v| -> Result<Option<isize>, RuntimeError> {
                             return match &globals.stored_values[v] {
                                 Value::Number(n) => {
@@ -2942,7 +2942,7 @@ impl VariableFuncs for ast::Variable {
                                             &format!("Cannot slice with non-integer number {}.", n),
                                             &[],
                                             None,
-                                        )));
+                                        )));
                                     }
                                     Ok(Some(*n as isize))
                                 }
@@ -2953,55 +2953,55 @@ impl VariableFuncs for ast::Variable {
                                         found: globals.get_type_str(v),
                                         val_def: globals.get_area(v),
                                         info: info.clone(),
-                                    });
+                                    });
                                 }
-                            };
-                        };
+                            };
+                        };
 
                         for (parsed_slices, context) in combinations {
-                            let mut sorted_nslice = Vec::<Slice>::new();
-                            let mut count: usize = 0;
+                            let mut sorted_nslice = Vec::<Slice>::new();
+                            let mut count: usize = 0;
                             loop {
                                 if count >= parsed_slices.len() {
-                                    break;
+                                    break;
                                 } else if count + 2 >= parsed_slices.len() {
-                                    panic!("this is not very bueno {}", parsed_slices.len());
+                                    panic!("this is not very bueno {}", parsed_slices.len());
                                 }
-                                let mut sorted_slice: Slice = (None, None, None);
-                                sorted_slice.0 = conv_slice(parsed_slices[count])?;
-                                count += 1;
-                                sorted_slice.1 = conv_slice(parsed_slices[count])?;
-                                count += 1;
-                                sorted_slice.2 = conv_slice(parsed_slices[count])?;
-                                count += 1;
+                                let mut sorted_slice: Slice = (None, None, None);
+                                sorted_slice.0 = conv_slice(parsed_slices[count])?;
+                                count += 1;
+                                sorted_slice.1 = conv_slice(parsed_slices[count])?;
+                                count += 1;
+                                sorted_slice.2 = conv_slice(parsed_slices[count])?;
+                                count += 1;
 
-                                sorted_nslice.push(sorted_slice);
+                                sorted_nslice.push(sorted_slice);
                             }
-                            sorted_nslices.push((sorted_nslice, context));
+                            sorted_nslices.push((sorted_nslice, context));
                         }
 
                         match val {
                             Value::Array(arr) => {
                                 for nslice in sorted_nslices {
-                                    //println!("slices {:?}", nslice);
-                                    let mut nslice_0 = nslice.0;
-                                    nslice_0.reverse();
+                                    //println!("slices {:?}", nslice);
+                                    let mut nslice_0 = nslice.0;
+                                    nslice_0.reverse();
                                     let sliced = slice_array(
                                         &arr,
                                         nslice_0,
                                         globals,
                                         info.clone(),
                                         nslice.1.inner(),
-                                    )?;
+                                    )?;
 
                                     let stored_arr = store_const_value(
                                         Value::Array(sliced),
                                         globals,
                                         nslice.1.inner().start_group,
                                         info.position,
-                                    );
+                                    );
 
-                                    nslice.1.inner().return_value = stored_arr;
+                                    nslice.1.inner().return_value = stored_arr;
                                 }
                             }
                             _ => {
@@ -3018,26 +3018,26 @@ impl VariableFuncs for ast::Variable {
 
                 ast::Path::Index(i) => {
                     for full_context in contexts.iter() {
-                        let val_ptr = full_context.inner().return_value;
-                        (*full_context.inner()).return_value2 = val_ptr;
-                        let val = globals.stored_values[val_ptr].clone(); // this is the object we are indexing
+                        let val_ptr = full_context.inner().return_value;
+                        (*full_context.inner()).return_value2 = val_ptr;
+                        let val = globals.stored_values[val_ptr].clone(); // this is the object we are indexing
 
-                        i.eval(full_context, globals, info.clone(), constant)?;
+                        i.eval(full_context, globals, info.clone(), constant)?;
 
                         for full_context in full_context.iter() {
-                            let index_ptr = full_context.inner().return_value;
+                            let index_ptr = full_context.inner().return_value;
                             match &val {
                                 Value::Array(arr) => {
                                     match &globals.stored_values[index_ptr] {
                                         Value::Number(n) => {
-                                            let len = arr.len();
+                                            let len = arr.len();
                                             if (*n) < 0.0 && (-*n) as usize > len {
                                                 return Err(RuntimeError::CustomError(create_error(
                                                     info,
                                                     &format!("Index too low! Index is {}, but length is {}.", n, len),
                                                     &[],
                                                     None,
-                                                )));
+                                                )));
                                             }
 
                                             if *n as usize >= len {
@@ -3046,7 +3046,7 @@ impl VariableFuncs for ast::Variable {
                                                     &format!("Index too high! Index is {}, but length is {}.", n, len),
                                                     &[],
                                                     None,
-                                                )));
+                                                )));
                                             }
 
                                             if *n < 0.0 {
@@ -3069,15 +3069,15 @@ impl VariableFuncs for ast::Variable {
                                 }
                                 Value::Dict(d) => match &globals.stored_values[index_ptr] {
                                     Value::Str(s) => {
-                                        let intern = LocalIntern::new(s.clone());
+                                        let intern = LocalIntern::new(s.clone());
                                         if !d.contains_key(&intern) {
                                             return Err(RuntimeError::UndefinedErr {
                                                 undefined: s.to_string(),
                                                 info,
                                                 desc: "dictionary key".to_string(),
-                                            });
+                                            });
                                         }
-                                        full_context.inner().return_value = d[&intern];
+                                        full_context.inner().return_value = d[&intern];
                                     }
                                     _ => {
                                         return Err(RuntimeError::TypeError {
@@ -3092,7 +3092,7 @@ impl VariableFuncs for ast::Variable {
                                 Value::Obj(o, _) => {
                                     match &globals.stored_values[index_ptr] {
                                         Value::Dict(d) => {
-                                            let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
+                                            let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
                                             if gotten_type == None
                                                 || globals.stored_values[*gotten_type.unwrap()]
                                                     != Value::TypeIndicator(19)
@@ -3103,10 +3103,10 @@ impl VariableFuncs for ast::Variable {
                                                     found: globals.get_type_str(index_ptr),
                                                     val_def: globals.get_area(index_ptr),
                                                     info,
-                                                });
+                                                });
                                             }
 
-                                            let id = d.get(&globals.OBJ_KEY_ID);
+                                            let id = d.get(&globals.OBJ_KEY_ID);
                                             if id == None {
                                                 return Err(RuntimeError::CustomError(
                                                     create_error(
@@ -3115,7 +3115,7 @@ impl VariableFuncs for ast::Variable {
                                                         &[],
                                                         None,
                                                     ),
-                                                ));
+                                                ));
                                             }
                                             let okey = match &globals.stored_values[*id.unwrap()] {
                                                 // check if the ID is actually an int. it should be
@@ -3128,12 +3128,12 @@ impl VariableFuncs for ast::Variable {
                                                         info,
                                                     })
                                                 }
-                                            };
+                                            };
 
-                                            let mut contains = false;
+                                            let mut contains = false;
                                             for iter in o.iter() {
                                                 if iter.0 == okey {
-                                                    contains = true;
+                                                    contains = true;
 
                                                     let out_val = match &iter.1 {
                                                         // its just converting value to objparam basic level stuff
@@ -3148,7 +3148,7 @@ impl VariableFuncs for ast::Variable {
                                                         ObjParam::Bool(b) => Value::Bool(*b),
 
                                                         ObjParam::GroupList(g) => {
-                                                            let mut out = Vec::new();
+                                                            let mut out = Vec::new();
                                                             for s in g {
                                                                 let stored = store_const_value(
                                                                     Value::Group(*s),
@@ -3157,8 +3157,8 @@ impl VariableFuncs for ast::Variable {
                                                                         .inner()
                                                                         .start_group,
                                                                     info.position,
-                                                                );
-                                                                out.push(stored);
+                                                                );
+                                                                out.push(stored);
                                                             }
                                                             Value::Array(out)
                                                         }
@@ -3168,28 +3168,28 @@ impl VariableFuncs for ast::Variable {
                                                                 LocalIntern<String>,
                                                                 StoredValue,
                                                             >::default(
-                                                            );
+                                                            );
                                                             let stored = store_const_value(
                                                                 Value::TypeIndicator(20),
                                                                 globals,
                                                                 full_context.inner().start_group,
                                                                 info.position,
-                                                            );
+                                                            );
                                                             map.insert(
                                                                 globals.TYPE_MEMBER_NAME,
                                                                 stored,
-                                                            );
+                                                            );
                                                             Value::Dict(map)
                                                         }
-                                                    };
+                                                    };
                                                     let stored = store_const_value(
                                                         out_val,
                                                         globals,
                                                         full_context.inner().start_group,
                                                         info.position,
-                                                    );
-                                                    full_context.inner().return_value = stored;
-                                                    break;
+                                                    );
+                                                    full_context.inner().return_value = stored;
+                                                    break;
                                                 }
                                             }
 
@@ -3201,7 +3201,7 @@ impl VariableFuncs for ast::Variable {
                                                         &[],
                                                         None,
                                                     ),
-                                                ));
+                                                ));
                                             }
                                         }
                                         _ => {
@@ -3215,18 +3215,18 @@ impl VariableFuncs for ast::Variable {
                                     }
                                 }
                                 Value::Str(s) => {
-                                    let arr: Vec<char> = s.chars().collect();
+                                    let arr: Vec<char> = s.chars().collect();
 
                                     match &globals.stored_values[index_ptr] {
                                         Value::Number(n) => {
-                                            let len = arr.len();
+                                            let len = arr.len();
                                             if (*n) < 0.0 && (-*n) as usize >= len {
                                                 return Err(RuntimeError::CustomError(create_error(
                                                     info,
                                                     &format!("Index too low! Index is {}, but length is {}.", n, len),
                                                     &[],
                                                     None,
-                                                )));
+                                                )));
                                             }
 
                                             if *n as usize >= len {
@@ -3235,7 +3235,7 @@ impl VariableFuncs for ast::Variable {
                                                     &format!("Index too high! Index is {}, but length is {}.", n, len),
                                                     &[],
                                                     None,
-                                                )));
+                                                )));
                                             }
 
                                             if *n < 0.0 {
@@ -3247,7 +3247,7 @@ impl VariableFuncs for ast::Variable {
                                                         globals,
                                                         full_context.inner().start_group,
                                                         info.position,
-                                                    );
+                                                    );
                                             } else {
                                                 (*full_context.inner()).return_value =
                                                     store_const_value(
@@ -3255,7 +3255,7 @@ impl VariableFuncs for ast::Variable {
                                                         globals,
                                                         full_context.inner().start_group,
                                                         info.position,
-                                                    );
+                                                    );
                                             }
                                         }
                                         _ => {
@@ -3283,49 +3283,49 @@ impl VariableFuncs for ast::Variable {
 
                 ast::Path::Increment => {
                     for full_context in contexts.iter() {
-                        let val_ptr = full_context.inner().return_value;
-                        (*full_context.inner()).return_value2 = val_ptr;
+                        let val_ptr = full_context.inner().return_value;
+                        (*full_context.inner()).return_value2 = val_ptr;
                         handle_unary_operator(
                             val_ptr,
                             Builtin::IncrOp,
                             full_context,
                             globals,
                             &info,
-                        )?;
+                        )?;
                     }
                 }
 
                 ast::Path::Decrement => {
                     for full_context in contexts.iter() {
-                        let val_ptr = full_context.inner().return_value;
-                        (*full_context.inner()).return_value2 = val_ptr;
+                        let val_ptr = full_context.inner().return_value;
+                        (*full_context.inner()).return_value2 = val_ptr;
                         handle_unary_operator(
                             val_ptr,
                             Builtin::DecrOp,
                             full_context,
                             globals,
                             &info,
-                        )?;
+                        )?;
                     }
                 }
 
                 ast::Path::Constructor(defs) => {
                     for full_context in contexts.iter() {
-                        let val_ptr = full_context.inner().return_value;
-                        (*full_context.inner()).return_value2 = val_ptr;
+                        let val_ptr = full_context.inner().return_value;
+                        (*full_context.inner()).return_value2 = val_ptr;
 
                         match globals.stored_values[val_ptr].clone() {
                             Value::TypeIndicator(_) => {
-                                let mut new_defs = defs.clone();
+                                let mut new_defs = defs.clone();
                                 new_defs.push(ast::DictDef::Def((
                                     globals.TYPE_MEMBER_NAME,
                                     ast::ValueBody::Resolved(val_ptr)
                                         .to_variable(globals.get_area(val_ptr).pos)
                                         .to_expression(),
-                                )));
+                                )));
                                 ast::ValueBody::Dictionary(new_defs.clone())
                                     .to_variable(info.position.pos)
-                                    .to_value(full_context, globals, info.clone(), constant)?;
+                                    .to_value(full_context, globals, info.clone(), constant)?;
                             }
                             _a => {
                                 return Err(RuntimeError::TypeError {
@@ -3341,18 +3341,18 @@ impl VariableFuncs for ast::Variable {
 
                 ast::Path::Call(args) => {
                     for full_context in contexts.iter() {
-                        let val_ptr = full_context.inner().return_value;
+                        let val_ptr = full_context.inner().return_value;
 
                         match globals.stored_values[val_ptr].clone() {
                             Value::Macro(m) => {
-                                let parent = full_context.inner().return_value2;
+                                let parent = full_context.inner().return_value2;
                                 execute_macro(
                                     (*m, args.clone()),
                                     full_context,
                                     globals,
                                     parent,
                                     info.clone(),
-                                )?;
+                                )?;
                             }
 
                             Value::TypeIndicator(_) => {
@@ -3367,7 +3367,7 @@ impl VariableFuncs for ast::Variable {
                                         ),
                                         &[],
                                         None,
-                                    )));
+                                    )));
                                 }
 
                                 args[0].value.eval(
@@ -3375,7 +3375,7 @@ impl VariableFuncs for ast::Variable {
                                     globals,
                                     info.clone(),
                                     constant,
-                                )?;
+                                )?;
 
                                 // go through each context, c = context
                                 for full_context in full_context.iter() {
@@ -3386,7 +3386,7 @@ impl VariableFuncs for ast::Variable {
                                         full_context,
                                         globals,
                                         &info,
-                                    )?; // just use the "as" operator
+                                    )?; // just use the "as" operator
                                 }
                             }
 
@@ -3397,9 +3397,9 @@ impl VariableFuncs for ast::Variable {
                                     globals,
                                     info.clone(),
                                     constant,
-                                )?;
+                                )?;
 
-                                globals.push_new_preserved();
+                                globals.push_new_preserved();
                                 for (arg_values, _) in &evaled_args {
                                     for val in arg_values {
                                         globals.push_preserved_val(*val)
@@ -3407,10 +3407,10 @@ impl VariableFuncs for ast::Variable {
                                 }
 
                                 for (args, context) in evaled_args {
-                                    built_in_function(name, args, info.clone(), globals, context)?;
+                                    built_in_function(name, args, info.clone(), globals, context)?;
                                 }
 
-                                globals.pop_preserved();
+                                globals.pop_preserved();
                             }
                             _a => {
                                 return Err(RuntimeError::TypeError {
@@ -3423,24 +3423,24 @@ impl VariableFuncs for ast::Variable {
                             }
                         }
                         for full_context in full_context.iter() {
-                            (*full_context.inner()).return_value2 = val_ptr;
+                            (*full_context.inner()).return_value2 = val_ptr;
                         }
                     }
                 }
-            };
+            };
 
             for full_context in contexts.iter() {
-                globals.push_preserved_val(full_context.inner().return_value);
-                globals.push_preserved_val(full_context.inner().return_value2);
+                globals.push_preserved_val(full_context.inner().return_value);
+                globals.push_preserved_val(full_context.inner().return_value2);
             }
         }
 
-        globals.pop_preserved();
+        globals.pop_preserved();
 
-        use ast::UnaryOperator;
+        use ast::UnaryOperator;
         if let Some(o) = &self.operator {
             for full_context in contexts.iter() {
-                let val_ptr = full_context.inner().return_value;
+                let val_ptr = full_context.inner().return_value;
 
                 handle_unary_operator(
                     val_ptr,
@@ -3477,7 +3477,7 @@ impl VariableFuncs for ast::Variable {
         //             .map
         //             .get_mut(val)
         //             .expect("index not found"))
-        //             .allow_context_change = true;
+        //             .allow_context_change = true;
 
         //     }
         // }
@@ -3489,7 +3489,7 @@ impl VariableFuncs for ast::Variable {
             }
         }
 
-        merge_all_contexts(contexts, globals, true);
+        merge_all_contexts(contexts, globals, true);
 
         Ok(())
     }
@@ -3503,12 +3503,12 @@ impl VariableFuncs for ast::Variable {
         mutable: bool,
         layer: i16,
     ) -> Result<DefineResult, RuntimeError> {
-        use ariadne::Fmt;
-        use parser::fmt::SpwnFmt;
-        let mut results = Vec::new();
+        use ariadne::Fmt;
+        use parser::fmt::SpwnFmt;
+        let mut results = Vec::new();
         for full_context in contexts.iter() {
-            let mut defined = true;
-            let mut redefinable = false;
+            let mut defined = true;
+            let mut redefinable = false;
 
             let value = match &self.operator {
                 None => store_val_m(
@@ -3529,7 +3529,7 @@ impl VariableFuncs for ast::Variable {
                         None,
                     )))
                 }
-            };
+            };
 
             let mut current_ptr = match &self.value.body {
                 ast::ValueBody::Symbol(a) => {
@@ -3538,13 +3538,13 @@ impl VariableFuncs for ast::Variable {
                         mutable && self.path.is_empty(),
                     ) {
                         if full_context.inner().is_redefinable(*a) == Some(true) {
-                            redefinable = true;
+                            redefinable = true;
                         }
                         ptr
                     } else {
                         // define or redefine
-                        full_context.inner().new_variable(*a, value, layer);
-                        defined = false;
+                        full_context.inner().new_variable(*a, value, layer);
+                        defined = false;
                         value
                     }
                 }
@@ -3563,7 +3563,7 @@ impl VariableFuncs for ast::Variable {
                             &format!("Use a type statement to define a new type: type @{}", t),
                             &[],
                             None,
-                        )));
+                        )));
                     }
                 }
 
@@ -3575,7 +3575,7 @@ impl VariableFuncs for ast::Variable {
                             undefined: globals.SELF_MEMBER_NAME.to_string(),
                             desc: "variable".to_string(),
                             info: info.clone(),
-                        });
+                        });
                     }
                 }
 
@@ -3587,7 +3587,7 @@ impl VariableFuncs for ast::Variable {
                         None,
                     )))
                 }
-            };
+            };
 
             for p in &self.path {
                 if !defined {
@@ -3599,13 +3599,13 @@ impl VariableFuncs for ast::Variable {
                         ),
                         &[],
                         None,
-                    )));
+                    )));
                 }
-                redefinable = false;
+                redefinable = false;
 
                 match p {
                     ast::Path::Member(m) => {
-                        let val = globals.stored_values[current_ptr].clone();
+                        let val = globals.stored_values[current_ptr].clone();
                         match val.member(*m, full_context.inner(), globals, info.clone()) {
                             Some(s) => current_ptr = s,
                             None => {
@@ -3613,32 +3613,32 @@ impl VariableFuncs for ast::Variable {
                                     return Err(RuntimeError::MutabilityError {
                                         val_def: globals.get_area(current_ptr),
                                         info: info.clone(),
-                                    });
+                                    });
                                 }
                                 let stored =
-                                    globals.stored_values.map.get_mut(current_ptr).unwrap();
+                                    globals.stored_values.map.get_mut(current_ptr).unwrap();
                                 if let Value::Dict(d) = &mut stored.val {
-                                    (*d).insert(*m, value);
-                                    defined = false;
-                                    current_ptr = value;
+                                    (*d).insert(*m, value);
+                                    defined = false;
+                                    current_ptr = value;
                                 } else {
                                     return Err(RuntimeError::CustomError(create_error(
                                         info.clone(),
                                         "Cannot edit members of a non-dictionary value",
                                         &[],
                                         None,
-                                    )));
+                                    )));
                                 }
                             }
-                        };
+                        };
                     }
                     ast::Path::Index(i) => {
                         // keep previous return value
-                        let prev_ret = full_context.inner().return_value;
-                        globals.push_new_preserved();
-                        globals.push_preserved_val(prev_ret);
+                        let prev_ret = full_context.inner().return_value;
+                        globals.push_new_preserved();
+                        globals.push_preserved_val(prev_ret);
 
-                        i.eval(full_context, globals, info.clone(), true)?;
+                        i.eval(full_context, globals, info.clone(), true)?;
 
                         if let FullContext::Split(_, _) = full_context {
                             return Err(RuntimeError::CustomError(create_error(
@@ -3646,19 +3646,19 @@ impl VariableFuncs for ast::Variable {
                                 "Index definition values that split the context are not supported",
                                 &[],
                                 None,
-                            )));
+                            )));
                         }
 
-                        let first_context_eval = full_context.inner().return_value;
-                        (*full_context.inner()).return_value = prev_ret;
-                        globals.pop_preserved();
+                        let first_context_eval = full_context.inner().return_value;
+                        (*full_context.inner()).return_value = prev_ret;
+                        globals.pop_preserved();
 
                         match &globals.stored_values[current_ptr] {
                             Value::Dict(d) => {
                                 if let Value::Str(st) =
                                     globals.stored_values[first_context_eval].clone()
                                 {
-                                    let intern = LocalIntern::new(st);
+                                    let intern = LocalIntern::new(st);
                                     match d.get(&intern) {
                                         Some(a) => current_ptr = *a,
                                         None => {
@@ -3666,14 +3666,14 @@ impl VariableFuncs for ast::Variable {
                                                 .stored_values
                                                 .map
                                                 .get_mut(current_ptr)
-                                                .unwrap();
+                                                .unwrap();
                                             if !stored.mutable {
                                                 return Err(RuntimeError::MutabilityError {
                                                     val_def: stored.def_area,
                                                     info: info.clone(),
-                                                });
+                                                });
                                             }
-                                            let fn_context = full_context.inner().start_group;
+                                            let fn_context = full_context.inner().start_group;
                                             if stored.fn_context != fn_context {
                                                 return Err(
                                                     RuntimeError::ContextChangeMutateError {
@@ -3684,25 +3684,25 @@ impl VariableFuncs for ast::Variable {
                                                             .fn_context_change_stack
                                                             .clone(),
                                                     },
-                                                );
+                                                );
                                             }
 
                                             if let Value::Dict(d) = &mut stored.val {
-                                                (*d).insert(intern, value);
-                                                defined = false;
-                                                current_ptr = value;
+                                                (*d).insert(intern, value);
+                                                defined = false;
+                                                current_ptr = value;
                                             } else {
-                                                unreachable!();
+                                                unreachable!();
                                             }
                                         }
-                                    };
+                                    };
                                 } else {
                                     return Err(RuntimeError::TypeError {
                                         expected: "string".to_string(),
                                         found: globals.get_type_str(first_context_eval),
                                         val_def: globals.get_area(first_context_eval),
                                         info: info.clone(),
-                                    });
+                                    });
                                 }
                             }
                             Value::Array(a) => {
@@ -3719,13 +3719,13 @@ impl VariableFuncs for ast::Variable {
                                             ),
                                             &[],
                                             None,
-                                        )));
+                                        )));
                                     } else {
-                                        let i = convert_to_int(n, info)?;
+                                        let i = convert_to_int(n, info)?;
                                         if i < 0 {
-                                            current_ptr = a[a.len() - (-i as usize)];
+                                            current_ptr = a[a.len() - (-i as usize)];
                                         } else {
-                                            current_ptr = a[i as usize];
+                                            current_ptr = a[i as usize];
                                         }
                                     }
                                 } else {
@@ -3734,7 +3734,7 @@ impl VariableFuncs for ast::Variable {
                                         found: globals.get_type_str(first_context_eval),
                                         val_def: globals.get_area(first_context_eval),
                                         info: info.clone(),
-                                    });
+                                    });
                                 }
                             }
 
@@ -3744,7 +3744,7 @@ impl VariableFuncs for ast::Variable {
                                     "Assigning a character in a string is not suppored",
                                     &[],
                                     Some("Consider making a new string"),
-                                )));
+                                )));
                             }
                             _ => {
                                 return Err(RuntimeError::CustomError(create_error(
@@ -3752,7 +3752,7 @@ impl VariableFuncs for ast::Variable {
                                     &format!("The expression `value{} = ...` is only allowed when `value` is a dictionary or an array", "[ ... ]".fg(ariadne::Color::Red)),
                                     &[],
                                     None,
-                                )));
+                                )));
                             }
                         }
                     }
@@ -3762,19 +3762,19 @@ impl VariableFuncs for ast::Variable {
                                 match (*globals).implementations.get_mut(t) {
                                     Some(imp) => {
                                         if let Some((val, _)) = imp.get(m) {
-                                            current_ptr = *val;
+                                            current_ptr = *val;
                                         } else {
-                                            (*imp).insert(*m, (value, true));
-                                            defined = false;
-                                            current_ptr = value;
+                                            (*imp).insert(*m, (value, true));
+                                            defined = false;
+                                            current_ptr = value;
                                         }
                                     }
                                     None => {
-                                        let mut new_imp = FnvHashMap::default();
-                                        new_imp.insert(*m, (value, true));
-                                        (*globals).implementations.insert(*t, new_imp);
-                                        defined = false;
-                                        current_ptr = value;
+                                        let mut new_imp = FnvHashMap::default();
+                                        new_imp.insert(*m, (value, true));
+                                        (*globals).implementations.insert(*t, new_imp);
+                                        defined = false;
+                                        current_ptr = value;
                                     }
                                 }
                             }
@@ -3784,9 +3784,9 @@ impl VariableFuncs for ast::Variable {
                                     found: globals.get_type_str(current_ptr),
                                     val_def: globals.get_area(current_ptr),
                                     info: info.clone(),
-                                });
+                                });
                             }
-                        };
+                        };
                     }
                     _ => {
                         return Err(RuntimeError::CustomError(create_error(
@@ -3797,7 +3797,7 @@ impl VariableFuncs for ast::Variable {
                             ),
                             &[],
                             None,
-                        )));
+                        )));
                     }
                 }
             }
@@ -3807,17 +3807,17 @@ impl VariableFuncs for ast::Variable {
             } else {
                 results.push(DefineResult::Ok)
             }
-            (*full_context.inner()).return_value2 = current_ptr;
+            (*full_context.inner()).return_value2 = current_ptr;
         }
-        let mut iter = results.into_iter();
-        let out = iter.next().unwrap();
+        let mut iter = results.into_iter();
+        let out = iter.next().unwrap();
         if iter.any(|a| a != out) {
             return Err(RuntimeError::CustomError(create_error(
                 info.clone(),
                 "This definition expression is executed in a split context, where some contexts make it an assign expression, while others make it a definition, which is not allowed",
                 &[],
                 None,
-            )));
+            )));
         }
         Ok(out)
     }
@@ -3829,15 +3829,15 @@ pub fn display_val(
     globals: &mut Globals,
     info: &CompilerInfo,
 ) -> Result<String, RuntimeError> {
-    assert!(matches!(full_context, FullContext::Single(_)));
+    assert!(matches!(full_context, FullContext::Single(_)));
     let stored = store_const_value(
         val,
         globals,
         full_context.inner().start_group,
         Default::default(),
-    );
+    );
 
-    handle_unary_operator(stored, Builtin::DisplayOp, full_context, globals, info)?;
+    handle_unary_operator(stored, Builtin::DisplayOp, full_context, globals, info)?;
     Ok(
         match globals.stored_values[full_context.inner().return_value].clone() {
             Value::Str(s) => s,

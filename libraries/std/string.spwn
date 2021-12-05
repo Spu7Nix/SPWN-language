@@ -6,7 +6,7 @@ $.assert(''.is_empty())
 $.assert(!('x'.is_empty()))
     ")]
 	(self) {
-		return self.length == 0;
+		return self.length == 0;
 	},
 	substr: #[desc("Gets a substring beginning at the specified start and ending at the specified end.")]
 	(self, start: @number, end: @number) {
@@ -14,21 +14,21 @@ $.assert(!('x'.is_empty()))
 		let end = end.constrain(0,self.length)
 		if start == end { return '' }
 		if start > end {
-			return $.substr(self, end, start).reverse(); // we do a little trolling
+			return $.substr(self, end, start).reverse(); // we do a little trolling
 		}
-		return $.substr(self, start, end);
+		return $.substr(self, start, end);
 	},
 	join: #[desc("Joins a list using the string.") example("
 $.assert(''.join(['a', 'b']) == 'ab')
 $.assert('current'.join(['string', ' element', ' join']) == 'currentstring element join')
     ")]
 	(self, list: @array) {
-		let out = "";
+		let out = "";
 		for i in 0..list.length {
             if i > 0 {out += self}
-			out += @string(list[i]);
+			out += @string(list[i]);
 		}
-		return out;
+		return out;
 	},
 	split: #[desc("Splits the string by the specified seperator.") example("
 $.assert('a b c'.split(' ') == ['a', 'b', 'c'])
@@ -36,22 +36,22 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
     ")]
 	(self, spstr: @string) {
 		if spstr.length == 0 {
-			return self as @array;
+			return self as @array;
 		} else {
-			return $.split_str(self, spstr);
+			return $.split_str(self, spstr);
 		}
 	},
 	starts_with: #[desc("Checks does the string starts with a string.")]
 	(self, substr: @string) {
 		if substr == '' { return true }
 		if substr.length > self.length { return false }
-		return self.substr(0, substr.length) == substr;
+		return self.substr(0, substr.length) == substr;
 	},
 	ends_with: #[desc("Checks does the string starts with a string.")]
 	(self, substr: @string) {
 		if substr == '' { return true }
 		if substr.length > self.length { return false }
-		return self.substr(self.length-substr.length, self.length) == substr;
+		return self.substr(self.length-substr.length, self.length) == substr;
 	},
 	index: #[desc("Gets the index of a string, if it doesn't exists returns null.")]
 	(self, substr: @string) {

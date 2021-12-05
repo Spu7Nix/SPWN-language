@@ -1,34 +1,34 @@
 //! Defining all native types (and functions?)
 #![allow(unused_assignments)]
-use internment::LocalIntern;
-use shared::StoredValue;
+use internment::LocalIntern;
+use shared::StoredValue;
 
-use crate::compiler_types::*;
-use crate::context::*;
-use crate::globals::Globals;
-use crate::leveldata::*;
-use errors::{create_error, RuntimeError};
-use fnv::FnvHashMap;
-use parser::ast::ObjectMode;
+use crate::compiler_types::*;
+use crate::context::*;
+use crate::globals::Globals;
+use crate::leveldata::*;
+use errors::{create_error, RuntimeError};
+use fnv::FnvHashMap;
+use parser::ast::ObjectMode;
 
-use std::fs;
-use std::hash::Hash;
-use std::hash::Hasher;
-use std::path::Path;
+use std::fs;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::path::Path;
 
-use crate::value::*;
-use crate::value_storage::*;
+use crate::value::*;
+use crate::value_storage::*;
 
-use std::io::stdout;
-use std::io::Write;
+use std::io::stdout;
+use std::io::Write;
 
-use std::collections::hash_map::DefaultHasher;
+use std::collections::hash_map::DefaultHasher;
 
 // BUILT IN STD
-use include_dir::{Dir, File};
+use include_dir::{Dir, File};
 
 #[cfg(not(debug_assertions))]
-const STANDARD_LIBS: Dir = include_dir!("../libraries");
+const STANDARD_LIBS: Dir = include_dir!("../libraries");
 
 // dont import std when in dev mode
 #[cfg(debug_assertions)]
@@ -36,7 +36,7 @@ const STANDARD_LIBS: Dir = Dir {
     path: "",
     files: &[],
     dirs: &[],
-};
+};
 
 pub fn get_lib_file<'a, S: AsRef<Path>>(path: S) -> Option<File<'a>> {
     get_file(&STANDARD_LIBS, path.as_ref())
@@ -44,25 +44,25 @@ pub fn get_lib_file<'a, S: AsRef<Path>>(path: S) -> Option<File<'a>> {
 
 fn get_file<'a>(dir: &'a Dir, path: &Path) -> Option<File<'a>> {
     for file in dir.files {
-        let replaced = &file.path.replace("\\", "/");
-        let file_path = &Path::new(replaced);
+        let replaced = &file.path.replace("\\", "/");
+        let file_path = &Path::new(replaced);
 
         if Path::new(file_path) == path {
-            return Some(*file);
+            return Some(*file);
         }
     }
 
     for dir in dir.dirs {
         if let Some(d) = get_file(dir, path) {
-            return Some(d);
+            return Some(d);
         }
     }
 
     None
 }
 
-//use text_io;
-use errors::compiler_info::{CodeArea, CompilerInfo};
+//use text_io;
+use errors::compiler_info::{CodeArea, CompilerInfo};
 
 macro_rules! arg_length {
     ($info:expr , $count:expr, $args:expr , $message:expr, $builtin:ident) => {
@@ -71,15 +71,15 @@ macro_rules! arg_length {
                 $builtin,
                 message: $message,
                 info: $info,
-            });
+            });
         }
-    };
+    };
 }
 
 pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GdObj {
-    let mut params = FnvHashMap::default();
-    params.insert(57, ObjParam::Group(context.start_group));
-    (*uid_counter) += 1;
+    let mut params = FnvHashMap::default();
+    params.insert(57, ObjParam::Group(context.start_group));
+    (*uid_counter) += 1;
     GdObj {
         params: FnvHashMap::default(),
         func_id: context.func_id,
@@ -88,8 +88,8 @@ pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GdObj {
     }
 }
 
-pub type ArbitraryId = u16;
-pub type SpecificId = u16;
+pub type ArbitraryId = u16;
+pub type SpecificId = u16;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Id {
     Specific(SpecificId),
@@ -120,7 +120,7 @@ impl Group {
 
     pub fn next_free(counter: &mut ArbitraryId) -> Self {
         //creates new specific group
-        (*counter) += 1;
+        (*counter) += 1;
         Group {
             id: Id::Arbitrary(*counter),
         }
@@ -142,7 +142,7 @@ impl Color {
 
     pub fn next_free(counter: &mut ArbitraryId) -> Self {
         //creates new specific color
-        (*counter) += 1;
+        (*counter) += 1;
         Self {
             id: Id::Arbitrary(*counter),
         }
@@ -164,7 +164,7 @@ impl Block {
 
     pub fn next_free(counter: &mut ArbitraryId) -> Self {
         //creates new specific block
-        (*counter) += 1;
+        (*counter) += 1;
         Self {
             id: Id::Arbitrary(*counter),
         }
@@ -185,7 +185,7 @@ impl Item {
 
     pub fn next_free(counter: &mut ArbitraryId) -> Self {
         //creates new specific item id
-        (*counter) += 1;
+        (*counter) += 1;
         Self {
             id: Id::Arbitrary(*counter),
         }
@@ -203,7 +203,7 @@ impl Value {
         let get_impl = |t: u16, m: LocalIntern<String>| match globals.implementations.get(&t) {
             Some(imp) => imp.get(&m).map(|mem| mem.0),
             None => None,
-        };
+        };
         if member == globals.TYPE_MEMBER_NAME {
             return Some(match self {
                 Value::Dict(dict) => match dict.get(&globals.TYPE_MEMBER_NAME) {
@@ -222,7 +222,7 @@ impl Value {
                     context.start_group,
                     info.position,
                 ),
-            });
+            });
         } else {
             match self {
                 Value::Str(a) => {
@@ -232,7 +232,7 @@ impl Value {
                             globals,
                             context.start_group,
                             info.position,
-                        ));
+                        ));
                     }
                 }
                 Value::Array(a) => {
@@ -242,7 +242,7 @@ impl Value {
                             globals,
                             context.start_group,
                             info.position,
-                        ));
+                        ));
                     }
                 }
                 Value::Range(start, end, step) => match member.as_ref().as_str() {
@@ -273,7 +273,7 @@ impl Value {
                     _ => (),
                 },
                 _ => (),
-            };
+            };
 
             match self {
                 Value::Builtins => match Builtin::from_str(member.as_str()) {
@@ -307,7 +307,7 @@ impl Value {
     }
 }
 
-use std::str::FromStr;
+use std::str::FromStr;
 
 macro_rules! typed_argument_check {
 
@@ -315,15 +315,15 @@ macro_rules! typed_argument_check {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
-        let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], $globals, $context.start_group, true);
-    };
+        let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], $globals, $context.start_group, true);
+    };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) mut ($($arg_name:ident),*)) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
-        let ( $(mut $arg_name),*) = $globals.stored_values[$arguments[$arg_index]].clone();
-    };
+        let ( $(mut $arg_name),*) = $globals.stored_values[$arguments[$arg_index]].clone();
+    };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) ($($arg_name:ident),*): $arg_type:ident) => {
         #[allow(unused_variables)]
@@ -345,8 +345,8 @@ macro_rules! typed_argument_check {
                     info: $info,
                 })
             }
-        };
-    };
+        };
+    };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
         #[allow(unused_variables)]
@@ -367,8 +367,8 @@ macro_rules! typed_argument_check {
                     info: $info,
                 })
             }
-        };
-    };
+        };
+    };
 
 
 }
@@ -377,21 +377,21 @@ macro_rules! reassign_variable {
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) mut ($($arg_name:ident),*)) => {
 
-        $globals.stored_values[$arguments[$arg_index]] = ($($arg_name)*);
-        $globals.stored_values.set_mutability($arguments[$arg_index], true);
+        $globals.stored_values[$arguments[$arg_index]] = ($($arg_name)*);
+        $globals.stored_values.set_mutability($arguments[$arg_index], true);
 
-    };
+    };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
-        $globals.stored_values[$arguments[$arg_index]] = Value::$arg_type($($arg_name),*);
-        $globals.stored_values.set_mutability($arguments[$arg_index], true);
+        $globals.stored_values[$arguments[$arg_index]] = Value::$arg_type($($arg_name),*);
+        $globals.stored_values.set_mutability($arguments[$arg_index], true);
 
 
-    };
+    };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) ($($arg_name:ident),*)) => {};
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) ($($arg_name:ident),*)) => {};
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) ($($arg_name:ident),*): $arg_type:ident) => {};
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident) ($($arg_name:ident),*): $arg_type:ident) => {};
 
 
 }
@@ -402,27 +402,27 @@ macro_rules! builtin_arg_mut_check {
             return Err(RuntimeError::MutabilityError {
                 info: $info,
                 val_def: $globals.get_area($arguments[$arg_index]),
-            });
+            });
         }
-        let fn_context = $globals.get_val_fn_context($arguments[$arg_index], $info.clone())?;
+        let fn_context = $globals.get_val_fn_context($arguments[$arg_index], $info.clone())?;
         if fn_context != $context.start_group {
             return Err(RuntimeError::ContextChangeMutateError {
                 info: $info,
                 val_def: $globals.get_area($arguments[$arg_index]),
                 context_changes: $context.fn_context_change_stack.clone(),
-            });
+            });
         }
-    };
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) ($($arg_name:ident),*)$(: $arg_type:ident)?) => {};
+    };
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) ($($arg_name:ident),*)$(: $arg_type:ident)?) => {};
 }
 
 macro_rules! raw_check {
     ($globals:ident, $context:ident, $info:ident, $out:ident) => {
         (*$context).return_value =
-            store_const_value($out, $globals, $context.start_group, $info.position);
-    };
+            store_const_value($out, $globals, $context.start_group, $info.position);
+    };
 
-    (#RAW $globals:ident, $context:ident, $info:ident, $out:ident) => {};
+    (#RAW $globals:ident, $context:ident, $info:ident, $out:ident) => {};
 }
 
 macro_rules! builtins {
@@ -458,21 +458,21 @@ macro_rules! builtins {
             $(
                 Builtin::$variant,
             )*
-        ];
+        ];
 
         pub const BUILTIN_NAMES: &[&str] = &[
             $(
                 stringify!($name),
             )*
-        ];
+        ];
 
-        pub struct BuiltinPermissions (FnvHashMap<Builtin, bool>);
+        pub struct BuiltinPermissions (FnvHashMap<Builtin, bool>);
 
         impl BuiltinPermissions {
             pub fn new() -> Self {
-                let mut map = FnvHashMap::default();
+                let mut map = FnvHashMap::default();
                 $(
-                    map.insert(Builtin::$variant, $safe);
+                    map.insert(Builtin::$variant, $safe);
                 )*
                 Self(map)
             }
@@ -480,7 +480,7 @@ macro_rules! builtins {
                 self.0[&b]
             }
             pub fn set(&mut self, b: Builtin, setting: bool) {
-                self.0.insert(b, setting);
+                self.0.insert(b, setting);
             }
             pub fn is_safe(&self, b: Builtin) -> bool {
                 match b {
@@ -520,17 +520,17 @@ macro_rules! builtins {
                 }
             }
             for full_context in contexts.iter() {
-                let $full_context: *mut FullContext = full_context;
-                let $context = full_context.inner();
+                let $full_context: *mut FullContext = full_context;
+                let $context = full_context.inner();
                 match func {
                     $(
                         Builtin::$variant => {
 
-                            let $builtin = stringify!($name).to_string();
+                            let $builtin = stringify!($name).to_string();
 
                             $(
                                 #[allow(unused_assignments)]
-                                let mut arg_index = 0;
+                                let mut arg_index = 0;
                                 $(
                                     if arg_index >= $arguments.len() {
                                         return Err(RuntimeError::BuiltinError {
@@ -545,13 +545,13 @@ macro_rules! builtins {
                                     builtin_arg_mut_check!(
                                         ($globals, arg_index, $arguments, $info, $context) $($mut)?
                                         ($($arg_name),*)$(: $arg_type)?
-                                    );
+                                    );
                                     typed_argument_check!(
                                         ($globals, arg_index, $arguments, $info, $context, $builtin) $($mut)?
                                         ($($arg_name),*)$(: $arg_type)?
-                                    );
+                                    );
 
-                                    arg_index += 1;
+                                    arg_index += 1;
                                 )+
                                 if arg_index < $arguments.len() - 1 {
                                     return Err(RuntimeError::BuiltinError {
@@ -564,23 +564,23 @@ macro_rules! builtins {
                                 }
                             )?
 
-                            let _out = $body;
+                            let _out = $body;
 
                             $(
 
-                                arg_index = 0;
+                                arg_index = 0;
                                 $(
 
 
                                     reassign_variable!(
                                         ($globals, arg_index, $arguments, $info) $($mut)? ($($arg_name),*)$(: $arg_type)?
-                                    );
+                                    );
 
-                                    arg_index += 1;
+                                    arg_index += 1;
                                 )+
                             )?
 
-                            raw_check!($(#$raw)? $globals, $context, $info, _out);
+                            raw_check!($(#$raw)? $globals, $context, $info, _out);
 
 
 
@@ -592,7 +592,7 @@ macro_rules! builtins {
         }
 
         impl std::str::FromStr for Builtin {
-            type Err = ();
+            type Err = ();
 
             fn from_str(s: &str) -> std::result::Result<Builtin, Self::Err> {
                 match s {
@@ -612,57 +612,57 @@ macro_rules! builtins {
         }
 
         pub fn builtin_docs() -> String {
-            let mut all = Vec::new();
+            let mut all = Vec::new();
             $(
                 let mut full_out = format!(
                     "## $.{}\n",
                     stringify!($name).replace("_", "\\_")
-                );
-                let mut out = String::new();
+                );
+                let mut out = String::new();
 
 
                 if !$desc.is_empty() {
                     out += &format!(
                         "## Description:\n{} <div>\n",
                         $desc
-                    );
+                    );
                 }
 
                 if !$example.is_empty() {
                     out += &format!(
                         "## Example:\n```spwn\n{}\n```\n",
                         $example.trim()
-                    );
+                    );
 
                 }
-                out += &format!("**Allowed by default:** {}\n", if $safe { "yes" } else { "no" });
+                out += &format!("**Allowed by default:** {}\n", if $safe { "yes" } else { "no" });
                 #[allow(unused_mut, unused_variables)]
-                let mut arg_title_set = false;
+                let mut arg_title_set = false;
                 $(
-                    out += &format!("## Arguments: \n **{}**\n", $argdesc);
-                    arg_title_set = true;
+                    out += &format!("## Arguments: \n **{}**\n", $argdesc);
+                    arg_title_set = true;
                 )?
                 $(
-                    let mut args = Vec::<(&str, Option<&str>, bool)>::new();
+                    let mut args = Vec::<(&str, Option<&str>, bool)>::new();
 
                     $(
                         #[allow(unused_mut)]
-                        let mut name = stringify!($($arg_name),*);
+                        let mut name = stringify!($($arg_name),*);
                         #[allow(unused_mut, unused_assignments)]
-                        let mut typ: Option<&str> = None;
-                        $(typ = Some(stringify!($arg_type));)?
+                        let mut typ: Option<&str> = None;
+                        $(typ = Some(stringify!($arg_type));)?
                         #[allow(unused_mut, unused_assignments)]
-                        let mut mutable = false;
-                        $(mutable = stringify!($mut) == "mut";)?
-                        args.push((name, typ, mutable));
+                        let mut mutable = false;
+                        $(mutable = stringify!($mut) == "mut";)?
+                        args.push((name, typ, mutable));
                     )+
-                    if !arg_title_set { out += "## Arguments: \n"; }
-                    out += "| # | **Name** | **Type** |\n|-|-|-|\n";
+                    if !arg_title_set { out += "## Arguments: \n"; }
+                    out += "| # | **Name** | **Type** |\n|-|-|-|\n";
                     for (i, (name, typ, mutable)) in args.into_iter().enumerate() {
                         out += &format!("| {} | `{}` | {}{} |\n", i + 1, name, if mutable {"_mutable_ "} else {""}, match typ {
                             Some(s) => format!("_{}_", s),
                             None => String::new(),
-                        });
+                        });
                     }
 
 
@@ -672,38 +672,38 @@ macro_rules! builtins {
                 )?
 
                 for line in out.lines() {
-                    full_out += &format!("> {}\n", line);
+                    full_out += &format!("> {}\n", line);
                 }
 
-                all.push((stringify!($name), full_out));
+                all.push((stringify!($name), full_out));
 
             )*
-            let mut out = String::new();
+            let mut out = String::new();
 
-            let mut operators = Vec::new();
-            let mut normal_ones = Vec::new();
+            let mut operators = Vec::new();
+            let mut normal_ones = Vec::new();
 
             for (name, doc) in all {
                 if name.starts_with("_") && name.ends_with("_") {
-                    operators.push((name, doc));
+                    operators.push((name, doc));
                 } else {
-                    normal_ones.push((name, doc));
+                    normal_ones.push((name, doc));
                 }
             }
 
-            normal_ones.sort_by(|a, b| a.0.cmp(&b.0));
-            operators.sort_by(|a, b| a.0.cmp(&b.0));
+            normal_ones.sort_by(|a, b| a.0.cmp(&b.0));
+            operators.sort_by(|a, b| a.0.cmp(&b.0));
 
-            out += "# List of Built-in functions\n";
+            out += "# List of Built-in functions\n";
 
             for (_, doc) in normal_ones.iter() {
-                out += doc;
+                out += doc;
             }
 
-            out += "# Default Implementations for Operators\n";
+            out += "# Default Implementations for Operators\n";
 
             for (_, doc) in operators.iter() {
-                out += doc;
+                out += doc;
             }
 
 
@@ -711,7 +711,7 @@ macro_rules! builtins {
         }
 
 
-    };
+    };
 }
 
 builtins! {
@@ -724,7 +724,7 @@ builtins! {
                 builtin,
                 message: String::from("Assertion failed"),
                 info,
-            });
+            });
         } else {
             Value::Null
         }
@@ -732,25 +732,25 @@ builtins! {
 
     [Print] #[safe = true, desc = "Prints value(s) to the console", example = "$.print(\"Hello world!\")"]
     fn print(#["any"]) {
-        let mut out = String::new();
+        let mut out = String::new();
         for val in arguments.iter() {
             match &globals.stored_values[*val] {
                 Value::Str(s) => out += s,
                 _ => out += &{
-                    let ctx = unsafe { FullContext::from_ptr(full_context) };
-                    handle_unary_operator(*val, Builtin::DisplayOp, ctx, globals, &info)?;
-                    let out = ctx.inner().return_value;
-                    let val = &globals.stored_values[out];
+                    let ctx = unsafe { FullContext::from_ptr(full_context) };
+                    handle_unary_operator(*val, Builtin::DisplayOp, ctx, globals, &info)?;
+                    let out = ctx.inner().return_value;
+                    let val = &globals.stored_values[out];
                     if let Value::Str(s) = val {
                         s.clone()
                     } else {
                         val.clone().to_str(globals)
                     }
                 }
-            };
+            };
 
         }
-        writeln!(globals.std_out, "{}", out).expect("Error writing to output");
+        writeln!(globals.std_out, "{}", out).expect("Error writing to output");
         Value::Null
     }
 
@@ -758,8 +758,8 @@ builtins! {
     fn time(#["none"]) {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            arg_length!(info, 0, arguments, "Expected no arguments".to_string(), builtin);
-            use std::time::SystemTime;
+            arg_length!(info, 0, arguments, "Expected no arguments".to_string(), builtin);
+            use std::time::SystemTime;
             let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                 Ok(time) => time,
                 Err(e) => {
@@ -770,7 +770,7 @@ builtins! {
                     })
                 }
             }
-            .as_secs_f64();
+            .as_secs_f64();
             Value::Number(now)
         }
 
@@ -780,17 +780,17 @@ builtins! {
 
     [SpwnVersion] #[safe = true, desc = "Gets the current version of spwn", example = "$.spwn_version()"]
     fn spwn_version(#["none"]) {
-        arg_length!(info, 0, arguments, "Expected no arguments".to_string(), builtin);
+        arg_length!(info, 0, arguments, "Expected no arguments".to_string(), builtin);
 
         Value::Str(env!("CARGO_PKG_VERSION").to_string())
     }
 
     [GetInput] #[safe = true, desc = "Gets some input from the user", example = "inp = $.get_input()"]
     fn get_input((prompt): Str) {
-        print!("{}", prompt);
+        print!("{}", prompt);
         stdout()
             .flush()
-            .expect("Unexpected error occurred when trying to get user input");
+            .expect("Unexpected error occurred when trying to get user input");
         Value::Str(text_io::read!("{}\n"))
     }
 
@@ -798,7 +798,7 @@ builtins! {
 
     [B64Encode] #[safe = true, desc = "Returns the input string encoded with base64 encoding (useful for text objects)", example = "$.b64encode(\"hello there\")"]
     fn b64encode((s): Str) {
-        let encrypted = base64::encode(s.as_bytes());
+        let encrypted = base64::encode(s.as_bytes());
         Value::Str(encrypted)
     }
 
@@ -813,7 +813,7 @@ builtins! {
                     info,
                 })
             }
-        };
+        };
         Value::Str(String::from_utf8_lossy(&decrypted).to_string())
     }
 
@@ -822,7 +822,7 @@ builtins! {
     [HTTPRequest] #[safe = false, desc = "Sends an HTTP request", example = ""] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let mut headermap = reqwest::header::HeaderMap::new();
+            let mut headermap = reqwest::header::HeaderMap::new();
             for (name, value) in &headers {
                 let header_name = match reqwest::header::HeaderName::from_bytes(name.as_bytes()) {
                     Ok(hname) => hname,
@@ -833,12 +833,12 @@ builtins! {
                             info
                         })
                     }
-                };
-                let header_value = globals.stored_values[*value].clone().to_str(globals);
-                headermap.insert(header_name, header_value.trim_matches('\'').parse().unwrap());
+                };
+                let header_value = globals.stored_values[*value].clone().to_str(globals);
+                headermap.insert(header_name, header_value.trim_matches('\'').parse().unwrap());
             }
 
-            let client = reqwest::blocking::Client::new();
+            let client = reqwest::blocking::Client::new();
             let request_maker = match &method[..] {
                 "get" => client.get(&url),
                 "post" => client.post(&url),
@@ -855,7 +855,7 @@ builtins! {
                         info
                     })
                 }
-            };
+            };
 
             let response = match request_maker
                 .headers(headermap)
@@ -869,9 +869,9 @@ builtins! {
                             info
                         })
                     }
-            };
+            };
 
-            let mut output_map = FnvHashMap::default();
+            let mut output_map = FnvHashMap::default();
 
             let response_status = store_const_value(
                 Value::Number(
@@ -880,18 +880,18 @@ builtins! {
                 globals,
                 context.start_group,
                 CodeArea::new(),
-            );
+            );
 
-            let response_headermap = response.headers();
-            let mut response_headers_value = FnvHashMap::default();
+            let response_headermap = response.headers();
+            let mut response_headers_value = FnvHashMap::default();
             for (name, value) in response_headermap.iter() {
                 let header_value = store_const_value(
                     Value::Str(String::from(value.to_str().expect("Couldn't parse return header value"))),
                     globals,
                     context.start_group,
                     CodeArea::new()
-                );
-                response_headers_value.insert(LocalIntern::new(String::from(name.as_str())), header_value);
+                );
+                response_headers_value.insert(LocalIntern::new(String::from(name.as_str())), header_value);
             }
 
             let response_headers = store_const_value(
@@ -899,7 +899,7 @@ builtins! {
                 globals,
                 context.start_group,
                 CodeArea::new()
-            );
+            );
 
             let response_text = store_const_value(
                 Value::Str(
@@ -908,11 +908,11 @@ builtins! {
                 globals,
                 context.start_group,
                 CodeArea::new(),
-            );
+            );
 
-            output_map.insert(LocalIntern::new(String::from("status")), response_status);
-            output_map.insert(LocalIntern::new(String::from("headers")), response_headers);
-            output_map.insert(LocalIntern::new(String::from("text")), response_text);
+            output_map.insert(LocalIntern::new(String::from("status")), response_status);
+            output_map.insert(LocalIntern::new(String::from("headers")), response_headers);
+            output_map.insert(LocalIntern::new(String::from("text")), response_text);
             Value::Dict(output_map)
         }
         #[cfg(target_arch = "wasm32")]
@@ -925,8 +925,8 @@ builtins! {
     }
 
     [Hash] #[safe = true, desc = "Calculates the numerical hash of a value", example = "$.hash(\"hello\")"] fn hash((n)) { Value::Number( {
-        let mut s = DefaultHasher::new();
-        n.hash(&mut s, globals);
+        let mut s = DefaultHasher::new();
+        n.hash(&mut s, globals);
         s.finish() / 1000
     } as f64 ) }
 
@@ -977,7 +977,7 @@ $.add(obj {
                 builtin,
                 message: "Expected 1 argument".to_string(),
                 info,
-            });
+            });
         }
         let (obj, mode) = match globals.stored_values[arguments[0]].clone() {
             Value::Obj(obj, mode) => (obj, mode),
@@ -987,9 +987,9 @@ $.add(obj {
                 val_def: globals.get_area(arguments[0]),
                 info,
             })
-        };
+        };
 
-        let mut ignore_context = false;
+        let mut ignore_context = false;
         if arguments.len() == 2 {
             match globals.stored_values[arguments[1]].clone() {
                 Value::Bool(b) => ignore_context = b,
@@ -999,13 +999,13 @@ $.add(obj {
                     val_def: globals.get_area(arguments[1]),
                     info,
                 })
-            };
+            };
         }
 
-        let mut obj_map = FnvHashMap::<u16, ObjParam>::default();
+        let mut obj_map = FnvHashMap::<u16, ObjParam>::default();
 
         for p in obj {
-            obj_map.insert(p.0, p.1.clone());
+            obj_map.insert(p.0, p.1.clone());
             // add params into map
         }
 
@@ -1017,16 +1017,16 @@ $.add(obj {
                         message: String::from(
                             "you cannot add an obj type object at runtime"),
                         info
-                    });
+                    });
                 }
-                (*globals).uid_counter += 1;
+                (*globals).uid_counter += 1;
                 let obj = GdObj {
                     params: obj_map,
                     func_id: context.func_id,
                     mode: ObjectMode::Object,
                     unique_id: globals.uid_counter,
 
-                };
+                };
                 (*globals).objects.push(obj)
             }
             ObjectMode::Trigger => {
@@ -1036,13 +1036,13 @@ $.add(obj {
                     mode: ObjectMode::Trigger,
                     ..context_trigger(context, &mut globals.uid_counter)
                 }
-                .context_parameters(context);
-                (*globals).trigger_order += 1.0;
+                .context_parameters(context);
+                (*globals).trigger_order += 1.0;
                 (*globals).func_ids[context.func_id]
                     .obj_list
                     .push((obj, crate::compiler_types::TriggerOrder(globals.trigger_order)))
             }
-        };
+        };
         Value::Null
     }
 
@@ -1060,9 +1060,9 @@ $.assert(arr == [1])
             context.start_group,
             !globals.is_mutable(arguments[1]),
             globals.get_area(arguments[1])
-        );
+        );
 
-        (arr).push(cloned);
+        (arr).push(cloned);
 
         Value::Null
     }
@@ -1070,12 +1070,12 @@ $.assert(arr == [1])
     [SplitStr] #[safe = true, desc = "Returns an array from the split string. You can also use `string.split(delimiter)`", example = "$.assert($.split_str(\"1,2,3\", \",\") == [\"1\", \"2\", \"3\"])"]
     fn split_str((s): Str, (substr): Str) {
 
-        let mut output = Vec::<StoredValue>::new();
+        let mut output = Vec::<StoredValue>::new();
 
         for split in s.split(&*substr) {
             let entry =
-                store_const_value(Value::Str(split.to_string()), globals, context.start_group, CodeArea::new());
-            output.push(entry);
+                store_const_value(Value::Str(split.to_string()), globals, context.start_group, CodeArea::new());
+            output.push(entry);
         }
 
         Value::Array(output)
@@ -1090,7 +1090,7 @@ $.assert(arr == [1])
 
                 Value::Dict(d) => {
                     // this is specifically for object_key dicts
-                    let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
+                    let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
                     if gotten_type == None
                         || globals.stored_values[*gotten_type.unwrap()]
                             != Value::TypeIndicator(19)
@@ -1104,23 +1104,23 @@ $.assert(arr == [1])
                         })
                     }
 
-                    let id = d.get(&globals.OBJ_KEY_ID);
+                    let id = d.get(&globals.OBJ_KEY_ID);
                     if id == None {
                         return Err(RuntimeError::CustomError(create_error(
                             info,
                             "object key has no 'id' member",
                             &[],
                             None,
-                        )));
+                        )));
                     }
-                    let pattern = d.get(&globals.OBJ_KEY_PATTERN);
+                    let pattern = d.get(&globals.OBJ_KEY_PATTERN);
                     if pattern == None {
                         return Err(RuntimeError::CustomError(create_error(
                             info,
                             "object key has no 'pattern' member",
                             &[],
                             None,
-                        )));
+                        )));
                     }
 
                     (
@@ -1147,7 +1147,7 @@ $.assert(arr == [1])
                         info,
                     })
                 }
-            };
+            };
 
             if m == ObjectMode::Trigger && (key == 57 || key == 62) {
                 // group ids and stuff on triggers
@@ -1166,7 +1166,7 @@ $.assert(arr == [1])
                         found: value.get_type_str(globals),
                         val_def: globals.get_area(arguments[2]),
                         info,
-                    });
+                    });
                 }
             }
             let err = Err(RuntimeError::CustomError(create_error(
@@ -1177,7 +1177,7 @@ $.assert(arr == [1])
                 ),
                 &[],
                 None,
-            )));
+            )));
 
             let out_val = match &value {
                 // its just converting value to objparam basic level stuff
@@ -1194,7 +1194,7 @@ $.assert(arr == [1])
 
                 Value::Array(a) => {
                     ObjParam::GroupList({
-                        let mut out = Vec::new();
+                        let mut out = Vec::new();
                         for s in a {
                             out.push(match globals.stored_values[*s] {
                             Value::Group(g) => g,
@@ -1211,31 +1211,31 @@ $.assert(arr == [1])
                     })
                 }
                 obj @ Value::Dict(_) => {
-                    let typ = obj.member(globals.TYPE_MEMBER_NAME, context, globals, info.clone()).unwrap();
+                    let typ = obj.member(globals.TYPE_MEMBER_NAME, context, globals, info.clone()).unwrap();
                     if globals.stored_values[typ] == Value::TypeIndicator(20) {
                         ObjParam::Epsilon
                     } else {
-                        return err;
+                        return err;
                     }
                 }
                 _ => {
-                    return err;
+                    return err;
                 }
-            };
+            };
 
             (key, out_val)
-        };
+        };
 
-        let mut has_key = false;
+        let mut has_key = false;
         for (i, (k, _)) in o.iter().enumerate() {
             if *k == okey {
-                has_key = true;
-                o[i].1 = oval.clone();
-                break;
+                has_key = true;
+                o[i].1 = oval.clone();
+                break;
             }
         }
         if !has_key {
-            o.push((okey, oval));
+            o.push((okey, oval));
         }
 
         Value::Null
@@ -1271,8 +1271,8 @@ $.extend_trigger_func(10g, () {
                     info,
                 })
             }
-        };
-        use parser::ast::*;
+        };
+        use parser::ast::*;
 
         let cmp_statement = CompoundStatement { statements: vec![
             Statement {
@@ -1286,9 +1286,9 @@ $.extend_trigger_func(10g, () {
                 arrow: false,
                 pos: info.position.pos
             }
-        ]};
+        ]};
 
-        cmp_statement.to_trigger_func(unsafe { FullContext::from_ptr(full_context) }, globals, info.clone(), Some(group))?;
+        cmp_statement.to_trigger_func(unsafe { FullContext::from_ptr(full_context) }, globals, info.clone(), Some(group))?;
 
 
 
@@ -1308,14 +1308,14 @@ $.random(1, 10) // returns a random integer between 1 and 10
     fn random(#["see example"]) {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            use rand::seq::SliceRandom;
-            use rand::Rng;
+            use rand::seq::SliceRandom;
+            use rand::Rng;
             if arguments.len() > 2 {
                 return Err(RuntimeError::BuiltinError {
                     builtin,
                     message: "Expected up to 2 arguments".to_string(),
                     info,
-                });
+                });
             }
 
             if arguments.is_empty() {
@@ -1328,12 +1328,12 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             builtin,
                             message: format!("Expected type that can be converted to @array for argument 1, found type {}", globals.get_type_str(arguments[0])),
                             info,
-                        });
+                        });
                     }
-                };
+                };
 
                 if arguments.len() == 1 {
-                    let rand_elem = val.choose(&mut rand::thread_rng());
+                    let rand_elem = val.choose(&mut rand::thread_rng());
 
                     if rand_elem.is_some() {
                         clone_and_get_value(
@@ -1355,14 +1355,14 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                 builtin,
                                 message: format!("Expected number, found {}", globals.get_type_str(arguments[1])),
                                 info,
-                            });
+                            });
                         }
-                    };
+                    };
 
-                    let mut out_arr = Vec::<StoredValue>::new();
+                    let mut out_arr = Vec::<StoredValue>::new();
 
                     for _ in 0..times {
-                        let rand_elem = val.choose(&mut rand::thread_rng());
+                        let rand_elem = val.choose(&mut rand::thread_rng());
 
                         if rand_elem.is_some() {
                             out_arr.push(clone_value(
@@ -1371,9 +1371,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                 context.start_group,
                                 !globals.is_mutable(*rand_elem.unwrap()),
                                 CodeArea::new()
-                            ));
+                            ));
                         } else {
-                            break;
+                            break;
                         }
                     }
 
@@ -1398,7 +1398,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                 builtin,
                 message: String::from("Expected 0 arguments"),
                 info,
-            });
+            });
         }
         Value::Str(globals.initial_string.clone())
     }
@@ -1409,10 +1409,10 @@ $.random(1, 10) // returns a random integer between 1 and 10
                 builtin,
                 message: String::from("Expected 1 or 2 arguments, the path to the file and the data format (default: utf-8)"),
                 info,
-            });
+            });
         }
 
-        let val = globals.stored_values[arguments[0]].clone();
+        let val = globals.stored_values[arguments[0]].clone();
         match val {
             Value::Str(p) => {
                 let format = match arguments.get(1) {
@@ -1426,24 +1426,24 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     "Data format needs to be a string (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"
                                         .to_string(),
                                 info,
-                            });
+                            });
                         }
                     }
                     _ => "text",
-                };
-                let path = std::path::PathBuf::from(p);
+                };
+                let path = std::path::PathBuf::from(p);
 
                 if !path.exists() {
                     return Err(RuntimeError::BuiltinError {
                         builtin,
                         message: "Path doesn't exist".to_string(),
                         info,
-                    });
+                    });
                 }
 
                 match format {
                     "text" => {
-                        let ret = fs::read_to_string(path);
+                        let ret = fs::read_to_string(path);
                         let rval = match ret {
                             Ok(file) => file,
                             Err(e) => {
@@ -1451,13 +1451,13 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
-                                });
+                                });
                             }
-                        };
+                        };
                         Value::Str(rval)
                     }
                     "bin" => {
-                        let ret = fs::read(path);
+                        let ret = fs::read(path);
                         let rval = match ret {
                             Ok(file) => file,
                             Err(e) => {
@@ -1465,9 +1465,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
-                                });
+                                });
                             }
-                        };
+                        };
                         Value::Array(
                             rval.iter()
                                 .map(|b| {
@@ -1477,7 +1477,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                         )
                     }
                     "json" => {
-                        let ret = fs::read_to_string(path);
+                        let ret = fs::read_to_string(path);
                         let rval = match ret {
                             Ok(file) => file,
                             Err(e) => {
@@ -1485,9 +1485,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
-                                });
+                                });
                             }
-                        };
+                        };
                         let parsed = match serde_json::from_str(&rval) {
                             Ok(value) => value,
                             Err(e) => {
@@ -1495,9 +1495,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     builtin,
                                     message: format!("Problem parsing JSON: {}", e),
                                     info,
-                                });
+                                });
                             }
-                        };
+                        };
                         fn parse_json_value(val: serde_json::Value, globals: &mut Globals, context: &Context, info: &CompilerInfo) -> Value {
                             // please sput forgive me for this shitcode ._.
                             match val {
@@ -1506,16 +1506,16 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                 serde_json::Value::Number(x) => Value::Number(x.as_f64().unwrap()),
                                 serde_json::Value::String(x) => Value::Str(x),
                                 serde_json::Value::Array(x) => {
-                                    let mut arr: Vec<StoredValue> = vec![];
+                                    let mut arr: Vec<StoredValue> = vec![];
                                     for v in x {
-                                        arr.push(store_const_value(parse_json_value(v, globals, context, info), globals, context.start_group, info.position));
+                                        arr.push(store_const_value(parse_json_value(v, globals, context, info), globals, context.start_group, info.position));
                                     }
                                     Value::Array(arr)
                                 },
                                 serde_json::Value::Object(x) => {
-                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
+                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
                                     for (key, value) in x {
-                                        dict.insert(LocalIntern::new(key), store_const_value(parse_json_value(value, globals, context, info), globals, context.start_group, info.position));
+                                        dict.insert(LocalIntern::new(key), store_const_value(parse_json_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
                                     Value::Dict(dict)
                                 },
@@ -1524,7 +1524,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                         parse_json_value(parsed, globals, context, &info)
                     }
                     "toml" => {
-                        let ret = fs::read_to_string(path);
+                        let ret = fs::read_to_string(path);
                         let rval = match ret {
                             Ok(file) => file,
                             Err(e) => {
@@ -1532,9 +1532,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
-                                });
+                                });
                             }
-                        };
+                        };
                         let parsed = match toml::from_str(&rval) {
                             Ok(value) => value,
                             Err(e) => {
@@ -1542,9 +1542,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     builtin,
                                     message: format!("Problem parsing toml: {}", e),
                                     info,
-                                });
+                                });
                             }
-                        };
+                        };
                         fn parse_toml_value(val: toml::Value, globals: &mut Globals, context: &Context, info: &CompilerInfo) -> Value {
                             // please sput forgive me for this shitcode ._.
                             match val {
@@ -1554,16 +1554,16 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                 toml::Value::String(x) => Value::Str(x),
                                 toml::Value::Datetime(x) => Value::Str(x.to_string()),
                                 toml::Value::Array(x) => {
-                                    let mut arr: Vec<StoredValue> = vec![];
+                                    let mut arr: Vec<StoredValue> = vec![];
                                     for v in x {
-                                        arr.push(store_const_value(parse_toml_value(v, globals, context, info), globals, context.start_group, info.position));
+                                        arr.push(store_const_value(parse_toml_value(v, globals, context, info), globals, context.start_group, info.position));
                                     }
                                     Value::Array(arr)
                                 },
                                 toml::Value::Table(x) => {
-                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
+                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
                                     for (key, value) in x {
-                                        dict.insert(LocalIntern::new(key), store_const_value(parse_toml_value(value, globals, context, info), globals, context.start_group, info.position));
+                                        dict.insert(LocalIntern::new(key), store_const_value(parse_toml_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
                                     Value::Dict(dict)
                                 },
@@ -1572,7 +1572,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                         parse_toml_value(parsed, globals, context, &info)
                     }
                     "yaml" => {
-                        let ret = fs::read_to_string(path);
+                        let ret = fs::read_to_string(path);
                         let rval = match ret {
                             Ok(file) => file,
                             Err(e) => {
@@ -1580,9 +1580,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
-                                });
+                                });
                             }
-                        };
+                        };
                         let parsed: serde_yaml::Value = match serde_yaml::from_str(&rval) {
                             Ok(value) => value,
                             Err(e) => {
@@ -1590,9 +1590,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                     builtin,
                                     message: format!("Problem parsing toml: {}", e),
                                     info,
-                                });
+                                });
                             }
-                        };
+                        };
                         fn parse_yaml_value(val: &serde_yaml::Value, globals: &mut Globals, context: &Context, info: &CompilerInfo) -> Value {
                             // please sput forgive me for this shitcode ._.
                             match val {
@@ -1601,16 +1601,16 @@ $.random(1, 10) // returns a random integer between 1 and 10
                                 serde_yaml::Value::Number(x) => Value::Number(x.as_f64().unwrap()),
                                 serde_yaml::Value::String(x) => Value::Str(x.to_string()),
                                 serde_yaml::Value::Sequence(x) => {
-                                    let mut arr: Vec<StoredValue> = vec![];
+                                    let mut arr: Vec<StoredValue> = vec![];
                                     for v in x {
-                                        arr.push(store_const_value(parse_yaml_value(v, globals, context, info), globals, context.start_group, info.position));
+                                        arr.push(store_const_value(parse_yaml_value(v, globals, context, info), globals, context.start_group, info.position));
                                     }
                                     Value::Array(arr)
                                 },
                                 serde_yaml::Value::Mapping(x) => {
-                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
+                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
                                     for (key, value) in x.iter() {
-                                        dict.insert(LocalIntern::new(key.as_str().unwrap().to_string()), store_const_value(parse_yaml_value(value, globals, context, info), globals, context.start_group, info.position));
+                                        dict.insert(LocalIntern::new(key.as_str().unwrap().to_string()), store_const_value(parse_yaml_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
                                     Value::Dict(dict)
                                 },
@@ -1633,7 +1633,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                     builtin,
                     message: "Path needs to be a string".to_string(),
                     info,
-                });
+                });
             }
         }
     }
@@ -1650,9 +1650,9 @@ $.random(1, 10) // returns a random integer between 1 and 10
                     builtin,
                     message: format!("Error when writing to file: {}", e),
                     info,
-                });
+                });
             }
-        };
+        };
         Value::Null
     }
 
@@ -1663,7 +1663,7 @@ $.assert(arr == [1, 2])
     "]
     fn pop(mut (arr)) {
 
-        let typ = globals.get_type_str(arguments[0]);
+        let typ = globals.get_type_str(arguments[0]);
 
         match &mut arr {
             Value::Array(arr) => match arr.pop() {
@@ -1686,21 +1686,21 @@ $.assert(arr == [1, 2])
 
     [Substr] #[safe = true, desc = "Returns a specified part of the input string", example = "$.substr(\"hello there\", 1, 5)"]
     fn substr((val): Str, (start_index): Number, (end_index): Number) {
-        let start_index = start_index as usize;
-        let end_index = end_index as usize;
+        let start_index = start_index as usize;
+        let end_index = end_index as usize;
         if start_index >= end_index {
             return Err(RuntimeError::BuiltinError {
                 builtin,
                 message: "Start index is larger than end index".to_string(),
                 info,
-            });
+            });
         }
         if end_index > val.len() {
             return Err(RuntimeError::BuiltinError {
                 builtin,
                 message: "End index is larger than string".to_string(),
                 info,
-            });
+            });
         }
         Value::Str(val.as_str()[start_index..end_index].to_string())
     }
@@ -1708,11 +1708,11 @@ $.assert(arr == [1, 2])
     [RemoveIndex] #[safe = true, desc = "Removes a specific value from an array. You can also use `array.remove(index)`", example = "$.remove_index(names, 2)"]
     fn remove_index(mut (arr), (index): Number) {
 
-        let typ = globals.get_type_str(arguments[0]);
+        let typ = globals.get_type_str(arguments[0]);
 
         match &mut arr {
             Value::Array(arr) => {
-                let out = (arr).remove(index as usize);
+                let out = (arr).remove(index as usize);
                 globals.stored_values[out].clone()
             }
 
@@ -1729,7 +1729,7 @@ $.assert(arr == [1, 2])
 
     [Regex] #[safe = true, desc = "Performs a regex operation on a string", example = ""]
     fn regex(#["`mode` can be either \"match\", \"replace\", \"find_all\" or \"find_groups\""](regex): Str, (s): Str, (mode): Str, (replace)) {
-        use fancy_regex::Regex;
+        use fancy_regex::Regex;
 
 
             if let Ok(r) = Regex::new(&regex) {
@@ -1752,84 +1752,84 @@ $.assert(arr == [1, 2])
                         }
                     },
                     "find_all" => {
-                        let mut output = Vec::new();
+                        let mut output = Vec::new();
 
                         for i in r.find_iter(&s){
 
-                            let isafe = i.unwrap();
+                            let isafe = i.unwrap();
 
-                            let mut pair = Vec::new();
-                            let p1 = store_const_value(Value::Number(isafe.start() as f64), globals, context.start_group, info.position);
-                            let p2 = store_const_value(Value::Number(isafe.end() as f64), globals, context.start_group, info.position);
+                            let mut pair = Vec::new();
+                            let p1 = store_const_value(Value::Number(isafe.start() as f64), globals, context.start_group, info.position);
+                            let p2 = store_const_value(Value::Number(isafe.end() as f64), globals, context.start_group, info.position);
 
-                            pair.push(p1);
-                            pair.push(p2);
+                            pair.push(p1);
+                            pair.push(p2);
 
-                            let pair_arr = store_const_value(Value::Array(pair), globals, context.start_group, info.position);
-                            output.push(pair_arr);
+                            let pair_arr = store_const_value(Value::Array(pair), globals, context.start_group, info.position);
+                            output.push(pair_arr);
                         }
 
                         Value::Array(output)
                     },
                     "find_groups" => {
-                        let mut output = Vec::new();
+                        let mut output = Vec::new();
 
                         for i in r.captures_iter(&s){
 
-                            let capture = i.unwrap();
+                            let capture = i.unwrap();
 
-                            let mut found = false;
+                            let mut found = false;
 
-                            let mut range = Vec::new();
-                            let mut text = String::new();
-                            let mut group_name = None;
+                            let mut range = Vec::new();
+                            let mut text = String::new();
+                            let mut group_name = None;
                             for n in r.capture_names() {
                                 if let Some(name) = n {
                                     if let Some(m) = capture.name(name) {
-                                        found = true;
+                                        found = true;
                                         range.push(
                                             store_const_value(Value::Number(m.start() as f64), globals, context.start_group, info.position)
-                                        );
+                                        );
                                         range.push(
                                             store_const_value(Value::Number(m.end() as f64), globals, context.start_group, info.position)
-                                        );
-                                        text = m.as_str().to_string();
-                                        group_name = Some(name.to_string());
+                                        );
+                                        text = m.as_str().to_string();
+                                        group_name = Some(name.to_string());
                                     }
                                 }
                             }
                             if !found {
                                 for g in 1..r.captures_len() {
                                     if let Some(m) = capture.get(g) {
-                                        found = true;
+                                        found = true;
                                         range.push(
                                             store_const_value(Value::Number(m.start() as f64), globals, context.start_group, info.position)
-                                        );
+                                        );
                                         range.push(
                                             store_const_value(Value::Number(m.end() as f64), globals, context.start_group, info.position)
-                                        );
-                                        text = m.as_str().to_string();
+                                        );
+                                        text = m.as_str().to_string();
                                     }
                                 }
                             }
                             if !found { continue }
 
-                            let mut match_map = FnvHashMap::default();
+                            let mut match_map = FnvHashMap::default();
                             match_map.insert(
                                 LocalIntern::new("range".to_string()),
                                 store_const_value(Value::Array(range), globals, context.start_group, info.position),
-                            );
+                            );
                             match_map.insert(
                                 LocalIntern::new("text".to_string()),
                                 store_const_value(Value::Str(text), globals, context.start_group, info.position),
-                            );
+                            );
                             match_map.insert(
                                 LocalIntern::new("name".to_string()),
                                 if let Some(n) = group_name {
                                     store_const_value(Value::Str(n), globals, context.start_group, info.position)
                                 } else { store_const_value(Value::Null, globals, context.start_group, info.position) },
-                            );
-                            output.push(store_const_value(Value::Dict(match_map), globals, context.start_group, info.position));
+                            );
+                            output.push(store_const_value(Value::Dict(match_map), globals, context.start_group, info.position));
                         }
 
                         Value::Array(output)
@@ -1850,14 +1850,14 @@ $.assert(arr == [1, 2])
                     builtin,
                     message: "Failed to build regex (invalid syntax)".to_string(),
                     info,
-                });
+                });
             }
 
     }
 
     [RangeOp] #[safe = true, desc = "Default implementation of the `..` operator", example = "$._range_(0, 10)"]
     fn _range_((val_a), (b): Number) {
-        let end = convert_to_int(b, &info)?;
+        let end = convert_to_int(b, &info)?;
         match val_a {
             Value::Number(start) => {
                 Value::Range(convert_to_int(start, &info)?, end, 1)
@@ -1870,7 +1870,7 @@ $.assert(arr == [1, 2])
                         "Range operator cannot be used on a range that already has a non-default stepsize",
                         &[],
                         None,
-                    )));
+                    )));
 
 
                 }
@@ -1884,7 +1884,7 @@ $.assert(arr == [1, 2])
                             "range cannot have a stepsize less than or 0",
                             &[],
                             None,
-                        )));
+                        )));
                     } else {
                         step as usize
                     },
@@ -1896,21 +1896,21 @@ $.assert(arr == [1, 2])
                     found: globals.get_type_str(arguments[0]),
                     val_def: globals.get_area(arguments[0]),
                     info,
-                });
+                });
 
             }
         }
     }
     // unary operators
     [IncrOp] #[safe = true, desc = "Default implementation of the `n++` operator", example = "$._increment_(n)"]
-    fn _increment_(mut (a): Number) { a += 1.0; Value::Number(a - 1.0)}
+    fn _increment_(mut (a): Number) { a += 1.0; Value::Number(a - 1.0)}
     [DecrOp] #[safe = true, desc = "Default implementation of the `n--` operator", example = "_decrement_(n)"]
-    fn _decrement_(mut (a): Number) { a -= 1.0; Value::Number(a + 1.0)}
+    fn _decrement_(mut (a): Number) { a -= 1.0; Value::Number(a + 1.0)}
 
     [PreIncrOp] #[safe = true, desc = "Default implementation of the `++n` operator", example = "$._pre_increment_(n)"]
-    fn _pre_increment_(mut (a): Number) { a += 1.0; Value::Number(a)}
+    fn _pre_increment_(mut (a): Number) { a += 1.0; Value::Number(a)}
     [PreDecrOp] #[safe = true, desc = "Default implementation of the `--n` operator", example = "$._pre_decrement_(n)"]
-    fn _pre_decrement_(mut (a): Number) { a -= 1.0; Value::Number(a)}
+    fn _pre_decrement_(mut (a): Number) { a -= 1.0; Value::Number(a)}
 
     [NegOp] #[safe = true, desc = "Default implementation of the `-n` operator", example = "$._negate_(n)"]
     fn _negate_((a): Number) { Value::Number(-a)}
@@ -1926,7 +1926,7 @@ $.assert(arr == [1, 2])
                     found: globals.get_type_str(arguments[0]),
                     val_def: globals.get_area(arguments[0]),
                     info,
-                });
+                });
             }
         }
     }
@@ -1971,22 +1971,22 @@ $.assert(arr == [1, 2])
 
     [EqOp] #[safe = true, desc = "Default implementation of the `==` operator", example = "$._equal_(\"hello\", \"hello\")"]
     [[RAW]] fn _equal_((a), (b)) {
-        default_value_equality(arguments[0], arguments[1], globals, unsafe { FullContext::from_ptr(full_context) }, &info)?;
+        default_value_equality(arguments[0], arguments[1], globals, unsafe { FullContext::from_ptr(full_context) }, &info)?;
     }
 
     [IsOp] #[safe = true, desc = "Default implementation of the `is` operator", example = "$._is_([1, 2, 3], [@number])"]
     [[RAW]] fn _is_((val), (pattern)) {
-        val.matches_pat(&pattern, &info, globals, unsafe { FullContext::from_ptr(full_context) }, true)?;
+        val.matches_pat(&pattern, &info, globals, unsafe { FullContext::from_ptr(full_context) }, true)?;
     }
 
     [NotEqOp] #[safe = true, desc = "Default implementation of the `!=` operator", example = "$._not_equal_(\"hello\", \"bye\")"]
     [[RAW]] fn _not_equal_((a), (b)) {
-        let contexts = unsafe { FullContext::from_ptr(full_context) };
-        default_value_equality(arguments[0], arguments[1], globals, contexts, &info)?;
+        let contexts = unsafe { FullContext::from_ptr(full_context) };
+        default_value_equality(arguments[0], arguments[1], globals, contexts, &info)?;
         // negate
         for c in contexts.iter() {
             if let Value::Bool(b) = &mut globals.stored_values[c.inner().return_value] {
-                *b = !(*b);
+                *b = !(*b);
             } else {
                 unreachable!() // unchecked?
             }
@@ -2003,7 +2003,7 @@ $.assert(arr == [1, 2])
             Value::Number(a) => Value::Number(a * b),
             Value::Str(a) => Value::Str(a.repeat(convert_to_int(b, &info)? as usize)),
             Value::Array(ar) => {
-                let mut new_out = Vec::<StoredValue>::new();
+                let mut new_out = Vec::<StoredValue>::new();
                 for _ in 0..convert_to_int(b, &info)? {
                     for value in &ar {
                         new_out.push(clone_value(
@@ -2012,7 +2012,7 @@ $.assert(arr == [1, 2])
                             context.start_group,
                             !globals.is_mutable(*value),
                             info.position)
-                        );
+                        );
                     }
                 }
 
@@ -2046,9 +2046,9 @@ $.assert(arr == [1, 2])
             (Value::Number(a), Value::Number(b)) => Value::Number(a + b),
             (Value::Str(a), Value::Str(b)) => Value::Str(a + &b),
             (Value::Array(a), Value::Array(b)) => Value::Array({
-                let mut new_arr = Vec::new();
+                let mut new_arr = Vec::new();
                 for el in a.iter().chain(b.iter()) {
-                    new_arr.push(clone_value(*el, globals, context.start_group, !globals.is_mutable(*el), info.position));
+                    new_arr.push(clone_value(*el, globals, context.start_group, !globals.is_mutable(*el), info.position));
                 }
                 new_arr
 
@@ -2069,7 +2069,7 @@ $.assert(arr == [1, 2])
                         ),
                     ],
                     None,
-                )));
+                )));
             }
         }
     }
@@ -2077,16 +2077,16 @@ $.assert(arr == [1, 2])
     fn _minus_((a): Number, (b): Number) { Value::Number(a - b) }
     [AssignOp] #[safe = true, desc = "Default implementation of the `=` operator", example = "$._assign_(val, 64)"]
     fn _assign_(mut (a), (b)) {
-        a = b;
-        (*globals.stored_values.map.get_mut(arguments[0]).unwrap()).def_area = info.position;
+        a = b;
+        (*globals.stored_values.map.get_mut(arguments[0]).unwrap()).def_area = info.position;
         Value::Null
     }
     [SwapOp] #[safe = true, desc = "Default implementation of the `<=>` operator", example = "$._swap_(a, b)"]
     fn _swap_(mut (a), mut (b)) {
 
-        std::mem::swap(&mut a, &mut b);
-        (*globals.stored_values.map.get_mut(arguments[0]).unwrap()).def_area = info.position;
-        (*globals.stored_values.map.get_mut(arguments[1]).unwrap()).def_area = info.position;
+        std::mem::swap(&mut a, &mut b);
+        (*globals.stored_values.map.get_mut(arguments[0]).unwrap()).def_area = info.position;
+        (*globals.stored_values.map.get_mut(arguments[1]).unwrap()).def_area = info.position;
         Value::Null
     }
 
@@ -2094,12 +2094,12 @@ $.assert(arr == [1, 2])
     fn _in_((a), (b)) {
         match (a.clone(), b.clone()) {
             (_, Value::Array(ar)) => {
-                let mut out = false;
+                let mut out = false;
                 for v in ar.clone() {
                     // use custom == impl?
                     if strict_value_equality(v, arguments[0], globals) {
-                        out = true;
-                        break;
+                        out = true;
+                        break;
                     }
                 }
                 Value::Bool(out)
@@ -2113,12 +2113,12 @@ $.assert(arr == [1, 2])
             (Value::Str(s), Value::Str(s2)) => Value::Bool(s2.contains(&*s)),
 
             (Value::Number(n), Value::Obj(o, _m)) => {
-                let obj_has: bool = o.iter().any(|k| k.0 == n as u16);
+                let obj_has: bool = o.iter().any(|k| k.0 == n as u16);
                 Value::Bool(obj_has)
             }
 
             (Value::Dict(d), Value::Obj(o, _m)) => {
-                let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
+                let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
 
                 if gotten_type == None
                     || globals.stored_values[*gotten_type.unwrap()]
@@ -2130,17 +2130,17 @@ $.assert(arr == [1, 2])
                         found: globals.get_type_str(arguments[0]),
                         val_def: globals.get_area(arguments[0]),
                         info,
-                    });
+                    });
                 }
 
-                let id = d.get(&globals.OBJ_KEY_ID);
+                let id = d.get(&globals.OBJ_KEY_ID);
                 if id == None {
                     return Err(RuntimeError::BuiltinError {
                         builtin,
                         // object_key has an ID member for the key basically
                         message: "object key has no 'id' member".to_string(),
                         info,
-                    });
+                    });
                 }
                 let ob_key = match &globals.stored_values[*id.unwrap()] {
                     // check if the ID is actually an int. it should be
@@ -2153,8 +2153,8 @@ $.assert(arr == [1, 2])
                             info,
                         })
                     }
-                };
-                let obj_has: bool = o.iter().any(|k| k.0 == ob_key);
+                };
+                let obj_has: bool = o.iter().any(|k| k.0 == ob_key);
                 Value::Bool(obj_has)
             }
 
@@ -2228,7 +2228,7 @@ $.assert(arr == [1, 2])
     fn _as_((a), (t): TypeIndicator) { convert_type(&a,t,&info,globals,context)? }
 
     [SubtractOp] #[safe = true, desc = "Default implementation of the `-=` operator", example = "$._subtract_(val, 10)"]
-    fn _subtract_(mut (a): Number, (b): Number) { a -= b; Value::Null }
+    fn _subtract_(mut (a): Number, (b): Number) { a -= b; Value::Null }
     [AddOp] #[safe = true, desc = "Default implementation of the `+=` operator", example = "$._add_(val, 10)"]
     fn _add_(mut (a), (b)) {
         match (&mut a, b) {
@@ -2236,7 +2236,7 @@ $.assert(arr == [1, 2])
             (Value::Str(a), Value::Str(b)) => *a += &b,
             (Value::Array(a), Value::Array(b)) => {
                 for el in b.iter() {
-                    a.push(clone_value(*el, globals, context.start_group, !globals.is_mutable(*el), info.position));
+                    a.push(clone_value(*el, globals, context.start_group, !globals.is_mutable(*el), info.position));
                 }
             },
             _ => return Err(RuntimeError::CustomError(create_error(
@@ -2275,17 +2275,17 @@ $.assert(arr == [1, 2])
                 )))
 
             }
-        };
+        };
         Value::Null
     }
     [DivideOp] #[safe = true, desc = "Default implementation of the `/=` operator", example = "$._divide_(val, 3)"]
-    fn _divide_(mut (a): Number, (b): Number) { a /= b; Value::Null }
+    fn _divide_(mut (a): Number, (b): Number) { a /= b; Value::Null }
     [IntdivideOp] #[safe = true, desc = "Default implementation of the `/%=` operator", example = "$._intdivide_(val, 3)"]
-    fn _intdivide_(mut (a): Number, (b): Number) { a /= b; a = a.floor(); Value::Null }
+    fn _intdivide_(mut (a): Number, (b): Number) { a /= b; a = a.floor(); Value::Null }
     [ExponateOp] #[safe = true, desc = "Default implementation of the `^=` operator", example = "$._exponate_(val, 3)"]
-    fn _exponate_(mut (a): Number, (b): Number) { a = a.powf(b); Value::Null }
+    fn _exponate_(mut (a): Number, (b): Number) { a = a.powf(b); Value::Null }
     [ModulateOp] #[safe = true, desc = "Default implementation of the `%=` operator", example = "$._modulate_(val, 3)"]
-    fn _modulate_(mut (a): Number, (b): Number) { a = a.rem_euclid(b); Value::Null }
+    fn _modulate_(mut (a): Number, (b): Number) { a = a.rem_euclid(b); Value::Null }
 
     [EitherOp] #[safe = true, desc = "Default implementation of the `|` operator", example = "$._either_(@number, @counter)"]
     fn _either_((a), (b)) {
@@ -2323,8 +2323,8 @@ $.assert(arr == [1, 2])
         Value::Str(a.to_str_full(globals, |val, globals| display_val(val.clone(), unsafe { FullContext::from_ptr(full_context) }, globals, &info) )?)
     }
     [Display] #[safe = true, desc = "returns the value display string for the given value", example = "$.display(counter()) // \"counter(?i, bits = 16)\""] fn display((a)) {
-        let ctx = unsafe { FullContext::from_ptr(full_context) };
-        handle_unary_operator(arguments[0], Builtin::DisplayOp, ctx, globals, &info)?;
+        let ctx = unsafe { FullContext::from_ptr(full_context) };
+        handle_unary_operator(arguments[0], Builtin::DisplayOp, ctx, globals, &info)?;
         // add error on context split?
         globals.stored_values[ctx.inner().return_value].clone()
     }

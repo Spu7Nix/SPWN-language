@@ -7,7 +7,7 @@ $.assert(arr.is_empty())
 $.assert(!arr2.is_empty())
     ")]
     (self) {
-        return self.length == 0;
+        return self.length == 0;
     },
     max: #[desc("Gets the highest number in the array.") example("
 arr = [3, 1, 4, 1]
@@ -104,15 +104,15 @@ $.assert(arr.reverse() == [3, 2, 1])
     ")]
     (self) {
         if self.length == 0 {
-            return [];
+            return [];
             break
         }
-        let ret = [];
+        let ret = [];
         for i in 1..self.length {
-            ret.push(self[-i]);
+            ret.push(self[-i]);
         }
-        ret.push(self[0]);
-        return ret;
+        ret.push(self[0]);
+        return ret;
     },
     push: #[desc("Pushes a value to the end of the array.") example("
 let arr = [1, 2, 3]
@@ -146,11 +146,11 @@ $.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
     ")]
     (self, cb: _ -> _, in_place: @bool = false) {
         if !in_place {
-            let output = [];
+            let output = [];
             for iter in self {
-                output.push(cb(iter));
+                output.push(cb(iter));
             }
-            return output;
+            return output;
         } else {
             for i in 0..self.length {
                 self[i] = cb(self[i])
@@ -163,11 +163,11 @@ $.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
     ")]
     (self, cb: (_, @number) -> _, in_place: @bool = false) {
         if !in_place {
-            let output = [];
+            let output = [];
             for i in 0..self.length {
-                output.push(cb(self[i],i));
+                output.push(cb(self[i],i));
             }
-            return output;
+            return output;
         } else {
             for i in 0..self.length {
                 self[i] = cb(self[i],i)
@@ -179,11 +179,11 @@ arr = [1, 2, 3, 4, 5]
 $.assert(arr.filter(el => el > 3) == [4, 5])
     ")]
     (self, cb: _ -> @bool, in_place: @bool = false) {
-        let output = [];
+        let output = [];
         for iter in self {
-            let r = cb(iter);
+            let r = cb(iter);
             if r.type != @bool {
-                throw "Filter must return a boolean value";
+                throw "Filter must return a boolean value";
             } else if r {
                 output.push(iter)
             }
@@ -200,11 +200,11 @@ sum = arr.reduce((acum, el) => acum + el)
 $.assert(sum == 15)
     ")]
     (self, cb: (_, _) -> _) {
-        let acum = self[0];
+        let acum = self[0];
         for iter in 1..self.length {
-            acum = cb(acum, self[iter]);
+            acum = cb(acum, self[iter]);
         }
-        return acum;
+        return acum;
     },
     any: #[desc("Determines whether the specified callback function returns true for any element of an array.") example("
 arr = [false, false, true, false]
@@ -324,7 +324,7 @@ arr = [1, 2, [3, 4], 5, [6, 7, [8]]]
 $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
     ")]
     (self) {
-        let output = [];
+        let output = [];
 
         for elem in self {
             if elem.type != @array {

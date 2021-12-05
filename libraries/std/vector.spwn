@@ -142,7 +142,7 @@ impl @vector {
     _equal_: (self, other: @vector) {
         self.assert_dims(other)
         for i in 0..self.dims.length {
-            if self.dims[i] != other.dims[i] { return false; }
+            if self.dims[i] != other.dims[i] { return false; }
         }
         return true
     },
