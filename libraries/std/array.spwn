@@ -319,6 +319,15 @@ $.assert(arr == [5, 1, 5, 3, 2])
         self = [value] + self
         return value
     },
+    insert: #[desc("Pushes a value at a certain index of the array and returns it.") example("
+let arr = [1, 5, 3, 2]
+$.assert(arr.insert(2, 7) == 7)
+$.assert(arr == [1, 5, 7, 3, 2])
+    ")]
+    (self, index: @number, value) {
+        self = self[:index] + [value] + self[index:]
+        return value
+    },
     flatten: #[desc("Flattens any sub-arrays into one big array.") example("
 arr = [1, 2, [3, 4], 5, [6, 7, [8]]]
 $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])

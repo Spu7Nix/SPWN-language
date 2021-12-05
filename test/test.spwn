@@ -1,23 +1,8 @@
 #[no_level]
 
-uwu = "0b1010" as @number // 10
-owo = "0x0a" as @number   // 10
-qwq = "0o12" as @number   // 10
 
-foo = u"
-
-    foo
-        bar
-    baz
-"
-
-$.print(foo, " ", foo.type)
-
-$.print(uwu, " ", uwu.type)
-$.print(owo, " ", owo.type)
-$.print(qwq, " ", qwq.type)
+let arr = [1, 5, 3, 2]
+arr.insert(-1, 7)
+$.print(arr)
 
 
-// list = ["hello", " ", "world", "!"]
-
-// $.print(list.reduce((a, b, c) => a + b))
