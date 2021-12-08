@@ -32,7 +32,7 @@ impl @counter {
             "Defines the maximum stable size of the counter. If the counter goes outside of the range from 0 to 2^size, it's behavior will be undefined. Smaller sizes are more group effective."
         )] bits: @number = DEFAULT_BITS,
         #[desc("Resets the counter in case the item has been used before. This only applies if the `source` argument is not an item.")] reset: @bool = true,
-    ){
+    ) -> @counter {
         let out = null
         if source.type == @number {
             id = ?i
@@ -83,7 +83,7 @@ points.display(75, 75)
         self,
         #[desc("X pos of display in units (1 grid square = 30 units)")] x: @number,
         #[desc("Y pos of display in units")] y: @number
-    ) {
+    ) -> @NULL {
         extract import "constants.spwn".obj_props
         $.add(obj {
             OBJ_ID: 1615,
@@ -108,7 +108,7 @@ a.add_to(b)
         #[desc("Counter(s) to add to")] items: [@counter | @item] | @counter | @item,
         #[desc("Multiplier for the value added")] factor: @number = 1,
         #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @number -> @NULL = (n){}
-    ) {
+    ) -> @NULL  {
         for i in self.bits..0 {
             x = 2^i
 
@@ -130,7 +130,7 @@ a.add_to(b)
     #[desc("Like normal add_to, but each counter has its own factor")] (
         self,
         #[desc("Counter(s) to add to")] items: [[@counter | @number]],
-    ) {
+    ) -> @NULL  {
         for i in self.bits..0 {
             x = 2^i
 
@@ -158,7 +158,7 @@ b.subtract_from(a)
         #[desc("Counter(s) to subtract from")] items: [@counter | @item] | @counter | @item,
         #[desc("Multiplier for the value subtracted")] factor: @number = 1,
         #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @number -> @NULL = (n){}
-    ) {
+    ) -> @NULL {
         for i in self.bits..0 {
             x = 2^i
 
@@ -186,7 +186,7 @@ c.multiply(10)
     (
         self,
         #[desc("Factor to multiply by, either another counter (very expensive) or a normal number")] factor: @counter | @number,
-    ) {
+    ) -> @NULL {
 
         if factor.type == @number {
             temp = @counter::new(0, reset = false, bits = self.bits)
@@ -220,7 +220,7 @@ c.divide(2, remainder = r)
         self,
         #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor: @counter | @number,
         #[desc("Counter or item to set to the remainder value")] remainder: @counter | @item = @counter::new(),
-    ) {
+    ) -> @NULL {
 
 
         if divisor.type == @number {
@@ -262,7 +262,7 @@ c2 = counter(15)
 
 cmp = c1.compare(c2) // -1
 // c1 is now -5, c2 is now 0
-    ")](self, other: @counter, factor: @number = 1) {
+    ")](self, other: @counter, factor: @number = 1) -> in [-1, 0, 1] {
         comp = @counter::new(0, reset = false, bits = $.max(self.bits, other.bits))
         self.copy_to(comp)
         other.copy_to(comp, factor = -1)
@@ -290,7 +290,7 @@ c.reset()
     (
         self,
         #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @number -> @NULL = (n){}
-    ){
+    ) -> @NULL {
 
         reset_counter(self, for_each)
     },
@@ -304,7 +304,7 @@ c.reset_negative()
     (
         self,
         #[desc("Macro to be called for each decrease of the counter. Takes one argument representing the number the counter is being decreased by")] for_each: @number -> @NULL = (n){}
-    ){
+    ) -> @NULL {
 
         for i in self.bits..0 {
             x = 2^i
@@ -326,7 +326,7 @@ c1.copy_to(c2)
         self,
         #[desc("Counter(s) to copy to")] items: [@counter | @item] | @counter | @item,
         #[desc("Factor of to multiply the copy by")] factor: @number = 1
-    ) {
+    ) -> @NULL {
         temp_storage = @counter::new(0, reset = false, bits = self.bits)
 
         for i in self.bits..0 {
@@ -354,7 +354,7 @@ c2 = c1.clone()
 // c1 and c2 are now 100
     ")] (
         self
-    ) {
+    ) -> @counter {
         new_counter = @counter::new(0, bits = self.bits)
         self.copy_to([new_counter])
         return new_counter
@@ -365,7 +365,7 @@ c1 = counter(10)
 c2 = c1 + 10
 // c2 is 20
     ")]
-    (self, other: @number | @counter) {
+    (self, other: @number | @counter) -> @counter {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.add(other)
@@ -382,7 +382,7 @@ c1 = counter(10)
 c2 = c1 - 3
 // c2 is 7
     ")]
-    (self, other: @number | @counter) {
+    (self, other: @number | @counter) -> @counter {
         if other.type == @number {
             new_counter = self.clone()
             new_counter.add(-other)
@@ -399,7 +399,7 @@ c1 = counter(10)
 c2 = c1 * 10
 // c2 is 100
     ")]
-    (self, other: @number | @counter) {
+    (self, other: @number | @counter) -> @counter {
         if other.type == @number {
             new = @counter::new(0, bits = self.bits)
             self.copy_to(new, factor = other)
@@ -418,7 +418,7 @@ c1 = counter(100)
 c2 = c1 / 10
 // c2 is 10
     ")]
-    (self, num: @number | @counter) {
+    (self, num: @number | @counter) -> @counter {
         clone = self.clone()
         clone.divide(num)
         -> return clone
@@ -429,7 +429,7 @@ c1 = counter(42)
 c2 = c1 % 10
 // c2 is 2
     ")]
-    (self, num: @number | @counter) {
+    (self, num: @number | @counter) -> @counter {
         clone = self.clone()
         out = @counter::new(0, bits = self.bits)
         clone.divide(num, remainder = out)
@@ -441,7 +441,7 @@ c = counter(42)
 c %= 10
 // c is 2
     ")]
-    (self, num: @number | @counter) {
+    (self, num: @number | @counter) -> @NULL {
         out = @counter::new(0, bits = self.bits)
         self.divide(num, remainder = out)
         self.reset()
@@ -453,7 +453,7 @@ c = counter(42)
 more = c > 10
 // more is now true
     ")]
-    (self, other: @number | @counter) {
+    (self, other: @number | @counter) -> @bool {
 
         if other.type == @number {
 
@@ -481,7 +481,7 @@ c = counter(42)
 less = c < 42
 // less is now false
     ")]
-    (self, other: @number | @counter) {
+    (self, other: @number | @counter) -> @bool {
 
         if other.type == @number {
 
@@ -508,7 +508,7 @@ c = counter(42)
 more_or_eq = c >= 10
 // more_or_eq is now true
     ")]
-    (self, other: @number | @counter) {
+    (self, other: @number | @counter) -> @bool {
 
         if other.type == @number {
 
@@ -535,7 +535,7 @@ c = counter(42)
 less_or_eq = c <= 42
 // less_or_eq is now true
     ")]
-    (self, other: @number | @counter) {
+    (self, other: @number | @counter) -> @bool {
 
         if other.type == @number {
 
@@ -562,7 +562,7 @@ c = counter(42)
 eq = c == 42
 // eq is now true
     ")]
-    (self, other: @number | @counter) {
+    (self, other: @number | @counter) -> @bool {
         if other.type == @number {
 
             ret_false = !{
@@ -590,7 +590,7 @@ eq = c == 42
 c = counter(42)
 not_eq = c != 42
 // not_eq is now false
-    ")](self, other: @number | @counter) {
+    ")](self, other: @number | @counter) -> @bool {
         -> return !(self == other)
     },
 
@@ -599,7 +599,7 @@ c = counter(10)
 c.add(10)
 // c is now 20
     ")]
-    (self, #[desc("Amount to add")] num: @number) {
+    (self, #[desc("Amount to add")] num: @number) -> @NULL {
         self.item.add(num)
     },
 
@@ -607,7 +607,7 @@ c.add(10)
 c = counter(10)
 c += 10
 // c is now 20
-    ")](self, num: @number | @counter) {
+    ")](self, num: @number | @counter) -> @NULL {
         if num.type == @number {
 
             self.add(num)
@@ -620,7 +620,7 @@ c += 10
 c = counter(10)
 c++
 // c is now 11
-    ")](self) {
+    ")](self) -> @NULL {
         self.add(1)
     },
 
@@ -628,7 +628,7 @@ c++
 c = counter(10)
 c--
 // c is now 9
-    ")](self) {
+    ")](self) -> @NULL {
         self.add(-1)
     },
 
@@ -636,7 +636,7 @@ c--
 c = counter(20)
 c -= 5
 // c is now 15
-    ")](self, num: @number | @counter) {
+    ")](self, num: @number | @counter) -> @NULL {
         if num.type == @number {
 
             self.add(-num)
@@ -650,7 +650,7 @@ c -= 5
 c = counter(5)
 c *= 6
 // c is now 30
-    ")](self, num: @number | @counter) {
+    ")](self, num: @number | @counter) -> @NULL {
 
         if num.type == @number {
             self.multiply(num)
@@ -663,7 +663,7 @@ c *= 6
 c = counter(30)
 c /= 6
 // c is now 5
-    ")](self, num: @number | @counter) {
+    ")](self, num: @number | @counter) -> @NULL {
         if num.type == @number {
             self.divide(num)
         } else if num.type == @counter {
@@ -675,7 +675,7 @@ c /= 6
 c = counter(23)
 c = 42
 // c is now 42
-    ")](self, num: @number | @counter | @bool) {
+    ")](self, num: @number | @counter | @bool) -> @NULL {
         self.reset()
         if num.type == @number {
             if self.bits == 1 {
@@ -703,7 +703,7 @@ wait(1)
 c1 <=> c2
 // c1 is now 42, c2 is now 23
     ")]
-    (self, num: @counter) {
+    (self, num: @counter) -> @NULL {
         swap_tmp = @counter::new(0, bits = self.bits, reset = false);
         self.add_to(swap_tmp)
         num.add_to(self)
@@ -718,7 +718,7 @@ wait(1)
     ")] (
         self,
         #[desc("Array or range of possible output values")] range: [@number] | @range
-    ) {
+    ) -> @number {
         let funcs = []
 
         for val in range {
@@ -759,7 +759,7 @@ c.to_const_enclosed(0..10, (c_const) {
         #[desc("Array or range of possible output values")] range: [@number] | @range,
         #[desc("Closure where you can use the const value, should take the value as the first argument")] closure: @number -> @NULL,
 
-    ) {
+    ) -> @NULL {
         -> () {
             val = self.to_const(range)
             closure(val)
@@ -771,7 +771,7 @@ c = counter(1)
 b = c as @bool
 // b is now true
     ")]
-    (self, _type: @type_indicator) {
+    (self, _type: @type_indicator) -> _ {
         if _type == @bool {
             if self.bits != 1 {
                 throw "A counter must be initialized with a boolean (for example `counter(true)`) for it to be convertable to a boolean"
@@ -789,11 +789,11 @@ c = counter(2)
 on(c.reaches(10), !{
     BG.pulse(rgb8(0, 255, 0), fade_out = 0.5) // will pulse each time the counter becomes 10
 })
-    ")] (self, #[desc("Value to reach")] value: @number) {
+    ")] (self, #[desc("Value to reach")] value: @number) -> @event {
         return self.item.count(value)
     },
 
-    _display_: #[desc("Formats the counter to a printable string")] (self) {
+    _display_: #[desc("Formats the counter to a printable string")] (self) -> @string {
         return "counter(" + $.display(self.item) + ", bits = " + $.display(self.bits) + ")"
     }
 

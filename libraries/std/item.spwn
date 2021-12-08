@@ -2,13 +2,14 @@
 constants = import "constants.spwn"
 extract constants.obj_props
 
+import "events.spwn"
 extract import "util.spwn"
 
 impl @item {
 
     add:
     #[desc("Implementation of the pickup trigger") example("10i.add(5)")]
-    (self, #[desc("Amount to add")] amount: @number) {
+    (self, #[desc("Amount to add")] amount: @number) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1817,
             COUNT: amount,
@@ -27,7 +28,7 @@ impl @item {
         #[desc("Comparison mode")] comparison: @comparison,
         #[desc("Number to compare with")] other: @number,
         #[desc("Target function if comparison is 'true'")] function: @trigger_function
-    ) {
+    ) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1811,
             TARGET: function,
@@ -47,7 +48,7 @@ on(10i.count(100), !{
     (
         self,
         #[desc("Number to check against")] number: @number = 0
-    ) {
+    ) -> @event {
         -> return @event::{
             on_triggered: (function) => $.add( trigger{
                 OBJ_ID: 1611,

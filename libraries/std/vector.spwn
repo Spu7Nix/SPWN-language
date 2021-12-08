@@ -4,7 +4,7 @@ type @vector
 
 
 impl @vector {
-    new: #[constructor] ( dims: [@number] ) {
+    new: #[constructor] ( dims: [@number] ) -> @vector {
         if dims.length < 1 {
             throw "Cannot create a vector with less than 1 dimension"
         }
@@ -15,40 +15,40 @@ impl @vector {
             else: @vector::{ dims },
         }
     },
-    new2: #[constructor] ( x: @number, y: @number ) {
+    new2: #[constructor] ( x: @number, y: @number ) -> @vector {
         return @vector::{ dims: [x,y], x, y }
     },
-    new3: #[constructor] ( x: @number, y: @number, z: @number ) {
+    new3: #[constructor] ( x: @number, y: @number, z: @number ) -> @vector {
         return @vector::{ dims: [x,y,z], x, y, z }
     },
 
-    assert_dims: #[desc("Asserts if the vectors have the same number of dimensions")] (self, other: @vector) {
+    assert_dims: #[desc("Asserts if the vectors have the same number of dimensions")] (self, other: @vector) -> @bool {
         if self.dims.length != other.dims.length {
             throw "Vectors must have the same amount of dimensions"
         }
     },
 
-    _display_: (self) {
+    _display_: (self) -> @string {
         return '(' + ", ".join(self.dims) + ')'
     },
 
-    _plus_: (self, other: @vector) {
+    _plus_: (self, other: @vector) -> @vector {
         self.assert_dims(other)
         return @vector::new( self.dims.map_index((el,i) => el + other.dims[i]) )
     },
-    _add_: (self, other: @vector) {
+    _add_: (self, other: @vector) -> @NULL {
         self.assert_dims(other)
         self.dims.map_index((el,i) => el + other.dims[i], true)
     },
-    _minus_: (self, other: @vector) {
+    _minus_: (self, other: @vector) -> @vector {
         self.assert_dims(other)
         return @vector::new( self.dims.map_index((el,i) => el - other.dims[i]) )
     },
-    _subtract_: (self, other: @vector) {
+    _subtract_: (self, other: @vector) -> @NULL {
         self.assert_dims(other)
         self.dims.map_index((el,i) => el - other.dims[i], true)
     },
-    _times_: (self, other: @vector | @number) {
+    _times_: (self, other: @vector | @number) -> @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -57,7 +57,7 @@ impl @vector {
             @number: @vector::new( self.dims.map(el => el * other)),
         }
     },
-    _multiply_: (self, other: @vector | @number) {
+    _multiply_: (self, other: @vector | @number) -> @NULL {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -66,7 +66,7 @@ impl @vector {
             @number: self.dims.map(el => el * other, true),
         }
     },
-    _divided_by_: (self, other: @vector | @number) {
+    _divided_by_: (self, other: @vector | @number) -> @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -75,7 +75,7 @@ impl @vector {
             @number: @vector::new( self.dims.map(el => el / other))
         }
     },
-    _divide_: (self, other: @vector | @number) {
+    _divide_: (self, other: @vector | @number) -> @NULL {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -84,7 +84,7 @@ impl @vector {
             @number: self.dims.map(el => el / other, true)
         }
     },
-    _mod_: (self, other: @vector | @number) {
+    _mod_: (self, other: @vector | @number) -> @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -93,7 +93,7 @@ impl @vector {
             @number: @vector::new( self.dims.map(el => el % other))
         }
     },
-    _modulate_: (self, other: @vector | @number) {
+    _modulate_: (self, other: @vector | @number) -> @NULL {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -102,7 +102,7 @@ impl @vector {
             @number: self.dims.map(el => el % other, true)
         }
     },
-    _pow_: (self, other: @vector | @number) {
+    _pow_: (self, other: @vector | @number) -> @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -111,7 +111,7 @@ impl @vector {
             @number: @vector::new( self.dims.map(el => el ^ other))
         }
     },
-    _exponate_: (self, other: @vector | @number) {
+    _exponate_: (self, other: @vector | @number) -> @NULL {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -120,7 +120,7 @@ impl @vector {
             @number: self.dims.map(el => el ^ other, true)
         }
     },
-    _intdivide_: (self, other: @vector | @number) {
+    _intdivide_: (self, other: @vector | @number) -> @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -129,7 +129,7 @@ impl @vector {
             @number: @vector::new( self.dims.map(el => el /% other))
         }
     },
-    _intdivided_by_: (self, other: @vector | @number) {
+    _intdivided_by_: (self, other: @vector | @number) -> @NULL {
         if other.type == @vector {
             self.assert_dims(other)
         }
@@ -139,23 +139,23 @@ impl @vector {
         }
     },
 
-    _equal_: (self, other: @vector) {
+    _equal_: (self, other: @vector) -> @bool {
         self.assert_dims(other)
         for i in 0..self.dims.length {
             if self.dims[i] != other.dims[i] { return false; }
         }
         return true
     },
-    _not_equal_: (self, other: @vector) {
+    _not_equal_: (self, other: @vector) -> @bool {
         self.assert_dims(other)
         return !(self == other)
     },
 
-    abs: (self) {
+    abs: (self) -> @vector {
         return @vector::new( self.dims.map(el => $.abs(el) ) )
     },
 
-    dot: (self, other: @vector) {
+    dot: (self, other: @vector) -> @number {
         self.assert_dims(other)
         let result = 0
         for i in 0..self.dims.length {
@@ -163,7 +163,7 @@ impl @vector {
         }
         return result
     },
-    cross: (self, other: @vector) {
+    cross: (self, other: @vector) -> @number | @vector {
         self.assert_dims(other)
         if self.dims.length == 2 {
             return self.dims[0] * other.dims[1] - self.dims[1] * other.dims[0]
@@ -178,10 +178,10 @@ impl @vector {
         }
     },
 
-    length: (self) {
+    length: (self) -> @number {
         return $.sqrt(self.length_sq())
     },
-    length_sq: (self) {
+    length_sq: (self) -> @number {
         let result = 0
         for i in self.dims {
             result += i*i
@@ -189,24 +189,24 @@ impl @vector {
         return result
     },
 
-    normalized: (self) {
+    normalized: (self) -> @vector {
         len = self.length()
         return @vector::new( self.dims.map(el => el / len) )
     },
-    floor: (self) {
+    floor: (self) -> @vector {
         return @vector::new( self.dims.map(el => $.floor(el)) )
     },
-    ceil: (self) {
+    ceil: (self) -> @vector {
         return @vector::new( self.dims.map(el => $.ceil(el)) )
     },
-    round: (self) {
+    round: (self) -> @vector {
         return @vector::new( self.dims.map(el => $.round(el)) )
     },
 
-    inverse: (self) {
+    inverse: (self) -> @vector {
         return @vector::new( self.dims.map(el => 1 / el) )
     },
-    sign: (self) {
+    sign: (self) -> @vector {
 
         return @vector::new( self.dims.map((el) {
             if el > 0 {
@@ -219,41 +219,41 @@ impl @vector {
 
     },
 
-    map: (self, cb: _ -> _) {
+    map: (self, cb: _ -> _) -> @vector {
         return @vector::new( self.dims.map(cb) )
     },
 
-    angle_to: (self, other: @vector) {
+    angle_to: (self, other: @vector) -> @number {
         self.assert_dims(other)
         return $.acos( self.dot(other) / self.length() / other.length() )
     },
-    bounce: (self, other: @vector) {
+    bounce: (self, other: @vector) -> @vector {
         self.assert_dims(other)
         normal = other.normalized()
         coef = self.dot(normal)
         refl = self + (normal * coef - self) * 2
         return refl * -1
     },
-    direction_to: (self, other: @vector) {
+    direction_to: (self, other: @vector) -> @vector {
         self.assert_dims(other)
         return (other - self).normalized()
     },
-    distance_to: (self, other: @vector) {
+    distance_to: (self, other: @vector) -> @vector {
         self.assert_dims(other)
         return (other - self).length()
     },
-    distance_sq_to: (self, other: @vector) {
+    distance_sq_to: (self, other: @vector) -> @vector {
         self.assert_dims(other)
         return (other - self).length_sq()
     },
-    is_normalized: (self) {
+    is_normalized: (self) -> @bool {
         return $.abs(self.length_sq() - 1) < 0.00000000000001
     },
-    lerp: (self, other: @vector, t: @number) {
+    lerp: (self, other: @vector, t: @number) -> @vector {
         self.assert_dims(other)
         return self + (other - self) * t
     },
-    max_dim: (self) {
+    max_dim: (self) -> @number {
         let max = self.dims[0]
         let max_i = 0
         for i in 0..self.dims.length {
@@ -264,7 +264,7 @@ impl @vector {
         }
         return max_i
     },
-    min_dim: (self) {
+    min_dim: (self) -> @number {
         let min = self.dims[0]
         let min_i = 0
         for i in 0..self.dims.length {
@@ -275,23 +275,23 @@ impl @vector {
         }
         return min_i
     },
-    move_toward: (self, other: @vector, amount: @number) {
+    move_toward: (self, other: @vector, amount: @number) -> @vector {
         self.assert_dims(other)
         return self + self.direction_to(other) * amount
     },
-    project: (self, other: @vector) {
+    project: (self, other: @vector) -> @vector {
         self.assert_dims(other)
         normal = other.normalized()
         return normal * self.dot(normal)
     },
-    reflect: (self, other: @vector) {
+    reflect: (self, other: @vector) -> @vector {
         self.assert_dims(other)
         normal = other.normalized()
         coef = self.dot(normal)
         refl = self + (normal * coef - self) * 2
         return refl
     },
-    rotated: (self, axis: @vector, angle: @number) {
+    rotated: (self, axis: @vector, angle: @number) -> @vector {
         self.assert_dims(other)
         if self.dims.length == 3 {
             return self*$.cos(angle) + axis.cross(self)*$.sin(angle) + axis*axis.dot(self)*(1-$.cos(angle))
@@ -299,7 +299,7 @@ impl @vector {
             throw "Rotating a vector around another works only for 3D vectors"
         }
     },
-    rotated_2d: (self, angle: @number) {
+    rotated_2d: (self, angle: @number) -> @vector {
         if self.dims.length == 2 {
             return @vector::new([
                 self.x * $.cos(angle) - self.y * $.sin(angle),
@@ -309,12 +309,12 @@ impl @vector {
             throw "Rotating a vector in 2D works only for 2D vectors 😳"
         } 
     },
-    slerp: (self, other: @vector, t: @number) {
+    slerp: (self, other: @vector, t: @number) -> @vector {
         self.assert_dims(other)
         angle = self.angle_to(other)
         return self*($.sin(angle*(1-t))/$.sin(angle)) + other*($.sin(t*angle)/$.sin(angle))
     },
-    slide: (self, other: @vector) {
+    slide: (self, other: @vector) -> @vector {
         self.assert_dims(other)
         return self - self.project(other)
     },

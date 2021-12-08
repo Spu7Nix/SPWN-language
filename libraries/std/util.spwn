@@ -1,7 +1,7 @@
 // utility macroes
 #[no_std, cache_output]
 -> return {
-    create_range_macro: (typ: @type_indicator) {
+    create_range_macro: (typ: @type_indicator) -> @macro {
         -> return (self, other: typ) {
             range = (self as @number)..(other as @number)
             let out = []

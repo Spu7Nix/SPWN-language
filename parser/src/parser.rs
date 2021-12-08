@@ -2058,6 +2058,22 @@ fn try_parse_macro(
                 Some(Token::ClosingBracket) => match test_tokens.next(false) {
                     Some(Token::OpenCurlyBracket) => parse_macro_def(tokens, notes)?,
                     Some(Token::ThickArrow) => parse_macro_def(tokens, notes)?,
+                    Some(Token::Arrow) => {
+                        let mut test_tokens = tokens.clone();
+                        match parse_macro_def(&mut test_tokens, notes) {
+                            Ok(v) => {
+                                (*tokens) = test_tokens;
+                                v
+                            }
+                            Err(e) => {
+                                match try_parse_macro_pattern(tokens, notes) {
+                                    Ok(pat) => ast::ValueBody::MacroPattern(pat),
+                                    // return macro error, since its more likely that they were trying to make a normal macro
+                                    Err(_) => return Err(e),
+                                }
+                            },
+                        }
+                    },
                     _ => {
                         test_tokens.previous();
                         (*tokens) = test_tokens;
@@ -2071,10 +2087,12 @@ fn try_parse_macro(
                             (*tokens) = test_tokens;
                             v
                         }
-                        Err(e) => match try_parse_macro_pattern(tokens, notes) {
-                            Ok(pat) => ast::ValueBody::MacroPattern(pat),
-                            // return macro error, since its more likely that they were trying to make a normal macro
-                            Err(_) => return Err(e),
+                        Err(e) => {
+                            match try_parse_macro_pattern(tokens, notes) {
+                                Ok(pat) => ast::ValueBody::MacroPattern(pat),
+                                // return macro error, since its more likely that they were trying to make a normal macro
+                                Err(_) => return Err(e),
+                            }
                         },
                     }
                 }
@@ -2090,7 +2108,7 @@ fn try_parse_macro(
             })
         }
 
-        Err(_) => {
+        Err(e) => {
             let mut test_tokens = tokens.clone();
             match parse_macro_def(&mut test_tokens, notes) {
                 Ok(v) => {
@@ -2124,6 +2142,8 @@ fn parse_variable(
 
     let mut first_token = tokens.next(false);
     let (start_pos, _) = tokens.position();
+
+    let mut fart = false;
 
     let operator = match first_token {
         // does it start with an op? (e.g -3, let i)
@@ -2635,6 +2655,7 @@ fn parse_variable(
 
         Some(Token::OpenBracket) => {
             if allow_macro_def {
+                fart = true;
                 try_parse_macro(tokens, notes, properties.clone(), None)?
             } else {
                 let expr = parse_expr(tokens, notes, true, true)?;
@@ -2669,6 +2690,7 @@ fn parse_variable(
 
         a => expected!("a value".to_string(), tokens, notes, a),
     };
+    
 
     let mut path = Vec::<ast::Path>::new();
 
@@ -2802,6 +2824,7 @@ fn parse_variable(
             let (_, end_pos) = tokens.position();
 
             let args = vec![val.to_expression()];
+
 
             ast::Variable {
                 operator: None,
