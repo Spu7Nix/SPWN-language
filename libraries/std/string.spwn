@@ -15,7 +15,7 @@ trim = (
     let start = 0
     let end = string.length
     if left {
-        for i in ..string.length {
+        for i in 0..string.length {
             if tokens.contains(string[i]) {
                 start = i+1
             } else {break}
