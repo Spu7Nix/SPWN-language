@@ -47,7 +47,9 @@ return {
     hsv: @chroma::from_hsv,
     hsv2: @chroma::from_hsv2,
     blend_modes: chroma.BLEND_MODES,
+
     level_objects: level_info.level_objects,
+    get_objects: level_info.get_objects,
 }
 
 

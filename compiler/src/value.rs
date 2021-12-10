@@ -1203,7 +1203,69 @@ pub fn convert_type(
             Value::Pattern(Pattern::Type(*t))
         }
 
-            
+        (Value::Obj(v, _), type_id!(dictionary)) => {
+
+            let mut map = FnvHashMap::default();
+            for (id, param) in v {
+                map.insert(
+                    LocalIntern::new(id.to_string()),
+                    store_const_value(
+                        match param {
+                            // its just converting value to objparam basic level stuff
+                            ObjParam::Number(n) => Value::Number(*n),
+                            ObjParam::Text(s) => Value::Str(s.clone()),
+
+                            ObjParam::Group(g) => Value::Group(*g),
+                            ObjParam::Color(c) => Value::Color(*c),
+                            ObjParam::Block(b) => Value::Block(*b),
+                            ObjParam::Item(i) => Value::Item(*i),
+
+                            ObjParam::Bool(b) => Value::Bool(*b),
+
+                            ObjParam::GroupList(g) => {
+                                let mut out = Vec::new();
+                                for s in g {
+                                    let stored = store_const_value(
+                                        Value::Group(*s),
+                                        globals,
+                                        context
+                                            .start_group,
+                                        info.position,
+                                    );
+                                    out.push(stored);
+                                }
+                                Value::Array(out)
+                            }
+
+                            ObjParam::Epsilon => {
+                                let mut map = FnvHashMap::<
+                                    LocalIntern<String>,
+                                    StoredValue,
+                                >::default(
+                                );
+                                let stored = store_const_value(
+                                    Value::TypeIndicator(20),
+                                    globals,
+                                    context.start_group,
+                                    info.position,
+                                );
+                                map.insert(
+                                    globals.TYPE_MEMBER_NAME,
+                                    stored,
+                                );
+                                Value::Dict(map)
+                            }
+                        },
+                        globals,
+                        context.start_group,
+                        info.position
+                    )
+                );
+            }
+
+            Value::Dict(map)
+
+        },
 
         _ => {
             
