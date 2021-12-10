@@ -1104,11 +1104,12 @@ pub fn convert_type(
 
     
         (Value::Str(s), type_id!(number)) => {
-            match &s[..2] {
-                "0x" => {
-                    if let Ok(out) = i64::from_str_radix(&s.replace("0x", ""), 16) {
-                        return Ok(Value::Number(out as f64))
-                    } else {
+            if s.len() < 2 {
+                let out: std::result::Result<f64, _> = s.parse();
+                match out {
+                    Ok(n) => Value::Number(n),
+                    _ => {
+                        
                         return Err(RuntimeError::CustomError(create_error(
                             info.clone(),
                             &format!("Cannot convert string '{}' to @number", s),
@@ -1117,42 +1118,57 @@ pub fn convert_type(
                         ))) 
                     }
                 }
-                "0b" => {
-                    if let Ok(out) = i64::from_str_radix(&s.replace("0b", ""), 2) {
-                        return Ok(Value::Number(out as f64))
-                    } else {
-                        return Err(RuntimeError::CustomError(create_error(
-                            info.clone(),
-                            &format!("Cannot convert string '{}' to @number", s),
-                            &[],
-                            None,
-                        ))) 
-                    }
-                }
-                "0o" => {
-                    if let Ok(out) = i64::from_str_radix(&s.replace("0o", ""), 8) {
-                        return Ok(Value::Number(out as f64))
-                    } else {
-                        return Err(RuntimeError::CustomError(create_error(
-                            info.clone(),
-                            &format!("Cannot convert string '{}' to @number", s),
-                            &[],
-                            None,
-                        ))) 
-                    }
-                }
-                _ => {
-                    let out: std::result::Result<f64, _> = s.parse();
-                    match out {
-                        Ok(n) => Value::Number(n),
-                        _ => {
-                            
+            } else {
+                match &s[..2] {
+                    "0x" => {
+                        if let Ok(out) = i64::from_str_radix(&s.replace("0x", ""), 16) {
+                            return Ok(Value::Number(out as f64))
+                        } else {
                             return Err(RuntimeError::CustomError(create_error(
                                 info.clone(),
                                 &format!("Cannot convert string '{}' to @number", s),
                                 &[],
                                 None,
                             ))) 
+                        }
+                    }
+                    "0b" => {
+                        if let Ok(out) = i64::from_str_radix(&s.replace("0b", ""), 2) {
+                            return Ok(Value::Number(out as f64))
+                        } else {
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                &format!("Cannot convert string '{}' to @number", s),
+                                &[],
+                                None,
+                            ))) 
+                        }
+                    }
+                    "0o" => {
+                        if let Ok(out) = i64::from_str_radix(&s.replace("0o", ""), 8) {
+                            return Ok(Value::Number(out as f64))
+                        } else {
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                &format!("Cannot convert string '{}' to @number", s),
+                                &[],
+                                None,
+                            ))) 
+                        }
+                    }
+                    _ => {
+                        let out: std::result::Result<f64, _> = s.parse();
+                        match out {
+                            Ok(n) => Value::Number(n),
+                            _ => {
+                                
+                                return Err(RuntimeError::CustomError(create_error(
+                                    info.clone(),
+                                    &format!("Cannot convert string '{}' to @number", s),
+                                    &[],
+                                    None,
+                                ))) 
+                            }
                         }
                     }
                 }

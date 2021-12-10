@@ -17,7 +17,7 @@ import "regex.spwn"
 import "number.spwn"
 import "http.spwn"
 import "range.spwn"
-import "level_info.spwn"
+level_info = import "level_info.spwn"
 
 chroma = import "chroma.spwn"
 general = import "general_triggers.spwn"
@@ -47,7 +47,7 @@ return {
     hsv: @chroma::from_hsv,
     hsv2: @chroma::from_hsv2,
     blend_modes: chroma.BLEND_MODES,
-    level_info: @level_info,
+    level_objects: level_info.level_objects,
 }
 
 

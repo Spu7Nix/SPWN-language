@@ -135,7 +135,7 @@ $.assert(wares.contains(5))
 	dict = {key1: 0, key2: 1, key3: 2}
 	$.assert(dict.map((k, v) => k[v]) == ['k', 'e', 'y'])
 		")]
-		(self, cb: _ -> _) -> @array {
+		(self, cb: (_, _) -> _) -> @array {
 			let output = [];
 			for iter in self {
 				output.push(cb(iter[0], iter[1]));
