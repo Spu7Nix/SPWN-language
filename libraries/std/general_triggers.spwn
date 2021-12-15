@@ -13,7 +13,7 @@ return {
         #[desc("Strength value")] strength: @number = 1,
         #[desc("Interval value")] interval: @number = 0,
         #[desc("Duration of shake")] duration: @number = 0.5
-    ){
+    ) -> @NULL {
         $.add( trigger {
             OBJ_ID: 1520,
             STRENGTH: strength,
@@ -23,25 +23,25 @@ return {
         wait(duration)
     },
 
-    disable_trail: #[desc("Disables the player's trail") example("disable_trail()")] (){
+    disable_trail: #[desc("Disables the player's trail") example("disable_trail()")] () -> @NULL {
         $.add( trigger{
             OBJ_ID: 33,
         })
     },
 
-    enable_trail: #[desc("Enables the player's trail") example("enable_trail()")] (){
+    enable_trail: #[desc("Enables the player's trail") example("enable_trail()")] () -> @NULL {
         $.add( trigger{
             OBJ_ID: 32,
         })
     },
 
-    show_player: #[desc("Shows the player") example("show_player()")] (){
+    show_player: #[desc("Shows the player") example("show_player()")] () -> @NULL {
         $.add( trigger{
             OBJ_ID: 1613,
         })
     },
 
-    hide_player: #[desc("Hides the player") example("hide_player()")] (){
+    hide_player: #[desc("Hides the player") example("hide_player()")] () -> @NULL {
         $.add( trigger{
             OBJ_ID: 1612,
         })
@@ -49,7 +49,7 @@ return {
 
     toggle_bg_effect: #[desc("Implementation of the bg effect on/off triggers") example("toggle_bg_effect(false)")] (
         #[desc("Whether to toggle bg effect on or off")] on: @bool = false
-    ) {
+    ) -> @NULL {
         if on {
             $.add( trigger{
                 OBJ_ID: 1818,
@@ -70,7 +70,7 @@ return {
         #[desc("Duration of movement")] duration: @number = 0,
         easing: @easing_type = NONE,
         easing_rate: @number = 2
-    ) {
+    ) -> @object {
         return obj{
             OBJ_ID: 901,
             TARGET: group,
@@ -89,7 +89,7 @@ return {
         #[desc("Lock to player X")] lock_x: @bool = true,
         #[desc("Lock to player Y")] lock_y: @bool = true,
         #[desc("Duration of lock")] duration: @number = 999,
-    ) {
+    ) -> @object {
         return obj{
             OBJ_ID: 901,
             TARGET: group,
@@ -103,7 +103,7 @@ return {
     example("$.add( stop_trigger(10g).with(X,600) ) // Creates a stop trigger at X 600 that stops group 10")]
     (
         #[desc("Group to stop")] group: @group,
-    ) {
+    ) -> @object {
         return obj{
             OBJ_ID: 1616,
             TARGET: group,
@@ -112,7 +112,7 @@ return {
 
     alpha_trigger: #[desc("Returns an alpha trigger as an object")
     example("$.add( alpha_trigger(1g,0.5,duration = 2).with(X,600) ) // Creates an alpha trigger at X 600 that fades group 1 to half opacity over 2 seconds")]
-    (group: @group, opacity: @number = 1, duration: @number = 0){
+    (group: @group, opacity: @number = 1, duration: @number = 0) -> @object {
         return obj {
             OBJ_ID: 1007,
             TARGET: group,
@@ -123,7 +123,7 @@ return {
 
     toggle_on_trigger: #[desc("Returns a toggle on trigger as an object")
     example("$.add( toggle_on_trigger(5g).with(X,600) ) // Creates a toggle trigger at X 600 that turns on group 5")]
-    (#[desc("Group to toggle")] group: @group){
+    (#[desc("Group to toggle")] group: @group) -> @object {
         return obj{
             OBJ_ID: 1049,
             TARGET: group,
@@ -133,7 +133,7 @@ return {
 
     toggle_off_trigger: #[desc("Returns a toggle off trigger as an object")
     example("$.add( toggle_off_trigger(5g).with(X,600) ) // Creates a toggle trigger at X 600 that turns off group 5")]
-    (#[desc("Group to toggle")] group: @group){
+    (#[desc("Group to toggle")] group: @group) -> @object {
         return obj{
             OBJ_ID: 1049,
             TARGET: group,
@@ -151,7 +151,7 @@ return {
         #[desc("Easing type")] easing: @easing_type = NONE,
         #[desc("Easing rate")] easing_rate: @number = 2,
         #[desc("Only rotate positions of the objects, not the textures")] lock_object_rotation: @bool = false
-    ){
+    ) -> @object {
         return obj{
             OBJ_ID: 1346,
             TARGET: group,
@@ -172,7 +172,7 @@ return {
         #[desc("Multiplier for the movement on the X-axis")] x_mod: @number = 1,
         #[desc("Multiplier for the movement on the Y-axis")] y_mod: @number = 1,
         #[desc("Duration of following")] duration: @number = 999
-    ){
+    ) -> @object {
         return obj{
             OBJ_ID: 1347,
             X_MOD: x_mod,
@@ -192,7 +192,7 @@ return {
         #[desc("Offset on the Y-axis")] offset: @number = 0,
         #[desc("Maximum speed")] max_speed: @number = 0,
         #[desc("Duration of following")] duration: @number = 999
-    ){
+    ) -> @object {
         return obj{
             OBJ_ID: 1814,
             SPEED : speed,
@@ -214,7 +214,7 @@ return {
         #[desc("Will move to the object only on the y-axis")] y_only: @bool = false,
         #[desc("Easing type")] easing: @easing_type = NONE,
         #[desc("Easing rate")] easing_rate: @number = 2
-    ) {
+    ) -> @object {
         return obj{
             OBJ_ID: 901,
             TARGET: group,
@@ -256,7 +256,7 @@ return {
         #[desc("Toggle HSV mode")] hsv: @bool = false,
         #[desc("HSV specific: saturation checked")] s_checked: @bool = false,
         #[desc("HSV specific: brightness checked")] b_checked: @bool = false
-    ) {
+    ) -> @object {
         if hsv {
             return obj{
                 OBJ_ID: 1006,
@@ -298,7 +298,7 @@ return {
         #[desc("Duration of color change")] duration: @number = 0,
         #[desc("Opacity of target color")] opacity: @number = 1,
         #[desc("Toggle blending on target color")] blending: @bool = false
-    ){
+    ) -> @object {
         return obj{
             OBJ_ID: 899,
             DURATION: duration,
@@ -314,7 +314,7 @@ return {
 
     pickup_trigger: #[desc("Returns a pickup trigger as an object")
     example("$.add( pickup_trigger(1i,3).with(X,600) )")]
-    (#[desc("Item ID to modify")] item_id: @item, #[desc("Amount to add")] amount: @number) {
+    (#[desc("Item ID to modify")] item_id: @item, #[desc("Amount to add")] amount: @number) -> @object {
         return obj{
             OBJ_ID: 1817,
             COUNT: amount,
@@ -324,7 +324,7 @@ return {
 
     spawn_trigger: #[desc("Returns a spawn trigger as an object")
     example("$.add( spawn_trigger(5g,0.5).with(X,600) )")]
-    (#[desc("Group to spawn")] group: @group, #[desc("Delay")] delay: @number) {
+    (#[desc("Group to spawn")] group: @group, #[desc("Delay")] delay: @number) -> @object {
         return obj{
 			OBJ_ID: 1268,
 			SPAWN_DURATION: delay,

@@ -1,5 +1,6 @@
 #[no_std, cache_output]
 constants = import "constants.spwn"
+chroma = import "chroma.spwn"
 
 extract constants.obj_props
 extract constants.comparisons
@@ -23,7 +24,7 @@ for group in 1g..10g {
         #[desc("Duration of movement")] duration: @number = 0,
         easing: @easing_type = NONE,
         easing_rate: @number = 2
-    ) {
+    ) -> @NULL {
         $.add( trigger{
             OBJ_ID: 901,
             TARGET: self,
@@ -47,7 +48,7 @@ for group in 1g..10g {
         easing: @easing_type = NONE,
         easing_rate: @number = 2,
         #[desc("Saves groups and objects if the group only contains one object")] single: @bool = false,
-    ) {
+    ) -> @NULL {
         if single {
             self.follow(self,x_mod=-1+x,y_mod=-1+y,duration = duration)
             self.move(1,1,duration=duration,easing=easing,easing_rate=easing_rate)
@@ -71,7 +72,7 @@ for group in 1g..10g {
         #[desc("Lock to player X")] lock_x: @bool = true,
         #[desc("Lock to player Y")] lock_y: @bool = true,
         #[desc("Duration of lock")] duration: @number = 999,
-    ) {
+    ) -> @NULL {
         $.add( trigger{
             OBJ_ID: 901,
             TARGET: self,
@@ -89,7 +90,7 @@ move!
 wait(2)
 move.start_group.stop()
     ")]
-    (self){
+    (self) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1616,
             TARGET: self,
@@ -97,7 +98,7 @@ move.start_group.stop()
     },
 
     alpha: #[desc("Implementation of the alpha trigger") example("1g.alpha(0)")]
-    (self, opacity: @number = 1, duration: @number = 0){
+    (self, opacity: @number = 1, duration: @number = 0) -> @NULL {
         $.add( trigger {
             OBJ_ID: 1007,
             TARGET: self,
@@ -109,7 +110,7 @@ move.start_group.stop()
 
     toggle_on:
     #[desc("Toggles the group on") example("10g.toggle_on()")]
-    (self){
+    (self) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1049,
             TARGET: self,
@@ -118,7 +119,7 @@ move.start_group.stop()
     },
 
     toggle_off: #[desc("Toggles the group off") example("10g.toggle_off()")]
-    (self){
+    (self) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1049,
             TARGET: self,
@@ -138,7 +139,7 @@ center = 3g
         #[desc("Easing type")] easing: @easing_type = NONE,
         #[desc("Easing rate")] easing_rate: @number = 2,
         #[desc("Only rotate positions of the objects, not the textures")] lock_object_rotation: @bool = false
-    ){
+    ) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1346,
             TARGET: self,
@@ -160,7 +161,7 @@ center = 3g
         #[desc("Multiplier for the movement on the X-axis")] x_mod: @number = 1,
         #[desc("Multiplier for the movement on the Y-axis")] y_mod: @number = 1,
         #[desc("Duration of following")] duration: @number = 999
-    ){
+    ) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1347,
             X_MOD: x_mod,
@@ -187,7 +188,7 @@ center = 3g
         #[desc("Group of object B to follow")] groupB: @group,
         #[desc("Group of object B to follow")] weight: @number = 0.5,
         #[desc("Duration of following")] duration: @number = 999,
-    ){
+    ) -> @NULL {
         self.follow(groupA,x_mod = 1 - weight,y_mod = 1 - weight,duration = duration)
         self.follow(groupB,x_mod = weight,y_mod = weight,duration = duration)
     },
@@ -201,7 +202,7 @@ center = 3g
         #[desc("Offset on the Y-axis")] offset: @number = 0,
         #[desc("Maximum speed")] max_speed: @number = 0,
         #[desc("Duration of following")] duration: @number = 999
-    ){
+    ) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1814,
             SPEED : speed,
@@ -224,7 +225,7 @@ center = 3g
         #[desc("Will move to the object only on the y-axis")] y_only: @bool = false,
         #[desc("Easing type")] easing: @easing_type = NONE,
         #[desc("Easing rate")] easing_rate: @number = 2
-    ) {
+    ) -> @NULL {
         $.add( trigger{
             OBJ_ID: 901,
             TARGET: self,
@@ -263,7 +264,7 @@ center = 3g
         #[desc("Duration of movement")] duration: @number = 0, 
         #[desc("Easing type")] easing: @easing_type = NONE, 
         #[desc("Easing rate")] easing_rate: @number = 2,
-    ) {
+    ) -> @NULL {
         if x == null && y == null {
             throw "At least one coordinate must be specified"
         }
@@ -278,50 +279,57 @@ center = 3g
         self.move_to(target, duration, y == null, x == null, easing, easing_rate)
     },
 
-    pulse:
-    #[desc("Implementation of the pulse trigger for groups") example("10g.pulse(255, 0, 0, fade_out = 0.5)")]
+    pulse_hsv: #[desc("Implementation of the pulse trigger for groups with hsv") example("10g.pulse_hsv(180, 1, 1, fade_out = 0.5)")]
     (
         self,
-        #[desc("Red value of pulse color (or hue if HSV is enabled)")] r: @number,
-        #[desc("Green value of pulse color (or saturation if HSV is enabled)")] g: @number,
-        #[desc("Blue value of pulse color (or brightness/value if HSV is enabled)")] b: @number,
+        #[desc("Hue")] h: @number,
+        #[desc("Saturation")] s: @number,
+        #[desc("Brightness")] b: @number,
+        #[desc("Saturation checked")] s_checked: @bool = false,
+        #[desc("Brightness checked")] b_checked: @bool = false,
         #[desc("Fade-in duration")] fade_in: @number = 0,
         #[desc("Duration to hold the color")] hold: @number = 0,
         #[desc("Fade-out duration")] fade_out: @number = 0,
         #[desc("Whether to prioritize this pulse over simultaneous pulses")] exclusive: @bool = false,
-        #[desc("Toggle HSV mode")] hsv: @bool = false,
-        #[desc("HSV specific: saturation checked")] s_checked: @bool = false,
-        #[desc("HSV specific: brightness checked")] b_checked: @bool = false
-    ) {
-        if hsv {
-            $.add( trigger{
-                OBJ_ID: 1006,
-                COPIED_COLOR_HVS:
-                    r as @string + "a" + g as @string + "a" + b as @string + "a"
-                     + s_checked as @number as @string + "a" + b_checked as @number as @string,
-                EXCLUSIVE: exclusive,
-                FADE_IN: fade_in,
-                HOLD: hold,
-                FADE_OUT: fade_out,
-                TARGET: self,
-                PULSE_HSV: hsv,
-                TARGET_TYPE: 1 //group
-            })
-        } else {
-            $.add( trigger{
-                OBJ_ID: 1006,
-                TRIGGER_RED: r,
-                TRIGGER_GREEN: g,
-                TRIGGER_BLUE: b,
-                EXCLUSIVE: exclusive,
-                FADE_IN: fade_in,
-                HOLD: hold,
-                FADE_OUT: fade_out,
-                TARGET: self,
-                PULSE_HSV: hsv,
-                TARGET_TYPE: 1 //group
-            })
-        }
+    ) -> @NULL {
+        $.add( trigger{
+            OBJ_ID: 1006,
+            COPIED_COLOR_HVS:
+                h as @string + "a" + s as @string + "a" + b as @string + "a"
+                    + s_checked as @number as @string + "a" + b_checked as @number as @string,
+            EXCLUSIVE: exclusive,
+            FADE_IN: fade_in,
+            HOLD: hold,
+            FADE_OUT: fade_out,
+            TARGET: self,
+            PULSE_HSV: true,
+            TARGET_TYPE: 1,
+        })
+        wait(fade_in + hold + fade_out)
+    },
+
+    pulse: #[desc("Implementation of the pulse trigger for groups") example("10g.pulse(rgb8(255, 0, 0), fade_out = 0.5)")]
+    (
+        self,
+        #[desc("Chroma for pulse color")] c: @chroma,
+        #[desc("Fade-in duration")] fade_in: @number = 0,
+        #[desc("Duration to hold the color")] hold: @number = 0,
+        #[desc("Fade-out duration")] fade_out: @number = 0,
+        #[desc("Whether to prioritize this pulse over simultaneous pulses")] exclusive: @bool = false,
+    ) -> @NULL {
+        $.add( trigger{
+            OBJ_ID: 1006,
+            TRIGGER_RED: c.r8(),
+            TRIGGER_GREEN: c.g8(),
+            TRIGGER_BLUE: c.b8(),
+            EXCLUSIVE: exclusive,
+            FADE_IN: fade_in,
+            HOLD: hold,
+            FADE_OUT: fade_out,
+            TARGET: self,
+            PULSE_HSV: false,
+            TARGET_TYPE: 1,
+        })
         wait(fade_in + hold + fade_out)
     }
 

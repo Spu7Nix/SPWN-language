@@ -251,8 +251,9 @@ impl SpwnFmt for (Expression, Expression) {
 impl SpwnFmt for ArrayDef {
     fn fmt(&self, ind: Indent) -> String {
         match &self.operator {
-            Some(ArrayPrefix::Collect) => format!("..{}", self.value.fmt(ind)),
-            None => self.value.fmt(ind)
+            Some(ArrayPrefix::Collect) => format!("*{}", self.value.fmt(ind)),
+            Some(ArrayPrefix::Spread) => format!("..{}", self.value.fmt(ind)),
+            None => self.value.fmt(ind),
         }
     }
 }
@@ -282,19 +283,31 @@ impl SpwnFmt for ValueBody {
             TypeIndicator(x) => format!("@{}", x),
             Null => "null".to_string(),
             SelfVal => "self".to_string(),
-            Ternary(t) => format!(
-                "{} if {} else {}",
-                t.if_expr.fmt(ind),
-                t.condition.fmt(ind),
-                t.else_expr.fmt(ind)
-            ),
+            Ternary(t) => {
+                if !t.is_pattern {
+                    format!(
+                        "{} if is {} else {}",
+                        t.if_expr.fmt(ind),
+                        t.condition.fmt(ind),
+                        t.else_expr.fmt(ind)
+                    )
+                } else {
+                    format!(
+                        "{} if {} else {}",
+                        t.if_expr.fmt(ind),
+                        t.condition.fmt(ind),
+                        t.else_expr.fmt(ind)
+                    )
+                }
+            }
             ListComp(c) => format!(
                 "{} for {} in {}",
                 c.body.fmt(ind),
                 c.symbol,
                 c.iterator.fmt(ind)
             ),
-            Switch(_, _) => "switch".to_string(),
+            Switch(_, _) => todo!(),
+            MacroPattern(_) => todo!(),
         }
     }
 }
@@ -453,11 +466,13 @@ impl SpwnFmt for Operator {
             Operator::Divide => "/=",
             Operator::IntDivide => "/%=",
             Operator::As => "as",
-            Operator::Has => "has",
+            Operator::In => "in",
             Operator::Either => "|",
+            Operator::Both => "&",
             Operator::Exponate => "^=",
             Operator::Modulate => "%=",
             Operator::Swap => "<=>",
+            Operator::Is => "is",
         }
         .to_string()
     }
@@ -470,6 +485,13 @@ impl SpwnFmt for UnaryOperator {
             UnaryOperator::Minus => "-",
             UnaryOperator::Decrement => "--",
             UnaryOperator::Increment => "++",
+            UnaryOperator::EqPattern => "==",
+            UnaryOperator::NotEqPattern => "!=",
+            UnaryOperator::MorePattern => ">",
+            UnaryOperator::LessPattern => "<",
+            UnaryOperator::MoreOrEqPattern => ">=",
+            UnaryOperator::LessOrEqPattern => "<=",
+            UnaryOperator::InPattern => "in",
         }
         .to_string()
     }

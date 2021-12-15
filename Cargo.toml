@@ -10,7 +10,9 @@ members = [
     "optimizer",
     "docgen",
     "spwn-web",
+    "pckp"
 ]
 
-[profile.release]
-debug = true
+[profile.dev]
+debug-assertions = true
+opt-level = 2

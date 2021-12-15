@@ -15,13 +15,14 @@ pub enum DictDef {
 #[derive(Clone, PartialEq, Debug)]
 pub enum ArrayPrefix {
     Collect,
+    Spread,
     // future-proofing
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct ArrayDef {
     pub value: Expression,
-    pub operator: Option<ArrayPrefix>
+    pub operator: Option<ArrayPrefix>,
 }
 
 //pub type Comment = (Option<String>, Option<String>);
@@ -97,9 +98,16 @@ pub enum ValueBody {
     Macro(Macro),
     Resolved(StoredValue),
     TypeIndicator(String),
+    MacroPattern(MacroPattern),
     SelfVal,
     Ternary(Ternary),
     Null,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MacroPattern {
+    pub args: Vec<Expression>,
+    pub ret: Expression,
 }
 
 impl ValueBody {
@@ -136,6 +144,7 @@ pub struct StrInner {
 #[derive(Clone, PartialEq, Debug)]
 pub enum StringFlags {
     Raw,
+    Unindent
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -145,6 +154,7 @@ pub enum Operator {
     Equal,
     NotEqual,
     Range,
+    Is,
     MoreOrEqual,
     LessOrEqual,
     More,
@@ -158,6 +168,7 @@ pub enum Operator {
     Modulo,
 
     Either,
+    Both,
 
     Assign,
     Add,
@@ -166,7 +177,7 @@ pub enum Operator {
     Divide,
     IntDivide,
     As,
-    Has,
+    In,
 
     Exponate,
     Modulate,
@@ -179,6 +190,14 @@ pub enum UnaryOperator {
     Minus,
     Increment,
     Decrement,
+
+    EqPattern,
+    NotEqPattern,
+    MorePattern,
+    LessPattern,
+    MoreOrEqPattern,
+    LessOrEqPattern,
+    InPattern,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -356,7 +375,7 @@ pub struct While {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum CaseType {
-    Value(Expression),
+    //Value(Expression),
     Pattern(Expression),
     Default,
 }
@@ -412,6 +431,7 @@ pub struct Ternary {
     pub condition: Expression,
     pub if_expr: Expression,
     pub else_expr: Expression,
+    pub is_pattern: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]

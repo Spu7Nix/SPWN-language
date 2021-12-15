@@ -25,9 +25,18 @@ use std::io::Write;
 use std::collections::hash_map::DefaultHasher;
 
 // BUILT IN STD
-use include_dir::{include_dir, Dir, File};
+use include_dir::{Dir, File};
 
+#[cfg(not(debug_assertions))]
 const STANDARD_LIBS: Dir = include_dir!("../libraries");
+
+// dont import std when in dev mode
+#[cfg(debug_assertions)]
+const STANDARD_LIBS: Dir = Dir {
+    path: "",
+    files: &[],
+    dirs: &[],
+};
 
 pub fn get_lib_file<'a, S: AsRef<Path>>(path: S) -> Option<File<'a>> {
     get_file(&STANDARD_LIBS, path.as_ref())
@@ -56,9 +65,10 @@ fn get_file<'a>(dir: &'a Dir, path: &Path) -> Option<File<'a>> {
 use errors::compiler_info::{CodeArea, CompilerInfo};
 
 macro_rules! arg_length {
-    ($info:expr , $count:expr, $args:expr , $message:expr) => {
+    ($info:expr , $count:expr, $args:expr , $message:expr, $builtin:ident) => {
         if $args.len() != $count {
             return Err(RuntimeError::BuiltinError {
+                $builtin,
                 message: $message,
                 info: $info,
             });
@@ -301,21 +311,21 @@ use std::str::FromStr;
 
 macro_rules! typed_argument_check {
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident)  ($($arg_name:ident),*)) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident)  ($($arg_name:ident),*)) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
         let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], $globals, $context.start_group, true);
     };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) mut ($($arg_name:ident),*)) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) mut ($($arg_name:ident),*)) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
         let ( $(mut $arg_name),*) = $globals.stored_values[$arguments[$arg_index]].clone();
     };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) ($($arg_name:ident),*): $arg_type:ident) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) ($($arg_name:ident),*): $arg_type:ident) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
@@ -325,6 +335,7 @@ macro_rules! typed_argument_check {
 
             a => {
                 return Err(RuntimeError::BuiltinError {
+                    $builtin,
                     message: format!(
                         "Expected {} for argument {}, found {}",
                         stringify!($arg_type),
@@ -337,7 +348,7 @@ macro_rules! typed_argument_check {
         };
     };
 
-    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
+    (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
         #[allow(unused_variables)]
         #[allow(unused_mut)]
         #[allow(unused_parens)]
@@ -346,6 +357,7 @@ macro_rules! typed_argument_check {
 
             a => {
                 return Err(RuntimeError::BuiltinError {
+                    $builtin,
                     message: format!(
                         "Expected {} for argument {}, found {}",
                         stringify!($arg_type),
@@ -404,10 +416,19 @@ macro_rules! builtin_arg_mut_check {
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident) ($($arg_name:ident),*)$(: $arg_type:ident)?) => {};
 }
 
+macro_rules! raw_check {
+    ($globals:ident, $context:ident, $info:ident, $out:ident) => {
+        (*$context).return_value =
+            store_const_value($out, $globals, $context.start_group, $info.position);
+    };
+
+    (#RAW $globals:ident, $context:ident, $info:ident, $out:ident) => {};
+}
+
 macro_rules! builtins {
 
     {
-        ($arguments:ident, $info:ident, $globals:ident, $context:ident, $full_context:ident)
+        ($arguments:ident, $info:ident, $globals:ident, $context:ident, $full_context:ident, $builtin:ident)
         $(
             [$variant:ident]
             #[
@@ -416,7 +437,7 @@ macro_rules! builtins {
                 example = $example:expr$(,)?
             ]
 
-            fn $name:ident(
+            $([[$raw:ident]])? fn $name:ident(
                 $(#[$argdesc:literal])?
                 $(
                     $(
@@ -482,14 +503,17 @@ macro_rules! builtins {
             $globals: &mut Globals,
             contexts: &mut FullContext,
         ) -> Result<(), RuntimeError> {
+            #![allow(unused_variables)]
             if !$globals.permissions.is_allowed(func) {
                 if !$globals.permissions.is_safe(func) {
                     return Err(RuntimeError::BuiltinError {
+                        builtin: String::from(func),
                         message: format!("This built-in function requires an explicit `--allow {}` flag when running the script", String::from(func)),
                         $info,
                     })
                 } else {
                     return Err(RuntimeError::BuiltinError {
+                        builtin: String::from(func),
                         message: String::from("This built-in function was denied permission to run"),
                         $info,
                     })
@@ -502,12 +526,15 @@ macro_rules! builtins {
                     $(
                         Builtin::$variant => {
 
+                            let $builtin = stringify!($name).to_string();
+
                             $(
                                 #[allow(unused_assignments)]
                                 let mut arg_index = 0;
                                 $(
                                     if arg_index >= $arguments.len() {
                                         return Err(RuntimeError::BuiltinError {
+                                            builtin: stringify!($name).to_string(),
                                             message: String::from(
                                                 "Too few arguments provided",
                                             ),
@@ -520,7 +547,7 @@ macro_rules! builtins {
                                         ($($arg_name),*)$(: $arg_type)?
                                     );
                                     typed_argument_check!(
-                                        ($globals, arg_index, $arguments, $info, $context) $($mut)?
+                                        ($globals, arg_index, $arguments, $info, $context, $builtin) $($mut)?
                                         ($($arg_name),*)$(: $arg_type)?
                                     );
 
@@ -528,6 +555,7 @@ macro_rules! builtins {
                                 )+
                                 if arg_index < $arguments.len() - 1 {
                                     return Err(RuntimeError::BuiltinError {
+                                        builtin: stringify!($name).to_string(),
                                         message: String::from(
                                             "Too many arguments provided",
                                         ),
@@ -536,7 +564,7 @@ macro_rules! builtins {
                                 }
                             )?
 
-                            let out = $body;
+                            let _out = $body;
 
                             $(
 
@@ -551,7 +579,10 @@ macro_rules! builtins {
                                     arg_index += 1;
                                 )+
                             )?
-                            (*$context).return_value = store_const_value(out, $globals, $context.start_group, $info.position);
+
+                            raw_check!($(#$raw)? $globals, $context, $info, _out);
+
+
 
                         }
                     )+
@@ -684,12 +715,13 @@ macro_rules! builtins {
 }
 
 builtins! {
-    (arguments, info, globals, context, full_context)
+    (arguments, info, globals, context, full_context, builtin)
 
     [Assert] #[safe = true, desc = "Throws an error if the argument is not `true`", example = "$.assert(true)"]
     fn assert((b): Bool) {
         if !b {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: String::from("Assertion failed"),
                 info,
             });
@@ -705,7 +737,7 @@ builtins! {
             match &globals.stored_values[*val] {
                 Value::Str(s) => out += s,
                 _ => out += &{
-                    let ctx = FullContext::from_ptr(full_context);
+                    let ctx = unsafe { FullContext::from_ptr(full_context) };
                     handle_unary_operator(*val, Builtin::DisplayOp, ctx, globals, &info)?;
                     let out = ctx.inner().return_value;
                     let val = &globals.stored_values[out];
@@ -726,12 +758,13 @@ builtins! {
     fn time(#["none"]) {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            arg_length!(info, 0, arguments, "Expected no arguments".to_string());
+            arg_length!(info, 0, arguments, "Expected no arguments".to_string(), builtin);
             use std::time::SystemTime;
             let now = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
                 Ok(time) => time,
                 Err(e) => {
                     return Err(RuntimeError::BuiltinError {
+                        builtin,
                         message: format!("System time error: {}", e),
                         info,
                     })
@@ -747,7 +780,7 @@ builtins! {
 
     [SpwnVersion] #[safe = true, desc = "Gets the current version of spwn", example = "$.spwn_version()"]
     fn spwn_version(#["none"]) {
-        arg_length!(info, 0, arguments, "Expected no arguments".to_string());
+        arg_length!(info, 0, arguments, "Expected no arguments".to_string(), builtin);
 
         Value::Str(env!("CARGO_PKG_VERSION").to_string())
     }
@@ -761,10 +794,7 @@ builtins! {
         Value::Str(text_io::read!("{}\n"))
     }
 
-    [Matches] #[safe = true, desc = "Returns `true` if the value matches the pattern, otherwise it returns `false`", example = "$.matches([1, 2, 3], [@number])"]
-    fn matches((val), (pattern)) {
-        Value::Bool(val.matches_pat(&pattern, &info, globals, context)?)
-    }
+
 
     [B64Encode] #[safe = true, desc = "Returns the input string encoded with base64 encoding (useful for text objects)", example = "$.b64encode(\"hello there\")"]
     fn b64encode((s): Str) {
@@ -778,6 +808,7 @@ builtins! {
             Ok(s) => s,
             Err(e) => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!("Base 64 error: {}", e),
                     info,
                 })
@@ -797,6 +828,7 @@ builtins! {
                     Ok(hname) => hname,
                     Err(_) => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: format!("Could not convert header name: '{}'", name),
                             info
                         })
@@ -818,6 +850,7 @@ builtins! {
                 "head" => client.head(&url),
                 _ => {
                     return Err(RuntimeError::BuiltinError {
+                        builtin,
                         message: format!("Request type not supported: '{}'", method),
                         info
                     })
@@ -831,6 +864,7 @@ builtins! {
                     Ok(resp) => resp,
                     Err(_) => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: format!("Could not make request to: '{}'", url),
                             info
                         })
@@ -940,6 +974,7 @@ $.add(obj {
     fn add(#["The object or trigger to add"]) {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: "Expected 1 argument".to_string(),
                 info,
             });
@@ -977,7 +1012,8 @@ $.add(obj {
         match mode {
             ObjectMode::Object => {
                 if !ignore_context && context.start_group.id != Id::Specific(0) {
-                    return Err(RuntimeError::BuiltinError { // objects cant be added dynamically, of course
+                    return Err(RuntimeError::BuiltinError {
+                        builtin, // objects cant be added dynamically, of course
                         message: String::from(
                             "you cannot add an obj type object at runtime"),
                         info
@@ -1124,7 +1160,7 @@ $.assert(arr == [1])
             }
 
             if let Some(ref pat) = pattern {
-                if !value.matches_pat(pat, &info, globals, context)? {
+                if !value.pure_matches_pat(pat, &info, globals, context.clone())? {
                     return Err(RuntimeError::TypeError {
                         expected: pat.to_str(globals),
                         found: value.get_type_str(globals),
@@ -1215,6 +1251,7 @@ $.assert($.mutability(mut))
         Value::Bool(globals.can_mutate(arguments[0]))
     }
 
+
     [ExtendTriggerFunc] #[safe = true, desc = "Executes a macro in a specific trigger function context", example = "
 $.extend_trigger_func(10g, () {
     11g.move(10, 0, 0.5) // will add a move trigger in group 10
@@ -1226,6 +1263,7 @@ $.extend_trigger_func(10g, () {
             Value::TriggerFunc(f) => f.start_group,
             a => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!(
                         "Expected group or trigger function, found {}",
                         a.to_str(globals)
@@ -1250,7 +1288,7 @@ $.extend_trigger_func(10g, () {
             }
         ]};
 
-        cmp_statement.to_trigger_func(FullContext::from_ptr(full_context), globals, info.clone(), Some(group))?;
+        cmp_statement.to_trigger_func(unsafe { FullContext::from_ptr(full_context) }, globals, info.clone(), Some(group))?;
 
 
 
@@ -1274,6 +1312,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
             use rand::Rng;
             if arguments.len() > 2 {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: "Expected up to 2 arguments".to_string(),
                     info,
                 });
@@ -1286,6 +1325,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                     Ok(Value::Array(v)) => v,
                     _ => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: format!("Expected type that can be converted to @array for argument 1, found type {}", globals.get_type_str(arguments[0])),
                             info,
                         });
@@ -1312,6 +1352,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                         },
                         _ => {
                             return Err(RuntimeError::BuiltinError {
+                                builtin,
                                 message: format!("Expected number, found {}", globals.get_type_str(arguments[1])),
                                 info,
                             });
@@ -1350,10 +1391,22 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
     }
 
+    [ReadLevel] #[safe = true, desc = "Returns the level string of the level being written to, or nothing if there is no output level", example = "level_string = $.read_level()"]
+    fn level_string() {
+        if !arguments.is_empty() {
+            return Err(RuntimeError::BuiltinError {
+                builtin,
+                message: String::from("Expected 0 arguments"),
+                info,
+            });
+        }
+        Value::Str(globals.initial_string.clone())
+    }
     [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local system (uses the current directory as base for relative paths)", example = "data = $.readfile(\"file.txt\")"]
     fn readfile(#["Path of file to read, and the format it's in (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"]) {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: String::from("Expected 1 or 2 arguments, the path to the file and the data format (default: utf-8)"),
                 info,
             });
@@ -1368,6 +1421,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             s
                         } else {
                             return Err(RuntimeError::BuiltinError {
+                                builtin,
                                 message:
                                     "Data format needs to be a string (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"
                                         .to_string(),
@@ -1381,6 +1435,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
 
                 if !path.exists() {
                     return Err(RuntimeError::BuiltinError {
+                        builtin,
                         message: "Path doesn't exist".to_string(),
                         info,
                     });
@@ -1393,6 +1448,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1406,6 +1462,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1425,6 +1482,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1434,6 +1492,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(value) => value,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem parsing JSON: {}", e),
                                     info,
                                 });
@@ -1470,6 +1529,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1479,6 +1539,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(value) => value,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem parsing toml: {}", e),
                                     info,
                                 });
@@ -1516,6 +1577,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(file) => file,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem opening the file: {}", e),
                                     info,
                                 });
@@ -1525,6 +1587,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                             Ok(value) => value,
                             Err(e) => {
                                 return Err(RuntimeError::BuiltinError {
+                                    builtin,
                                     message: format!("Problem parsing toml: {}", e),
                                     info,
                                 });
@@ -1557,6 +1620,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
                     }
                     _ => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: "Invalid data format ( use \"text\", \"bin\", \"json\", \"toml\" or \"yaml\" )"
                                 .to_string(),
                             info,
@@ -1566,6 +1630,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
             }
             _ => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: "Path needs to be a string".to_string(),
                     info,
                 });
@@ -1582,6 +1647,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
             Ok(_) => (),
             Err(e) => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!("Error when writing to file: {}", e),
                     info,
                 });
@@ -1610,6 +1676,7 @@ $.assert(arr == [1, 2])
             },
             _ => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!("Expected array or string, found @{}", typ),
                     info,
                 })
@@ -1623,12 +1690,14 @@ $.assert(arr == [1, 2])
         let end_index = end_index as usize;
         if start_index >= end_index {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: "Start index is larger than end index".to_string(),
                 info,
             });
         }
         if end_index > val.len() {
             return Err(RuntimeError::BuiltinError {
+                builtin,
                 message: "End index is larger than string".to_string(),
                 info,
             });
@@ -1650,6 +1719,7 @@ $.assert(arr == [1, 2])
             Value::Str(s) => Value::Str(s.remove(index as usize).to_string()),
             _ => {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: format!("Expected array or string, found @{}", typ),
                     info,
                 })
@@ -1673,6 +1743,7 @@ $.assert(arr == [1, 2])
                             _ => {
                                 return Err(
                                     RuntimeError::BuiltinError {
+                                        builtin,
                                         message: format!("Invalid or missing replacer. Expected @string, found @{}", &globals.get_type_str(arguments[3])),
                                         info
                                     }
@@ -1706,7 +1777,7 @@ $.assert(arr == [1, 2])
                         for i in r.captures_iter(&s){
 
                             let capture = i.unwrap();
-                            
+
                             let mut found = false;
 
                             let mut range = Vec::new();
@@ -1742,7 +1813,7 @@ $.assert(arr == [1, 2])
                                 }
                             }
                             if !found { continue }
-                            
+
                             let mut match_map = FnvHashMap::default();
                             match_map.insert(
                                 LocalIntern::new("range".to_string()),
@@ -1765,6 +1836,7 @@ $.assert(arr == [1, 2])
                     },
                     _ => {
                         return Err(RuntimeError::BuiltinError {
+                            builtin,
                             message: format!(
                                 "Invalid regex mode \"{}\" in regex {}. Expected \"match\", \"replace\", \"find_all\" or \"find_groups\"",
                                 mode, r
@@ -1775,6 +1847,7 @@ $.assert(arr == [1, 2])
                 }
             } else {
                 return Err(RuntimeError::BuiltinError {
+                    builtin,
                     message: "Failed to build regex (invalid syntax)".to_string(),
                     info,
                 });
@@ -1842,15 +1915,49 @@ $.assert(arr == [1, 2])
     [NegOp] #[safe = true, desc = "Default implementation of the `-n` operator", example = "$._negate_(n)"]
     fn _negate_((a): Number) { Value::Number(-a)}
     [NotOp] #[safe = true, desc = "Default implementation of the `!b` operator", example = "$._not_(b)"]
-    fn _not_((a): Bool) { Value::Bool(!a)}
-    [UnaryRangeOp] #[safe = true, desc = "Default implementation of the `..n` operator", example = "$._unary_range_(n)"]
-    fn _unary_range_((a): Number) { Value::Range(0, convert_to_int(a, &info)?, 1)}
+    fn _not_((a)) {
+        match a {
+            Value::Bool(b) => Value::Bool(!b),
+            Value::Pattern(p) => Value::Pattern(Pattern::Not(Box::new(p))),
+            Value::TypeIndicator(t) => Value::Pattern(Pattern::Not(Box::new(Pattern::Type(t)))),
+            _ => {
+                return Err(RuntimeError::TypeError {
+                    expected: "boolean or pattern".to_string(),
+                    found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[0]),
+                    info,
+                });
+            }
+        }
+    }
+    // [UnaryRangeOp] #[safe = true, desc = "Default implementation of the `..n` operator", example = "$._unary_range_(n)"]
+    // fn _unary_range_((a): Number) { Value::Range(0, convert_to_int(a, &info)?, 1)}
+    [EqPatternOp] #[safe = true, desc = "Default implementation of the `==a` operator", example = "$._eq_pattern_(a)"]
+    fn _eq_pattern_((a)) { Value::Pattern(Pattern::Eq(store_const_value(a, globals, context.start_group, info.position))) }
 
+    [NotEqPatternOp] #[safe = true, desc = "Default implementation of the `!=a` operator", example = "$._not_eq_pattern_(a)"]
+    fn _not_eq_pattern_((a)) { Value::Pattern(Pattern::NotEq(store_const_value(a, globals, context.start_group, info.position))) }
+
+    [MorePatternOp] #[safe = true, desc = "Default implementation of the `>a` operator", example = "$._more_pattern_(a)"]
+    fn _more_pattern_((a)) { Value::Pattern(Pattern::MoreThan(store_const_value(a, globals, context.start_group, info.position))) }
+
+    [LessPatternOp] #[safe = true, desc = "Default implementation of the `<a` operator", example = "$._less_pattern_(a)"]
+    fn _less_pattern_((a)) { Value::Pattern(Pattern::LessThan(store_const_value(a, globals, context.start_group, info.position))) }
+
+    [MoreOrEqPatternOp] #[safe = true, desc = "Default implementation of the `>=a` operator", example = "$._more_or_eq_pattern_(a)"]
+    fn _more_or_eq_pattern_((a)) { Value::Pattern(Pattern::MoreOrEq(store_const_value(a, globals, context.start_group, info.position))) }
+
+    [LessOrEqPatternOp] #[safe = true, desc = "Default implementation of the `<=a` operator", example = "$._less_or_eq_pattern_(a)"]
+    fn _less_or_eq_pattern_((a)) { Value::Pattern(Pattern::LessOrEq(store_const_value(a, globals, context.start_group, info.position))) }
+
+    [InPatternOp] #[safe = true, desc = "Default implementation of the `in a` operator", example = "$._in_pattern_(a)"]
+    fn _in_pattern_((a)) { Value::Pattern(Pattern::In(store_const_value(a, globals, context.start_group, info.position))) }
     // operators
     [OrOp] #[safe = true, desc = "Default implementation of the `||` operator", example = "	$._or_(true, false)"]
     fn _or_((a): Bool, (b): Bool) { Value::Bool(a || b) }
     [AndOp] #[safe = true, desc = "Default implementation of the `&&` operator", example = "$._and_(true, true)"]
     fn _and_((a): Bool, (b): Bool) { Value::Bool(a && b) }
+
 
     [MoreThanOp] #[safe = true, desc = "Default implementation of the `>` operator", example = "$._more_than_(100, 50)"]
     fn _more_than_((a): Number, (b): Number) { Value::Bool(a > b) }
@@ -1863,9 +1970,28 @@ $.assert(arr == [1, 2])
     fn _less_or_equal_((a): Number, (b): Number) { Value::Bool(a <= b) }
 
     [EqOp] #[safe = true, desc = "Default implementation of the `==` operator", example = "$._equal_(\"hello\", \"hello\")"]
-    fn _equal_((a), (b)) { Value::Bool(value_equality(arguments[0], arguments[1], globals)) }
+    [[RAW]] fn _equal_((a), (b)) {
+        default_value_equality(arguments[0], arguments[1], globals, unsafe { FullContext::from_ptr(full_context) }, &info)?;
+    }
+
+    [IsOp] #[safe = true, desc = "Default implementation of the `is` operator", example = "$._is_([1, 2, 3], [@number])"]
+    [[RAW]] fn _is_((val), (pattern)) {
+        val.matches_pat(&pattern, &info, globals, unsafe { FullContext::from_ptr(full_context) }, true)?;
+    }
+
     [NotEqOp] #[safe = true, desc = "Default implementation of the `!=` operator", example = "$._not_equal_(\"hello\", \"bye\")"]
-    fn _not_equal_((a), (b)) { Value::Bool(!value_equality(arguments[0], arguments[1], globals)) }
+    [[RAW]] fn _not_equal_((a), (b)) {
+        let contexts = unsafe { FullContext::from_ptr(full_context) };
+        default_value_equality(arguments[0], arguments[1], globals, contexts, &info)?;
+        // negate
+        for c in contexts.iter() {
+            if let Value::Bool(b) = &mut globals.stored_values[c.inner().return_value] {
+                *b = !(*b);
+            } else {
+                unreachable!() // unchecked?
+            }
+        }
+    }
 
     [DividedByOp] #[safe = true, desc = "Default implementation of the `/` operator", example = "$._divided_by_(64, 8)"]
     fn _divided_by_((a): Number, (b): Number) { Value::Number(a / b) }
@@ -1964,13 +2090,14 @@ $.assert(arr == [1, 2])
         Value::Null
     }
 
-    [HasOp] #[safe = true, desc = "Default implementation of the `has` operator", example = "$._has_([1,2,3], 2)"]
-    fn _has_((a), (b)) {
-        match (a, b) {
-            (Value::Array(ar), _) => {
+    [InOp] #[safe = true, desc = "Default implementation of the `in` operator", example = "$._in_(2, [1,2,3])"]
+    fn _in_((a), (b)) {
+        match (a.clone(), b.clone()) {
+            (_, Value::Array(ar)) => {
                 let mut out = false;
                 for v in ar.clone() {
-                    if value_equality(v, arguments[1], globals) {
+                    // use custom == impl?
+                    if strict_value_equality(v, arguments[0], globals) {
                         out = true;
                         break;
                     }
@@ -1978,20 +2105,19 @@ $.assert(arr == [1, 2])
                 Value::Bool(out)
             }
 
-            (Value::Dict(d), Value::Str(b)) => {
-
-
+            (Value::Str(b), Value::Dict(d)) => {
+                // use custom == impl?
                 Value::Bool(d.get(&LocalIntern::new(b)).is_some())
             }
 
-            (Value::Str(s), Value::Str(s2)) => Value::Bool(s.contains(&*s2)),
+            (Value::Str(s), Value::Str(s2)) => Value::Bool(s2.contains(&*s)),
 
-            (Value::Obj(o, _m), Value::Number(n)) => {
+            (Value::Number(n), Value::Obj(o, _m)) => {
                 let obj_has: bool = o.iter().any(|k| k.0 == n as u16);
                 Value::Bool(obj_has)
             }
 
-            (Value::Obj(o, _m), Value::Dict(d)) => {
+            (Value::Dict(d), Value::Obj(o, _m)) => {
                 let gotten_type = d.get(&globals.TYPE_MEMBER_NAME);
 
                 if gotten_type == None
@@ -2001,8 +2127,8 @@ $.assert(arr == [1, 2])
                     // 19 = object_key??
                     return Err(RuntimeError::TypeError {
                         expected: "either @number or @object_key".to_string(),
-                        found: globals.get_type_str(arguments[1]),
-                        val_def: globals.get_area(arguments[1]),
+                        found: globals.get_type_str(arguments[0]),
+                        val_def: globals.get_area(arguments[0]),
                         info,
                     });
                 }
@@ -2010,6 +2136,7 @@ $.assert(arr == [1, 2])
                 let id = d.get(&globals.OBJ_KEY_ID);
                 if id == None {
                     return Err(RuntimeError::BuiltinError {
+                        builtin,
                         // object_key has an ID member for the key basically
                         message: "object key has no 'id' member".to_string(),
                         info,
@@ -2031,38 +2158,66 @@ $.assert(arr == [1, 2])
                 Value::Bool(obj_has)
             }
 
-            (Value::Obj(_, _), _) => {
+            (_, Value::Obj(_, _)) => {
                 return Err(RuntimeError::TypeError {
                     expected: "@number or @object_key".to_string(),
-                    found: globals.get_type_str(arguments[1]),
-                    val_def: globals.get_area(arguments[1]),
+                    found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[0]),
                     info,
                 })
             }
 
-            (Value::Str(_), _) => {
+            (_, Value::Str(_)) => {
                 return Err(RuntimeError::TypeError {
                     expected: "string to compare".to_string(),
-                    found: globals.get_type_str(arguments[1]),
-                    val_def: globals.get_area(arguments[1]),
+                    found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[0]),
                     info,
                 })
             }
 
-            (Value::Dict(_), _) => {
+            (_, Value::Dict(_)) => {
                 return Err(RuntimeError::TypeError {
                     expected: "string as key".to_string(),
-                    found: globals.get_type_str(arguments[1]),
-                    val_def: globals.get_area(arguments[1]),
+                    found: globals.get_type_str(arguments[0]),
+                    val_def: globals.get_area(arguments[0]),
                     info,
                 })
             }
+
+            (Value::Pattern(p1), _) => Value::Bool(
+                if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
+                    p1.in_pat(&p, globals)?
+                } else {
+                    unreachable!()
+                }
+            ),
+
+            (_, Value::Pattern(p2)) => Value::Bool(
+                if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
+                    p.in_pat(&p2, globals)?
+                } else {
+                    unreachable!()
+                }
+            ),
+
+            (Value::TypeIndicator(_), Value::TypeIndicator(_)) => Value::Bool(
+                if let (Value::Pattern(p1), Value::Pattern(p2)) = (
+                    convert_type(&a, type_id!(pattern), &info, globals, context)?,
+                    convert_type(&b, type_id!(pattern), &info, globals, context)?,
+                ) {
+                    p1.in_pat(&p2, globals)?
+                } else {
+                    unreachable!()
+                }
+            ),
+
 
             _ => {
                 return Err(RuntimeError::TypeError {
                     expected: "array, dictionary, object, or string".to_string(),
-                    found: globals.get_type_str(arguments[0]),
-                    val_def: globals.get_area(arguments[1]),
+                    found: globals.get_type_str(arguments[1]),
+                    val_def: globals.get_area(arguments[0]),
                     info,
                 })
             }
@@ -2147,12 +2302,30 @@ $.assert(arr == [1, 2])
             },
         ))
     }
+
+    [BothOp] #[safe = true, desc = "Default implementation of the `&` operator", example = "$._both_(@number, @counter)"]
+    fn _both_((a), (b)) {
+        Value::Pattern(Pattern::Both(
+            if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), &info, globals, context)? {
+                Box::new(p)
+            } else {
+                unreachable!()
+            },
+            if let Value::Pattern(p) = convert_type(&b, type_id!(pattern), &info, globals, context)? {
+                Box::new(p)
+            } else {
+                unreachable!()
+            },
+        ))
+    }
+
     [DisplayOp] #[safe = true, desc = "returns the default value display string for the given value", example = "$._display_(counter()) // \"@counter::{ item: ?i, bits: 16 }\""] fn _display_((a)) {
-        Value::Str(a.to_str_full(globals, |val, globals| display_val(val.clone(), FullContext::from_ptr(full_context), globals, &info))?)
+        Value::Str(a.to_str_full(globals, |val, globals| display_val(val.clone(), unsafe { FullContext::from_ptr(full_context) }, globals, &info) )?)
     }
     [Display] #[safe = true, desc = "returns the value display string for the given value", example = "$.display(counter()) // \"counter(?i, bits = 16)\""] fn display((a)) {
-        let ctx = FullContext::from_ptr(full_context);
+        let ctx = unsafe { FullContext::from_ptr(full_context) };
         handle_unary_operator(arguments[0], Builtin::DisplayOp, ctx, globals, &info)?;
+        // add error on context split?
         globals.stored_values[ctx.inner().return_value].clone()
     }
 

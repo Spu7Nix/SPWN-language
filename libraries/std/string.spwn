@@ -39,24 +39,30 @@ impl @string {
 $.assert(''.is_empty())
 $.assert(!('x'.is_empty()))
     ")]
-	(self) {
+	(self) -> @bool {
 		return self.length == 0;
 	},
 	substr: #[desc("Gets a substring beginning at the specified start and ending at the specified end.")]
-	(self, start: @number, end: @number) {
-		let start = start.constrain(0,self.length)
-		let end = end.constrain(0,self.length)
+	(self, start: @number, end: @number) -> @string {
+		let start = start.clamp(0,self.length)
+		let end = end.clamp(0,self.length)
 		if start == end { return '' }
 		if start > end {
 			return $.substr(self, end, start).reverse(); // we do a little trolling
 		}
 		return $.substr(self, start, end);
 	},
+    overwrite: #[desc("Overwrites a portion of a string with another string.") example('
+$.assert("abcdefghij".overwrite(2,5,"thingy") == "abthingyfghij")
+    ')]
+    (self, start: @number, end: @number, str: @string) -> @string {
+        return self.substr(0, start) + str + self.substr(end, self.length)
+    },
 	join: #[desc("Joins a list using the string.") example("
 $.assert(''.join(['a', 'b']) == 'ab')
-$.assert('current'.join(['string', ' element', ' join']) == 'currentstring element join')
+$.assert(', '.join(['string', 'element', 'join']) == 'string, element, join')
     ")]
-	(self, list: @array) {
+	(self, list: @array) -> @string {
 		let out = "";
 		for i in 0..list.length {
             if i > 0 {out += self}
@@ -68,27 +74,27 @@ $.assert('current'.join(['string', ' element', ' join']) == 'currentstring eleme
 $.assert('a b c'.split(' ') == ['a', 'b', 'c'])
 $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
     ")]
-	(self, spstr: @string) {
+	(self, spstr: @string) -> [@string] {
 		if spstr.length == 0 {
 			return self as @array;
 		} else {
 			return $.split_str(self, spstr);
 		}
 	},
-	starts_with: #[desc("Checks does the string starts with a string.")]
-	(self, substr: @string) {
+	starts_with: #[desc("Checks if the string starts with a string.")]
+	(self, substr: @string) -> @bool {
 		if substr == '' { return true }
 		if substr.length > self.length { return false }
 		return self.substr(0, substr.length) == substr;
 	},
-	ends_with: #[desc("Checks does the string starts with a string.")]
-	(self, substr: @string) {
+	ends_with: #[desc("Checks if the string starts with a string.")]
+	(self, substr: @string) -> @string {
 		if substr == '' { return true }
 		if substr.length > self.length { return false }
 		return self.substr(self.length-substr.length, self.length) == substr;
 	},
 	index: #[desc("Gets the index of a string, if it doesn't exists returns null.")]
-	(self, substr: @string) {
+	(self, substr: @string) -> @number | @NULL {
 		if substr == '' { return null }
 		if substr.length > self.length { return null }
 		r = self.length - substr.length + 1
@@ -100,11 +106,11 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
 		return null
 	},
 	contains: #[desc("Checks if the string contains a string.")]
-	(self, substr: @string) {
-		return self has substr
+	(self, substr: @string) -> @bool {
+		return substr in self
 	},
 	reverse: #[desc("Reverses the string.")]
-	(self) {
+	(self) -> @string {
 		let ret_str = ""
         for i in 0..self.length {
             ret_str += self[self.length - 1 - i]
@@ -112,29 +118,29 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
         return ret_str
 	},
 	lowercase: #[desc("Makes whole string lowercase.")]
-	(self) {
+	(self) -> @string {
         dict = @zip::new(uppercase,lowercase) as @dictionary
 		return ''.join(self.split('').map(el => dict.get(el, el)))
 	},
 	uppercase: #[desc("Makes whole string uppercase.")]
-	(self) {
+	(self) -> @string {
         dict = @zip::new(lowercase,uppercase) as @dictionary
-		return ''.join(self.split('').map(el => dict.get(el, el)))
+        return ''.join(self.split('').map(el => dict.get(el, el)))
 	},
 	is_upper: #[desc("Checks if whole string is uppercase, ignores characters that is not in the alphabet.")]
-	(self) {
+	(self) -> @bool {
 		return self.uppercase() == self
 	},
 	is_lower: #[desc("Checks if whole string is lowercase, ignores characters that is not in the alphabet.")]
-	(self) {
+	(self) -> @bool {
 		return self.lowercase() == self
 	},
     l_pad: #[desc("Returns a left-padded version of the string")]
-    (self, times: @number, seq: @string = ' ') {
+    (self, times: @number, seq: @string = ' ') -> @string {
         return seq * times + self
     },
     r_pad: #[desc("Returns a right-padded version of the string")]
-    (self, times: @number, seq: @string = ' ') {
+    (self, times: @number, seq: @string = ' ') -> @string {
         return self + seq * times
     },
     l_trim: #[desc("Returns a left-trimmed verison of the string") example("
@@ -176,7 +182,7 @@ $.assert('hi {} and {}'.fmt([name1, name2]) == 'hi bob and alice')
 $.assert('hi {1} and {0}'.fmt([name1, name2]) == 'hi alice and bob')
 $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
     ")]
-    (self, subs) {
+    (self, subs) -> @string {
         blank_regex = "\\{\\}"
         numbered_regex = "\\{\\d+\\}"
 
@@ -221,22 +227,22 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
         return ret_str
     },
 
-    find: (self, re: @string) {
+    find: (self, re: @string) -> @bool {
         return $.regex(re, self, "match", null)
     },
 
-    find_all: (self, re: @string) {
+    find_all: (self, re: @string) -> [[@number]] {
         return $.regex(re, self, "find_all", null)
     },
 
-    replace: (self, re: @string, replacement: @string) {
+    replace: (self, re: @string, replacement: @string) -> @string {
         return $.regex(re, self, "replace", replacement)
     },
 
     to_obj: #[desc("Returns a text object with the string as text") example("
 extract obj_props
 \"hello\".to_obj().with(X, 45).with(Y, 45).add()
-    ")] (self) {
+    ")] (self) -> @object {
         extract import "constants.spwn".obj_props
         return obj {
             OBJ_ID: 914,
@@ -247,7 +253,7 @@ extract obj_props
     isdigit:  #[desc("Returns true if string is numeric, false otherwise") example("
 let num = \"123\"
 num.isdigit() // true
-    ")] (self) {
+    ")] (self) -> @bool {
     	return @regex::new("^[0-9]").match(self)
     }
 }

@@ -2,7 +2,7 @@ use crate::builtins::*;
 use crate::compiler_types::*;
 use crate::globals::Globals;
 use crate::leveldata::*;
-use crate::value::{value_equality, Value};
+use crate::value::{strict_value_equality, Value};
 use crate::value_storage::{clone_value, store_val_m};
 use errors::compiler_info::CodeArea;
 
@@ -176,11 +176,9 @@ impl FullContext {
     pub fn iter(&mut self) -> ContextIter {
         ContextIter::new(self)
     }
-
-    pub fn from_ptr(ptr: *mut FullContext) -> &'static mut FullContext {
-        unsafe {
-            ptr.as_mut().unwrap()
-        }
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn from_ptr(ptr: *mut FullContext) -> &'static mut FullContext {
+        ptr.as_mut().unwrap()
     }
 }
 
@@ -406,13 +404,15 @@ pub fn merge_contexts(
             }
             let mut not_eq = false;
 
-            if check_return_vals && !value_equality(c.return_value, ref_c.return_value, globals) {
+            if check_return_vals
+                && !strict_value_equality(c.return_value, ref_c.return_value, globals)
+            {
                 not_eq = true;
             } else {
                 //check variables are equal
                 for (key, stack) in &c.variables {
                     for (i, VariableData { val, .. }) in stack.iter().enumerate() {
-                        if !value_equality(ref_c.variables[key][i].val, *val, globals) {
+                        if !strict_value_equality(ref_c.variables[key][i].val, *val, globals) {
                             not_eq = true;
                             break;
                         }

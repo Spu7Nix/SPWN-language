@@ -12,18 +12,14 @@ import "obj_set.spwn"
 import "dictionary.spwn"
 import "string.spwn"
 import "counter.spwn"
-import "binary_counter.spwn"
 import "fileio.spwn"
 import "regex.spwn"
 import "number.spwn"
-import "heapq.spwn"
-import "complex.spwn"
-import "zip.spwn"
 import "http.spwn"
-import "vector.spwn"
 import "range.spwn"
+level_info = import "level_info.spwn"
 
-hashmap = import "hashmap.spwn"
+chroma = import "chroma.spwn"
 general = import "general_triggers.spwn"
 events = import "events.spwn"
 ctrl_flow = import "control_flow.spwn"
@@ -36,22 +32,24 @@ return {
     ..events,
     ..ctrl_flow,
 
-    pi: constants.pi,
-    euler: constants.euler,
+    PI: constants.PI,
+    EULER: constants.EULER,
 
     counter: @counter::new,
-    binary_counter: @binary_counter,
     on: @event::on,
     obj_props: constants.obj_props,
     obj_ids: constants.obj_ids,
     open: @file::new,
     obj_set: @obj_set::new,
     regex: @regex::new,
-    heapq: @heapq::new,
-    complex: @complex::new,
-    hashmap: @hashmap::new,
-    hashmap_apply: hashmap.hashmap_apply,
-    zip: @zip::new,
+    rgb: @chroma::from_rgb,
+    rgb8: @chroma::from_rgb8,
+    hsv: @chroma::from_hsv,
+    hsv2: @chroma::from_hsv2,
+    blend_modes: chroma.BLEND_MODES,
+
+    level_objects: level_info.level_objects,
+    get_objects: level_info.get_objects,
 }
 
 

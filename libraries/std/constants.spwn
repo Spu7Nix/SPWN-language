@@ -18,36 +18,38 @@ ok = (id: @number, pat: @pattern | @type_indicator) {
     return @object_key::{id, pattern: pat}
 }
 
+
+
 @easing_type::_display_ = (self) {
     return switch self.id {
-        case 0: "NONE",
-        case 1: "EASE_IN_OUT",
-        case 2: "EASE_IN",
-        case 3: "EASE_OUT",
-        case 4: "ELASTIC_IN_OUT",
-        case 5: "ELASTIC_IN",
-        case 6: "ELASTIC_OUT",
-        case 7: "BOUNCE_IN_OUT",
-        case 8: "BOUNCE_IN",
-        case 9: "BOUNCE_OUT",
-        case 10: "EXPONENTIAL_IN_OUT",
-        case 11: "EXPONENTIAL_IN",
-        case 12: "EXPONENTIAL_OUT",
-        case 13: "SINE_IN_OUT",
-        case 14: "SINE_IN",
-        case 15: "SINE_OUT",
-        case 16: "BACK_IN_OUT",
-        case 17: "BACK_IN",
-        case 18: "BACK_OUT",
+        ==0: "NONE",
+        ==1: "EASE_IN_OUT",
+        ==2: "EASE_IN",
+        ==3: "EASE_OUT",
+        ==4: "ELASTIC_IN_OUT",
+        ==5: "ELASTIC_IN",
+        ==6: "ELASTIC_OUT",
+        ==7: "BOUNCE_IN_OUT",
+        ==8: "BOUNCE_IN",
+        ==9: "BOUNCE_OUT",
+        ==10: "EXPONENTIAL_IN_OUT",
+        ==11: "EXPONENTIAL_IN",
+        ==12: "EXPONENTIAL_OUT",
+        ==13: "SINE_IN_OUT",
+        ==14: "SINE_IN",
+        ==15: "SINE_OUT",
+        ==16: "BACK_IN_OUT",
+        ==17: "BACK_IN",
+        ==18: "BACK_OUT",
         else: $._display_(self)
     }
 }
 
 @comparison::_display_ = (self) {
     return switch self.id {
-        case 0: "EQUAL_TO",
-        case 1: "LARGER_THAN",
-        case 2: "SMALLER_THAN",
+        ==0: "EQUAL_TO",
+        ==1: "LARGER_THAN",
+        ==2: "SMALLER_THAN",
         else: $._display_(self)
     }
 }
@@ -194,7 +196,7 @@ return {
         PULSE_HSV : ok(48, @bool),
         COPIED_COLOR_HVS : ok(49, @string),
         COPIED_COLOR_ID : ok(50, @color),
-        TARGET : ok(51, @color | @group | @trigger_function),
+        TARGET : ok(51, @color | @group | @trigger_function | @number),
         TARGET_TYPE : ok(52, @number),
         YELLOW_TELEPORTATION_PORTAL_DISTANCE: ok(54, @number),
         ACTIVATE_GROUP : ok(56, @bool),

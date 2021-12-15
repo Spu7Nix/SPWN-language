@@ -6,13 +6,13 @@ extract constants.obj_props
 extract constants.comparisons
 
 wait = #[desc("Adds a delay before the next triggers") example("
-BG.set(255, 0, 0) // turn background red
+BG.set(rgb8(255, 0, 0)) // turn background red
 wait(2) // wait 2 seconds
-BG.set(0, 255, 0) // turn background green
+BG.set(rgb8(0, 255, 0)) // turn background green
 ")] (
 	#[desc("Delay time in seconds (leave empty for minimum delay)")]
 	time: @number | @epsilon = @epsilon::{}
-){
+) -> @NULL {
 	if time.type == @epsilon || time > 0 {
 		$.add( trigger{
 			OBJ_ID: 1268,
@@ -27,14 +27,14 @@ BG.set(0, 255, 0) // turn background green
 
 }
 call_with_delay = #[desc("Call a function after a delay") example("
-BG.set(255, 0, 0) // turn background red
+BG.set(rgb8(255, 0, 0)) // turn background red
 call_with_delay(2, !{
-	BG.set(0, 255, 0) // turn background green 2 seconds later
+	BG.set(rgb8(0, 255, 0)) // turn background green 2 seconds later
 })
 ")] (
 	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{},
 	#[desc("Function to call after the delay")] function: @trigger_function | @group
-) {
+) -> @NULL {
 	$.add(trigger{
 		OBJ_ID: 1268,
 		SPAWN_DURATION: time,
@@ -62,7 +62,7 @@ wait(0.4)
 f! // moves
 	")] (
 		#[desc("Time to supress signal")] delay: @number
-	){
+	) -> @NULL {
 		//if checker is 0, a signal can come through
 		//if checker is 1, it will be supressed
 		checker = @counter::new(0)
@@ -90,7 +90,7 @@ wait(0.4)
 f! // does nothing
 wait(1000)
 f! // does nothing
-	")] (){
+	")] () -> @NULL {
 
 		checker = @counter::new(0)
 		checker.item.if_is(EQUAL_TO, 0, !{
@@ -136,10 +136,10 @@ for_loop(0..10, (i) {
 	")]
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
-	#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: @macro,
+	#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: _ -> @NULL, // supposed to be @counter -> @NULL, but @counter isnt defined lol
         #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
         #[desc("Whether to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true,
-    ) {
+    ) -> @NULL {
 		i = @counter::new(range.start)
 
         func = !{
@@ -173,10 +173,10 @@ while_loop(() => c > 4, () {
 // c is now 3
 	")]
 	(
-		#[desc("While loop condition, should -> return a boolean")] expr: @macro,
-		#[desc("Macro of the code that gets looped")] code: @macro,
+		#[desc("While loop condition, should return a boolean")] expr: () -> @bool,
+		#[desc("Macro of the code that gets looped")] code: () -> @NULL,
 		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
-	) {
+	) -> @NULL {
 		func = !{
 			if expr() {
 				code()
@@ -199,10 +199,10 @@ do_while_loop(() => c > 10, () {
 // c is now 2
 	")]
 	(
-		#[desc("While loop condition, should -> return a boolean")] expr: @macro,
-		#[desc("Macro of the code that gets looped")] code: @macro,
+		#[desc("While loop condition, should -> return a boolean")] expr: () -> @bool,
+		#[desc("Macro of the code that gets looped")] code: () -> @NULL,
 		#[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
-	) {
+	) -> @NULL {
 		func = !{
 			code()
 			wait(delay)

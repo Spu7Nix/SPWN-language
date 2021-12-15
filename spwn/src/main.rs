@@ -24,6 +24,8 @@ use std::path::PathBuf;
 use editorlive::editorlive::editor_paste;
 use std::fs;
 
+use ::pckp::config_file;
+
 const ERROR_EXIT_CODE: i32 = 1;
 
 use std::io::Write;
@@ -196,26 +198,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         None
                     };
-                    let mut std_out = std::io::stdout();
-                    let mut compiled = match compiler::compile_spwn(
-                        statements,
-                        SpwnSource::File(script_path),
-                        included_paths,
-                        notes,
-                        permissions,
-                        &mut std_out,
-                    ) {
-                        Err(err) => {
-                            create_report(ErrorReport::from(err)).eprint(cache).unwrap();
-                            std::process::exit(ERROR_EXIT_CODE);
-                        }
-                        Ok(p) => p,
-                    };
 
-                    //dbg!(&compiled.prev_imports);
-
-                    if !compile_only {
-                        let level_string = if let Some(gd_path) = &gd_path {
+                    let level_string = if !compile_only {
+                        if let Some(gd_path) = &gd_path {
                             print_with_color("Reading savefile...", Color::Cyan);
                             let mut file = fs::File::open(gd_path)?;
                             let mut file_content = Vec::new();
@@ -241,7 +226,59 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             level_string
                         } else {
                             String::new()
-                        };
+                        }
+                    } else {
+                        String::new()
+                    };
+
+                    let pckp_path = script_path.parent().unwrap().to_path_buf();
+                    let cfg_file = config_file::get_config(Some(pckp_path.clone()));
+
+                    let pckp_package = match config_file::config_to_package(cfg_file) {
+                        Ok(p) => p,
+                        Err(e) => {
+                            eprint_with_color(
+                                &format!("Error reading pckp file:\n{}", e.to_string()),
+                                Color::Red,
+                            );
+
+                            std::process::exit(ERROR_EXIT_CODE);
+                        }
+                    };
+                    if let Some(pack) = pckp_package {
+                        match pack.install_dependencies(pckp_path) {
+                            Ok(_) => (),
+                            Err(e) => {
+                                eprint_with_color(
+                                    &format!("Error installing dependencies:\n{}", e.to_string()),
+                                    Color::Red,
+                                );
+
+                                std::process::exit(ERROR_EXIT_CODE);
+                            }
+                        }
+                    }
+
+                    let mut std_out = std::io::stdout();
+                    let mut compiled = match compiler::compile_spwn(
+                        statements,
+                        SpwnSource::File(script_path),
+                        included_paths,
+                        notes,
+                        permissions,
+                        level_string.clone(),
+                        &mut std_out,
+                    ) {
+                        Err(err) => {
+                            create_report(ErrorReport::from(err)).eprint(cache).unwrap();
+                            std::process::exit(ERROR_EXIT_CODE);
+                        }
+                        Ok(p) => p,
+                    };
+
+                    //dbg!(&compiled.prev_imports);
+
+                    if !compile_only {
                         let mut reserved = optimize::ReservedIds {
                             object_groups: Default::default(),
                             trigger_groups: Default::default(),

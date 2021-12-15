@@ -44,6 +44,7 @@ pub struct Globals<'a> {
 
     pub func_ids: Vec<FunctionId>,
     pub objects: Vec<GdObj>,
+    pub initial_string: String,
 
     pub prev_imports: FnvHashMap<ImportType, (StoredValue, Implementations)>,
 
@@ -141,6 +142,7 @@ impl<'a> Globals<'a> {
     pub fn new(
         path: SpwnSource,
         permissions: BuiltinPermissions,
+        initial_string: String,
         std_out: &'a mut impl Write,
     ) -> Self {
         let (storage, builtin_storage, null_storage) = ValStorage::new();
@@ -169,6 +171,7 @@ impl<'a> Globals<'a> {
                 obj_list: Vec::new(),
             }],
             objects: Vec::new(),
+            initial_string,
             implementations: FnvHashMap::default(),
             sync_groups: vec![SyncGroup {
                 parts: vec![0],
@@ -285,42 +288,45 @@ impl<'a> Globals<'a> {
         self.stored_values.mark(self.NULL_STORAGE);
         self.stored_values.mark(self.BUILTIN_STORAGE);
 
-        //unsafe {
-            let root_context = FullContext::from_ptr(contexts
-                .with_breaks()
-                .next()
-                .unwrap()
-                .inner()
-                .root_context_ptr);
+        let root_context = unsafe {
+            FullContext::from_ptr(
+                contexts
+                    .with_breaks()
+                    .next()
+                    .unwrap()
+                    .inner()
+                    .root_context_ptr,
+            )
+        };
 
-            for c in root_context.with_breaks() {
-                for stack in c.inner().get_variables().values() {
-                    for VariableData { val: v, .. } in stack.iter() {
-                        self.stored_values.mark(*v);
-                    }
-                }
-
-                match c.inner().broken {
-                    Some((BreakType::Macro(Some(v), _), _)) | Some((BreakType::Switch(v), _)) => {
-                        self.stored_values.mark(v);
-                    }
-                    _ => (),
-                }
-
-                // for split contexts
-                self.stored_values.mark(c.inner().return_value);
-                self.stored_values.mark(c.inner().return_value2);
-            }
-            for s in self.stored_values.preserved_stack.clone() {
-                for v in s {
-                    self.stored_values.mark(v);
-                }
-            }
-            for imp in self.implementations.values() {
-                for (v, _) in imp.values() {
+        for c in root_context.with_breaks() {
+            for stack in c.inner().get_variables().values() {
+                for VariableData { val: v, .. } in stack.iter() {
                     self.stored_values.mark(*v);
                 }
             }
+
+            match c.inner().broken {
+                Some((BreakType::Macro(Some(v), _), _)) | Some((BreakType::Switch(v), _)) => {
+                    self.stored_values.mark(v);
+                }
+                _ => (),
+            }
+
+            // for split contexts
+            self.stored_values.mark(c.inner().return_value);
+            self.stored_values.mark(c.inner().return_value2);
+        }
+        for s in self.stored_values.preserved_stack.clone() {
+            for v in s {
+                self.stored_values.mark(v);
+            }
+        }
+        for imp in self.implementations.values() {
+            for (v, _) in imp.values() {
+                self.stored_values.mark(*v);
+            }
+        }
         //}
 
         for (v, imp) in self.prev_imports.values() {

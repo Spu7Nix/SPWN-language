@@ -42,6 +42,7 @@ pub enum RuntimeError {
     CustomError(ErrorReport),
 
     BuiltinError {
+        builtin: String,
         message: String,
         info: CompilerInfo,
     },
@@ -219,6 +220,7 @@ pub fn create_error(
     }
 }
 
+#[derive(Debug)]
 pub struct ErrorReport {
     pub info: CompilerInfo,
     pub message: String,
@@ -301,7 +303,7 @@ impl From<RuntimeError> for ErrorReport {
                     ),
                     (
                         info.position,
-                        &format!("Expected {}, found {}", pattern.fg(a), val.fg(b)),
+                        &format!("This {} is not {}", val.fg(a), pattern.fg(b)),
                     ),
                 ],
                 None,
@@ -309,9 +311,13 @@ impl From<RuntimeError> for ErrorReport {
 
             RuntimeError::CustomError(report) => report,
 
-            RuntimeError::BuiltinError { message, info } => create_error(
+            RuntimeError::BuiltinError {
+                message,
+                info,
+                builtin,
+            } => create_error(
                 info.clone(),
-                "Error when using built-in function",
+                &format!("Error when using built-in function: {}", builtin),
                 &[(info.position, &message)],
                 None,
             ),
@@ -421,6 +427,7 @@ impl From<RuntimeError> for ErrorReport {
     }
 }
 
+#[derive(Debug)]
 pub enum SyntaxError {
     ExpectedErr {
         expected: String,
