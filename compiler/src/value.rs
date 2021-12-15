@@ -60,6 +60,7 @@ pub struct Macro {
     pub ret_pattern: Option<StoredValue>,
 }
 
+#[allow(clippy::derive_hash_xor_eq)]
 impl Hash for Macro {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         //self.args.hash(state);
@@ -111,6 +112,9 @@ pub enum Pattern {
 
     Either(Box<Pattern>, Box<Pattern>),
     Both(Box<Pattern>, Box<Pattern>),
+    Not(Box<Pattern>),
+
+    Any,
 
     Eq(StoredValue),
     NotEq(StoredValue),
@@ -118,7 +122,61 @@ pub enum Pattern {
     LessThan(StoredValue),
     MoreOrEq(StoredValue),
     LessOrEq(StoredValue),
+    In(StoredValue),
+
+    Macro {
+        args: Vec<Pattern>, 
+        ret: Box<Pattern>
+    }
 }
+
+impl Pattern {
+    pub fn in_pat(
+        &self,
+        p: &Pattern,
+        globals: &Globals
+    ) -> Result<bool, RuntimeError> {
+        Ok( match (self, p) {
+            (_, Pattern::Any) => true,
+            (Pattern::Any, _) => false,
+
+            (_, Pattern::Not(a)) => !(self.in_pat(a, globals)?),
+            (Pattern::Not(a), _) => !(a.in_pat(p, globals)?),
+
+            (Pattern::Either(a, b), _) => (a.in_pat(p, globals)?) && (b.in_pat(p, globals)?),
+            (Pattern::Both(a, b), _) =>
+                Pattern::Not(Box::new(
+                    Pattern::Either(
+                        Box::new(Pattern::Not(a.clone())),
+                        Box::new(Pattern::Not(b.clone())),
+                    )
+                )).in_pat(p, globals)?,
+
+            (Pattern::Type(a), Pattern::Type(b)) => a == b,
+
+            (Pattern::Eq(a), Pattern::Eq(b)) |
+            (Pattern::NotEq(a), Pattern::NotEq(b)) |
+            (Pattern::MoreThan(a), Pattern::MoreThan(b)) |
+            (Pattern::LessThan(a), Pattern::LessThan(b)) |
+            (Pattern::MoreOrEq(a), Pattern::MoreOrEq(b)) |
+            (Pattern::LessOrEq(a), Pattern::LessOrEq(b)) |
+            (Pattern::In(a), Pattern::In(b)) => strict_value_equality(*a, *b, globals),
+
+            (Pattern::Array(a), Pattern::Array(b)) => match (a.len(), b.len()) {
+                (0, 0) => true,
+                (1, 1) => a[0].in_pat(&b[0], globals)?,
+                _ => false,
+            }
+            
+            (_, Pattern::Both(a, b)) => self.in_pat(a, globals)? && self.in_pat(b, globals)?,
+            (_, Pattern::Either(a, b)) => self.in_pat(a, globals)? || self.in_pat(b, globals)?,
+            // TODO: macro patterns??
+            _ => false,
+
+        } )
+    }
+}
+
 
 pub fn default_value_equality(
     val1: StoredValue,
@@ -198,7 +256,8 @@ pub fn default_value_equality(
                 | (MoreThan(a), MoreThan(b))
                 | (LessThan(a), LessThan(b))
                 | (MoreOrEq(a), MoreOrEq(b))
-                | (LessOrEq(a), LessOrEq(b)) => {
+                | (LessOrEq(a), LessOrEq(b))
+                | (In(a), In(b)) => {
                     handle_operator(a, b, Builtin::EqOp, contexts, globals, info)?
                 }
                 (a, b) => set_return_bool(a == b, globals, contexts),
@@ -251,7 +310,8 @@ pub fn strict_value_equality(val1: StoredValue, val2: StoredValue, globals: &Glo
                 | (MoreThan(a), MoreThan(b))
                 | (LessThan(a), LessThan(b))
                 | (MoreOrEq(a), MoreOrEq(b))
-                | (LessOrEq(a), LessOrEq(b)) => strict_value_equality(*a, *b, globals),
+                | (LessOrEq(a), LessOrEq(b)) 
+                | (In(a), In(b)) => strict_value_equality(*a, *b, globals),
                 _ => p1 == p2,
             }
         }
@@ -439,15 +499,10 @@ impl Value {
     ) -> Result<bool, RuntimeError> {
         let mut full_context = FullContext::Single(context); // not part of the full tree, but shouldnt matter, since it shouldnt be changed
         self.matches_pat(pat_val, info, globals, &mut full_context, false)?;
-        match globals.stored_values[full_context.inner().return_value] {
-            Value::Bool(b) => Ok(b),
-            _ => {
-                return Err(RuntimeError::TypeError {
-                    expected: "bool".to_string(),
-                    found: globals.get_type_str(full_context.inner().return_value),
-                    val_def: globals.get_area(full_context.inner().return_value),
-                    info: info.clone(),
-                })
+        match &globals.stored_values[full_context.inner().return_value] {
+            Value::Bool(b) => Ok(*b),
+            a => {
+                panic!("Expected bool, got {}", a.clone().to_str(globals));
             }
         }
     }
@@ -537,9 +592,37 @@ impl Value {
                         }
                     }
                 }
+                Pattern::Not(p) => {
+                    self.matches_pat(
+                        &Value::Pattern(*p),
+                        info,
+                        globals,
+                        full_context,
+                        allow_side_effect,
+                    )?;
+                    match globals.stored_values[(*full_context.inner()).return_value] {
+                        Value::Bool(b) => {
+                            (*full_context.inner()).return_value = store_const_value(
+                                Value::Bool(!b),
+                                globals,
+                                full_context.inner().start_group,
+                                info.position,
+                            )
+                        },
+                        _ => unreachable!(),
+                    }
+                }
                 Pattern::Type(t) => {
                     (*full_context.inner()).return_value = store_const_value(
                         Value::Bool(self.to_num(globals) == t),
+                        globals,
+                        full_context.inner().start_group,
+                        info.position,
+                    );
+                }
+                Pattern::Any => {
+                    (*full_context.inner()).return_value = store_const_value(
+                        Value::Bool(true),
                         globals,
                         full_context.inner().start_group,
                         info.position,
@@ -559,6 +642,8 @@ impl Value {
                             }
 
                             1 => {
+
+                                // TODO: make sure it always sets the return value
                                 full_context.reset_return_vals(globals);
                                 for el in a_val {
                                     for full_context in full_context.iter() {
@@ -594,6 +679,58 @@ impl Value {
                         );
                     }
                 }
+                Pattern::Macro { args, ret } => {
+                    if let Value::Macro(m) = self {
+                        if m.args.len() != args.len() {
+                            (*full_context.inner()).return_value = store_const_value(
+                                Value::Bool(false),
+                                globals,
+                                full_context.inner().start_group,
+                                info.position,
+                            );
+                        } else {
+                            let mut is_matching = true;
+                            for (i, m_arg) in m.args.iter().enumerate() {
+                                if let Some(pat_stored) = m_arg.pattern {
+                                    match &convert_type(&globals.stored_values[pat_stored].clone(), type_id!(pattern), info, globals, full_context.inner())?  {
+                                        Value::Pattern(p) => {
+                                            let matches = args[i].in_pat(p, globals)?;
+                                            if !matches {
+                                                is_matching = false;
+                                                break;
+                                            }
+                                        },
+                                        _ => unreachable!()
+                                    }
+                                }
+                            }
+                            if is_matching {
+                                if let Some(ret_stored) = m.ret_pattern {
+                                    match &convert_type(&globals.stored_values[ret_stored].clone(), type_id!(pattern), info, globals, full_context.inner())? {
+                                        Value::Pattern(p) => {
+                                            is_matching = (*ret).in_pat(p, globals)?;
+                                            
+                                        },
+                                        _ => unreachable!()
+                                    }
+                                }
+                            }
+                            (*full_context.inner()).return_value = store_const_value(
+                                Value::Bool(is_matching),
+                                globals,
+                                full_context.inner().start_group,
+                                info.position,
+                            );
+                        }
+                    } else {
+                        (*full_context.inner()).return_value = store_const_value(
+                            Value::Bool(false),
+                            globals,
+                            full_context.inner().start_group,
+                            info.position,
+                        );
+                    }
+                }
                 a => {
                     // bool operator patterns
                     let val = store_const_value(
@@ -609,6 +746,7 @@ impl Value {
                         Pattern::LessThan(v) => (Builtin::LessThanOp, v),
                         Pattern::MoreOrEq(v) => (Builtin::MoreOrEqOp, v),
                         Pattern::LessOrEq(v) => (Builtin::LessOrEqOp, v),
+                        Pattern::In(v) => (Builtin::InOp, v),
                         _ => unreachable!(),
                     };
                     
@@ -790,14 +928,18 @@ impl Value {
             Value::Pattern(p) => match p {
                 Pattern::Type(t) => Value::TypeIndicator(*t).to_str(globals),
                 Pattern::Either(p1, p2) => format!(
-                    "{} | {}",
+                    "({} | {})",
                     display_inner(&Value::Pattern(*p1.clone()), globals)?,
                     display_inner(&Value::Pattern(*p2.clone()), globals)?
                 ),
                 Pattern::Both(p1, p2) => format!(
-                    "{} & {}",
+                    "({} & {})",
                     display_inner(&Value::Pattern(*p1.clone()), globals)?,
                     display_inner(&Value::Pattern(*p2.clone()), globals)?
+                ),
+                Pattern::Not(p) => format!(
+                    "!{}",
+                    display_inner(&Value::Pattern(*p.clone()), globals)?,
                 ),
                 Pattern::Array(a) => {
                     if a.is_empty() {
@@ -831,6 +973,26 @@ impl Value {
                 }
                 Pattern::LessOrEq(a) => {
                     format!("<={}", globals.stored_values[*a].to_owned().to_str(globals))
+                }
+                Pattern::In(a) => {
+                    format!("in {}", globals.stored_values[*a].to_owned().to_str(globals))
+                }
+                Pattern::Any => {
+                    "_".to_string()
+                }
+                Pattern::Macro { args, ret } => {
+                    let mut out = String::from("(");
+                    if !args.is_empty() {
+                        for arg in args.iter() {
+                            out += &display_inner(&Value::Pattern(arg.clone()), globals)?;
+                            out += ", ";
+                        }
+                        out.pop();
+                        out.pop();
+                    }
+                    out += ") -> ";
+                    out += &display_inner(&Value::Pattern(*ret.clone()), globals)?;
+                    out
                 }
             },
         })
@@ -874,11 +1036,6 @@ pub fn convert_type(
         (Value::Number(n), type_id!(item)) => Value::Item(Item::new(*n as u16)),
         (Value::Number(n), type_id!(number)) => Value::Number(*n),
         (Value::Number(n), type_id!(bool)) => Value::Bool(*n != 0.0),
-
-            
-        
-
-        
 
         (Value::Group(g), type_id!(number)) => Value::Number(match g.id {
             Id::Specific(n) => n as f64,
@@ -947,17 +1104,73 @@ pub fn convert_type(
 
     
         (Value::Str(s), type_id!(number)) => {
-            let out: std::result::Result<f64, _> = s.parse();
-            match out {
-                Ok(n) => Value::Number(n),
-                _ => {
-                    
-                    return Err(RuntimeError::CustomError(create_error(
-                        info.clone(),
-                        &format!("Cannot convert string '{}' to @number", s),
-                        &[],
-                        None,
-                    ))) 
+            if s.len() < 2 {
+                let out: std::result::Result<f64, _> = s.parse();
+                match out {
+                    Ok(n) => Value::Number(n),
+                    _ => {
+                        
+                        return Err(RuntimeError::CustomError(create_error(
+                            info.clone(),
+                            &format!("Cannot convert string '{}' to @number", s),
+                            &[],
+                            None,
+                        ))) 
+                    }
+                }
+            } else {
+                match &s[..2] {
+                    "0x" => {
+                        if let Ok(out) = i64::from_str_radix(&s.replace("0x", ""), 16) {
+                            return Ok(Value::Number(out as f64))
+                        } else {
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                &format!("Cannot convert string '{}' to @number", s),
+                                &[],
+                                None,
+                            ))) 
+                        }
+                    }
+                    "0b" => {
+                        if let Ok(out) = i64::from_str_radix(&s.replace("0b", ""), 2) {
+                            return Ok(Value::Number(out as f64))
+                        } else {
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                &format!("Cannot convert string '{}' to @number", s),
+                                &[],
+                                None,
+                            ))) 
+                        }
+                    }
+                    "0o" => {
+                        if let Ok(out) = i64::from_str_radix(&s.replace("0o", ""), 8) {
+                            return Ok(Value::Number(out as f64))
+                        } else {
+                            return Err(RuntimeError::CustomError(create_error(
+                                info.clone(),
+                                &format!("Cannot convert string '{}' to @number", s),
+                                &[],
+                                None,
+                            ))) 
+                        }
+                    }
+                    _ => {
+                        let out: std::result::Result<f64, _> = s.parse();
+                        match out {
+                            Ok(n) => Value::Number(n),
+                            _ => {
+                                
+                                return Err(RuntimeError::CustomError(create_error(
+                                    info.clone(),
+                                    &format!("Cannot convert string '{}' to @number", s),
+                                    &[],
+                                    None,
+                                ))) 
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -990,7 +1203,69 @@ pub fn convert_type(
             Value::Pattern(Pattern::Type(*t))
         }
 
-            
+        (Value::Obj(v, _), type_id!(dictionary)) => {
+
+            let mut map = FnvHashMap::default();
+            for (id, param) in v {
+                map.insert(
+                    LocalIntern::new(id.to_string()),
+                    store_const_value(
+                        match param {
+                            // its just converting value to objparam basic level stuff
+                            ObjParam::Number(n) => Value::Number(*n),
+                            ObjParam::Text(s) => Value::Str(s.clone()),
+
+                            ObjParam::Group(g) => Value::Group(*g),
+                            ObjParam::Color(c) => Value::Color(*c),
+                            ObjParam::Block(b) => Value::Block(*b),
+                            ObjParam::Item(i) => Value::Item(*i),
+
+                            ObjParam::Bool(b) => Value::Bool(*b),
+
+                            ObjParam::GroupList(g) => {
+                                let mut out = Vec::new();
+                                for s in g {
+                                    let stored = store_const_value(
+                                        Value::Group(*s),
+                                        globals,
+                                        context
+                                            .start_group,
+                                        info.position,
+                                    );
+                                    out.push(stored);
+                                }
+                                Value::Array(out)
+                            }
+
+                            ObjParam::Epsilon => {
+                                let mut map = FnvHashMap::<
+                                    LocalIntern<String>,
+                                    StoredValue,
+                                >::default(
+                                );
+                                let stored = store_const_value(
+                                    Value::TypeIndicator(20),
+                                    globals,
+                                    context.start_group,
+                                    info.position,
+                                );
+                                map.insert(
+                                    globals.TYPE_MEMBER_NAME,
+                                    stored,
+                                );
+                                Value::Dict(map)
+                            }
+                        },
+                        globals,
+                        context.start_group,
+                        info.position
+                    )
+                );
+            }
+
+            Value::Dict(map)
+
+        },
 
         _ => {
             
@@ -1309,6 +1584,13 @@ impl VariableFuncs for ast::Variable {
                 ast::ValueBody::Symbol(string) => {
                     if string.as_ref() == "$" {
                         full_context.inner().return_value = globals.BUILTIN_STORAGE;
+                    } else if string.as_ref() == "_" {
+                        full_context.inner().return_value = store_const_value(
+                            Value::Pattern(Pattern::Any),
+                            globals,
+                            full_context.inner().start_group,
+                            info.position,
+                        );
                     } else {
                         match full_context.inner().get_variable(*string) {
                             Some(value) => full_context.inner().return_value = value,
@@ -2561,6 +2843,42 @@ impl VariableFuncs for ast::Variable {
                 }
                 //ast::ValueLiteral::Resolved(r) => out.push((r.clone(), context)),
                 ast::ValueBody::Null => full_context.inner().return_value = globals.NULL_STORAGE,
+                ast::ValueBody::MacroPattern(ast::MacroPattern { args, ret }) => {
+                    let mut args = args.clone();
+                    args.push(ret.clone());
+                    let combinations = all_combinations(args, full_context, globals, info.clone(), constant)?;
+                    for (args, fc) in combinations {
+                        let mut patterns = Vec::new();
+                        // get all the arg values and convert to patterns
+                        for arg in args {
+                            let pat_val = convert_type(&globals.stored_values[arg].clone(), type_id!(pattern), &info, globals, fc.inner())?;
+                            match pat_val {
+                                Value::Pattern(p) => {
+                                    patterns.push(p);
+                                }
+                                a => {
+                                    return Err(RuntimeError::TypeError {
+                                        expected: "pattern".to_string(),
+                                        found: a.get_type_str(globals),
+                                        val_def: globals.get_area(arg),
+                                        info,
+                                    })
+                                }
+                            }
+                        }
+                        let ret = Box::new(patterns.pop().unwrap());
+                        
+                        fc.inner().return_value = store_const_value(
+                            Value::Pattern(Pattern::Macro{
+                                args: patterns, ret
+                            }),
+                            globals,
+                            fc.inner().start_group,
+                            info.position,
+                        )
+                    }
+
+                },
             };
         }
         let mut path_iter = self.path.iter();
@@ -3215,6 +3533,7 @@ impl VariableFuncs for ast::Variable {
                         UnaryOperator::LessPattern => Builtin::LessPatternOp,
                         UnaryOperator::MoreOrEqPattern => Builtin::MoreOrEqPatternOp,
                         UnaryOperator::LessOrEqPattern => Builtin::LessOrEqPatternOp,
+                        UnaryOperator::InPattern => Builtin::InPatternOp,
                     },
                     full_context,
                     globals,

@@ -4,7 +4,7 @@ impl @range {
 let range = 10..5..50
 $.assert(range.reverse() == 50..5..10)
     ")]
-    (self) {
+    (self) -> @range {
         return self.end..self.step_size..self.start
     },
 }

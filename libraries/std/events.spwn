@@ -18,7 +18,7 @@ on(touch(), !{
     ")] (
         #[desc("Event to trigger on")] event: @event,
         #[desc("Function to trigger")] function: @trigger_function
-    ){
+    ) -> @NULL {
         event.on_triggered(function)
     },
     
@@ -32,7 +32,7 @@ return {
 }
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
-    ) {
+    ) -> @event {
         return @event::{
             on_triggered: (function) => $.add( trigger{
                 OBJ_ID: 1595,
@@ -52,7 +52,7 @@ return {
 }
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
-    ) {
+    ) -> @event {
         return @event::{
             on_triggered: (function) => $.add( trigger{
                 OBJ_ID: 1595,
@@ -68,12 +68,12 @@ return {
 
     collision: #[desc("Implementation of the collision trigger (returns an event)") example("
 [[handle(collision(1b, 2b))]] !{
-    BG.set(0, 0, 0)
+    BG.set(rgb(0, 0, 0))
 }
     ")] (
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
-    ) {
+    ) -> @event {
         return @event::{
             on_triggered: (function) => $.add( trigger{
                 OBJ_ID: 1815,
@@ -90,12 +90,12 @@ return {
 
     collision_exit: #[desc("Returns an event for when a collision exits") example("
 [[handle(collision_exit(1b, 2b))]] !{
-    BG.set(0, 0, 0)
+    BG.set(rgb(0, 0, 0))
 }
     ")] (
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
-    ) {
+    ) -> @event {
         return @event::{
             on_triggered: (function) => $.add( trigger{
                 OBJ_ID: 1815,
@@ -112,9 +112,9 @@ return {
 
     death: #[desc("Returns an event for when the player dies") example("
 [[handle(death())]] !{
-    BG.set(0, 0, 0)
+    BG.set(rgb(0, 0, 0))
 }
-    ")] (){
+    ")] () -> @event {
         return @event::{
             on_triggered: (function) => $.add( trigger{
                 OBJ_ID: 1812,
@@ -126,9 +126,9 @@ return {
 
     count: #[desc("Implementation of a count trigger (returns an event)") example("
 [[handle(count(4i, 3))]] !{
-    BG.set(0, 0, 0)
+    BG.set(rgb(0, 0, 0))
 }
-    ")] (it: @item, hits: @number, multi: @bool = true) {
+    ")] (it: @item, hits: @number, multi: @bool = true) -> @event {
         return @event::{
             on_triggered: (function) => $.add(trigger {
                 OBJ_ID: 1611,

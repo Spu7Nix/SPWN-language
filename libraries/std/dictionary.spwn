@@ -8,7 +8,7 @@ impl @dictionary {
 dict = {}
 $.assert(dict.is_empty())
 	")]
-	(self) {
+	(self) -> @bool {
 		// no way to get number of entries currently afaik
 		// so this 'loop' will get skipped over if empty,
 		// or otherwise early exit on the first entry if not
@@ -25,7 +25,7 @@ wares = {
 }
 $.assert(wares.keys() == ['apple', 'gold', 'peanuts'])
 	")]
-	(self) {
+	(self) -> [@string] {
 		let ret = []
 		for kv in self {
 			ret.push(kv[0])
@@ -40,7 +40,7 @@ wares = {
 }
 $.assert(wares.values() == [10, 1000, 5])
 	")]
-	(self) {
+	(self) -> [_] {
 		let ret = []
 		for kv in self {
 			ret.push(kv[1])
@@ -59,7 +59,7 @@ $.assert(wares.items() == [
 	['peanuts', 5],
 ])
 	")]
-	(self) {
+	(self) -> [@array] {
 		let ret = []
 		for kv in self {
 			ret.push(kv)
@@ -78,8 +78,8 @@ $.assert(wares == {
 	peanuts: 5,
 })
 	")]
-	(self, key: @string, val) {
-		if self has key {
+	(self, key: @string, val) -> @NULL {
+		if key in self {
 			self[key] = val
 		} else {
 			let self[key] = val
@@ -95,8 +95,8 @@ let wares = {
 $.assert(wares.get('peanuts') == 5)
 $.assert(wares.get('silver', default = 42) == 42)
 	")]
-	(self, key: @string, default = @dict_not_found::{}) {
-		if self has key {
+	(self, key: @string, default = @dict_not_found::{}) -> _ {
+		if key in self {
 			return self[key]
 		} else {
 			if default.type == @dict_not_found {
@@ -116,7 +116,7 @@ wares.clear()
 
 $.assert(wares.is_empty())
 	")]
-	(self) {
+	(self) -> @NULL {
 		self = {}
 	},
 	contains_value: #[desc("Checks if the dictionary contains a value.") example("
@@ -128,14 +128,14 @@ let wares = {
 
 $.assert(wares.contains(5))
 	")]
-	(self, value) {
+	(self, value) -> @bool {
 		return self.values().contains(value)
 	},
 		map: #[desc("Calls a defined callback function on each key-value pair of a dictionary, and returns an array that contains the results.") example("
 	dict = {key1: 0, key2: 1, key3: 2}
 	$.assert(dict.map((k, v) => k[v]) == ['k', 'e', 'y'])
 		")]
-		(self, cb: @macro) {
+		(self, cb: (_, _) -> _) -> @array {
 			let output = [];
 			for iter in self {
 				output.push(cb(iter[0], iter[1]));

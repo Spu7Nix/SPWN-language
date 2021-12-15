@@ -21,7 +21,8 @@ pub enum ObjParam {
     GroupList(Vec<Group>),
     Epsilon,
 }
-
+// this is so bruh
+#[allow(clippy::derive_hash_xor_eq)]
 impl Hash for ObjParam {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {

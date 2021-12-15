@@ -283,20 +283,22 @@ impl SpwnFmt for ValueBody {
             TypeIndicator(x) => format!("@{}", x),
             Null => "null".to_string(),
             SelfVal => "self".to_string(),
-            Ternary(t) => if !t.is_pattern {
-                format!(
-                    "{} if is {} else {}",
-                    t.if_expr.fmt(ind),
-                    t.condition.fmt(ind),
-                    t.else_expr.fmt(ind)
-                )
-            } else {
-                format!(
-                    "{} if {} else {}",
-                    t.if_expr.fmt(ind),
-                    t.condition.fmt(ind),
-                    t.else_expr.fmt(ind)
-                )
+            Ternary(t) => {
+                if !t.is_pattern {
+                    format!(
+                        "{} if is {} else {}",
+                        t.if_expr.fmt(ind),
+                        t.condition.fmt(ind),
+                        t.else_expr.fmt(ind)
+                    )
+                } else {
+                    format!(
+                        "{} if {} else {}",
+                        t.if_expr.fmt(ind),
+                        t.condition.fmt(ind),
+                        t.else_expr.fmt(ind)
+                    )
+                }
             }
             ListComp(c) => format!(
                 "{} for {} in {}",
@@ -304,7 +306,8 @@ impl SpwnFmt for ValueBody {
                 c.symbol,
                 c.iterator.fmt(ind)
             ),
-            Switch(_, _) => "switch".to_string(),
+            Switch(_, _) => todo!(),
+            MacroPattern(_) => todo!(),
         }
     }
 }
@@ -463,7 +466,7 @@ impl SpwnFmt for Operator {
             Operator::Divide => "/=",
             Operator::IntDivide => "/%=",
             Operator::As => "as",
-            Operator::Has => "has",
+            Operator::In => "in",
             Operator::Either => "|",
             Operator::Both => "&",
             Operator::Exponate => "^=",
@@ -488,6 +491,7 @@ impl SpwnFmt for UnaryOperator {
             UnaryOperator::LessPattern => "<",
             UnaryOperator::MoreOrEqPattern => ">=",
             UnaryOperator::LessOrEqPattern => "<=",
+            UnaryOperator::InPattern => "in",
         }
         .to_string()
     }

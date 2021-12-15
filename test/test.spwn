@@ -1,1 +1,5 @@
-$.print(level_info::objects)
+
+extract obj_props
+
+$.print(level_objects)
+$.print(get_objects(X, >15))
