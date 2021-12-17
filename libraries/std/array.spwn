@@ -234,12 +234,18 @@ $.assert(arr2.all(el => el > 0)) // checks if the array contains only positive e
         }
         return true
     },
-    sum: #[desc("Gets the sum of the value in the array.") example("
+    sum: #[desc("Gets the sum of the values in the array.") example('
 arr = [1, 2, 3, 4, 5]
 $.assert(arr.sum() == 15)
-    ")]
-    (self) -> _ {
-        return self.reduce((acum, el) => acum + el)
+arr2 = ["abc", "ab", "abcd"]
+$.assert(arr2.sum(a => a.length) == 9)
+    ')]
+    (self, cb: _ -> _ = a => a) -> _ {
+        let result = cb(self[0])
+        for i in self[1:] {
+            result += cb(i)
+        }
+        return result
     },
 
     _partition: #[desc("Private function needed for .sort()")]
