@@ -119,13 +119,19 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
 	},
 	lowercase: #[desc("Makes whole string lowercase.")]
 	(self) -> @string {
-        dict = @zip::new(uppercase,lowercase) as @dictionary
-		return ''.join(self.split('').map(el => dict.get(el, el)))
+        let dict = {}
+        for [k, v] in [*[uppercase.split(''), lowercase.split('')]] {
+            dict[k] = v
+        }
+        return ''.join(self.split('').map(c => dict[c] if c in dict else c))
 	},
 	uppercase: #[desc("Makes whole string uppercase.")]
 	(self) -> @string {
-        dict = @zip::new(lowercase,uppercase) as @dictionary
-        return ''.join(self.split('').map(el => dict.get(el, el)))
+        let dict = {}
+        for [k, v] in [*[lowercase.split(''), uppercase.split('')]] {
+            dict[k] = v
+        }
+        return ''.join(self.split('').map(c => dict[c] if c in dict else c))
 	},
 	is_upper: #[desc("Checks if whole string is uppercase, ignores characters that is not in the alphabet.")]
 	(self) -> @bool {
@@ -149,7 +155,7 @@ str2 = '   pog  __'
 $.assert(str1.l_trim() == 'abcd g    ')
 $.assert(str2.l_trim() == 'pog  __')
     ")]
-    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) {
+    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, left = true)
     },
     r_trim: #[desc("Returns a right-trimmed version of the string") example("
@@ -160,7 +166,7 @@ $.assert(str.r_trim() == 'abcd')
 $.assert(str2.r_trim() == '      abcd g')
 $.assert(str3.r_trim(tokens = [' ', '_']) == '   pog')    
     ")]
-    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) {
+    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, right = true)
     },
     trim: #[desc("Returns a trimmed version of the string") example("
@@ -171,7 +177,7 @@ $.assert(str.trim() == 'abcd')
 $.assert(str2.trim() == 'abcd g')
 $.assert(str3.trim(tokens = [' ', '_']))
     ")]
-    (self, tokens: @string | [@string] = [' ','\n','\t','\r']){
+    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, left = true, right = true)
     },
     fmt: #[desc("Returns a formtted version of the string. Accepts either a single argument or an array") example("

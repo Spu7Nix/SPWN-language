@@ -1,8 +1,3 @@
 
-extract obj_props
-
-let head = get_objects(GROUPS, ==[1g])
-head = @set::from(head)
-$.print(head)
-
-head.place(15, 15)
+a = "aavvbvGDF0vxb"
+$.print(a.uppercase())
