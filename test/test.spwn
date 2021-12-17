@@ -1,3 +1,13 @@
 
-a = "aavvbvGDF0vxb"
-$.print(a.uppercase())
+
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
+$.print(''.join(@array(0..10).shuffle()))
