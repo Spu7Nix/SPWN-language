@@ -175,7 +175,7 @@ pub enum Token {
     #[regex("0o[0-7](_?[0-7]+)*")]
     OctalLiteral,
 
-    #[regex(r#"[a-z]?"(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
+    #[regex(r#"[a-z]?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
     StringLiteral,
 
     #[token("true")]
