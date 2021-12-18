@@ -1912,8 +1912,6 @@ pub fn str_content(
                         out.0 += "\n";
                     }
                 }
-            } else {
-                out.0 += "\n";
             }
 
             out.0 = out.0.trim_end().to_string(); // removes the newlines at the end
