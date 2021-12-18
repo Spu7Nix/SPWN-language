@@ -143,11 +143,11 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
 	},
     l_pad: #[desc("Returns a left-padded version of the string")]
     (self, times: @number, seq: @string = ' ') -> @string {
-        return seq * times + self
+        return seq * ([times-self.length, 0].max()) + self
     },
     r_pad: #[desc("Returns a right-padded version of the string")]
     (self, times: @number, seq: @string = ' ') -> @string {
-        return self + seq * times
+        return self + seq * ([times-self.length, 0].max())
     },
     l_trim: #[desc("Returns a left-trimmed verison of the string") example("
 str1 = '      abcd g    '
