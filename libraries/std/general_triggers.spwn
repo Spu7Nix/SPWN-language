@@ -240,9 +240,9 @@ return {
     },
 
     pulse_trigger: #[desc("Returns a pulse trigger as an object")
-    example("
-    $.add( pulse_trigger(10g,255,0,0,fade_out = 0.5).with(X,600) )
-    $.add( pulse_trigger(10c,255,0,0,fade_out = 0.5).with(X,600) )
+    example(u"
+        $.add( pulse_trigger(10g,255,0,0,fade_out = 0.5).with(X,600) )
+        $.add( pulse_trigger(10c,255,0,0,fade_out = 0.5).with(X,600) )
     ")]
     (
         #[desc("Target to pulse (group or color)")] target: @group | @color,

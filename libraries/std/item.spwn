@@ -18,10 +18,10 @@ impl @item {
     },
 
     if_is:
-    #[desc("Implementation of the instant count trigger") example("
-10i.if_is(EQUAL_TO, 5, !{
-    BG.pulse(rgb8(255, 0, 0), fade_out = 0.5)
-})
+    #[desc("Implementation of the instant count trigger") example(u"
+        10i.if_is(EQUAL_TO, 5, !{
+            BG.pulse(rgb8(255, 0, 0), fade_out = 0.5)
+        })
     ")]
     (
         self,
@@ -40,10 +40,10 @@ impl @item {
     },
 
     count:
-    #[desc("Implementation of the count trigger (-> returns an event for when an item reaches a certain value)") example("
-on(10i.count(100), !{
-    BG.pulse(rgb8(0, 255, 0), fade_out = 0.5) // will pulse each time item ID 10 becomes 100
-})
+    #[desc("Implementation of the count trigger (-> returns an event for when an item reaches a certain value)") example(u"
+        on(10i.count(100), !{
+            BG.pulse(rgb8(0, 255, 0), fade_out = 0.5) // will pulse each time item ID 10 becomes 100
+        })
     ")]
     (
         self,
@@ -62,9 +62,9 @@ on(10i.count(100), !{
         }
 
     },
-    _range_: #[desc("Implementation of the range operator (`..`) for item IDs") example("
-for item in 1i..10i {
-    item.add(10)
-}
+    _range_: #[desc("Implementation of the range operator (`..`) for item IDs") example(u"
+        for item in 1i..10i {
+            item.add(10)
+        }
     ")] create_range_macro(@item)
 }

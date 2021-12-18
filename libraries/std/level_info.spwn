@@ -75,9 +75,9 @@ matches = (v, p: MATCHER) -> @bool => switch p {
 return {
 	objects: level_objects,
 	get_objects: #[desc("Returns an array of all the objects in the level with a property whose value matches the pattern or macro")
-	example("
-objects_over_x_50 = get_objects(obj_props.X, >50)
-objects_with_group_2 = get_objects(obj_props.GROUPS, g => 2g in g)
+	example(u"
+		objects_over_x_50 = get_objects(obj_props.X, >50)
+		objects_with_group_2 = get_objects(obj_props.GROUPS, g => 2g in g)
     ")] (
         prop: @object_key,
         match: MATCHER,
@@ -85,11 +85,11 @@ objects_with_group_2 = get_objects(obj_props.GROUPS, g => 2g in g)
 		return level_objects.filter(o => prop in o && matches(o[prop], match))
     },
 	get_marker: #[desc("Returns the first text object found with the given text, or null if none are found")
-	example('
-extract obj_props
+	example(u'
+		extract obj_props
 
-thing_marker = get_marker("thing marker")
-$.add( move_trigger(1g,10,0).with(X, thing_marker[X] ) )
+		thing_marker = get_marker("thing marker")
+		$.add( move_trigger(1g,10,0).with(X, thing_marker[X] ) )
 	')] (
 		text: @string,
 	) -> @object | @NULL {

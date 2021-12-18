@@ -1,22 +1,22 @@
 #[no_std, cache_output]
 impl @array {
 
-    is_empty: #[desc("Returns true if the array has a length of 0, false otherwise.") example("
-arr = []
-arr2 = [1, 2, 3]
-$.assert(arr.is_empty())
-$.assert(!arr2.is_empty())
+    is_empty: #[desc("Returns true if the array has a length of 0, false otherwise.") example(u"
+        arr = []
+        arr2 = [1, 2, 3]
+        $.assert(arr.is_empty())
+        $.assert(!arr2.is_empty())
     ")]
     (self) -> @bool {
         return self.length == 0;
     },
 
-    max: #[desc("Gets the highest number in the array.") example("
-arr = [3, 1, 4, 1]
-$.assert(arr.max() == 4)
+    max: #[desc("Gets the highest number in the array.") example(u"
+        arr = [3, 1, 4, 1]
+        $.assert(arr.max() == 4)
 
-arr = ['abc', 'b', 'abdc']
-$.assert(arr.max(key = (el: @string) => el.length) == 'abdc')
+        arr = ['abc', 'b', 'abdc']
+        $.assert(arr.max(key = (el: @string) => el.length) == 'abdc')
     ")]
     (self, key: _ -> _ = (el) => el) -> _ {
         let highest = self[0]
@@ -30,12 +30,12 @@ $.assert(arr.max(key = (el: @string) => el.length) == 'abdc')
         return highest
     },
 
-    min: #[desc("Gets the lowest number in the array.") example("
-arr = [3, 1, 4, 1]
-$.assert(arr.min() == 1)
+    min: #[desc("Gets the lowest number in the array.") example(u"
+        arr = [3, 1, 4, 1]
+        $.assert(arr.min() == 1)
 
-arr = ['abc', 'b', 'abdc']
-$.assert(arr.min(key = (el: @string) => el.length) == 'b')
+        arr = ['abc', 'b', 'abdc']
+        $.assert(arr.min(key = (el: @string) => el.length) == 'b')
     ")]
     (self, key: _ -> _ = (el) => el) -> _ {
         let lowest = self[0]
@@ -48,18 +48,18 @@ $.assert(arr.min(key = (el: @string) => el.length) == 'b')
         return lowest
     },
 
-    contains: #[desc("See if array contains an element.") example("
-fruit = ['apple', 'banana', 'mango']
-$.assert(fruit.contains('banana'))
+    contains: #[desc("See if array contains an element.") example(u"
+        fruit = ['apple', 'banana', 'mango']
+        $.assert(fruit.contains('banana'))
     ")]
     (self, el) -> @bool {
 		return el in self
 	},
 
-    index: #[desc("Gets the index of an element (if it doesn't exist, `null` is returned)") example("
-fruit = ['apple', 'banana', 'mango']
-$.assert(fruit.index('apple') == 0)
-$.assert(fruit.index('carrot') == null)
+    index: #[desc("Gets the index of an element (if it doesn't exist, `null` is returned)") example(u"
+        fruit = ['apple', 'banana', 'mango']
+        $.assert(fruit.index('apple') == 0)
+        $.assert(fruit.index('carrot') == null)
     ")]
     (self, el, #[desc("Index to start the search from")] from: @number = 0) -> @number {
         for i in from..self.length {
@@ -70,10 +70,10 @@ $.assert(fruit.index('carrot') == null)
         return null
     },
 
-    index_last: #[desc("Gets the index of the last occurence of an element (if it doesn't exist, `null` is returned)") example("
-arr = [1,-5,2,4,2,6]
-$.assert(arr.index_last(2) == 4)
-$.assert(arr.index_last(-3) == null)
+    index_last: #[desc("Gets the index of the last occurence of an element (if it doesn't exist, `null` is returned)") example(u"
+        arr = [1,-5,2,4,2,6]
+        $.assert(arr.index_last(2) == 4)
+        $.assert(arr.index_last(-3) == null)
     ")]
     (self, el, #[desc("Index to end the search at")] until: @number = 0) -> @number {
         for i in self.length..until {
@@ -84,7 +84,7 @@ $.assert(arr.index_last(-3) == null)
         return null
     },
 
-    index_all: #[desc("Returns an array of all occurences of an element") example("
+    index_all: #[desc("Returns an array of all occurences of an element") example(u"
 arr = [1,-5,2,4,2,6]
 $.assert(arr.index_all(2) == [2,4])
     ")]
@@ -98,18 +98,18 @@ $.assert(arr.index_all(2) == [2,4])
         return occurences
     },
 
-    clear: #[desc("Clears the array.") example("
-let arr = [1, 2, 3]
-arr.clear()
-$.assert(arr.is_empty())
+    clear: #[desc("Clears the array.") example(u"
+        let arr = [1, 2, 3]
+        arr.clear()
+        $.assert(arr.is_empty())
     ")]
     (self) -> @NULL {
         self = []
     },
 
-    reverse: #[desc("Reverses the array.") example("
-let arr = [1, 2, 3]
-$.assert(arr.reverse() == [3, 2, 1])
+    reverse: #[desc("Reverses the array.") example(u"
+        let arr = [1, 2, 3]
+        $.assert(arr.reverse() == [3, 2, 1])
     ")]
     (self) -> @array {
         if self.length == 0 {
@@ -124,23 +124,23 @@ $.assert(arr.reverse() == [3, 2, 1])
         return ret;
     },
 
-    average: #[desc("Returns the average of the numbers in the array.") example("
-let arr = [5, 1, 5, 3, 2]
-$.assert(arr.average() == 3.2)
+    average: #[desc("Returns the average of the numbers in the array.") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        $.assert(arr.average() == 3.2)
     ")]
     (self) -> @number {
         numbers = self.filter(v => (v is @number) && v - v == 0)
         return numbers.sum() / numbers.length
     },
 
-    center: #[desc("Returns the item in the center of the array.") example("
-let arr = [5, 1, 5, 3, 2]
-$.assert(arr.center() == 5)
-$.assert(arr.center(true) == 5)
+    center: #[desc("Returns the item in the center of the array.") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        $.assert(arr.center() == 5)
+        $.assert(arr.center(true) == 5)
 
-let arr = [5, 1, 5, 3]
-$.assert(arr.center() == 1)
-$.assert(arr.center(true) == 5)   
+        let arr = [5, 1, 5, 3]
+        $.assert(arr.center() == 1)
+        $.assert(arr.center(true) == 5)   
     ")]
     (self, ceil: @bool = false) -> _ {
         if self.length == 0 {return null}
@@ -149,9 +149,9 @@ $.assert(arr.center(true) == 5)
         return self[index]
     },
 
-    most: #[desc("Returns the item that appears most times.") example("
-let arr = [5, 1, 5, 3, 2]
-$.assert(arr.most() == 5)
+    most: #[desc("Returns the item that appears most times.") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        $.assert(arr.most() == 5)
     ")]
     (self, last: @bool = false) -> _ {
         if self.length == 0 {return null}
@@ -175,11 +175,11 @@ $.assert(arr.most() == 5)
         return array[mass[0]]
     },
 
-    partition: #[desc("Partitions the array into two arrays where the first array resulted into true and the second array resulted into false.") example("
-let arr = [5, 1, 5, 3, 2]
-let [bigger, smaller] = arr.partition(v => v > 4)
-$.assert(bigger == [5, 5])
-$.assert(smaller == [1, 3, 2])
+    partition: #[desc("Partitions the array into two arrays where the first array resulted into true and the second array resulted into false.") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        let [bigger, smaller] = arr.partition(v => v > 4)
+        $.assert(bigger == [5, 5])
+        $.assert(smaller == [1, 3, 2])
     ")]
     (self, cb: @macro = (item) => true) -> [@array] {
         let partition = [[],[]]
@@ -191,9 +191,9 @@ $.assert(smaller == [1, 3, 2])
         return partition
     },
 
-    shuffle: #[desc("Returns the array in random order.") example("
-let arr = [5, 1, 5, 3, 2]
-$.print(arr.shuffle())
+    shuffle: #[desc("Returns the array in random order.") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        $.print(arr.shuffle())
     ")]
     (self) -> @array {
         let clone = self
@@ -205,9 +205,9 @@ $.print(arr.shuffle())
         return array
     },
 
-    unique: #[desc("Returns the array only with items that didn't appear before.") example("
-let arr = [5, 1, 5, 3, 2]
-$.assert(arr.unique() == [5, 1, 3, 2])
+    unique: #[desc("Returns the array only with items that didn't appear before.") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        $.assert(arr.unique() == [5, 1, 3, 2])
     ")]
     (self) -> @array {
         let array = []
@@ -219,46 +219,46 @@ $.assert(arr.unique() == [5, 1, 3, 2])
         return array
     },
 
-    pick: #[desc("Returns an item from the array by random.") example("
-let arr = [5, 1, 5, 3, 2]
-$.print(arr.pick())
+    pick: #[desc("Returns an item from the array by random.") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        $.print(arr.pick())
     ")]
     (self){
         return $.random(self)
     },
 
-    push: #[desc("Pushes a value to the end of the array.") example("
-let arr = [1, 2, 3]
-arr.push(4)
-$.assert(arr == [1, 2, 3, 4])
+    push: #[desc("Pushes a value to the end of the array.") example(u"
+        let arr = [1, 2, 3]
+        arr.push(4)
+        $.assert(arr == [1, 2, 3, 4])
     ")]
     (self, value) -> @NULL {
         $.append(self, value)
     },
 
-    pop: #[desc("Removes a specific index from the array and returns it.") example("
-let arr = [1, 2, 3, 4]
-arr.pop()
-$.assert(arr == [1, 2, 3])
-arr.pop(1)
-$.assert(arr == [1, 3])
+    pop: #[desc("Removes a specific index from the array and returns it.") example(u"
+        let arr = [1, 2, 3, 4]
+        arr.pop()
+        $.assert(arr == [1, 2, 3])
+        arr.pop(1)
+        $.assert(arr == [1, 3])
     ")]
     (self, index: @number = -1) -> _ {
         let index = index % self.length // to correct for negative values
         return $.remove_index(self, index)
     },
 
-    remove: #[desc("Returns array with all elements that match value removed") example("
-let arr = [1, 2, 3, 4, 5]
-$.assert(arr.remove(3) == [1, 2, 4, 5])
+    remove: #[desc("Returns array with all elements that match value removed") example(u"
+        let arr = [1, 2, 3, 4, 5]
+        $.assert(arr.remove(3) == [1, 2, 4, 5])
     ")]
     (self, index: @number) -> @array {
         return self.map(x => x if x != index else null).filter(el => el != null)
     },
 
-    map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results, or modifies in place if specified.") example("
-arr = [1, 2, 3, 4, 5]
-$.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
+    map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results, or modifies in place if specified.") example(u"
+        arr = [1, 2, 3, 4, 5]
+        $.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
     ")]
     (self, cb: _ -> _, in_place: @bool = false) -> @array | @NULL {
         if !in_place {
@@ -274,9 +274,9 @@ $.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
         }
     },
 
-    map_index: #[desc("Calls a defined callback function on each element of an array along with its index, and returns an array that contains the results, or modifies in place if specified.") example("
-arr = [1, 2, 3, 4, 5]
-$.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
+    map_index: #[desc("Calls a defined callback function on each element of an array along with its index, and returns an array that contains the results, or modifies in place if specified.") example(u"
+        arr = [1, 2, 3, 4, 5]
+        $.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
     ")]
     (self, cb: (_, @number) -> _, in_place: @bool = false) -> @array | @NULL {
         if !in_place {
@@ -292,9 +292,9 @@ $.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
         }
     },
 
-    filter: #[desc("Returns the elements of an array that meet the condition specified in the callback function.") example("
-arr = [1, 2, 3, 4, 5]
-$.assert(arr.filter(el => el > 3) == [4, 5])
+    filter: #[desc("Returns the elements of an array that meet the condition specified in the callback function.") example(u"
+        arr = [1, 2, 3, 4, 5]
+        $.assert(arr.filter(el => el > 3) == [4, 5])
     ")]
     (self, cb: _ -> @bool, in_place: @bool = false) -> @array | @NULL {
         let output = [];
@@ -313,10 +313,10 @@ $.assert(arr.filter(el => el > 3) == [4, 5])
     },
 
     reduce: #[desc("Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
-    example("
-arr = [1, 2, 3, 4, 5]
-sum = arr.reduce((acum, el) => acum + el)
-$.assert(sum == 15)
+    example(u"
+        arr = [1, 2, 3, 4, 5]
+        sum = arr.reduce((acum, el) => acum + el)
+        $.assert(sum == 15)
     ")]
     (self, cb: (_, _) -> _) -> _ {
         let acum = self[0];
@@ -326,11 +326,11 @@ $.assert(sum == 15)
         return acum;
     },
 
-    any: #[desc("Determines whether the specified callback function returns true for any element of an array.") example("
-arr = [false, false, true, false]
-$.assert(arr.any())
-arr2 = [1, 2, 3, 1, 4, -1, 7]
-$.assert(arr2.any(el => el < 0)) // checks if the array contains any negative elements
+    any: #[desc("Determines whether the specified callback function returns true for any element of an array.") example(u"
+        arr = [false, false, true, false]
+        $.assert(arr.any())
+        arr2 = [1, 2, 3, 1, 4, -1, 7]
+        $.assert(arr2.any(el => el < 0)) // checks if the array contains any negative elements
     ")]
     (self, map: _ -> @bool = (a) => @bool(a)) -> @bool {
         for item in self {
@@ -341,11 +341,11 @@ $.assert(arr2.any(el => el < 0)) // checks if the array contains any negative el
         return false
     },
 
-    all: #[desc("Determines whether all the members of an array satisfy the specified callback.") example("
-arr = [true, true, true]
-$.assert(arr.all())
-arr2 = [1, 2, 3, 1, 4, 7]
-$.assert(arr2.all(el => el > 0)) // checks if the array contains only positive elements
+    all: #[desc("Determines whether all the members of an array satisfy the specified callback.") example(u"
+        arr = [true, true, true]
+        $.assert(arr.all())
+        arr2 = [1, 2, 3, 1, 4, 7]
+        $.assert(arr2.all(el => el > 0)) // checks if the array contains only positive elements
     ")]
     (self, map: _ -> @bool = (a) => @bool(a)) -> @bool {
         for item in self {
@@ -356,12 +356,12 @@ $.assert(arr2.all(el => el > 0)) // checks if the array contains only positive e
         return true
     },
 
-    sum: #[desc("Gets the sum of the values in the array.") example('
-arr = [1, 2, 3, 4, 5]
-$.assert(arr.sum() == 15)
-arr2 = ["abc", "ab", "abcd"]
-$.assert(arr2.sum(a => a.length) == 9)
-    ')]
+    sum: #[desc("Gets the sum of the values in the array.") example(u"
+        arr = [1, 2, 3, 4, 5]
+        $.assert(arr.sum() == 15)
+        arr2 = ['abc', 'ab', 'abcd']
+        $.assert(arr2.sum(a => a.length) == 9)
+    ")]
     (self, cb: _ -> _ = a => a) -> _ {
         let result = cb(self[0])
         for i in self[1:] {
@@ -386,18 +386,18 @@ $.assert(arr2.sum(a => a.length) == 9)
         return i + 1
     },
 
-    sort: #[desc("Sorts array in-place") example("
-let arr = [5, 1, 5, 3, 2]
-arr.sort()
-$.assert(arr == [1, 2, 3, 5, 5])
+    sort: #[desc("Sorts array in-place") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        arr.sort()
+        $.assert(arr == [1, 2, 3, 5, 5])
 
-let arr = [5, 1, 5, 3, 2]
-arr.sort(begin = 2, end = 4)
-$.assert(arr == [5, 1, 2, 3, 5])
+        let arr = [5, 1, 5, 3, 2]
+        arr.sort(begin = 2, end = 4)
+        $.assert(arr == [5, 1, 2, 3, 5])
 
-let arr = [5, 1, 5, 3, 2]
-arr.sort(comp = (a, b) => a >= b)
-$.assert(arr == [5, 5, 3, 2, 1])
+        let arr = [5, 1, 5, 3, 2]
+        arr.sort(comp = (a, b) => a >= b)
+        $.assert(arr == [5, 5, 3, 2, 1])
     ")]
     (self, begin: @number = 0, end: @number = -1, comp: (_, _) -> @bool = (a, b) => a <= b) -> @NULL {
 
@@ -418,11 +418,11 @@ $.assert(arr == [5, 5, 3, 2, 1])
         }
     },
 
-    sorted: #[desc("Returns a sorted verison of the array") example("
-arr = [5, 1, 5, 3, 2]
-$.assert(arr.sorted() == [1, 2, 3, 5, 5])
-$.assert(arr.sorted(begin = 2, end = 4) == [5, 1, 2, 3, 5])
-$.assert(arr.sorted(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
+    sorted: #[desc("Returns a sorted verison of the array") example(u"
+        arr = [5, 1, 5, 3, 2]
+        $.assert(arr.sorted() == [1, 2, 3, 5, 5])
+        $.assert(arr.sorted(begin = 2, end = 4) == [5, 1, 2, 3, 5])
+        $.assert(arr.sorted(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
     ")]
     (self, begin: @number = 0, end: @number = -1, comp: (_, _) -> @bool = (a, b) => a <= b) -> @array {
         let new_arr = self
@@ -431,38 +431,38 @@ $.assert(arr.sorted(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
         return new_arr
     },
 
-    shift: #[desc("Removes the first index from the array and returns it.") example("
-let arr = [5, 1, 5, 3, 2]
-$.assert(arr.shift() == 5)
-$.assert(arr == [1, 5, 3, 2])
+    shift: #[desc("Removes the first index from the array and returns it.") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        $.assert(arr.shift() == 5)
+        $.assert(arr == [1, 5, 3, 2])
     ")]
     (self) -> _ {
         return self.pop(0)
     },
 
-    unshift: #[desc("Pushes a value to the start of the array and returns it.") example("
-let arr = [1, 5, 3, 2]
-$.assert(arr.unshift(5) == 5)
-$.assert(arr == [5, 1, 5, 3, 2])
+    unshift: #[desc("Pushes a value to the start of the array and returns it.") example(u"
+        let arr = [1, 5, 3, 2]
+        $.assert(arr.unshift(5) == 5)
+        $.assert(arr == [5, 1, 5, 3, 2])
     ")]
     (self, value) -> _ {
         self = [value] + self
         return value
     },
 
-    insert: #[desc("Pushes a value at a certain index of the array and returns it.") example("
-let arr = [1, 5, 3, 2]
-$.assert(arr.insert(2, 7) == 7)
-$.assert(arr == [1, 5, 7, 3, 2])
+    insert: #[desc("Pushes a value at a certain index of the array and returns it.") example(u"
+        let arr = [1, 5, 3, 2]
+        $.assert(arr.insert(2, 7) == 7)
+        $.assert(arr == [1, 5, 7, 3, 2])
     ")]
     (self, index: @number, value) -> _ {
         self = self[:index] + [value] + self[index:]
         return value
     },
 
-    flatten: #[desc("Flattens any sub-arrays into one big array.") example("
-arr = [1, 2, [3, 4], 5, [6, 7, [8]]]
-$.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
+    flatten: #[desc("Flattens any sub-arrays into one big array.") example(u"
+        arr = [1, 2, [3, 4], 5, [6, 7, [8]]]
+        $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
     ")]
     (self) -> @array {
         let output = [];
@@ -480,17 +480,17 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         return output
     },
 
-    enumerate: #[desc("Returns an array of index-element pairs") example('
-    arr = ["a","b","c"]
-    for i in arr.enumerate() {
-        $.print(i[0], ": ", i[1])
-    }
-    /* output:
-    0: a
-    1: b
-    2: c
-    */
-        ')]
+    enumerate: #[desc("Returns an array of index-element pairs") example(u"
+        arr = ['a','b','c']
+        for i in arr.enumerate() {
+            $.print(i[0], ': ', i[1])
+        }
+        /* output:
+        0: a
+        1: b
+        2: c
+        */
+    ")]
     (self, #[desc("Return the pair as a dictionary")] dict: @bool = false) -> [@dictionary | @array] {
         if dict {
             return @array(0..self.length).map(i => {index: i, value: self[i]})
@@ -498,10 +498,10 @@ $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
         return @array(0..self.length).map(i => [i, self[i]])
     },
 
-    split: #[desc("Splits the array on the indicies") example("
-x = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]  
-$.assert(x.split([5]) == [[0,1,2,3,4],[5,6,7,8,9]])
-$.assert(x.split([5, 7]) == [[0,1,2,3,4],[5,6],[7,8,9]])
+    split: #[desc("Splits the array on the indicies") example(u"
+        x = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]  
+        $.assert(x.split([5]) == [[0,1,2,3,4],[5,6,7,8,9]])
+        $.assert(x.split([5, 7]) == [[0,1,2,3,4],[5,6],[7,8,9]])
     ")]
     (self, indicies: [@number]) -> [@array] {
         let ret_arr = []
@@ -517,14 +517,14 @@ $.assert(x.split([5, 7]) == [[0,1,2,3,4],[5,6],[7,8,9]])
         return ret_arr
     },
 
-    scan: #[desc("Takes in an initial value and a macro which acts on a reference of that value and each array value.") example("
-x = [1,2,3]
-x_1 = x.scan(10, (&state, x){
-    state *= x
-    return -state
-})
-$.assert(x_1 == [-10, -20, -60])
-")]
+    scan: #[desc("Takes in an initial value and a macro which acts on a reference of that value and each array value.") example(u"
+        x = [1,2,3]
+        x_1 = x.scan(10, (&state, x){
+            state *= x
+            return -state
+        })
+        $.assert(x_1 == [-10, -20, -60])
+    ")]
     (self, state, closure: (_, _) -> _) -> @array { // TODO: add & in macro patterns
         let state = state
         let ret_arr = []
