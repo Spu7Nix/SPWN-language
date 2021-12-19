@@ -143,15 +143,19 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
 	},
     l_pad: #[desc("Returns a left-padded version of the string")]
     (self, times: @number, seq: @string = ' ') -> @string {
+        if self.length >= times { return self }
         pad = seq if seq.length > 0 else ' '
         len = [times-self.length, 0].max()
-        return (pad * len).substr(0,len) + self
+        mul = $.ceil(len / pad.length)
+        return (pad * mul).substr(0, len) + self
     },
     r_pad: #[desc("Returns a right-padded version of the string")]
     (self, times: @number, seq: @string = ' ') -> @string {
+        if self.length >= times { return self }
         pad = seq if seq.length > 0 else ' '
         len = [times-self.length, 0].max()
-        return self + (pad * len).substr(0,len)
+        mul = $.ceil(len / pad.length)
+        return self + (pad * mul).substr(0, len)
     },
     l_trim: #[desc("Returns a left-trimmed verison of the string") example("
 str1 = '      abcd g    '
