@@ -56,6 +56,19 @@ $.assert(fruit.contains('banana'))
 		return el in self
 	},
 
+    join: #[desc("Joins the array using the string.") example(u"
+        fruit = ['apple', 'banana', 'mango']
+        $.assert(fruit.join(' ') == 'apple banana mango')
+    ")]
+    (self, joiner: @string = ' ') -> @string {
+        let output = ''
+        for i in 0..self.length {
+            if i > 0 { output += joiner }
+            output += self[i] as @string
+        }
+        return output
+    },
+
     index: #[desc("Gets the index of an element (if it doesn't exist, `null` is returned)") example("
 fruit = ['apple', 'banana', 'mango']
 $.assert(fruit.index('apple') == 0)
