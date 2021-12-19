@@ -383,22 +383,6 @@ $.assert(arr2.sum(a => a.length) == 9)
         return result
     },
 
-    _partition: #[desc("Private function needed for .sort()")]
-    (self, low: @number, high: @number, comp: (_, _) -> @bool = (a, b) => a <= b) {
-        pivot = self[high]
-        let i = low - 1
-
-        for j in low..high {
-            if comp(self[j], pivot) {
-                i += 1
-                self[i] <=> self[j]
-            }
-        }
-
-        self[i+1] <=> self[high]
-        return i + 1
-    },
-
     sort: #[desc("Sorts array in-place") example("
 let arr = [5, 1, 5, 3, 2]
 arr.sort()
