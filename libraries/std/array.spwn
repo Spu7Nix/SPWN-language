@@ -383,36 +383,19 @@ $.assert(arr2.sum(a => a.length) == 9)
         return result
     },
 
-    sort: #[desc("Sorts array in-place") example("
-let arr = [5, 1, 5, 3, 2]
-arr.sort()
-$.assert(arr == [1, 2, 3, 5, 5])
+    sort: #[desc("Returns a sorted verison of the array") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        $.assert(arr.sort() == [1, 2, 3, 5, 5])
 
-let arr = [5, 1, 5, 3, 2]
-arr.sort(begin = 2, end = 4)
-$.assert(arr == [5, 1, 2, 3, 5])
-
-let arr = [5, 1, 5, 3, 2]
-arr.sort(comp = (a, b) => a >= b)
-$.assert(arr == [5, 5, 3, 2, 1])
+        let arr = [5, 1, 5, 3, 2]
+        $.assert(arr.sort(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
     ")]
-    (self, begin: @number = 0, end: @number = -1, comp: (_, _) -> @bool = (a, b) => a <= b) -> @NULL {
-
-        // when end == -1, that means the end of the array, but comparing to -1 doesnt work so switch it back to legnth - 1
-        let new_end = end
-        if end == -1 {
-            new_end = self.length - 1
-        }
-
-        // uses quick sort
-        // no type checking becuase theoretically this can sort anything if it hasthe right comparator
-        // if sort was overloaded we could have two seperate implementations
-        if begin < new_end {
-            let q = self._partition(low = begin, high = new_end, comp = comp)
-
-            self.sort(begin = begin, end = q-1, comp = comp)
-            self.sort(begin = q+1, end = new_end, comp = comp)
-        }
+    (self, comp: (_,_) -> @bool = (a, b) => a <= b) {
+        let array = self
+        if array.length == 0 { return [] }
+        pivot = array.pop()
+        [ truthy, falsy ] = array.partition(i => comp(i,pivot))
+        return truthy.sort(comp = comp) + [pivot] + falsy.sort(comp = comp) // heskell quicksort goes brr
     },
 
     sorted: #[desc("Returns a sorted verison of the array") example("
