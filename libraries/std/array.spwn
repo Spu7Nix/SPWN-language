@@ -390,11 +390,17 @@ $.assert(arr2.sum(a => a.length) == 9)
         let arr = [5, 1, 5, 3, 2]
         $.assert(arr.sort(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
     ")]
-    (self, comp: (_,_) -> @bool = (a, b) => a <= b) {
+    (self, comp: (_,_) -> @bool | @number = (a, b) => a <= b) -> @array {
         let array = self
         if array.length == 0 { return [] }
         pivot = array.pop()
-        [ truthy, falsy ] = array.partition(i => comp(i,pivot))
+        [ truthy, falsy ] = array.partition((i){
+            result = comp(i,pivot)
+            return switch result {
+                @bool: result,
+                @number: result < 0,
+            }
+        })
         return truthy.sort(comp = comp) + [pivot] + falsy.sort(comp = comp) // heskell quicksort goes brr
     },
 
