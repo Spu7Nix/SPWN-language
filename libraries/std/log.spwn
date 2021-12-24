@@ -1,7 +1,7 @@
 #[no_std, cache_output]
 
 util = import 'util.spwn'
-extract (import 'constants.spwn').colors
+extract import 'constants.spwn'.colors
 import 'chroma.spwn'
 import 'dictionary.spwn'
 import 'string.spwn'
@@ -22,8 +22,16 @@ log_time = (label: @string, time: @number) {
     )
 }
 
+type @runtime_log
+impl @runtime_log {
+    flash: (color: @chroma){
+        -> BG.pulse(color, 0.1, 0.1, 0.1)
+    },
+}
+
 type @log
 impl @log {
+    runtime: @runtime_log,
     time: (label: @string = default) -> @NULL {
         instant = $.time()
         data.time_labels.set(label, instant)
