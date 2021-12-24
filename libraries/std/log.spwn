@@ -1,0 +1,63 @@
+#[no_std, cache_output]
+
+util = import 'util.spwn'
+extract (import 'constants.spwn').colors
+import 'chroma.spwn'
+import 'dictionary.spwn'
+import 'string.spwn'
+
+let data = {
+    time_labels: {},
+    counts: {},
+}
+
+default = 'default'
+
+log_time = (label: @string, time: @number) {
+    $.print(
+        "{}: {}".fmt([
+            label,
+            util.prettify_time(time)
+        ])
+    )
+}
+
+type @log
+impl @log {
+    time: (label: @string = default) -> @NULL {
+        instant = $.time()
+        data.time_labels.set(label, instant)
+    },
+    time_log: (label: @string) -> @NULL {
+        instant = $.time()
+        if !(label in data.time_labels) {
+            throw "Label {} not found".fmt(label)
+        }
+        log_time(label, instant - data.time_labels.get(label))
+    },
+    time_end: (label = default) -> @NULL {
+        instant = $.time()
+        if !(label in data.time_labels) {
+            throw "Label {} does not exist".fmt($.display(label))
+        }
+        log_time(label, instant - data.time_labels.get(label))
+        // how to remove a key from a dict?
+    },
+    count: (label: @string = default) -> @NULL {
+        count = switch label {
+            in data.counts: (){
+                count = data.counts.get(label) + 1
+                data.counts.set(label, count)
+                return count
+            }(),
+            else: (){
+                data.counts.set(label, 1)
+                return 1
+            }()
+        }
+        $.print("{0}: {1}".fmt([label, count]))
+    },
+    reset_count: (label: @string = default) -> @NULL {
+        data.counts.set(label, 0)
+    },
+}
