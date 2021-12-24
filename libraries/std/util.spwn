@@ -19,5 +19,40 @@ MATCHER = @pattern | bool_macro
     matches: (v, p: MATCHER) -> @bool => switch p {
         @pattern: v is p,
         @macro: p(v)
-    }
+    },
+    prettify_time: (time: @number){
+        let microseconds = $.floor(time * 1000000)
+        let milliseconds = $.floor(time * 1000)
+        let seconds = $.floor(time)
+        let minutes = $.floor(seconds / 60)
+        let hours = $.floor(minutes / 60)
+        let days = $.floor(hours / 24)
+        let years = $.floor(days / 365)
+
+        timings = [
+            [years, "y"],
+            [days % 365, "d"],
+            [hours % 24, "h"],
+            [minutes % 60, "m"],
+            [seconds % 60, "s"],
+            [milliseconds % 1000, "ms"],
+            [microseconds % 1000, "µs"],
+        ]
+
+        max = 3
+
+        let out = []
+        let skip = false
+
+        for i in 0..timings.length {
+            if out.length >= max { break }
+            [ quantity, scale ] = timings[i]
+            if quantity > 0 || skip == true {
+                out.push("{}{}".fmt([quantity, scale]))
+                skip = true
+            }
+        }
+
+        return out.join(' ')
+    },
 }
