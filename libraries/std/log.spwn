@@ -24,7 +24,12 @@ log_time = (label: @string, time: @number) {
 
 type @runtime_log
 impl @runtime_log {
-    flash: (color: @chroma){
+    flash: #[desc('Flashes the background') example(u"
+        while_loop(() => true, (){
+            5g!
+            @log::runtime::flash()
+        }, delay = 1)
+    ")](color: @chroma = rgb(1,1,1)) -> @NULL {
         -> BG.pulse(color, 0.1, 0.1, 0.1)
     },
 }
@@ -32,18 +37,36 @@ impl @runtime_log {
 type @log
 impl @log {
     runtime: @runtime_log,
-    time: (label: @string = default) -> @NULL {
+    time: #[desc("Saves the current time to a given label.") example(u"
+        @log::time('start')
+
+        // <insert all your heavy code here>
+
+        @log::time_end('start')
+    ")] (label: @string = default) -> @NULL {
         instant = $.time()
         data.time_labels.set(label, instant)
     },
-    time_log: (label: @string) -> @NULL {
+    time_log: #[desc("Logs the time between now and the start of the label.") example(u"
+        @log::time('for')
+        
+        for i in 0..10 {
+            @log::time_log('for')
+        }
+    ")] (label: @string) -> @NULL {
         instant = $.time()
         if !(label in data.time_labels) {
             throw "Label {} not found".fmt(label)
         }
         log_time(label, instant - data.time_labels.get(label))
     },
-    time_end: (label = default) -> @NULL {
+    time_end: #[desc("Logs the time between now and the start of the label and destroys it (it doesn't for now 💀).") example(u"
+        @log::time('huge loop')
+
+        for i in 0..100000 {}
+
+        @log::time_end('huge loop')
+    ")] (label = default) -> @NULL {
         instant = $.time()
         if !(label in data.time_labels) {
             throw "Label {} does not exist".fmt($.display(label))
@@ -51,21 +74,26 @@ impl @log {
         log_time(label, instant - data.time_labels.get(label))
         // how to remove a key from a dict?
     },
-    count: (label: @string = default) -> @NULL {
-        count = switch label {
-            in data.counts: (){
-                count = data.counts.get(label) + 1
-                data.counts.set(label, count)
-                return count
-            }(),
-            else: (){
-                data.counts.set(label, 1)
-                return 1
-            }()
+    count: #[desc("Logs how many times the label got counted.") example(u"
+        for i in 0..10 {
+            @log::count('my loop')
         }
+    ")] (label: @string = default) -> @NULL {
+        count = data.counts.get(label) + 1 if label in data.counts else 1
+        data.counts.set(label, count)
         $.print("{0}: {1}".fmt([label, count]))
     },
-    reset_count: (label: @string = default) -> @NULL {
+    reset_count: #[desc("Resets the counted amount of the label.") example(u"
+        for i in 0..10 {
+            @log::count('loop')
+        }
+
+        @log::reset_count('loop')
+
+        for i in 0..10 {
+            @log::count('loop')
+        }
+    ")] (label: @string = default) -> @NULL {
         data.counts.set(label, 0)
     },
 }
