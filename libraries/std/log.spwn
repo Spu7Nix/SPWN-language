@@ -29,7 +29,7 @@ impl @runtime_log {
             5g!
             @log::runtime::flash()
         }, delay = 1)
-    ")](color: @chroma = rgb(1,1,1)) -> @NULL {
+    ")](color: @chroma = @chroma::from_rgb(1,1,1)) -> @NULL {
         -> BG.pulse(color, 0.1, 0.1, 0.1)
     },
 }
