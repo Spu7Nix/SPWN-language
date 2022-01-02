@@ -184,7 +184,7 @@ pub enum Token {
     #[token("false")]
     False,
 
-    #[regex(r"[0-9?]+[gbci]")]
+    #[regex(r"([0-9]+|\?)[gbci]")]
     Id,
 
     //TERMINATORS
