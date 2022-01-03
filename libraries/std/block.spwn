@@ -26,7 +26,7 @@ on(touch(), !{
     (
         self,
         #[desc("Block ID to check against")] other: @block
-    ) {
+    ) -> @item {
         item = ?i
         on(events.collision(self, other), !{
             item.add(1)

@@ -220,6 +220,7 @@ pub fn create_error(
     }
 }
 
+#[derive(Debug)]
 pub struct ErrorReport {
     pub info: CompilerInfo,
     pub message: String,
@@ -426,6 +427,7 @@ impl From<RuntimeError> for ErrorReport {
     }
 }
 
+#[derive(Debug)]
 pub enum SyntaxError {
     ExpectedErr {
         expected: String,

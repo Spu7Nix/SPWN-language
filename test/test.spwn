@@ -1,3 +1,5 @@
 
+extract obj_props
 
-$.print(2 + 3 * 4)
+$.print(level_objects)
+$.print(get_objects(X, >15))

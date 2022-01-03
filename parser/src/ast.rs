@@ -15,6 +15,7 @@ pub enum DictDef {
 #[derive(Clone, PartialEq, Debug)]
 pub enum ArrayPrefix {
     Collect,
+    Spread,
     // future-proofing
 }
 
@@ -97,9 +98,16 @@ pub enum ValueBody {
     Macro(Macro),
     Resolved(StoredValue),
     TypeIndicator(String),
+    MacroPattern(MacroPattern),
     SelfVal,
     Ternary(Ternary),
     Null,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MacroPattern {
+    pub args: Vec<Expression>,
+    pub ret: Expression,
 }
 
 impl ValueBody {
@@ -136,6 +144,7 @@ pub struct StrInner {
 #[derive(Clone, PartialEq, Debug)]
 pub enum StringFlags {
     Raw,
+    Unindent
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -168,7 +177,7 @@ pub enum Operator {
     Divide,
     IntDivide,
     As,
-    Has,
+    In,
 
     Exponate,
     Modulate,
@@ -188,6 +197,7 @@ pub enum UnaryOperator {
     LessPattern,
     MoreOrEqPattern,
     LessOrEqPattern,
+    InPattern,
 }
 
 #[derive(Clone, PartialEq, Debug)]

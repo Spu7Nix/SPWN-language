@@ -32,16 +32,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+#[derive(Default)]
 pub struct SpwnCache {
     files: HashMap<SpwnSource, Source>,
-}
-
-impl Default for SpwnCache {
-    fn default() -> Self {
-        Self {
-            files: HashMap::default(),
-        }
-    }
 }
 
 impl ariadne::Cache<SpwnSource> for SpwnCache {
@@ -91,6 +84,7 @@ pub fn run_spwn(code: String, included: Vec<PathBuf>) -> Result<[String; 2], Str
         included,
         notes,
         Default::default(),
+        "".to_string(),
         &mut std_out,
     ) {
         Ok(a) => a,
