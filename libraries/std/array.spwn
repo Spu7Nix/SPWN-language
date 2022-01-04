@@ -361,7 +361,7 @@ $.assert(result == 0.4)
         return acum;
     },
 
-    foldr: #[desc("Calls the specified callback function for all the elements in an array from left to right. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    foldr: #[desc("Calls the specified callback function for all the elements in an array from right to left. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
     example("
 arr = [1, 2, 3, 4, 5]
 sum = arr.foldr($._plus_)
