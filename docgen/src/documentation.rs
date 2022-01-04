@@ -104,7 +104,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         )));
     }
 
-    let mut doc = format!("# Documentation for `{}` \n", name);
+    let mut doc = format!("# Documentation for `{}`\n\n", name);
 
     let exports = globals.stored_values[start_context.inner().return_value].clone();
     let implementations = globals.implementations.clone();
@@ -122,7 +122,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     }) + globals.objects.len();
 
     //if used_groups > 0 || used_colors > 0 || used_blocks > 0 || used_used > 0 {
-    doc += "## Info\n";
+    doc += "\n## Info\n";
     //}
 
     doc += &format!(
@@ -137,7 +137,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         used_groups, used_colors, used_blocks, used_items, total_objects
     );
     if !implementations.is_empty() && implementations.iter().any(|(_, a)| !a.is_empty()) {
-        doc += "# Type Implementations\n";
+        doc += "\n## Type Implementations\n\n";
 
         let mut list: Vec<_> = implementations
             .into_iter()
@@ -181,7 +181,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     }
 
     doc += &format!(
-        "# Exports\n{}",
+        "\n## Exports\n\n{}",
         document_val(&exports, &mut globals, &mut start_context)?
     );
 
@@ -363,7 +363,7 @@ fn document_val(
 
     if literal.len() < 300 {
         doc += &format!(
-            "**Printed**\n\n```spwn\n{}\n```\n\n**Type:**`@{}`\n",
+            "**Printed**\n\n```spwn\n{}\n```\n\n**Type:** `@{}`\n",
             literal, type_name
         );
     } else {
