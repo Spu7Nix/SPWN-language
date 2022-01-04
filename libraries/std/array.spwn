@@ -325,7 +325,7 @@ $.assert(arr.filter(el => el > 3) == [4, 5])
         self = output
     },
 
-    reduce: #[desc("Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    reduce: #[desc("Calls the specified callback function for all the elements in an array with a default value. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
     example("
 arr = [1, 2, 3, 4, 5]
 sum = arr.reduce((acum, el) => acum + el)
@@ -335,10 +335,46 @@ arr = [5, 1, 5, 3, 2]
 product = arr.reduce((acum, el) => acum * el, 1)
 $.assert(product == 150)
     ")]
-    (self, cb: (_, _) -> _, default = 0) -> _ {
+    (self, cb: ((_, _) -> _) | @builtin, default = 0) -> _ {
         let acum = default;
-        for iter in 0..self.length {
+        for iter in self {
+            acum = cb(acum, iter);
+        }
+        return acum;
+    },
+
+    foldl: #[desc("Calls the specified callback function for all the elements in an array from left to right. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    example("
+arr = [1, 2, 3, 4, 5]
+sum = arr.foldl($._plus_)
+$.assert(sum == 15)
+
+arr = [2, 1, 5]
+result = arr.foldl($._divided_by_)
+$.assert(result == 0.4)
+    ")]
+    (self, cb: ((_, _) -> _) | @builtin) -> _ {
+        let acum = self[0];
+        for iter in 1..self.length {
             acum = cb(acum, self[iter]);
+        }
+        return acum;
+    },
+
+    foldr: #[desc("Calls the specified callback function for all the elements in an array from left to right. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    example("
+arr = [1, 2, 3, 4, 5]
+sum = arr.foldr($._plus_)
+$.assert(sum == 15)
+
+arr = [2, 1, 5]
+result = arr.foldr($._divided_by_)
+$.assert(result == 10)
+    ")]
+    (self, cb: ((_, _) -> _) | @builtin) -> _ {
+        let acum = self[-1];
+        for iter in (self.length - 1)..0 {
+            acum = cb(self[iter], acum);
         }
         return acum;
     },
