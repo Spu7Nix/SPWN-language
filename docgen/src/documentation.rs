@@ -266,17 +266,17 @@ fn document_macro(
     //description
     let mut doc = String::new();
     if let Some(s) = mac.tag.get_desc() {
-        doc += &format!("\n#### Description\n\n_{}_\n", s)
+        doc += &format!("\n**Description:**\n\n_{}_\n", s)
     };
 
     if let Some(example) = mac.tag.get_example() {
-        doc += &format!("\n#### Example\n\n```spwn\n{}\n```\n\n", example)
+        doc += &format!("\n**Example:**\n\n```spwn\n{}\n```\n\n", example)
     }
 
     if !(mac.args.is_empty()
         || (mac.args.len() == 1 && mac.args[0].name == globals.SELF_MEMBER_NAME))
     {
-        doc += "\n#### Arguments\n";
+        doc += "\n**Arguments:**\n";
         doc += "
 | # | name | type | default value | description |
 | - | ---- | ---- | ------------- | ----------- |
