@@ -81,14 +81,14 @@ You can either:
 
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
-```cmd
-pacman -U spwn-0.0.7-x86_64-linux_arch.pkg.tar.zst
+```sh
+$ pacman -U spwn-0.0.7-x86_64-linux_arch.pkg.tar.zst
 ```
 
 - Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
 
-```cmd
-yay -S spwn-bin
+```sh
+$ yay -S spwn-bin
 ```
 
 #### Android
