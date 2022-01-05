@@ -83,7 +83,7 @@ You can either:
 
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
-```cmd
+```sh
 pacman -U spwn-0.0.7-x86_64-linux_arch.pkg.tar.zst
 ```
 
