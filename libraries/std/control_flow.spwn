@@ -178,7 +178,7 @@ for_loop(0..10, (i) {
 
         func!
 
-	},
+	}, 
 
 	while_loop: #[desc("Implementation of a conditional spawn loop") example("
 c = counter(11)
