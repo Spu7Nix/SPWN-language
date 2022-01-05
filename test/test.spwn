@@ -1,7 +1,1 @@
-
-
-$.print([2, 1, 5].foldl((a,b) => a / b))
-$.print([2, 1, 5].foldl($._divided_by_))
-
-$.print([2, 1, 5].foldr((a,b) => a / b))
-$.print([2, 1, 5].foldr($._divided_by_))
+$.print(counter().display_object(10, 50))

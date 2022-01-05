@@ -95,6 +95,28 @@ points.display(75, 75)
         });
     },
 
+    
+    display_object:
+    #[desc("Creates a item display object that displays the value of the counter") example("
+points = counter(0)
+points.display(75, 75)
+    ")]
+    (
+        self,
+        #[desc("X pos of display in units (1 grid square = 30 units)")] x: @number,
+        #[desc("Y pos of display in units")] y: @number
+    ) -> @object {
+        extract import "constants.spwn".obj_props
+        return obj {
+            OBJ_ID: 1615,
+            X: x,
+            Y: y,
+            ITEM: self.item,
+            COLOR: 1c,
+            GROUPS: 999g
+        };
+    },
+
     add_to:
     #[desc("Adds the counter's value to a counter (or all counters in a list), and resets the counter to 0 in the process") example("
 a = counter(100)
