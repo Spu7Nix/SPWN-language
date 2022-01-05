@@ -96,7 +96,7 @@ points.display(75, 75)
     },
 
     
-    display_object:
+    to_obj:
     #[desc("Creates a item display object that displays the value of the counter") example("
 points = counter(0)
 points.display(75, 75)
