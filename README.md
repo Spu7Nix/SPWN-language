@@ -41,7 +41,9 @@ You can either use the installers for your operating system, or build SPWN from 
 
 
 ### Universal
+
 #### this method is outdated; use a method described below instead
+
 With Rust installed:
 
 - Run `cargo install spwn`
