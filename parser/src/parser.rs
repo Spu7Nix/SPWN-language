@@ -2667,7 +2667,7 @@ fn parse_variable(
 
         Some(Token::OpenBracket) => {
             if allow_macro_def {
-                fart = true;
+                fart = false;
                 try_parse_macro(tokens, notes, properties.clone(), None)?
             } else {
                 let expr = parse_expr(tokens, notes, true, true)?;
