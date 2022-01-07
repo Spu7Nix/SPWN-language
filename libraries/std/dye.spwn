@@ -1,0 +1,198 @@
+#[no_std, cache_output]
+regex = import "regex.spwn"
+
+ANSI = @regex::new(r"(\u{1b})(\[([0-9;]*m)+)")
+
+type @dye
+impl @dye {
+
+	FORE: #[desc("The foreground colour of the text") example("@dye::FORE.RED | @dye::FORE.LIGHT_RED")]
+	{
+		BLACK: "\u{1b}[30m",
+		RED: "\u{1b}[31m",
+		GREEN: "\u{1b}[32m",
+		YELLOW: "\u{1b}[33m",
+		BLUE: "\u{1b}[34m",
+		MAGENTA: "\u{1b}[35m",
+		CYAN: "\u{1b}[36m",
+		WHITE: "\u{1b}[37m",
+		
+		LIGHT_BLACK: "\u{1b}[90m",
+		LIGHT_RED: "\u{1b}[91m",
+		LIGHT_GREEN: "\u{1b}[92m",
+		LIGHT_YELLOW: "\u{1b}[93m",
+		LIGHT_BLUE: "\u{1b}[94m",
+		LIGHT_MAGENTA: "\u{1b}[95m",
+		LIGHT_CYAN: "\u{1b}[96m",
+		LIGHT_WHITE: "\u{1b}[97m",
+	},
+
+	BACK: #[desc("The background colour of the text") example("@dye::BACK.RED | @dye::BACK.LIGHT_RED")]
+	{
+		BLACK: "\u{1b}[40m",
+		RED: "\u{1b}[41m",
+		GREEN: "\u{1b}[42m",
+		YELLOW: "\u{1b}[43m",
+		BLUE: "\u{1b}[44m",
+		MAGENTA: "\u{1b}[45m",
+		CYAN: "\u{1b}[46m",
+		WHITE: "\u{1b}[47m",
+
+		LIGHT_BLACK: "\u{1b}[100m",
+		LIGHT_RED: "\u{1b}[101m",
+		LIGHT_GREEN: "\u{1b}[102m",
+		LIGHT_YELLOW: "\u{1b}[103m",
+		LIGHT_BLUE: "\u{1b}[104m",
+		LIGHT_MAGENTA: "\u{1b}[105m",
+		LIGHT_CYAN: "\u{1b}[106m",
+		LIGHT_WHITE: "\u{1b}[107m",
+
+		DEFAULT: "\u{1b}[49m",
+	},
+
+	STYLE: #[desc("
+The style colouur of the text (bold, italic, etc.),
+Note: Depending on your system and terminal, these may not style the text, but rather do things like change the colour
+	") example("@dye::STYLE.BOLD")]
+	{
+		BOLD: "\u{1b}[1m",
+		ITALIC: "\u{1b}[3m",
+		UNDERLINE: "\u{1b}[4m",
+		BLINK: "\u{1b}[5m",
+		STRIKE: "\u{1b}[9m",
+	},
+
+	RESET: #[desc("Resets the string colours for the next string") example("@dye::RESET")] "\u{1b}[0m",
+
+	dye: #[constructor, desc("Creates a new dyed string given a string, foreground, background and style") example("
+string = @dye::dye(\"I am a dyed string\", fore=@dye::FORE.MAGENTA, back=@dye::BACK.BLACK, styles=@dye::STYLE.ITALIC)
+	")] 
+	(string: @string, fore="", back="", styles=null) {
+		let string = ANSI.replace(string, "")
+		
+		let style_str = ""
+		if styles is @array {
+			style_str = "".join(styles)
+		} else {
+			style_str = styles
+		}
+
+		beg = "{}{}{}".fmt([style_str if style_str != null else "", fore, back])
+
+		return @dye::new(beg + string + @dye::RESET)
+	},
+
+	new: #[constructor, desc("Creates a blank dyed string") example("let string = @dye::new(string=\"Some string\")")]
+	(string: @string="") {
+		let slf = @dye::{
+			str: string,
+			length: #[desc("The length of the string (including colours and styles)")] 0,
+			raw_length: #[desc("The length of the string (excluding colours and styles)")] 0,
+		}
+		slf.__update_lengths()
+		return slf
+	},
+	
+	append: #[desc("Adds a string to the current string") example("string.append(@dye::dye(...))")]
+	(self, string: @dye|@string) {
+		let string = string
+		if self is @dye {
+			string = string.str
+		}
+
+		self.str += string
+
+		self.__update_lengths()
+
+		return self
+	},
+
+	join: #[desc("Appends a string to the current string, separated by a delimiter") example("string.join(\"string\", delim=\",\")")]
+	(self, string, delim=" ") {
+		let delim = delim
+		if delim is @dye {
+			delim = delim.str
+		}
+		self.str = self.str + delim
+		self.append(string)
+	},
+
+	repeat: #[desc("Repeats the current string `times` times") example("let rep = string.repeat(2)")]
+	(self, times) {
+		return @dye::new(self.str * times)
+	},
+
+	add_styles: #[desc("Adds a style to the current string") example("string.add_style(@dye::STYLE.BOLD)")]
+	(self, styles) {
+		let styles = styles
+		if !(styles is @array) {
+			styles = [styles]
+		}
+		for s in styles {
+			self.str = s + self.str
+		}
+
+		self.__update_lengths()
+
+		return self
+	},
+	remove_styles: #[desc("Removes a style from the current string") example("string.remove_style(@dye::STYLE.BOLD)")]
+	(self, styles) {
+		let styles = styles
+		if !(styles is @array) {
+			styles = [styles]
+		}
+
+		for s in styles {
+			self.str = self.str.replace(r"\{}".fmt([s.replace("", "")]), "")
+		}
+
+		self.__update_lengths()
+
+		return self
+	},
+
+	printable: #[desc("Returns the printable version of the current string") example("string.printable()")]
+	(self) {
+		return self.str
+	},
+
+	strip: #[desc("Strips all the colours and styles from the current string and returns the cleaned string") example("string.strip()")]
+	(self) {
+		return ANSI.replace(self.str, "")
+	},
+
+	escape: #[desc("Returns the escaped version current string (will literally print \\u{1b}...)") example("string.escape()")]
+	(self) {
+		return self.str.replace("", "\\u{1b}")
+	},
+
+	__update_lengths: (self) {
+		self.length = self.str.length
+		self.raw_length = self.strip().length
+	},
+
+	_display_: (self) {
+		return "@dye::{{ {}, (\"{}\") }}".fmt([self.str, self.escape()])
+	},
+
+	_times_: (self, num) {
+		return self.repeat(num)
+	},
+
+	_plus_: (self, other) {
+		self._add_(other)
+
+		return self
+	},
+
+	_add_: (self, other) {
+		self.append(other)
+	},
+
+	_as_: (self, itype) {
+		if itype == @string {
+			return self.printable()
+		}
+	}
+}

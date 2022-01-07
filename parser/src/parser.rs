@@ -1830,9 +1830,65 @@ pub fn str_content(
                         Some('n') => '\n',
                         Some('r') => '\r',
                         Some('t') => '\t',
+                        Some('b') => '\x08',
                         Some('"') => '\"',
                         Some('\'') => '\'',
                         Some('\\') => '\\',
+                        Some('u') => {
+                            match chars.next() {
+                                Some('{') => {},
+                                Some(c) => {
+                                    return Err(SyntaxError::ExpectedErr {
+                                        expected: "'{'".to_string(), found: format!("'{}'", c),
+                                        pos: tokens.position(), file: notes.file.clone(),
+                                    });
+                                }
+                                None => {
+                                    return Err(SyntaxError::ExpectedErr {
+                                        expected: "'{'".to_string(), found: "EOS".to_string(),
+                                        pos: tokens.position(), file: notes.file.clone(),
+                                    });
+                                }
+                            };
+
+                            let mut hex = String::new();
+
+                            for h in chars.clone().take_while(|c| match *c {
+                                '0'..='9' | 'a'..='f' | 'A'..='F' => true,
+                                _ => false,
+                            }) {
+                                hex.push(h);
+                            }
+                            let mut skipped = chars.by_ref().skip(hex.len());
+
+                            match skipped.next() {
+                                Some('}') => {},
+                                Some(c) => {
+                                    return Err(SyntaxError::ExpectedErr {
+                                        expected: "'}'".to_string(), found: format!("'{}'", c),
+                                        pos: tokens.position(), file: notes.file.clone(),
+                                    });
+                                }
+                                None => {
+                                    return Err(SyntaxError::ExpectedErr {
+                                        expected: "'}'".to_string(), found: "EOS".to_string(),
+                                        pos: tokens.position(), file: notes.file.clone(),
+                                    })
+                                }
+                            };
+
+                            if hex.len() < 1 || hex.len() > 6 {
+                                return Err(SyntaxError::ExpectedErr {
+                                    expected: "2 to 6 hexadecimal characters".to_string(), found: hex.len().to_string(),
+                                    pos: tokens.position(), file: notes.file.clone(),
+                                })
+                            }
+                            
+                            match std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap()) {
+                                Some(v) => v,
+                                None => '\0',
+                            }
+                        },
                         Some(a) => {
                             return Err(SyntaxError::SyntaxError {
                                 message: format!("Invalid escape: \\{}", a),

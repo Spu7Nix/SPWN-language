@@ -17,6 +17,7 @@ import "regex.spwn"
 import "number.spwn"
 import "http.spwn"
 import "range.spwn"
+import "dye.spwn"
 level_info = import "level_info.spwn"
 
 chroma = import "chroma.spwn"
