@@ -91,5 +91,5 @@ impl @color {
             PULSE_HSV: false,
         })
         wait(fade_in + hold + fade_out)
-    }
+    },
 }

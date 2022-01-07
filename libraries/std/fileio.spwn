@@ -42,5 +42,5 @@ impl @file {
 			self.fseek += size;
 			return $.substr(self.filedata, oldseek, [self.fseek, self.size].min());
 		}
-	}
+	},
 }

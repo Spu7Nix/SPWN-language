@@ -75,13 +75,13 @@ return {
         SINE_OUT : et(15),
         BACK_IN_OUT : et(16),
         BACK_IN : et(17),
-        BACK_OUT : et(18)
+        BACK_OUT : et(18),
     },
 
     comparisons : {
         EQUAL_TO : cmp(0),
         LARGER_THAN : cmp(1),
-        SMALLER_THAN : cmp(2)
+        SMALLER_THAN : cmp(2),
     },
 
     colors: {
@@ -155,7 +155,7 @@ return {
             TEXT: 914,
 
             USER_COIN: 1329,
-        }
+        },
     },
 
     obj_props : {

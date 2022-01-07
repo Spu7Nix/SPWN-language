@@ -443,7 +443,7 @@ impl @chroma {
             mode
         )
         return @chroma::from_rgb(r, g, b, a)
-    }
+    },
 
 }
 

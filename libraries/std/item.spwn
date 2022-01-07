@@ -66,5 +66,5 @@ impl @item {
         for item in 1i..10i {
             item.add(10)
         }
-    ")] create_range_macro(@item)
+    ")] create_range_macro(@item),
 }

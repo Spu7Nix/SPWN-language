@@ -331,7 +331,7 @@ impl @group {
             TARGET_TYPE: 1,
         })
         wait(fade_in + hold + fade_out)
-    }
+    },
 
 
 }

@@ -562,5 +562,5 @@ $.assert(arr.index_all(2) == [2,4])
         }
 
         return ret_arr
-    }
+    },
 }

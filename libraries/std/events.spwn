@@ -138,5 +138,5 @@ return {
                 COUNT_MULTI_ACTIVATE: multi
             })
         }
-    }
+    },
 }

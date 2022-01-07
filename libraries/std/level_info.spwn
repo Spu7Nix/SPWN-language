@@ -56,8 +56,8 @@ if $.level_string() != "" {
 								return @color(@number(value))
 							}
 						} ()
-					}
-					_: @number(value)
+					},
+					_: @number(value),
 				}
 			)
 		}
