@@ -143,19 +143,11 @@ impl @string {
 	},
     l_pad: #[desc("Returns a left-padded version of the string")]
     (self, times: @number, seq: @string = ' ') -> @string {
-        if self.length >= times { return self }
-        pad = seq if seq.length > 0 else ' '
-        len = [times-self.length, 0].max()
-        mul = $.ceil(len / pad.length)
-        return (pad * mul).substr(0, len) + self
+        return seq * times + self
     },
     r_pad: #[desc("Returns a right-padded version of the string")]
     (self, times: @number, seq: @string = ' ') -> @string {
-        if self.length >= times { return self }
-        pad = seq if seq.length > 0 else ' '
-        len = [times-self.length, 0].max()
-        mul = $.ceil(len / pad.length)
-        return self + (pad * mul).substr(0, len)
+        return self + seq * times
     },
     l_trim: #[desc("Returns a left-trimmed verison of the string") example(u"
         str1 = '      abcd g    '

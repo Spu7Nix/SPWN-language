@@ -175,7 +175,7 @@ pub enum Token {
     #[regex("0o[0-7](_?[0-7]+)*")]
     OctalLiteral,
 
-    #[regex(r#"[a-z]?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
+    #[regex(r#"[a-z]?"(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
     StringLiteral,
 
     #[token("true")]
@@ -184,7 +184,7 @@ pub enum Token {
     #[token("false")]
     False,
 
-    #[regex(r"([0-9]+|\?)[gbci]")]
+    #[regex(r"[0-9?]+[gbci]")]
     Id,
 
     //TERMINATORS
@@ -1894,27 +1894,15 @@ pub fn str_content(
                 })
             }
 
-            let mut lines = out_str
-                .lines()
-                .map(|line| line.trim_end())
-                .skip_while(|elem| elem.is_empty()); // removes the newlines at the beginning
+            let mut lines = out_str.lines().filter(|line| line.len() > 0);
 
-            if lines.clone().filter(|line| line.len() > 0).count() > 0 {
-                let min_indent = lines.clone()
-                    .filter(|line| line.len() > 0)
-                    .map(|line|  line.chars().take_while(|a| *a == ' ').count())
-                    .min().unwrap_or_else(|| unreachable!());
+            let min_indent = lines.clone().map(|line| line.chars().take_while(|a| *a == ' ').count()).min().unwrap_or_else(|| unreachable!());
 
-                while let Some(line) = lines.next() {
-                    if line.len() >= min_indent {
-                        out.0 += &format!("{}\n", &line[min_indent..]);
-                    } else {
-                        out.0 += "\n";
-                    }
+            while let Some(line) = lines.next() {
+                if line.chars().take(min_indent).all(|c| c == ' ') {
+                    out.0 += &format!("{}\n", &line[min_indent..]);
                 }
             }
-
-            out.0 = out.0.trim_end().to_string(); // removes the newlines at the end
         }
         _ => {
             return Err(SyntaxError::SyntaxError {
@@ -2667,7 +2655,7 @@ fn parse_variable(
 
         Some(Token::OpenBracket) => {
             if allow_macro_def {
-                fart = false;
+                fart = true;
                 try_parse_macro(tokens, notes, properties.clone(), None)?
             } else {
                 let expr = parse_expr(tokens, notes, true, true)?;
