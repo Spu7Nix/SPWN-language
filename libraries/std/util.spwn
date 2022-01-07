@@ -20,7 +20,7 @@ MATCHER = @pattern | bool_macro
         @pattern: v is p,
         @macro: p(v)
     },
-    prettify_time: (time: @number){
+    prettify_time: (time: @number, max: @number = 3) -> @string {
         let microseconds = $.floor(time * 1000000)
         let milliseconds = $.floor(time * 1000)
         let seconds = $.floor(time)
@@ -38,8 +38,6 @@ MATCHER = @pattern | bool_macro
             [milliseconds % 1000, "ms"],
             [microseconds % 1000, "µs"],
         ]
-
-        max = 3
 
         let out = []
         let skip = false
