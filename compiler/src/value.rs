@@ -630,6 +630,7 @@ impl Value {
                 }
                 Pattern::Array(a_pat) => {
                     if let Value::Array(a_val) = self {
+
                         match a_pat.len() {
                             // empty array matches any array pattern
                             0 => {
@@ -645,22 +646,33 @@ impl Value {
 
                                 // TODO: make sure it always sets the return value
                                 full_context.reset_return_vals(globals);
-                                for el in a_val {
-                                    for full_context in full_context.iter() {
-                                        if globals.stored_values[full_context.inner().return_value]
-                                            != Value::Bool(false)
-                                        {
-                                            let val = globals.stored_values[*el].clone();
-                                            val.matches_pat(
-                                                &Value::Pattern(a_pat[0].clone()),
-                                                info,
-                                                globals,
-                                                full_context,
-                                                allow_side_effect,
-                                            )?;
+
+                                if a_val.len() == 0 {
+                                    (*full_context.inner()).return_value = store_const_value(
+                                        Value::Bool(true),
+                                        globals,
+                                        full_context.inner().start_group,
+                                        info.position,
+                                    );
+                                } else {
+                                    for el in a_val {
+                                        for full_context in full_context.iter() {
+                                            if globals.stored_values[full_context.inner().return_value]
+                                                != Value::Bool(false)
+                                            {
+                                                let val = globals.stored_values[*el].clone();
+                                                val.matches_pat(
+                                                    &Value::Pattern(a_pat[0].clone()),
+                                                    info,
+                                                    globals,
+                                                    full_context,
+                                                    allow_side_effect,
+                                                )?;
+                                            }
                                         }
                                     }
                                 }
+
                             }
 
                             _ => return Err(RuntimeError::CustomError(create_error(

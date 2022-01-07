@@ -41,9 +41,26 @@ call_with_delay(2, !{
 		TARGET: function,
 	})
 }
+call_on_x_position = #[desc("Call a function after an x position") example("
+BG.set(255, 0, 0) // turn background red
+call_on_x_position(300, !{
+	BG.set(0, 255, 0) // turn background green at x position 300
+})
+")] (
+	#[desc("X position")] position:@number,
+	#[desc("Function to call after reaching x position")] function:@trigger_function|@group,
+) {
+	$.add(obj{
+		OBJ_ID: 1268,
+		X: position,
+		Y: 2145, 
+		TARGET: function,
+	})
+}
 -> return {
 	wait: wait,
 	call_with_delay: call_with_delay,
+	call_on_x_position: call_on_x_position,
 
 
 
@@ -161,7 +178,7 @@ for_loop(0..10, (i) {
 
         func!
 
-	},
+	}, 
 
 	while_loop: #[desc("Implementation of a conditional spawn loop") example("
 c = counter(11)

@@ -1,0 +1,112 @@
+#[no_std, cache_output]
+
+type @set
+constants = import "constants.spwn"
+extract constants.obj_props
+extract import "util.spwn"
+
+rot_vec = (x, y, r) => [x * $.cos(r) - y * $.sin(r), x * $.sin(r) + y * $.cos(r)]
+rot = (x, y, cx, cy, r) {
+    v = rot_vec(x - cx, y - cy, r)
+    return [v[0] + cx, v[1] + cy]
+}
+
+impl @set {
+    new: () -> @set {
+        return @set::{
+            objects: []
+        }
+    },
+    from: (
+        objects: [@object] = [],
+        center_x: @number | @NULL = null,
+        center_y: @number | @NULL = null,
+    ) -> @set {
+        if objects == [] { return @set::new() }
+        let [center_x, center_y] = [center_x, center_y]
+        if center_x == null {
+            center_x = objects.sum(o => o[X]) / objects.length
+        }
+        if center_y == null {
+            center_y = objects.sum(o => o[Y]) / objects.length
+        }
+        return @set::{
+            objects: objects.map(o => o.with(X, o[X] - center_x).with(Y, o[Y] - center_y) )
+        }
+    },
+    map: (
+        self,
+        cb: @object -> @object
+    ) -> @set {
+        return @set::from(
+            self.objects.map( cb ),
+            0,
+            0,
+        )
+    },
+    place: (
+        self,
+        x: @number,
+        y: @number,
+    ) -> @NULL {
+        self.objects.map(o => $.add(
+            o.with(X, o[X] + x).with(Y, o[Y] + y)
+        ))
+    },
+    rotated: (
+        self,
+        degrees: @number,
+        around_x: @number = 0,
+        around_y: @number = 0,
+        lock: @bool = false,
+    ) -> @set {
+        return self.map(
+            (o) {
+                v = rot(o[X], o[Y], around_x, around_y, - 3.1415926535897932 / 180 * degrees)
+                return o.with(X, v[0]).with(Y, v[1]).with(ROTATION, (o[ROTATION] if ROTATION in o else 0) + (degrees if !lock else 0))
+            }
+        )
+    },
+    with: (
+        self,
+        prop: @object_key | @number,
+        value,
+    ) -> @set {
+        return self.map(
+            o => o.with(prop, value)
+        )
+    },
+    replace: (
+        self,
+        prop: @object_key | @number,
+        match: MATCHER,
+        new,
+        default,
+    ) -> @set {
+        return self.map(
+            (o) {
+                value = o[prop] if prop in o else default
+                if matches(value, match) {
+                    return o.with(
+                        prop,
+                        ( new(value) if new is @macro else new )
+                    )
+                }
+                return o
+            }
+        )
+    },
+
+    
+    replace_group: (
+        self,
+        group: @group,
+        new: @group,
+    ) -> @set {
+        return self.map(
+            (o) => o.with(GROUPS, o[GROUPS].map(g => new if g == group else g)) if GROUPS in o else o
+        )
+    },
+}
+
+

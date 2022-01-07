@@ -95,6 +95,24 @@ points.display(75, 75)
         });
     },
 
+    
+    to_obj:
+    #[desc("Creates a item display object that displays the value of the counter") example("
+points = counter(0)
+$.add( points.to_obj().with(obj_props.GROUPS, 5g) )
+    ")]
+    (
+        self,
+    ) -> @object {
+        extract import "constants.spwn".obj_props
+        return obj {
+            OBJ_ID: 1615,
+            ITEM: self.item,
+            COLOR: 1c,
+            GROUPS: 999g
+        };
+    },
+
     add_to:
     #[desc("Adds the counter's value to a counter (or all counters in a list), and resets the counter to 0 in the process") example("
 a = counter(100)

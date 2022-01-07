@@ -1,5 +1,39 @@
 #[no_std, cache_output]
 
+trim = (
+    string: @string,
+    tokens: @string | [@string],
+    left: @bool = false,
+    right: @bool = false,
+){
+    token_check = token => token.length > 0
+    let tokens = switch tokens {
+        [@string]: tokens.filter(token_check),
+        @string: tokens.split('').filter(token_check),
+    }
+    if tokens.length == 0 {return string}
+    let start = 0
+    let end = string.length
+    if left {
+        for i in 0..string.length {
+            if tokens.contains(string[i]) {
+                start = i+1
+            } else {break}
+        }
+    }
+    if right {
+        for i in (string.length)..0 {
+            if tokens.contains(string[i]) {
+                end = i
+            } else {break}
+        }
+    }
+    return $.substr(string, start, end) if start < end else "" 
+}
+
+uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+lowercase = "abcdefghijklmnopqrstuvwxyz"
+
 impl @string {
 	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise") example("
 $.assert(''.is_empty())
@@ -85,13 +119,19 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
 	},
 	lowercase: #[desc("Makes whole string lowercase.")]
 	(self) -> @string {
-		dict = {A:'a',B:'b',C:'c',D:'d',E:'e',F:'f',G:'g',H:'h',I:'i',J:'j',K:'k',L:'l',M:'m',N:'n',O:'o',P:'p',Q:'q',R:'r',S:'s',T:'t',U:'u',V:'v',W:'w',X:'x',Y:'y',Z:'z'}
-		return ''.join(self.split('').map(el => dict.get(el, el)))
+        let dict = {}
+        for [k, v] in [*[uppercase.split(''), lowercase.split('')]] {
+            dict[k] = v
+        }
+        return ''.join(self.split('').map(c => dict[c] if c in dict else c))
 	},
 	uppercase: #[desc("Makes whole string uppercase.")]
 	(self) -> @string {
-		dict = {a:'A',b:'B',c:'C',d:'D',e:'E',f:'F',g:'G',h:'H',i:'I',j:'J',k:'K',l:'L',m:'M',n:'N',o:'O',p:'P',q:'Q',r:'R',s:'S',t:'T',u:'U',v:'V',w:'W',x:'X',y:'Y',z:'Z'}
-		return ''.join(self.split('').map(el => dict.get(el, el)))
+        let dict = {}
+        for [k, v] in [*[lowercase.split(''), uppercase.split('')]] {
+            dict[k] = v
+        }
+        return ''.join(self.split('').map(c => dict[c] if c in dict else c))
 	},
 	is_upper: #[desc("Checks if whole string is uppercase, ignores characters that is not in the alphabet.")]
 	(self) -> @bool {
@@ -103,11 +143,19 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
 	},
     l_pad: #[desc("Returns a left-padded version of the string")]
     (self, times: @number, seq: @string = ' ') -> @string {
-        return seq * times + self
+        if self.length >= times { return self }
+        pad = seq if seq.length > 0 else ' '
+        len = [times-self.length, 0].max()
+        mul = $.ceil(len / pad.length)
+        return (pad * mul).substr(0, len) + self
     },
     r_pad: #[desc("Returns a right-padded version of the string")]
     (self, times: @number, seq: @string = ' ') -> @string {
-        return self + seq * times
+        if self.length >= times { return self }
+        pad = seq if seq.length > 0 else ' '
+        len = [times-self.length, 0].max()
+        mul = $.ceil(len / pad.length)
+        return self + (pad * mul).substr(0, len)
     },
     l_trim: #[desc("Returns a left-trimmed verison of the string") example("
 str1 = '      abcd g    '
@@ -115,32 +163,8 @@ str2 = '   pog  __'
 $.assert(str1.l_trim() == 'abcd g    ')
 $.assert(str2.l_trim() == 'pog  __')
     ")]
-    (self, tokens: @string | [@string] = [' ', '\n']) -> @string {
-        // check for tokens
-        for token in tokens {
-            if token.length != 1 {
-                throw "Trim tokens must all be 1-character long"
-            }
-        }
-
-        let tokenlist = tokens
-        if tokens.type == @string {
-            tokenlist = [tokens]
-        }
-
-        // scan left
-        let begin = 0
-
-        for i in 0..self.length {
-            if tokenlist.contains(self[i]) {
-                continue
-            } else {
-                begin = i
-                break
-            }
-        }
-
-        return $.substr(self, begin, self.length)
+    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
+        return trim(self, tokens, left = true)
     },
     r_trim: #[desc("Returns a right-trimmed version of the string") example("
 str = 'abcd      '
@@ -150,8 +174,8 @@ $.assert(str.r_trim() == 'abcd')
 $.assert(str2.r_trim() == '      abcd g')
 $.assert(str3.r_trim(tokens = [' ', '_']) == '   pog')    
     ")]
-    (self, tokens: @string | [@string] = [' ', '\n']) -> @string {
-        return self.reverse().l_trim(tokens).reverse() // lol
+    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
+        return trim(self, tokens, right = true)
     },
     trim: #[desc("Returns a trimmed version of the string") example("
 str = 'abcd      '
@@ -161,8 +185,8 @@ $.assert(str.trim() == 'abcd')
 $.assert(str2.trim() == 'abcd g')
 $.assert(str3.trim(tokens = [' ', '_']))
     ")]
-    (self, tokens: @string | [@string] = [' ', '\n']) -> @string {
-        return self.l_trim(tokens).r_trim(tokens)
+    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
+        return trim(self, tokens, left = true, right = true)
     },
     fmt: #[desc("Returns a formtted version of the string. Accepts either a single argument or an array") example("
 name1 = 'bob'

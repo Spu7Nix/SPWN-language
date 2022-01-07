@@ -18,6 +18,7 @@ import "number.spwn"
 import "http.spwn"
 import "range.spwn"
 import "dye.spwn"
+import "set.spwn"
 level_info = import "level_info.spwn"
 
 chroma = import "chroma.spwn"
@@ -49,8 +50,7 @@ return {
     hsv2: @chroma::from_hsv2,
     blend_modes: chroma.BLEND_MODES,
 
-    level_objects: level_info.level_objects,
-    get_objects: level_info.get_objects,
+    level: level_info,
 }
 
 

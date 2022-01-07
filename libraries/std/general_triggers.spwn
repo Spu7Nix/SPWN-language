@@ -324,10 +324,10 @@ return {
 
     spawn_trigger: #[desc("Returns a spawn trigger as an object")
     example("$.add( spawn_trigger(5g,0.5).with(X,600) )")]
-    (#[desc("Group to spawn")] group: @group, #[desc("Delay")] delay: @number) -> @object {
+    (#[desc("Group to spawn")] group: @group | @trigger_function, #[desc("Delay")] time: @number | @epsilon = @epsilon::{}) -> @object {
         return obj{
 			OBJ_ID: 1268,
-			SPAWN_DURATION: delay,
+			SPAWN_DURATION: time,
 			TARGET: group,
 		}
     },

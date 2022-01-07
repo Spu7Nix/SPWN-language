@@ -1,5 +1,9 @@
 // utility macroes
 #[no_std, cache_output]
+
+bool_macro = _ -> @bool
+MATCHER = @pattern | bool_macro
+
 -> return {
     create_range_macro: (typ: @type_indicator) -> @macro {
         -> return (self, other: typ) {
@@ -10,5 +14,10 @@
             }
             -> return out
         }
+    },
+    MATCHER,
+    matches: (v, p: MATCHER) -> @bool => switch p {
+        @pattern: v is p,
+        @macro: p(v)
     }
 }
