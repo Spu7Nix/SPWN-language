@@ -29,8 +29,13 @@ impl @runtime_log {
             5g!
             @log::runtime::flash()
         }, delay = 1)
-    ")](color: @chroma = @chroma::from_rgb(1,1,1)) -> @NULL {
-        -> BG.pulse(color, 0.1, 0.1, 0.1)
+    ")](
+        color: @chroma = @chroma::from_rgb(1,1,1),
+        fade_in: @number = 0.1,
+        hold: @number = 0.1,
+        fade_out: @number = 0.1,
+    ) -> @NULL {
+        -> BG.pulse(color, fade_in, hold, fade_out)
     },
 }
 
@@ -38,11 +43,9 @@ type @log
 impl @log {
     runtime: @runtime_log,
     time: #[desc("Saves the current time to a given label.") example(u"
-        @log::time('start')
-
-        // <insert all your heavy code here>
-
-        @log::time_end('start')
+        @log::time('heavy calculation')
+        // <insert your heavy code here>
+        @log::time_end('heavy calculation')
     ")] (label: @string = default) -> @NULL {
         instant = $.time()
         data.time_labels.set(label, instant)
