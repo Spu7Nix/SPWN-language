@@ -45,5 +45,5 @@ impl @obj_set {
     rotate_relative: #[desc("Rotates objects in a set around a centerpoint")]
     (self, center_group: @group, deg: @number, duration: @number, easing: @easing_type, easing_rate: @number, lock_object_rotation: @bool) {
         self.group.rotate(center_group, deg, duration, easing, easing_rate, lock_object_rotation)
-    }
+    },
 }

@@ -815,6 +815,6 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
 
     _display_: #[desc("Formats the counter to a printable string")] (self) -> @string {
         return "counter(" + $.display(self.item) + ", bits = " + $.display(self.bits) + ")"
-    }
+    },
 
 }

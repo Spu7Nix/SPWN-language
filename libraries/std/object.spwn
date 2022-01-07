@@ -26,5 +26,5 @@ impl @object {
 	},
 	add: (self) -> @NULL {
 		$.add(self);
-	}
+	},
 }

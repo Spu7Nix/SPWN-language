@@ -269,5 +269,5 @@ impl @string {
         num.isdigit() // true
     ")] (self) -> @bool {
     	return @regex::new("^[0-9]").match(self)
-    }
+    },
 }

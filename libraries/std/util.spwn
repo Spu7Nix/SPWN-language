@@ -19,5 +19,5 @@ MATCHER = @pattern | bool_macro
     matches: (v, p: MATCHER) -> @bool => switch p {
         @pattern: v is p,
         @macro: p(v)
-    }
+    },
 }
