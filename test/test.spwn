@@ -1,13 +1,1 @@
-
-
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
-$.print(''.join(@array(0..10).shuffle()))
+$.print(counter().display_object(10, 50))

@@ -56,12 +56,25 @@ impl @array {
 		return el in self
 	},
 
+    join: #[desc("Joins the array using the string.") example(u"
+        fruit = ['apple', 'banana', 'mango']
+        $.assert(fruit.join(' ') == 'apple banana mango')
+    ")]
+    (self, joiner: @string = ' ') -> @string {
+        let output = ''
+        for i in 0..self.length {
+            if i > 0 { output += joiner }
+            output += self[i] as @string
+        }
+        return output
+    },
+
     index: #[desc("Gets the index of an element (if it doesn't exist, `null` is returned)") example(u"
         fruit = ['apple', 'banana', 'mango']
         $.assert(fruit.index('apple') == 0)
         $.assert(fruit.index('carrot') == null)
     ")]
-    (self, el, #[desc("Index to start the search from")] from: @number = 0) -> @number {
+    (self, el, #[desc("Index to start the search from")] from: @number = 0) -> @number | @NULL {
         for i in from..self.length {
             if self[i] == el {
                 return i
@@ -311,14 +324,35 @@ $.assert(arr.index_all(2) == [2,4])
         }
         self = output
     },
-
-    reduce: #[desc("Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    reduce: #[desc("Calls the specified callback function for all the elements in an array with a default value. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
     example(u"
         arr = [1, 2, 3, 4, 5]
         sum = arr.reduce((acum, el) => acum + el)
         $.assert(sum == 15)
+
+        arr = [5, 1, 5, 3, 2]
+        product = arr.reduce((acum, el) => acum * el, 1)
+        $.assert(product == 150)
     ")]
-    (self, cb: (_, _) -> _) -> _ {
+    (self, cb: ((_, _) -> _) | @builtin, default = 0) -> _ {
+        let acum = default;
+        for iter in self {
+            acum = cb(acum, iter);
+        }
+        return acum;
+    },
+
+    foldl: #[desc("Calls the specified callback function for all the elements in an array from left to right. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    example(u"
+        arr = [1, 2, 3, 4, 5]
+        sum = arr.foldl($._plus_)
+        $.assert(sum == 15)
+
+        arr = [2, 1, 5]
+        result = arr.foldl($._divided_by_)
+        $.assert(result == 0.4)
+    ")]
+    (self, cb: ((_, _) -> _) | @builtin) -> _ {
         let acum = self[0];
         for iter in 1..self.length {
             acum = cb(acum, self[iter]);
@@ -326,12 +360,33 @@ $.assert(arr.index_all(2) == [2,4])
         return acum;
     },
 
-    any: #[desc("Determines whether the specified callback function returns true for any element of an array.") example(u"
-        arr = [false, false, true, false]
-        $.assert(arr.any())
-        arr2 = [1, 2, 3, 1, 4, -1, 7]
-        $.assert(arr2.any(el => el < 0)) // checks if the array contains any negative elements
+    foldr: #[desc("Calls the specified callback function for all the elements in an array from right to left. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    example(u"
+        arr = [1, 2, 3, 4, 5]
+        sum = arr.foldr($._plus_)
+        $.assert(sum == 15)
+
+        arr = [2, 1, 5]
+        result = arr.foldr($._divided_by_)
+        $.assert(result == 10)
     ")]
+    (self, cb: ((_, _) -> _) | @builtin) -> _ {
+        let acum = self[-1];
+        for iter in (self.length - 1)..0 {
+            acum = cb(self[iter], acum);
+        }
+        return acum;
+    },
+
+    any: #[
+        desc("Determines whether the specified callback function returns true for any element of an array.")
+        example(u"
+            arr = [false, false, true, false]
+            $.assert(arr.any())
+            arr2 = [1, 2, 3, 1, 4, -1, 7]
+            $.assert(arr2.any(el => el < 0)) // checks if the array contains any negative elements
+        ")
+    ]
     (self, map: _ -> @bool = (a) => @bool(a)) -> @bool {
         for item in self {
             if map(item) {
@@ -370,65 +425,38 @@ $.assert(arr.index_all(2) == [2,4])
         return result
     },
 
-    _partition: #[desc("Private function needed for .sort()")]
-    (self, low: @number, high: @number, comp: (_, _) -> @bool = (a, b) => a <= b) {
-        pivot = self[high]
-        let i = low - 1
+    sort: #[desc("Returns a sorted verison of the array") example(u"
+        let arr = [5, 1, 5, 3, 2]
+        $.assert(arr.sort() == [1, 2, 3, 5, 5])
 
-        for j in low..high {
-            if comp(self[j], pivot) {
-                i += 1
-                self[i] <=> self[j]
+        let arr = [5, 1, 5, 3, 2]
+        $.assert(arr.sort(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
+    ")]
+    (self, comp: (_,_) -> @bool | @number = (a, b) => a <= b) -> @array {
+        let array = self
+        if array.length == 0 { return [] }
+        pivot = array.pop()
+        [ truthy, falsy ] = array.partition((i){
+            result = comp(i,pivot)
+            return switch result {
+                @bool: result,
+                @number: result < 0,
+            }
+        })
+        return truthy.sort(comp = comp) + [pivot] + falsy.sort(comp = comp) // heskell quicksort goes brr
+    },
+
+    sorted: #[desc("Returns true if the array is sorted.") example(u"
+        $.assert([5, 1, 5, 3, 2].sorted() == false)
+        $.assert([1, 2, 3, 5, 5].sorted() == true)
+        $.assert([5, 5, 3, 2, 1].sorted(comp = (a, b) => a >= b) == true)
+    ")]
+    (self, comp: (_, _) -> @bool = (a, b) => a <= b) -> @bool {
+        for i in 1..self.length {
+            if !comp(self[i-1], self[i]) {
+                return false
             }
         }
-
-        self[i+1] <=> self[high]
-        return i + 1
-    },
-
-    sort: #[desc("Sorts array in-place") example(u"
-        let arr = [5, 1, 5, 3, 2]
-        arr.sort()
-        $.assert(arr == [1, 2, 3, 5, 5])
-
-        let arr = [5, 1, 5, 3, 2]
-        arr.sort(begin = 2, end = 4)
-        $.assert(arr == [5, 1, 2, 3, 5])
-
-        let arr = [5, 1, 5, 3, 2]
-        arr.sort(comp = (a, b) => a >= b)
-        $.assert(arr == [5, 5, 3, 2, 1])
-    ")]
-    (self, begin: @number = 0, end: @number = -1, comp: (_, _) -> @bool = (a, b) => a <= b) -> @NULL {
-
-        // when end == -1, that means the end of the array, but comparing to -1 doesnt work so switch it back to legnth - 1
-        let new_end = end
-        if end == -1 {
-            new_end = self.length - 1
-        }
-
-        // uses quick sort
-        // no type checking becuase theoretically this can sort anything if it hasthe right comparator
-        // if sort was overloaded we could have two seperate implementations
-        if begin < new_end {
-            let q = self._partition(low = begin, high = new_end, comp = comp)
-
-            self.sort(begin = begin, end = q-1, comp = comp)
-            self.sort(begin = q+1, end = new_end, comp = comp)
-        }
-    },
-
-    sorted: #[desc("Returns a sorted verison of the array") example(u"
-        arr = [5, 1, 5, 3, 2]
-        $.assert(arr.sorted() == [1, 2, 3, 5, 5])
-        $.assert(arr.sorted(begin = 2, end = 4) == [5, 1, 2, 3, 5])
-        $.assert(arr.sorted(comp = (a, b) => a >= b) == [5, 5, 3, 2, 1])
-    ")]
-    (self, begin: @number = 0, end: @number = -1, comp: (_, _) -> @bool = (a, b) => a <= b) -> @array {
-        let new_arr = self
-        new_arr.sort(begin,end,comp)
-
-        return new_arr
     },
 
     shift: #[desc("Removes the first index from the array and returns it.") example(u"
