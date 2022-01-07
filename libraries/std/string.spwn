@@ -35,9 +35,9 @@ uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 lowercase = "abcdefghijklmnopqrstuvwxyz"
 
 impl @string {
-	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise") example("
-$.assert(''.is_empty())
-$.assert(!('x'.is_empty()))
+	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise") example(u"
+        $.assert(''.is_empty())
+        $.assert(!('x'.is_empty()))
     ")]
 	(self) -> @bool {
 		return self.length == 0;
@@ -52,15 +52,15 @@ $.assert(!('x'.is_empty()))
 		}
 		return $.substr(self, start, end);
 	},
-    overwrite: #[desc("Overwrites a portion of a string with another string.") example('
-$.assert("abcdefghij".overwrite(2,5,"thingy") == "abthingyfghij")
+    overwrite: #[desc("Overwrites a portion of a string with another string.") example(u'
+        $.assert("abcdefghij".overwrite(2,5,"thingy") == "abthingyfghij")
     ')]
     (self, start: @number, end: @number, str: @string) -> @string {
         return self.substr(0, start) + str + self.substr(end, self.length)
     },
-	join: #[desc("Joins a list using the string.") example("
-$.assert(''.join(['a', 'b']) == 'ab')
-$.assert(', '.join(['string', 'element', 'join']) == 'string, element, join')
+	join: #[desc("Joins a list using the string.") example(u"
+        $.assert(''.join(['a', 'b']) == 'ab')
+        $.assert(', '.join(['string', 'element', 'join']) == 'string, element, join')
     ")]
 	(self, list: @array) -> @string {
 		let out = "";
@@ -70,9 +70,9 @@ $.assert(', '.join(['string', 'element', 'join']) == 'string, element, join')
 		}
 		return out;
 	},
-	split: #[desc("Splits the string by the specified seperator.") example("
-$.assert('a b c'.split(' ') == ['a', 'b', 'c'])
-$.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
+	split: #[desc("Splits the string by the specified seperator.") example(u"
+        $.assert('a b c'.split(' ') == ['a', 'b', 'c'])
+        $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
     ")]
 	(self, spstr: @string) -> [@string] {
 		if spstr.length == 0 {
@@ -157,44 +157,44 @@ $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
         mul = $.ceil(len / pad.length)
         return self + (pad * mul).substr(0, len)
     },
-    l_trim: #[desc("Returns a left-trimmed verison of the string") example("
-str1 = '      abcd g    '
-str2 = '   pog  __'
-$.assert(str1.l_trim() == 'abcd g    ')
-$.assert(str2.l_trim() == 'pog  __')
+    l_trim: #[desc("Returns a left-trimmed verison of the string") example(u"
+        str1 = '      abcd g    '
+        str2 = '   pog  __'
+        $.assert(str1.l_trim() == 'abcd g    ')
+        $.assert(str2.l_trim() == 'pog  __')
     ")]
     (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, left = true)
     },
-    r_trim: #[desc("Returns a right-trimmed version of the string") example("
-str = 'abcd      '
-str2 = '      abcd g    '
-str3 = '   pog  __'
-$.assert(str.r_trim() == 'abcd')
-$.assert(str2.r_trim() == '      abcd g')
-$.assert(str3.r_trim(tokens = [' ', '_']) == '   pog')    
+    r_trim: #[desc("Returns a right-trimmed version of the string") example(u"
+        str = 'abcd      '
+        str2 = '      abcd g    '
+        str3 = '   pog  __'
+        $.assert(str.r_trim() == 'abcd')
+        $.assert(str2.r_trim() == '      abcd g')
+        $.assert(str3.r_trim(tokens = [' ', '_']) == '   pog')    
     ")]
     (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, right = true)
     },
-    trim: #[desc("Returns a trimmed version of the string") example("
-str = 'abcd      '
-str2 = '      abcd g    '
-str3 = '   pog  __'
-$.assert(str.trim() == 'abcd')
-$.assert(str2.trim() == 'abcd g')
-$.assert(str3.trim(tokens = [' ', '_']))
+    trim: #[desc("Returns a trimmed version of the string") example(u"
+        str = 'abcd      '
+        str2 = '      abcd g    '
+        str3 = '   pog  __'
+        $.assert(str.trim() == 'abcd')
+        $.assert(str2.trim() == 'abcd g')
+        $.assert(str3.trim(tokens = [' ', '_']))
     ")]
     (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, left = true, right = true)
     },
-    fmt: #[desc("Returns a formtted version of the string. Accepts either a single argument or an array") example("
-name1 = 'bob'
-name2 = 'alice'
-$.assert('hi {}'.fmt(name1) == 'hi bob')
-$.assert('hi {} and {}'.fmt([name1, name2]) == 'hi bob and alice')
-$.assert('hi {1} and {0}'.fmt([name1, name2]) == 'hi alice and bob')
-$.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
+    fmt: #[desc("Returns a formtted version of the string. Accepts either a single argument or an array") example(u"
+        name1 = 'bob'
+        name2 = 'alice'
+        $.assert('hi {}'.fmt(name1) == 'hi bob')
+        $.assert('hi {} and {}'.fmt([name1, name2]) == 'hi bob and alice')
+        $.assert('hi {1} and {0}'.fmt([name1, name2]) == 'hi alice and bob')
+        $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
     ")]
     (self, subs) -> @string {
         blank_regex = "\\{\\}"
@@ -253,9 +253,9 @@ $.assert('{} has {} apples'.fmt([name1, 5]) == 'bob has 5 apples')
         return $.regex(re, self, "replace", replacement)
     },
 
-    to_obj: #[desc("Returns a text object with the string as text") example("
-extract obj_props
-\"hello\".to_obj().with(X, 45).with(Y, 45).add()
+    to_obj: #[desc("Returns a text object with the string as text") example(u"
+        extract obj_props
+        \"hello\".to_obj().with(X, 45).with(Y, 45).add()
     ")] (self) -> @object {
         extract import "constants.spwn".obj_props
         return obj {
@@ -264,9 +264,9 @@ extract obj_props
         }
     },
     
-    isdigit:  #[desc("Returns true if string is numeric, false otherwise") example("
-let num = \"123\"
-num.isdigit() // true
+    isdigit: #[desc("Returns true if string is numeric, false otherwise") example(u"
+        let num = \"123\"
+        num.isdigit() // true
     ")] (self) -> @bool {
     	return @regex::new("^[0-9]").match(self)
     }

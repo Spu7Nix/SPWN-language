@@ -11,10 +11,10 @@ extract import "general_triggers.spwn"
 
 impl @group {
 
-    _range_: #[desc("Implementation of the range operator (`..`) for groups") example("
-for group in 1g..10g {
-    -> group.move(10, 0, 0.5)
-}
+    _range_: #[desc("Implementation of the range operator (`..`) for groups") example(u"
+        for group in 1g..10g {
+            -> group.move(10, 0, 0.5)
+        }
     ")] create_range_macro(@group),
     move: #[desc("Implementation of the move trigger") example("10g.move(100, 0, 0.5, easing = EASE_IN_OUT)")]
     (
@@ -82,13 +82,13 @@ for group in 1g..10g {
         })
     },
 
-    stop: #[desc("Implementation of the stop trigger") example("
-move = !{
-    10g.move(1000, 0, 10)
-}
-move!
-wait(2)
-move.start_group.stop()
+    stop: #[desc("Implementation of the stop trigger") example(u"
+        move = !{
+            10g.move(1000, 0, 10)
+        }
+        move!
+        wait(2)
+        move.start_group.stop()
     ")]
     (self) -> @NULL {
         $.add( trigger{
@@ -127,9 +127,9 @@ move.start_group.stop()
         })
     },
 
-    rotate: #[desc("Implementation of the rotate trigger") example("
-center = 3g
-10g.rotate(center, 360, 2, easing = EASE_IN_OUT)
+    rotate: #[desc("Implementation of the rotate trigger") example(u"
+        center = 3g
+        10g.rotate(center, 360, 2, easing = EASE_IN_OUT)
     ")]
     (
         self,
@@ -175,12 +175,12 @@ center = 3g
     
     follow_lerp:
     #[desc("Keeps an object's position proportionally between 2 others")
-    example("
-// Since this function works using follow triggers, objects need to already be in the proper position,
-// otherwise they'll be offset.
-1g.follow_lerp(2g,3g,0.5) // Keeps group 1 in the middle of groups 2 and 3
-1g.follow_lerp(2g,3g,0.25) // Keeps group 1 25% of the way between groups 2 and 3
-1g.follow_lerp(2g,3g,-1) // Keeps group 1 as a reflection of group 3 by group 2
+    example(u"
+        // Since this function works using follow triggers, objects need to already be in the proper position,
+        // otherwise they'll be offset.
+        1g.follow_lerp(2g,3g,0.5) // Keeps group 1 in the middle of groups 2 and 3
+        1g.follow_lerp(2g,3g,0.25) // Keeps group 1 25% of the way between groups 2 and 3
+        1g.follow_lerp(2g,3g,-1) // Keeps group 1 as a reflection of group 3 by group 2
     ")]
     (
         self,
@@ -252,10 +252,10 @@ center = 3g
     },
 
     move_to_xy:
-    #[desc("Moves group to a specific coordinate") example("
-10g.move_to_xy(300, 300)
-10g.move_to_xy(x = 300) // does not move on the y axis
-10g.move_to_xy(y = 300) // does not move on the x axis
+    #[desc("Moves group to a specific coordinate") example(u"
+        10g.move_to_xy(300, 300)
+        10g.move_to_xy(x = 300) // does not move on the y axis
+        10g.move_to_xy(y = 300) // does not move on the x axis
     ")]
     (
         self,

@@ -5,10 +5,10 @@ constants = import "constants.spwn"
 extract constants.obj_props
 extract constants.comparisons
 
-wait = #[desc("Adds a delay before the next triggers") example("
-BG.set(rgb8(255, 0, 0)) // turn background red
-wait(2) // wait 2 seconds
-BG.set(rgb8(0, 255, 0)) // turn background green
+wait = #[desc("Adds a delay before the next triggers") example(u"
+	BG.set(rgb8(255, 0, 0)) // turn background red
+	wait(2) // wait 2 seconds
+	BG.set(rgb8(0, 255, 0)) // turn background green
 ")] (
 	#[desc("Delay time in seconds (leave empty for minimum delay)")]
 	time: @number | @epsilon = @epsilon::{}
@@ -26,11 +26,11 @@ BG.set(rgb8(0, 255, 0)) // turn background green
 	}
 
 }
-call_with_delay = #[desc("Call a function after a delay") example("
-BG.set(rgb8(255, 0, 0)) // turn background red
-call_with_delay(2, !{
-	BG.set(rgb8(0, 255, 0)) // turn background green 2 seconds later
-})
+call_with_delay = #[desc("Call a function after a delay") example(u"
+	BG.set(rgb8(255, 0, 0)) // turn background red
+	call_with_delay(2, !{
+		BG.set(rgb8(0, 255, 0)) // turn background green 2 seconds later
+	})
 ")] (
 	#[desc("Delay time in seconds (leave empty for minimum delay)")] time: @number | @epsilon = @epsilon::{},
 	#[desc("Function to call after the delay")] function: @trigger_function | @group
@@ -64,19 +64,19 @@ call_on_x_position(300, !{
 
 
 
-	supress_signal: #[desc("Stops signal from coming past for some time") example("
-f = !{
-	supress_signal(1)
-	10g.move(10, 0)
-}
+	supress_signal: #[desc("Stops signal from coming past for some time") example(u"
+		f = !{
+			supress_signal(1)
+			10g.move(10, 0)
+		}
 
-f! // moves
-wait(0.4)
-f! // does nothing
-wait(0.4)
-f! // does nothing
-wait(0.4)
-f! // moves
+		f! // moves
+		wait(0.4)
+		f! // does nothing
+		wait(0.4)
+		f! // does nothing
+		wait(0.4)
+		f! // moves
 	")] (
 		#[desc("Time to supress signal")] delay: @number
 	) -> @NULL {
@@ -97,16 +97,16 @@ f! // moves
 
 	},
 
-	supress_signal_forever: #[desc("Stops signal from coming past after call") example("
-f = !{
-	supress_signal_forever()
-	10g.move(10, 0)
-}
-f! // moves
-wait(0.4)
-f! // does nothing
-wait(1000)
-f! // does nothing
+	supress_signal_forever: #[desc("Stops signal from coming past after call") example(u"
+		f = !{
+			supress_signal_forever()
+			10g.move(10, 0)
+		}
+		f! // moves
+		wait(0.4)
+		f! // does nothing
+		wait(1000)
+		f! // does nothing
 	")] () -> @NULL {
 
 		checker = @counter::new(0)
@@ -142,14 +142,14 @@ f! // does nothing
 
 	// },
 
-	for_loop: #[desc("Implementation of a spawn loop with a counter") example("
-for_loop(0..10, (i) {
-	if i < 5 {
-		10g.move(-10, 0)
-	} else {
-		10g.move(10, 0)
-	}
-})
+	for_loop: #[desc("Implementation of a spawn loop with a counter") example(u"
+		for_loop(0..10, (i) {
+			if i < 5 {
+				10g.move(-10, 0)
+			} else {
+				10g.move(10, 0)
+			}
+		})
 	")]
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
@@ -180,14 +180,14 @@ for_loop(0..10, (i) {
 
 	}, 
 
-	while_loop: #[desc("Implementation of a conditional spawn loop") example("
-c = counter(11)
+	while_loop: #[desc("Implementation of a conditional spawn loop") example(u"
+		c = counter(11)
 
-while_loop(() => c > 4, () {
-	c -= 2
-})
+		while_loop(() => c > 4, () {
+			c -= 2
+		})
 
-// c is now 3
+		// c is now 3
 	")]
 	(
 		#[desc("While loop condition, should return a boolean")] expr: () -> @bool,
@@ -206,14 +206,14 @@ while_loop(() => c > 4, () {
         call_with_delay(delay, func)
 	},
 
-	do_while_loop: #[desc("Implementation of a conditional spawn loop") example("
-c = counter(4)
+	do_while_loop: #[desc("Implementation of a conditional spawn loop") example(u"
+		c = counter(4)
 
-do_while_loop(() => c > 10, () {
-	c -= 2
-})
+		do_while_loop(() => c > 10, () {
+			c -= 2
+		})
 
-// c is now 2
+		// c is now 2
 	")]
 	(
 		#[desc("While loop condition, should -> return a boolean")] expr: () -> @bool,
