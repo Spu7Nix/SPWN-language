@@ -39,12 +39,18 @@ SPWN is a programming language that compiles to Geometry Dash levels. What that 
 
 You can either use the installers for your operating system, or build SPWN from source. Please note that building from source will give you access to newer features and bug fixes, but **may be unstable**.
 
+
 ### Universal
+
+#### this method is outdated; use a method described below instead
 
 With Rust installed:
 
 - Run `cargo install spwn`
-- Wait for it to compile, and you're set.
+- Wait for it to compile
+- Download the [libraries](https://github.com/Spu7Nix/SPWN-language/tree/v0.6-beta/libraries) folder
+- Copy the libraries folder to `$HOME/.cargo/bin/spwn`
+- Make something awesome!
 
 If you would like a pre-compiled package, look below.
 
@@ -77,13 +83,13 @@ You can either:
 
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
-```cmd
+```sh
 pacman -U spwn-0.0.7-x86_64-linux_arch.pkg.tar.zst
 ```
 
 - Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
 
-```cmd
+```sh
 yay -S spwn-bin
 ```
 
