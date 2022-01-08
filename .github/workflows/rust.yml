@@ -41,4 +41,6 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - run: ls
+    - run: ls > out.txt
+    - run: cat out.txt
+    - run: echo "fart = true"
