@@ -35,10 +35,3 @@ jobs:
       with:
         name: ubuntu-linux-artifact
         path: build_artifacts
-        
-        
-  run-ls:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - run: ls ../..
