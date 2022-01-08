@@ -1,3 +1,6 @@
+#[macro_use(include_dir)]
+extern crate include_dir;
+
 pub mod builtins;
 pub mod compiler;
 pub mod compiler_types;
