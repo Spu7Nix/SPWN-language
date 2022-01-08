@@ -32,7 +32,7 @@ impl @number {
     },
     ordinal: #[desc("Returns the number in ordinal form") example("$.assert(1.ordinal() == '1st')")]
     (self) -> @string {
-        number = self.floor() if number >= 0 else self.ceil()
+        number = self.floor() if self >= 0 else self.ceil()
         numb_abs = number.abs()
         return switch true {
             ==(((numb_abs % 100) / 10).floor() == 1): "{}th",
