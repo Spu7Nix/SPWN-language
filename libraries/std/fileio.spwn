@@ -5,7 +5,7 @@ type @file
 
 impl @file {
 	new: #[
-		constructor
+		constructor,
 		desc("Creates a new file IO object")
 		example("@file::new('C:/path/to/file.txt')")
 	] (

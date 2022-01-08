@@ -1,5 +1,7 @@
 #[no_std, cache_output]
 
+import 'array.spwn'
+
 trim = (
     string: @string,
     tokens: @string | [@string],
