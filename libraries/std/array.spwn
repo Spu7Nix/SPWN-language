@@ -342,7 +342,7 @@ $.assert(arr.index_all(2) == [2,4])
         return acum;
     },
 
-    foldl: #[desc("Calls the specified callback function for all the elements in an array from left to right. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    l_fold: #[desc("Calls the specified callback function for all the elements in an array from left to right. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
     example(u"
         arr = [1, 2, 3, 4, 5]
         sum = arr.foldl($._plus_)
@@ -360,14 +360,14 @@ $.assert(arr.index_all(2) == [2,4])
         return acum;
     },
 
-    foldr: #[desc("Calls the specified callback function for all the elements in an array from right to left. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    r_fold: #[desc("Calls the specified callback function for all the elements in an array from right to left. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
     example(u"
         arr = [1, 2, 3, 4, 5]
-        sum = arr.foldr($._plus_)
+        sum = arr.r_fold($._plus_)
         $.assert(sum == 15)
 
         arr = [2, 1, 5]
-        result = arr.foldr($._divided_by_)
+        result = arr.r_fold($._divided_by_)
         $.assert(result == 10)
     ")]
     (self, cb: ((_, _) -> _) | @builtin) -> _ {

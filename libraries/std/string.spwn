@@ -266,9 +266,9 @@ impl @string {
         }
     },
     
-    isdigit: #[desc("Returns true if string is numeric, false otherwise") example(u"
+    is_digit: #[desc("Returns true if string is numeric, false otherwise") example(u"
         let num = \"123\"
-        num.isdigit() // true
+        num.is_digit() // true
     ")] (self) -> @bool {
     	return @regex::new("^[0-9]").match(self)
     },
