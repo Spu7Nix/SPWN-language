@@ -1,6 +1,6 @@
 #[no_std, cache_output]
 impl @range {
-    reverse: #[desc("Reverses the range.") example(u"
+    reverse: #[desc("Reverses the range."), example(u"
         let range = 10..5..50
         $.assert(range.reverse() == 50..5..10)
     ")]

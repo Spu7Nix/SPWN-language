@@ -4,7 +4,7 @@ import "array.spwn"
 type @dict_not_found;
 
 impl @dictionary {
-	is_empty: #[desc("Returns true if there are no entries in the dictionary, false otherwise.") example(u"
+	is_empty: #[desc("Returns true if there are no entries in the dictionary, false otherwise."), example(u"
 		dict = {}
 		$.assert(dict.is_empty())
 	")]
@@ -17,7 +17,7 @@ impl @dictionary {
 		}
 		return true;
 	},
-	keys: #[desc("Gets the dictionary's keys.") example(u"
+	keys: #[desc("Gets the dictionary's keys."), example(u"
 		wares = {
 			apple: 10,
 			gold: 1000,
@@ -32,7 +32,7 @@ impl @dictionary {
 		}
 		return ret
 	},
-	values: #[desc("Gets the dictionary's values.") example(u"
+	values: #[desc("Gets the dictionary's values."), example(u"
 		wares = {
 			apple: 10,
 			gold: 1000,
@@ -47,7 +47,7 @@ impl @dictionary {
 		}
 		return ret
 	},
-	items: #[desc("Gets the dictionary's items.") example(u"
+	items: #[desc("Gets the dictionary's items."), example(u"
 		wares = {
 			apple: 10,
 			gold: 1000,
@@ -66,7 +66,7 @@ impl @dictionary {
 		}
 		return ret
 	},
-	set: #[desc("Sets an item in the dictionary.") example(u"
+	set: #[desc("Sets an item in the dictionary."), example(u"
 		let wares = {
 			apple: 10,
 			gold: 1000,
@@ -85,7 +85,7 @@ impl @dictionary {
 			let self[key] = val
 		}
 	},
-	get: #[desc("Gets an item from the dictionary.") example(u"
+	get: #[desc("Gets an item from the dictionary."), example(u"
 		let wares = {
 			apple: 10,
 			gold: 1000,
@@ -106,7 +106,7 @@ impl @dictionary {
 			}
 		}
 	},
-	clear: #[desc("Clears the dictionary.") example(u"
+	clear: #[desc("Clears the dictionary."), example(u"
 		let wares = {
 			apple: 10,
 			gold: 1000,
@@ -119,7 +119,7 @@ impl @dictionary {
 	(self) -> @NULL {
 		self = {}
 	},
-	contains_value: #[desc("Checks if the dictionary contains a value.") example(u"
+	contains_value: #[desc("Checks if the dictionary contains a value."), example(u"
 		let wares = {
 			apple: 10,
 			gold: 1000,
@@ -131,7 +131,7 @@ impl @dictionary {
 	(self, value) -> @bool {
 		return self.values().contains(value)
 	},
-	map: #[desc("Calls a defined callback function on each key-value pair of a dictionary, and returns an array that contains the results.") example(u"
+	map: #[desc("Calls a defined callback function on each key-value pair of a dictionary, and returns an array that contains the results."), example(u"
 		dict = {key1: 0, key2: 1, key3: 2}
 		$.assert(dict.map((k, v) => k[v]) == ['k', 'e', 'y'])
 	")]

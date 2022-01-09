@@ -1,7 +1,7 @@
 #[no_std, cache_output]
 impl @array {
 
-    is_empty: #[desc("Returns true if the array has a length of 0, false otherwise.") example(u"
+    is_empty: #[desc("Returns true if the array has a length of 0, false otherwise."), example(u"
         arr = []
         arr2 = [1, 2, 3]
         $.assert(arr.is_empty())
@@ -11,7 +11,7 @@ impl @array {
         return self.length == 0;
     },
 
-    max: #[desc("Gets the highest number in the array.") example(u"
+    max: #[desc("Gets the highest number in the array."), example(u"
         arr = [3, 1, 4, 1]
         $.assert(arr.max() == 4)
 
@@ -30,7 +30,7 @@ impl @array {
         return highest
     },
 
-    min: #[desc("Gets the lowest number in the array.") example(u"
+    min: #[desc("Gets the lowest number in the array."), example(u"
         arr = [3, 1, 4, 1]
         $.assert(arr.min() == 1)
 
@@ -48,7 +48,7 @@ impl @array {
         return lowest
     },
 
-    contains: #[desc("See if array contains an element.") example(u"
+    contains: #[desc("See if array contains an element."), example(u"
         fruit = ['apple', 'banana', 'mango']
         $.assert(fruit.contains('banana'))
     ")]
@@ -56,7 +56,7 @@ impl @array {
 		return el in self
 	},
 
-    join: #[desc("Joins the array using the string.") example(u"
+    join: #[desc("Joins the array using the string."), example(u"
         fruit = ['apple', 'banana', 'mango']
         $.assert(fruit.join(' ') == 'apple banana mango')
     ")]
@@ -69,7 +69,7 @@ impl @array {
         return output
     },
 
-    index: #[desc("Gets the index of an element (if it doesn't exist, `null` is returned)") example(u"
+    index: #[desc("Gets the index of an element (if it doesn't exist, `null` is returned)"), example(u"
         fruit = ['apple', 'banana', 'mango']
         $.assert(fruit.index('apple') == 0)
         $.assert(fruit.index('carrot') == null)
@@ -83,7 +83,7 @@ impl @array {
         return null
     },
 
-    index_last: #[desc("Gets the index of the last occurence of an element (if it doesn't exist, `null` is returned)") example(u"
+    index_last: #[desc("Gets the index of the last occurence of an element (if it doesn't exist, `null` is returned)"), example(u"
         arr = [1,-5,2,4,2,6]
         $.assert(arr.index_last(2) == 4)
         $.assert(arr.index_last(-3) == null)
@@ -97,7 +97,7 @@ impl @array {
         return null
     },
 
-    index_all: #[desc("Returns an array of all occurences of an element") example(u"
+    index_all: #[desc("Returns an array of all occurences of an element"), example(u"
 arr = [1,-5,2,4,2,6]
 $.assert(arr.index_all(2) == [2,4])
     ")]
@@ -111,7 +111,7 @@ $.assert(arr.index_all(2) == [2,4])
         return occurences
     },
 
-    clear: #[desc("Clears the array.") example(u"
+    clear: #[desc("Clears the array."), example(u"
         let arr = [1, 2, 3]
         arr.clear()
         $.assert(arr.is_empty())
@@ -120,7 +120,7 @@ $.assert(arr.index_all(2) == [2,4])
         self = []
     },
 
-    reverse: #[desc("Reverses the array.") example(u"
+    reverse: #[desc("Reverses the array."), example(u"
         let arr = [1, 2, 3]
         $.assert(arr.reverse() == [3, 2, 1])
     ")]
@@ -137,7 +137,7 @@ $.assert(arr.index_all(2) == [2,4])
         return ret;
     },
 
-    average: #[desc("Returns the average of the numbers in the array.") example(u"
+    average: #[desc("Returns the average of the numbers in the array."), example(u"
         let arr = [5, 1, 5, 3, 2]
         $.assert(arr.average() == 3.2)
     ")]
@@ -146,7 +146,7 @@ $.assert(arr.index_all(2) == [2,4])
         return numbers.sum() / numbers.length
     },
 
-    center: #[desc("Returns the item in the center of the array.") example(u"
+    center: #[desc("Returns the item in the center of the array."), example(u"
         let arr = [5, 1, 5, 3, 2]
         $.assert(arr.center() == 5)
         $.assert(arr.center(true) == 5)
@@ -162,7 +162,7 @@ $.assert(arr.index_all(2) == [2,4])
         return self[index]
     },
 
-    most: #[desc("Returns the item that appears most times.") example(u"
+    most: #[desc("Returns the item that appears most times."), example(u"
         let arr = [5, 1, 5, 3, 2]
         $.assert(arr.most() == 5)
     ")]
@@ -188,7 +188,7 @@ $.assert(arr.index_all(2) == [2,4])
         return array[mass[0]]
     },
 
-    partition: #[desc("Partitions the array into two arrays where the first array resulted into true and the second array resulted into false.") example(u"
+    partition: #[desc("Partitions the array into two arrays where the first array resulted into true and the second array resulted into false."), example(u"
         let arr = [5, 1, 5, 3, 2]
         let [bigger, smaller] = arr.partition(v => v > 4)
         $.assert(bigger == [5, 5])
@@ -204,7 +204,7 @@ $.assert(arr.index_all(2) == [2,4])
         return partition
     },
 
-    shuffle: #[desc("Returns the array in random order.") example(u"
+    shuffle: #[desc("Returns the array in random order."), example(u"
         let arr = [5, 1, 5, 3, 2]
         $.print(arr.shuffle())
     ")]
@@ -218,7 +218,7 @@ $.assert(arr.index_all(2) == [2,4])
         return array
     },
 
-    unique: #[desc("Returns the array only with items that didn't appear before.") example(u"
+    unique: #[desc("Returns the array only with items that didn't appear before."), example(u"
         let arr = [5, 1, 5, 3, 2]
         $.assert(arr.unique() == [5, 1, 3, 2])
     ")]
@@ -232,7 +232,7 @@ $.assert(arr.index_all(2) == [2,4])
         return array
     },
 
-    pick: #[desc("Returns an item from the array by random.") example(u"
+    pick: #[desc("Returns an item from the array by random."), example(u"
         let arr = [5, 1, 5, 3, 2]
         $.print(arr.pick())
     ")]
@@ -240,7 +240,7 @@ $.assert(arr.index_all(2) == [2,4])
         return $.random(self)
     },
 
-    push: #[desc("Pushes a value to the end of the array.") example(u"
+    push: #[desc("Pushes a value to the end of the array."), example(u"
         let arr = [1, 2, 3]
         arr.push(4)
         $.assert(arr == [1, 2, 3, 4])
@@ -249,7 +249,7 @@ $.assert(arr.index_all(2) == [2,4])
         $.append(self, value)
     },
 
-    pop: #[desc("Removes a specific index from the array and returns it.") example(u"
+    pop: #[desc("Removes a specific index from the array and returns it."), example(u"
         let arr = [1, 2, 3, 4]
         arr.pop()
         $.assert(arr == [1, 2, 3])
@@ -261,7 +261,7 @@ $.assert(arr.index_all(2) == [2,4])
         return $.remove_index(self, index)
     },
 
-    remove: #[desc("Returns array with all elements that match value removed") example(u"
+    remove: #[desc("Returns array with all elements that match value removed"), example(u"
         let arr = [1, 2, 3, 4, 5]
         $.assert(arr.remove(3) == [1, 2, 4, 5])
     ")]
@@ -269,7 +269,7 @@ $.assert(arr.index_all(2) == [2,4])
         return self.map(x => x if x != index else null).filter(el => el != null)
     },
 
-    map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results, or modifies in place if specified.") example(u"
+    map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results, or modifies in place if specified."), example(u"
         arr = [1, 2, 3, 4, 5]
         $.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
     ")]
@@ -287,7 +287,7 @@ $.assert(arr.index_all(2) == [2,4])
         }
     },
 
-    map_index: #[desc("Calls a defined callback function on each element of an array along with its index, and returns an array that contains the results, or modifies in place if specified.") example(u"
+    map_index: #[desc("Calls a defined callback function on each element of an array along with its index, and returns an array that contains the results, or modifies in place if specified."), example(u"
         arr = [1, 2, 3, 4, 5]
         $.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
     ")]
@@ -305,7 +305,7 @@ $.assert(arr.index_all(2) == [2,4])
         }
     },
 
-    filter: #[desc("Returns the elements of an array that meet the condition specified in the callback function.") example(u"
+    filter: #[desc("Returns the elements of an array that meet the condition specified in the callback function."), example(u"
         arr = [1, 2, 3, 4, 5]
         $.assert(arr.filter(el => el > 3) == [4, 5])
     ")]
@@ -324,7 +324,7 @@ $.assert(arr.index_all(2) == [2,4])
         }
         self = output
     },
-    reduce: #[desc("Calls the specified callback function for all the elements in an array with a default value. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    reduce: #[desc("Calls the specified callback function for all the elements in an array with a default value. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function."),
     example(u"
         arr = [1, 2, 3, 4, 5]
         sum = arr.reduce((acum, el) => acum + el)
@@ -342,7 +342,7 @@ $.assert(arr.index_all(2) == [2,4])
         return acum;
     },
 
-    l_fold: #[desc("Calls the specified callback function for all the elements in an array from left to right. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    l_fold: #[desc("Calls the specified callback function for all the elements in an array from left to right. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function."),
     example(u"
         arr = [1, 2, 3, 4, 5]
         sum = arr.foldl($._plus_)
@@ -360,7 +360,7 @@ $.assert(arr.index_all(2) == [2,4])
         return acum;
     },
 
-    r_fold: #[desc("Calls the specified callback function for all the elements in an array from right to left. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.")
+    r_fold: #[desc("Calls the specified callback function for all the elements in an array from right to left. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function."),
     example(u"
         arr = [1, 2, 3, 4, 5]
         sum = arr.r_fold($._plus_)
@@ -379,7 +379,7 @@ $.assert(arr.index_all(2) == [2,4])
     },
 
     any: #[
-        desc("Determines whether the specified callback function returns true for any element of an array.")
+        desc("Determines whether the specified callback function returns true for any element of an array."),
         example(u"
             arr = [false, false, true, false]
             $.assert(arr.any())
@@ -396,7 +396,7 @@ $.assert(arr.index_all(2) == [2,4])
         return false
     },
 
-    all: #[desc("Determines whether all the members of an array satisfy the specified callback.") example(u"
+    all: #[desc("Determines whether all the members of an array satisfy the specified callback."), example(u"
         arr = [true, true, true]
         $.assert(arr.all())
         arr2 = [1, 2, 3, 1, 4, 7]
@@ -411,7 +411,7 @@ $.assert(arr.index_all(2) == [2,4])
         return true
     },
 
-    sum: #[desc("Gets the sum of the values in the array.") example(u"
+    sum: #[desc("Gets the sum of the values in the array."), example(u"
         arr = [1, 2, 3, 4, 5]
         $.assert(arr.sum() == 15)
         arr2 = ['abc', 'ab', 'abcd']
@@ -425,7 +425,7 @@ $.assert(arr.index_all(2) == [2,4])
         return result
     },
 
-    sort: #[desc("Returns a sorted verison of the array") example(u"
+    sort: #[desc("Returns a sorted verison of the array"), example(u"
         let arr = [5, 1, 5, 3, 2]
         $.assert(arr.sort() == [1, 2, 3, 5, 5])
 
@@ -446,7 +446,7 @@ $.assert(arr.index_all(2) == [2,4])
         return truthy.sort(comp = comp) + [pivot] + falsy.sort(comp = comp) // heskell quicksort goes brr
     },
 
-    sorted: #[desc("Returns true if the array is sorted.") example(u"
+    sorted: #[desc("Returns true if the array is sorted."), example(u"
         $.assert([5, 1, 5, 3, 2].sorted() == false)
         $.assert([1, 2, 3, 5, 5].sorted() == true)
         $.assert([5, 5, 3, 2, 1].sorted(comp = (a, b) => a >= b) == true)
@@ -459,7 +459,7 @@ $.assert(arr.index_all(2) == [2,4])
         }
     },
 
-    shift: #[desc("Removes the first index from the array and returns it.") example(u"
+    shift: #[desc("Removes the first index from the array and returns it."), example(u"
         let arr = [5, 1, 5, 3, 2]
         $.assert(arr.shift() == 5)
         $.assert(arr == [1, 5, 3, 2])
@@ -468,7 +468,7 @@ $.assert(arr.index_all(2) == [2,4])
         return self.pop(0)
     },
 
-    unshift: #[desc("Pushes a value to the start of the array and returns it.") example(u"
+    unshift: #[desc("Pushes a value to the start of the array and returns it."), example(u"
         let arr = [1, 5, 3, 2]
         $.assert(arr.unshift(5) == 5)
         $.assert(arr == [5, 1, 5, 3, 2])
@@ -478,7 +478,7 @@ $.assert(arr.index_all(2) == [2,4])
         return value
     },
 
-    insert: #[desc("Pushes a value at a certain index of the array and returns it.") example(u"
+    insert: #[desc("Pushes a value at a certain index of the array and returns it."), example(u"
         let arr = [1, 5, 3, 2]
         $.assert(arr.insert(2, 7) == 7)
         $.assert(arr == [1, 5, 7, 3, 2])
@@ -488,7 +488,7 @@ $.assert(arr.index_all(2) == [2,4])
         return value
     },
 
-    flatten: #[desc("Flattens any sub-arrays into one big array.") example(u"
+    flatten: #[desc("Flattens any sub-arrays into one big array."), example(u"
         arr = [1, 2, [3, 4], 5, [6, 7, [8]]]
         $.assert(arr.flatten() == [1, 2, 3, 4, 5, 6, 7, 8])
     ")]
@@ -508,7 +508,7 @@ $.assert(arr.index_all(2) == [2,4])
         return output
     },
 
-    enumerate: #[desc("Returns an array of index-element pairs") example(u"
+    enumerate: #[desc("Returns an array of index-element pairs"), example(u"
         arr = ['a','b','c']
         for i in arr.enumerate() {
             $.print(i[0], ': ', i[1])
@@ -526,7 +526,7 @@ $.assert(arr.index_all(2) == [2,4])
         return @array(0..self.length).map(i => [i, self[i]])
     },
 
-    split: #[desc("Splits the array on the indicies") example(u"
+    split: #[desc("Splits the array on the indicies"), example(u"
         x = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]  
         $.assert(x.split([5]) == [[0,1,2,3,4],[5,6,7,8,9]])
         $.assert(x.split([5, 7]) == [[0,1,2,3,4],[5,6],[7,8,9]])
@@ -545,7 +545,7 @@ $.assert(arr.index_all(2) == [2,4])
         return ret_arr
     },
 
-    scan: #[desc("Takes in an initial value and a macro which acts on a reference of that value and each array value.") example(u"
+    scan: #[desc("Takes in an initial value and a macro which acts on a reference of that value and each array value."), example(u"
         x = [1,2,3]
         x_1 = x.scan(10, (&state, x){
             state *= x

@@ -9,6 +9,9 @@ impl @object {
 		new_obj.set(key, value)
 		return new_obj
 	},
+	has_key: (self, key: @object_key) -> @bool {
+		return key in self
+	},
 	add_groups: (self, groups: @group | [@group]) -> @NULL {
 		let grps = switch groups {
 			@group: [groups],

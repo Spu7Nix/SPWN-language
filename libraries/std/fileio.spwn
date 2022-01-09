@@ -18,7 +18,7 @@ impl @file {
 		let ret.fseek = 0;
 		return ret;
 	},
-	seek: #[desc("Sets a position in the file to read from") example(u"
+	seek: #[desc("Sets a position in the file to read from"), example(u"
 		f = @file::new('data.txt')
 		f.seek(10)
 		data = f.read(5) // reads characters 10 to 15
@@ -28,7 +28,7 @@ impl @file {
 		}
 		self.fseek = s;
 	},
-	read: #[desc("Reads the data in the file from the seek position to the end (or for a specified amount of characters)") example(u"
+	read: #[desc("Reads the data in the file from the seek position to the end (or for a specified amount of characters)"), example(u"
 		data = @file::new('data.txt').read()
 	")](self, s=-1) -> @string {
 		let size = s

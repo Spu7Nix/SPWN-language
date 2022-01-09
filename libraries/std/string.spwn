@@ -37,7 +37,7 @@ uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 lowercase = "abcdefghijklmnopqrstuvwxyz"
 
 impl @string {
-	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise") example(u"
+	is_empty: #[desc("Returns true if the string has a length of 0, false otherwise"), example(u"
         $.assert(''.is_empty())
         $.assert(!('x'.is_empty()))
     ")]
@@ -54,13 +54,13 @@ impl @string {
 		}
 		return $.substr(self, start, end);
 	},
-    overwrite: #[desc("Overwrites a portion of a string with another string.") example(u'
+    overwrite: #[desc("Overwrites a portion of a string with another string."), example(u'
         $.assert("abcdefghij".overwrite(2,5,"thingy") == "abthingyfghij")
     ')]
     (self, start: @number, end: @number, str: @string) -> @string {
         return self.substr(0, start) + str + self.substr(end, self.length)
     },
-	join: #[desc("Joins a list using the string.") example(u"
+	join: #[desc("Joins a list using the string."), example(u"
         $.assert(''.join(['a', 'b']) == 'ab')
         $.assert(', '.join(['string', 'element', 'join']) == 'string, element, join')
     ")]
@@ -72,7 +72,7 @@ impl @string {
 		}
 		return out;
 	},
-	split: #[desc("Splits the string by the specified seperator.") example(u"
+	split: #[desc("Splits the string by the specified seperator."), example(u"
         $.assert('a b c'.split(' ') == ['a', 'b', 'c'])
         $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
     ")]
@@ -159,7 +159,7 @@ impl @string {
         mul = $.ceil(len / pad.length)
         return self + (pad * mul).substr(0, len)
     },
-    l_trim: #[desc("Returns a left-trimmed verison of the string") example(u"
+    l_trim: #[desc("Returns a left-trimmed verison of the string"), example(u"
         str1 = '      abcd g    '
         str2 = '   pog  __'
         $.assert(str1.l_trim() == 'abcd g    ')
@@ -168,7 +168,7 @@ impl @string {
     (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, left = true)
     },
-    r_trim: #[desc("Returns a right-trimmed version of the string") example(u"
+    r_trim: #[desc("Returns a right-trimmed version of the string"), example(u"
         str = 'abcd      '
         str2 = '      abcd g    '
         str3 = '   pog  __'
@@ -179,7 +179,7 @@ impl @string {
     (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, right = true)
     },
-    trim: #[desc("Returns a trimmed version of the string") example(u"
+    trim: #[desc("Returns a trimmed version of the string"), example(u"
         str = 'abcd      '
         str2 = '      abcd g    '
         str3 = '   pog  __'
@@ -190,7 +190,7 @@ impl @string {
     (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, left = true, right = true)
     },
-    fmt: #[desc("Returns a formtted version of the string. Accepts either a single argument or an array") example(u"
+    fmt: #[desc("Returns a formtted version of the string. Accepts either a single argument or an array"), example(u"
         name1 = 'bob'
         name2 = 'alice'
         $.assert('hi {}'.fmt(name1) == 'hi bob')
@@ -255,7 +255,7 @@ impl @string {
         return $.regex(re, self, "replace", replacement)
     },
 
-    to_obj: #[desc("Returns a text object with the string as text") example(u"
+    to_obj: #[desc("Returns a text object with the string as text"), example(u"
         extract obj_props
         \"hello\".to_obj().with(X, 45).with(Y, 45).add()
     ")] (self) -> @object {
@@ -266,7 +266,7 @@ impl @string {
         }
     },
     
-    is_digit: #[desc("Returns true if string is numeric, false otherwise") example(u"
+    is_digit: #[desc("Returns true if string is numeric, false otherwise"), example(u"
         let num = \"123\"
         num.is_digit() // true
     ")] (self) -> @bool {

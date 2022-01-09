@@ -150,7 +150,7 @@ blend_rgb = (r1, g1, b1, a1, r2, g2, b2, a2, mode) {
 impl @chroma {
 
     from_rgb: #[
-        desc('Creatss a new chroma from rgb values (0-1)')
+        desc('Creatss a new chroma from rgb values (0-1)'),
         example(u"
             orange = @chroma::from_rgb(1, 0.5, 0)
         ")
@@ -172,7 +172,7 @@ impl @chroma {
     },
 
     from_rgb8: #[
-        desc('Creatss a new chroma from 8-bit rgb values (0-255)')
+        desc('Creatss a new chroma from 8-bit rgb values (0-255)'),
         example(u"
             cyan = @chroma::from_rgb(0, 255, 255)
         ")
@@ -194,7 +194,7 @@ impl @chroma {
     },
 
     from_hsv: #[
-        desc('Creatss a new chroma from hsv values (0-1)')
+        desc('Creatss a new chroma from hsv values (0-1)'),
         example(u"
             blue = @chroma::from_hsv(2/3, 1, 1)
         ")
@@ -216,7 +216,7 @@ impl @chroma {
     },
 
     from_hsv2: #[
-        desc('Creatss a new chroma from hsv values (0-360, 0-100, 0-100)')
+        desc('Creatss a new chroma from hsv values (0-360, 0-100, 0-100)'),
         example(u"
             yellow = @chroma::from_hsv2(60, 100, 100)
         ")
@@ -241,7 +241,7 @@ impl @chroma {
     },
 
     from_hex: #[
-        desc('Creatss a new chroma from a hex string')
+        desc('Creatss a new chroma from a hex string'),
         example(u"
             white = @chroma::from_hex('ffffff')
             black = @chroma::from_hex('#000000')
@@ -272,7 +272,7 @@ impl @chroma {
     },
 
     r: #[
-        desc('Gets or sets a chroma\'s red value')
+        desc('Gets or sets a chroma\'s red value'),
         example(u"
             let a = rgb(1,1,1,0.5)
             $.print(a.r()) // gets the value
@@ -296,7 +296,7 @@ impl @chroma {
     },
     
     r8: #[
-        desc('Gets or sets a chroma\'s 8-bit red value')
+        desc('Gets or sets a chroma\'s 8-bit red value'),
         example(u"
             let a = rgb(1,1,1)
             $.print(a.r8()) // gets the value
@@ -320,7 +320,7 @@ impl @chroma {
     },
     
     h: #[
-        desc('Gets or sets a chroma\'s hue value')
+        desc('Gets or sets a chroma\'s hue value'),
         example(u"
             let a = rgb(1,1,1)
             $.print(a.h()) // gets the value
@@ -396,7 +396,7 @@ impl @chroma {
     },
 
     over: #[
-        desc('Blends this chroma with another chroma as if layered above it')
+        desc('Blends this chroma with another chroma as if layered above it'),
         example(u"
             a = rgb(1,0.5,1)
             b = rgb(0,0.5,1)
@@ -421,7 +421,7 @@ impl @chroma {
     },
 
     under: #[
-        desc('Blends this chroma with another chroma as if layered under it')
+        desc('Blends this chroma with another chroma as if layered under it'),
         example(u"
             a = rgb(1,0.5,1)
             b = rgb(0,0.5,1)
