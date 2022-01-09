@@ -8,7 +8,7 @@ extract import "util.spwn"
 impl @item {
 
     add:
-    #[desc("Implementation of the pickup trigger") example("10i.add(5)")]
+    #[desc("Implementation of the pickup trigger"), example("10i.add(5)")]
     (self, #[desc("Amount to add")] amount: @number) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1817,
@@ -18,7 +18,7 @@ impl @item {
     },
 
     if_is:
-    #[desc("Implementation of the instant count trigger") example(u"
+    #[desc("Implementation of the instant count trigger"), example(u"
         10i.if_is(EQUAL_TO, 5, !{
             BG.pulse(rgb8(255, 0, 0), fade_out = 0.5)
         })
@@ -40,7 +40,7 @@ impl @item {
     },
 
     count:
-    #[desc("Implementation of the count trigger (-> returns an event for when an item reaches a certain value)") example(u"
+    #[desc("Implementation of the count trigger (-> returns an event for when an item reaches a certain value)"), example(u"
         on(10i.count(100), !{
             BG.pulse(rgb8(0, 255, 0), fade_out = 0.5) // will pulse each time item ID 10 becomes 100
         })
@@ -62,7 +62,7 @@ impl @item {
         }
 
     },
-    _range_: #[desc("Implementation of the range operator (`..`) for item IDs") example(u"
+    _range_: #[desc("Implementation of the range operator (`..`) for item IDs"), example(u"
         for item in 1i..10i {
             item.add(10)
         }

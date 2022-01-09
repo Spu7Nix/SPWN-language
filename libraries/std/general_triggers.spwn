@@ -8,7 +8,7 @@ extract import "control_flow.spwn"
 
 return {
 
-    shake: #[desc("Implementation of the shake trigger") example("shake()")]
+    shake: #[desc("Implementation of the shake trigger"), example("shake()")]
     (
         #[desc("Strength value")] strength: @number = 1,
         #[desc("Interval value")] interval: @number = 0,
@@ -23,31 +23,31 @@ return {
         wait(duration)
     },
 
-    disable_trail: #[desc("Disables the player's trail") example("disable_trail()")] () -> @NULL {
+    disable_trail: #[desc("Disables the player's trail"), example("disable_trail()")] () -> @NULL {
         $.add( trigger{
             OBJ_ID: 33,
         })
     },
 
-    enable_trail: #[desc("Enables the player's trail") example("enable_trail()")] () -> @NULL {
+    enable_trail: #[desc("Enables the player's trail"), example("enable_trail()")] () -> @NULL {
         $.add( trigger{
             OBJ_ID: 32,
         })
     },
 
-    show_player: #[desc("Shows the player") example("show_player()")] () -> @NULL {
+    show_player: #[desc("Shows the player"), example("show_player()")] () -> @NULL {
         $.add( trigger{
             OBJ_ID: 1613,
         })
     },
 
-    hide_player: #[desc("Hides the player") example("hide_player()")] () -> @NULL {
+    hide_player: #[desc("Hides the player"), example("hide_player()")] () -> @NULL {
         $.add( trigger{
             OBJ_ID: 1612,
         })
     },
 
-    toggle_bg_effect: #[desc("Implementation of the bg effect on/off triggers") example("toggle_bg_effect(false)")] (
+    toggle_bg_effect: #[desc("Implementation of the bg effect on/off triggers"), example("toggle_bg_effect(false)")] (
         #[desc("Whether to toggle bg effect on or off")] on: @bool = false
     ) -> @NULL {
         if on {
@@ -61,8 +61,7 @@ return {
         }
     },
 
-    move_trigger: #[desc("Returns a move trigger as an object")
-    example("$.add( move_trigger(1g,10,0).with(X,600) ) // Creates a move trigger at X 600 that moves group 1 a block to the right")]
+    move_trigger: #[desc("Returns a move trigger as an object"), example("$.add( move_trigger(1g,10,0).with(X,600) ) // Creates a move trigger at X 600 that moves group 1 a block to the right")]
     (
         #[desc("Group to move")] group: @group,
         #[desc("Units to move on the X axis")] x: @number,
@@ -82,8 +81,7 @@ return {
         }
     },
 
-    lock_to_player_trigger: #[desc("Returns a move trigger that locks the group's position as an object")
-    example("$.add( lock_to_player_trigger(1g,lock_x = true,lock_y = false).with(X,600) ) // Creates a move trigger at X 600 that locks group 1 to the player's X")]
+    lock_to_player_trigger: #[desc("Returns a move trigger that locks the group's position as an object"), example("$.add( lock_to_player_trigger(1g,lock_x = true,lock_y = false).with(X,600) ) // Creates a move trigger at X 600 that locks group 1 to the player's X")]
     (
         #[desc("Group to lock")] group: @group,
         #[desc("Lock to player X")] lock_x: @bool = true,
@@ -99,8 +97,7 @@ return {
         }
     },
 
-    stop_trigger: #[desc("Returns a stop trigger as an object")
-    example("$.add( stop_trigger(10g).with(X,600) ) // Creates a stop trigger at X 600 that stops group 10")]
+    stop_trigger: #[desc("Returns a stop trigger as an object"), example("$.add( stop_trigger(10g).with(X,600) ) // Creates a stop trigger at X 600 that stops group 10")]
     (
         #[desc("Group to stop")] group: @group,
     ) -> @object {
@@ -110,8 +107,7 @@ return {
         }
     },
 
-    alpha_trigger: #[desc("Returns an alpha trigger as an object")
-    example("$.add( alpha_trigger(1g,0.5,duration = 2).with(X,600) ) // Creates an alpha trigger at X 600 that fades group 1 to half opacity over 2 seconds")]
+    alpha_trigger: #[desc("Returns an alpha trigger as an object"), example("$.add( alpha_trigger(1g,0.5,duration = 2).with(X,600) ) // Creates an alpha trigger at X 600 that fades group 1 to half opacity over 2 seconds")]
     (group: @group, opacity: @number = 1, duration: @number = 0) -> @object {
         return obj {
             OBJ_ID: 1007,
@@ -121,8 +117,7 @@ return {
         }
     },
 
-    toggle_on_trigger: #[desc("Returns a toggle on trigger as an object")
-    example("$.add( toggle_on_trigger(5g).with(X,600) ) // Creates a toggle trigger at X 600 that turns on group 5")]
+    toggle_on_trigger: #[desc("Returns a toggle on trigger as an object"), example("$.add( toggle_on_trigger(5g).with(X,600) ) // Creates a toggle trigger at X 600 that turns on group 5")]
     (#[desc("Group to toggle")] group: @group) -> @object {
         return obj{
             OBJ_ID: 1049,
@@ -131,8 +126,7 @@ return {
         }
     },
 
-    toggle_off_trigger: #[desc("Returns a toggle off trigger as an object")
-    example("$.add( toggle_off_trigger(5g).with(X,600) ) // Creates a toggle trigger at X 600 that turns off group 5")]
+    toggle_off_trigger: #[desc("Returns a toggle off trigger as an object"), example("$.add( toggle_off_trigger(5g).with(X,600) ) // Creates a toggle trigger at X 600 that turns off group 5")]
     (#[desc("Group to toggle")] group: @group) -> @object {
         return obj{
             OBJ_ID: 1049,
@@ -141,8 +135,7 @@ return {
         }
     },
 
-    rotate_trigger: #[desc("Returns a rotate trigger as an object")
-    example("$.add( rotate_trigger(10g,3g,90,duration = 5).with(X,600) ) // Creates a rotate trigger at X 600 that rotates group 10 90 degrees around group 3 over 5 seconds")]
+    rotate_trigger: #[desc("Returns a rotate trigger as an object"), example("$.add( rotate_trigger(10g,3g,90,duration = 5).with(X,600) ) // Creates a rotate trigger at X 600 that rotates group 10 90 degrees around group 3 over 5 seconds")]
     (
         #[desc("Group to rotate")] group: @group,
         #[desc("Group of object to rotate around")] center: @group,
@@ -164,8 +157,7 @@ return {
         }
     },
 
-    follow_trigger: #[desc("Returns a follow trigger as an object")
-    example("$.add( follow_trigger(10g,3g).with(X,600) ) // Creates a follow trigger at X 600 that makes group 10 follow group 3")]
+    follow_trigger: #[desc("Returns a follow trigger as an object"), example("$.add( follow_trigger(10g,3g).with(X,600) ) // Creates a follow trigger at X 600 that makes group 10 follow group 3")]
     (
         #[desc("Group that will follow")] group: @group,
         #[desc("Group of object to follow")] other: @group,
@@ -183,8 +175,7 @@ return {
         }
     },
     
-    follow_player_y_trigger: #[desc("Returns a follow player Y trigger as an object")
-    example("$.add( follow_player_y_trigger(10g,delay = 0.5).with(X,600) )")]
+    follow_player_y_trigger: #[desc("Returns a follow player Y trigger as an object"), example("$.add( follow_player_y_trigger(10g,delay = 0.5).with(X,600) )")]
     (
         #[desc("Group that will follow")] group: @group,
         #[desc("Interpolation factor (?)")] speed: @number = 1,
@@ -204,8 +195,7 @@ return {
         }
     },
 
-    move_to_trigger: #[desc("Returns a move trigger that uses \"move to\" as an object")
-    example("$.add( move_to_trigger(10g,3g).with(X,600) ) // Creates a move trigger at X 600 that moves group 10 to group 3")]
+    move_to_trigger: #[desc("Returns a move trigger that uses \"move to\" as an object"), example("$.add( move_to_trigger(10g,3g).with(X,600) ) // Creates a move trigger at X 600 that moves group 10 to group 3")]
     (
         #[desc("Group to move")] group: @group,
         #[desc("Group of the object to move to")] target: @group,
@@ -239,8 +229,7 @@ return {
         }
     },
 
-    pulse_trigger: #[desc("Returns a pulse trigger as an object")
-    example(u"
+    pulse_trigger: #[desc("Returns a pulse trigger as an object"), example(u"
         $.add( pulse_trigger(10g,255,0,0,fade_out = 0.5).with(X,600) )
         $.add( pulse_trigger(10c,255,0,0,fade_out = 0.5).with(X,600) )
     ")]
@@ -288,8 +277,7 @@ return {
         }
     },
 
-    color_trigger: #[desc("Returns a color trigger as an object")
-    example("$.add( color_trigger(BG,0,0,0,0.5).with(X,600) )")]
+    color_trigger: #[desc("Returns a color trigger as an object"), example("$.add( color_trigger(BG,0,0,0,0.5).with(X,600) )")]
     (
         #[desc("Color channel to change")] channel: @color,
         #[desc("Red value of the target color")] r: @number,
@@ -312,8 +300,7 @@ return {
         }
     },
 
-    pickup_trigger: #[desc("Returns a pickup trigger as an object")
-    example("$.add( pickup_trigger(1i,3).with(X,600) )")]
+    pickup_trigger: #[desc("Returns a pickup trigger as an object"), example("$.add( pickup_trigger(1i,3).with(X,600) )")]
     (#[desc("Item ID to modify")] item_id: @item, #[desc("Amount to add")] amount: @number) -> @object {
         return obj{
             OBJ_ID: 1817,
@@ -322,8 +309,7 @@ return {
         }
     },
 
-    spawn_trigger: #[desc("Returns a spawn trigger as an object")
-    example("$.add( spawn_trigger(5g,0.5).with(X,600) )")]
+    spawn_trigger: #[desc("Returns a spawn trigger as an object"), example("$.add( spawn_trigger(5g,0.5).with(X,600) )")]
     (#[desc("Group to spawn")] group: @group | @trigger_function, #[desc("Delay")] time: @number | @epsilon = @epsilon::{}) -> @object {
         return obj{
 			OBJ_ID: 1268,

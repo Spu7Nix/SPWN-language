@@ -6,7 +6,7 @@ extract constants.obj_props
 type @event
 
 impl @event {
-    on: #[desc("Triggers a function every time an event fires") example(u"
+    on: #[desc("Triggers a function every time an event fires"), example(u"
         on(touch(), !{
             10g.move(10, 0)
         })
@@ -26,7 +26,7 @@ impl @event {
 
 return {
 
-    touch: #[desc("Implementation of the touch trigger (returns an event)") example(u"
+    touch: #[desc("Implementation of the touch trigger (returns an event)"), example(u"
         [[handle(touch())]] !{
             10g.move(10, 0)
         }
@@ -46,7 +46,7 @@ return {
 
     },
 
-    touch_end: #[desc("Returns an event for when a touch ends") example(u"
+    touch_end: #[desc("Returns an event for when a touch ends"), example(u"
         [[handle(touch_end())]] !{
             10g.move(10, 0)
         }
@@ -65,7 +65,7 @@ return {
         }
     },
 
-    collision: #[desc("Implementation of the collision trigger (returns an event)") example(u"
+    collision: #[desc("Implementation of the collision trigger (returns an event)"), example(u"
         [[handle(collision(1b, 2b))]] !{
             BG.set(rgb(0, 0, 0))
         }
@@ -87,7 +87,7 @@ return {
 
     },
 
-    collision_exit: #[desc("Returns an event for when a collision exits") example(u"
+    collision_exit: #[desc("Returns an event for when a collision exits"), example(u"
         [[handle(collision_exit(1b, 2b))]] !{
             BG.set(rgb(0, 0, 0))
         }
@@ -109,7 +109,7 @@ return {
     },
 
 
-    death: #[desc("Returns an event for when the player dies") example(u"
+    death: #[desc("Returns an event for when the player dies"), example(u"
         [[handle(death())]] !{
             BG.set(rgb(0, 0, 0))
         }
@@ -123,7 +123,7 @@ return {
         }
     },
 
-    count: #[desc("Implementation of a count trigger (returns an event)") example(u"
+    count: #[desc("Implementation of a count trigger (returns an event)"), example(u"
         [[handle(count(4i, 3))]] !{
             BG.set(rgb(0, 0, 0))
         }

@@ -5,7 +5,7 @@ constants = import "constants.spwn"
 extract constants.obj_props
 extract constants.comparisons
 
-wait = #[desc("Adds a delay before the next triggers") example(u"
+wait = #[desc("Adds a delay before the next triggers"), example(u"
 	BG.set(rgb8(255, 0, 0)) // turn background red
 	wait(2) // wait 2 seconds
 	BG.set(rgb8(0, 255, 0)) // turn background green
@@ -26,7 +26,7 @@ wait = #[desc("Adds a delay before the next triggers") example(u"
 	}
 
 }
-call_with_delay = #[desc("Call a function after a delay") example(u"
+call_with_delay = #[desc("Call a function after a delay"), example(u"
 	BG.set(rgb8(255, 0, 0)) // turn background red
 	call_with_delay(2, !{
 		BG.set(rgb8(0, 255, 0)) // turn background green 2 seconds later
@@ -41,7 +41,7 @@ call_with_delay = #[desc("Call a function after a delay") example(u"
 		TARGET: function,
 	})
 }
-call_on_x_position = #[desc("Call a function after an x position") example("
+call_on_x_position = #[desc("Call a function after an x position"), example("
 BG.set(255, 0, 0) // turn background red
 call_on_x_position(300, !{
 	BG.set(0, 255, 0) // turn background green at x position 300
@@ -64,7 +64,7 @@ call_on_x_position(300, !{
 
 
 
-	supress_signal: #[desc("Stops signal from coming past for some time") example(u"
+	supress_signal: #[desc("Stops signal from coming past for some time"), example(u"
 		f = !{
 			supress_signal(1)
 			10g.move(10, 0)
@@ -97,7 +97,7 @@ call_on_x_position(300, !{
 
 	},
 
-	supress_signal_forever: #[desc("Stops signal from coming past after call") example(u"
+	supress_signal_forever: #[desc("Stops signal from coming past after call"), example(u"
 		f = !{
 			supress_signal_forever()
 			10g.move(10, 0)
@@ -142,7 +142,7 @@ call_on_x_position(300, !{
 
 	// },
 
-	for_loop: #[desc("Implementation of a spawn loop with a counter") example(u"
+	for_loop: #[desc("Implementation of a spawn loop with a counter"), example(u"
 		for_loop(0..10, (i) {
 			if i < 5 {
 				10g.move(-10, 0)
@@ -180,7 +180,7 @@ call_on_x_position(300, !{
 
 	}, 
 
-	while_loop: #[desc("Implementation of a conditional spawn loop") example(u"
+	while_loop: #[desc("Implementation of a conditional spawn loop"), example(u"
 		c = counter(11)
 
 		while_loop(() => c > 4, () {
@@ -206,7 +206,7 @@ call_on_x_position(300, !{
         call_with_delay(delay, func)
 	},
 
-	do_while_loop: #[desc("Implementation of a conditional spawn loop") example(u"
+	do_while_loop: #[desc("Implementation of a conditional spawn loop"), example(u"
 		c = counter(4)
 
 		do_while_loop(() => c > 10, () {

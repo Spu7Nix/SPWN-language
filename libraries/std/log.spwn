@@ -24,7 +24,7 @@ log_time = (label: @string, time: @number) {
 
 type @runtime_log
 impl @runtime_log {
-    flash: #[desc('Flashes the background') example(u"
+    flash: #[desc('Flashes the background'), example(u"
         while_loop(() => true, (){
             5g!
             @log::runtime::flash()
@@ -42,7 +42,7 @@ impl @runtime_log {
 type @log
 impl @log {
     runtime: @runtime_log,
-    time: #[desc("Saves the current time to a given label.") example(u"
+    time: #[desc("Saves the current time to a given label."), example(u"
         @log::time('heavy calculation')
         // <insert your heavy code here>
         @log::time_end('heavy calculation')
@@ -50,7 +50,7 @@ impl @log {
         instant = $.time()
         data.time_labels.set(label, instant)
     },
-    time_log: #[desc("Logs the time between now and the start of the label.") example(u"
+    time_log: #[desc("Logs the time between now and the start of the label."), example(u"
         @log::time('for')
         
         for i in 0..10 {
@@ -63,7 +63,7 @@ impl @log {
         }
         log_time(label, instant - data.time_labels.get(label))
     },
-    time_end: #[desc("Logs the time between now and the start of the label and destroys it (it doesn't for now 💀).") example(u"
+    time_end: #[desc("Logs the time between now and the start of the label and destroys it (it doesn't for now 💀)."), example(u"
         @log::time('huge loop')
 
         for i in 0..100000 {}
@@ -77,7 +77,7 @@ impl @log {
         log_time(label, instant - data.time_labels.get(label))
         // how to remove a key from a dict?
     },
-    count: #[desc("Logs how many times the label got counted.") example(u"
+    count: #[desc("Logs how many times the label got counted."), example(u"
         for i in 0..10 {
             @log::count('my loop')
         }
@@ -86,7 +86,7 @@ impl @log {
         data.counts.set(label, count)
         $.print("{0}: {1}".fmt([label, count]))
     },
-    reset_count: #[desc("Resets the counted amount of the label.") example(u"
+    reset_count: #[desc("Resets the counted amount of the label."), example(u"
         for i in 0..10 {
             @log::count('loop')
         }
