@@ -1784,11 +1784,15 @@ fn check_for_tag(
                         let name = tokens.slice();
                         let args = match tokens.next(false) {
                             Some(Token::OpenBracket) => parse_args(tokens, notes)?,
-                            Some(Token::Comma) => Vec::new(),
                             Some(Token::ClosingSquareBracket) => {
                                 contents.tags.push((name, Vec::new()));
                                 break;
                             }
+                            Some(Token::Comma) => Vec::new(),
+                            Some(Token::Symbol) => {
+                                tokens.previous();
+                                Vec::new()
+                            },
                             a => expected!(
                                 "either '(', ']' or comma (',')".to_string(),
                                 tokens,
@@ -1797,11 +1801,12 @@ fn check_for_tag(
                             ),
                         };
                         contents.tags.push((name, args));
-                    }
+                    },
+                    Some(Token::Comma) => {},
                     a => expected!("either Symbol or ']'".to_string(), tokens, notes, a),
                 };
             }
-
+            
             Ok(contents)
         }
         _ => {
