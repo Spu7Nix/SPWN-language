@@ -104,7 +104,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         )));
     }
 
-    let mut doc = format!("# Documentation for `{}` \n", name);
+    let mut doc = format!("# Documentation for `{}`\n\n", name);
 
     let exports = globals.stored_values[start_context.inner().return_value].clone();
     let implementations = globals.implementations.clone();
@@ -122,7 +122,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     }) + globals.objects.len();
 
     //if used_groups > 0 || used_colors > 0 || used_blocks > 0 || used_used > 0 {
-    doc += "## Info:\n";
+    doc += "\n## Info\n";
     //}
 
     doc += &format!(
@@ -137,7 +137,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         used_groups, used_colors, used_blocks, used_items, total_objects
     );
     if !implementations.is_empty() && implementations.iter().any(|(_, a)| !a.is_empty()) {
-        doc += "# Type Implementations:\n";
+        doc += "\n## Type Implementations\n\n";
 
         let mut list: Vec<_> = implementations
             .into_iter()
@@ -171,7 +171,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
             doc += &format!("- [**@{1}**]({}-docs/{1}.md)\n", name, type_name);
 
             let content = &format!(
-                "  \n# **@{}**: \n {}",
+                "# **@{}**\n{}",
                 type_name,
                 document_dict(dict, &mut globals, &mut start_context)?
             );
@@ -181,7 +181,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     }
 
     doc += &format!(
-        "# Exports:\n{}",
+        "\n## Exports\n\n{}",
         document_val(&exports, &mut globals, &mut start_context)?
     );
 
@@ -234,7 +234,7 @@ fn document_dict(
 
         member_doc += &format!(
             r#"
-## **{}**:
+### {}
 
 {}
 >
@@ -247,7 +247,7 @@ fn document_dict(
 
     for list in categories {
         if !list.1.is_empty() {
-            doc += &format!("\n## {}:\n", list.0);
+            doc += &format!("\n## {}\n", list.0);
 
             for (key, val) in list.1.iter() {
                 doc += &document_member(key.as_ref(), val)?
@@ -266,17 +266,17 @@ fn document_macro(
     //description
     let mut doc = String::new();
     if let Some(s) = mac.tag.get_desc() {
-        doc += &format!("## Description: \n _{}_\n", s)
+        doc += &format!("\n**Description:**\n\n_{}_\n", s)
     };
 
     if let Some(example) = mac.tag.get_example() {
-        doc += &format!("### Example: \n```spwn\n {}\n```\n", example)
+        doc += &format!("\n**Example:**\n\n```spwn\n{}\n```\n\n", example)
     }
 
     if !(mac.args.is_empty()
         || (mac.args.len() == 1 && mac.args[0].name == globals.SELF_MEMBER_NAME))
     {
-        doc += "## Arguments:\n";
+        doc += "\n**Arguments:**\n";
         doc += "
 | # | name | type | default value | description |
 | - | ---- | ---- | ------------- | ----------- |
@@ -293,7 +293,7 @@ fn document_macro(
             if arg.default != None {
                 arg_string += &format!("| {} | `{}` |", i, arg.name);
             } else {
-                arg_string += &format!("| {} | **`{}`** |", i, arg.name);
+                arg_string += &format!("| {} | `{}` |", i, arg.name);
             }
 
             if let Some(typ) = arg.pattern {
@@ -326,7 +326,7 @@ fn document_macro(
 
             //add_arrows(&mut arg_string);
 
-            doc += &arg_string;
+            doc += arg_string.replace('_', "\\_").as_ref();
 
             //doc += "\n  ";
         }
@@ -363,11 +363,11 @@ fn document_val(
 
     if literal.len() < 300 {
         doc += &format!(
-            " **Printed:** \n```spwn\n{}\n``` \n**Type:** `@{}` \n",
+            "**Printed**\n\n```spwn\n{}\n```\n\n**Type:** `@{}`\n",
             literal, type_name
         );
     } else {
-        doc += &format!(" **Type:** `@{}` \n", type_name);
+        doc += &format!("**Type:** `@{}`\n", type_name);
     }
 
     doc += &match &val {
