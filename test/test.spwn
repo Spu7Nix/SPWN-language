@@ -1,18 +1,1 @@
-extract obj_props
-
-let a = @set::new()
-
-$.print(a.is_empty())
-
-a.push(obj { GROUPS: 10g, X: 0, Y: 0 })
-
-$.print(a)
-
-a = a.replace(GROUPS, ==10g, 5g, 1g)
-
-$.print(a)
-
-a = a.with(EDITOR_LAYER_1, 5)
-
-$.print(a)
-
+$.print("\u{01B50000}")
