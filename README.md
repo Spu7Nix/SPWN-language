@@ -41,10 +41,15 @@ You can either use the installers for your operating system, or build SPWN from 
 
 ### Universal
 
+#### this method is outdated; use a method described below instead
+
 With Rust installed:
 
 - Run `cargo install spwn`
-- Wait for it to compile, and you're set.
+- Wait for it to compile
+- Download the [libraries](https://github.com/Spu7Nix/SPWN-language/tree/v0.6-beta/libraries) folder
+- Copy the libraries folder to `$HOME/.cargo/bin/spwn`
+- Make something awesome!
 
 If you would like a pre-compiled package, look below.
 

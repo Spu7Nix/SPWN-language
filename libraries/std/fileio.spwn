@@ -4,7 +4,13 @@
 type @file
 
 impl @file {
-	new: #[constructor, desc("Creates a new file IO object") example("@file::new('C:/path/to/file.txt')")](#[desc("Path to file (at the moment this is only stable with absolute paths)")] path: @string) -> @file {
+	new: #[
+		constructor,
+		desc("Creates a new file IO object")
+		example("@file::new('C:/path/to/file.txt')")
+	] (
+		#[desc("Path to file (at the moment this is only stable with absolute paths)")] path: @string
+	) -> @file {
 		let ret = @file::{};
 
 		ret.filedata = $.readfile(path);
@@ -12,21 +18,21 @@ impl @file {
 		let ret.fseek = 0;
 		return ret;
 	},
-	seek: #[desc("Sets a position in the file to read from") example("
-f = @file::new('data.txt')
-f.seek(10)
-data = f.read(5) // reads characters 10 to 15
+	seek: #[desc("Sets a position in the file to read from") example(u"
+		f = @file::new('data.txt')
+		f.seek(10)
+		data = f.read(5) // reads characters 10 to 15
 	")] (self, s: @number) -> @NULL {
 		if s < 0 {
 			throw "Negative seek position " + s as @string;
 		}
 		self.fseek = s;
 	},
-	read: #[desc("Reads the data in the file from the seek position to the end (or for a specified amount of characters)") example("
-data = @file::new('data.txt').read()
+	read: #[desc("Reads the data in the file from the seek position to the end (or for a specified amount of characters)") example(u"
+		data = @file::new('data.txt').read()
 	")](self, s=-1) -> @string {
 		let size = s
-		if s == -1 {
+		if s < 0 {
 			size = self.size;
 		}
 		if self.fseek >= self.size {
@@ -36,5 +42,5 @@ data = @file::new('data.txt').read()
 			self.fseek += size;
 			return $.substr(self.filedata, oldseek, [self.fseek, self.size].min());
 		}
-	}
+	},
 }

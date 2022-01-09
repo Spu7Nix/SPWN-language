@@ -8,13 +8,15 @@ extract import "control_flow.spwn"
 extract import "util.spwn"
 impl @color {
 
-    _range_: #[desc("Implementation of the range operator (`..`) for colors") example("
-for color in 1c..10c {
-    -> color.set(rgb(0,0,0), 0.5)
-}
+    _range_: #[desc("Implementation of the range operator (`..`) for colors") example(u"
+        for color in 1c..10c {
+            -> color.set(rgb(0,0,0), 0.5)
+        }
     ")] create_range_macro(@color),
     set:
-    #[desc("Implementation of the color trigger") example("BG.set(rgb(0, 0, 0), 0.5) // turns the background color black")]
+    #[desc("Implementation of the color trigger") example(u"
+        BG.set(rgb(0, 0, 0), 0.5) // turns the background color black
+    ")]
     (
         self,
         #[desc("Target chroma")] c: @chroma,
@@ -35,7 +37,9 @@ for color in 1c..10c {
         wait(duration)
     }, //1,899,2,285,3,105,36,1,7,255,8,255,9,255,10,0.5,35,0;
 
-    pulse_hsv: #[desc("Implementation of the pulse trigger for colors with hsv") example("BG.pulse_hsv(180, 1, 1, fade_out = 0.5) // pulses the background with the complementary color")]
+    pulse_hsv: #[desc("Implementation of the pulse trigger for colors with hsv") example(u"
+        BG.pulse_hsv(180, 1, 1, fade_out = 0.5) // pulses the background with the complementary color
+    ")]
     (
         self,
         #[desc("Hue")] h: @number,
@@ -63,7 +67,9 @@ for color in 1c..10c {
         wait(fade_in + hold + fade_out)
     },
 
-    pulse: #[desc("Implementation of the pulse trigger for colors") example("BG.pulse(rgb8(255, 0, 0), fade_out = 0.5) // pulses the background red")]
+    pulse: #[desc("Implementation of the pulse trigger for colors") example(u"
+        BG.pulse(rgb8(255, 0, 0), fade_out = 0.5) // pulses the background red
+    ")]
     (
         self,
         #[desc("Chroma for pulse color")] c: @chroma,
@@ -85,5 +91,5 @@ for color in 1c..10c {
             PULSE_HSV: false,
         })
         wait(fade_in + hold + fade_out)
-    }
+    },
 }
