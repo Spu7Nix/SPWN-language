@@ -39,7 +39,6 @@ SPWN is a programming language that compiles to Geometry Dash levels. What that 
 
 You can either use the installers for your operating system, or build SPWN from source. Please note that building from source will give you access to newer features and bug fixes, but **may be unstable**.
 
-
 ### Universal
 
 #### this method is outdated; use a method described below instead
@@ -83,13 +82,13 @@ You can either:
 
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
-```sh
+```cmd
 pacman -U spwn-0.0.7-x86_64-linux_arch.pkg.tar.zst
 ```
 
 - Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
 
-```sh
+```cmd
 yay -S spwn-bin
 ```
 
