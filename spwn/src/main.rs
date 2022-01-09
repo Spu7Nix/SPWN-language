@@ -54,13 +54,12 @@ fn eprint_with_color(text: &str, color: termcolor::Color) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
-    let mut args_iter = args.iter();
+    let mut args_iter = env::args().into_iter();
     args_iter.next();
 
-    match &args_iter.next() {
+    match args_iter.next() {
         Some(a) => {
-            match a as &str {
+            match &*a {
                 "help" => {
                     println!("{}", HELP);
                     Ok(())
@@ -103,12 +102,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 compile_only = true;
                             }
                             "--no-optimize" | "-o" => opti_enabled = false,
-                            "--level-name" | "-n" => level_name = args_iter.next().cloned(),
+                            "--level-name" | "-n" => level_name = args_iter.next(),
                             "--live-editor" | "-e" => live_editor = true,
-                            "--save-file" | "-s" => save_file = args_iter.next().cloned(),
+                            "--save-file" | "-s" => save_file = args_iter.next(),
                             "--included-path" | "-i" => included_paths.push({
                                 let path = PathBuf::from(
-                                    args_iter.next().cloned().expect("No path provided"),
+                                    args_iter.next().expect("No path provided"),
                                 );
                                 if path.exists() {
                                     path
@@ -119,7 +118,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "--allow" | "-a" => {
                                 let b = args_iter
                                     .next()
-                                    .cloned()
                                     .expect("Expected built-in function name");
                                 permissions.set(
                                     builtins::Builtin::from_str(&b)
@@ -130,7 +128,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             "--deny" | "-d" => {
                                 let b = args_iter
                                     .next()
-                                    .cloned()
                                     .expect("Expected built-in function name");
                                 permissions.set(
                                     builtins::Builtin::from_str(&b)
@@ -424,7 +421,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         let cache = SpwnCache::default();
 
-                        match documentation::document_lib(lib_path) {
+                        match documentation::document_lib(&lib_path) {
                             Ok(_) => (),
                             Err(e) => {
                                 create_report(ErrorReport::from(e)).eprint(cache).unwrap();
