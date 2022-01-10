@@ -20,8 +20,12 @@ jobs:
       run: cargo build --release --verbose
     - name: Run tests
       run: cargo test --release --verbose
+    - name: Install rust WASM
+      run: rustup target add wasm32-unknown-unknown
+    - name: Test if the code will build to a WASM binary
+      run: cargo check --target wasm32-unknown-unknown
       
-  upload:
+  upload-ubuntu:
     runs-on: ubuntu-latest
     
     steps:
@@ -34,5 +38,23 @@ jobs:
 
     - uses: actions/upload-artifact@v2
       with:
-        name: ubuntu-linux-artifact
+        name: ubuntu-linux-artifacts
         path: build_artifacts
+      
+  upload-wasm:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+
+    - run: mkdir -p build_artifacts
+    - run: cp -r libraries build_artifacts
+    - run: rustup target add wasm32-unknown-unknown
+    - run: cargo build --target wasm32-unknown-unknown
+    - run: mv target/wasm32-unknown-unknown/release/spwn build_artifacts
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: wasm32-artifacts
+        path: build_artifacts
+
