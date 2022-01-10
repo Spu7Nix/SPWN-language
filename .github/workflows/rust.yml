@@ -28,9 +28,9 @@ jobs:
     - uses: actions/checkout@v2
 
     - run: mkdir -p build_artifacts
+    - run: cp -r libraries build_artifacts
     - run: cargo build --release
     - run: mv target/release/spwn build_artifacts
-    - run: cp libraries build_artifacts
 
     - uses: actions/upload-artifact@v2
       with:
