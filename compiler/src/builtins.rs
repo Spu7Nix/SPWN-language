@@ -466,6 +466,7 @@ macro_rules! builtins {
             )*
         ];
 
+        #[derive(Debug)]
         pub struct BuiltinPermissions (FnvHashMap<Builtin, bool>);
 
         impl BuiltinPermissions {
