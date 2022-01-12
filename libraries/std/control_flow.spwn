@@ -142,7 +142,7 @@ call_on_x_position(300, !{
 
 	// },
 
-	suppress_signal_until: #[desc("Suppresses the signal until the desired group is called"), example(u"
+	suppress_signal_until: #[desc("Suppresses the signal until the desired group or trigger function is called"), example(u"
 		func = !{
 			suppress_signal_until(5g)
 			@log::runtime::flash()
@@ -153,7 +153,7 @@ call_on_x_position(300, !{
 		wait(0.4)
 		func! // flashes
 	")] (
-		#[desc("Group/trigger function to call to stop suppression (default: current context)")]
+		#[desc("Group or trigger function to call to stop suppression (default: current context)")]
 		group: @group | @trigger_function = null,
 	) -> @NULL {
 		// 0 = suppressed
