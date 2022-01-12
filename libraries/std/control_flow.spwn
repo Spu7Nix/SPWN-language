@@ -82,7 +82,7 @@ call_on_x_position(300, !{
 	) -> @NULL {
 		//if checker is 0, a signal can come through
 		//if checker is 1, it will be suppressed
-		checker = @counter::new(0)
+		checker = @counter::new(0, reset = false)
 		-> (){
 			wait(delay)
 			checker.item.if_is(EQUAL_TO, 1, !{
@@ -109,7 +109,7 @@ call_on_x_position(300, !{
 		f! // does nothing
 	")] () -> @NULL {
 
-		checker = @counter::new(0)
+		checker = @counter::new(0, reset = false)
 		checker.item.if_is(EQUAL_TO, 0, !{
 			checker.item.add(1)
 			-> return
@@ -123,7 +123,7 @@ call_on_x_position(300, !{
 	// ){
 	// 	//if checker is 0, a signal can come through
 	// 	//if checker is 1, it will be suppressed
-	// 	checker = @counter::new(0)
+	// 	checker = @counter::new(0, reset = false)
 
 	// 	-> (){
 	// 		checker.item.add(1)
