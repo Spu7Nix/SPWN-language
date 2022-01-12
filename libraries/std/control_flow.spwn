@@ -64,9 +64,9 @@ call_on_x_position(300, !{
 
 
 
-	supress_signal: #[desc("Stops signal from coming past for some time"), example(u"
+	suppress_signal: #[desc("Stops signal from coming past for some time"), example(u"
 		f = !{
-			supress_signal(1)
+			suppress_signal(1)
 			10g.move(10, 0)
 		}
 
@@ -78,10 +78,10 @@ call_on_x_position(300, !{
 		wait(0.4)
 		f! // moves
 	")] (
-		#[desc("Time to supress signal")] delay: @number
+		#[desc("Time to suppress signal")] delay: @number
 	) -> @NULL {
 		//if checker is 0, a signal can come through
-		//if checker is 1, it will be supressed
+		//if checker is 1, it will be suppressed
 		checker = @counter::new(0)
 		-> (){
 			wait(delay)
@@ -97,9 +97,9 @@ call_on_x_position(300, !{
 
 	},
 
-	supress_signal_forever: #[desc("Stops signal from coming past after call"), example(u"
+	suppress_signal_forever: #[desc("Stops signal from coming past after call"), example(u"
 		f = !{
-			supress_signal_forever()
+			suppress_signal_forever()
 			10g.move(10, 0)
 		}
 		f! // moves
@@ -118,11 +118,11 @@ call_on_x_position(300, !{
 
 	},
 
-	// supress_signal_quick: #[desc("Stops signal from coming past for some time (better for quick/glitchy signals)")] (
-	// 	#[desc("Time to supress signal")] delay: @number,
+	// suppress_signal_quick: #[desc("Stops signal from coming past for some time (better for quick/glitchy signals)")] (
+	// 	#[desc("Time to suppress signal")] delay: @number,
 	// ){
 	// 	//if checker is 0, a signal can come through
-	// 	//if checker is 1, it will be supressed
+	// 	//if checker is 1, it will be suppressed
 	// 	checker = @counter::new(0)
 
 	// 	-> (){

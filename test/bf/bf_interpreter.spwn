@@ -313,7 +313,7 @@ impl @bfreader {
     interpret: (self) {
 
         ret = !{
-            supress_signal(0.05)
+            suppress_signal(0.05)
             -> self.group.move(spacing, 0, 0)
             -> return
         }
@@ -324,14 +324,14 @@ impl @bfreader {
         }
 
         slow_ret =  !{
-            supress_signal(0.1)
+            suppress_signal(0.1)
             wait(0.1)
             -> self.group.move(spacing, 0, 0)
             -> return
         }
 
         // slow_ret = !{
-        //     supress_signal(0.06)
+        //     suppress_signal(0.06)
         //     ret!
         // }
 
@@ -391,7 +391,7 @@ impl @bfreader {
                 //wait()
                 cell.copy_to([self.num_out], )
             } ()
-            supress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APPARENTLY
+            suppress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APPARENTLY
             // REQUIRED FOR TEXT TO WORK ON MOBILE FOR SOME REASON
 
             self.std_out.write(self.num_out, )
@@ -399,7 +399,7 @@ impl @bfreader {
             slow_ret!
         }
         -> if @bool(self.input) {
-            //supress_signal(0.1)
+            //suppress_signal(0.1)
             std_in = self.std_in
             -> input_layer.alpha(1, 0.5)
 
@@ -460,7 +460,7 @@ impl @bfreader {
             }
 
             gs.button_a().on_triggered(!{
-                supress_signal(0.05)
+                suppress_signal(0.05)
                 if input_mode == 1 {
                     -> input_inc_button.pulse(59, 144, 247, fade_out = 0.3)
                     std_in += 1
@@ -853,7 +853,7 @@ game_bg_target = 908g
 switch_game_bg = 909g
 
 random_affect = !{
-    supress_signal(0.2)
+    suppress_signal(0.2)
     -> if random_seed >= random_max - 1 {
         wait()
         random_seed -= random_max - 1
@@ -1648,7 +1648,7 @@ gs.button_b().on_triggered(!{
                     //stop double tap
 
 
-                    supress_signal_forever()
+                    suppress_signal_forever()
                     tut_page_num.add(1)
                     54c.set(0,0,0, 0.5)
                     activate_button(null, 193c)

@@ -168,7 +168,7 @@ impl @textdisplay {
         //         }
         //         letter.item.if_is(EQUAL_TO, 0, !{
         //             wait()
-        //             if speed > 1  { supress_signal(0.1) }
+        //             if speed > 1  { suppress_signal(0.1) }
         //             -> return
         //         })
         //     }
