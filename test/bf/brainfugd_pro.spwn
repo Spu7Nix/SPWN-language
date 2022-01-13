@@ -254,7 +254,7 @@ impl @bfreader {
         }
 
         // slow_ret = !{
-        //     supress_signal(0.06)
+        //     suppress_signal(0.06)
         //     ret!
         // }
 
@@ -314,7 +314,7 @@ impl @bfreader {
                 //wait()
                 cell.copy_to([self.num_out], )
             } ()
-            supress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APARENTLY
+            suppress_signal(0.1) // DO NOT REMOVE VERY IMPORTANT APARENTLY
             // REQUIRED FOR TEXT TO WORK ON MOBILE FOR SOME REASON
 
             self.std_out.write(self.num_out, )
@@ -322,7 +322,7 @@ impl @bfreader {
             ret!
         }
         -> if current == INPUT {
-            //supress_signal(0.1)
+            //suppress_signal(0.1)
             std_in = self.std_in
             -> input_layer.alpha(1, 0.5)
 
@@ -349,7 +349,7 @@ impl @bfreader {
             input_mode += 1
 
             gs.button_a().on_triggered(!{
-                supress_signal(0.05)
+                suppress_signal(0.05)
                 if input_mode == 1 {
                     -> input_inc_button.pulse(59, 144, 247, fade_out = 0.3)
                     std_in += 1
@@ -820,7 +820,7 @@ start()
 
 
 gs.button_a().on_triggered(!{
-    supress_signal(0.1)
+    suppress_signal(0.1)
     -> right_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
     -> right_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> right_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
@@ -841,7 +841,7 @@ gs.button_b().on_triggered(!{
     -> left_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> left_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
 
-    supress_signal(0.1)
+    suppress_signal(0.1)
 
 
 

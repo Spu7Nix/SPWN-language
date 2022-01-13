@@ -64,9 +64,9 @@ call_on_x_position(300, !{
 
 
 
-	supress_signal: #[desc("Stops signal from coming past for some time"), example(u"
+	suppress_signal: #[desc("Stops signal from coming past for some time"), example(u"
 		f = !{
-			supress_signal(1)
+			suppress_signal(1)
 			10g.move(10, 0)
 		}
 
@@ -78,11 +78,11 @@ call_on_x_position(300, !{
 		wait(0.4)
 		f! // moves
 	")] (
-		#[desc("Time to supress signal")] delay: @number
+		#[desc("Time to suppress signal")] delay: @number
 	) -> @NULL {
 		//if checker is 0, a signal can come through
-		//if checker is 1, it will be supressed
-		checker = @counter::new(0)
+		//if checker is 1, it will be suppressed
+		checker = @counter::new(0, reset = false)
 		-> (){
 			wait(delay)
 			checker.item.if_is(EQUAL_TO, 1, !{
@@ -97,9 +97,9 @@ call_on_x_position(300, !{
 
 	},
 
-	supress_signal_forever: #[desc("Stops signal from coming past after call"), example(u"
+	suppress_signal_forever: #[desc("Stops signal from coming past after call"), example(u"
 		f = !{
-			supress_signal_forever()
+			suppress_signal_forever()
 			10g.move(10, 0)
 		}
 		f! // moves
@@ -109,7 +109,7 @@ call_on_x_position(300, !{
 		f! // does nothing
 	")] () -> @NULL {
 
-		checker = @counter::new(0)
+		checker = @counter::new(0, reset = false)
 		checker.item.if_is(EQUAL_TO, 0, !{
 			checker.item.add(1)
 			-> return
@@ -118,12 +118,12 @@ call_on_x_position(300, !{
 
 	},
 
-	// supress_signal_quick: #[desc("Stops signal from coming past for some time (better for quick/glitchy signals)")] (
-	// 	#[desc("Time to supress signal")] delay: @number,
+	// suppress_signal_quick: #[desc("Stops signal from coming past for some time (better for quick/glitchy signals)")] (
+	// 	#[desc("Time to suppress signal")] delay: @number,
 	// ){
 	// 	//if checker is 0, a signal can come through
-	// 	//if checker is 1, it will be supressed
-	// 	checker = @counter::new(0)
+	// 	//if checker is 1, it will be suppressed
+	// 	checker = @counter::new(0, reset = false)
 
 	// 	-> (){
 	// 		checker.item.add(1)
@@ -141,6 +141,39 @@ call_on_x_position(300, !{
 
 
 	// },
+
+	suppress_signal_until: #[desc("Suppresses the signal until the desired group or trigger function is called"), example(u"
+		func = !{
+			suppress_signal_until(5g)
+			@log::runtime::flash()
+		}
+
+		func! // does nothing
+		5g!
+		wait(0.4)
+		func! // flashes
+	")] (
+		#[desc("Group or trigger function to call to stop suppression (default: current context)")]
+		group: @group | @trigger_function = null,
+	) -> @NULL {
+		// 0 = suppressed
+		// 1 = not suppressed
+		checker = @counter::new(bits = 1, reset = false)
+
+		-> (){
+			context_func = switch group {
+				@NULL: $.trigger_fn_context(),
+				else: group,
+			}
+			$.extend_trigger_func(context_func, (){
+				if checker == 0 { checker++ }
+			})
+		}()
+
+		if checker == 1 {
+			-> return
+		}
+	},
 
 	for_loop: #[desc("Implementation of a spawn loop with a counter"), example(u"
 		for_loop(0..10, (i) {
