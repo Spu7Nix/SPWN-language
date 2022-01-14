@@ -1,11 +1,29 @@
 #[no_std, cache_output]
-constants = import "constants.spwn"
 
+constants = import "constants.spwn"
 extract constants.obj_props
+
+extract import "control_flow.spwn"
 
 type @event
 
 impl @event {
+    new: #[constructor, desc("Creates a new event"), example(u"
+        my_event = @event::new()
+
+        my_event.on(!{
+            @log::runtime::flash()
+        })
+
+        wait(5)
+        my_event.emit()
+    ")] (
+        #[desc("Group used for emitting and listening to the event")] group: @group = ?g,
+    ){
+        return @event::{
+            io: group,
+        }
+    },
     on: #[desc("Triggers a function every time an event fires"), example(u"
         on(touch(), !{
             10g.move(10, 0)
@@ -15,13 +33,40 @@ impl @event {
         [[ on(touch()) ]] !{
             10g.move(10, 0)
         }
+
+        // 'on' will suppress signals if the context in which it is defined never got triggered
+        on(touch(), !{
+            on(death(), !{
+                10g.move(10, 0) // dying won't do anything if you didn't touch up to that point
+            })
+        })
+        // you can negate this effect by doing `on(event, !{}, suppress = false)`
     ")] (
-        #[desc("Event to trigger on")] event: @event,
-        #[desc("Function to trigger")] function: @trigger_function
+        self,
+        #[desc("Function to trigger")] function: @trigger_function|@group,
+        #[desc("Force suppression in current context")] suppress: @bool = true,
     ) -> @NULL {
-        event.on_triggered(function)
+        if suppress == false || $.trigger_fn_context() == 0g {
+            $.extend_trigger_func(self.io, (){
+                function!
+            })
+        } else {
+            locker = ?g
+            locker!
+            $.extend_trigger_func(self.io, (){
+                suppress_signal_until(locker)
+                function!
+            })
+        }
     },
-    
+    emit: #[desc("Triggers all listeners of this event"), example(u"
+        wait(5)
+        event.emit()
+    ")] (
+        self,
+    ) {
+        self.io!
+    },
 }
 
 return {
@@ -33,17 +78,15 @@ return {
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) -> @event {
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1595,
-                HOLD_MODE: true,
-                TOGGLE_MODE: 1,
-                TARGET: function,
-                DUAL_MODE: dual_side,
-
-            })
-        }
-
+        event = @event::new()
+        $.add( trigger{
+            OBJ_ID: 1595,
+            HOLD_MODE: true,
+            TOGGLE_MODE: 1,
+            TARGET: event.io,
+            DUAL_MODE: dual_side,
+        })
+        return event
     },
 
     touch_end: #[desc("Returns an event for when a touch ends"), example(u"
@@ -53,16 +96,15 @@ return {
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) -> @event {
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1595,
-                HOLD_MODE: true,
-                TOGGLE_MODE: 2,
-                TARGET: function,
-                DUAL_MODE: dual_side,
-
-            })
-        }
+        event = @event::new()
+        $.add( trigger{
+            OBJ_ID: 1595,
+            HOLD_MODE: true,
+            TOGGLE_MODE: 2,
+            TARGET: event.io,
+            DUAL_MODE: dual_side,
+        })
+        return event
     },
 
     collision: #[desc("Implementation of the collision trigger (returns an event)"), example(u"
@@ -73,18 +115,16 @@ return {
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
     ) -> @event {
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1815,
-                BLOCK_A: a,
-                BLOCK_B: b,
-                ACTIVATE_GROUP: true,
-                ACTIVATE_ON_EXIT: false,
-                TARGET: function,
-
-            })
-        }
-
+        event = @event::new()
+        $.add( trigger{
+            OBJ_ID: 1815,
+            BLOCK_A: a,
+            BLOCK_B: b,
+            ACTIVATE_GROUP: true,
+            ACTIVATE_ON_EXIT: false,
+            TARGET: event.io,
+        })
+        return event
     },
 
     collision_exit: #[desc("Returns an event for when a collision exits"), example(u"
@@ -95,17 +135,16 @@ return {
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
     ) -> @event {
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1815,
-                BLOCK_A: a,
-                BLOCK_B: b,
-                ACTIVATE_GROUP: true,
-                ACTIVATE_ON_EXIT: true,
-                TARGET: function,
-
-            })
-        }
+        event = @event::new()
+        $.add( trigger{
+            OBJ_ID: 1815,
+            BLOCK_A: a,
+            BLOCK_B: b,
+            ACTIVATE_GROUP: true,
+            ACTIVATE_ON_EXIT: true,
+            TARGET: event.io,
+        })
+        return event
     },
 
 
@@ -114,13 +153,13 @@ return {
             BG.set(rgb(0, 0, 0))
         }
     ")] () -> @event {
-        return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1812,
-                ACTIVATE_GROUP: true,
-                TARGET: function
-            })
-        }
+        event = @event::new()
+        $.add( trigger{
+            OBJ_ID: 1812,
+            ACTIVATE_GROUP: true,
+            TARGET: event.io,
+        })
+        return event
     },
 
     count: #[desc("Implementation of a count trigger (returns an event)"), example(u"
@@ -128,15 +167,15 @@ return {
             BG.set(rgb(0, 0, 0))
         }
     ")] (it: @item, hits: @number, multi: @bool = true) -> @event {
-        return @event::{
-            on_triggered: (function) => $.add(trigger {
-                OBJ_ID: 1611,
-                ACTIVATE_GROUP: true,
-                TARGET: function,
-                ITEM: it,
-                COUNT: hits,
-                COUNT_MULTI_ACTIVATE: multi
-            })
-        }
+        event = @event::new()
+        $.add( trigger{
+            OBJ_ID: 1611,
+            ACTIVATE_GROUP: true,
+            TARGET: event.io,
+            ITEM: it,
+            COUNT: hits,
+            COUNT_MULTI_ACTIVATE: multi,
+        })
+        return event
     },
 }
