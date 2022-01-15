@@ -65,10 +65,11 @@ frames = #[desc("Waits for an arbitrary amount of frames"), example(u"
 	frames(60) // wait 60 frames (1 second on 60fps)
 	@log::runtime::flash(rgb(0,0,1)) // flash the screen
 ")] (
-	#[desc("The amount of frames to wait")] frames: @number, // TODO: add @counter
+	#[desc("The amount of frames to wait")] frames: @number|@counter,
 ) -> @NULL {
 	frames_setup = import "frames_setup.spwn"
 	setup = frames_setup()
+
 	frames_count = @counter::new(bits = $.ceil($.log(frames, 2)))
 
 	extern = !{ // currently doing this won't work, and it will throw an error from optimizer.rs
