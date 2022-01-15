@@ -1,0 +1,63 @@
+#[no_std, cache_output]
+
+let frames_setup_cache = null
+
+return (){
+    if frames_setup_cache != null { return frames_setup_cache }
+
+    // no more circular dependencies
+    util = import 'util.spwn'
+    constants = import 'constants.spwn'
+    extract constants.obj_ids
+    extract constants.obj_props
+    extract import 'events.spwn'
+    extract import 'control_flow.spwn'
+
+    block_a = ?b
+    block_b = ?b
+    group_toggle = ?g
+    group_first = ?g
+    group_second = ?g
+    group_frame = ?g
+
+    frames_setup_cache = {
+        block_a: block_a,
+        block_b: block_b,
+        group_toggle: group_toggle,
+        group_first: group_first,
+        group_second: group_second,
+        group_frame: group_frame,
+    }
+
+    $.add(obj{
+        OBJ_ID: special.COLLISION_BLOCK,
+        X: 0,
+        Y: 2400,
+        BLOCK_A: block_a,
+        GROUPS: group_toggle,
+        DYNAMIC_BLOCK: true,
+    })
+    $.add(obj{
+        OBJ_ID: special.COLLISION_BLOCK,
+        X: 0,
+        Y: 2400,
+        BLOCK_A: block_b,
+    })
+
+    collision(block_a, block_b).on(!{
+        group_toggle.toggle_off()
+        group_first!
+        group_frame!
+    })
+    collision_exit(block_a, block_b).on(!{
+        group_toggle.toggle_on()
+        group_second!
+        group_frame!
+    })
+
+    call_on_x_position(1, !{
+        group_toggle.toggle_off()
+    })
+
+    return frames_setup_cache
+}

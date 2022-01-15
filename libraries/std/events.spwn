@@ -25,7 +25,7 @@ impl @event {
             group = ?g
         }
         return @event::{
-            io: group,
+            io: group if group != null else ?g,
         }
     },
     on: #[desc("Triggers a function every time an event fires"), example(u"
@@ -166,20 +166,35 @@ return {
         return event
     },
 
-    // count: #[desc("Implementation of a count trigger (returns an event)"), example(u"
-    //     on(count(4i, 3), !{
-    //         BG.set(rgb(0, 0, 0))
-    //     })
-    // ")] (it: @item, hits: @number, multi: @bool = true) -> @event {
-    //     event = @event::new()
-    //     $.add( trigger{
-    //         OBJ_ID: 1611,
-    //         ACTIVATE_GROUP: true,
-    //         TARGET: event.io,
-    //         ITEM: it,
-    //         COUNT: hits,
-    //         COUNT_MULTI_ACTIVATE: multi,
-    //     })
-    //     return event
-    // },
+    count: #[desc("Implementation of a count trigger (returns an event)"), example(u"
+        [[handle(count(4i, 3))]] !{
+            BG.set(rgb(0, 0, 0))
+        }
+    ")] (it: @item, hits: @number, multi: @bool = true) -> @event {
+        event = @event::new()
+        $.add( trigger{
+            OBJ_ID: 1611,
+            ACTIVATE_GROUP: true,
+            TARGET: event.io,
+            ITEM: it,
+            COUNT: hits,
+            COUNT_MULTI_ACTIVATE: multi,
+        })
+        return event
+    },
+
+    frame: #[desc("Gives an event that runs on every frame"), example(u"
+        on(frame(), !{
+            10g.move(1, 0) // moves every frame (on 60fps the block would move by 6 blocks per second)
+        })
+    ")] () -> @event {
+        frames_setup = import "frames_setup.spwn"
+
+        event = @event::new()
+        $.extend_trigger_func(
+            frames_setup().group_frame,
+            () => event.emit(),
+        )
+        return event
+    },
 }

@@ -26,6 +26,7 @@ wait = #[desc("Adds a delay before the next triggers"), example(u"
 	}
 
 }
+
 call_with_delay = #[desc("Call a function after a delay"), example(u"
 	BG.set(rgb8(255, 0, 0)) // turn background red
 	call_with_delay(2, !{
@@ -41,6 +42,7 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
 		TARGET: function,
 	})
 }
+
 call_on_x_position = #[desc("Call a function after an x position"), example("
 BG.set(rgb8(255, 0, 0)) // turn background red
 call_on_x_position(300, !{
@@ -57,11 +59,37 @@ call_on_x_position(300, !{
 		TARGET: function,
 	})
 }
+
+frames = #[desc("Waits for an arbitrary amount of frames"), example(u"
+	@log::runtime::flash(rgb(1,0,0)) // flash the screen
+	frames(60) // wait 60 frames (1 second on 60fps)
+	@log::runtime::flash(rgb(0,0,1)) // flash the screen
+")] (
+	#[desc("The amount of frames to wait")] frames: @number, // TODO: add @counter
+) -> @NULL {
+	frames_setup = import "frames_setup.spwn"
+	setup = frames_setup()
+	frames_count = @counter::new(bits = $.ceil($.log(frames, 2)))
+
+	extern = !{ // currently doing this won't work, and it will throw an error from optimizer.rs
+		if frames_count < frames {
+			frames_count++
+		} else if frames_count == frames {
+			frames_count++
+			-> return
+		}
+	}
+
+	$.extend_trigger_func(setup.group_frame, (){
+		extern!
+	})
+}
+
 -> return {
 	wait: wait,
 	call_with_delay: call_with_delay,
 	call_on_x_position: call_on_x_position,
-
+	frames: frames,
 
 
 	suppress_signal: #[desc("Stops signal from coming past for some time"), example(u"
