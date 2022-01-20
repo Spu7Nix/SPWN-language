@@ -33,7 +33,7 @@ impl @counter {
         )] bits: @number = DEFAULT_BITS,
         #[desc("Resets the counter in case the item has been used before. This only applies if the `source` argument is not an item.")] reset: @bool = true,
     ) -> @counter {
-        return match source.type {
+        return match source {
             @number: (){
                 id = ?i
                 if source != 0 { id.add(source) }
@@ -46,12 +46,10 @@ impl @counter {
                 }
                 return out
             }(),
-            @item: (){
-                return @counter::{
-                    item: source,
-                    bits,
-                }
-            }(),
+            @item: @counter::{
+                item: source,
+                bits,
+            },
             @bool: (){
                 if bits != DEFAULT_BITS && bits != 1 {
                     throw "A boolean counter can only have size = 1"

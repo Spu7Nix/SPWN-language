@@ -38,17 +38,39 @@ pub struct ReservedIds {
     pub object_items: FnvHashSet<Id>,
 }
 
-fn get_role(obj_id: u16, hd: bool) -> TriggerRole {
-    match obj_id {
-        1268 => {
-            if hd {
-                TriggerRole::Func
-            } else {
-                TriggerRole::Spawn
-            }
+fn get_role(obj: &GdObj) -> TriggerRole {
+    if let Some(ObjParam::Number(obj_id)) = obj.params.get(&1) {
+        let mut hd = false;
+        if let Some(ObjParam::Bool(hd_val)) = obj.params.get(&103) {
+            hd = *hd_val;
         }
-        1595 | 1611 | 1811 | 1815 | 1812 => TriggerRole::Func,
-        _ => TriggerRole::Output,
+        match *obj_id as u16 {
+            1268 => {
+                if let Some(ObjParam::Group(Group {
+                    id: Id::Specific(_),
+                })) = obj.params.get(&51)
+                {
+                    TriggerRole::Output
+                } else if hd {
+                    TriggerRole::Func
+                } else {
+                    TriggerRole::Spawn
+                }
+            }
+            1595 | 1611 | 1811 | 1815 | 1812 => {
+                if let Some(ObjParam::Group(Group {
+                    id: Id::Specific(_),
+                })) = obj.params.get(&51)
+                {
+                    TriggerRole::Output
+                } else {
+                    TriggerRole::Func
+                }
+            }
+            _ => TriggerRole::Output,
+        }
+    } else {
+        TriggerRole::Output
     }
 }
 
@@ -114,32 +136,32 @@ pub fn optimize(
     // sort all triggers by their group
     for (f, fnid) in obj_in.iter().enumerate() {
         for (o, (obj, _)) in fnid.obj_list.iter().enumerate() {
-            if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
-                let mut hd = false;
-                if let Some(ObjParam::Bool(hd_val)) = obj.params.get(&103) {
-                    hd = *hd_val;
-                }
-                let trigger = Trigger {
-                    obj: ObjPtr(f, o),
-                    role: get_role(*id as u16, hd),
-                    deleted: false,
-                };
-                if let Some(ObjParam::Group(group)) = obj.params.get(&57) {
-                    match network.get_mut(group) {
-                        Some(l) => (*l).triggers.push(trigger),
-                        None => {
-                            network.insert(*group, TriggerGang::new(vec![trigger]));
-                        }
+            //if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
+            // let mut hd = false;
+            // if let Some(ObjParam::Bool(hd_val)) = obj.params.get(&103) {
+            //     hd = *hd_val;
+            // }
+            let trigger = Trigger {
+                obj: ObjPtr(f, o),
+                role: get_role(obj),
+                deleted: false,
+            };
+            if let Some(ObjParam::Group(group)) = obj.params.get(&57) {
+                match network.get_mut(group) {
+                    Some(l) => (*l).triggers.push(trigger),
+                    None => {
+                        network.insert(*group, TriggerGang::new(vec![trigger]));
                     }
-                } else {
-                    match network.get_mut(&NO_GROUP) {
-                        Some(l) => (*l).triggers.push(trigger),
-                        None => {
-                            network.insert(NO_GROUP, TriggerGang::new(vec![trigger]));
-                        }
+                }
+            } else {
+                match network.get_mut(&NO_GROUP) {
+                    Some(l) => (*l).triggers.push(trigger),
+                    None => {
+                        network.insert(NO_GROUP, TriggerGang::new(vec![trigger]));
                     }
                 }
             }
+            //}
         }
     }
 
@@ -257,7 +279,8 @@ fn dead_code_optimization(
                     reserved,
                     &mut visited,
                     0,
-                ) {
+                ) == DeadCodeResult::Keep
+                {
                     (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
                 }
             }
@@ -391,6 +414,12 @@ pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
     // *network = new_network;
 }
 
+#[derive(PartialEq, Eq)]
+enum DeadCodeResult {
+    Keep,
+    Delete,
+}
+
 #[must_use]
 fn check_for_dead_code<'a>(
     network: &'a mut TriggerNetwork,
@@ -400,11 +429,12 @@ fn check_for_dead_code<'a>(
     reserved: &ReservedIds,
     visited_stack: &mut Vec<(Group, usize)>,
     d: u32,
-) -> bool {
+) -> DeadCodeResult {
+    use DeadCodeResult::*;
     //returns whether to keep or delete the trigger
     let trigger = network[&start.0].triggers[start.1];
     if !trigger.deleted {
-        return true;
+        return Keep;
     }
 
     if trigger.role == TriggerRole::Output {
@@ -423,15 +453,15 @@ fn check_for_dead_code<'a>(
             // }
 
             if !reserved.object_groups.contains(i) && !reserved.trigger_groups.contains(i) {
-                return false;
+                return Delete;
             }
         }
         (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
-        return true;
+        return Keep;
     }
 
     if visited_stack.contains(&start) {
-        return true; // keep all loops
+        return Delete; // keep all loops
     }
 
     // if trigger is an output trigger, keep this branch
@@ -443,10 +473,10 @@ fn check_for_dead_code<'a>(
     let list: Vec<(usize, Group)> = if let Some(ObjParam::Group(g)) = start_obj.get(&51) {
         if is_start_group(*g, reserved) {
             //(*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
-            return true;
+            return Keep;
         } else if let Some(gang) = network.get(g) {
             if gang.triggers.is_empty() {
-                return false;
+                return Delete;
             }
 
             vec![*g; gang.triggers.len()]
@@ -457,15 +487,15 @@ fn check_for_dead_code<'a>(
         } else {
             //dangling
 
-            return false;
+            return Delete;
         }
     } else {
         //dangling
 
-        return false;
+        return Delete;
     };
 
-    let mut out = false;
+    let mut out = Delete;
 
     visited_stack.push(start);
 
@@ -480,9 +510,10 @@ fn check_for_dead_code<'a>(
             reserved,
             visited_stack,
             d + 1,
-        ) {
+        ) == Keep
+        {
             (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
-            out = true;
+            out = Keep;
         }
     }
 

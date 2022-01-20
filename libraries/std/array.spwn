@@ -309,10 +309,10 @@ $.assert(arr.index_all(2) == [2,4])
         arr = [1, 2, 3, 4, 5]
         $.assert(arr.filter(el => el > 3) == [4, 5])
     ")]
-    (self, cb: _ -> @bool, in_place: @bool = false) -> @array | @NULL {
+    (self, cb: (_ -> @bool) | @pattern, in_place: @bool = false) -> @array | @NULL {
         let output = [];
         for iter in self {
-            let r = cb(iter);
+            let r = cb(iter) if cb is @macro else iter is cb;
             if r.type != @bool {
                 throw "Filter must return a boolean value";
             } else if r {
@@ -387,9 +387,10 @@ $.assert(arr.index_all(2) == [2,4])
             $.assert(arr2.any(el => el < 0)) // checks if the array contains any negative elements
         ")
     ]
-    (self, map: _ -> @bool = (a) => @bool(a)) -> @bool {
+    (self, map: (_ -> @bool) | @pattern = (a) => @bool(a)) -> @bool {
         for item in self {
-            if map(item) {
+            b = map(item) if map is @macro else item is map
+            if b {
                 return true
             }
         }
@@ -402,9 +403,10 @@ $.assert(arr.index_all(2) == [2,4])
         arr2 = [1, 2, 3, 1, 4, 7]
         $.assert(arr2.all(el => el > 0)) // checks if the array contains only positive elements
     ")]
-    (self, map: _ -> @bool = (a) => @bool(a)) -> @bool {
+    (self, map: (_ -> @bool) | @pattern = (a) => @bool(a)) -> @bool {
         for item in self {
-            if !map(item) {
+            b = map(item) if map is @macro else item is map
+            if !b {
                 return false
             }
         }
