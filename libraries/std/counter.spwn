@@ -33,7 +33,7 @@ impl @counter {
         )] bits: @number = DEFAULT_BITS,
         #[desc("Resets the counter in case the item has been used before. This only applies if the `source` argument is not an item.")] reset: @bool = true,
     ) -> @counter {
-        return switch source.type {
+        return match source.type {
             @number: (){
                 id = ?i
                 if source != 0 { id.add(source) }

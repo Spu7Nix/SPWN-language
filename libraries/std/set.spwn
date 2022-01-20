@@ -113,14 +113,14 @@ impl @set {
 	(
         self,
         prop: @object_key | @number,
-        match: MATCHER,
+        pat: MATCHER,
         new,
         default,
     ) -> @set {
         return self.map(
             (o) {
                 value = o[prop] if prop in o else default
-                if matches(value, match) {
+                if matches(value, pat) {
                     return o.with(
                         prop,
                         ( new(value) if new is @macro else new )

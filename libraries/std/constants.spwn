@@ -20,7 +20,7 @@ ok = (id: @number, pat: @pattern | @type_indicator, name: @string) {
 
 
 @easing_type::_display_ = (self) {
-    return switch self.id {
+    return match self.id {
         ==0: "NONE",
         ==1: "EASE_IN_OUT",
         ==2: "EASE_IN",
@@ -45,7 +45,7 @@ ok = (id: @number, pat: @pattern | @type_indicator, name: @string) {
 }
 
 @comparison::_display_ = (self) {
-    return switch self.id {
+    return match self.id {
         ==0: "EQUAL_TO",
         ==1: "LARGER_THAN",
         ==2: "SMALLER_THAN",

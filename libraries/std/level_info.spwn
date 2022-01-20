@@ -30,7 +30,7 @@ if $.level_string() != "" {
 			$.edit_obj(
 				new_obj,
 				@number(prop),
-				switch @number(prop) {
+				match @number(prop) {
 					==1: () {
 						obj_id = @number(value)
 						return @number(value)
@@ -41,11 +41,11 @@ if $.level_string() != "" {
 					in GROUP_PROPS: @group(@number(value)),
 					in BLOCK_PROPS: @block(@number(value)),
 					==57: value.split('.').map(x => @group(@number(x)) ),
-					==80: switch obj_id {
+					==80: match obj_id {
 						==1815: @block(@number(value)),
 						_: @item(@number(value))
 					},
-					==51: switch obj_id {
+					==51: match obj_id {
 						in TARGETING_GROUP: @group(@number(value)),
 						in TARGETING_COLOR: @color(@number(value)),
 						==1006: () {
@@ -67,7 +67,7 @@ if $.level_string() != "" {
 }
 
 MATCHER = @pattern | (_ -> @bool)
-matches = (v, p: MATCHER) -> @bool => switch p {
+matches = (v, p: MATCHER) -> @bool => match p {
     @pattern: v is p,
     @macro: p(v)
 }
@@ -79,9 +79,9 @@ return {
 		objects_with_group_2 = get_objects(obj_props.GROUPS, g => 2g in g)
     ")] (
         prop: @object_key,
-        match: MATCHER,
+        pat: MATCHER,
     ) -> [@object] {
-		return level_objects.filter(o => prop in o && matches(o[prop], match))
+		return level_objects.filter(o => prop in o && matches(o[prop], pat))
     },
 	get_marker: #[desc("Returns the first text object found with the given text, or null if none are found"), example(u'
 		extract obj_props

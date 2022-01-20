@@ -2541,7 +2541,7 @@ impl VariableFuncs for ast::Variable {
                     globals.pop_preserved();
                 }
 
-                ast::ValueBody::Switch(expr, cases) => {
+                ast::ValueBody::Match(expr, cases) => {
                     expr.eval(full_context, globals, info.clone(), constant)?;
 
                     for full_context in full_context.iter() {

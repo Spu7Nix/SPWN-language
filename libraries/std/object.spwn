@@ -13,14 +13,14 @@ impl @object {
 		return key in self
 	},
 	add_groups: (self, groups: @group | [@group]) -> @NULL {
-		let grps = switch groups {
+		let grps = match groups {
 			@group: [groups],
 			[@group]: groups
 		};
 
 		if obj_props.GROUPS in self {
 
-			grps += switch self[obj_props.GROUPS] {
+			grps += match self[obj_props.GROUPS] {
 				@group: [self[obj_props.GROUPS]],
 				[@group]: self[obj_props.GROUPS]
 			};

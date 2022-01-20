@@ -130,7 +130,7 @@ impl @voxel {
         
         part_2.toggle_off()
 
-        new_face_normal = switch [direction, vert] {
+        new_face_normal = match [direction, vert] {
             ==[1, false]: [1, 0, 0],
             ==[-1, false]: [-1, 0, 0],
             ==[1, true]: [0, 1, 0],

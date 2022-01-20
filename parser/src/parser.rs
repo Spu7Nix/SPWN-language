@@ -257,6 +257,9 @@ pub enum Token {
     #[token("switch")]
     Switch,
 
+    #[token("match")]
+    Match,
+
     // #[token("case")]
     // Case,
     #[token("break")]
@@ -325,11 +328,10 @@ impl Token {
             | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
 
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
+            Switch => "Deprecated keyword, use `match` instead",
 
             Return | Implement | For | ErrorStatement | If | Else | Object | Trigger | Import
-            | Extract | Null | Type | Let | SelfVal | Break | Continue | Switch | While => {
-                "keyword"
-            }
+            | Extract | Null | Type | Let | SelfVal | Break | Continue | Match | While => "keyword",
             //Comment | MultiCommentStart | MultiCommentEnd => "comment",
             StatementSeparator => "statement separator",
             Error => "unknown",
@@ -1792,7 +1794,7 @@ fn check_for_tag(
                             Some(Token::Symbol) => {
                                 tokens.previous();
                                 Vec::new()
-                            },
+                            }
                             a => expected!(
                                 "either '(', ']' or comma (',')".to_string(),
                                 tokens,
@@ -1801,12 +1803,12 @@ fn check_for_tag(
                             ),
                         };
                         contents.tags.push((name, args));
-                    },
-                    Some(Token::Comma) => {},
+                    }
+                    Some(Token::Comma) => {}
                     a => expected!("either Symbol or ']'".to_string(), tokens, notes, a),
                 };
             }
-            
+
             Ok(contents)
         }
         _ => {
@@ -1840,17 +1842,21 @@ pub fn str_content(
                         Some('\\') => '\\',
                         Some('u') => {
                             match chars.next() {
-                                Some('{') => {},
+                                Some('{') => {}
                                 Some(c) => {
                                     return Err(SyntaxError::ExpectedErr {
-                                        expected: "'{'".to_string(), found: format!("'{}'", c),
-                                        pos: tokens.position(), file: notes.file.clone(),
+                                        expected: "'{'".to_string(),
+                                        found: format!("'{}'", c),
+                                        pos: tokens.position(),
+                                        file: notes.file.clone(),
                                     });
                                 }
                                 None => {
                                     return Err(SyntaxError::ExpectedErr {
-                                        expected: "'{'".to_string(), found: "EOS".to_string(),
-                                        pos: tokens.position(), file: notes.file.clone(),
+                                        expected: "'{'".to_string(),
+                                        found: "EOS".to_string(),
+                                        pos: tokens.position(),
+                                        file: notes.file.clone(),
                                     });
                                 }
                             };
@@ -1866,33 +1872,39 @@ pub fn str_content(
                             let mut skipped = chars.by_ref().skip(hex.len());
 
                             match skipped.next() {
-                                Some('}') => {},
+                                Some('}') => {}
                                 Some(c) => {
                                     return Err(SyntaxError::ExpectedErr {
-                                        expected: "'}'".to_string(), found: format!("'{}'", c),
-                                        pos: tokens.position(), file: notes.file.clone(),
+                                        expected: "'}'".to_string(),
+                                        found: format!("'{}'", c),
+                                        pos: tokens.position(),
+                                        file: notes.file.clone(),
                                     });
                                 }
                                 None => {
                                     return Err(SyntaxError::ExpectedErr {
-                                        expected: "'}'".to_string(), found: "EOS".to_string(),
-                                        pos: tokens.position(), file: notes.file.clone(),
+                                        expected: "'}'".to_string(),
+                                        found: "EOS".to_string(),
+                                        pos: tokens.position(),
+                                        file: notes.file.clone(),
                                     })
                                 }
                             };
 
                             if hex.len() < 1 || hex.len() > 6 {
                                 return Err(SyntaxError::ExpectedErr {
-                                    expected: "2 to 6 hexadecimal characters".to_string(), found: hex.len().to_string(),
-                                    pos: tokens.position(), file: notes.file.clone(),
-                                })
+                                    expected: "2 to 6 hexadecimal characters".to_string(),
+                                    found: hex.len().to_string(),
+                                    pos: tokens.position(),
+                                    file: notes.file.clone(),
+                                });
                             }
-                            
+
                             match std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap()) {
                                 Some(v) => v,
                                 None => '\0',
                             }
-                        },
+                        }
                         Some(a) => {
                             return Err(SyntaxError::SyntaxError {
                                 message: format!("Invalid escape: \\{}", a),
@@ -1919,7 +1931,7 @@ pub fn str_content(
 
             out.1 = StringFlags::Unindent.into();
 
-            let mut out_str = String::new(); 
+            let mut out_str = String::new();
 
             while let Some(c) = chars.next() {
                 out_str.push(if c == '\\' {
@@ -1951,7 +1963,7 @@ pub fn str_content(
                     message: "Strings with the u flag must start with a newline".into(),
                     pos: tokens.position(),
                     file: notes.file.clone(),
-                })
+                });
             }
 
             let mut lines = out_str
@@ -1960,10 +1972,12 @@ pub fn str_content(
                 .skip_while(|elem| elem.is_empty()); // removes the newlines at the beginning
 
             if lines.clone().filter(|line| line.len() > 0).count() > 0 {
-                let min_indent = lines.clone()
+                let min_indent = lines
+                    .clone()
                     .filter(|line| line.len() > 0)
-                    .map(|line|  line.chars().take_while(|a| *a == ' ').count())
-                    .min().unwrap_or_else(|| unreachable!());
+                    .map(|line| line.chars().take_while(|a| *a == ' ').count())
+                    .min()
+                    .unwrap_or_else(|| unreachable!());
 
                 while let Some(line) = lines.next() {
                     if line.len() >= min_indent {
@@ -2143,9 +2157,9 @@ fn try_parse_macro(
                                     // return macro error, since its more likely that they were trying to make a normal macro
                                     Err(_) => return Err(e),
                                 }
-                            },
+                            }
                         }
-                    },
+                    }
                     _ => {
                         test_tokens.previous();
                         (*tokens) = test_tokens;
@@ -2165,7 +2179,7 @@ fn try_parse_macro(
                                 // return macro error, since its more likely that they were trying to make a normal macro
                                 Err(_) => return Err(e),
                             }
-                        },
+                        }
                     }
                 }
                 Some(Token::Colon) => parse_macro_def(tokens, notes)?,
@@ -2214,8 +2228,6 @@ fn parse_variable(
 
     let mut first_token = tokens.next(false);
     let (start_pos, _) = tokens.position();
-
-    let mut fart = false;
 
     let operator = match first_token {
         // does it start with an op? (e.g -3, let i)
@@ -2303,40 +2315,46 @@ fn parse_variable(
             })
         }
         Some(Token::BinaryLiteral) => {
-            ast::ValueBody::Number(match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0b", ""), 2) {
-                Ok(n) => n as f64, // its a valid number
-                Err(err) => {
-                    return Err(SyntaxError::SyntaxError {
-                        message: format!("Error when parsing number: {}", err),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    });
-                }
-            })
+            ast::ValueBody::Number(
+                match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0b", ""), 2) {
+                    Ok(n) => n as f64, // its a valid number
+                    Err(err) => {
+                        return Err(SyntaxError::SyntaxError {
+                            message: format!("Error when parsing number: {}", err),
+                            pos: tokens.position(),
+                            file: notes.file.clone(),
+                        });
+                    }
+                },
+            )
         }
         Some(Token::HexLiteral) => {
-            ast::ValueBody::Number(match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0x", ""), 16) {
-                Ok(n) => n as f64, // its a valid number
-                Err(err) => {
-                    return Err(SyntaxError::SyntaxError {
-                        message: format!("Error when parsing number: {}", err),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    });
-                }
-            })
+            ast::ValueBody::Number(
+                match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0x", ""), 16) {
+                    Ok(n) => n as f64, // its a valid number
+                    Err(err) => {
+                        return Err(SyntaxError::SyntaxError {
+                            message: format!("Error when parsing number: {}", err),
+                            pos: tokens.position(),
+                            file: notes.file.clone(),
+                        });
+                    }
+                },
+            )
         }
         Some(Token::OctalLiteral) => {
-            ast::ValueBody::Number(match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0o", ""), 8) {
-                Ok(n) => n as f64, // its a valid number
-                Err(err) => {
-                    return Err(SyntaxError::SyntaxError {
-                        message: format!("Error when parsing number: {}", err),
-                        pos: tokens.position(),
-                        file: notes.file.clone(),
-                    });
-                }
-            })
+            ast::ValueBody::Number(
+                match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0o", ""), 8) {
+                    Ok(n) => n as f64, // its a valid number
+                    Err(err) => {
+                        return Err(SyntaxError::SyntaxError {
+                            message: format!("Error when parsing number: {}", err),
+                            pos: tokens.position(),
+                            file: notes.file.clone(),
+                        });
+                    }
+                },
+            )
         }
         Some(Token::StringLiteral) => {
             // is a string
@@ -2714,7 +2732,7 @@ fn parse_variable(
             ast::ValueBody::TypeIndicator(type_name)
         }
 
-        Some(Token::Switch) => {
+        Some(Token::Match) => {
             let value = parse_expr(tokens, notes, true, false)?; // what are we switching?
 
             let cases = match tokens.next(false) {
@@ -2722,12 +2740,11 @@ fn parse_variable(
                 a => expected!("'{'".to_string(), tokens, notes, a),
             };
             //ast::ValueBody::TypeIndicator("number".to_string())
-            ast::ValueBody::Switch(value, cases)
+            ast::ValueBody::Match(value, cases)
         }
 
         Some(Token::OpenBracket) => {
             if allow_macro_def {
-                fart = false;
                 try_parse_macro(tokens, notes, properties.clone(), None)?
             } else {
                 let expr = parse_expr(tokens, notes, true, true)?;
@@ -2762,7 +2779,6 @@ fn parse_variable(
 
         a => expected!("a value".to_string(), tokens, notes, a),
     };
-    
 
     let mut path = Vec::<ast::Path>::new();
 
@@ -2896,7 +2912,6 @@ fn parse_variable(
             let (_, end_pos) = tokens.position();
 
             let args = vec![val.to_expression()];
-
 
             ast::Variable {
                 operator: None,

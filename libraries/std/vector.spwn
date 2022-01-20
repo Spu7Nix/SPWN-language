@@ -8,7 +8,7 @@ impl @vector {
         if dims.length < 1 {
             throw "Cannot create a vector with less than 1 dimension"
         }
-        return switch dims.length {
+        return match dims.length {
             ==2: @vector::{ dims, x: dims[0], y: dims[1] },
             ==3: @vector::{ dims, x: dims[0], y: dims[1], z: dims[2] },
             ==4: @vector::{ dims, x: dims[0], y: dims[1], z: dims[2], w: dims[3] },
@@ -52,7 +52,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        return switch other {
+        return match other {
             @vector: @vector::new( self.dims.map_index((el,i) => el * other.dims[i])),
             @number: @vector::new( self.dims.map(el => el * other)),
         }
@@ -61,7 +61,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        switch other {
+        match other {
             @vector: self.dims.map_index((el,i) => el * other.dims[i], true),
             @number: self.dims.map(el => el * other, true),
         }
@@ -70,7 +70,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        return switch other {
+        return match other {
             @vector: @vector::new( self.dims.map_index((el,i) => el / other.dims[i]))
             @number: @vector::new( self.dims.map(el => el / other))
         }
@@ -79,7 +79,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        switch other {
+        match other {
             @vector: self.dims.map_index((el,i) => el / other.dims[i], true)
             @number: self.dims.map(el => el / other, true)
         }
@@ -88,7 +88,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        return switch other {
+        return match other {
             @vector: @vector::new( self.dims.map_index((el,i) => el % other.dims[i]))
             @number: @vector::new( self.dims.map(el => el % other))
         }
@@ -97,7 +97,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        switch other {
+        match other {
             @vector: self.dims.map_index((el,i) => el % other.dims[i], true)
             @number: self.dims.map(el => el % other, true)
         }
@@ -106,7 +106,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        return switch other {
+        return match other {
             @vector: @vector::new( self.dims.map_index((el,i) => el ^ other.dims[i]))
             @number: @vector::new( self.dims.map(el => el ^ other))
         }
@@ -115,7 +115,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        switch other {
+        match other {
             @vector: self.dims.map_index((el,i) => el ^ other.dims[i], true)
             @number: self.dims.map(el => el ^ other, true)
         }
@@ -124,7 +124,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        return switch other {
+        return match other {
             @vector: @vector::new( self.dims.map_index((el,i) => el /% other.dims[i]))
             @number: @vector::new( self.dims.map(el => el /% other))
         }
@@ -133,7 +133,7 @@ impl @vector {
         if other.type == @vector {
             self.assert_dims(other)
         }
-        switch other {
+        match other {
             @vector: self.dims.map_index((el,i) => el /% other.dims[i], true)
             @number: self.dims.map(el => el /% other, true)
         }

@@ -34,7 +34,7 @@ impl @number {
     (self) -> @string {
         number = self.floor() if self >= 0 else self.ceil()
         numb_abs = number.abs()
-        return switch true {
+        return match true {
             ==(((numb_abs % 100) / 10).floor() == 1): "{}th",
             ==(numb_abs % 10 == 1): "{}st",
             ==(numb_abs % 10 == 2): "{}nd",

@@ -27,7 +27,7 @@ rgb_to_hsv = (r, g, b) {
 
 hsv_to_rgb = (h, s, v) {
 
-    return switch h {
+    return match h {
         <=60: [255, h.map(0,60,0,255), 0],
         <=120: [h.map(60,120,255,0), 255, 0],
         <=180: [0, 255, h.map(120,180,0,255)],
@@ -42,7 +42,7 @@ hex_value = (c) {
     if c in '0123456789' {
         return @number(c)
     }
-    return switch c {
+    return match c {
         =='a'|=='A': 10,
         =='b'|=='B': 11,
         =='c'|=='C': 12,
@@ -59,7 +59,7 @@ value_hex = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
 
 hex_to_rgb = (s) {
     let s = s.substr(1,s.length) if s[0] == '#' else s
-    return switch s.length {
+    return match s.length {
         ==6: [
             hex_value(s[0])*16 + hex_value(s[1]),
             hex_value(s[2])*16 + hex_value(s[3]),
@@ -262,7 +262,7 @@ impl @chroma {
     },
 
     _display_: (self) -> @string {
-        return switch self._declare_type {
+        return match self._declare_type {
             =="rgb": "rgb({}, {}, {}, {})".fmt([self._r, self._g, self._b, self._a]),
             =="rgb8": "rgb8({}, {}, {}, {})".fmt([self._r8, self._g8, self._b8, self._a8]),
             =="hsv": "hsv({}, {}, {}, {})".fmt([self._h, self._s, self._v, self._a]),

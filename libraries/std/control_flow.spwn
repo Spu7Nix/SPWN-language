@@ -161,7 +161,7 @@ call_on_x_position(300, !{
 		checker = @counter::new(bits = 1, reset = false)
 
 		-> (){
-			context_func = switch group {
+			context_func = match group {
 				@NULL: $.trigger_fn_context(),
 				else: group,
 			}

@@ -438,7 +438,7 @@ $.assert(arr.index_all(2) == [2,4])
         pivot = array.pop()
         [ truthy, falsy ] = array.partition((i){
             result = comp(i,pivot)
-            return switch result {
+            return match result {
                 @bool: result,
                 @number: result < 0,
             }

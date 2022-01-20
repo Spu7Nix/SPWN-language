@@ -306,7 +306,7 @@ impl SpwnFmt for ValueBody {
                 c.symbol,
                 c.iterator.fmt(ind)
             ),
-            Switch(_, _) => todo!(),
+            Match(_, _) => todo!(),
             MacroPattern(_) => todo!(),
         }
     }

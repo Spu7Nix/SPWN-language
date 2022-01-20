@@ -91,7 +91,7 @@ pub enum ValueBody {
     Expression(Expression),
     Str(StrInner),
     Import(ImportType, bool),
-    Switch(Expression, Vec<Case>),
+    Match(Expression, Vec<Case>),
     Array(Vec<ArrayDef>),
     ListComp(Comprehension),
     Obj(ObjectLiteral),
@@ -144,7 +144,7 @@ pub struct StrInner {
 #[derive(Clone, PartialEq, Debug)]
 pub enum StringFlags {
     Raw,
-    Unindent
+    Unindent,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -387,7 +387,7 @@ pub struct Case {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Switch {
+pub struct Match {
     pub value: Expression,
     pub cases: Vec<Case>,
 }

@@ -56,7 +56,7 @@ impl @textdisplay {
                     SCALING: 0.7,
                 })
 
-                cblock = switch order[ch] {
+                cblock = match order[ch] {
                     =="I": wincon[0],
                     =="N": wincon[1],
                     =="C": wincon[2],

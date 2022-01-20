@@ -9,7 +9,7 @@ trim = (
     right: @bool = false,
 ){
     token_check = token => token.length > 0
-    let tokens = switch tokens {
+    let tokens = match tokens {
         [@string]: tokens.filter(token_check),
         @string: tokens.split('').filter(token_check),
     }
@@ -270,6 +270,6 @@ impl @string {
         let num = \"123\"
         num.is_digit() // true
     ")] (self) -> @bool {
-    	return @regex::new("^[0-9]").match(self)
+        return $.regex("^[0-9]", self, "match", null)
     },
 }

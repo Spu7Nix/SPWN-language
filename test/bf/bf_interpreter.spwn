@@ -569,7 +569,7 @@ roll_groups = 70g..110g
 
 insert_bf_cmd = (ch: @string, offset: [@number], group: @group) {
 
-    blockid = switch ch {
+    blockid = match ch {
         ==">": RIGHT,//increment the data pointer (to point to the next cell to the right).
         =="<": LEFT,	//decrement the data pointer (to point to the next cell to the left).
         =="+": INCR,	//increment (increase by one) the byte at the data pointer.
@@ -850,7 +850,7 @@ end_anim.toggle_off()
 //-> bg2.move(-1000, 0, 0) //unload
 
 game_bg_target = 908g
-switch_game_bg = 909g
+match_game_bg = 909g
 
 random_affect = !{
     suppress_signal(0.2)
@@ -875,7 +875,7 @@ while_loop(() => true, delay = 0.47, () {
     random_affect!
 })
 
-let switch_to_bg = []
+let match_to_bg = []
 for bg in game_bgs {
     func = !{
         for g in game_bgs {
@@ -889,13 +889,13 @@ for bg in game_bgs {
         bg[2]!
         bg[0].toggle_on()
     }
-    switch_to_bg.push(func)
+    match_to_bg.push(func)
 }
 
 
-$.extend_trigger_func(switch_game_bg, (){
+$.extend_trigger_func(match_game_bg, (){
     option = [bg_option1, bg_option2][random_bg_seed.to_const(0..bg_options)]
-    switch_to_bg[option.to_const(0..game_bgs.length)]!
+    match_to_bg[option.to_const(0..game_bgs.length)]!
 })
 
 for g in game_bgs {
@@ -999,7 +999,7 @@ start = (){
 
 
 
-    call_with_delay(0.5, switch_game_bg)
+    call_with_delay(0.5, match_game_bg)
 
     collision(reset_selector, selector.block).on_triggered(reset_selector_func)
 
@@ -1283,17 +1283,17 @@ gm_name_colors = 20c..29c
 allow_menu_move = counter(0)
 //212c
 // follow group shit
-game_switch = ?g //group that toggles the triggers that switch to ingame
-tut_switch = ?g //group that toggles the triggers that switch to ingame
-switch_spacing = 150
-game_switch.toggle_off()
-tut_switch.toggle_off()
+game_match = ?g //group that toggles the triggers that match to ingame
+tut_match = ?g //group that toggles the triggers that match to ingame
+match_spacing = 150
+game_match.toggle_off()
+tut_match.toggle_off()
 
 start_func = !{
     activate_button(195c, 191c)
 
     move_group_game.toggle_on()
-    game_switch.toggle_off()
+    game_match.toggle_off()
 
 
 
@@ -1354,7 +1354,7 @@ tut_letters = !{
 
 tut_func = !{
     move_group_tut.toggle_on()
-    tut_switch.toggle_off()
+    tut_match.toggle_off()
     -> 54c.set(0,0,0, 0.5, opacity = 0.0)
 
     move_group_tut.follow(981g)
@@ -1376,40 +1376,40 @@ tut_func = !{
 for i in 5..669 {
     //game
     $.add( obj{
-        X: switch_spacing * i - 2,
+        X: match_spacing * i - 2,
         Y: -15,
         OBJ_ID: 901,
         TARGET: move_group_game,
-        MOVE_X: i * switch_spacing,
+        MOVE_X: i * match_spacing,
         DURATION: 0,
-        GROUPS: game_switch,
+        GROUPS: game_match,
     })
     $.add( obj{
-        X: switch_spacing * i,
+        X: match_spacing * i,
         Y: -45,
         OBJ_ID: 1268,
         SPAWN_DURATION: 0,
         TARGET: start_func,
-        GROUPS: game_switch,
+        GROUPS: game_match,
     })
 
     //tut
     $.add( obj{
-        X: switch_spacing * i - 2,
+        X: match_spacing * i - 2,
         Y: -15 - 90,
         OBJ_ID: 901,
         TARGET: move_group_tut,
-        MOVE_X: i * switch_spacing,
+        MOVE_X: i * match_spacing,
         DURATION: 0,
-        GROUPS: tut_switch,
+        GROUPS: tut_match,
     })
     $.add( obj{
-        X: switch_spacing * i,
+        X: match_spacing * i,
         Y: -45 - 90,
         OBJ_ID: 1268,
         SPAWN_DURATION: 0,
         TARGET: tut_func,
-        GROUPS: tut_switch,
+        GROUPS: tut_match,
     })
 }
 // added this because compiler stupid and im too lazy to fix
@@ -1475,7 +1475,7 @@ gs.button_a().on_triggered(!{
             move_group_menu.toggle_off()
             menu_follow.start_group.stop()
             //move_group.move(0, -160, 0)
-            tut_switch.toggle_on()
+            tut_match.toggle_on()
 
             -> while_loop(() => gamemode == 0, delay = 1, () {
                 inc_item.add(1)
@@ -1523,7 +1523,7 @@ gs.button_a().on_triggered(!{
             challenge -= 1
             call_with_delay(0.05, next_challenge)
             //move_group.move(-1100, 0, 0)
-            game_switch.toggle_on()
+            game_match.toggle_on()
 
 
         }
@@ -1541,7 +1541,7 @@ gs.button_a().on_triggered(!{
             challenge_board.move(-200 * first_coin_challenge, 0)
             wait()
             gamemode -= 1
-            game_switch.toggle_on()
+            game_match.toggle_on()
 
 
 
@@ -1557,7 +1557,7 @@ gs.button_a().on_triggered(!{
 
             //-> bg2.move(1000, 0, 0) //reload
             //move_group.move(-1100, 0, 0)
-            game_switch.toggle_on()
+            game_match.toggle_on()
 
 
 
@@ -1661,7 +1661,7 @@ gs.button_b().on_triggered(!{
                     challenge -= 1
                     call_with_delay(0.05, next_challenge)
                     //move_group.move(-1100, 0, 0)
-                    game_switch.toggle_on()
+                    game_match.toggle_on()
                 }
             })
 

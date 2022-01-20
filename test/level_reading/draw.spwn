@@ -25,7 +25,7 @@ draw_line = (x1: @number, y1: @number, x2: @number, y2: @number, width: @number 
         mid_x = (x1+x2)/2
         mid_y = (y1+y2)/2
         draw_line(
-            //sin and cos are switched here to result in a 90 degree rotation (technically transposition)
+            //sin and cos are matched here to result in a 90 degree rotation (technically transposition)
             mid_x + $.sin(obj_rot)*15*width,
             mid_y - $.cos(obj_rot)*15*width,
             mid_x - $.sin(obj_rot)*15*width,

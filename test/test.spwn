@@ -1,1 +1,1 @@
-$.print("\u{01B50000}")
+$.print("hello")
