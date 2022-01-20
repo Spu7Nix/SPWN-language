@@ -647,7 +647,7 @@ impl Value {
                                 // TODO: make sure it always sets the return value
                                 full_context.reset_return_vals(globals);
 
-                                if a_val.len() == 0 {
+                                if a_val.is_empty() {
                                     (*full_context.inner()).return_value = store_const_value(
                                         Value::Bool(true),
                                         globals,

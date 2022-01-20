@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use std::fs;
 
 use yaml_rust::{YamlLoader, Yaml};
-use path_absolutize::*;
+
+#[cfg(not(target_arch = "wasm32"))]
+use path_absolutize::Absolutize;
 
 use crate::package::{Package, Dependency, DependencySource};
 use crate::error::PckpError;
@@ -24,9 +26,9 @@ struct ScanErrorPub {
 
 impl ScanErrorPub {
     fn from(pri: yaml_rust::scanner::ScanError) -> Self {
-        return unsafe {
+        unsafe {
              std::mem::transmute(pri)
-        }; // this is horrible ik
+        } // this is horrible ik
     }
 }
 
@@ -36,7 +38,7 @@ fn yaml_to_str(y: &Yaml) -> String {
         Yaml::Integer(i) => i.to_string(),
         Yaml::String(s) => s.to_string(),
         Yaml::Boolean(b) => if *b {"true".to_string()} else {"false".to_string()},
-        Yaml::Array(a) => format!("[{}]", a.into_iter().map(|x| yaml_to_str(x)).collect::<Vec<_>>().join(",")),
+        Yaml::Array(a) => format!("[{}]", a.iter().map(yaml_to_str).collect::<Vec<_>>().join(",")),
         Yaml::Hash(h) => format!("{{{}}}", h.into_iter().map(|(k, v)| format!("{}: {}", yaml_to_str(k), yaml_to_str(v))).collect::<Vec<_>>().join(",")),
         Yaml::Alias(a) => a.to_string(),
         Yaml::Null => "Null".to_string(),
@@ -50,11 +52,11 @@ struct YamlMap {
 }
 
 impl YamlMap {
-    fn from_hash(parent: &str, hash: &Yaml, cfg: &PathBuf) -> Result<Self, PckpError> {
+    fn from_hash(parent: &str, hash: &Yaml, cfg: &Path) -> Result<Self, PckpError> {
         match hash.as_hash() {
-            Some(a) => Ok(YamlMap {internal: a.clone(), cfg: cfg.clone()}),
+            Some(a) => Ok(YamlMap {internal: a.clone(), cfg: cfg.to_path_buf()}),
             a => {
-                Err(PckpError::config(format!("Expected dictionary in {}, found {:?}", parent, a), cfg.clone(), None))
+                Err(PckpError::config(format!("Expected dictionary in {}, found {:?}", parent, a), cfg.to_path_buf(), None))
             }
         }
     }
@@ -104,7 +106,7 @@ macro_rules! ensure_variant {
 }
 
 pub fn get_config(opath: Option<PathBuf>) -> PathBuf {
-    let mut path = opath.unwrap_or(PathBuf::new());
+    let mut path = opath.unwrap_or_default();
     path.push(CONFIG_NAME);
     path
 }
@@ -113,9 +115,10 @@ fn check_invalid(n: &str) -> Option<char> {
     let mut b = [0; 4];
     let potential_invalid: Vec<char> = n.chars().filter(|x| !String::from("qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLXCVBNM_-.0123456789").contains(&*x.encode_utf8(&mut b))).collect();
 
-    potential_invalid.first().map(|x| *x)
+    potential_invalid.first().copied()
 }
-
+// not on wasm
+#[cfg(not(target_arch = "wasm32"))]
 pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
 
     if cfg.exists() {
@@ -129,7 +132,7 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                         return Err(PckpError::config(public.info, cfg, Some((public.mark.line, public.mark.col))))
                     }
                 };
-                if yaml.len() == 0 {
+                if yaml.is_empty() {
                     return Err(PckpError::config("Config file must include a package name".to_string(), cfg, None))
                 }
 
@@ -152,7 +155,7 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
 
                 let folders_maybe = match (f_list, f_str) {
                     (_, Ok(b)) => Ok(b.map(|x| vec![Yaml::String(x.to_string())])),
-                    (a, _) => a.map(|x| x.map(|y| y.clone()))
+                    (a, _) => a.map(|x| x.cloned())
                 }?;
 
                 match folders_maybe {
@@ -188,13 +191,13 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                                 b => return Err(
                                     PckpError::config(
                                         format!("Expected list element {:?} to be of type string", b),
-                                        cfg.clone(),
+                                        cfg,
                                         None
                                     )
                                 )
                             });
                         }
-                        ()
+                        
                     },
                     None => folders.push(PathBuf::new().absolutize_virtually(cfg.parent().unwrap().as_os_str().to_str().unwrap()).unwrap().to_path_buf())
                 }
@@ -213,7 +216,7 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                                             })
                                         },
                                         Yaml::Hash(h) => {
-                                            let dmap = YamlMap::from_hash("dependencies", &Yaml::Hash(h.clone()), &cfg)?;
+                                            let dmap = YamlMap::from_hash("dependencies", &Yaml::Hash(h), &cfg)?;
 
                                             Ok(Dependency {
 
@@ -244,7 +247,7 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                                 }]
                             },
                             Yaml::Hash(h) => {
-                                let dmap = YamlMap::from_hash("dependencies", &Yaml::Hash(h.clone()), &cfg)?;
+                                let dmap = YamlMap::from_hash("dependencies", &Yaml::Hash(h), &cfg)?;
 
                                 vec![Dependency {
 
@@ -261,7 +264,7 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                             c => return Err(
                                 PckpError::config(
                                     format!("{:?} cannot be parsed as a dependency", c),
-                                    cfg.clone(),
+                                    cfg,
                                     None
                                 )
                             )
@@ -269,16 +272,21 @@ pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
                     },
                     None => Vec::new()
                 }.into_iter()
-                 .map(|dep| Package::dependency(dep))
+                 .map(Package::dependency)
                  .collect::<Vec<_>>();
 
-                return Ok(Some(Package::local(package_name, version, folders, depends)));
+                Ok(Some(Package::local(package_name, version, folders, depends)))
             },
             Err(_) => {
-                return Err(PckpError::config("Could not open configuration file".to_string(), cfg, None));
+                Err(PckpError::config("Could not open configuration file".to_string(), cfg, None))
             }
         }
     } else {
         Ok(None)
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn config_to_package(cfg: PathBuf) -> Result<Option<Package>, PckpError> {
+    panic!("you can't use this function on wasm haha get fucked")
 }

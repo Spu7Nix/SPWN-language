@@ -96,7 +96,7 @@ impl Package {
                     // folder guaranteed to exist from config parser
 
                 }*/
-                let mut dest = path.to_path_buf();
+                let mut dest = path.clone();
                 dest.push(PACKAGE_DIR);
 
                 if !dest.exists() {
@@ -117,7 +117,7 @@ impl Package {
                     } else {
                         format!("{}@{}", p.name, p.version)
                     };
-                    dest.push(new_path.to_string());
+                    dest.push(new_path);
 
                     for folder in &p.paths {
                         let mut opts = fs_dir::CopyOptions::new();

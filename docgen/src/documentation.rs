@@ -290,11 +290,7 @@ fn document_macro(
             }
             i += 1;
 
-            if arg.default != None {
-                arg_string += &format!("| {} | `{}` |", i, arg.name);
-            } else {
-                arg_string += &format!("| {} | `{}` |", i, arg.name);
-            }
+            arg_string += &format!("| {} | `{}` |", i, arg.name);
 
             if let Some(typ) = arg.pattern {
                 let val = &globals.stored_values[typ].clone();

@@ -21,7 +21,6 @@ use builtins::BuiltinPermissions;
 use shared::SpwnSource;
 use spwn::SpwnCache;
 
-use std::env;
 use std::path::PathBuf;
 
 use editorlive::editorlive::editor_paste;
@@ -387,7 +386,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             let cache = SpwnCache::default();
 
-            match documentation::document_lib(&lib_path) {
+            match documentation::document_lib(lib_path) {
                 Ok(_) => (),
                 Err(e) => {
                     create_report(ErrorReport::from(e)).eprint(cache).unwrap();

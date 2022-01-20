@@ -1784,20 +1784,20 @@ $.assert(arr == [1, 2])
                             let mut range = Vec::new();
                             let mut text = String::new();
                             let mut group_name = None;
-                            for n in r.capture_names() {
-                                if let Some(name) = n {
-                                    if let Some(m) = capture.name(name) {
-                                        found = true;
-                                        range.push(
-                                            store_const_value(Value::Number(m.start() as f64), globals, context.start_group, info.position)
-                                        );
-                                        range.push(
-                                            store_const_value(Value::Number(m.end() as f64), globals, context.start_group, info.position)
-                                        );
-                                        text = m.as_str().to_string();
-                                        group_name = Some(name.to_string());
-                                    }
+                            for name in r.capture_names().flatten() {
+
+                                if let Some(m) = capture.name(name) {
+                                    found = true;
+                                    range.push(
+                                        store_const_value(Value::Number(m.start() as f64), globals, context.start_group, info.position)
+                                    );
+                                    range.push(
+                                        store_const_value(Value::Number(m.end() as f64), globals, context.start_group, info.position)
+                                    );
+                                    text = m.as_str().to_string();
+                                    group_name = Some(name.to_string());
                                 }
+
                             }
                             if !found {
                                 for g in 1..r.captures_len() {

@@ -1863,10 +1863,10 @@ pub fn str_content(
 
                             let mut hex = String::new();
 
-                            for h in chars.clone().take_while(|c| match *c {
-                                '0'..='9' | 'a'..='f' | 'A'..='F' => true,
-                                _ => false,
-                            }) {
+                            for h in chars
+                                .clone()
+                                .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
+                            {
                                 hex.push(h);
                             }
                             let mut skipped = chars.by_ref().skip(hex.len());
@@ -1891,7 +1891,7 @@ pub fn str_content(
                                 }
                             };
 
-                            if hex.len() < 1 || hex.len() > 6 {
+                            if hex.is_empty() || hex.len() > 6 {
                                 return Err(SyntaxError::ExpectedErr {
                                     expected: "2 to 6 hexadecimal characters".to_string(),
                                     found: hex.len().to_string(),
@@ -1900,10 +1900,8 @@ pub fn str_content(
                                 });
                             }
 
-                            match std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap()) {
-                                Some(v) => v,
-                                None => '\0',
-                            }
+                            std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap())
+                                .unwrap_or('\0')
                         }
                         Some(a) => {
                             return Err(SyntaxError::SyntaxError {
@@ -1966,20 +1964,20 @@ pub fn str_content(
                 });
             }
 
-            let mut lines = out_str
+            let lines = out_str
                 .lines()
                 .map(|line| line.trim_end())
                 .skip_while(|elem| elem.is_empty()); // removes the newlines at the beginning
 
-            if lines.clone().filter(|line| line.len() > 0).count() > 0 {
+            if lines.clone().filter(|line| !line.is_empty()).count() > 0 {
                 let min_indent = lines
                     .clone()
-                    .filter(|line| line.len() > 0)
+                    .filter(|line| !line.is_empty())
                     .map(|line| line.chars().take_while(|a| *a == ' ').count())
                     .min()
                     .unwrap_or_else(|| unreachable!());
 
-                while let Some(line) = lines.next() {
+                for line in lines {
                     if line.len() >= min_indent {
                         out.0 += &format!("{}\n", &line[min_indent..]);
                     } else {
@@ -2194,7 +2192,7 @@ fn try_parse_macro(
             })
         }
 
-        Err(e) => {
+        Err(_) => {
             let mut test_tokens = tokens.clone();
             match parse_macro_def(&mut test_tokens, notes) {
                 Ok(v) => {
