@@ -920,6 +920,7 @@ builtins! {
         {
             return Err(RuntimeError::BuiltinError {
                 message: "http is not supported on web versions".to_string(),
+                builtin: "http_request".to_string(),
                 info
             })
         }
@@ -1387,6 +1388,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
         {
             return Err(RuntimeError::BuiltinError {
                 message: "rng is not supported on web versions".to_string(),
+                builtin: "random".to_string(),
                 info
             })
         }
