@@ -423,7 +423,7 @@ pub fn execute_macro(
                                 });
                             }
                         };
-                        if arg_def.as_ref {
+                        if arg_def.arg_type == ast::ArgType::Ref {
                             new_variables.insert(
                                 *name,
                                 vec![VariableData {
@@ -440,7 +440,7 @@ pub fn execute_macro(
                                         arg_values[i],
                                         globals,
                                         context.start_group,
-                                        true,
+                                        arg_def.arg_type != ast::ArgType::Mut,
                                         CodeArea {
                                             pos: arg_def.position,
                                             file: m.def_file,
@@ -510,7 +510,7 @@ pub fn execute_macro(
                             });
                         }
                     };
-                    if m.args[def_index].as_ref {
+                    if m.args[def_index].arg_type == ast::ArgType::Ref {
                         new_variables.insert(
                             m.args[def_index].name,
                             vec![VariableData {
@@ -527,7 +527,7 @@ pub fn execute_macro(
                                     arg_values[i],
                                     globals,
                                     context.start_group,
-                                    true,
+                                    m.args[def_index].arg_type != ast::ArgType::Mut,
                                     CodeArea {
                                         pos: m.args[def_index].position,
                                         file: m.def_file,

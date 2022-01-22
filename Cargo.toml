@@ -16,3 +16,7 @@ members = [
 [profile.dev]
 debug-assertions = true
 opt-level = 2
+
+[profile.test]
+debug-assertions = false
+opt-level = 2

@@ -343,13 +343,19 @@ pub struct Native {
     pub args: Vec<Argument>,
 }*/
 //     name     def value     props     type ind.     location in file     is reference
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ArgType {
+    Ref,
+    Mut,
+    Const,
+}
 pub type ArgDef = (
     LocalIntern<String>,
     Option<Expression>,
     Attribute,
     Option<Expression>,
     FileRange,
-    bool,
+    ArgType,
 );
 #[derive(Clone, PartialEq, Debug)]
 pub struct Macro {
