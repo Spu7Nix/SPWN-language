@@ -11,7 +11,7 @@ use crate::value::*;
 
 use core::panic;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValStorage {
     pub map: SlotMap<StoredValue, StoredValData>,
     pub preserved_stack: Vec<Vec<StoredValue>>,
@@ -26,11 +26,6 @@ pub struct StoredValData {
     pub def_area: CodeArea,
     marked: bool,
 }
-// LIFETIME:
-//
-// value gets deleted when lifetime reaches 0
-// deeper scope => lifetime++
-// shallower scope => lifetime--
 
 impl std::ops::Index<StoredValue> for ValStorage {
     type Output = Value;

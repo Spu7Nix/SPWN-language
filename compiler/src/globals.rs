@@ -283,6 +283,7 @@ impl<'a> Globals<'a> {
 
     pub fn collect_garbage(&mut self, contexts: &mut FullContext) {
         //gc
+        //println!("before: {}", self.stored_values.map.len());
 
         //mark
         self.stored_values.mark(self.NULL_STORAGE);
@@ -342,6 +343,8 @@ impl<'a> Globals<'a> {
 
         //sweep
         self.stored_values.sweep();
+
+        //println!("after: {}", self.stored_values.map.len());
 
         self.stored_values.prev_value_count = self.stored_values.map.len() as u32;
     }

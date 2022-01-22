@@ -16,7 +16,7 @@ impl @number {
     (self) -> @number => $.sqrt(self),
     log: #[desc("Returns the logarithm of the number (default: natural logarithm)"), example("$.assert(2.log() == 0.6931471805599453)")]
     (self, base = EULER) -> @number => $.log(self, base),
-    lerp: #[desc("Returns the linear interpolation between the two numbers"), example("$.assert((0.7).lerp(0,2) == 1.4")]
+    lerp: #[desc("Returns the linear interpolation between the two numbers"), example("$.assert((0.7).lerp(0,2) == 1.4)")]
     (self, lower, higher) -> @number => lower + (higher - lower) * self,
     map: #[desc("Maps a number linearily from one interval to another"), example("$.assert(2.map(1, 4, 5, 11) == 7)")]
     (self, istart: @number, istop: @number, ostart: @number, ostop: @number) -> @number {
@@ -58,8 +58,8 @@ impl @number {
     },
     to_precision: #[desc("Turns the number to a specific precision"), example("$.assert((0.12345).to_precision(3) == 0.123)")]
     (self, precision: @number = 0) -> @number => self.to_fixed(precision) as @number,
-    is_finite: #[desc("Checks if the number is finite"), example("$.assert((0/0).is_finite()) == false")]
-    (self) -> @bool => self - self == 0,
+    // is_finite: #[desc("Checks if the number is finite"), example("$.assert((0/0).is_finite()) == false")]
+    // (self) -> @bool => self - self == 0,
 }
 
 

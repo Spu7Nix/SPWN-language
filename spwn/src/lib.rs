@@ -25,6 +25,7 @@ pub use ::parser::parser::parse_spwn;
 
 pub use errors::compiler_info;
 
+use shared::ImportType;
 use shared::SpwnSource;
 
 use std::collections::hash_map::Entry;
@@ -168,3 +169,158 @@ pub fn run_spwn(code: String, included: Vec<PathBuf>) -> Result<[String; 2], Str
 }
 #[cfg(test)]
 mod tests;
+
+#[test]
+pub fn run_all_doc_examples() {
+    let mut globals_path = std::env::current_dir().unwrap();
+    globals_path.push("temp"); // this folder doesn't actually exist, but it needs to be there because .parent is called in import_module
+    let mut std_out = Vec::<u8>::new();
+
+    let mut globals = globals::Globals::new(
+        SpwnSource::File(globals_path),
+        builtins::BuiltinPermissions::new(),
+        String::from(""),
+        &mut std_out,
+    );
+    globals.includes.push(PathBuf::from("./"));
+
+    let mut start_context = context::FullContext::new(&globals);
+
+    let info = compiler_info::CompilerInfo::new();
+
+    compiler::import_module(
+        &ImportType::Lib(STD_PATH.to_string()),
+        &mut start_context,
+        &mut globals,
+        info,
+        false,
+    )
+    .unwrap();
+
+    let exports = globals.stored_values[start_context.inner().return_value].clone();
+
+    if let value::Value::Dict(d) = &exports {
+        for (a, b, c) in d.iter().map(|(k, v)| (*k, *v, -1)) {
+            start_context.inner().new_redefinable_variable(a, b, c)
+        }
+    } else {
+        panic!("The standard library must return a dictionary");
+    }
+
+    let implementations = globals.implementations.clone();
+
+    let mut all_tests = Vec::new();
+
+    add_tests("std".to_string(), exports, &globals, &mut all_tests);
+
+    for (typ, dict) in implementations {
+        let type_name = value::find_key_for_value(&globals.type_ids, typ).unwrap();
+        for (name, (val, _)) in dict {
+            let val = globals.stored_values[val].clone();
+            add_tests(
+                format!("@{}::{}", type_name, name),
+                val,
+                &globals,
+                &mut all_tests,
+            );
+        }
+    }
+
+    //dbg!(&all_tests);
+
+    let mut all_failed_tests = Vec::new();
+
+    //let storage = globals.stored_values.clone();
+
+    for (name, code) in all_tests {
+        //println!("Running test: `\n{}\n`", code);
+
+        let source = SpwnSource::String(LocalIntern::new(code.clone()));
+        let cache = SpwnCache::default();
+
+        let info = compiler_info::CompilerInfo {
+            ..compiler_info::CompilerInfo::from_area(errors::compiler_info::CodeArea {
+                file: LocalIntern::new(source.clone()),
+                pos: (0, 0),
+            })
+        };
+
+        let (statements, _) = match parse_spwn(code, source.clone(), BUILTIN_NAMES) {
+            Ok(a) => a,
+            Err(e) => {
+                let mut out = Vec::<u8>::new();
+                create_report(ErrorReport::from(e))
+                    .write(cache, &mut out)
+                    .unwrap();
+                all_failed_tests.push((name, String::from_utf8_lossy(&out).to_string()));
+                continue;
+            }
+        };
+
+        //globals.stored_values = storage.clone();
+        globals.objects.clear();
+
+        let mut contexts = start_context.clone();
+        contexts.inner().root_context_ptr = &mut contexts;
+
+        match compiler::compile_scope(&statements, &mut contexts, &mut globals, info.clone()) {
+            Ok(_) => (),
+            Err(e) => {
+                let mut out = Vec::<u8>::new();
+                create_report(ErrorReport::from(e))
+                    .write(cache, &mut out)
+                    .unwrap();
+                all_failed_tests.push((name, String::from_utf8_lossy(&out).to_string()));
+                continue;
+            }
+        }
+    }
+
+    if !all_failed_tests.is_empty() {
+        eprintln!(
+            "{} examples from the STD failed to compile:",
+            all_failed_tests.len()
+        );
+        for (name, err) in all_failed_tests {
+            eprintln!("{}:\n{}\n", name, err);
+        }
+        panic!("Some examples failed to compile");
+    }
+}
+
+#[cfg(test)]
+fn add_tests(
+    name: String,
+    val: value::Value,
+    globals: &globals::Globals,
+    all_tests: &mut Vec<(String, String)>,
+) {
+    match val {
+        value::Value::Macro(m) => {
+            if let Some(example) = m.tag.get_example(true) {
+                all_tests.push((name, example));
+            }
+        }
+        value::Value::Dict(d) => {
+            for (prop_name, v) in d.iter() {
+                add_tests(
+                    format!("{}.{}", name, prop_name),
+                    globals.stored_values[*v].clone(),
+                    globals,
+                    all_tests,
+                );
+            }
+        }
+        value::Value::Array(l) => {
+            for (i, v) in l.iter().enumerate() {
+                add_tests(
+                    format!("{}[{}]", name, i),
+                    globals.stored_values[*v].clone(),
+                    globals,
+                    all_tests,
+                );
+            }
+        }
+        _ => (),
+    };
+}

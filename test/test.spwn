@@ -1,7 +1,5 @@
-m = (let b, let a) {
-    a += b
-    b *= a
-    return [a, b]
+@log::time('for')
+        
+for i in 0..10 {
+    @log::time_log('for')
 }
-
-$.print(m(10, 5))

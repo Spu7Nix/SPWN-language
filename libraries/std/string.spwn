@@ -185,7 +185,7 @@ impl @string {
         str3 = '   pog  __'
         $.assert(str.trim() == 'abcd')
         $.assert(str2.trim() == 'abcd g')
-        $.assert(str3.trim(tokens = [' ', '_']))
+        $.assert(str3.trim(tokens = [' ', '_']) == 'pog')
     ")]
     (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
         return trim(self, tokens, left = true, right = true)

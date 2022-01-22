@@ -69,7 +69,7 @@ impl @log {
         for i in 0..100000 {}
 
         @log::time_end('huge loop')
-    ")] (label = default) -> @NULL {
+    ", run_test = false)] (label = default) -> @NULL {
         instant = $.time()
         if !(label in data.time_labels) {
             throw "Label {} does not exist".fmt($.display(label))

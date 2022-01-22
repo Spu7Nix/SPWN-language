@@ -7,6 +7,7 @@ use ariadne::Fmt;
 use internment::LocalIntern;
 use shared::{BreakType, FileRange, SpwnSource};
 
+#[derive(Debug)]
 pub enum RuntimeError {
     UndefinedErr {
         undefined: String,

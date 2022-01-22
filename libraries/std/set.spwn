@@ -23,7 +23,7 @@ impl @set {
     from: #[desc("Creates a new object set from am optional array of objects, with an optional center x and center y position"), example(u"
         let object_set = @set::from(objects=my_objects, center_x=30, center_y=15)
 		//`@set::from(my_objects, 5, 10)` is also valid
-    ")]
+    ", run_test = false)]
 	(
         objects: [@object] = [],
         center_x: @number | @NULL = null,
@@ -59,7 +59,7 @@ impl @set {
     },
     map: #[desc("Calls a defined callback function on each object of the set, and returns a new set that contains the modified objects"), example(u"
 		let shifted_objects = objects.map(o => o[obj_props.X] + 30)
-	")]
+	", run_test = false)]
 	(
         self,
         cb: @object -> @object
@@ -82,7 +82,7 @@ impl @set {
     },
     rotated: #[desc("Rotates every object in the set, returning a new set with the modified objects"), example(u"
 		let rotated_objects = objects.rotated(90, around_x=30, around_y=30)
-	")]
+	", run_test = false)]
 	(
         self,
         degrees: @number,
@@ -109,7 +109,7 @@ impl @set {
     },
     replace: #[desc("Replaces every object that has a specific prop value, with another specified value (or a fallback default value), returning a new set with the modified objects"), example(u"
 		let replaced = objects.replace(obj_props.EDITOR_LAYER_1, ==1, 0, 1)
-	")]
+	", run_test = false)]
 	(
         self,
         prop: @object_key | @number,
