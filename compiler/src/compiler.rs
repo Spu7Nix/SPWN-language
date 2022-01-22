@@ -3,7 +3,6 @@
 use errors::create_error;
 use internment::LocalIntern;
 
-
 use shared::BreakType;
 use shared::ImportType;
 use shared::SpwnSource;
@@ -242,7 +241,7 @@ pub fn compile_scope(
                     &info,
                     def.mutable,
                     0,
-                    None
+                    None,
                 )?;
             }
             Expr(expr) => expr.eval(contexts, globals, info.clone(), true)?,
@@ -623,7 +622,7 @@ pub fn compile_scope(
                                     &info,
                                     true,
                                     -1,
-                                    None
+                                    None,
                                 )?;
 
                                 /*if let Some(single) = maybe_single {
@@ -701,7 +700,7 @@ pub fn compile_scope(
                                         &info,
                                         true,
                                         -1,
-                                        None
+                                        None,
                                     )?;
                                     /*if let Some(single) = maybe_single {
                                         (*c.inner()).new_variable(
@@ -989,7 +988,7 @@ pub fn do_assignment(
     info: &CompilerInfo,
     mutable: bool,
     scope: i16,
-    concat: Option<bool>
+    concat: Option<bool>,
 ) -> Result<(), RuntimeError> {
     if destex.values.is_empty() {
         return Err(RuntimeError::CustomError(create_error(
@@ -1045,20 +1044,12 @@ pub fn do_assignment(
             info,
             mutable,
             scope,
-            concat
+            concat,
         )?;
         Ok(())
     } else if let ast::ValueBody::Dictionary(kvs) = &dest.value.body {
         destructure_sanitize(src)?;
-        dict_destructure_define(
-            kvs, 
-            info, 
-            src, 
-            contexts, 
-            globals, 
-            mutable, 
-            concat
-        )?;
+        dict_destructure_define(kvs, info, src, contexts, globals, mutable, concat)?;
         Ok(())
     } else {
         // no destructure here
@@ -1088,7 +1079,6 @@ pub fn do_assignment(
         let defined = if concat != Some(false) {
             dest.try_define(contexts, globals, info, mutable, scope)?
         } else {
-
             for f_c in contexts.iter() {
                 let tmp = f_c.inner().return_value;
                 dest.to_value(f_c, globals, info.clone(), false)?;
@@ -1100,42 +1090,40 @@ pub fn do_assignment(
         };
 
         for full_context in contexts.iter() {
+            let (defined, storage) = if let Some(overwrite) = concat {
+                let initial_storage = full_context.inner().return_value2;
+                if overwrite {
+                    let stub = store_val_m(
+                        Value::Null,
+                        globals,
+                        full_context.inner().start_group,
+                        false,
+                        info.position,
+                    );
+                    globals.stored_values[initial_storage] = Value::Array(vec![stub]);
 
-            let (defined, storage) = 
-                if let Some(overwrite) = concat {
-                    let initial_storage = full_context.inner().return_value2;
-                    if overwrite {
-                        let stub = store_val_m(
-                            Value::Null,
-                            globals,
-                            full_context.inner().start_group,
-                            false,
-                            info.position,
-                        );
-                        globals.stored_values[initial_storage] = Value::Array(vec![stub]);
-
-                        (DefineResult::Ok, stub)
-                    } else {
-                        let stub = store_val_m(
-                            Value::Null,
-                            globals,
-                            full_context.inner().start_group,
-                            false,
-                            info.position,
-                        );
-
-                        match &mut globals.stored_values[initial_storage] {
-                            Value::Array(a) => a.push(stub),
-                            _ => {
-                                unreachable!()
-                            }
-                        }
-                        (DefineResult::Ok, stub)
-                    }
+                    (DefineResult::Ok, stub)
                 } else {
-                    let storage = full_context.inner().return_value2;
-                    (defined, storage)
-                };
+                    let stub = store_val_m(
+                        Value::Null,
+                        globals,
+                        full_context.inner().start_group,
+                        false,
+                        info.position,
+                    );
+
+                    match &mut globals.stored_values[initial_storage] {
+                        Value::Array(a) => a.push(stub),
+                        _ => {
+                            unreachable!()
+                        }
+                    }
+                    (DefineResult::Ok, stub)
+                }
+            } else {
+                let storage = full_context.inner().return_value2;
+                (defined, storage)
+            };
 
             let assign_implemented = globals.stored_values[full_context.inner().return_value]
                 .clone()
@@ -1374,7 +1362,7 @@ fn dict_destructure_define(
                         info,
                         mutable,
                         0,
-                        concat
+                        concat,
                     )?;
                 }
             }
@@ -1407,7 +1395,7 @@ fn dict_destructure_define(
                 info,
                 mutable,
                 0,
-                concat
+                concat,
             )?;
         }
     }
@@ -1430,7 +1418,12 @@ fn array_destructure_define(
             Value::Array(val_a) => {
                 let ranges = arr
                     .iter()
-                    .filter(|x| matches!(x.operator, Some(ast::ArrayPrefix::Collect | ast::ArrayPrefix::Spread)))
+                    .filter(|x| {
+                        matches!(
+                            x.operator,
+                            Some(ast::ArrayPrefix::Collect | ast::ArrayPrefix::Spread)
+                        )
+                    })
                     .map(|x| &x.value)
                     .collect::<Vec<_>>();
 
@@ -1500,16 +1493,17 @@ fn array_destructure_define(
                                     for stored_value in val_a.iter().skip(idx).take(idx_step) {
                                         do_assignment(
                                             the_expr,
-                                            &Some(ast::ValueBody::Resolved(*stored_value)
+                                            &Some(
+                                                ast::ValueBody::Resolved(*stored_value)
                                                     .to_variable(the_expr.values[0].pos)
-                                                    .to_expression()
+                                                    .to_expression(),
                                             ),
                                             expr_ctx,
                                             globals,
                                             info,
                                             mutable,
                                             scope,
-                                            Some(overwrite)
+                                            Some(overwrite),
                                         )?;
                                         overwrite = false;
                                     }
@@ -1525,7 +1519,7 @@ fn array_destructure_define(
                                         info,
                                         mutable,
                                         scope,
-                                        concat
+                                        concat,
                                     )?;
                                 }
                             }

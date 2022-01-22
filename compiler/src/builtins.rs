@@ -30,7 +30,6 @@ use include_dir::{Dir, File};
 #[cfg(not(debug_assertions))]
 const STANDARD_LIBS: Dir = include_dir!("../libraries");
 
-// dont import std when in dev mode
 #[cfg(debug_assertions)]
 const STANDARD_LIBS: Dir = Dir {
     path: "",

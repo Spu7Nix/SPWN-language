@@ -1,3 +1,4 @@
+#[cfg(not(debug_assertions))]
 #[macro_use(include_dir)]
 extern crate include_dir;
 

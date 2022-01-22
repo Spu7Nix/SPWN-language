@@ -166,17 +166,5 @@ pub fn run_spwn(code: String, included: Vec<PathBuf>) -> Result<[String; 2], Str
 
     Ok([String::from_utf8_lossy(&std_out).to_string(), new_ls])
 }
-
-#[test]
-fn run_test() {
-    dbg!(run_spwn(
-        "$.print('Hello')".to_string(),
-        vec![std::env::current_dir().expect("Cannot access current directory")],
-    ))
-    .unwrap();
-}
-/*
-
-if a is ==10 | <5
-
-*/
+#[cfg(test)]
+mod tests;

@@ -86,7 +86,7 @@ pub struct MacroArgDef {
     pub attribute: ast::Attribute,
     pub pattern: Option<StoredValue>,
     pub position: FileRange,
-    pub as_ref: bool,
+    pub arg_type: ast::ArgType,
 }
 // impl Macro {
 //     pub fn get_arg_area(&self) -> CodeArea {
@@ -1424,7 +1424,7 @@ pub fn macro_to_value(
                 attribute: attr.clone(),
                 pattern: pat,
                 position: *pos,
-                as_ref: *as_ref,
+                arg_type: *as_ref,
             });
         }
 

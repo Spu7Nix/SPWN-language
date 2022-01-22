@@ -1,6 +1,7 @@
-c = counter(10)
-c2 = counter(20)
-c.display(45, 45)
-c2.display(45, 90)
-wait(1)
-c *= c2
+m = (let b, let a) {
+    a += b
+    b *= a
+    return [a, b]
+}
+
+$.print(m(10, 5))

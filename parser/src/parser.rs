@@ -1642,13 +1642,18 @@ fn parse_arg_def(
         let properties = check_for_tag(tokens, notes)?;
 
         let mut arg_tok = tokens.next(false);
-        let as_ref = match arg_tok {
+        use ast::ArgType;
+        let argtype = match arg_tok {
             Some(Token::ClosingBracket) => break,
             Some(Token::Ampersand) => {
                 arg_tok = tokens.next(false);
-                true
+                ArgType::Ref
             }
-            _ => false,
+            Some(Token::Let) => {
+                arg_tok = tokens.next(false);
+                ArgType::Mut
+            }
+            _ => ArgType::Const,
         };
 
         let symbol = LocalIntern::new(tokens.slice());
@@ -1667,7 +1672,7 @@ fn parse_arg_def(
                 let end = tokens.position().1;
                 //xtokens.previous();
 
-                (symbol, value, properties, None, (start, end), as_ref)
+                (symbol, value, properties, None, (start, end), argtype)
             }
 
             Some(Token::Colon) => {
@@ -1687,12 +1692,12 @@ fn parse_arg_def(
                         let end = tokens.position().1;
                         //tokens.previous();
 
-                        (symbol, value, properties, type_value, (start, end), as_ref)
+                        (symbol, value, properties, type_value, (start, end), argtype)
                     }
                     Some(_) => {
                         tokens.previous();
                         let end = tokens.position().1;
-                        (symbol, None, properties, type_value, (start, end), as_ref)
+                        (symbol, None, properties, type_value, (start, end), argtype)
                     }
                     None => {
                         return Err(SyntaxError::SyntaxError {
@@ -1722,7 +1727,7 @@ fn parse_arg_def(
                         properties,
                         None,
                         (start, tokens.position().1),
-                        as_ref,
+                        argtype,
                     ),
                     _ => expected!("symbol".to_string(), tokens, notes, arg_tok),
                 }
@@ -2418,7 +2423,7 @@ fn parse_variable(
                             properties.clone(),
                             None,
                             tokens.position(),
-                            false,
+                            ast::ArgType::Const,
                         )]
                     } else {
                         Vec::new()
