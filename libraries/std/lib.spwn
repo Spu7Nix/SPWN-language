@@ -44,6 +44,7 @@ return {
     regex: @regex::new,
     rgb: @chroma::from_rgb,
     rgb8: @chroma::from_rgb8,
+    hex: @chroma::from_hex,
     hsv: @chroma::from_hsv,
     hsv2: @chroma::from_hsv2,
     blend_modes: chroma.BLEND_MODES,
