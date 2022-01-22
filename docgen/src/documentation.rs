@@ -269,7 +269,7 @@ fn document_macro(
         doc += &format!("\n**Description:**\n\n_{}_\n", s)
     };
 
-    if let Some(example) = mac.tag.get_example() {
+    if let Some(example) = mac.tag.get_example(false) {
         doc += &format!("\n**Example:**\n\n```spwn\n{}\n```\n\n", example)
     }
 

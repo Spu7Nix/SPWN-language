@@ -40,27 +40,21 @@ impl @item {
     },
 
     count:
-    #[desc("Implementation of the count trigger (-> returns an event for when an item reaches a certain value)"), example(u"
-        on(10i.count(100), !{
-            BG.pulse(rgb8(0, 255, 0), fade_out = 0.5) // will pulse each time item ID 10 becomes 100
+    #[desc("Implementation of a count trigger (returns an event)"), example(u"
+        on(4i.count(3), !{
+            BG.set(rgb(0, 0, 0))
         })
-    ")]
-    (
-        self,
-        #[desc("Number to check against")] number: @number = 0
-    ) -> @event {
-        -> return @event::{
-            on_triggered: (function) => $.add( trigger{
-                OBJ_ID: 1611,
-                TARGET: function,
-                COUNT: number,
-                ACTIVATE_GROUP: true,
-                ITEM: self,
-                COUNT_MULTI_ACTIVATE: true,
-
-            })
-        }
-
+    ")] (self, hits: @number, multi: @bool = true) -> @event {
+        event = @event::new()
+        $.add( trigger{
+            OBJ_ID: 1611,
+            ACTIVATE_GROUP: true,
+            TARGET: event.io,
+            ITEM: self,
+            COUNT: hits,
+            COUNT_MULTI_ACTIVATE: multi,
+        })
+        return event
     },
     _range_: #[desc("Implementation of the range operator (`..`) for item IDs"), example(u"
         for item in 1i..10i {

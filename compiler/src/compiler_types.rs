@@ -40,6 +40,7 @@ pub struct FunctionId {
 }
 
 pub type SyncPartId = usize;
+#[derive(Clone)]
 pub struct SyncGroup {
     pub parts: Vec<SyncPartId>,
     pub groups_used: Vec<ArbitraryId>, // groups that are already used by this sync group, and can be reused in later parts

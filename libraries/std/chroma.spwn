@@ -186,7 +186,7 @@ impl @chroma {
     from_rgb8: #[
         desc('Creatss a new chroma from 8-bit rgb values (0-255)'),
         example(u"
-            cyan = @chroma::from_rgb(0, 255, 255)
+            cyan = @chroma::from_rgb8(0, 255, 255)
         ")
     ] (r: @number, g: @number, b: @number, a: @number = 255) -> @chroma {
         if ! ( [r, g, b, a] is [>=0 & <=255] ) {

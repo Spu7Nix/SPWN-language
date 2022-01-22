@@ -243,11 +243,24 @@ impl Attribute {
         }
     }
 
-    pub fn get_example(&self) -> Option<String> {
+    pub fn get_example(&self, testable: bool) -> Option<String> {
         if let Some(args) = self.get("example") {
             if args.is_empty() {
                 None
             } else {
+                if testable && args.len() > 1 {
+                    if let Some(s) = args[1].symbol {
+                        if s.as_ref() == "run_test" {
+                            if let &ValueBody::Bool(b) = &args[1].value.values[0].value.body {
+                                if !b {
+                                    return None;
+                                }
+                            }
+                        } else {
+                            panic!("expected run_test as second argument");
+                        }
+                    }
+                }
                 match &args[0].value.values[0].value.body {
                     ValueBody::Str(s) => Some(s.inner.trim().to_string()),
                     val => Some(val.fmt(0)),

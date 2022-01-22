@@ -447,7 +447,7 @@ macro_rules! builtins {
         )*
     } => {
 
-        #[derive(Debug,Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub enum Builtin {
             $(
                 $variant,
@@ -465,7 +465,7 @@ macro_rules! builtins {
             )*
         ];
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub struct BuiltinPermissions (FnvHashMap<Builtin, bool>);
 
         impl BuiltinPermissions {

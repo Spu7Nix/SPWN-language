@@ -62,7 +62,7 @@ impl @event {
     emit: #[desc("Triggers all listeners of this event"), example(u"
         wait(5)
         event.emit()
-    ")] (
+    ", run_test = false)] (
         self,
     ) {
         self.io!
@@ -72,9 +72,9 @@ impl @event {
 return {
 
     touch: #[desc("Implementation of the touch trigger (returns an event)"), example(u"
-        [[handle(touch())]] !{
+        on(touch(), !{
             10g.move(10, 0)
-        }
+        })
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) -> @event {
@@ -90,9 +90,9 @@ return {
     },
 
     touch_end: #[desc("Returns an event for when a touch ends"), example(u"
-        [[handle(touch_end())]] !{
+        on(touch_end(), !{
             10g.move(10, 0)
-        }
+        })
     ")] (
         #[desc("Dual mode (only check for touch on the dual side)")] dual_side: @bool = false
     ) -> @event {
@@ -108,9 +108,9 @@ return {
     },
 
     collision: #[desc("Implementation of the collision trigger (returns an event)"), example(u"
-        [[handle(collision(1b, 2b))]] !{
+        on(collision(1b, 2b), !{
             BG.set(rgb(0, 0, 0))
-        }
+        })
     ")] (
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
@@ -128,9 +128,9 @@ return {
     },
 
     collision_exit: #[desc("Returns an event for when a collision exits"), example(u"
-        [[handle(collision_exit(1b, 2b))]] !{
+        on(collision_exit(1b, 2b), !{
             BG.set(rgb(0, 0, 0))
-        }
+        })
     ")] (
         #[desc("Block A ID")] a: @block,
         #[desc("Block B ID")] b: @block
@@ -149,9 +149,9 @@ return {
 
 
     death: #[desc("Returns an event for when the player dies"), example(u"
-        [[handle(death())]] !{
+        on(death(), !{
             BG.set(rgb(0, 0, 0))
-        }
+        })
     ")] () -> @event {
         event = @event::new()
         $.add( trigger{
@@ -162,20 +162,20 @@ return {
         return event
     },
 
-    count: #[desc("Implementation of a count trigger (returns an event)"), example(u"
-        [[handle(count(4i, 3))]] !{
-            BG.set(rgb(0, 0, 0))
-        }
-    ")] (it: @item, hits: @number, multi: @bool = true) -> @event {
-        event = @event::new()
-        $.add( trigger{
-            OBJ_ID: 1611,
-            ACTIVATE_GROUP: true,
-            TARGET: event.io,
-            ITEM: it,
-            COUNT: hits,
-            COUNT_MULTI_ACTIVATE: multi,
-        })
-        return event
-    },
+    // count: #[desc("Implementation of a count trigger (returns an event)"), example(u"
+    //     on(count(4i, 3), !{
+    //         BG.set(rgb(0, 0, 0))
+    //     })
+    // ")] (it: @item, hits: @number, multi: @bool = true) -> @event {
+    //     event = @event::new()
+    //     $.add( trigger{
+    //         OBJ_ID: 1611,
+    //         ACTIVATE_GROUP: true,
+    //         TARGET: event.io,
+    //         ITEM: it,
+    //         COUNT: hits,
+    //         COUNT_MULTI_ACTIVATE: multi,
+    //     })
+    //     return event
+    // },
 }

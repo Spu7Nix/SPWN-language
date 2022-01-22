@@ -126,7 +126,7 @@ impl @dictionary {
 			peanuts: 5,
 		}
 
-		$.assert(wares.contains(5))
+		$.assert(wares.contains_value(5))
 	")]
 	(self, value) -> @bool {
 		return self.values().contains(value)

@@ -42,9 +42,9 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
 	})
 }
 call_on_x_position = #[desc("Call a function after an x position"), example("
-BG.set(255, 0, 0) // turn background red
+BG.set(rgb8(255, 0, 0)) // turn background red
 call_on_x_position(300, !{
-	BG.set(0, 255, 0) // turn background green at x position 300
+	BG.set(rgb8(0, 255, 0)) // turn background green at x position 300
 })
 ")] (
 	#[desc("X position")] position:@number,

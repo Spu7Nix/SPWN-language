@@ -5,11 +5,18 @@ use std::path::PathBuf;
 use crate::run_spwn;
 
 macro_rules! run_test {
-    {NAME: $name:ident CODE: $code:literal $(OUTPUT: $output:literal)?} => {
+    {$([$attr:ident])? NAME: $name:ident CODE: $code:literal $(OUTPUT: $output:literal)?} => {
         #[test]
+        $(#[$attr])?
         fn $name() {
-            let res = run_spwn($code.to_string(), vec![PathBuf::from("./")]).unwrap();
-            $(assert!(res[0].trim() == $output.trim());)?
+            let res = match run_spwn($code.to_string(), vec![PathBuf::from("./")]) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    panic!("test {} failed, see message above", stringify!($name));
+                }
+            };
+            $(assert_eq!(res[0].trim(), $output.trim());)?
         }
     };
 }
@@ -32,6 +39,30 @@ m(1, 2, 3)
 m2 = (a, b, c) -> @number {
     return a + b + c
 }
+    "
+}
+
+// mutability
+run_test! {
+    [should_panic]
+    NAME: mutability1
+    CODE: r"
+#[no_std]
+a = 1
+a += 1
+    "
+}
+
+run_test! {
+    [should_panic]
+    NAME: mutability2
+    CODE: r"
+#[no_std]
+a = 1
+m = (&b) {
+    b += 1
+}
+m(a)
     "
 }
 

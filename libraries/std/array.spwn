@@ -15,8 +15,8 @@ impl @array {
         arr = [3, 1, 4, 1]
         $.assert(arr.max() == 4)
 
-        arr = ['abc', 'b', 'abdc']
-        $.assert(arr.max(key = (el: @string) => el.length) == 'abdc')
+        arr2 = ['abc', 'b', 'abdc']
+        $.assert(arr2.max(key = (el: @string) => el.length) == 'abdc')
     ")]
     (self, key: _ -> _ = (el) => el) -> _ {
         let highest = self[0]
@@ -34,8 +34,8 @@ impl @array {
         arr = [3, 1, 4, 1]
         $.assert(arr.min() == 1)
 
-        arr = ['abc', 'b', 'abdc']
-        $.assert(arr.min(key = (el: @string) => el.length) == 'b')
+        arr2 = ['abc', 'b', 'abdc']
+        $.assert(arr2.min(key = (el: @string) => el.length) == 'b')
     ")]
     (self, key: _ -> _ = (el) => el) -> _ {
         let lowest = self[0]
@@ -88,7 +88,7 @@ impl @array {
         $.assert(arr.index_last(2) == 4)
         $.assert(arr.index_last(-3) == null)
     ")]
-    (self, el, #[desc("Index to end the search at")] until: @number = 0) -> @number {
+    (self, el, #[desc("Index to end the search at")] until: @number = 0) -> @number | @NULL {
         for i in self.length..until {
             if self[i] == el {
                 return i
@@ -330,8 +330,8 @@ $.assert(arr.index_all(2) == [2,4])
         sum = arr.reduce((acum, el) => acum + el)
         $.assert(sum == 15)
 
-        arr = [5, 1, 5, 3, 2]
-        product = arr.reduce((acum, el) => acum * el, 1)
+        arr2 = [5, 1, 5, 3, 2]
+        product = arr2.reduce((acum, el) => acum * el, 1)
         $.assert(product == 150)
     ")]
     (self, cb: ((_, _) -> _) | @builtin, default = 0) -> _ {
@@ -345,11 +345,11 @@ $.assert(arr.index_all(2) == [2,4])
     l_fold: #[desc("Calls the specified callback function for all the elements in an array from left to right. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function."),
     example(u"
         arr = [1, 2, 3, 4, 5]
-        sum = arr.foldl($._plus_)
+        sum = arr.l_fold($._plus_)
         $.assert(sum == 15)
 
-        arr = [2, 1, 5]
-        result = arr.foldl($._divided_by_)
+        arr2 = [2, 1, 5]
+        result = arr2.l_fold($._divided_by_)
         $.assert(result == 0.4)
     ")]
     (self, cb: ((_, _) -> _) | @builtin) -> _ {
@@ -366,8 +366,8 @@ $.assert(arr.index_all(2) == [2,4])
         sum = arr.r_fold($._plus_)
         $.assert(sum == 15)
 
-        arr = [2, 1, 5]
-        result = arr.r_fold($._divided_by_)
+        arr2 = [2, 1, 5]
+        result = arr2.r_fold($._divided_by_)
         $.assert(result == 10)
     ")]
     (self, cb: ((_, _) -> _) | @builtin) -> _ {
