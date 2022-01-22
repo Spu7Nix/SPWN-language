@@ -1,5 +1,5 @@
-@log::time('for')
-        
-for i in 0..10 {
-    @log::time_log('for')
+m = (a: _ -> _) {
+    return a(10)
 }
+
+$.print(m((a: @number) => a ** 2))

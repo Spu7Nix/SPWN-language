@@ -459,6 +459,7 @@ $.assert(arr.index_all(2) == [2,4])
                 return false
             }
         }
+        return true
     },
 
     shift: #[desc("Removes the first index from the array and returns it."), example(u"

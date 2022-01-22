@@ -706,7 +706,7 @@ impl Value {
                                 if let Some(pat_stored) = m_arg.pattern {
                                     match &convert_type(&globals.stored_values[pat_stored].clone(), type_id!(pattern), info, globals, full_context.inner())?  {
                                         Value::Pattern(p) => {
-                                            let matches = args[i].in_pat(p, globals)?;
+                                            let matches = p.in_pat(&args[i], globals)?;
                                             if !matches {
                                                 is_matching = false;
                                                 break;
@@ -720,7 +720,7 @@ impl Value {
                                 if let Some(ret_stored) = m.ret_pattern {
                                     match &convert_type(&globals.stored_values[ret_stored].clone(), type_id!(pattern), info, globals, full_context.inner())? {
                                         Value::Pattern(p) => {
-                                            is_matching = (*ret).in_pat(p, globals)?;
+                                            is_matching = p.in_pat(&ret, globals)?;
                                             
                                         },
                                         _ => unreachable!()
