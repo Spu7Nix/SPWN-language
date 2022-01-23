@@ -576,7 +576,7 @@ Should be used like this: value.macro(arguments)",
                                 *default,
                                 globals,
                                 context.start_group,
-                                true,
+                                arg.arg_type != ast::ArgType::Mut,
                                 CodeArea {
                                     pos: arg.position,
                                     file: m.def_file,

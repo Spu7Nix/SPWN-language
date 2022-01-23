@@ -18,8 +18,11 @@ impl @event {
         wait(5)
         my_event.emit()
     ")] (
-        #[desc("Group used for emitting and listening to the event")] group: @group = ?g,
+        #[desc("Group used for emitting and listening to the event")] let group: @group | @NULL = null,
     ){
+        if group == null {
+            group = ?g
+        }
         return @event::{
             io: group,
         }

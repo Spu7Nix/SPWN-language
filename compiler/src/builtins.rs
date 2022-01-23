@@ -953,7 +953,7 @@ builtins! {
     [Asinh] #[safe = true, desc = "Calculates the arcsinh of a number", example = "$.asinh(0)"] fn asinh((n): Number) {Value::Number(n.asinh())}
     [Atan2] #[safe = true, desc = "Calculates the arctan^2 of a number", example = "$.atan2(0, -1)"] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
     [Atanh] #[safe = true, desc = "Calculates the arctanh of a number", example = "$.atanh(0.996)"] fn atanh((n): Number) {Value::Number(n.atanh())}
-    [Cbrt] #[safe = true, desc = "Calculates the cube root of a number", example = "$.assert($.cbrt(27) == 3)"] fn cbrt((n): Number) {Value::Number(n.cbrt())}
+    [Cbrt] #[safe = true, desc = "Calculates the cube root of a number", example = "$.cbrt(27)"] fn cbrt((n): Number) {Value::Number(n.cbrt())}
     [Cosh] #[safe = true, desc = "Calculates the cosh of a number", example = "$.cosh(0)"] fn cosh((n): Number) {Value::Number(n.cosh())}
     [Exp] #[safe = true, desc = "Calculates the e^x of a number", example = "$.exp(5) // e^5"] fn exp((n): Number) {Value::Number(n.exp())}
     [Exp2] #[safe = true, desc = "Calculates the 2^x of a number", example = "$.assert($.exp2(10) == 1024)"] fn exp2((n): Number) {Value::Number(n.exp2())}
@@ -1284,14 +1284,14 @@ $.extend_trigger_func(10g, () {
             }
         };
 
-        if context.start_group.id != crate::builtins::Id::Specific(0) {
-            return Err(RuntimeError::BuiltinError {
-                builtin, // objects cant be added dynamically, of course
-                message: String::from(
-                    "you cannot extend trigger funcs at runtime"),
-                info
-            });
-        }
+        // if context.start_group.id != crate::builtins::Id::Specific(0) {
+        //     return Err(RuntimeError::BuiltinError {
+        //         builtin, // objects cant be added dynamically, of course
+        //         message: String::from(
+        //             "you cannot extend trigger funcs at runtime"),
+        //         info
+        //     });
+        // }
         use parser::ast::*;
 
         let cmp_statement = CompoundStatement { statements: vec![
