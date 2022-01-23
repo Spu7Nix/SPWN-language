@@ -1,5 +1,6 @@
 #[no_std, cache_output]
 
+#[desc("Represents a color value, used in for example color triggers and pulse triggers.")]
 type @chroma
 
 rgb_to_hsv = (r, g, b) {

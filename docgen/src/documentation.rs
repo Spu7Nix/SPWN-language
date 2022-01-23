@@ -154,25 +154,11 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     let mut type_links = FnvHashMap::<u16, String>::default();
     let mut type_paths = FnvHashMap::<u16, String>::default();
 
-    let (doc_content, sidebar_content) = document_val(
-        &exports,
-        &mut globals,
-        &mut start_context,
-        &type_links,
-        &format!("{}/{}", folder_name, main_file),
-        None,
-    )?;
-
-    sidebar += &sidebar_content
-        .lines()
-        .map(|l| format!("\t{}\n", l))
-        .collect::<Vec<_>>()
-        .join("");
-
-    doc += &format!("\n## Exports\n\n{}", doc_content);
-
-    if !implementations.is_empty() && implementations.iter().any(|(_, a)| !a.is_empty()) {
-        let mut list: Vec<_> = implementations
+    let mut impl_list = Vec::new();
+    let doc_implementations =
+        !implementations.is_empty() && implementations.iter().any(|(_, a)| !a.is_empty());
+    if doc_implementations {
+        impl_list = implementations
             .into_iter()
             .map(|(a, map)| {
                 (
@@ -194,8 +180,8 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                 )
             })
             .collect();
-        list.sort_by(|a, b| a.0.cmp(&b.0));
-        for (typ, _) in list.iter() {
+        impl_list.sort_by(|a, b| a.0.cmp(&b.0));
+        for (typ, _) in impl_list.iter() {
             let mut type_name = find_key_for_value(&globals.type_ids, *typ)
                 .expect("Implemented type was not found!")
                 .clone();
@@ -208,7 +194,27 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
             type_links.insert(*typ, format!("[`@{}`]({})", orig_name, path));
             type_paths.insert(*typ, path);
         }
-        for (typ, dict) in list.iter() {
+    }
+
+    let (doc_content, sidebar_content) = document_val(
+        &exports,
+        &mut globals,
+        &mut start_context,
+        &type_links,
+        &format!("{}/{}", folder_name, main_file),
+        None,
+    )?;
+
+    sidebar += &sidebar_content
+        .lines()
+        .map(|l| format!("\t{}\n", l))
+        .collect::<Vec<_>>()
+        .join("");
+
+    doc += &format!("\n## Exports\n\n{}", doc_content);
+
+    if doc_implementations {
+        for (typ, dict) in impl_list.iter() {
             let type_name = find_key_for_value(&globals.type_ids, *typ)
                 .expect("Implemented type was not found!")
                 .clone();
@@ -356,6 +362,38 @@ fn document_macro(
 
     if let Some(example) = mac.tag.get_example(false) {
         doc += &format!("\n**Example:**\n\n```spwn\n{}\n```\n\n", example)
+    }
+
+    if let Some(ret) = mac.ret_pattern {
+        match globals.stored_values[ret].clone() {
+            Value::Pattern(ret) => {
+                if ret != Pattern::Type(type_id!(NULL)) {
+                    doc += &format!(
+                        "\n**Returns:** \n{}\n",
+                        display_pattern(&ret, full_context, globals, type_links)?
+                    );
+                }
+            }
+            Value::TypeIndicator(t) => {
+                if t != type_id!(NULL) {
+                    doc += &format!(
+                        "\n**Returns:** \n{}\n",
+                        type_links.get(&t).cloned().unwrap_or_else(|| {
+                            String::from("`@")
+                                + &find_key_for_value(&globals.type_ids, t).unwrap().clone()
+                                + "`"
+                        })
+                    );
+                }
+            }
+            a => {
+                doc += &format!(
+                    "\n**Returns:** \n{}\n",
+                    a.display(full_context, globals, &CompilerInfo::new())?
+                        .replace("|", "\\|")
+                );
+            }
+        }
     }
 
     if !(mac.args.is_empty()
@@ -533,7 +571,7 @@ fn document_val(
             literal, type_name
         );
     } else {
-        doc += &format!("**Type:** `@{}`\n", type_name);
+        doc += &format!("**Type:** {}\n", type_name);
     }
 
     let (new_doc, sidebar) = &match &val {

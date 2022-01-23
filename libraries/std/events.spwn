@@ -5,6 +5,7 @@ extract constants.obj_props
 
 extract import "control_flow.spwn"
 
+#[desc("An api for runtime events, like player input, collisions, etc.")]
 type @event
 
 impl @event {
