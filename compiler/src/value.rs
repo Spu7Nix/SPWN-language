@@ -318,7 +318,7 @@ pub fn strict_value_equality(val1: StoredValue, val2: StoredValue, globals: &Glo
         (a, b) => a == b,
     }
 }
-
+#[macro_export]
 macro_rules! type_id {
     (group) => {
         0

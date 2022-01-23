@@ -11,7 +11,7 @@ use errors::compiler_info::CompilerInfo;
 
 use compiler::context::FullContext;
 use compiler::globals::Globals;
-use compiler::value::*;
+use compiler::{type_id, value::*};
 
 use std::fs::File;
 
@@ -145,6 +145,9 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 ",
         used_groups, used_colors, used_blocks, used_items, total_objects
     );
+
+    let mut type_links = FnvHashMap::<u16, String>::default();
+
     if !implementations.is_empty() && implementations.iter().any(|(_, a)| !a.is_empty()) {
         doc += "\n## Type Implementations\n\n";
 
@@ -171,26 +174,35 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
             })
             .collect();
         list.sort_by(|a, b| a.0.cmp(&b.0));
-        for (typ, dict) in list.iter() {
+        for (typ, _) in list.iter() {
             let mut type_name = find_key_for_value(&globals.type_ids, *typ)
                 .expect("Implemented type was not found!")
                 .clone();
-
+            let orig_name = type_name.clone();
             find_avaliable_name(&mut output_path.clone(), &mut type_name);
-            doc += &format!("- [**@{1}**]({}-docs/{1}.md)\n", name, type_name);
+            let path = format!("{}-docs/{}.md", name, type_name);
+
+            doc += &format!("- [**@{}**]({})\n", type_name, path);
+
+            type_links.insert(*typ, format!("[@{}]({})", orig_name, path));
+        }
+        for (typ, dict) in list.iter() {
+            let type_name = find_key_for_value(&globals.type_ids, *typ)
+                .expect("Implemented type was not found!")
+                .clone();
 
             let content = &if let Some(desc) = globals.type_descriptions.get(typ).cloned() {
                 format!(
                     "# **@{}**\n?> {}\n{}",
                     type_name,
                     desc,
-                    document_dict(dict, &mut globals, &mut start_context)?
+                    document_dict(dict, &mut globals, &mut start_context, &type_links)?
                 )
             } else {
                 format!(
                     "# **@{}**\n{}",
                     type_name,
-                    document_dict(dict, &mut globals, &mut start_context)?
+                    document_dict(dict, &mut globals, &mut start_context, &type_links)?
                 )
             };
 
@@ -200,7 +212,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 
     doc += &format!(
         "\n## Exports\n\n{}",
-        document_val(&exports, &mut globals, &mut start_context)?
+        document_val(&exports, &mut globals, &mut start_context, &type_links)?
     );
 
     globals.pop_preserved();
@@ -213,6 +225,7 @@ fn document_dict(
     dict: &FnvHashMap<LocalIntern<String>, StoredValue>,
     globals: &mut Globals,
     full_context: &mut FullContext,
+    type_links: &FnvHashMap<u16, String>,
 ) -> Result<String, RuntimeError> {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
     type ValList = Vec<(LocalIntern<String>, StoredValue)>;
@@ -244,7 +257,7 @@ fn document_dict(
     let mut document_member = |key: &String, val: &StoredValue| -> Result<String, RuntimeError> {
         let mut member_doc = String::new();
         let inner_val = globals.stored_values[*val].clone();
-        let val_str = document_val(&inner_val, globals, full_context)?;
+        let val_str = document_val(&inner_val, globals, full_context, type_links)?;
         let mut formatted = String::new();
 
         for line in val_str.lines() {
@@ -282,6 +295,7 @@ fn document_macro(
     mac: &Macro,
     globals: &mut Globals,
     full_context: &mut FullContext,
+    type_links: &FnvHashMap<u16, String>,
 ) -> Result<String, RuntimeError> {
     //description
     let mut doc = String::new();
@@ -316,8 +330,21 @@ fn document_macro(
                 let val = &globals.stored_values[typ].clone();
                 arg_string += &format!(
                     " {} |",
-                    val.display(full_context, globals, &CompilerInfo::new())?
-                        .replace("|", "or")
+                    match val {
+                        Value::Pattern(p) => display_pattern(p, full_context, globals, type_links)?
+                            .replace('_', "\\_"),
+                        Value::TypeIndicator(t) =>
+                            type_links.get(t).cloned().unwrap_or_else(|| {
+                                String::from("`@")
+                                    + &find_key_for_value(&globals.type_ids, *t).unwrap().clone()
+                                    + "`"
+                            }),
+                        _ => format!(
+                            "`{}`",
+                            val.display(full_context, globals, &CompilerInfo::new())?
+                                .replace("|", "\\|")
+                        ),
+                    }
                 );
             } else {
                 arg_string += "any |";
@@ -342,7 +369,7 @@ fn document_macro(
 
             //add_arrows(&mut arg_string);
 
-            doc += arg_string.replace('_', "\\_").as_ref();
+            doc += arg_string.as_ref();
 
             //doc += "\n  ";
         }
@@ -353,10 +380,77 @@ fn document_macro(
     Ok(doc)
 }
 
+fn display_pattern(
+    pat: &Pattern,
+    full_context: &mut FullContext,
+    globals: &mut Globals,
+    type_links: &FnvHashMap<u16, String>,
+) -> Result<String, RuntimeError> {
+    Ok(match pat {
+        Pattern::Type(type_id) => type_links.get(type_id).cloned().unwrap_or_else(|| {
+            String::from("`@")
+                + find_key_for_value(&globals.type_ids, *type_id)
+                    .expect("Implemented type was not found!")
+                + "`"
+        }),
+        Pattern::Array(a) => {
+            format!(
+                "an {} of {} elements",
+                type_links
+                    .get(&type_id!(array))
+                    .unwrap_or(&"`@array`".to_string()),
+                display_pattern(&a[0], full_context, globals, type_links)?
+            )
+        }
+        Pattern::Either(p1, p2) => format!(
+            "{} or {}",
+            display_pattern(p1, full_context, globals, type_links)?,
+            display_pattern(p2, full_context, globals, type_links)?
+        ),
+        Pattern::Both(p1, p2) => format!(
+            "{} and {}",
+            display_pattern(p1, full_context, globals, type_links)?,
+            display_pattern(p2, full_context, globals, type_links)?
+        ),
+        Pattern::Not(p) => format!(
+            "not {}",
+            display_pattern(&**p, full_context, globals, type_links)?
+        ),
+        Pattern::Any => "any".to_string(),
+
+        Pattern::Macro { args, ret } => {
+            let mut arg_list = String::new();
+            for arg in args.iter() {
+                arg_list += &format!(
+                    "{}, ",
+                    display_pattern(arg, full_context, globals, type_links)?
+                );
+            }
+            arg_list.pop();
+            arg_list.pop();
+            format!(
+                "a {} that returns {} and takes {} as {}",
+                type_links
+                    .get(&type_id!(macro))
+                    .unwrap_or(&"`@macro`".to_string()),
+                display_pattern(&**ret, full_context, globals, type_links)?,
+                arg_list,
+                if args.len() == 1 {
+                    "an argument"
+                } else {
+                    "arguments"
+                }
+            )
+        }
+        _ => Value::Pattern(pat.clone()).display(full_context, globals, &CompilerInfo::new())?,
+    })
+}
+
 fn document_val(
     val: &Value,
     globals: &mut Globals,
     full_context: &mut FullContext,
+    type_links: &FnvHashMap<u16, String>,
 ) -> Result<String, RuntimeError> {
     let mut doc = String::new();
     let typ_index = val
@@ -373,12 +467,16 @@ fn document_val(
     };
     let literal = val.display(full_context, globals, &CompilerInfo::new())?;
 
-    let type_name =
-        find_key_for_value(&globals.type_ids, type_id).expect("Implemented type was not found!");
+    let type_name = type_links.get(&type_id).cloned().unwrap_or_else(|| {
+        String::from("`@")
+            + find_key_for_value(&globals.type_ids, type_id)
+                .expect("Implemented type was not found!")
+            + "`"
+    });
 
     if literal.len() < 300 {
         doc += &format!(
-            "**Printed**\n\n```spwn\n{}\n```\n\n**Type:** `@{}`\n",
+            "**Printed**\n\n```spwn\n{}\n```\n\n**Type:** {}\n",
             literal, type_name
         );
     } else {
@@ -386,8 +484,8 @@ fn document_val(
     }
 
     doc += &match &val {
-        Value::Dict(d) => document_dict(d, globals, full_context)?,
-        Value::Macro(m) => document_macro(m, globals, full_context)?,
+        Value::Dict(d) => document_dict(d, globals, full_context, type_links)?,
+        Value::Macro(m) => document_macro(m, globals, full_context, type_links)?,
         _ => String::new(),
     };
 
