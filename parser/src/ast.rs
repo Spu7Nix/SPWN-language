@@ -42,7 +42,7 @@ pub enum StatementBody {
     Expr(Expression),
     Definition(Definition),
 
-    TypeDef(String),
+    TypeDef { name: String, attr: Attribute },
 
     Return(Option<Expression>),
     Impl(Implementation),

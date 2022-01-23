@@ -42,6 +42,8 @@ pub struct Globals<'a> {
     pub type_ids: FnvHashMap<String, (u16, CodeArea)>,
     pub type_id_count: u16,
 
+    pub type_descriptions: FnvHashMap<u16, String>,
+
     pub func_ids: Vec<FunctionId>,
     pub objects: Vec<GdObj>,
     pub initial_string: String,
@@ -191,6 +193,7 @@ impl<'a> Globals<'a> {
             OBJ_KEY_PATTERN: LocalIntern::new(String::from("pattern")),
             built_in_path: None,
             std_out,
+            type_descriptions: FnvHashMap::default(),
         };
 
         let mut add_type = |name: &str, id: u16| {

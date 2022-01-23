@@ -70,6 +70,12 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     output_path.push(PathBuf::from(format!("{}-docs", name)));
     if !output_path.exists() {
         std::fs::create_dir(output_path.clone()).unwrap();
+    } else {
+        // delete all files in the directory
+        for entry in std::fs::read_dir(output_path.clone()).unwrap() {
+            let entry = entry.unwrap();
+            std::fs::remove_file(entry.path()).unwrap();
+        }
     }
     let info: CompilerInfo = CompilerInfo::new();
     globals
@@ -173,11 +179,20 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
             find_avaliable_name(&mut output_path.clone(), &mut type_name);
             doc += &format!("- [**@{1}**]({}-docs/{1}.md)\n", name, type_name);
 
-            let content = &format!(
-                "# **@{}**\n{}",
-                type_name,
-                document_dict(dict, &mut globals, &mut start_context)?
-            );
+            let content = &if let Some(desc) = globals.type_descriptions.get(typ).cloned() {
+                format!(
+                    "# **@{}**\n?> {}\n{}",
+                    type_name,
+                    desc,
+                    document_dict(dict, &mut globals, &mut start_context)?
+                )
+            } else {
+                format!(
+                    "# **@{}**\n{}",
+                    type_name,
+                    document_dict(dict, &mut globals, &mut start_context)?
+                )
+            };
 
             create_doc_file(output_path.clone(), type_name, content);
         }

@@ -299,7 +299,7 @@ pub fn compile_scope(
                 }
             }
 
-            TypeDef(name) => {
+            TypeDef { name, attr } => {
                 //initialize type
                 let already = globals.type_ids.get(name);
                 if let Some(t) = already {
@@ -319,6 +319,11 @@ pub fn compile_scope(
                     (*globals)
                         .type_ids
                         .insert(name.clone(), (globals.type_id_count, info.position));
+                    if let Some(desc) = attr.get_desc() {
+                        (*globals)
+                            .type_descriptions
+                            .insert(globals.type_id_count, desc);
+                    }
                 }
                 //Value::TypeIndicator(globals.type_id_count)
             }
@@ -1403,6 +1408,7 @@ fn dict_destructure_define(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn array_destructure_define(
     arr: &[ast::ArrayDef],
     value: &ast::Expression,
