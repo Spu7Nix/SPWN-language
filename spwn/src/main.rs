@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         [
             App::new("build")
                 .about("Runs/builds a given file")
-                .visible_alias("bu")
+                .visible_alias("b")
                 .args(&[
                     arg!(<SCRIPT> "Path to spwn source file").value_hint(ValueHint::AnyPath),
                     arg!(-c --"console-output" "Makes the script print the created level into the console instead of writing it to your save file"),
