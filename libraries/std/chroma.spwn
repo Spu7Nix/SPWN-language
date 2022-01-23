@@ -72,6 +72,18 @@ hex_to_rgb = (s) {
             hex_value(s[4])*16 + hex_value(s[5]),
             hex_value(s[6])*16 + hex_value(s[7]),
         ],
+        ==3: [
+            hex_value(s[0])*17,
+            hex_value(s[1])*17,
+            hex_value(s[2])*17,
+            255,
+        ],
+        ==4: [
+            hex_value(s[0])*17,
+            hex_value(s[1])*17,
+            hex_value(s[2])*17,
+            hex_value(s[3])*17,
+        ],
         else: () {
             throw "Invalid hex code length"
         } ()
