@@ -2,4 +2,4 @@ m = (a: _ -> _) {
     return a(10)
 }
 
-$.print(m((a: @number) => a ** 2))
+$.print($.fract(123.456))

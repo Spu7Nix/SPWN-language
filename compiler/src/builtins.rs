@@ -465,6 +465,12 @@ macro_rules! builtins {
             )*
         ];
 
+        pub const BUILTIN_EXAMPLES: &[(&str, &str)] = &[
+            $(
+                (stringify!($name), $example),
+            )*
+        ];
+
         #[derive(Debug, Clone)]
         pub struct BuiltinPermissions (FnvHashMap<Builtin, bool>);
 
@@ -785,7 +791,7 @@ builtins! {
         Value::Str(env!("CARGO_PKG_VERSION").to_string())
     }
 
-    [GetInput] #[safe = true, desc = "Gets some input from the user", example = "inp = $.get_input()"]
+    [GetInput] #[safe = true, desc = "Gets some input from the user", example = "// inp = $.get_input('What is your name?')"]
     fn get_input((prompt): Str) {
         print!("{}", prompt);
         stdout()
@@ -943,22 +949,22 @@ builtins! {
     [Ceil] #[safe = true, desc = "Calculates the ceil of a number, AKA the number rounded up to the nearest integer", example = "$.assert($.ceil(1.5) == 2)"] fn ceil((n): Number) { Value::Number(n.ceil()) }
 
     [Abs] #[safe = true, desc = "Calculates the absolute value of a number", example = "$.assert($.abs(-100) == 100)"] fn abs((n): Number) {Value::Number(n.abs())}
-    [Acosh] #[safe = true, desc = "Calculates the arccosh of a number", example = "$.acosh(num)"] fn acosh((n): Number) {Value::Number(n.acosh())}
-    [Asinh] #[safe = true, desc = "Calculates the arcsinh of a number", example = "$.asinh(num)"] fn asinh((n): Number) {Value::Number(n.asinh())}
-    [Atan2] #[safe = true, desc = "Calculates the arctan^2 of a number", example = "$.atan2(a, b)"] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
-    [Atanh] #[safe = true, desc = "Calculates the arctanh of a number", example = "$.atanh(num)"] fn atanh((n): Number) {Value::Number(n.atanh())}
+    [Acosh] #[safe = true, desc = "Calculates the arccosh of a number", example = "$.acosh(1)"] fn acosh((n): Number) {Value::Number(n.acosh())}
+    [Asinh] #[safe = true, desc = "Calculates the arcsinh of a number", example = "$.asinh(0)"] fn asinh((n): Number) {Value::Number(n.asinh())}
+    [Atan2] #[safe = true, desc = "Calculates the arctan^2 of a number", example = "$.atan2(0, -1)"] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
+    [Atanh] #[safe = true, desc = "Calculates the arctanh of a number", example = "$.atanh(0.996)"] fn atanh((n): Number) {Value::Number(n.atanh())}
     [Cbrt] #[safe = true, desc = "Calculates the cube root of a number", example = "$.assert($.cbrt(27) == 3)"] fn cbrt((n): Number) {Value::Number(n.cbrt())}
-    [Cosh] #[safe = true, desc = "Calculates the cosh of a number", example = "$.cosh(num)"] fn cosh((n): Number) {Value::Number(n.cosh())}
-    [Exp] #[safe = true, desc = "Calculates the e^x of a number", example = "$.exp(x)"] fn exp((n): Number) {Value::Number(n.exp())}
+    [Cosh] #[safe = true, desc = "Calculates the cosh of a number", example = "$.cosh(0)"] fn cosh((n): Number) {Value::Number(n.cosh())}
+    [Exp] #[safe = true, desc = "Calculates the e^x of a number", example = "$.exp(5) // e^5"] fn exp((n): Number) {Value::Number(n.exp())}
     [Exp2] #[safe = true, desc = "Calculates the 2^x of a number", example = "$.assert($.exp2(10) == 1024)"] fn exp2((n): Number) {Value::Number(n.exp2())}
-    [Expm1] #[safe = true, desc = "Calculates e^x - 1 in a way that is accurate even if the number is close to zero", example = "$.exp_m1(num)"] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
-    [Fract] #[safe = true, desc = "Gets the fractional part of a number", example = "$.assert($.fract(123.456) == 0.456)"] fn fract((n): Number) {Value::Number(n.fract())}
+    [Expm1] #[safe = true, desc = "Calculates e^x - 1 in a way that is accurate even if the number is close to zero", example = "$.exp_m1(0.002)"] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
+    [Fract] #[safe = true, desc = "Gets the fractional part of a number", example = "$.fract(1.23)"] fn fract((n): Number) {Value::Number(n.fract())}
 
     [Sqrt] #[safe = true, desc = "Calculates the square root of a number", example = "$.sqrt(2)"] fn sqrt((n): Number) {Value::Number(n.sqrt())}
-    [Sinh] #[safe = true, desc = "Calculates the hyperbolic sin of a number", example = "$.sinh(num)"] fn sinh((n): Number) {Value::Number(n.sinh())}
-    [Tanh] #[safe = true, desc = "Calculates the hyperbolic tan of a number", example = "$.tanh(num)"] fn tanh((n): Number) {Value::Number(n.tanh())}
-    [NaturalLog] #[safe = true, desc = "Calculates the ln (natural log) of a number", example = "$.ln(num)"] fn ln((n): Number) {Value::Number(n.ln())}
-    [Log] #[safe = true, desc = "Calculates the log base x of a number", example = "$.log(num, base)"] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
+    [Sinh] #[safe = true, desc = "Calculates the hyperbolic sin of a number", example = "$.sinh(0)"] fn sinh((n): Number) {Value::Number(n.sinh())}
+    [Tanh] #[safe = true, desc = "Calculates the hyperbolic tan of a number", example = "$.tanh(0.549)"] fn tanh((n): Number) {Value::Number(n.tanh())}
+    [NaturalLog] #[safe = true, desc = "Calculates the ln (natural log) of a number", example = "$.ln(2.71828)"] fn ln((n): Number) {Value::Number(n.ln())}
+    [Log] #[safe = true, desc = "Calculates the log base x of a number", example = "$.assert($.log(1024, 2) == 10)"] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
     [Min] #[safe = true, desc = "Calculates the min of two numbers", example = "$.assert($.min(1, 2) == 1)"] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
     [Max] #[safe = true, desc = "Calculates the max of two numbers", example = "$.assert($.max(1, 2) == 2)"] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
     [Round] #[safe = true, desc = "Rounds a number", example = "$.assert($.round(1.2) == 1)"] fn round((n): Number) {Value::Number(n.round())}
@@ -1082,7 +1088,11 @@ $.assert(arr == [1])
         Value::Array(output)
     }
 
-    [EditObj] #[safe = true, desc = "Changes the value of an object key. You can also use `object.set(key, value)`", example = "$.edit_obj(object, ROTATION, 180)"]
+    [EditObj] #[safe = true, desc = "Changes the value of an object key. You can also use `object.set(key, value)`", example = "
+extract obj_props
+let object = color_trigger(BG, 0, 0, 0, 0.5)
+$.edit_obj(object, X, 600)
+    "]
     fn edit_obj(mut (o, m): Obj, (key), (value)) {
 
         let (okey, oval) = {
@@ -1304,7 +1314,7 @@ $.extend_trigger_func(10g, () {
     [Random] #[safe = true, desc = "Generates random numbers, or picks a random element of an array", example = "
 $.random() // a completely random number
 $.random([1, 2, 3, 6]) // returns either 1, 2, 3, or 6
-$.random(1, 10) // returns a random integer between 1 and 10
+$.random(1..11) // returns a random integer between 1 and 10
     "]
     fn random(#["see example"]) {
         #[cfg(not(target_arch = "wasm32"))]
@@ -1393,7 +1403,7 @@ $.random(1, 10) // returns a random integer between 1 and 10
         }
     }
 
-    [ReadLevel] #[safe = true, desc = "Returns the level string of the level being written to, or nothing if there is no output level", example = "level_string = $.read_level()"]
+    [ReadLevel] #[safe = true, desc = "Returns the level string of the level being written to, or nothing if there is no output level", example = "level_string = $.level_string()"]
     fn level_string() {
         if !arguments.is_empty() {
             return Err(RuntimeError::BuiltinError {
@@ -1707,7 +1717,11 @@ $.assert(arr == [1, 2])
         Value::Str(val.as_str()[start_index..end_index].to_string())
     }
 
-    [RemoveIndex] #[safe = true, desc = "Removes a specific value from an array. You can also use `array.remove(index)`", example = "$.remove_index(names, 2)"]
+    [RemoveIndex] #[safe = true, desc = "Removes a specific value from an array. You can also use `array.remove(index)`", example = "
+let names = ['James', 'Sophia', 'Romulus', 'Remus', 'Tiberius']
+$.remove_index(names, 2)
+$.assert(names == ['James', 'Sophia', 'Remus', 'Tiberius'])
+    "]
     fn remove_index(mut (arr), (index): Number) {
 
         let typ = globals.get_type_str(arguments[0]);
@@ -1904,19 +1918,19 @@ $.assert(arr == [1, 2])
         }
     }
     // unary operators
-    [IncrOp] #[safe = true, desc = "Default implementation of the `n++` operator", example = "$._increment_(n)"]
+    [IncrOp] #[safe = true, desc = "Default implementation of the `n++` operator", example = "let n = 0\n$._increment_(n)\n$.assert(n == 1)"]
     fn _increment_(mut (a): Number) { a += 1.0; Value::Number(a - 1.0)}
-    [DecrOp] #[safe = true, desc = "Default implementation of the `n--` operator", example = "_decrement_(n)"]
+    [DecrOp] #[safe = true, desc = "Default implementation of the `n--` operator", example = "let n = 1\n$._decrement_(n)\n$.assert(n == 0)"]
     fn _decrement_(mut (a): Number) { a -= 1.0; Value::Number(a + 1.0)}
 
-    [PreIncrOp] #[safe = true, desc = "Default implementation of the `++n` operator", example = "$._pre_increment_(n)"]
+    [PreIncrOp] #[safe = true, desc = "Default implementation of the `++n` operator", example = "let n = 0\n$.assert($._pre_increment_(n) == 1)"]
     fn _pre_increment_(mut (a): Number) { a += 1.0; Value::Number(a)}
-    [PreDecrOp] #[safe = true, desc = "Default implementation of the `--n` operator", example = "$._pre_decrement_(n)"]
+    [PreDecrOp] #[safe = true, desc = "Default implementation of the `--n` operator", example = "let n = 1\n$.assert($._pre_decrement_(n) == 0)"]
     fn _pre_decrement_(mut (a): Number) { a -= 1.0; Value::Number(a)}
 
-    [NegOp] #[safe = true, desc = "Default implementation of the `-n` operator", example = "$._negate_(n)"]
+    [NegOp] #[safe = true, desc = "Default implementation of the `-n` operator", example = "$.assert($._negate_(1) == -1)"]
     fn _negate_((a): Number) { Value::Number(-a)}
-    [NotOp] #[safe = true, desc = "Default implementation of the `!b` operator", example = "$._not_(b)"]
+    [NotOp] #[safe = true, desc = "Default implementation of the `!b` operator", example = "$.assert($._not_(false))"]
     fn _not_((a)) {
         match a {
             Value::Bool(b) => Value::Bool(!b),
@@ -1934,28 +1948,28 @@ $.assert(arr == [1, 2])
     }
     // [UnaryRangeOp] #[safe = true, desc = "Default implementation of the `..n` operator", example = "$._unary_range_(n)"]
     // fn _unary_range_((a): Number) { Value::Range(0, convert_to_int(a, &info)?, 1)}
-    [EqPatternOp] #[safe = true, desc = "Default implementation of the `==a` operator", example = "$._eq_pattern_(a)"]
+    [EqPatternOp] #[safe = true, desc = "Default implementation of the `==a` operator", example = "$.assert(10 is $._eq_pattern_(10))"]
     fn _eq_pattern_((a)) { Value::Pattern(Pattern::Eq(store_const_value(a, globals, context.start_group, info.position))) }
 
-    [NotEqPatternOp] #[safe = true, desc = "Default implementation of the `!=a` operator", example = "$._not_eq_pattern_(a)"]
+    [NotEqPatternOp] #[safe = true, desc = "Default implementation of the `!=a` operator", example = "$.assert(10 is $._not_eq_pattern_(5))"]
     fn _not_eq_pattern_((a)) { Value::Pattern(Pattern::NotEq(store_const_value(a, globals, context.start_group, info.position))) }
 
-    [MorePatternOp] #[safe = true, desc = "Default implementation of the `>a` operator", example = "$._more_pattern_(a)"]
+    [MorePatternOp] #[safe = true, desc = "Default implementation of the `>a` operator", example = "$.assert(10 is $._more_pattern_(9))"]
     fn _more_pattern_((a)) { Value::Pattern(Pattern::MoreThan(store_const_value(a, globals, context.start_group, info.position))) }
 
-    [LessPatternOp] #[safe = true, desc = "Default implementation of the `<a` operator", example = "$._less_pattern_(a)"]
+    [LessPatternOp] #[safe = true, desc = "Default implementation of the `<a` operator", example = "$.assert(10 is $._less_pattern_(11))"]
     fn _less_pattern_((a)) { Value::Pattern(Pattern::LessThan(store_const_value(a, globals, context.start_group, info.position))) }
 
-    [MoreOrEqPatternOp] #[safe = true, desc = "Default implementation of the `>=a` operator", example = "$._more_or_eq_pattern_(a)"]
+    [MoreOrEqPatternOp] #[safe = true, desc = "Default implementation of the `>=a` operator", example = "$.assert(10 is $._more_or_eq_pattern_(10))"]
     fn _more_or_eq_pattern_((a)) { Value::Pattern(Pattern::MoreOrEq(store_const_value(a, globals, context.start_group, info.position))) }
 
-    [LessOrEqPatternOp] #[safe = true, desc = "Default implementation of the `<=a` operator", example = "$._less_or_eq_pattern_(a)"]
+    [LessOrEqPatternOp] #[safe = true, desc = "Default implementation of the `<=a` operator", example = "$.assert(10 is $._less_or_eq_pattern_(10))"]
     fn _less_or_eq_pattern_((a)) { Value::Pattern(Pattern::LessOrEq(store_const_value(a, globals, context.start_group, info.position))) }
 
-    [InPatternOp] #[safe = true, desc = "Default implementation of the `in a` operator", example = "$._in_pattern_(a)"]
+    [InPatternOp] #[safe = true, desc = "Default implementation of the `in a` operator", example = "$.assert(10 is $._in_pattern_([8, 10, 12]))"]
     fn _in_pattern_((a)) { Value::Pattern(Pattern::In(store_const_value(a, globals, context.start_group, info.position))) }
     // operators
-    [OrOp] #[safe = true, desc = "Default implementation of the `||` operator", example = "	$._or_(true, false)"]
+    [OrOp] #[safe = true, desc = "Default implementation of the `||` operator", example = "$._or_(true, false)"]
     fn _or_((a): Bool, (b): Bool) { Value::Bool(a || b) }
     [AndOp] #[safe = true, desc = "Default implementation of the `&&` operator", example = "$._and_(true, true)"]
     fn _and_((a): Bool, (b): Bool) { Value::Bool(a && b) }
@@ -2077,13 +2091,13 @@ $.assert(arr == [1, 2])
     }
     [MinusOp] #[safe = true, desc = "Default implementation of the `-` operator", example = "$._minus_(128, 64)"]
     fn _minus_((a): Number, (b): Number) { Value::Number(a - b) }
-    [AssignOp] #[safe = true, desc = "Default implementation of the `=` operator", example = "$._assign_(val, 64)"]
+    [AssignOp] #[safe = true, desc = "Default implementation of the `=` operator", example = "let val = 0\n$._assign_(val, 64)\n$.assert(val == 64)"]
     fn _assign_(mut (a), (b)) {
         a = b;
         (*globals.stored_values.map.get_mut(arguments[0]).unwrap()).def_area = info.position;
         Value::Null
     }
-    [SwapOp] #[safe = true, desc = "Default implementation of the `<=>` operator", example = "$._swap_(a, b)"]
+    [SwapOp] #[safe = true, desc = "Default implementation of the `<=>` operator", example = "let a = 10\nlet b = 5\n$._swap_(a, b)\n$.assert(a == 5)\n$.assert(b == 10)"]
     fn _swap_(mut (a), mut (b)) {
 
         std::mem::swap(&mut a, &mut b);
@@ -2229,9 +2243,9 @@ $.assert(arr == [1, 2])
     [AsOp] #[safe = true, desc = "Default implementation of the `as` operator", example = "$._as_(1000, @string)"]
     fn _as_((a), (t): TypeIndicator) { convert_type(&a,t,&info,globals,context)? }
 
-    [SubtractOp] #[safe = true, desc = "Default implementation of the `-=` operator", example = "$._subtract_(val, 10)"]
+    [SubtractOp] #[safe = true, desc = "Default implementation of the `-=` operator", example = "let val = 25\n$._subtract_(val, 10)\n$.assert(val == 15)"]
     fn _subtract_(mut (a): Number, (b): Number) { a -= b; Value::Null }
-    [AddOp] #[safe = true, desc = "Default implementation of the `+=` operator", example = "$._add_(val, 10)"]
+    [AddOp] #[safe = true, desc = "Default implementation of the `+=` operator", example = "let val = 25\n$._add_(val, 10)\n$.assert(val == 35)"]
     fn _add_(mut (a), (b)) {
         match (&mut a, b) {
             (Value::Number(a), Value::Number(b)) => *a += b,
@@ -2257,7 +2271,7 @@ $.assert(arr == [1, 2])
         }
         Value::Null
     }
-    [MultiplyOp] #[safe = true, desc = "Default implementation of the `*=` operator", example = "$._multiply_(val, 10)"]        fn _multiply_(mut (a), (b): Number)         {
+    [MultiplyOp] #[safe = true, desc = "Default implementation of the `*=` operator", example = "let val = 5\n$._multiply_(val, 10)\n$.assert(val == 50)"]        fn _multiply_(mut (a), (b): Number)         {
         match &mut a {
             Value::Number(a) => *a *= b,
             Value::Str(a) => *a = a.repeat(convert_to_int(b, &info)? as usize),
@@ -2280,13 +2294,13 @@ $.assert(arr == [1, 2])
         };
         Value::Null
     }
-    [DivideOp] #[safe = true, desc = "Default implementation of the `/=` operator", example = "$._divide_(val, 3)"]
+    [DivideOp] #[safe = true, desc = "Default implementation of the `/=` operator", example = "let val = 9\n$._divide_(val, 3)\n$.assert(val == 3)"]
     fn _divide_(mut (a): Number, (b): Number) { a /= b; Value::Null }
-    [IntdivideOp] #[safe = true, desc = "Default implementation of the `/%=` operator", example = "$._intdivide_(val, 3)"]
+    [IntdivideOp] #[safe = true, desc = "Default implementation of the `/%=` operator", example = "let val = 10\n$._intdivide_(val, 3)\n$.assert(val == 3)"]
     fn _intdivide_(mut (a): Number, (b): Number) { a /= b; a = a.floor(); Value::Null }
-    [ExponateOp] #[safe = true, desc = "Default implementation of the `^=` operator", example = "$._exponate_(val, 3)"]
+    [ExponateOp] #[safe = true, desc = "Default implementation of the `^=` operator", example = "let val = 3\n$._exponate_(val, 3)\n$.assert(val == 27)"]
     fn _exponate_(mut (a): Number, (b): Number) { a = a.powf(b); Value::Null }
-    [ModulateOp] #[safe = true, desc = "Default implementation of the `%=` operator", example = "$._modulate_(val, 3)"]
+    [ModulateOp] #[safe = true, desc = "Default implementation of the `%=` operator", example = "let val = 10\n$._modulate_(val, 3)\n$.assert(val == 1)"]
     fn _modulate_(mut (a): Number, (b): Number) { a = a.rem_euclid(b); Value::Null }
 
     [EitherOp] #[safe = true, desc = "Default implementation of the `|` operator", example = "$._either_(@number, @counter)"]

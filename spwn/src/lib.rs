@@ -24,8 +24,6 @@ pub use ::parser::parser;
 pub use ::parser::parser::parse_spwn;
 
 pub use errors::compiler_info;
-
-use shared::ImportType;
 use shared::SpwnSource;
 
 use std::collections::hash_map::Entry;
@@ -172,13 +170,18 @@ mod tests;
 
 #[test]
 pub fn run_all_doc_examples() {
+    use shared::ImportType;
+    use std::str::FromStr;
+
     let mut globals_path = std::env::current_dir().unwrap();
     globals_path.push("temp"); // this folder doesn't actually exist, but it needs to be there because .parent is called in import_module
     let mut std_out = Vec::<u8>::new();
 
+    let permissions = builtins::BuiltinPermissions::new();
+
     let mut globals = globals::Globals::new(
         SpwnSource::File(globals_path),
-        builtins::BuiltinPermissions::new(),
+        permissions.clone(),
         String::from(""),
         &mut std_out,
     );
@@ -226,7 +229,11 @@ pub fn run_all_doc_examples() {
         }
     }
 
-    //dbg!(&all_tests);
+    for (name, code) in builtins::BUILTIN_EXAMPLES {
+        if permissions.is_allowed(builtins::Builtin::from_str(*name).unwrap()) {
+            all_tests.push((format!("$.{}", name), code.to_string()));
+        }
+    }
 
     let mut all_failed_tests = Vec::new();
 
