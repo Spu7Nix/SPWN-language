@@ -1283,6 +1283,15 @@ $.extend_trigger_func(10g, () {
                 })
             }
         };
+
+        if context.start_group.id != Id::Specific(0) {
+            return Err(RuntimeError::BuiltinError {
+                builtin, // objects cant be added dynamically, of course
+                message: String::from(
+                    "you cannot extend trigger funcs at runtime"),
+                info
+            });
+        }
         use parser::ast::*;
 
         let cmp_statement = CompoundStatement { statements: vec![
