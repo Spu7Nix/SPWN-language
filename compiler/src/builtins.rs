@@ -1284,7 +1284,7 @@ $.extend_trigger_func(10g, () {
             }
         };
 
-        if context.start_group.id != Id::Specific(0) {
+        if context.start_group.id != crate::builtins::Id::Specific(0) {
             return Err(RuntimeError::BuiltinError {
                 builtin, // objects cant be added dynamically, of course
                 message: String::from(
