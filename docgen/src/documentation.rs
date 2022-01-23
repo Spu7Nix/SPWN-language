@@ -67,7 +67,8 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     } else {
         path.to_string()
     };
-    output_path.push(PathBuf::from(format!("{}-docs", name)));
+    let folder_name = format!("{}-docs", name);
+    output_path.push(PathBuf::from(&folder_name));
     if !output_path.exists() {
         std::fs::create_dir(output_path.clone()).unwrap();
     } else {
@@ -112,6 +113,10 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 
     let mut doc = format!("# Documentation for `{}`\n\n", name);
 
+    let main_file = format!("{}-docs", name);
+
+    let mut sidebar = "[_go back_](/)\n- **Exports**\n".to_string();
+
     globals.push_new_preserved();
     globals.push_preserved_val(start_context.inner().return_value);
 
@@ -147,10 +152,26 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
     );
 
     let mut type_links = FnvHashMap::<u16, String>::default();
+    let mut type_paths = FnvHashMap::<u16, String>::default();
+
+    let (doc_content, sidebar_content) = document_val(
+        &exports,
+        &mut globals,
+        &mut start_context,
+        &type_links,
+        &format!("{}/{}", folder_name, main_file),
+        None,
+    )?;
+
+    sidebar += &sidebar_content
+        .lines()
+        .map(|l| format!("\t{}\n", l))
+        .collect::<Vec<_>>()
+        .join("");
+
+    doc += &format!("\n## Exports\n\n{}", doc_content);
 
     if !implementations.is_empty() && implementations.iter().any(|(_, a)| !a.is_empty()) {
-        doc += "\n## Type Implementations\n\n";
-
         let mut list: Vec<_> = implementations
             .into_iter()
             .map(|(a, map)| {
@@ -180,44 +201,48 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                 .clone();
             let orig_name = type_name.clone();
             find_avaliable_name(&mut output_path.clone(), &mut type_name);
-            let path = format!("{}-docs/{}.md", name, type_name);
+            let path = format!("{}/{}", folder_name, type_name);
 
-            doc += &format!("- [**@{}**]({})\n", type_name, path);
+            //sidebar += &format!("- [**@{}**]({})\n", type_name, path);
 
-            type_links.insert(*typ, format!("[@{}]({})", orig_name, path));
+            type_links.insert(*typ, format!("[`@{}`]({})", orig_name, path));
+            type_paths.insert(*typ, path);
         }
         for (typ, dict) in list.iter() {
             let type_name = find_key_for_value(&globals.type_ids, *typ)
                 .expect("Implemented type was not found!")
                 .clone();
+            let (doc_content, sidebar_content) = document_dict(
+                dict,
+                &mut globals,
+                &mut start_context,
+                &type_links,
+                &type_paths[typ],
+                Some(&type_name),
+            )?;
+
+            sidebar += &format!("- **@{}**\n", type_name.replace("_", "\\_"));
+
+            sidebar += &sidebar_content
+                .lines()
+                .map(|l| format!("\t{}\n", l))
+                .collect::<Vec<_>>()
+                .join("");
 
             let content = &if let Some(desc) = globals.type_descriptions.get(typ).cloned() {
-                format!(
-                    "# **@{}**\n?> {}\n{}",
-                    type_name,
-                    desc,
-                    document_dict(dict, &mut globals, &mut start_context, &type_links)?
-                )
+                format!("# **@{}**\n?> {}\n{}", type_name, desc, doc_content)
             } else {
-                format!(
-                    "# **@{}**\n{}",
-                    type_name,
-                    document_dict(dict, &mut globals, &mut start_context, &type_links)?
-                )
+                format!("# **@{}**\n{}", type_name, doc_content)
             };
 
             create_doc_file(output_path.clone(), type_name, content);
         }
     }
 
-    doc += &format!(
-        "\n## Exports\n\n{}",
-        document_val(&exports, &mut globals, &mut start_context, &type_links)?
-    );
-
     globals.pop_preserved();
 
-    create_doc_file(output_path, format!("{}-docs", name), &doc);
+    create_doc_file(output_path.clone(), main_file, &doc);
+    create_doc_file(output_path, "_sidebar".to_string(), &sidebar);
     Ok(())
 }
 
@@ -226,8 +251,12 @@ fn document_dict(
     globals: &mut Globals,
     full_context: &mut FullContext,
     type_links: &FnvHashMap<u16, String>,
-) -> Result<String, RuntimeError> {
+    path: &str,
+    type_name: Option<&str>,
+) -> Result<(String, String), RuntimeError> {
     let mut doc = String::new(); //String::from("<details>\n<summary> View members </summary>\n");
+    let mut inner_sidebar = String::new();
+
     type ValList = Vec<(LocalIntern<String>, StoredValue)>;
     let mut categories = [
         ("Constructors", ValList::new()),
@@ -254,10 +283,31 @@ fn document_dict(
         list.sort_by_key(|a| a.0);
     }
 
-    let mut document_member = |key: &String, val: &StoredValue| -> Result<String, RuntimeError> {
+    let mut document_member = |key: &String,
+                               val: &StoredValue,
+                               inner_sidebar: &mut String|
+     -> Result<String, RuntimeError> {
+        *inner_sidebar += &if let Some(type_name) = type_name {
+            format!(
+                "\t- [`@{}::`{}]({}?id={})\n",
+                type_name,
+                key.replace("_", "\\_"),
+                path,
+                key
+            )
+        } else {
+            format!("\t- [{}]({}?id={})\n", key.replace("_", "\\_"), path, key)
+        };
         let mut member_doc = String::new();
         let inner_val = globals.stored_values[*val].clone();
-        let val_str = document_val(&inner_val, globals, full_context, type_links)?;
+        let (val_str, _) = document_val(
+            &inner_val,
+            globals,
+            full_context,
+            type_links,
+            path,
+            type_name,
+        )?;
         let mut formatted = String::new();
 
         for line in val_str.lines() {
@@ -278,17 +328,18 @@ fn document_dict(
         Ok(member_doc)
     };
 
-    for list in categories {
-        if !list.1.is_empty() {
-            doc += &format!("\n## {}\n", list.0);
+    for (category, list) in categories {
+        if !list.is_empty() {
+            doc += &format!("\n## {}\n", category);
+            inner_sidebar += &format!("- {}\n", category);
 
-            for (key, val) in list.1.iter() {
-                doc += &document_member(key.as_ref(), val)?
+            for (key, val) in list.iter() {
+                doc += &document_member(key.as_ref(), val, &mut inner_sidebar)?
             }
         }
     }
 
-    Ok(doc)
+    Ok((doc, inner_sidebar))
 }
 
 fn document_macro(
@@ -451,7 +502,9 @@ fn document_val(
     globals: &mut Globals,
     full_context: &mut FullContext,
     type_links: &FnvHashMap<u16, String>,
-) -> Result<String, RuntimeError> {
+    path: &str,
+    tn: Option<&str>,
+) -> Result<(String, String), RuntimeError> {
     let mut doc = String::new();
     let typ_index = val
         .member(
@@ -483,16 +536,20 @@ fn document_val(
         doc += &format!("**Type:** `@{}`\n", type_name);
     }
 
-    doc += &match &val {
-        Value::Dict(d) => document_dict(d, globals, full_context, type_links)?,
-        Value::Macro(m) => document_macro(m, globals, full_context, type_links)?,
-        _ => String::new(),
+    let (new_doc, sidebar) = &match &val {
+        Value::Dict(d) => document_dict(d, globals, full_context, type_links, path, tn)?,
+        Value::Macro(m) => (
+            document_macro(m, globals, full_context, type_links)?,
+            String::new(),
+        ),
+        _ => (String::new(), String::new()),
     };
+    doc += new_doc;
 
     //add_arrows(&mut doc);
 
     //doc += "\n  ";
-    Ok(doc)
+    Ok((doc, sidebar.clone()))
 }
 
 // fn add_arrows(string: &mut String) {
