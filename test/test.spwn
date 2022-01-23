@@ -1,5 +1,6 @@
-m = (a: _ -> _) {
-    return a(10)
-}
+wait(1)
 
-$.print($.fract(123.456))
+for_loop(0..100, (i) {
+    10g.move(i, i * 2, 0.5, EASE_IN_OUT)
+    wait(0.1)
+})

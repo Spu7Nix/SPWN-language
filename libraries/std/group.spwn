@@ -19,22 +19,44 @@ impl @group {
     move: #[desc("Implementation of the move trigger"), example("10g.move(100, 0, 0.5, easing = EASE_IN_OUT)")]
     (
         self,
-        #[desc("Units to move on the X axis (10 units per grid square)")] x: @number,
-        #[desc("Units to move on the Y axis (10 units per grid square)")] y: @number,
+        #[desc("Units to move on the X axis (10 units per grid square)")] x: @number | @counter,
+        #[desc("Units to move on the Y axis (10 units per grid square)")] y: @number | @counter,
         #[desc("Duration of movement")] duration: @number = 0,
         easing: @easing_type = NONE,
-        easing_rate: @number = 2
+        easing_rate: @number = 2,
+        #[desc("X movement multiplier (so you dont have to dynamically multiply counters)")] x_multiplier: @number = 1,
+        #[desc("Y movement multiplier (so you dont have to dynamically multiply counters)")] y_multiplier: @number = 1,
     ) -> @NULL {
-        $.add( trigger{
-            OBJ_ID: 901,
-            TARGET: self,
-            MOVE_X: x * 3,
-            MOVE_Y: y * 3,
-            DURATION: duration,
-            EASING: easing.id,
-            EASING_RATE: easing_rate,
-        })
-
+        if x is @number && y is @number {
+            $.add( trigger{
+                OBJ_ID: 901,
+                TARGET: self,
+                MOVE_X: x * 3 * x_multiplier,
+                MOVE_Y: y * 3 * y_multiplier,
+                DURATION: duration,
+                EASING: easing.id,
+                EASING_RATE: easing_rate,
+            })
+        } else {
+            if x is @number {
+                -> self.move(x * x_multiplier, 0, duration, easing, easing_rate)
+            } else {
+                temp = @counter::new(0, reset = false, bits = x.bits)
+                x.add_to(temp, for_each = (n) {
+                    -> self.move(n * x_multiplier, 0, duration, easing, easing_rate)
+                })
+                temp.add_to(x)
+            }
+            if y is @number {
+                -> self.move(0, y * y_multiplier, duration, easing, easing_rate)
+            } else {
+                temp = @counter::new(0, reset = false, bits = x.bits)
+                y.add_to(temp, for_each = (n) {
+                    -> self.move(0, n * y_multiplier, duration, easing, easing_rate)
+                })
+                temp.add_to(y)
+            }
+        }
         wait(duration)
     },
 

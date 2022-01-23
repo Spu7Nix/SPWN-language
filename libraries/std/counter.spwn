@@ -2,6 +2,7 @@
 
 extract import "control_flow.spwn"
 extract import "constants.spwn".comparisons
+import "events.spwn"
 DEFAULT_BITS = 16
 type @counter
 
