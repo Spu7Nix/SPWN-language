@@ -1,6 +1,10 @@
-wait(1)
+a = (
+    color: @chroma = @chroma::from_rgb(1,1,1),
+    fade_in: @number = 0.0,
+    hold: @number = 0.0,
+    fade_out: @number = 0.5,
+) -> @NULL {
+    -> BG.pulse(color, fade_in, hold, fade_out)
+}
 
-for_loop(0..100, (i) {
-    10g.move(i, i * 2, 0.5, EASE_IN_OUT)
-    wait(0.1)
-})
+$.print(a)

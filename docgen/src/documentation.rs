@@ -106,6 +106,9 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 
     let mut doc = format!("# Documentation for `{}`\n\n", name);
 
+    globals.push_new_preserved();
+    globals.push_preserved_val(start_context.inner().return_value);
+
     let exports = globals.stored_values[start_context.inner().return_value].clone();
     let implementations = globals.implementations.clone();
 
@@ -184,6 +187,8 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         "\n## Exports\n\n{}",
         document_val(&exports, &mut globals, &mut start_context)?
     );
+
+    globals.pop_preserved();
 
     create_doc_file(output_path, format!("{}-docs", name), &doc);
     Ok(())
@@ -351,7 +356,6 @@ fn document_val(
         Value::TypeIndicator(t) => t,
         _ => unreachable!(),
     };
-
     let literal = val.display(full_context, globals, &CompilerInfo::new())?;
 
     let type_name =

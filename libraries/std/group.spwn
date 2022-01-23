@@ -15,6 +15,13 @@ impl @group {
         for group in 1g..10g {
             -> group.move(10, 0, 0.5)
         }
+
+        // you can also use counters
+        c = counter(10)
+        for group in 1g..10g {
+            group.move(c, 0, 0.5)
+            c += 5
+        }
     ")] create_range_macro(@group),
     move: #[desc("Implementation of the move trigger"), example("10g.move(100, 0, 0.5, easing = EASE_IN_OUT)")]
     (

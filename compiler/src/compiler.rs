@@ -980,6 +980,7 @@ pub fn compile_scope(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn do_assignment(
     destex: &ast::Expression,
     src: &Option<ast::Expression>,

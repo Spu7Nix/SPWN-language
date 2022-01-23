@@ -847,6 +847,10 @@ impl Value {
             }
             Value::Dict(dict_in) => {
                 let mut out = String::new();
+                globals.push_new_preserved();
+                for (_, v) in dict_in.iter() {
+                    globals.push_preserved_val(*v);
+                }
 
                 let mut d = dict_in.clone();
                 if let Some(n) = d.get(&globals.TYPE_MEMBER_NAME) {
@@ -875,10 +879,21 @@ impl Value {
                 }
 
                 out += "}"; //why do i have to do this twice? idk
-
+                globals.pop_preserved();
                 out
             }
             Value::Macro(m) => {
+                globals.push_new_preserved();
+                for arg in &m.args {
+                    if let Some(v) = &arg.pattern {
+                        globals.push_preserved_val(*v);
+                    }
+                    if let Some(v) = &arg.default {
+                        globals.push_preserved_val(*v);
+                    }
+
+                }
+
                 let mut out = String::from("(");
                 if !m.args.is_empty() {
                     for arg in m.args.iter() {
@@ -900,6 +915,7 @@ impl Value {
                     out.pop();
                     out.pop();
                 }
+                globals.pop_preserved();
                 out + ") { /* ... */ }"
             }
             Value::Str(s) => format!("'{}'", s),
@@ -907,6 +923,10 @@ impl Value {
                 if a.is_empty() {
                     "[]".to_string()
                 } else {
+                    globals.push_new_preserved();
+                    for v in a.iter() {
+                        globals.push_preserved_val(*v);
+                    }
                     let mut out = String::from("[");
                     for val in a {
                         out += &display_inner(&globals.stored_values[*val].clone(), globals)?;
@@ -915,7 +935,7 @@ impl Value {
                     out.pop();
                     out.pop();
                     out += "]";
-
+                    globals.pop_preserved();
                     out
                 }
             }
