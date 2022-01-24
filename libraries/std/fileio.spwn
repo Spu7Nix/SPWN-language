@@ -1,6 +1,7 @@
 #[no_std, cache_output]
 // brought to you by camden314
 
+#[desc("A type for reading files")]
 type @file
 
 impl @file {

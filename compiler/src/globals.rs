@@ -149,6 +149,86 @@ impl<'a> Globals<'a> {
         std_out: &'a mut impl Write,
     ) -> Self {
         let (storage, builtin_storage, null_storage) = ValStorage::new();
+        let mut type_descriptions = FnvHashMap::<u16, String>::default();
+
+        type_descriptions.insert(type_id!(group), "
+Groups are references to one or more Geometry Dash objects, and are used to make these objects do things like moving, rotating and pulsing.
+They can also be used to mark a specific object, as for example a rotation center or a target position to move to.
+Groups are also used to send signals between **triggers**, and are therefore quite closely related to trigger functions.
+        ".trim().to_string());
+
+        type_descriptions.insert(
+            type_id!(color),
+            "
+Colors are references to color channels in a Geometry Dash level.
+        "
+            .trim()
+            .to_string(),
+        );
+
+        type_descriptions.insert(
+            type_id!(item),
+            "
+Item IDs are references to numbers that exist during the runtime of a Geometry Dash level. 
+Items are used to store information that is changed during the level's runtime in an unpredictable way, like information about user input.
+        "
+            .trim().to_string()
+            ,
+        );
+
+        type_descriptions.insert(
+            type_id!(block),
+            "
+Collision Block IDs are references to one or more collision blocks, and are useful for tracking collisions between these.
+        "
+        .trim().to_string()
+            ,
+        );
+
+        type_descriptions.insert(
+            type_id!(number),
+            "
+Numbers are used to store numbers at compile time (if you want to have numbers at runtime, see [`@counter`](std-docs/counter) or [`@item`](std-docs/item))
+        "
+        .trim().to_string()
+            ,
+        );
+
+        type_descriptions.insert(
+            type_id!(bool),
+            "
+Booleans are used to store boolean values (`true` or `false`) at compile time (if you want to have booleans at runtime, see [`@counter`](std-docs/counter))
+        "
+        .trim().to_string()
+            ,
+        );
+
+        type_descriptions.insert(
+            type_id!(dictionary),
+            "
+Dictionaries are used to store key-value pairs at compile time.
+        "
+            .trim()
+            .to_string(),
+        );
+
+        type_descriptions.insert(
+            type_id!(string),
+            "
+Strings are used to store text at compile time.
+        "
+            .trim()
+            .to_string(),
+        );
+
+        type_descriptions.insert(
+            type_id!(array),
+            "
+Arrays are used to store lists of values at compile time.
+        "
+            .trim()
+            .to_string(),
+        );
 
         let mut globals = Globals {
             closed_groups: 0,
@@ -194,7 +274,7 @@ impl<'a> Globals<'a> {
             OBJ_KEY_PATTERN: LocalIntern::new(String::from("pattern")),
             built_in_path: None,
             std_out,
-            type_descriptions: FnvHashMap::default(),
+            type_descriptions,
             initial_objects: None,
         };
 

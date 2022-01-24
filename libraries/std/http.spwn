@@ -1,5 +1,6 @@
 #[no_std, cache_output]
 
+#[desc("A type sending http requests")]
 type @http
 impl @http {
     get: #[desc("Makes a get request to the provided URL. A dictionary of headers can optionally be passed in as a second argument")]

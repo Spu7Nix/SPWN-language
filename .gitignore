@@ -3,6 +3,7 @@ target
 **/*.rs.bk
 .DS_Store
 std-docs
+gamescene-docs
 spwn-web/pkg
 spwn-web/ansi_up.js
 *.sublime-workspace
