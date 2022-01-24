@@ -1,10 +1,4 @@
-a = (
-    color: @chroma = @chroma::from_rgb(1,1,1),
-    fade_in: @number = 0.0,
-    hold: @number = 0.0,
-    fade_out: @number = 0.5,
-) -> @NULL {
-    -> BG.pulse(color, fade_in, hold, fade_out)
-}
+extract $
+extract obj_props
 
-$.print(a)
+print(level.get_objects(OBJ_ID, ==211))

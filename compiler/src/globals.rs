@@ -47,6 +47,7 @@ pub struct Globals<'a> {
     pub func_ids: Vec<FunctionId>,
     pub objects: Vec<GdObj>,
     pub initial_string: String,
+    pub initial_objects: Option<StoredValue>,
 
     pub prev_imports: FnvHashMap<ImportType, (StoredValue, Implementations)>,
 
@@ -194,6 +195,7 @@ impl<'a> Globals<'a> {
             built_in_path: None,
             std_out,
             type_descriptions: FnvHashMap::default(),
+            initial_objects: None,
         };
 
         let mut add_type = |name: &str, id: u16| {
@@ -291,6 +293,10 @@ impl<'a> Globals<'a> {
         //mark
         self.stored_values.mark(self.NULL_STORAGE);
         self.stored_values.mark(self.BUILTIN_STORAGE);
+
+        if let Some(v) = self.initial_objects {
+            self.stored_values.mark(v);
+        }
 
         let root_context = unsafe {
             FullContext::from_ptr(

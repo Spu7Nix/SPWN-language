@@ -1423,6 +1423,34 @@ $.random(1..11) // returns a random integer between 1 and 10
         }
         Value::Str(globals.initial_string.clone())
     }
+    [ParseLevel] #[safe = true, desc = "Returns a array of the objects in the level being written to, or an empty array if there is no output level", example = "level = $.level_objects()"]
+    [[RAW]] fn level_objects() {
+        if !arguments.is_empty() {
+            return Err(RuntimeError::BuiltinError {
+                builtin,
+                message: String::from("Expected 0 arguments"),
+                info,
+            });
+        }
+        (*context).return_value = match globals.initial_objects {
+            Some(obj) => obj,
+            None => {
+                let stored = store_const_value(
+                    Value::Array(
+                        crate::parse_levelstring::parse_levelstring(&globals.initial_string)?.into_iter()
+                        .map(|v|
+                            store_const_value(v, globals, context.start_group, CodeArea::new())
+                        ).collect()
+                    ),
+                    globals,
+                    context.start_group,
+                    CodeArea::new(),
+                );
+                globals.initial_objects = Some(stored);
+                stored
+            }
+        };
+    }
     [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local system (uses the current directory as base for relative paths)", example = "data = $.readfile(\"file.txt\")"]
     fn readfile(#["Path of file to read, and the format it's in (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"]) {
         if arguments.is_empty() || arguments.len() > 2 {
