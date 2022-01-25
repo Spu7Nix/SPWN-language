@@ -108,14 +108,7 @@ impl @dictionary {
 
 		$.assert('peanuts' in wares == false)
 	")] (self, key: @string) -> @NULL {
-		// implementation be like 💀💀💀
-		let new_dict = {} 
-		for current_key in self.keys() {
-			if current_key != key {
-				new_dict[current_key] = self[current_key]
-			}
-		}
-		self = new_dict
+		if key in self { $.remove_index(self, key) }
 	},
 	clear: #[desc("Clears the dictionary."), example(u"
 		let wares = {
