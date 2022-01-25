@@ -11,19 +11,20 @@
 
 - Return types for macros with `(arguments) -> return_type { ... }` syntax
 - You can spread an array in another array with `..` syntax:
+- `spwn eval` subcommand for running code in the console
 
 ```rs
 b = [3, 4]
 $.assert([1, 2, ..b, 5] == [1, 2, 3, 4, 5])
 ```
 
-- Zip arrays together with `*[...]` syntax:
+- Unzip arrays with `*[...]` syntax:
 
 ```rs
 a = [1, "a"]
 b = [2, "b"]
 c = [3, "c"]
-$.assert([*[a, b, c]] == [[1, 2, 3], ["a", "b", "c"]])
+$.assert([\*[a, b, c]] == [[1, 2, 3], ["a", "b", "c"]])
 ```
 
 - Destructuring additions, including dictionary destruction, and destruction of the syntax mentioned above (`..` and `*[...]`)
@@ -40,14 +41,16 @@ $.assert([*[a, b, c]] == [[1, 2, 3], ["a", "b", "c"]])
   - `&` operator for combining two patterns, so that the resulting pattern requires the value to match both patterns
   - `_` pattern, which matches any value (wildcard)
   - pattern ternary operator, which returns a value if it matches a pattern, and otherwise returns the default value:
-  ```rs
-  10 if is >5 else 0 // 10
-  4 if is >5 else 0 // 0
-  ```
+    ```rs
+    10 if is >5 else 0 // 10
+    4 if is >5 else 0 // 0
+    ```
+- You can now remove stuff from dictionaries with `dict.delete(key)`
 
 ## STD Library Features
 
 - `@chroma` type for color values, this type is now used in for example color triggers instead of RGB arguments
 - `level` global variable for reading the objects in the current level
 - `@log` and `@runtime_log` types for debug logging to the console or at runtime
+- `@set` type for making groups of objects read from the level that can be rotated, scaled, and pasted in the level
 - Changes and improvements to many existing types (see the [docs](https://spu7nix.net/spwn/#/std-docs/std-docs))

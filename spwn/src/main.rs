@@ -207,7 +207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let end_command = ":build";
         println!(
             "{}{}{}",
-            "Type in your code, and type \"".fg(Blue),
+            "Write your code, and then type \"".fg(Blue),
             end_command.fg(Red),
             "\" to build it".fg(Blue)
         );
