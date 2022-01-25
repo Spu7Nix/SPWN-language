@@ -35,9 +35,9 @@ editorlive = { path = "../editorlive" }
 compiler = { path = "../compiler" }
 optimizer = { path = "../optimizer" }
 docgen = { path = "../docgen" }
-pckp = { path = "../pckp" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 levelstring = { path = "../levelstring" }
+pckp = { path = "../pckp" }
 
 # heat dir libraries -o wix/libraries.wxs -scom -frag -srd -sreg -gg -cg libraries -dr LIB_DIR -suid
