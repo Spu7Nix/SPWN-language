@@ -63,7 +63,7 @@ impl @log {
         }
         log_time(label, instant - data.time_labels.get(label))
     },
-    time_end: #[desc("Logs the time between now and the start of the label and destroys it (it doesn't for now 💀)."), example(u"
+    time_end: #[desc("Logs the time between now and the start of the label and destroys it."), example(u"
         @log::time('huge loop')
 
         for i in 0..100000 {}
@@ -75,7 +75,7 @@ impl @log {
             throw "Label {} does not exist".fmt($.display(label))
         }
         log_time(label, instant - data.time_labels.get(label))
-        // how to remove a key from a dict?
+        data.time_labels.delete(label)
     },
     count: #[desc("Logs how many times the label got counted."), example(u"
         for i in 0..10 {

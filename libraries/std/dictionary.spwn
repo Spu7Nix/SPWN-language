@@ -98,6 +98,25 @@ impl @dictionary {
 			}
 		}
 	},
+	delete: #[desc("Deletes an item from the dictionary."), example(u"
+		let wares = {
+			apple: 10,
+			gold: 1000,
+			peanuts: 5,
+		}
+		wares.delete('peanuts')
+
+		$.assert('peanuts' in wares == false)
+	")] (self, key: @string) -> @NULL {
+		// implementation be like 💀💀💀
+		let new_dict = {} 
+		for current_key in self.keys() {
+			if current_key != key {
+				new_dict[current_key] = self[current_key]
+			}
+		}
+		self = new_dict
+	},
 	clear: #[desc("Clears the dictionary."), example(u"
 		let wares = {
 			apple: 10,
