@@ -1754,22 +1754,72 @@ $.assert(arr == [1, 2])
         Value::Str(val.as_str()[start_index..end_index].to_string())
     }
 
-    [RemoveIndex] #[safe = true, desc = "Removes a specific value from an array. You can also use `array.remove(index)`", example = "
+    [RemoveIndex] #[safe = true, desc = "Removes a specific value from an array, string or dictionary. You can also use `array.remove(index)` or `dict.remove(key)`", example = "
 let names = ['James', 'Sophia', 'Romulus', 'Remus', 'Tiberius']
 $.remove_index(names, 2)
 $.assert(names == ['James', 'Sophia', 'Remus', 'Tiberius'])
+
+let name_age = {
+    'Sophia': 34, 
+    'Romulus': 14, 
+    'Remus': 15, 
+}
+$.remove_index(name_age, 'Romulus')
+$.assert(name_age == {
+    'Sophia': 34, 
+    'Remus': 15, 
+})
     "]
-    fn remove_index(mut (arr), (index): Number) {
+    fn remove_index(mut (arr), (index)) {
 
         let typ = globals.get_type_str(arguments[0]);
 
         match &mut arr {
             Value::Array(arr) => {
-                let out = (arr).remove(index as usize);
+                let out = (arr).remove(match index {
+                    Value::Number(n) => n as usize,
+                    _ => {
+                        return Err(RuntimeError::BuiltinError {
+                            builtin,
+                            message: format!("Expected number, found @{}", globals.get_type_str(arguments[0])),
+                            info,
+                        })
+                    }
+                });
                 globals.stored_values[out].clone()
             }
 
-            Value::Str(s) => Value::Str(s.remove(index as usize).to_string()),
+            Value::Str(s) => Value::Str(s.remove(match index {
+                Value::Number(n) => n as usize,
+                _ => {
+                    return Err(RuntimeError::BuiltinError {
+                        builtin,
+                        message: format!("Expected number, found @{}", globals.get_type_str(arguments[0])),
+                        info,
+                    })
+                }
+            }).to_string()),
+
+            Value::Dict(dict) => {
+                let out = match dict.remove(&LocalIntern::new(match index {
+                    Value::Str(s) => s,
+                    _ => {
+                        return Err(RuntimeError::BuiltinError {
+                            builtin,
+                            message: format!("Expected string, found @{}", globals.get_type_str(arguments[0])),
+                            info,
+                        })
+                    }
+                })) {
+                    Some(val) => val,
+                    None => return Err(RuntimeError::BuiltinError {
+                        builtin,
+                        message: "Index not found in dictionary".to_string(),
+                        info,
+                    }),
+                };
+                globals.stored_values[out].clone()
+            }
             _ => {
                 return Err(RuntimeError::BuiltinError {
                     builtin,
