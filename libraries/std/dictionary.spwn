@@ -98,6 +98,18 @@ impl @dictionary {
 			}
 		}
 	},
+	delete: #[desc("Deletes an item from the dictionary."), example(u"
+		let wares = {
+			apple: 10,
+			gold: 1000,
+			peanuts: 5,
+		}
+		wares.delete('peanuts')
+
+		$.assert('peanuts' in wares == false)
+	")] (self, key: @string) -> @NULL {
+		if key in self { $.remove_index(self, key) }
+	},
 	clear: #[desc("Clears the dictionary."), example(u"
 		let wares = {
 			apple: 10,
