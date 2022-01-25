@@ -1,4 +1,14 @@
-extract $
-extract obj_props
+$.print({} == {})
 
-print(level.get_objects(OBJ_ID, ==211))
+$.print({'a': 10} == {'a': 10})
+
+let name_age = {
+    'Sophia': 34, 
+    'Romulus': 14, 
+    'Remus': 15, 
+}
+$.remove_index(name_age, 'Romulus')
+$.assert(name_age == {
+    'Sophia': 34, 
+    'Remus': 15, 
+})

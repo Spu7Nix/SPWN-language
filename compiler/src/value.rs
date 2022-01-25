@@ -226,7 +226,7 @@ pub fn default_value_equality(
             }
             // check all keys are equal
             if d1.keys().cloned().collect::<FnvHashSet<_>>()
-                == d2.keys().cloned().collect::<FnvHashSet<_>>()
+                != d2.keys().cloned().collect::<FnvHashSet<_>>()
             {
                 set_return_bool(false, globals, contexts);
                 return Ok(());
