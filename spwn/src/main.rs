@@ -124,7 +124,7 @@ impl<'a> BuildOptions<'a> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let app = App::new("SPWN")
+    let matches = App::new("SPWN")
     .global_setting(AppSettings::ArgRequiredElseHelp)
     .subcommands(
         [
@@ -166,8 +166,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
                 .about("Generates documentation for a SPWN library, in the form of a markdown file"),
         ]
-    );
-    let matches = app.get_matches();
+    ).global_setting(clap::AppSettings::ArgRequiredElseHelp).get_matches();
 
     if let Some(build_cmd) = matches.subcommand_matches("build") {
         let script_path = build_cmd.value_of("SCRIPT").ok_or("unreachable")?;
