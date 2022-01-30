@@ -119,6 +119,8 @@ Let it compile and you're good to go
 
 ## Using SPWN
 
+### Please notice: SPWN doesn't have a Graphical User Interface, which means you can't launch it like any other program. You need to use your terminal.
+
 ### SPWN Playground
 
 SPWN Playground is a SPWN compiler built into your browser. You can use it to [try out SPWN](https://spu7nix.net/spwn/try/) before you decide to install it.
