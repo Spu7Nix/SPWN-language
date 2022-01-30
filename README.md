@@ -238,7 +238,7 @@ Build a file called AI.spwn and output the level string to the console.
 - [x] Type annotations for function arguments, variable definitions etc.
 - [x] `as` operator for automatically changing type
 - [ ] Finish documentation
-- [x] Break/continue statement.
+- [x] Break/continue statement
 - [x] Operation order
 - [x] Escaped characters in string
 - [x] Fix post-compile optimizations
