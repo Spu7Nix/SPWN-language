@@ -71,7 +71,7 @@ If you would like a pre-compiled package, look below.
 
 #### Debian based (Ubuntu, Mint, Elementary, ...)
 
-**No v0.7 installers for Debian based distros have been built yet.**
+**No v0.7 or v0.8 installers for Debian based distros have been built yet.**
 
 You can either:
 
@@ -83,7 +83,7 @@ You can either:
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
 ```cmd
-pacman -U spwn-0.0.7-x86_64-linux_arch.pkg.tar.zst
+pacman -U spwn-0.0.8-x86_64-linux_arch.pkg.tar.zst
 ```
 
 - Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
