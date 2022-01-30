@@ -69,6 +69,12 @@ If you would like a pre-compiled package, look below.
 
 ### Linux
 
+### Generic (any distro)
+- Download `spwn-0.0.8-x86_64.tar.gz` from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
+- Extract the tarball using `tar -xvf spwn-0.0.8-x86_64.tar.gz`
+- Run SPWN using `./spwn`
+- Optional: add SPWN to path by adding `PATH=$PATH:<where you extracted spwn>` to your `.bashrc` or `.zshrc`
+
 #### Debian based (Ubuntu, Mint, Elementary, ...)
 
 **No v0.7 or v0.8 installers for Debian based distros have been built yet.**
@@ -77,6 +83,7 @@ You can either:
 
 - Download the .deb file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases) and install it using dpkg with `sudo dpkg -i spwn_0.0.6-0_amd64.deb`.
 - Use a one-liner to do this faster: `curl -sLO https://github.com/Spu7Nix/SPWN-language/releases/download/v0.6-beta/spwn_0.6.0-0_amd64.deb && sudo dpkg -i spwn_0.6.0-0_amd64.deb`.
+- Use the generic install method
 
 #### Arch based (Manjaro, Artix, ...)
 
