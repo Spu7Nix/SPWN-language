@@ -17,6 +17,7 @@ use shared::FileRange;
 use shared::SpwnSource;
 //use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::Chars;
 
 use errors::SyntaxError;
 use internment::LocalIntern;
@@ -1829,10 +1830,98 @@ fn check_for_tag(
     }
 }
 
-pub fn str_content(
-    mut inp: String,
+fn char_escape(
+    chars: &mut Chars<'_>,
     tokens: &Tokens,
     notes: &ParseNotes,
+) -> Result<char, SyntaxError> {
+    match chars.next() {
+        Some('n') => Ok('\n'),
+        Some('r') => Ok('\r'),
+        Some('t') => Ok('\t'),
+        Some('"') => Ok('\"'),
+        Some('\'') => Ok('\''),
+        Some('\\') => Ok('\\'),
+        Some('u') => {
+            match chars.next() {
+                Some('{') => {}
+                Some(c) => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'{'".to_string(),
+                        found: format!("'{}'", c),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+                None => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'{'".to_string(),
+                        found: "EOS".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+            };
+
+            let mut hex = String::new();
+
+            for h in chars
+                .clone()
+                .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
+            {
+                hex.push(h);
+            }
+            let mut skipped = chars.by_ref().skip(hex.len());
+
+            match skipped.next() {
+                Some('}') => {}
+                Some(c) => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'}'".to_string(),
+                        found: format!("'{}'", c),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+                None => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'}'".to_string(),
+                        found: "EOS".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
+            };
+
+            if hex.is_empty() || hex.len() > 6 {
+                return Err(SyntaxError::ExpectedErr {
+                    expected: "2 to 6 hexadecimal characters".to_string(),
+                    found: hex.len().to_string(),
+                    pos: tokens.position(),
+                    file: notes.file.clone(),
+                });
+            }
+
+            Ok(
+                std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap())
+                .unwrap_or('\0')
+            )
+        }
+        Some(a) => {
+            return Err(SyntaxError::SyntaxError {
+                message: format!("Invalid escape: \\{}", a),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            })
+        }
+        None => unreachable!(),
+    }
+}
+
+pub fn str_content(
+    mut inp: String,
+    tokens: &mut Tokens,
+    notes: &mut ParseNotes,
 ) -> Result<(String, Option<StringFlags>), SyntaxError> {
     let first = inp.remove(0);
     inp.remove(inp.len() - 1);
@@ -1844,85 +1933,7 @@ pub fn str_content(
         '\'' | '"' => {
             while let Some(c) = chars.next() {
                 out.0.push(if c == '\\' {
-                    match chars.next() {
-                        Some('n') => '\n',
-                        Some('r') => '\r',
-                        Some('t') => '\t',
-                        Some('"') => '\"',
-                        Some('\'') => '\'',
-                        Some('\\') => '\\',
-                        Some('u') => {
-                            match chars.next() {
-                                Some('{') => {}
-                                Some(c) => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'{'".to_string(),
-                                        found: format!("'{}'", c),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    });
-                                }
-                                None => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'{'".to_string(),
-                                        found: "EOS".to_string(),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    });
-                                }
-                            };
-
-                            let mut hex = String::new();
-
-                            for h in chars
-                                .clone()
-                                .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
-                            {
-                                hex.push(h);
-                            }
-                            let mut skipped = chars.by_ref().skip(hex.len());
-
-                            match skipped.next() {
-                                Some('}') => {}
-                                Some(c) => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'}'".to_string(),
-                                        found: format!("'{}'", c),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    });
-                                }
-                                None => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'}'".to_string(),
-                                        found: "EOS".to_string(),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    })
-                                }
-                            };
-
-                            if hex.is_empty() || hex.len() > 6 {
-                                return Err(SyntaxError::ExpectedErr {
-                                    expected: "2 to 6 hexadecimal characters".to_string(),
-                                    found: hex.len().to_string(),
-                                    pos: tokens.position(),
-                                    file: notes.file.clone(),
-                                });
-                            }
-
-                            std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap())
-                                .unwrap_or('\0')
-                        }
-                        Some(a) => {
-                            return Err(SyntaxError::SyntaxError {
-                                message: format!("Invalid escape: \\{}", a),
-                                pos: tokens.position(),
-                                file: notes.file.clone(),
-                            })
-                        }
-                        None => unreachable!(),
-                    }
+                    char_escape(&mut chars, tokens, notes)?
                 } else {
                     c
                 });
@@ -1944,22 +1955,7 @@ pub fn str_content(
 
             while let Some(c) = chars.next() {
                 out_str.push(if c == '\\' {
-                    match chars.next() {
-                        Some('n') => '\n',
-                        Some('r') => '\r',
-                        Some('t') => '\t',
-                        Some('"') => '\"',
-                        Some('\'') => '\'',
-                        Some('\\') => '\\',
-                        Some(a) => {
-                            return Err(SyntaxError::SyntaxError {
-                                message: format!("Invalid escape: \\{}", a),
-                                pos: tokens.position(),
-                                file: notes.file.clone(),
-                            })
-                        }
-                        None => unreachable!(),
-                    }
+                    char_escape(&mut chars, tokens, notes)?
                 } else {
                     c
                 });
