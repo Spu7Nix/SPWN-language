@@ -27,6 +27,8 @@ use logos::Logos;
 
 use shared::ImportType;
 
+use base64;
+
 macro_rules! expected {
     ($expected:expr, $tokens:expr, $notes:expr, $a:expr) => {
         return Err(SyntaxError::ExpectedErr {
@@ -1938,6 +1940,23 @@ pub fn str_content(
                     c
                 });
             }
+        }
+        'b' => {
+            chars.next();
+
+            let mut actual_string = String::new();
+
+            out.1 = StringFlags::Base64.into();
+
+            while let Some(c) = chars.next() {
+                actual_string.push(if c == '\\' {
+                    char_escape(&mut chars, tokens, notes)?
+                } else {
+                    c
+                });
+            }
+
+            out.0 = base64::encode(actual_string);
         }
         'r' => {
             // remove "
