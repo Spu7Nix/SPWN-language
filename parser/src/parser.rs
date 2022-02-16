@@ -179,7 +179,7 @@ pub enum Token {
     #[regex("0o[0-7](_?[0-7]+)*")]
     OctalLiteral,
 
-    #[regex(r#"[a-z]?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
+    #[regex(r#"[a-z0-9]*("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
     StringLiteral,
 
     #[token("true")]
@@ -1925,14 +1925,23 @@ pub fn str_content(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
 ) -> Result<(String, Option<StringFlags>), SyntaxError> {
-    let first = inp.remove(0);
     inp.remove(inp.len() - 1);
 
     let mut out = (String::new(), None);
     let mut chars = inp.chars();
 
-    match first {
-        '\'' | '"' => {
+    let mut string_flag = String::new();
+    
+    while let Some(c) = chars.next() {
+        if c == '\'' || c == '"' {
+            break;
+        } else {
+            string_flag.push(c);
+        }
+    }
+
+    match string_flag.as_str() {
+        "" => {
             while let Some(c) = chars.next() {
                 out.0.push(if c == '\\' {
                     char_escape(&mut chars, tokens, notes)?
@@ -1941,12 +1950,10 @@ pub fn str_content(
                 });
             }
         }
-        'b' => {
-            chars.next();
+        "b64" => {
+            out.1 = StringFlags::Base64.into();
 
             let mut actual_string = String::new();
-
-            out.1 = StringFlags::Base64.into();
 
             while let Some(c) = chars.next() {
                 actual_string.push(if c == '\\' {
@@ -1958,16 +1965,11 @@ pub fn str_content(
 
             out.0 = base64::encode(actual_string);
         }
-        'r' => {
-            // remove "
-            chars.next();
-
+        "r" => {
             out.1 = StringFlags::Raw.into();
             out.0 = chars.collect()
         }
-        'u' => {
-            chars.next();
-
+        "u" => {
             out.1 = StringFlags::Unindent.into();
 
             let mut out_str = String::new();
@@ -2018,7 +2020,7 @@ pub fn str_content(
             return Err(SyntaxError::SyntaxError {
                 file: notes.file.to_owned(),
                 pos: tokens.position(),
-                message: format!("Invalid string flag: {}", first),
+                message: format!("Invalid string flag: {}", string_flag),
             })
         }
     }
