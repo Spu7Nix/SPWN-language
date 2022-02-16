@@ -968,6 +968,7 @@ name = "parser"
 version = "0.0.8"
 dependencies = [
  "ariadne",
+ "base64",
  "errors",
  "fnv",
  "internment",
