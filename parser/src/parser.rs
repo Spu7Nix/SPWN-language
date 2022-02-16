@@ -1950,7 +1950,7 @@ pub fn str_content(
                 });
             }
         }
-        "b64" => {
+        "64" => {
             out.1 = StringFlags::Base64.into();
 
             let mut actual_string = String::new();
