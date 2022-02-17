@@ -1982,7 +1982,10 @@ pub fn str_content(
                 });
             }
 
-            out_str = out_str.replace("\t", "    ");
+            out_str = out_str
+                .replace("\t", "    ")
+                .trim_start_matches(' ')
+                .to_string();
 
             if !out_str.starts_with('\n') {
                 return Err(SyntaxError::SyntaxError {
