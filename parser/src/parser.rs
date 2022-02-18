@@ -17,6 +17,7 @@ use shared::FileRange;
 use shared::SpwnSource;
 //use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::Chars;
 
 use errors::SyntaxError;
 use internment::LocalIntern;
@@ -25,6 +26,8 @@ use logos::Lexer;
 use logos::Logos;
 
 use shared::ImportType;
+
+use base64;
 
 macro_rules! expected {
     ($expected:expr, $tokens:expr, $notes:expr, $a:expr) => {
@@ -176,7 +179,7 @@ pub enum Token {
     #[regex("0o[0-7](_?[0-7]+)*")]
     OctalLiteral,
 
-    #[regex(r#"[a-z]?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
+    #[regex(r#"[a-z0-9]*("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
     StringLiteral,
 
     #[token("true")]
@@ -1829,143 +1832,160 @@ fn check_for_tag(
     }
 }
 
-pub fn str_content(
-    mut inp: String,
+fn char_escape(
+    chars: &mut Chars<'_>,
     tokens: &Tokens,
     notes: &ParseNotes,
+) -> Result<char, SyntaxError> {
+    match chars.next() {
+        Some('n') => Ok('\n'),
+        Some('r') => Ok('\r'),
+        Some('t') => Ok('\t'),
+        Some('"') => Ok('\"'),
+        Some('\'') => Ok('\''),
+        Some('\\') => Ok('\\'),
+        Some('u') => {
+            match chars.next() {
+                Some('{') => {}
+                Some(c) => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'{'".to_string(),
+                        found: format!("'{}'", c),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+                None => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'{'".to_string(),
+                        found: "EOS".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+            };
+
+            let mut hex = String::new();
+
+            for h in chars
+                .clone()
+                .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
+            {
+                hex.push(h);
+            }
+            let mut skipped = chars.by_ref().skip(hex.len());
+
+            match skipped.next() {
+                Some('}') => {}
+                Some(c) => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'}'".to_string(),
+                        found: format!("'{}'", c),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+                None => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'}'".to_string(),
+                        found: "EOS".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
+            };
+
+            if hex.is_empty() || hex.len() > 6 {
+                return Err(SyntaxError::ExpectedErr {
+                    expected: "2 to 6 hexadecimal characters".to_string(),
+                    found: hex.len().to_string(),
+                    pos: tokens.position(),
+                    file: notes.file.clone(),
+                });
+            }
+
+            Ok(
+                std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap())
+                .unwrap_or('\0')
+            )
+        }
+        Some(a) => {
+            return Err(SyntaxError::SyntaxError {
+                message: format!("Invalid escape: \\{}", a),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            })
+        }
+        None => unreachable!(),
+    }
+}
+
+pub fn str_content(
+    mut inp: String,
+    tokens: &mut Tokens,
+    notes: &mut ParseNotes,
 ) -> Result<(String, Option<StringFlags>), SyntaxError> {
-    let first = inp.remove(0);
     inp.remove(inp.len() - 1);
 
     let mut out = (String::new(), None);
     let mut chars = inp.chars();
 
-    match first {
-        '\'' | '"' => {
+    let mut string_flag = String::new();
+    
+    while let Some(c) = chars.next() {
+        if c == '\'' || c == '"' {
+            break;
+        } else {
+            string_flag.push(c);
+        }
+    }
+
+    match string_flag.as_str() {
+        "" => {
             while let Some(c) = chars.next() {
                 out.0.push(if c == '\\' {
-                    match chars.next() {
-                        Some('n') => '\n',
-                        Some('r') => '\r',
-                        Some('t') => '\t',
-                        Some('"') => '\"',
-                        Some('\'') => '\'',
-                        Some('\\') => '\\',
-                        Some('u') => {
-                            match chars.next() {
-                                Some('{') => {}
-                                Some(c) => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'{'".to_string(),
-                                        found: format!("'{}'", c),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    });
-                                }
-                                None => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'{'".to_string(),
-                                        found: "EOS".to_string(),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    });
-                                }
-                            };
-
-                            let mut hex = String::new();
-
-                            for h in chars
-                                .clone()
-                                .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
-                            {
-                                hex.push(h);
-                            }
-                            let mut skipped = chars.by_ref().skip(hex.len());
-
-                            match skipped.next() {
-                                Some('}') => {}
-                                Some(c) => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'}'".to_string(),
-                                        found: format!("'{}'", c),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    });
-                                }
-                                None => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'}'".to_string(),
-                                        found: "EOS".to_string(),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    })
-                                }
-                            };
-
-                            if hex.is_empty() || hex.len() > 6 {
-                                return Err(SyntaxError::ExpectedErr {
-                                    expected: "2 to 6 hexadecimal characters".to_string(),
-                                    found: hex.len().to_string(),
-                                    pos: tokens.position(),
-                                    file: notes.file.clone(),
-                                });
-                            }
-
-                            std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap())
-                                .unwrap_or('\0')
-                        }
-                        Some(a) => {
-                            return Err(SyntaxError::SyntaxError {
-                                message: format!("Invalid escape: \\{}", a),
-                                pos: tokens.position(),
-                                file: notes.file.clone(),
-                            })
-                        }
-                        None => unreachable!(),
-                    }
+                    char_escape(&mut chars, tokens, notes)?
                 } else {
                     c
                 });
             }
         }
-        'r' => {
-            // remove "
-            chars.next();
+        "64" => {
+            out.1 = StringFlags::Base64.into();
 
+            let mut actual_string = String::new();
+
+            while let Some(c) = chars.next() {
+                actual_string.push(if c == '\\' {
+                    char_escape(&mut chars, tokens, notes)?
+                } else {
+                    c
+                });
+            }
+
+            out.0 = base64::encode(actual_string);
+        }
+        "r" => {
             out.1 = StringFlags::Raw.into();
             out.0 = chars.collect()
         }
-        'u' => {
-            chars.next();
-
+        "u" => {
             out.1 = StringFlags::Unindent.into();
 
             let mut out_str = String::new();
 
             while let Some(c) = chars.next() {
                 out_str.push(if c == '\\' {
-                    match chars.next() {
-                        Some('n') => '\n',
-                        Some('r') => '\r',
-                        Some('t') => '\t',
-                        Some('"') => '\"',
-                        Some('\'') => '\'',
-                        Some('\\') => '\\',
-                        Some(a) => {
-                            return Err(SyntaxError::SyntaxError {
-                                message: format!("Invalid escape: \\{}", a),
-                                pos: tokens.position(),
-                                file: notes.file.clone(),
-                            })
-                        }
-                        None => unreachable!(),
-                    }
+                    char_escape(&mut chars, tokens, notes)?
                 } else {
                     c
                 });
             }
 
-            out_str = out_str.replace("\t", "    ");
+            out_str = out_str
+                .replace("\t", "    ")
+                .trim_start_matches(' ')
+                .to_string();
 
             if !out_str.starts_with('\n') {
                 return Err(SyntaxError::SyntaxError {
@@ -2003,7 +2023,7 @@ pub fn str_content(
             return Err(SyntaxError::SyntaxError {
                 file: notes.file.to_owned(),
                 pos: tokens.position(),
-                message: format!("Invalid string flag: {}", first),
+                message: format!("Invalid string flag: {}", string_flag),
             })
         }
     }
