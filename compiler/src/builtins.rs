@@ -227,7 +227,7 @@ impl Value {
                 Value::Str(a) => {
                     if member.as_ref() == "length" {
                         return Some(store_const_value(
-                            Value::Number(a.len() as f64),
+                            Value::Number(a.chars().count() as f64),
                             globals,
                             context.start_group,
                             info.position,
