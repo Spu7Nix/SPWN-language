@@ -143,6 +143,7 @@ pub struct StrInner {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum StringFlags {
+    Base64,
     Raw,
     Unindent,
 }

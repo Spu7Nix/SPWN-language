@@ -23,8 +23,9 @@ pub use ::parser::fmt;
 pub use ::parser::parser;
 pub use ::parser::parser::parse_spwn;
 
-pub use errors::compiler_info;
 pub use errors;
+pub use errors::compiler_info;
+pub use shared;
 use shared::SpwnSource;
 
 use std::collections::hash_map::Entry;

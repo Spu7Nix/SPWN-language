@@ -1,4 +1,5 @@
 use ariadne::Fmt;
+use clap::AppSettings;
 use clap::arg;
 use clap::ValueHint;
 //#![feature(arbitrary_enum_discriminant)]
@@ -123,10 +124,13 @@ impl<'a> BuildOptions<'a> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let matches = App::new("SPWN").subcommands(
+    let matches = App::new("SPWN")
+    .global_setting(AppSettings::ArgRequiredElseHelp)
+    .subcommands(
         [
             App::new("build")
-                .about("Runs/builds a given file")
+                .about("Runs/builds a given file"
+            )
                 .visible_alias("b")
                 .args(&[
                     arg!(<SCRIPT> "Path to spwn source file").value_hint(ValueHint::AnyPath),
