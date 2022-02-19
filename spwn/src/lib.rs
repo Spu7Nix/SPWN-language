@@ -24,6 +24,7 @@ pub use ::parser::parser;
 pub use ::parser::parser::parse_spwn;
 
 pub use errors::compiler_info;
+pub use errors;
 use shared::SpwnSource;
 
 use std::collections::hash_map::Entry;

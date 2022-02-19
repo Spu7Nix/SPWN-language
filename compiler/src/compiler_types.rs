@@ -324,8 +324,7 @@ pub fn execute_macro(
             .inner()
             .get_variables()
             .values()
-            .map(|stack| stack.iter().map(|VariableData { val: a, .. }| *a))
-            .flatten()
+            .flat_map(|stack| stack.iter().map(|VariableData { val: a, .. }| *a))
         {
             globals.push_preserved_val(val)
         }

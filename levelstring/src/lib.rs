@@ -195,9 +195,9 @@ fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, String> {
     } else {
         let xor = xor(sf.to_vec(), 11);
         let replaced = String::from_utf8_lossy(&xor)
-            .replace("-", "+")
-            .replace("_", "/")
-            .replace("\0", "");
+            .replace('-', "+")
+            .replace('_', "/")
+            .replace('\0', "");
         let b64 = match base64::decode(replaced.as_str()) {
             Ok(b) => b,
             Err(e) => return Err(format!("{}", e)),
@@ -295,9 +295,9 @@ pub fn get_level_string(ls: Vec<u8>, level_name: Option<&String>) -> Result<Stri
     //decrypting level string
     let ls_b64 = base_64_decrypt(
         level_string
-            .replace("-", "+")
-            .replace("_", "/")
-            .replace("\0", "")
+            .replace('-', "+")
+            .replace('_', "/")
+            .replace('\0', "")
             .as_bytes()
             .to_vec(),
     );
@@ -357,7 +357,7 @@ pub fn encrypt_level_string(
                         ls_encoder.write_all(full_ls.as_bytes()).unwrap();
                         let b64_encrypted =
                             base64::encode(&ls_encoder.finish().into_result().unwrap());
-                        let fin = b64_encrypted.replace("+", "-").replace("/", "_");
+                        let fin = b64_encrypted.replace('+', "-").replace('/', "_");
                         "H4sIAAAAAAAAC".to_string() + &fin[13..]
                     };
 
@@ -444,8 +444,8 @@ pub fn encrypt_level_string(
         with_signature.extend(data_size.to_le_bytes().to_vec());
 
         let encoded = base64::encode(&with_signature)
-            .replace("+", "-")
-            .replace("/", "_")
+            .replace('+', "-")
+            .replace('/', "_")
             .as_bytes()
             .to_vec();
 
