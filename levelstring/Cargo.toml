@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 
-quick-xml = "0.22.0"
+quick-xml = "0.20.0"
 base64 = "0.13.0"
 libflate = "1.1.0"
 crc32fast = "1.2.0"
