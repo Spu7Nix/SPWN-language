@@ -63,7 +63,11 @@ impl ariadne::Cache<SpwnSource> for SpwnCache {
     }
 }
 
-pub fn run_spwn(code: String, included: Vec<PathBuf>) -> Result<[String; 2], String> {
+pub fn run_spwn(
+    code: String,
+    included: Vec<PathBuf>,
+    optimize: bool,
+) -> Result<[String; 2], String> {
     let source = SpwnSource::String(LocalIntern::new(code.clone()));
     let cache = SpwnCache::default();
     let (statements, notes) = match parse_spwn(code, source.clone(), BUILTIN_NAMES) {
@@ -154,7 +158,7 @@ pub fn run_spwn(code: String, included: Vec<PathBuf>) -> Result<[String; 2], Str
         }
     }
 
-    if has_stuff {
+    if has_stuff && optimize {
         compiled.func_ids =
             optimizer::optimize::optimize(compiled.func_ids, compiled.closed_groups, reserved);
     }

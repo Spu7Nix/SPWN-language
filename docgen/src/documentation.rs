@@ -227,7 +227,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                 Some(&type_name),
             )?;
 
-            sidebar += &format!("- **@{}**\n", type_name.replace("_", "\\_"));
+            sidebar += &format!("- **@{}**\n", type_name.replace('_', "\\_"));
 
             sidebar += &sidebar_content
                 .lines()
@@ -302,7 +302,7 @@ fn document_dict(
                 key
             )
         } else {
-            format!("\t- [{}]({}?id={})\n", key.replace("_", "\\_"), path, key)
+            format!("\t- [{}]({}?id={})\n", key.replace('_', "\\_"), path, key)
         };
         let mut member_doc = String::new();
         let inner_val = globals.stored_values[*val].clone();
@@ -328,7 +328,7 @@ fn document_dict(
 {}
 >
 "#,
-            key.replace("_", "\\_"),
+            key.replace('_', "\\_"),
             formatted
         );
         Ok(member_doc)
@@ -390,7 +390,7 @@ fn document_macro(
                 doc += &format!(
                     "\n**Returns:** \n{}\n",
                     a.display(full_context, globals, &CompilerInfo::new())?
-                        .replace("|", "\\|")
+                        .replace('|', "\\|")
                 );
             }
         }
@@ -431,7 +431,7 @@ fn document_macro(
                         _ => format!(
                             "`{}`",
                             val.display(full_context, globals, &CompilerInfo::new())?
-                                .replace("|", "\\|")
+                                .replace('|', "\\|")
                         ),
                     }
                 );
@@ -444,7 +444,7 @@ fn document_macro(
                 arg_string += &format!(
                     " `{}` |",
                     val.display(full_context, globals, &CompilerInfo::new())?
-                        .replace("\n", "")
+                        .replace('\n', "")
                 );
             } else {
                 arg_string += " |";

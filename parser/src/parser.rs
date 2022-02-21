@@ -1904,10 +1904,7 @@ fn char_escape(
                 });
             }
 
-            Ok(
-                std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap())
-                .unwrap_or('\0')
-            )
+            Ok(std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap()).unwrap_or('\0'))
         }
         Some(a) => {
             return Err(SyntaxError::SyntaxError {
@@ -1931,7 +1928,7 @@ pub fn str_content(
     let mut chars = inp.chars();
 
     let mut string_flag = String::new();
-    
+
     while let Some(c) = chars.next() {
         if c == '\'' || c == '"' {
             break;
@@ -1983,7 +1980,7 @@ pub fn str_content(
             }
 
             out_str = out_str
-                .replace("\t", "    ")
+                .replace('\t', "    ")
                 .trim_start_matches(' ')
                 .to_string();
 
@@ -2363,7 +2360,7 @@ fn parse_variable(
         }
         Some(Token::HexLiteral) => {
             ast::ValueBody::Number(
-                match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0x", ""), 16) {
+                match i64::from_str_radix(&tokens.slice().replace('_', "").replace("0x", ""), 16) {
                     Ok(n) => n as f64, // its a valid number
                     Err(err) => {
                         return Err(SyntaxError::SyntaxError {
@@ -2377,7 +2374,7 @@ fn parse_variable(
         }
         Some(Token::OctalLiteral) => {
             ast::ValueBody::Number(
-                match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0o", ""), 8) {
+                match i64::from_str_radix(&tokens.slice().replace('_', "").replace("0o", ""), 8) {
                     Ok(n) => n as f64, // its a valid number
                     Err(err) => {
                         return Err(SyntaxError::SyntaxError {

@@ -9,7 +9,7 @@ macro_rules! run_test {
         #[test]
         $(#[$attr])?
         fn $name() {
-            let res = match run_spwn($code.to_string(), vec![PathBuf::from("./")]) {
+            let res = match run_spwn($code.to_string(), vec![PathBuf::from("./")], false) {
                 Ok(a) => a,
                 Err(e) => {
                     eprintln!("{}", e);

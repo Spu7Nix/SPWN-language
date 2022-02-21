@@ -17,8 +17,8 @@ fn js_array(values: Vec<String>) -> JsValue {
 }
 
 #[wasm_bindgen]
-pub fn run_spwn(code: &str) -> JsValue {
-    let output = spwn::run_spwn(code.to_string(), Vec::new());
+pub fn run_spwn(code: &str, optimize: bool) -> JsValue {
+    let output = spwn::run_spwn(code.to_string(), Vec::new(), optimize);
     js_array(match output {
         Ok(a) => a.to_vec(),
         Err(e) => vec![e, String::new()],
