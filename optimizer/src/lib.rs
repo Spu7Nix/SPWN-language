@@ -212,11 +212,20 @@ pub fn get_role(obj: &GdObj, toggle_groups: &ToggleGroups) -> TriggerRole {
                     }
                 }
             }
-            obj_ids::TOUCH
-            | obj_ids::COUNT
-            | obj_ids::INSTANT_COUNT
-            | obj_ids::COLLISION
-            | obj_ids::ON_DEATH => {
+            obj_ids::TOUCH => {
+                if let Some(ObjParam::Group(g)) = obj.params.get(&obj_props::TARGET) {
+                    if let Id::Specific(_) = g.id {
+                        // might interact with triggers in the editor
+                        TriggerRole::Output
+                    } else {
+                        TriggerRole::Func
+                    }
+                } else {
+                    // the user didnt provide a target group, so fuck them no optimization for you >:D
+                    TriggerRole::Output
+                }
+            }
+            obj_ids::COUNT | obj_ids::COLLISION | obj_ids::INSTANT_COUNT | obj_ids::ON_DEATH => {
                 if let Some(ObjParam::Bool(false)) | None =
                     obj.params.get(&obj_props::ACTIVATE_GROUP)
                 {

@@ -81,7 +81,7 @@ fn check_for_dead_code<'a>(
     }
 
     if visited_stack.contains(&start) {
-        return Delete; // keep all loops
+        return Keep; // keep all loops
     }
 
     // if trigger is an output trigger, keep this branch

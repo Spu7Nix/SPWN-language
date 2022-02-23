@@ -138,8 +138,7 @@ fn get_toggle_groups(objects: &[FunctionId]) -> ToggleGroups {
     for fnid in objects.iter() {
         for (obj, _) in fnid.obj_list.iter() {
             if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
-                if let obj_ids::TOUCH
-                | obj_ids::COUNT
+                if let obj_ids::COUNT
                 | obj_ids::INSTANT_COUNT
                 | obj_ids::COLLISION
                 | obj_ids::ON_DEATH
@@ -153,6 +152,12 @@ fn get_toggle_groups(objects: &[FunctionId]) -> ToggleGroups {
                         } else {
                             toggle_groups.toggles_on.insert(*target);
                         }
+                    }
+                } else if *id as u16 == obj_ids::TOUCH {
+                    // touch triggers are kinda quirky uwu owo
+                    if let Some(ObjParam::Group(target)) = obj.params.get(&obj_props::TARGET) {
+                        toggle_groups.toggles_off.insert(*target);
+                        toggle_groups.toggles_on.insert(*target);
                     }
                 }
             }
