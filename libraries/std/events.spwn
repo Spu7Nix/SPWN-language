@@ -183,18 +183,4 @@ return {
         return event
     },
 
-    frame: #[desc("Gives an event that runs on every frame"), example(u"
-        on(frame(), !{
-            10g.move(1, 0) // moves every frame (on 60fps the block would move by 6 blocks per second)
-        })
-    ")] () -> @event {
-        frames_setup = import "frames_setup.spwn"
-
-        event = @event::new()
-        $.extend_trigger_func(
-            frames_setup().group_frame,
-            () => event.emit(),
-        )
-        return event
-    },
 }
