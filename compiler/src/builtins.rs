@@ -997,7 +997,7 @@ $.add(obj {
         };
 
         if obj.is_empty() {
-            // return Ok(());
+            return Ok(());
         }
 
         let mut ignore_context = false;
