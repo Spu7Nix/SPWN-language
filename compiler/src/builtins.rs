@@ -996,6 +996,10 @@ $.add(obj {
             })
         };
 
+        if obj.is_empty() {
+            return Ok(());
+        }
+
         let mut ignore_context = false;
         if arguments.len() == 2 {
             match globals.stored_values[arguments[1]].clone() {
