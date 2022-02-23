@@ -1,5 +1,6 @@
 #[no_std, cache_output]
 
+constants = import "constants.spwn"
 extract constants.obj_ids
 extract constants.obj_props
 extract import 'events.spwn'
