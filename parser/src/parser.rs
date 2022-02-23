@@ -1929,7 +1929,7 @@ pub fn str_content(
 
     let mut string_flag = String::new();
 
-    while let Some(c) = chars.next() {
+    for c in chars.by_ref() {
         if c == '\'' || c == '"' {
             break;
         } else {
@@ -2332,7 +2332,7 @@ fn parse_variable(
     let value = match first_token {
         // what kind of variable is it?
         Some(Token::Number) => {
-            ast::ValueBody::Number(match tokens.slice().replace("_", "").parse() {
+            ast::ValueBody::Number(match tokens.slice().replace('_', "").parse() {
                 Ok(n) => n, // its a valid number
                 Err(err) => {
                     return Err(SyntaxError::SyntaxError {
@@ -2346,7 +2346,7 @@ fn parse_variable(
         }
         Some(Token::BinaryLiteral) => {
             ast::ValueBody::Number(
-                match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0b", ""), 2) {
+                match i64::from_str_radix(&tokens.slice().replace('_', "").replace("0b", ""), 2) {
                     Ok(n) => n as f64, // its a valid number
                     Err(err) => {
                         return Err(SyntaxError::SyntaxError {
