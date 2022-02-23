@@ -3,6 +3,9 @@
 #[desc("Represents a color value, used in for example color triggers and pulse triggers.")]
 type @chroma
 
+import "array.spwn"
+import "number.spwn"
+
 rgb_to_hsv = (r, g, b) {
     max = [r, g, b].max()
     min = [r, g, b].min()
@@ -459,6 +462,8 @@ impl @chroma {
     },
 
 }
+
+import "chroma/colors.spwn"
 
 return {
     BLEND_MODES,

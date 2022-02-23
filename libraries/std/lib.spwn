@@ -24,6 +24,7 @@ chroma = import "chroma.spwn"
 general = import "general_triggers.spwn"
 events = import "events.spwn"
 ctrl_flow = import "control_flow.spwn"
+frames = import "frames.spwn"
 
 return {
     ..constants.easing_types,
@@ -32,6 +33,7 @@ return {
     ..general,
     ..events,
     ..ctrl_flow,
+    ..frames,
 
     PI: constants.PI,
     EULER: constants.EULER,

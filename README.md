@@ -45,10 +45,10 @@ You can either use the installers for your operating system, or build SPWN from 
 
 With Rust installed:
 
-- Run `cargo install spwn`
-- Wait for it to compile
-- Download the [libraries](https://github.com/Spu7Nix/SPWN-language/tree/v0.6-beta/libraries) folder
-- Copy the libraries folder to `$HOME/.cargo/bin/spwn`
+- Run `cargo install spwn`.
+- Wait for it to compile.
+- Download the [libraries](https://github.com/Spu7Nix/SPWN-language/tree/v0.6-beta/libraries) folder.
+- Copy the libraries folder to `$HOME/.cargo/bin/spwn`.
 - Make something awesome!
 
 If you would like a pre-compiled package, look below.
@@ -69,21 +69,28 @@ If you would like a pre-compiled package, look below.
 
 ### Linux
 
+### Generic (any distro)
+- Download `spwn-0.0.8-x86_64.tar.gz` from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
+- Extract the tarball using `tar -xvf spwn-0.0.8-x86_64.tar.gz`.
+- Run SPWN using `./spwn`.
+- Optional: add SPWN to path by adding `PATH=$PATH:<where you extracted spwn>` to your `.bashrc` or `.zshrc`.
+
 #### Debian based (Ubuntu, Mint, Elementary, ...)
 
-**No v0.7 installers for Debian based distros have been built yet.**
+**No v0.7 or v0.8 installers for Debian based distros have been built yet.**
 
 You can either:
 
 - Download the .deb file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases) and install it using dpkg with `sudo dpkg -i spwn_0.0.6-0_amd64.deb`.
-- Use a one-liner to do this faster: `curl -sLO https://github.com/Spu7Nix/SPWN-language/releases/download/v0.6-beta/spwn_0.6.0-0_amd64.deb && sudo dpkg -i spwn_0.6.0-0_amd64.deb`
+- Use a one-liner to do this faster: `curl -sLO https://github.com/Spu7Nix/SPWN-language/releases/download/v0.6-beta/spwn_0.6.0-0_amd64.deb && sudo dpkg -i spwn_0.6.0-0_amd64.deb`.
+- Use the generic install method.
 
 #### Arch based (Manjaro, Artix, ...)
 
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
 ```cmd
-pacman -U spwn-0.0.7-x86_64-linux_arch.pkg.tar.zst
+pacman -U spwn-0.0.8-x86_64-linux_arch.pkg.tar.zst
 ```
 
 - Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
@@ -110,12 +117,12 @@ Let it compile and you're good to go
 
 ### Compiling from source
 
-1. Download source code from this repository
-2. Unzip the .zip file
-3. Install rust if you haven't already
-4. Open the unzipped folder in the terminal
-5. Run `cargo build`
-6. Compiled binary is placed in `target/debug`
+1. Download source code from this repository.
+2. Unzip the .zip file.
+3. Install rust if you haven't already.
+4. Open the unzipped folder in the terminal.
+5. Run `cargo build`.
+6. Compiled binary is placed in `target/debug`.
 
 ## Using SPWN
 
@@ -131,7 +138,7 @@ SPWN code can be programmed in any code editor, but the ones that have had SPWN 
 
 #### VSCode
 
-Navigate to [VSCode SPWN language support](https://marketplace.visualstudio.com/items?itemName=Spu7Nix.spwn-language-support) and hit install. In VSCode, hit enable and then create a new file with the extension .spwn
+Navigate to [VSCode SPWN language support](https://marketplace.visualstudio.com/items?itemName=Spu7Nix.spwn-language-support) and hit install. In VSCode, hit enable and then create a new file with the extension .spwn.
 
 > **Note:** Make sure to have the file in the same directory as the libraries folder.
 
