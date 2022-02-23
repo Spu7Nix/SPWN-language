@@ -26,6 +26,7 @@ wait = #[desc("Adds a delay before the next triggers"), example(u"
 	}
 
 }
+
 call_with_delay = #[desc("Call a function after a delay"), example(u"
 	BG.set(rgb8(255, 0, 0)) // turn background red
 	call_with_delay(2, !{
@@ -41,6 +42,7 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
 		TARGET: function,
 	})
 }
+
 call_on_x_position = #[desc("Call a function after an x position"), example("
 BG.set(rgb8(255, 0, 0)) // turn background red
 call_on_x_position(300, !{
@@ -57,11 +59,11 @@ call_on_x_position(300, !{
 		TARGET: function,
 	})
 }
+
 -> return {
 	wait: wait,
 	call_with_delay: call_with_delay,
 	call_on_x_position: call_on_x_position,
-
 
 
 	suppress_signal: #[desc("Stops signal from coming past for some time"), example(u"

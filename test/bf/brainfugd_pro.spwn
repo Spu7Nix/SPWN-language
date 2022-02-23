@@ -348,7 +348,7 @@ impl @bfreader {
             activate_button(803c, null)
             input_mode += 1
 
-            gs.button_a().on_triggered(!{
+            gs.button_a().on(!{
                 suppress_signal(0.05)
                 if input_mode == 1 {
                     -> input_inc_button.pulse(59, 144, 247, fade_out = 0.3)
@@ -356,7 +356,7 @@ impl @bfreader {
                     input_char.move(-100, 0, 0)
                 }
             })
-            gs.button_b().on_triggered(!{
+            gs.button_b().on(!{
                 -> if input_mode == 1 {
                     input_mode -= 1
                     done!
@@ -670,30 +670,30 @@ for i in ..commands {
         GROUPS: gs.hidden_group
     })
 
-    collision(end_check_block, selector.block).on_triggered(!{c.item.if_is(EQUAL_TO, order.length - 1, reset_selector_func)})
+    collision(end_check_block, selector.block).on(!{c.item.if_is(EQUAL_TO, order.length - 1, reset_selector_func)})
 
-    collision(inc_block, selector.block).on_triggered(!{
+    collision(inc_block, selector.block).on(!{
         sg.move(0, -y_spacing, 0)
         c += 1
     })
 
-    collision(NOOP, reset_block).on_triggered(!{
+    collision(NOOP, reset_block).on(!{
         sg.move(0, y_spacing * order.length, 0)
         c -= order.length
     })
 
 }
 
-collision(130b, 131b).on_triggered(!{
+collision(130b, 131b).on(!{
     952g.move(-20, 0, 0.3, easing = EASE_IN_OUT)
 })
 
-collision(130b, 132b).on_triggered(!{
+collision(130b, 132b).on(!{
     952g.move(-60, 0, 0.3, easing = EASE_IN_OUT)
 })
 
 
-collision(130b, 166b).on_triggered(!{
+collision(130b, 166b).on(!{
     952g.move(30, 0, 0.3, easing = EASE_IN_OUT)
 })
 
@@ -744,10 +744,10 @@ reset_env = !{
 
 start = (){
 
-    collision(reset_selector, selector.block).on_triggered(reset_selector_func)
+    collision(reset_selector, selector.block).on(reset_selector_func)
 
 
-    touch().on_triggered(!{
+    touch().on(!{
 
         if ended == 1 {
             reset_env!
@@ -772,11 +772,11 @@ start = (){
         }
     })
 
-    force_quit_taps.item.count(3).on_triggered(force_stop)
+    force_quit_taps.item.count(3).on(force_stop)
 
 
 
-    collision(run_block, selector.block).on_triggered(!{
+    collision(run_block, selector.block).on(!{
         is_running += 1
         block_input += 1
         954g.toggle_off() //prog selector collision disable
@@ -819,7 +819,7 @@ wait(2.5)
 start()
 
 
-gs.button_a().on_triggered(!{
+gs.button_a().on(!{
     suppress_signal(0.1)
     -> right_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
     -> right_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
@@ -836,7 +836,7 @@ gs.button_a().on_triggered(!{
 
 })
 
-gs.button_b().on_triggered(!{
+gs.button_b().on(!{
     -> left_button.move(0, -2, 0.1, easing = EASE_OUT, easing_rate = 4)
     -> left_button.move(0, 2, 0.4, easing = EASE_IN_OUT, easing_rate = 3)
     -> left_button.pulse(0, 0, 2, fade_out = 0.5, hsv = true)
