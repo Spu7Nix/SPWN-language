@@ -167,9 +167,9 @@ return {
     },
 
     count: #[desc("Implementation of a count trigger (returns an event)"), example(u"
-        [[handle(count(4i, 3))]] !{
+        on(count(4i, 3), !{
             BG.set(rgb(0, 0, 0))
-        }
+        })
     ")] (it: @item, hits: @number, multi: @bool = true) -> @event {
         event = @event::new()
         $.add( trigger{
