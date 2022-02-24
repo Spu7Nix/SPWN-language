@@ -69,17 +69,24 @@ pub fn optimize(
 
     // round 1
 
-    clean_network(&mut network, &objects, true);
+    for _ in 0..10 {
+        clean_network(&mut network, &objects, true);
 
-    dead_code::dead_code_optimization(&mut network, &mut objects, &mut closed_group, &reserved);
+        dead_code::dead_code_optimization(&mut network, &mut objects, &mut closed_group, &reserved);
 
-    clean_network(&mut network, &objects, false);
+        clean_network(&mut network, &objects, false);
 
-    spawn_optimisation::spawn_optimisation(&mut network, &mut objects, &reserved, &toggle_groups);
+        spawn_optimisation::spawn_optimisation(
+            &mut network,
+            &mut objects,
+            &reserved,
+            &toggle_groups,
+        );
 
-    clean_network(&mut network, &objects, false);
+        clean_network(&mut network, &objects, false);
 
-    update_reserved(&mut network, &mut objects, &mut reserved);
+        update_reserved(&mut network, &mut objects, &mut reserved);
+    }
 
     clean_network(&mut network, &objects, false);
 
