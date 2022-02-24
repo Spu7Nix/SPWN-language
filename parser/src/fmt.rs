@@ -432,11 +432,12 @@ impl SpwnFmt for Expression {
 
 impl SpwnFmt for Id {
     fn fmt(&self, ind: Indent) -> String {
-        if self.unspecified {
-            format!("?{}", self.class_name.fmt(ind))
-        } else {
-            format!("{}{}", self.number, self.class_name.fmt(ind))
-        }
+        format!(
+            "{}{}{}",
+            self.number,
+            if self.unspecified { "?" } else { "" },
+            self.class_name.fmt(ind),
+        )
     }
 }
 
