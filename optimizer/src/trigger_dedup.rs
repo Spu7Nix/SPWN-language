@@ -172,7 +172,7 @@ pub(crate) fn dedup_triggers(
         let mut swaps = FnvHashMap::default();
         let mut representative_groups = Vec::<(TriggerGangBehavior, Group)>::new();
 
-        for (group, gang) in network.iter_mut() {
+        for (group, gang) in network.map.iter_mut() {
             if is_start_group(*group, reserved) {
                 continue;
             }

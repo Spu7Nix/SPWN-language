@@ -20,7 +20,7 @@ pub fn group_toggling(
     closed_group: &mut u16,
 ) {
     let mut visited = FnvHashSet::default();
-    for group in network.clone().keys() {
+    for group in network.map.clone().keys() {
         if is_start_group(*group, reserved) {
             intraframe_grouping(
                 network,
@@ -68,7 +68,7 @@ fn intraframe_grouping(
                 return;
             }
             visited.insert(input);
-            let gang = &network[&input];
+            let gang = &network.map[&input];
             let mut sorted = gang.triggers.clone();
             sorted.sort_by(|a, b| objects[a.obj].1.partial_cmp(&objects[b.obj].1).unwrap());
             let mut with_betweens = Vec::new();
@@ -105,8 +105,8 @@ fn intraframe_grouping(
                     objects[trigger.obj].0.params.get(&obj_props::TARGET)
                 {
                     if !is_start_group(*target, reserved)
-                        && network[target].connections_in == 1
-                        && network[target].triggers.iter().all(|t| {
+                        && network.map[target].connections_in == 1
+                        && network.map[target].triggers.iter().all(|t| {
                             t.role == TriggerRole::Output
                                 || if let Some(ObjParam::Number(n)) =
                                     objects[t.obj].0.params.get(&1)
@@ -224,8 +224,8 @@ fn group_triggers(
         if let Some(ObjParam::Group(target)) =
             objects[*trigger].0.params.get_mut(&obj_props::TARGET)
         {
-            all_outputs.extend(network[target].triggers.iter().copied());
-            for t in &mut network.get_mut(target).unwrap().triggers {
+            all_outputs.extend(network.map[target].triggers.iter().copied());
+            for t in &mut network.map.get_mut(target).unwrap().triggers {
                 (*t).deleted = true;
             }
 
@@ -366,6 +366,7 @@ fn group_triggers(
         }
 
         network
+            .map
             .get_mut(&main_group)
             .unwrap()
             .triggers
@@ -441,17 +442,21 @@ pub fn create_toggle_trigger(
     };
 
     if let Some(ObjParam::Group(group)) = new_obj.params.get(&obj_props::GROUPS) {
-        match network.get_mut(group) {
+        match network.map.get_mut(group) {
             Some(gang) => (*gang).triggers.push(new_trigger),
             None => {
-                network.insert(*group, TriggerGang::new(vec![new_trigger]));
+                network
+                    .map
+                    .insert(*group, TriggerGang::new(vec![new_trigger]));
             }
         }
     } else {
-        match network.get_mut(&NO_GROUP) {
+        match network.map.get_mut(&NO_GROUP) {
             Some(gang) => (*gang).triggers.push(new_trigger),
             None => {
-                network.insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
+                network
+                    .map
+                    .insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
             }
         }
     }

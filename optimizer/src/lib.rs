@@ -136,14 +136,18 @@ impl ReservedIds {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ObjPtr(usize, usize);
 //                                     triggers      connections in
-pub type TriggerNetwork = FnvHashMap<Group, TriggerGang>;
+#[derive(Default)]
+pub struct TriggerNetwork {
+    map: FnvHashMap<Group, TriggerGang>,
+    connectors: FnvHashMap<Group, FnvHashSet<ObjPtr>>,
+}
 
 #[derive(Debug, Clone)]
 // what do you mean? its a trigger gang!
 pub struct TriggerGang {
     pub triggers: Vec<Trigger>,
     pub connections_in: u32,
-    // wether any of the connections in are not instant count triggers
+    // whether any of the connections in are not instant count triggers
     pub non_spawn_triggers_in: bool,
 }
 
@@ -197,19 +201,20 @@ pub fn get_role(obj: &GdObj, toggle_groups: &ToggleGroups) -> TriggerRole {
                 } else if hd {
                     TriggerRole::Func
                 } else {
-                    let togglable = match obj.params.get(&obj_props::GROUPS) {
-                        Some(ObjParam::GroupList(g)) => {
-                            g.iter().any(|g| toggle_groups.toggles_off.contains(g))
-                        }
-                        Some(ObjParam::Group(g)) => toggle_groups.toggles_off.contains(g),
-                        _ => false,
-                    };
+                    TriggerRole::Spawn
+                    // let togglable = match obj.params.get(&obj_props::GROUPS) {
+                    //     Some(ObjParam::GroupList(g)) => {
+                    //         g.iter().any(|g| toggle_groups.toggles_off.contains_key(g))
+                    //     }
+                    //     Some(ObjParam::Group(g)) => toggle_groups.toggles_off.contains_key(g),
+                    //     _ => false,
+                    // };
 
-                    if togglable {
-                        TriggerRole::Func
-                    } else {
-                        TriggerRole::Spawn
-                    }
+                    // if togglable {
+                    //     TriggerRole::Func
+                    // } else {
+                    //     TriggerRole::Spawn
+                    // }
                 }
             }
             obj_ids::TOUCH => {

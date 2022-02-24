@@ -32,7 +32,6 @@ struct SpawnTrigger {
     delay: SpawnDelay,
     trigger: Trigger,
 }
-
 // fn can_toggle_on(obj: &GdObj) -> bool {
 //     if let Some(ObjParam::Number(obj_id)) = obj.params.get(&1) {
 //         match *obj_id as u16 {
@@ -70,7 +69,7 @@ pub(crate) fn spawn_optimisation(
     let mut cycle_points = FnvHashSet::<Group>::default();
     let mut all = Vec::new();
 
-    for (group, gang) in network.iter_mut() {
+    for (group, gang) in network.map.iter_mut() {
         let output_condition = gang.triggers.iter().any(|t| t.role != TriggerRole::Spawn);
         if output_condition {
             outputs.insert(*group);
@@ -222,18 +221,36 @@ pub(crate) fn spawn_optimisation(
                 false,
             )
         };
-        if toggle_groups.toggles_off.contains(&start)
-            || (toggle_groups.toggles_on.contains(&start)
-                && toggle_groups.toggles_off.contains(&end))
+        let default = &FnvHashSet::default();
+        let targeters = network.connectors.get(&start).unwrap_or(default);
+
+        let start_can_toggle_off = if let Some(togglers) = toggle_groups.toggles_off.get(&start) {
+            // if the togglers are a subset of the targeters, we can safely remove the spawn trigger
+            !togglers.iter().all(|x| targeters.contains(x))
+        } else {
+            false
+        };
+
+        // let end_can_toggle_off = if let Some(togglers) = toggle_groups.toggles_off.get(&end) {
+        //     // if the togglers are a subset of the targeters, we can safely remove the spawn trigger
+        //     !togglers.iter().all(|x| targeters.contains(x))
+        // } else {
+        //     false
+        // };
+
+        if start_can_toggle_off
+            || (toggle_groups.toggles_on.contains_key(&start)
+                && toggle_groups.toggles_off.contains_key(&end))
         {
             plain_trigger(network)
-        } else if d == 0 && !is_start_group(end, reserved) && network[&end].connections_in == 1 {
+        } else if d == 0 && !is_start_group(end, reserved) && network.map[&end].connections_in == 1
+        {
             //dbg!(end, start);
             insert_to_swaps(end, start);
         } else if d == 0 && !is_start_group(start, reserved)
-                && network[&start].connections_in == 1 //??
-                && (network[&start].triggers.is_empty()
-                    || network[&start].triggers.iter().all(|t| t.deleted))
+                && network.map[&start].connections_in == 1 //??
+                && (network.map[&start].triggers.is_empty()
+                    || network.map[&start].triggers.iter().all(|t| t.deleted))
         {
             //dbg!(start, end);
             insert_to_swaps(start, end);

@@ -13,7 +13,7 @@ pub fn dead_code_optimization(
     closed_group: &mut u16,
     reserved: &ReservedIds,
 ) {
-    for (group, gang) in network.clone() {
+    for (group, gang) in network.map.clone() {
         if is_start_group(group, reserved) {
             for (i, _) in gang.triggers.iter().enumerate() {
                 let mut visited = Vec::new();
@@ -27,7 +27,7 @@ pub fn dead_code_optimization(
                     0,
                 ) == DeadCodeResult::Keep
                 {
-                    (*network.get_mut(&group).unwrap()).triggers[i].deleted = false;
+                    (*network.map.get_mut(&group).unwrap()).triggers[i].deleted = false;
                 }
             }
         }
@@ -52,7 +52,7 @@ fn check_for_dead_code<'a>(
 ) -> DeadCodeResult {
     use DeadCodeResult::*;
     //returns whether to keep or delete the trigger
-    let trigger = network[&start.0].triggers[start.1];
+    let trigger = network.map[&start.0].triggers[start.1];
     if !trigger.deleted {
         return Keep;
     }
@@ -76,7 +76,7 @@ fn check_for_dead_code<'a>(
                 return Delete;
             }
         }
-        (*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
+        (*network.map.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
         return Keep;
     }
 
@@ -95,7 +95,7 @@ fn check_for_dead_code<'a>(
             if is_start_group(*g, reserved) {
                 //(*network.get_mut(&start.0).unwrap()).triggers[start.1].deleted = false;
                 return Keep;
-            } else if let Some(gang) = network.get(g) {
+            } else if let Some(gang) = network.map.get(g) {
                 if gang.triggers.is_empty() {
                     return Delete;
                 }
@@ -133,7 +133,7 @@ fn check_for_dead_code<'a>(
             d + 1,
         ) == Keep
         {
-            (*network.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
+            (*network.map.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;
             out = Keep;
         }
     }

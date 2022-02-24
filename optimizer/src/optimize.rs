@@ -36,17 +36,19 @@ pub fn optimize(
                 deleted: false,
             };
             if let Some(ObjParam::Group(group)) = obj.params.get(&obj_props::GROUPS) {
-                match network.get_mut(group) {
+                match network.map.get_mut(group) {
                     Some(l) => (*l).triggers.push(trigger),
                     None => {
-                        network.insert(*group, TriggerGang::new(vec![trigger]));
+                        network.map.insert(*group, TriggerGang::new(vec![trigger]));
                     }
                 }
             } else {
-                match network.get_mut(&NO_GROUP) {
+                match network.map.get_mut(&NO_GROUP) {
                     Some(l) => (*l).triggers.push(trigger),
                     None => {
-                        network.insert(NO_GROUP, TriggerGang::new(vec![trigger]));
+                        network
+                            .map
+                            .insert(NO_GROUP, TriggerGang::new(vec![trigger]));
                     }
                 }
             }
@@ -91,7 +93,7 @@ pub fn optimize(
     let zero_group = Group {
         id: Id::Specific(0),
     };
-    if let Some(gang) = network.get(&zero_group) {
+    if let Some(gang) = network.map.get(&zero_group) {
         if gang.triggers.len() > 1 {
             closed_group += 1;
             let new_start_group = Group {
@@ -129,14 +131,14 @@ pub fn is_start_group(g: Group, reserved: &ReservedIds) -> bool {
 
 #[derive(Default)]
 pub struct ToggleGroups {
-    pub toggles_on: fnv::FnvHashSet<Group>,
-    pub toggles_off: fnv::FnvHashSet<Group>,
+    pub toggles_on: fnv::FnvHashMap<Group, Vec<ObjPtr>>,
+    pub toggles_off: fnv::FnvHashMap<Group, Vec<ObjPtr>>,
 }
 
 fn get_toggle_groups(objects: &[FunctionId]) -> ToggleGroups {
     let mut toggle_groups = ToggleGroups::default();
-    for fnid in objects.iter() {
-        for (obj, _) in fnid.obj_list.iter() {
+    for (i, fnid) in objects.iter().enumerate() {
+        for (j, (obj, _)) in fnid.obj_list.iter().enumerate() {
             if let Some(ObjParam::Number(id)) = obj.params.get(&1) {
                 if let obj_ids::COUNT
                 | obj_ids::INSTANT_COUNT
@@ -148,16 +150,23 @@ fn get_toggle_groups(objects: &[FunctionId]) -> ToggleGroups {
                         if let Some(ObjParam::Bool(false)) | None =
                             obj.params.get(&obj_props::ACTIVATE_GROUP)
                         {
-                            toggle_groups.toggles_off.insert(*target);
+                            &mut toggle_groups.toggles_off
                         } else {
-                            toggle_groups.toggles_on.insert(*target);
+                            &mut toggle_groups.toggles_on
                         }
+                        .entry(*target)
+                        .or_default()
+                        .push(ObjPtr(i, j));
                     }
                 } else if *id as u16 == obj_ids::TOUCH {
                     // touch triggers are kinda quirky uwu owo
                     if let Some(ObjParam::Group(target)) = obj.params.get(&obj_props::TARGET) {
-                        toggle_groups.toggles_off.insert(*target);
-                        toggle_groups.toggles_on.insert(*target);
+                        for a in [
+                            &mut toggle_groups.toggles_off,
+                            &mut toggle_groups.toggles_on,
+                        ] {
+                            a.entry(*target).or_default().push(ObjPtr(i, j));
+                        }
                     }
                 }
             }
@@ -174,7 +183,7 @@ fn update_reserved(
 ) {
     reserved.trigger_groups.clear();
 
-    for gang in network.values() {
+    for gang in network.map.values() {
         for trigger in gang.triggers.iter() {
             for (prop, param) in objects[trigger.obj].0.params.iter() {
                 if *prop == obj_props::GROUPS {
@@ -197,7 +206,7 @@ fn update_reserved(
 pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete_objects: bool) {
     let mut new_network = TriggerNetwork::default();
 
-    for (_, gang) in network.iter() {
+    for (_, gang) in network.map.iter() {
         let new_triggers: Vec<Trigger> = gang
             .triggers
             .iter()
@@ -211,34 +220,56 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
         for trigger in new_triggers {
             let obj = &objects[trigger.obj].0;
             if let Some(ObjParam::Group(group)) = obj.params.get(&obj_props::GROUPS) {
-                match new_network.get_mut(group) {
+                match new_network.map.get_mut(group) {
                     Some(l) => (*l).triggers.push(trigger),
                     None => {
-                        new_network.insert(*group, TriggerGang::new(vec![trigger]));
+                        new_network
+                            .map
+                            .insert(*group, TriggerGang::new(vec![trigger]));
                     }
                 }
             } else {
-                match new_network.get_mut(&NO_GROUP) {
+                match new_network.map.get_mut(&NO_GROUP) {
                     Some(l) => (*l).triggers.push(trigger),
                     None => {
-                        new_network.insert(NO_GROUP, TriggerGang::new(vec![trigger]));
+                        new_network
+                            .map
+                            .insert(NO_GROUP, TriggerGang::new(vec![trigger]));
                     }
                 }
             }
         }
     }
 
-    for (_, gang) in new_network.clone() {
+    // if let (TriggerRole::Func, Some(ObjParam::Group(target))) =
+    //     (trigger.role, obj.params.get(&obj_props::TARGET))
+    // {
+    //     network
+    //         .connectors
+    //         .entry(*target)
+    //         .or_default()
+    //         .insert(trigger.obj);
+    // }
+
+    for (_, gang) in new_network.map.clone() {
         for trigger in gang.triggers {
             let obj = &objects[trigger.obj].0;
-            if let Some(ObjParam::Group(id)) = obj.params.get(&obj_props::TARGET) {
-                if let Some(gang) = new_network.get_mut(id) {
+            if let (TriggerRole::Func, Some(ObjParam::Group(id))) =
+                (trigger.role, obj.params.get(&obj_props::TARGET))
+            {
+                if let Some(gang) = new_network.map.get_mut(id) {
                     (*gang).connections_in += 1;
 
                     if trigger.role != TriggerRole::Spawn {
                         (*gang).non_spawn_triggers_in = true;
                     }
                 }
+
+                new_network
+                    .connectors
+                    .entry(*id)
+                    .or_default()
+                    .insert(trigger.obj);
             }
         }
     }
@@ -298,7 +329,7 @@ fn rebuild(network: &TriggerNetwork, orig_structure: &[FunctionId]) -> Vec<Funct
         (*el).obj_list.clear();
     }
 
-    for gang in network.values() {
+    for gang in network.map.values() {
         for trigger in &gang.triggers {
             //assert!(trigger.optimized);
             if trigger.deleted {
@@ -363,17 +394,21 @@ pub fn create_spawn_trigger(
     };
 
     if let Some(ObjParam::Group(group)) = new_obj.params.get(&obj_props::GROUPS) {
-        match network.get_mut(group) {
+        match network.map.get_mut(group) {
             Some(gang) => (*gang).triggers.push(new_trigger),
             None => {
-                network.insert(*group, TriggerGang::new(vec![new_trigger]));
+                network
+                    .map
+                    .insert(*group, TriggerGang::new(vec![new_trigger]));
             }
         }
     } else {
-        match network.get_mut(&NO_GROUP) {
+        match network.map.get_mut(&NO_GROUP) {
             Some(gang) => (*gang).triggers.push(new_trigger),
             None => {
-                network.insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
+                network
+                    .map
+                    .insert(NO_GROUP, TriggerGang::new(vec![new_trigger]));
             }
         }
     }

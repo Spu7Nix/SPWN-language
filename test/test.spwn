@@ -1,6 +1,72 @@
-c = counter()
-c.display(40, 40)
+type @cell
+extract obj_props
+grid_pos = [315, 315]
+cell_block = ?b
 
-on(frame(), !{
-    c++
+start_setup = [
+    
+    [0],
+] 
+
+width = start_setup[0].length
+height = start_setup.length
+
+impl @cell {
+    new: (x, y) {
+        cell_group = ?g
+        cell_group.toggle_off()
+        $.add(obj {
+            OBJ_ID: 211,
+            X: grid_pos[0] + x * 30 + (width + 2) * 30,
+            Y: grid_pos[1] + y * 30,
+            GROUPS: cell_group,
+        })
+        neighbour_blocks = [?b]
+        $.add(obj {
+            OBJ_ID: 1816,
+            X: grid_pos[0] + x * 30,
+            Y: grid_pos[1] + y * 30,
+            GROUPS: cell_group,
+            BLOCK_A: cell_block,
+            DYNAMIC_BLOCK: true,
+        })
+        
+        neighbours = counter()
+        neighbours.display(grid_pos[0] + x * 30, grid_pos[1] + y * 30)
+        
+        return @cell::{neighbours, group: cell_group, x, y, neighbour_blocks}
+    }
+}
+
+
+let cells = []
+for x in 0..width {
+    for y in 0..height {
+        cells.push(@cell::new(x, y))
+    }
+}
+
+// update cells
+wait(0.1)
+
+for cell in cells {
+    for n in cell.neighbour_blocks {
+        if n == null { continue }
+        on(collision(n, cell_block), !{ cell.neighbours += 1 })
+        on(collision_exit(n, cell_block), !{ cell.neighbours -= 1 })
+    }
+}
+
+/*
+wait(0.1)
+for cell in cells {
+    if start_setup[cell.y][cell.x] == 1 { cell.group.toggle_on() }
+}
+wait(0.1)
+
+while_loop(() => true, delay = 0.1, () {
+    for cell in cells {
+        cell.update()
+    }
 })
+*/
