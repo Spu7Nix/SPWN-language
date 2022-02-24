@@ -95,101 +95,60 @@ pub enum Id {
     Arbitrary(ArbitraryId), // will be given specific ids at the end of compilation
 }
 
+macro_rules! id_default_methods {
+    ($id_struct:ident, $short_name:expr) => {
+        impl $id_struct {
+            pub fn new(id: SpecificId) -> $id_struct {
+                //creates new specific group
+                $id_struct {
+                    id: Id::Specific(id),
+                }
+            }
+
+            pub fn next_free(counter: &mut ArbitraryId) -> $id_struct {
+                //creates new specific group
+                (*counter) += 1;
+                $id_struct {
+                    id: Id::Arbitrary(*counter),
+                }
+            }
+        }
+
+        impl std::fmt::Debug for $id_struct {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.id {
+                    Id::Specific(n) => f.write_str(&format!("{}{}", n, $short_name)),
+                    Id::Arbitrary(n) => f.write_str(&format!("{}?{}", n, $short_name)),
+                }
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Group {
     pub id: Id,
 }
 
-impl std::fmt::Debug for Group {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.id {
-            Id::Specific(n) => f.write_str(&format!("{}g", n)),
-            Id::Arbitrary(n) => f.write_str(&format!("{}?g", n)),
-        }
-    }
-}
-
-impl Group {
-    pub fn new(id: SpecificId) -> Self {
-        //creates new specific group
-        Group {
-            id: Id::Specific(id),
-        }
-    }
-
-    pub fn next_free(counter: &mut ArbitraryId) -> Self {
-        //creates new specific group
-        (*counter) += 1;
-        Group {
-            id: Id::Arbitrary(*counter),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Color {
     pub id: Id,
 }
 
-impl Color {
-    pub fn new(id: SpecificId) -> Self {
-        //creates new specific color
-        Self {
-            id: Id::Specific(id),
-        }
-    }
-
-    pub fn next_free(counter: &mut ArbitraryId) -> Self {
-        //creates new specific color
-        (*counter) += 1;
-        Self {
-            id: Id::Arbitrary(*counter),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Block {
     pub id: Id,
 }
 
-impl Block {
-    pub fn new(id: SpecificId) -> Self {
-        //creates new specific block
-        Self {
-            id: Id::Specific(id),
-        }
-    }
-
-    pub fn next_free(counter: &mut ArbitraryId) -> Self {
-        //creates new specific block
-        (*counter) += 1;
-        Self {
-            id: Id::Arbitrary(*counter),
-        }
-    }
-}
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Item {
     pub id: Id,
 }
 
-impl Item {
-    pub fn new(id: SpecificId) -> Self {
-        //creates new specific item id
-        Self {
-            id: Id::Specific(id),
-        }
-    }
-
-    pub fn next_free(counter: &mut ArbitraryId) -> Self {
-        //creates new specific item id
-        (*counter) += 1;
-        Self {
-            id: Id::Arbitrary(*counter),
-        }
-    }
-}
+id_default_methods!(Group, "g");
+id_default_methods!(Color, "c");
+id_default_methods!(Block, "b");
+id_default_methods!(Item, "i");
 
 impl Value {
     pub fn member(
