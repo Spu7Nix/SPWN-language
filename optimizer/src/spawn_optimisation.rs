@@ -252,7 +252,6 @@ pub(crate) fn spawn_optimisation(
                 && (network.map[&start].triggers.is_empty()
                     || network.map[&start].triggers.iter().all(|t| t.deleted))
         {
-            //dbg!(start, end);
             insert_to_swaps(start, end);
         } else {
             plain_trigger(network)

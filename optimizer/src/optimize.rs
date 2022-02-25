@@ -261,7 +261,7 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
     for (_, gang) in new_network.map.clone() {
         for trigger in gang.triggers {
             let obj = &objects[trigger.obj].0;
-            if let (TriggerRole::Func, Some(ObjParam::Group(id))) =
+            if let (TriggerRole::Func | TriggerRole::Spawn, Some(ObjParam::Group(id))) =
                 (trigger.role, obj.params.get(&obj_props::TARGET))
             {
                 if let Some(gang) = new_network.map.get_mut(id) {
