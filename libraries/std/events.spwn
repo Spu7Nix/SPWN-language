@@ -25,7 +25,7 @@ impl @event {
             group = ?g
         }
         return @event::{
-            io: group,
+            io: group if group != null else ?g,
         }
     },
     on: #[desc("Triggers a function every time an event fires"), example(u"
@@ -50,18 +50,21 @@ impl @event {
         #[desc("Function to trigger")] function: @trigger_function|@group,
         #[desc("Force suppression in current context")] suppress: @bool = true,
     ) -> @NULL {
-        if suppress == false || $.trigger_fn_context() == 0g {
-            $.extend_trigger_func(self.io, (){
-                function!
-            })
-        } else {
-            locker = ?g
-            locker!
-            $.extend_trigger_func(self.io, (){
-                suppress_signal_until(locker)
-                function!
-            })
-        }
+        // if suppress == false || $.trigger_fn_context() == 0g {
+        //     $.extend_trigger_func(self.io, (){
+        //         function!
+        //     })
+        // } else {
+        //     locker = ?g
+        //     locker!
+        //     $.extend_trigger_func(self.io, (){
+        //         suppress_signal_until(locker)
+        //         function!
+        //     })
+        // }
+        $.extend_trigger_func(self.io, (){
+            function!
+        })
     },
     emit: #[desc("Triggers all listeners of this event"), example(u"
         wait(5)
@@ -166,20 +169,21 @@ return {
         return event
     },
 
-    // count: #[desc("Implementation of a count trigger (returns an event)"), example(u"
-    //     on(count(4i, 3), !{
-    //         BG.set(rgb(0, 0, 0))
-    //     })
-    // ")] (it: @item, hits: @number, multi: @bool = true) -> @event {
-    //     event = @event::new()
-    //     $.add( trigger{
-    //         OBJ_ID: 1611,
-    //         ACTIVATE_GROUP: true,
-    //         TARGET: event.io,
-    //         ITEM: it,
-    //         COUNT: hits,
-    //         COUNT_MULTI_ACTIVATE: multi,
-    //     })
-    //     return event
-    // },
+    count: #[desc("Implementation of a count trigger (returns an event)"), example(u"
+        on(count(4i, 3), !{
+            BG.set(rgb(0, 0, 0))
+        })
+    ")] (it: @item, hits: @number, multi: @bool = true) -> @event {
+        event = @event::new()
+        $.add( trigger{
+            OBJ_ID: 1611,
+            ACTIVATE_GROUP: true,
+            TARGET: event.io,
+            ITEM: it,
+            COUNT: hits,
+            COUNT_MULTI_ACTIVATE: multi,
+        })
+        return event
+    },
+
 }

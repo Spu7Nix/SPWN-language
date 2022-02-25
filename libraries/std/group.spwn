@@ -57,7 +57,7 @@ impl @group {
             if y is @number {
                 -> self.move(0, y * y_multiplier, duration, easing, easing_rate)
             } else {
-                temp = @counter::new(0, reset = false, bits = x.bits)
+                temp = @counter::new(0, reset = false, bits = y.bits)
                 y.add_to(temp, for_each = (n) {
                     -> self.move(0, n * y_multiplier, duration, easing, easing_rate)
                 })
