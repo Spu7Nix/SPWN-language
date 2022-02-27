@@ -4,6 +4,7 @@ use crate::optimize::is_start_group;
 use crate::optimize::replace_groups;
 use crate::optimize::ToggleGroups;
 use crate::ReservedIds;
+use crate::Swaps;
 use crate::Trigger;
 use crate::TriggerNetwork;
 use crate::TriggerRole;
@@ -20,6 +21,7 @@ struct SpawnDelay {
     pub(crate) epsiloned: bool,
 }
 
+#[derive(Debug)]
 struct Connection {
     start_group: Group,
     end_group: Group,
@@ -27,6 +29,7 @@ struct Connection {
     trigger: Trigger,
 }
 
+#[derive(Debug)]
 struct SpawnTrigger {
     target: Group,
     delay: SpawnDelay,
@@ -56,6 +59,11 @@ struct SpawnTrigger {
 // }
 
 // spawn trigger optimisation
+
+// attempts to remove as many spawn triggers as possible by
+// - combining them into a single spawn trigger (with their combined delay)
+// - removing the spawn trigger if it is not needed (if it has 0 delay)
+
 pub(crate) fn spawn_optimisation(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
@@ -128,6 +136,8 @@ pub(crate) fn spawn_optimisation(
         }
     }
 
+    //bg!(&spawn_connections, &all);
+
     for start in inputs.clone() {
         let mut visited = Vec::new();
         look_for_cycle(
@@ -140,6 +150,8 @@ pub(crate) fn spawn_optimisation(
             &mut all,
         )
     }
+
+    //dbg!(&spawn_connections, &all);
 
     // println!(
     //     "spawn_triggers: {:?}\n\n inputs: {:?}\n\n outputs: {:?}\n",
@@ -169,6 +181,8 @@ pub(crate) fn spawn_optimisation(
         //println!("</{:?}>", start);
     }
 
+    //dbg!(&all);
+
     let mut deduped = FnvHashMap::default();
 
     for Connection {
@@ -181,16 +195,8 @@ pub(crate) fn spawn_optimisation(
         deduped.insert((start_group, end_group, delay), trigger);
     }
 
-    let mut swaps = FnvHashMap::default();
+    let mut swaps = Swaps::default();
 
-    let mut insert_to_swaps = |a: Group, b: Group| {
-        for v in swaps.values_mut() {
-            if *v == a {
-                *v = b;
-            }
-        }
-        assert!(swaps.insert(a, b).is_none());
-    };
     // let mut start_counts = FnvHashMap::default();
     // let mut end_counts = FnvHashMap::default();
 
@@ -221,6 +227,17 @@ pub(crate) fn spawn_optimisation(
                 false,
             )
         };
+
+        let mut insert_to_swaps = |a: Group, b: Group, objects: &mut Triggerlist| {
+            let order = objects[trigger.obj].1;
+            for v in swaps.values_mut() {
+                if v.0 == a {
+                    *v = (b, order);
+                }
+            }
+            assert!(swaps.insert(a, (b, order)).is_none());
+        };
+
         let default = &FnvHashSet::default();
         let targeters = network.connectors.get(&start).unwrap_or(default);
 
@@ -246,18 +263,18 @@ pub(crate) fn spawn_optimisation(
         } else if d == 0 && !is_start_group(end, reserved) && network.map[&end].connections_in == 1
         {
             //dbg!(end, start);
-            insert_to_swaps(end, start);
+            insert_to_swaps(end, start, objects);
         } else if d == 0 && !is_start_group(start, reserved)
                 && network.map[&start].connections_in == 1 //??
                 && (network.map[&start].triggers.is_empty()
                     || network.map[&start].triggers.iter().all(|t| t.deleted))
         {
-            //dbg!(start, end);
-            insert_to_swaps(start, end);
+            insert_to_swaps(start, end, objects);
         } else {
             plain_trigger(network)
         }
     }
+    //dbg!(&swaps);
 
     replace_groups(swaps, objects);
 }
@@ -323,7 +340,7 @@ fn traverse(
         for SpawnTrigger {
             target: g,
             delay: d,
-            trigger,
+            trigger: t2,
         } in connections
         {
             //println!("{:?} -> {:?}", current, g);
@@ -337,7 +354,7 @@ fn traverse(
                     start_group: origin,
                     end_group: *g,
                     delay: new_delay,
-                    trigger: *trigger,
+                    trigger: trigger.unwrap_or(*t2),
                 });
 
                 // avoid infinite loop
@@ -362,7 +379,7 @@ fn traverse(
                     *g,
                     origin,
                     new_delay,
-                    Some(*trigger),
+                    trigger,
                     outputs,
                     cycle_points,
                     spawn_connections,

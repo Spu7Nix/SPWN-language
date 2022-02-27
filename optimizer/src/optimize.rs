@@ -1,5 +1,5 @@
 use compiler::builtins::{Group, Id};
-use compiler::compiler_types::FunctionId;
+use compiler::compiler_types::{FunctionId, TriggerOrder};
 use parser::ast::ObjectMode;
 
 use crate::{
@@ -68,6 +68,7 @@ pub fn optimize(
     //network = fix_read_write_order(&mut objects, &network, &mut closed_group);
 
     // round 1
+    //dbg!(&objects.list);
 
     for _ in 0..10 {
         clean_network(&mut network, &objects, true);
@@ -75,6 +76,7 @@ pub fn optimize(
         dead_code::dead_code_optimization(&mut network, &mut objects, &mut closed_group, &reserved);
 
         clean_network(&mut network, &objects, false);
+        //dbg!(&objects.list);
 
         spawn_optimisation::spawn_optimisation(
             &mut network,
@@ -84,6 +86,7 @@ pub fn optimize(
         );
 
         clean_network(&mut network, &objects, false);
+        //dbg!(&objects.list);
 
         update_reserved(&mut network, &mut objects, &mut reserved);
     }
@@ -108,7 +111,7 @@ pub fn optimize(
             };
 
             let mut swaps = Swaps::default();
-            swaps.insert(zero_group, new_start_group);
+            swaps.insert(zero_group, (new_start_group, TriggerOrder(0.0)));
 
             replace_groups(swaps, &mut objects);
 
@@ -261,7 +264,7 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
     for (_, gang) in new_network.map.clone() {
         for trigger in gang.triggers {
             let obj = &objects[trigger.obj].0;
-            if let (TriggerRole::Func, Some(ObjParam::Group(id))) =
+            if let (TriggerRole::Func | TriggerRole::Spawn, Some(ObjParam::Group(id))) =
                 (trigger.role, obj.params.get(&obj_props::TARGET))
             {
                 if let Some(gang) = new_network.map.get_mut(id) {
@@ -296,19 +299,30 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
 // }
 
 pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
-    for fn_id in objects.list.iter_mut() {
-        for (object, _) in &mut fn_id.obj_list {
-            for param in &mut object.params.values_mut() {
+    let mut map: FnvHashMap<Group, (Vec<ObjPtr>, Group, TriggerOrder)> = table
+        .into_iter()
+        .map(|(a, (b, c))| (a, (vec![], b, c)))
+        .collect();
+
+    for (i, fn_id) in objects.list.iter_mut().enumerate() {
+        for (j, (object, _)) in &mut fn_id.obj_list.iter_mut().enumerate() {
+            for (prop, param) in &mut object.params.iter_mut() {
                 match param {
                     ObjParam::Group(g) => {
-                        if let Some(to) = table.get(g) {
-                            *g = *to;
+                        if let Some(to) = map.get_mut(g) {
+                            *g = to.1;
+                            if *prop == obj_props::GROUPS {
+                                to.0.push(ObjPtr(i, j));
+                            }
                         }
                     }
                     ObjParam::GroupList(list) => {
                         for g in list {
-                            if let Some(to) = table.get(g) {
-                                *g = *to;
+                            if let Some(to) = map.get_mut(g) {
+                                *g = to.1;
+                                if *prop == obj_props::GROUPS {
+                                    to.0.push(ObjPtr(i, j));
+                                }
                             }
                         }
                     }
@@ -317,17 +331,19 @@ pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
             }
         }
     }
-    // let mut new_network = TriggerNetwork::default();
-    // for (group, gang) in network.iter() {
-    //     let new_group = if let Some(new) = table.get(group) {
-    //         new
-    //     } else {
-    //         group
-    //     };
-    //     new_network.insert(*new_group, gang.clone());
-    // }
+    //dbg!(&map);
 
-    // *network = new_network;
+    for (_, (mut triggers, _, order)) in map.into_iter() {
+        // sort objects by trigger order
+        triggers.sort_by(|a, b| objects[*a].1 .0.partial_cmp(&objects[*b].1 .0).unwrap());
+        const ORDER_WINDOW: f64 = 0.1;
+        let delta = ORDER_WINDOW / triggers.len() as f64;
+        for (i, trigger) in triggers.iter().enumerate() {
+            let new_order = TriggerOrder(order.0 + i as f64 * delta + delta);
+
+            objects[*trigger].1 = new_order;
+        }
+    }
 }
 
 fn rebuild(network: &TriggerNetwork, orig_structure: &[FunctionId]) -> Vec<FunctionId> {

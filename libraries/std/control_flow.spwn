@@ -188,27 +188,31 @@ call_on_x_position(300, !{
 	")]
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
-		#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: _ -> @NULL, // supposed to be @counter -> @NULL, but @counter isnt defined lol
+	      #[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: (@counter -> @NULL) | (() -> @NULL), // supposed to be @counter -> @NULL, but @counter isnt defined lol
         #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
-        #[desc("Whether to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true,
+        //#[desc("Whether to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true,
     ) -> @NULL {
 		i = @counter::new(range.start)
 
         func = !{
-            code(i)
+            if code is (@counter -> @NULL) {
+                code(i)
+            } else {
+                code()
+            }
+            wait(delay)
 			i.add(range.step_size)
-			wait()
-            i.item.if_is(SMALLER_THAN, range.end, !{
-                call_with_delay(delay, func)
-            })
-
-            i.item.if_is(LARGER_THAN, range.end - 1, !{
-                if reset {
-					wait()
-                    i.reset()
-                }
-                -> return
-            })
+            if range.step_size > 0 {
+                i.item.if_is(SMALLER_THAN, range.end, func)
+                i.item.if_is(LARGER_THAN, range.end - 1, !{
+                    -> return
+                })
+            } else {
+                i.item.if_is(LARGER_THAN, range.end, func)
+                i.item.if_is(SMALLER_THAN, range.end + 1, !{
+                    -> return
+                })
+            }
         }
 
         func!
@@ -238,7 +242,7 @@ call_on_x_position(300, !{
 			}
         }
 
-        call_with_delay(delay, func)
+        func!
 	},
 
 	do_while_loop: #[desc("Implementation of a conditional spawn loop"), example(u"
@@ -257,15 +261,14 @@ call_on_x_position(300, !{
 	) -> @NULL {
 		func = !{
 			code()
-			wait(delay)
 			if expr() {
-				func!
+				call_with_delay(delay, func)
 			} else {
 				-> return
 			}
         }
 
-        call_with_delay(delay, func)
+        func!
 	},
 
 

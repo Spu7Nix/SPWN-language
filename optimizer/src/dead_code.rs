@@ -7,6 +7,10 @@ use crate::{
     obj_props, optimize::is_start_group, ReservedIds, TriggerNetwork, TriggerRole, Triggerlist,
 };
 
+// performes a DFS from each start group, and removes all triggers that:
+// - dont lead to an output trigger
+// - are not reachable from a start group
+
 pub fn dead_code_optimization(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
