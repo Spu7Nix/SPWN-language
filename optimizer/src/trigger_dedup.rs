@@ -1,4 +1,5 @@
 use crate::optimize::clean_network;
+use crate::Swaps;
 
 use crate::optimize::replace_groups;
 
@@ -10,6 +11,7 @@ use compiler::builtins::Block;
 use compiler::builtins::Color;
 use compiler::builtins::Group;
 use compiler::builtins::Item;
+use compiler::compiler_types::TriggerOrder;
 use fnv::FnvHashMap;
 
 use crate::ReservedIds;
@@ -169,8 +171,8 @@ pub(crate) fn dedup_triggers(
     reserved: &ReservedIds,
 ) {
     loop {
-        let mut swaps = FnvHashMap::default();
-        let mut representative_groups = Vec::<(TriggerGangBehavior, Group)>::new();
+        let mut swaps = Swaps::default();
+        let mut representative_groups = Vec::<(TriggerGangBehavior, Group, TriggerOrder)>::new();
 
         for (group, gang) in network.map.iter_mut() {
             if is_start_group(*group, reserved) {
@@ -191,20 +193,26 @@ pub(crate) fn dedup_triggers(
             let behavior = get_triggergang_behavior(gang, objects);
 
             let mut found = false;
-            for (b, repr) in representative_groups.iter() {
+            for (b, repr, order) in representative_groups.iter() {
                 if b == &behavior {
                     for trigger in &mut gang.triggers {
                         (*trigger).deleted = true;
                     }
                     //dbg!(behavior, repr, group, &representative_groups);
-                    assert!(swaps.insert(*group, *repr).is_none());
+                    assert!(swaps.insert(*group, (*repr, *order)).is_none());
 
                     found = true;
                     break;
                 }
             }
             if !found {
-                representative_groups.push((behavior, *group));
+                let mut order = TriggerOrder(0.0);
+                for o in gang.triggers.iter().map(|t| objects[t.obj].1 .0) {
+                    if o > order.0 {
+                        order = TriggerOrder(o);
+                    }
+                }
+                representative_groups.push((behavior, *group, order));
             }
         }
 

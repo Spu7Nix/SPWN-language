@@ -1,7 +1,3 @@
-i = counter(0)
-for _ in 0..2 {
-    if i == 69 {
-        break
-    }
-}
-10g.move(10, 0)
+velocity = !{ 10g.toggle_on() }
+velocity.start_group.toggle_on()
+velocity!

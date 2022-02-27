@@ -12,7 +12,7 @@ pub mod optimize;
 mod spawn_optimisation;
 mod trigger_dedup;
 
-pub type Swaps = FnvHashMap<Group, Group>;
+pub type Swaps = FnvHashMap<Group, (Group, TriggerOrder)>;
 
 mod obj_ids {
     #![allow(dead_code)]
