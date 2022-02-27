@@ -1,3 +1,3 @@
-velocity = !{ 10g.toggle_on() }
-velocity.start_group.toggle_on()
-velocity!
+for_loop(0..10, () {
+    10g.move(10, 0, 0.5)
+})
