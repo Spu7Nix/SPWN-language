@@ -672,14 +672,25 @@ pub fn parse_statement(
         // ooh what type of token is it
         Some(Token::Arrow) => {
             //parse async statement
-            if tokens.next(false) == Some(Token::Arrow) {
-                //double arrow (throw error)
-                return Err(SyntaxError::UnexpectedErr {
-                    found: "double arrow (-> ->)".to_string(),
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                });
+            match tokens.next(false) {
+                Some(Token::Arrow) => {
+                    return Err(SyntaxError::UnexpectedErr {
+                        found: "double arrow (-> ->)".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                },
+                None => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "statement".to_string(),
+                        found: "EOF".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                },
+                _ => (),
             }
+            
 
             tokens.previous();
 
