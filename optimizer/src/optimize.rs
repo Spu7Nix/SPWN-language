@@ -143,6 +143,7 @@ pub fn is_start_group(g: Group, reserved: &ReservedIds) -> bool {
 pub struct ToggleGroups {
     pub toggles_on: fnv::FnvHashMap<Group, Vec<ObjPtr>>,
     pub toggles_off: fnv::FnvHashMap<Group, Vec<ObjPtr>>,
+    pub stops: fnv::FnvHashMap<Group, Vec<ObjPtr>>,
 }
 
 fn get_toggle_groups(objects: &[FunctionId]) -> ToggleGroups {
@@ -177,6 +178,14 @@ fn get_toggle_groups(objects: &[FunctionId]) -> ToggleGroups {
                         ] {
                             a.entry(*target).or_default().push(ObjPtr(i, j));
                         }
+                    }
+                } else if *id as u16 == obj_ids::STOP {
+                    if let Some(ObjParam::Group(target)) = obj.params.get(&obj_props::TARGET) {
+                        toggle_groups
+                            .stops
+                            .entry(*target)
+                            .or_default()
+                            .push(ObjPtr(i, j));
                     }
                 }
             }

@@ -258,6 +258,7 @@ pub(crate) fn spawn_optimisation(
         if start_can_toggle_off
             || (toggle_groups.toggles_on.contains_key(&start)
                 && toggle_groups.toggles_off.contains_key(&end))
+            || toggle_groups.stops.contains_key(&end)
         {
             plain_trigger(network)
         } else if d == 0 && !is_start_group(end, reserved) && network.map[&end].connections_in == 1
