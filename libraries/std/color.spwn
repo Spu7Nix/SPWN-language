@@ -40,7 +40,7 @@ impl @color {
 
     copy:
     #[desc("Makes a color channel copy another"), example(u"
-        1c.set(2c, duration = 1) // transitions color 1 into copying color 2 over 1 second
+        1c.copy(2c, duration = 1) // transitions color 1 into copying color 2 over 1 second
     ")]
     (
         self,
