@@ -13,6 +13,7 @@ impl @color {
             -> color.set(rgb(0,0,0), 0.5)
         }
     ")] create_range_macro(@color),
+
     set:
     #[desc("Implementation of the color trigger"), example(u"
         BG.set(rgb(0, 0, 0), 0.5) // turns the background color black
@@ -35,7 +36,34 @@ impl @color {
             36: 1,
         })
         wait(duration)
-    }, //1,899,2,285,3,105,36,1,7,255,8,255,9,255,10,0.5,35,0;
+    },
+
+    copy:
+    #[desc("Makes a color channel copy another"), example(u"
+        1c.set(2c, duration = 1) // transitions color 1 into copying color 2 over 1 second
+    ")]
+    (
+        self,
+        #[desc("Target channel")] c: @color,
+        #[desc("Duration of color change")] duration: @number = 0,
+        #[desc("Copy color HVS")] hvs: @string = "0a1a1a0a0",
+        #[desc("Toggle blending on target color")] blending: @bool = false,
+        #[desc("Channel opacity")] opacity: @number = 1,
+        #[desc("Copy target opacity")] copy_opacity: @bool = false,
+    ) -> @NULL {
+        $.add( trigger{
+            OBJ_ID: 899,
+            DURATION: duration,
+            COPIED_COLOR_ID: c,
+            COPIED_COLOR_HVS: hvs,
+            COPY_OPACITY: copy_opacity,
+            OPACITY: opacity,
+            BLENDING: blending,
+            TARGET_COLOR: self,
+            36: 1,
+        })
+        wait(duration)
+    },
 
     pulse_hsv: #[desc("Implementation of the pulse trigger for colors with hsv"), example(u"
         BG.pulse_hsv(180, 1, 1, fade_out = 0.5) // pulses the background with the complementary color
