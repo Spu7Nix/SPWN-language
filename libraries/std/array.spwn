@@ -436,8 +436,8 @@ $.assert(arr.index_all(2) == [2,4])
     ")]
     (self, comp: (_,_) -> @bool | @number = (a, b) => a <= b) -> @array {
         let array = self
-        if array.length == 0 { return [] }
-        pivot = array.pop()
+        if array.length <= 1 { return array }
+        pivot = array.pop($.random(0..array.length))
         [ truthy, falsy ] = array.partition((i){
             result = comp(i,pivot)
             return match result {
