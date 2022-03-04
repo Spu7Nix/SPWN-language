@@ -147,7 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             App::new("eval")
                 .about("Runs/builds the input given in stdin/the console as SPWN code")
-                .visible_alias("b")
+                .visible_alias("e")
                 .args(&[
                     arg!(-c --"console-output" "Makes the script print the created level into the console instead of writing it to your save file"),
                     arg!(-l --"no-level" "Only compiles the script, no level creation at all"),

@@ -1,12 +1,6 @@
 #[no_std, cache_output]
 events = import "events.spwn"
 
-on = (
-    event: @event,
-    function: @trigger_function
-){
-    event.on(function)
-}
 extract import "util.spwn"
 impl @block {
 

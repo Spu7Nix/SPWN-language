@@ -5,7 +5,7 @@ extract constants.obj_props
 
 extract import "control_flow.spwn"
 
-#[desc("An api for runtime events, like player input, collisions, etc.")]
+#[desc("An API for runtime events, like player input, collisions, etc.")]
 type @event
 
 impl @event {
@@ -19,11 +19,8 @@ impl @event {
         wait(5)
         my_event.emit()
     ")] (
-        #[desc("Group used for emitting and listening to the event")] let group: @group | @NULL = null,
+        #[desc("Group used for emitting and listening to the event")] group: @group = null,
     ){
-        if group == null {
-            group = ?g
-        }
         return @event::{
             io: group if group != null else ?g,
         }
@@ -37,32 +34,15 @@ impl @event {
         [[ on(touch()) ]] !{
             10g.move(10, 0)
         }
-
-        // 'on' will suppress signals if the context in which it is defined never got triggered
-        on(touch(), !{
-            on(death(), !{
-                10g.move(10, 0) // dying won't do anything if you didn't touch up to that point
-            })
-        })
-        // you can negate this effect by doing `on(event, !{}, suppress = false)`
     ")] (
         self,
         #[desc("Function to trigger")] function: @trigger_function|@group,
-        #[desc("Force suppression in current context")] suppress: @bool = true,
+        #[desc("Force suppression until current context")] suppress: @bool = false,
     ) -> @NULL {
-        // if suppress == false || $.trigger_fn_context() == 0g {
-        //     $.extend_trigger_func(self.io, (){
-        //         function!
-        //     })
-        // } else {
-        //     locker = ?g
-        //     locker!
-        //     $.extend_trigger_func(self.io, (){
-        //         suppress_signal_until(locker)
-        //         function!
-        //     })
-        // }
         $.extend_trigger_func(self.io, (){
+            if suppress == true && $.trigger_fn_context() != 0g {
+                suppress_signal_until()
+            }
             function!
         })
     },
