@@ -1968,8 +1968,8 @@ $.assert(name_age == {
         }
     }
     [InclRangeOp] #[safe = true, desc = "Default implementation of the `..=` operator", example = "$._incl_range_(0, 10)"]
-    fn _incl_range_((val_a), (b): Number) {
-        // can someone help me out? 💀
+    fn _incl_range_((val_a): Number, (b): Number) {
+        Value::Range(val_a as i32, (b + 1.0) as i32, 1)
     }
 
     // unary operators
