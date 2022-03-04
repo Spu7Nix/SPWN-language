@@ -1967,6 +1967,11 @@ $.assert(name_age == {
             }
         }
     }
+    [InclRangeOp] #[safe = true, desc = "Default implementation of the `..=` operator", example = "$._incl_range_(0, 10)"]
+    fn _incl_range_((val_a): Number, (b): Number) {
+        Value::Range(val_a as i32, (b + 1.0) as i32, 1)
+    }
+
     // unary operators
     [IncrOp] #[safe = true, desc = "Default implementation of the `n++` operator", example = "let n = 0\n$._increment_(n)\n$.assert(n == 1)"]
     fn _increment_(mut (a): Number) { a += 1.0; Value::Number(a - 1.0)}
