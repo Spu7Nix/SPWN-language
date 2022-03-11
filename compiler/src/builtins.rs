@@ -2072,7 +2072,22 @@ $.assert(name_age == {
     fn _times_((a), (b): Number) {
         match a {
             Value::Number(a) => Value::Number(a * b),
-            Value::Str(a) => Value::Str(a.repeat(convert_to_int(b, &info)? as usize)),
+            Value::Str(a) => {
+                let number = convert_to_int(b, &info)?;
+                if number >= 0 {
+                    Value::Str(a.repeat(number as usize))
+                } else {
+                    return Err(RuntimeError::BuiltinError {
+                        builtin: builtin,
+                        message: format!(
+                            "Expected {}, found {}",
+                            "a positive number",
+                            b,
+                        ),
+                        info: info,
+                    })
+                }
+            },
             Value::Array(ar) => {
                 let mut new_out = Vec::<StoredValue>::new();
                 for _ in 0..convert_to_int(b, &info)? {
@@ -2329,7 +2344,22 @@ $.assert(name_age == {
     [MultiplyOp] #[safe = true, desc = "Default implementation of the `*=` operator", example = "let val = 5\n$._multiply_(val, 10)\n$.assert(val == 50)"]        fn _multiply_(mut (a), (b): Number)         {
         match &mut a {
             Value::Number(a) => *a *= b,
-            Value::Str(a) => *a = a.repeat(convert_to_int(b, &info)? as usize),
+            Value::Str(a) => {
+                let number = convert_to_int(b, &info)?;
+                if number >= 0 {
+                    *a = a.repeat(number as usize)
+                } else {
+                    return Err(RuntimeError::BuiltinError {
+                        builtin: builtin,
+                        message: format!(
+                            "Expected {}, found {}",
+                            "a positive number",
+                            b,
+                        ),
+                        info: info,
+                    })
+                }
+            },
             _ => {
                 return Err(RuntimeError::CustomError(create_error(
                     info.clone(),
