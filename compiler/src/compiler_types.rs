@@ -213,6 +213,7 @@ impl From<ast::Operator> for Builtin {
             Either => EitherOp,
             Both => BothOp,
             Range => RangeOp,
+            InclRange => InclRangeOp,
             //MUTABLE ONLY
             //ADD CHECk
             Assign => AssignOp,

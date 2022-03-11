@@ -225,6 +225,9 @@ pub enum Token {
     #[token("..")]
     DotDot,
 
+    #[token("..=")]
+    DotDotEq,
+
     #[token("@")]
     At,
 
@@ -329,7 +332,7 @@ impl Token {
 
             Comma | OpenCurlyBracket | ClosingCurlyBracket | OpenSquareBracket
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
-            | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
+            | Period | DotDot | DotDotEq | At | Hash | Arrow | ThickArrow => "terminator",
 
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
             Switch => "Deprecated keyword, use `match` instead",
@@ -1045,7 +1048,7 @@ op_precedence! { // make sure the highest precedence is at the top
     9, Right => Power,
     8, Left => Modulo Star Slash IntDividedBy,
     7, Left => Plus Minus,
-    6, Left => Range,
+    6, Left => Range InclRange,
     5, Left => LessOrEqual MoreOrEqual,
     4, Left => Less More,
     3, Left => Is NotEqual In Equal,
@@ -1354,6 +1357,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
     // its just a giant match statement
     match token {
         Token::DotDot => Some(ast::Operator::Range),
+        Token::DotDotEq => Some(ast::Operator::InclRange),
         Token::Or => Some(ast::Operator::Or),
         Token::And => Some(ast::Operator::And),
         Token::Equal => Some(ast::Operator::Equal),
@@ -1485,6 +1489,10 @@ fn parse_dict(
             }
 
             Some(Token::DotDot) => {
+                let expr = parse_expr(tokens, notes, true, true, None)?;
+                defs.push(ast::DictDef::Extract(expr))
+            }
+            Some(Token::DotDotEq) => {
                 let expr = parse_expr(tokens, notes, true, true, None)?;
                 defs.push(ast::DictDef::Extract(expr))
             }
@@ -2303,6 +2311,16 @@ fn parse_variable(
                 file: notes.file.clone(),
             });
         }
+        Some(Token::DotDotEq) => {
+            return Err(SyntaxError::SyntaxError {
+                message:
+                    "`..=` is not an unary operator. Replace with 0..= to fix."
+                        .to_string(),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            });
+        }
+
         Some(Token::Decrement) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Decrement)
