@@ -2074,10 +2074,18 @@ $.assert(name_age == {
             Value::Number(a) => Value::Number(a * b),
             Value::Str(a) => {
                 let number = convert_to_int(b, &info)?;
-                if number > 0 {
+                if number >= 0 {
                     Value::Str(a.repeat(number as usize))
                 } else {
-                    Value::Str(String::new())
+                    return Err(RuntimeError::BuiltinError {
+                        builtin: builtin,
+                        message: format!(
+                            "Expected {}, found {}",
+                            "a positive number",
+                            b,
+                        ),
+                        info: info,
+                    })
                 }
             },
             Value::Array(ar) => {
@@ -2338,10 +2346,18 @@ $.assert(name_age == {
             Value::Number(a) => *a *= b,
             Value::Str(a) => {
                 let number = convert_to_int(b, &info)?;
-                *a = if number > 0 {
-                    a.repeat(number as usize)
+                if number >= 0 {
+                    *a = a.repeat(number as usize)
                 } else {
-                    String::new()
+                    return Err(RuntimeError::BuiltinError {
+                        builtin: builtin,
+                        message: format!(
+                            "Expected {}, found {}",
+                            "a positive number",
+                            b,
+                        ),
+                        info: info,
+                    })
                 }
             },
             _ => {
