@@ -122,7 +122,7 @@ macro_rules! id_default_methods {
                 }
             }
         }
-    }
+    };
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -577,82 +577,48 @@ macro_rules! builtins {
         }
 
         pub fn builtin_docs() -> String {
-            let mut all = Vec::new();
-            $(
-                let mut full_out = format!(
-                    "## $.{}\n",
-                    stringify!($name).replace("_", "\\_")
-                );
-                let mut out = String::new();
-
-
-                if !$desc.is_empty() {
-                    out += &format!(
-                        "## Description:\n{} <div>\n",
-                        $desc
-                    );
-                }
-
-                if !$example.is_empty() {
-                    out += &format!(
-                        "## Example:\n```spwn\n{}\n```\n",
-                        $example.trim()
-                    );
-
-                }
-                out += &format!("**Allowed by default:** {}\n", if $safe { "yes" } else { "no" });
-                #[allow(unused_mut, unused_variables)]
-                let mut arg_title_set = false;
+            let all = [
                 $(
-                    out += &format!("## Arguments: \n **{}**\n", $argdesc);
-                    arg_title_set = true;
-                )?
-                $(
-                    let mut args = Vec::<(&str, Option<&str>, bool)>::new();
+                    (stringify!($name),
+                    concat!(
+                        concat!(
+                        "## Description:\n", $desc, "<div>\n",
+                        ),
+                        concat!("## Example:\n```spwn\n", $example, "\n```\n"),
 
-                    $(
-                        #[allow(unused_mut)]
-                        let mut name = stringify!($($arg_name),*);
-                        #[allow(unused_mut, unused_assignments)]
-                        let mut typ: Option<&str> = None;
-                        $(typ = Some(stringify!($arg_type));)?
-                        #[allow(unused_mut, unused_assignments)]
-                        let mut mutable = false;
-                        $(mutable = stringify!($mut) == "mut";)?
-                        args.push((name, typ, mutable));
-                    )+
-                    if !arg_title_set { out += "## Arguments: \n"; }
-                    out += "| # | **Name** | **Type** |\n|-|-|-|\n";
-                    for (i, (name, typ, mutable)) in args.into_iter().enumerate() {
-                        out += &format!("| {} | `{}` | {}{} |\n", i + 1, name, if mutable {"_mutable_ "} else {""}, match typ {
-                            Some(s) => format!("_{}_", s),
-                            None => String::new(),
-                        });
-                    }
-
-
-
-
-
-                )?
-
-                for line in out.lines() {
-                    full_out += &format!("> {}\n", line);
-                }
-
-                all.push((stringify!($name), full_out));
-
-            )*
+                        concat!("**Allowed by default:** ", $safe, "\n"),
+                        concat!(
+                            "## Arguments: \n",
+                            $(
+                                "**", $argdesc, "**\n"
+                            )?
+                        ),
+                        $(
+                            concat!("| **Name** | **Type** |\n|-|-|\n",
+                                $(
+                                    concat!("| ", stringify!($($arg_name),*), " | ", concat!($(concat!("_", stringify!($mut), "able_ "),)? ""), concat!($(concat!("_", stringify!($arg_type), "_"),)? "") , " |\n"),
+                                )+
+                            ),
+                        )?
+                    )),
+                )*
+            ];
             let mut out = String::new();
 
             let mut operators = Vec::new();
             let mut normal_ones = Vec::new();
 
             for (name, doc) in all {
+                let header = format!("## $.{}\n", name);
+                let mut new_doc = String::new();
+                for line in doc.lines() {
+                    new_doc += &format!("> {}\n", line);
+                }
+                new_doc = header + &new_doc;
                 if name.starts_with("_") && name.ends_with("_") {
-                    operators.push((name, doc));
+                    operators.push((name, new_doc));
                 } else {
-                    normal_ones.push((name, doc));
+                    normal_ones.push((name, new_doc));
                 }
             }
 
