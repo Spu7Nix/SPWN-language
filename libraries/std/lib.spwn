@@ -20,6 +20,7 @@ import "string.spwn"
 import "fileio.spwn"
 import "regex.spwn"
 import "number.spwn"
+import "vector.spwn"
 import "http.spwn"
 import "range.spwn"
 import "set.spwn"
@@ -56,6 +57,9 @@ return {
     hsv: @chroma::from_hsv,
     hsv2: @chroma::from_hsv2,
     blend_modes: chroma.BLEND_MODES,
+    vec: @vector::new,
+    vec2: @vector::new2,
+    vec3: @vector::new3,
 
     level: level_info,
 }

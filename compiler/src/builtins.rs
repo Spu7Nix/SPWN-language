@@ -1933,6 +1933,11 @@ $.assert(name_age == {
             }
         }
     }
+    [InclRangeOp] #[safe = true, desc = "Default implementation of the `..=` operator", example = "$._incl_range_(0, 10)"]
+    fn _incl_range_((val_a): Number, (b): Number) {
+        Value::Range(val_a as i32, (b + 1.0) as i32, 1)
+    }
+
     // unary operators
     [IncrOp] #[safe = true, desc = "Default implementation of the `n++` operator", example = "let n = 0\n$._increment_(n)\n$.assert(n == 1)"]
     fn _increment_(mut (a): Number) { a += 1.0; Value::Number(a - 1.0)}
@@ -2033,7 +2038,22 @@ $.assert(name_age == {
     fn _times_((a), (b): Number) {
         match a {
             Value::Number(a) => Value::Number(a * b),
-            Value::Str(a) => Value::Str(a.repeat(convert_to_int(b, &info)? as usize)),
+            Value::Str(a) => {
+                let number = convert_to_int(b, &info)?;
+                if number >= 0 {
+                    Value::Str(a.repeat(number as usize))
+                } else {
+                    return Err(RuntimeError::BuiltinError {
+                        builtin: builtin,
+                        message: format!(
+                            "Expected {}, found {}",
+                            "a positive number",
+                            b,
+                        ),
+                        info: info,
+                    })
+                }
+            },
             Value::Array(ar) => {
                 let mut new_out = Vec::<StoredValue>::new();
                 for _ in 0..convert_to_int(b, &info)? {
@@ -2290,7 +2310,22 @@ $.assert(name_age == {
     [MultiplyOp] #[safe = true, desc = "Default implementation of the `*=` operator", example = "let val = 5\n$._multiply_(val, 10)\n$.assert(val == 50)"]        fn _multiply_(mut (a), (b): Number)         {
         match &mut a {
             Value::Number(a) => *a *= b,
-            Value::Str(a) => *a = a.repeat(convert_to_int(b, &info)? as usize),
+            Value::Str(a) => {
+                let number = convert_to_int(b, &info)?;
+                if number >= 0 {
+                    *a = a.repeat(number as usize)
+                } else {
+                    return Err(RuntimeError::BuiltinError {
+                        builtin: builtin,
+                        message: format!(
+                            "Expected {}, found {}",
+                            "a positive number",
+                            b,
+                        ),
+                        info: info,
+                    })
+                }
+            },
             _ => {
                 return Err(RuntimeError::CustomError(create_error(
                     info.clone(),
