@@ -113,16 +113,19 @@ Once you have these, run:
 cargo install spwn
 ```
 
-Let it compile and you're good to go
+Let it compile and you're good to go.
 
 ### Compiling from source
 
-1. Download source code from this repository.
+1. [Download](https://github.com/Spu7Nix/SPWN-language/archive/refs/heads/master.zip) the source code from this repository.
 2. Unzip the .zip file.
-3. Install rust if you haven't already.
-4. Open the unzipped folder in the terminal.
-5. Run `cargo build`.
-6. Compiled binary is placed in `target/debug`.
+3. Install rust (if you haven't already).
+4. Open the unzipped folder in the terminal by
+- Windows: Right click the folder and press `Open command window here`.
+- Mac: Open `Terminal.app` in the `Utilities` folder in the `Applications` folder, then drag and drop the folder onto the terminal window and press enter.
+- Linux: Right click the folder and press `Open in Terminal`.
+6. Run `cargo build --release`.
+7. Compiled binary is placed in the `target/release` directory.
 
 ## Using SPWN
 
@@ -176,49 +179,55 @@ Here is a list of SPWN command line subcommands and flags. This information can 
 
 ### Subcommands
 
-```cmd
-build [script file], b [script file]
-Runs/builds a given file
+```
+build    
+    Runs/builds a given file [aliases: b]
 
-doc [library path]
-Generates documentation for a SPWN library, in the form of a markdown file
+doc      
+    Generates documentation for a SPWN library, in the form of a markdown file
 
-version, -v, --version
-Gets the version of spwn
+eval     
+    Runs/builds the input given in stdin/the console as SPWN code [aliases: b]
+
+help  
+    Print this message or the help of the given subcommand(s)
 ```
 
-### Flags
+### Build Flags
 
-```cmd
---console-output, -c
-Makes the script print the created level into the console instead of
-writing it to your save file
+```
+-a, --allow <allow>...
+    Allow the use of a builtin
 
---no-level, -l
-Only compiles the script, no level creation at all
+-c, --console-output
+    Makes the script print the created level into the console instead of writing it to your
+    save file
 
---no-optimize, -o
-Removes post-optimization of triggers, making the output more readable,
-while also using a lot more objects and groups
+-d, --deny <deny>...
+    Deny the use of a builtin
 
---level-name [name], -n [name]
-Targets a specific level
+-e, --live-editor
+    Instead of writing the level to the save file, the script will use a live editor library
+    if it's installed (Currently works only for MacOS)
 
---live-editor, -e
-Instead of writing the level to the save file, the script will use a
-live editor library if it's installed (Currently works only for MacOS)
+-h, --help
+    Print help information
 
---save-file [file], -s [file]
-Chooses a specific save file to write to
+-i, --include-path <include-path>...
+    Adds a search path to look for librariesAdds a search path to look for libraries
 
---include-path [folder], -i [folder]
-Adds a search path to look for libraries
+-l, --no-level
+    Only compiles the script, no level creation at all
 
---allow [builtin]
-Allow use of a builtin
+-n, --level-name <NAME>...
+    Targets a specific level
 
---deny [builtin]
-Deny use of a builtin
+-o, --no-optimize
+    Removes post-optimization of triggers, making the output more readable, while also using
+    a lot more objects and groups
+
+-s, --save-file <FILE>...
+    Chooses a specific save file to write to
 ```
 
 ### Examples
