@@ -63,9 +63,13 @@ pub fn is_valid_symbol(name: &str, tokens: &Tokens, notes: &ParseNotes) -> Resul
     }
 }
 
+fn remove_underscores(lex: &mut Lexer<Token>) -> String {
+    return lex.slice().replace("_", "");
+}
+
 type TokenPos = usize;
 
-#[derive(Logos, Debug, PartialEq, Copy, Clone)]
+#[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token {
     //OPERATORS
     #[token("->")]
@@ -167,17 +171,17 @@ pub enum Token {
     #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)|\$")]
     Symbol,
 
-    #[regex(r"([0-9][0-9_]*(\.[0-9_]+)?)")]
-    Number,
+    #[regex(r"([0-9][0-9_]*(\.[0-9][0-9_]*)?)", remove_underscores)]
+    Number(String),
 
-    #[regex("0b[01](_?[01]+)*")]
-    BinaryLiteral,
+    #[regex("0b[01][_01]*", |lex| remove_underscores(lex).replace("0b", ""))]
+    BinaryLiteral(String),
 
-    #[regex("0x[a-fA-F0-9](_?[a-fA-F0-9]+)*")]
-    HexLiteral,
+    #[regex("0o[0-7][_0-7]*", |lex| remove_underscores(lex).replace("0o", ""))]
+    OctalLiteral(String),
 
-    #[regex("0o[0-7](_?[0-7]+)*")]
-    OctalLiteral,
+    #[regex("0x[a-fA-F0-9][_a-fA-F0-9]*", |lex| remove_underscores(lex).replace("0x", ""))]
+    HexLiteral(String),
 
     #[regex(r#"[a-z0-9]*("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
     StringLiteral,
@@ -325,7 +329,7 @@ impl Token {
                 "operator"
             }
             Symbol => "identifier",
-            Number | BinaryLiteral | HexLiteral | OctalLiteral => "number literal",
+            Number(_) | BinaryLiteral(_) | OctalLiteral(_) | HexLiteral(_) => "number literal",
             StringLiteral => "string literal",
             True | False => "boolean literal",
             Id => "ID literal",
@@ -388,11 +392,11 @@ impl<'a> Tokens<'a> {
             let slice = self.iter.slice().to_string();
             let range = self.iter.span();
 
-            self.stack.push((next_elem, slice, range));
+            self.stack.push((next_elem.clone(), slice, range));
             next_elem
         } else {
             self.index -= 1;
-            self.stack[self.stack.len() - self.index - 1].0
+            self.stack[self.stack.len() - self.index - 1].0.clone()
         }
     }
 
@@ -509,7 +513,7 @@ impl<'a> Tokens<'a> {
             if !ss && self.stack[len - self.index - 1].0 == Some(Token::StatementSeparator) {
                 self.previous_no_ignore(ss)
             } else if len - self.index >= 1 {
-                self.stack[len - self.index - 1].0
+                self.stack[len - self.index - 1].0.clone()
             } else {
                 None
             }
@@ -523,7 +527,7 @@ impl<'a> Tokens<'a> {
         if len == 0 || len - self.index < 1 {
             None
         } else {
-            self.stack[len - self.index - 1].0
+            self.stack[len - self.index - 1].0.clone()
         }
     }
 
@@ -2360,8 +2364,8 @@ fn parse_variable(
 
     let value = match first_token {
         // what kind of variable is it?
-        Some(Token::Number) => {
-            ast::ValueBody::Number(match tokens.slice().replace('_', "").parse() {
+        Some(Token::Number(number)) => ast::ValueBody::Number(
+            match number.parse() {
                 Ok(n) => n, // its a valid number
                 Err(err) => {
                     return Err(SyntaxError::SyntaxError {
@@ -2371,50 +2375,44 @@ fn parse_variable(
                         file: notes.file.clone(),
                     });
                 }
-            })
-        }
-        Some(Token::BinaryLiteral) => {
-            ast::ValueBody::Number(
-                match i64::from_str_radix(&tokens.slice().replace('_', "").replace("0b", ""), 2) {
-                    Ok(n) => n as f64, // its a valid number
-                    Err(err) => {
-                        return Err(SyntaxError::SyntaxError {
-                            message: format!("Error when parsing number: {}", err),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        });
-                    }
-                },
-            )
-        }
-        Some(Token::HexLiteral) => {
-            ast::ValueBody::Number(
-                match i64::from_str_radix(&tokens.slice().replace('_', "").replace("0x", ""), 16) {
-                    Ok(n) => n as f64, // its a valid number
-                    Err(err) => {
-                        return Err(SyntaxError::SyntaxError {
-                            message: format!("Error when parsing number: {}", err),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        });
-                    }
-                },
-            )
-        }
-        Some(Token::OctalLiteral) => {
-            ast::ValueBody::Number(
-                match i64::from_str_radix(&tokens.slice().replace('_', "").replace("0o", ""), 8) {
-                    Ok(n) => n as f64, // its a valid number
-                    Err(err) => {
-                        return Err(SyntaxError::SyntaxError {
-                            message: format!("Error when parsing number: {}", err),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        });
-                    }
-                },
-            )
-        }
+            }
+        ),
+        Some(Token::BinaryLiteral(number)) => ast::ValueBody::Number(
+            match i128::from_str_radix(&number, 2) {
+                Ok(n) => n as f64, // its a valid number
+                Err(err) => {
+                    return Err(SyntaxError::SyntaxError {
+                        message: format!("Error when parsing number: {}", err),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+            },
+        ),
+        Some(Token::OctalLiteral(number)) => ast::ValueBody::Number(
+            match i128::from_str_radix(&number, 8) {
+                Ok(n) => n as f64, // its a valid number
+                Err(err) => {
+                    return Err(SyntaxError::SyntaxError {
+                        message: format!("Error when parsing number: {}", err),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+            },
+        ),
+        Some(Token::HexLiteral(number)) => ast::ValueBody::Number(
+            match i128::from_str_radix(&number, 16) {
+                Ok(n) => n as f64, // its a valid number
+                Err(err) => {
+                    return Err(SyntaxError::SyntaxError {
+                        message: format!("Error when parsing number: {}", err),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+            },
+        ),
         Some(Token::StringLiteral) => {
             // is a string
 
