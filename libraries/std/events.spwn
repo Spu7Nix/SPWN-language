@@ -58,6 +58,11 @@ impl @event {
 }
 
 return {
+    on: (
+        event: @event,
+        function,
+        suppress = false,
+    ) => event.on(function, suppress = suppress),
 
     touch: #[desc("Implementation of the touch trigger (returns an event)"), example(u"
         on(touch(), !{
@@ -167,9 +172,9 @@ return {
         return event
     },
 
-    call_on_x_position: #[desc("Call a function after an x position"), example(u"
+    x_position: #[desc("Returns an event for when the player reaches a specific x position"), example(u"
         BG.set(rgb8(255, 0, 0)) // turn background red
-        on(call_on_x_position(300), !{
+        on(x_position(300), !{
             BG.set(rgb8(0, 255, 0)) // turn background green when x position is 300
         })
     ")] (
