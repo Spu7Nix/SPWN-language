@@ -43,27 +43,9 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
 	})
 }
 
-call_on_x_position = #[desc("Call a function after an x position"), example("
-BG.set(rgb8(255, 0, 0)) // turn background red
-call_on_x_position(300, !{
-	BG.set(rgb8(0, 255, 0)) // turn background green at x position 300
-})
-")] (
-	#[desc("X position")] position:@number,
-	#[desc("Function to call after reaching x position")] function:@trigger_function|@group,
-) {
-	$.add(obj{
-		OBJ_ID: 1268,
-		X: position,
-		Y: 2145, 
-		TARGET: function,
-	})
-}
-
 -> return {
 	wait: wait,
 	call_with_delay: call_with_delay,
-	call_on_x_position: call_on_x_position,
 
 
 	suppress_signal: #[desc("Stops signal from coming past for some time"), example(u"

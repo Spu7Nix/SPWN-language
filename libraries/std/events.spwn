@@ -4,6 +4,7 @@ constants = import "constants.spwn"
 extract constants.obj_props
 
 extract import "control_flow.spwn"
+extract import "general_triggers.spwn"
 
 #[desc("An API for runtime events, like player input, collisions, etc.")]
 type @event
@@ -166,4 +167,16 @@ return {
         return event
     },
 
+    call_on_x_position: #[desc("Call a function after an x position"), example(u"
+        BG.set(rgb8(255, 0, 0)) // turn background red
+        on(call_on_x_position(300), !{
+            BG.set(rgb8(0, 255, 0)) // turn background green when x position is 300
+        })
+    ")] (
+        #[desc("X position")] position:@number,
+    ) {
+        event = @event::new()
+        $.add(spawn_trigger(event.io).with(X, position).with(Y, 2145))
+        return event
+    }
 }
