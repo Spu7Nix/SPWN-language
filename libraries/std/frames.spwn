@@ -54,7 +54,7 @@ frames_setup = () {
         group_frame!
     })
 
-    call_on_x_position(1, !{
+    on(x_position(1), !{
         group_toggle.toggle_off()
     })
 

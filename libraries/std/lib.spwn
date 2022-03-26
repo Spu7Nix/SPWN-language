@@ -46,7 +46,6 @@ return {
     EULER: constants.EULER,
 
     counter: @counter::new,
-    on: (event: @event, function, suppress = true) => event.on(function, suppress = suppress), // nobody wants to do anything against this 😭😭😭
     obj_props: constants.obj_props,
     obj_ids: constants.obj_ids,
     open: @file::new,

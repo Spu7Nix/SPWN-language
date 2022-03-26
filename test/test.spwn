@@ -1,6 +1,3 @@
-
-
-
-
-
-
+on(call_on_x_position(500), !{
+    @log::runtime::flash(rgb8(255,0,100))
+})
