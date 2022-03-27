@@ -255,10 +255,10 @@ impl @string {
         return $.regex(re, self, "replace", replacement)
     },
 
-    to_obj: #[desc("Returns a text object with the string as text"), example(u"
+    to_obj: #[desc("Returns a text object with the string as text"), example(u'
         extract obj_props
-        \"hello\".to_obj().with(X, 45).with(Y, 45).add()
-    ")] (self) -> @object {
+        "hello".to_obj().with(X, 45).with(Y, 45).add()
+    ')] (self) -> @object {
         extract import "constants.spwn".obj_props
         return obj {
             OBJ_ID: 914,
@@ -266,10 +266,25 @@ impl @string {
         }
     },
     
-    is_digit: #[desc("Returns true if string is numeric, false otherwise"), example(u"
-        let num = \"123\"
-        num.is_digit() // true
-    ")] (self) -> @bool {
-        return $.regex("^[0-9]", self, "match", null)
+    is_digit: #[desc("Returns true if the string is made of digits"), example(u'
+        $.assert("123".is_digit() == true)
+        $.assert("123.45".is_digit() == false)
+    ')] (self) -> @bool {
+        return $.regex(r"^\d+$", self, "match", null)
     },
+
+    is_decimal: #[desc("Returns true if the string is made of digits and a decimal point"), example(u'
+        $.assert("123.45".is_decimal() == true)
+        $.assert("123".is_decimal() == false)
+    ')] (self) -> @bool {
+        return $.regex(r"^\d+\.\d+$", self, "match", null)
+    },
+
+    is_alpha: #[desc("Returns true if the string is made of letters"), example(u'
+        $.assert("abc".is_alpha() == true)
+        $.assert("123".is_alpha() == false)
+    ')] (self) -> @bool {
+        return $.regex(r"^[a-zA-Z]+$", self, "match", null)
+    },
+
 }

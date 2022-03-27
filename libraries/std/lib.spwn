@@ -1,12 +1,6 @@
 #[no_std, cache_output]
 let constants = import "constants.spwn"
 
-#[desc(u"
-`counter` is a wrapper around the item ID system in Geometry Dash. In practice, it works as a replacement for numbers.
-The difference between numbers and counters, is that counters can be modified in the level's runtime. 
-")]
-type @counter
-
 //type implementations
 import "counter.spwn"
 import "group.spwn"
