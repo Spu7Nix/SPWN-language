@@ -1,5 +1,6 @@
 #[no_std, cache_output]
 
+extract import "constants.spwn".obj_props
 import 'array.spwn'
 
 trim = (
@@ -259,7 +260,6 @@ impl @string {
         extract obj_props
         "hello".to_obj().with(X, 45).with(Y, 45).add()
     ')] (self) -> @object {
-        extract import "constants.spwn".obj_props
         return obj {
             OBJ_ID: 914,
             TEXT: $.b64encode(self),

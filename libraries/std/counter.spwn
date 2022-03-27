@@ -8,6 +8,7 @@ type @counter
 
 extract import "control_flow.spwn"
 extract import "constants.spwn".comparisons
+extract import "constants.spwn".obj_props
 import "events.spwn"
 DEFAULT_BITS = 16
 
@@ -92,7 +93,6 @@ impl @counter {
         #[desc("X pos of display in units (1 grid square = 30 units)")] x: @number,
         #[desc("Y pos of display in units")] y: @number
     ) -> @NULL {
-        extract import "constants.spwn".obj_props
         $.add(obj {
             OBJ_ID: 1615,
             X: x,
@@ -112,7 +112,6 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
     (
         self,
     ) -> @object {
-        extract import "constants.spwn".obj_props
         return obj {
             OBJ_ID: 1615,
             ITEM: self.item,
