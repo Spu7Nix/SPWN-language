@@ -64,11 +64,14 @@ return {
     ")] (
         #[desc("The amount of frames to wait")] frames: @number|@counter,
     ) -> @NULL {
-        setup = frames_setup()
-
         frames_count = @counter::new(bits = $.ceil($.log(frames, 2)))
 
-        extern = !{ // currently doing this won't work, and it will throw an error from optimizer.rs
+        let frames = match frames {
+            @number: frames.floor(),
+            @counter: frames.clone(),
+        }
+
+        extern = !{
             if frames_count < frames {
                 frames_count++
             } else if frames_count == frames {
@@ -77,7 +80,10 @@ return {
             }
         }
 
-        $.extend_trigger_func(setup.group_frame, (){
+        current_context = $.trigger_fn_context()
+
+        $.extend_trigger_func(frames_setup().group_frame, (){
+            suppress_signal_until(current_context)
             extern!
         })
     },

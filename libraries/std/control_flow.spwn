@@ -140,21 +140,24 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
 		#[desc("Group or trigger function to call to stop suppression (default: current context)")]
 		group: @group | @trigger_function = null,
 	) -> @NULL {
+		context_func = match group {
+			@NULL: $.trigger_fn_context(),
+			else: group,
+		}
+
+		if context_func == 0g { -> return }
+
 		// 0 = suppressed
 		// 1 = not suppressed
 		checker = @counter::new(bits = 1, reset = false)
 
 		-> (){
-			context_func = match group {
-				@NULL: $.trigger_fn_context(),
-				else: group,
-			}
 			$.extend_trigger_func(context_func, (){
 				if checker == 0 { checker++ }
 			})
 		}()
 
-		if checker == 1 {
+		if checker > 0 {
 			-> return
 		}
 	},

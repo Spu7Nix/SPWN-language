@@ -41,9 +41,7 @@ impl @event {
         #[desc("Force suppression until current context")] suppress: @bool = false,
     ) -> @NULL {
         $.extend_trigger_func(self.io, (){
-            if suppress == true && $.trigger_fn_context() != 0g {
-                suppress_signal_until()
-            }
+            if suppress { suppress_signal_until() }
             function!
         })
     },
