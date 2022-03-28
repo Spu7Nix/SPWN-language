@@ -53,4 +53,13 @@ MATCHER = @pattern | bool_macro
 
         return out.join(' ')
     },
+    cache_macro: (macro: @macro) -> @macro {
+        let cache = @NULL
+        return (){ // TODO: add ..args in the future when it will be supported
+            if cache == @NULL {
+                cache = macro() // TODO: add ..args in the future
+            }
+            return cache
+        }
+    },
 }
