@@ -2262,7 +2262,7 @@ fn parse_number_radix(
     radix: u32,
     prefix: &str,
 ) -> Result<ast::ValueBody, SyntaxError> {
-    match i128::from_str_radix(&tokens.slice().replace('_', "").replace(prefix, ""), radix) {
+    match u128::from_str_radix(&tokens.slice().replace('_', "").replace(prefix, ""), radix) {
         Ok(n) => Ok(ast::ValueBody::Number(n as f64)),
         Err(err) => return Err(SyntaxError::SyntaxError {
             message: format!("Error when parsing number: {}", err),
