@@ -47,7 +47,7 @@ You can either use the installers for your operating system, or build SPWN from 
 - Run `cargo install spwn`.
 - Wait for it to compile.
 - Download the [libraries](https://github.com/Spu7Nix/SPWN-language/tree/v0.6-beta/libraries) folder.
-- Copy the libraries folder to `$HOME/.cargo/~~bin/spwn`.
+- Copy the libraries folder to `$HOME/.cargo/bin/spwn`.
 - Make something awesome!</s>
 
 If you would like a pre-compiled package, look below.
