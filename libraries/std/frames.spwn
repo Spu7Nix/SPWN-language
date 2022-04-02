@@ -15,7 +15,7 @@ frames_setup = cache_macro(() {
     group_first = ?g
     group_second = ?g
     group_frame = ?g
-    $.print("test")
+
     $.add(obj{
         OBJ_ID: special.COLLISION_BLOCK,
         X: 0,
