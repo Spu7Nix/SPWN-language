@@ -1760,7 +1760,7 @@ $.assert(name_age == {
     }
 
     [Regex] #[safe = true, desc = "Performs a regex operation on a string", example = ""]
-    fn regex(#["`mode` can be either \"match\", \"replace\", \"find_all\" or \"find_groups\""](regex): Str, (s): Str, (mode): Str, (replace)) {
+    fn regex(#["`mode` can be either \"match\", \"replace\", \"find_all\" or \"find_groups\"\n"](regex): Str, (s): Str, (mode): Str, (replace)) {
         use fancy_regex::Regex;
 
 
