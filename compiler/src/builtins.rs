@@ -26,6 +26,7 @@ use std::collections::hash_map::DefaultHasher;
 
 // BUILT IN STD
 use include_dir::{Dir, File};
+use std::env;
 
 #[cfg(not(debug_assertions))]
 const STANDARD_LIBS: Dir = include_dir!("../libraries");
@@ -1451,6 +1452,11 @@ $.random(1..11) // returns a random integer between 1 and 10
             }
         };
     }
+
+    [CWD] #[safe = true, desc = "returns the current working directory", example = "$.cwd() // \"C:/spwn_projects/current_project/idk_how_to_name_it/\""] fn cwd() {
+        Value::Str(env::current_dir().unwrap().to_str().unwrap().to_string())
+    }
+
     [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local system (uses the current directory as base for relative paths)", example = "data = $.readfile(\"file.txt\")"]
     fn readfile(#["Path of file to read, and the format it's in (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"]) {
         if arguments.is_empty() || arguments.len() > 2 {
@@ -1701,6 +1707,106 @@ $.random(1..11) // returns a random integer between 1 and 10
                     info,
                 });
             }
+        };
+        Value::Null
+    }
+
+    [DeleteFile] #[safe = false, desc = "Deletes a file in the local system", example = "$.deletefile(\"file.txt\")"] fn deletefile((path): Str) {
+        match fs::remove_file(path) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(RuntimeError::BuiltinError {
+                    builtin,
+                    message: format!("Error when deleting file: {}", e),
+                    info,
+                });
+            }
+        };
+        Value::Null
+    }
+
+    [FileExists] #[safe = false, desc = "Checks if an item exists in the local system", example = "$.fileexists(\"file.txt\")"] fn fileexists((path): Str) {
+        Value::Bool(fs::metadata(path).is_ok())
+    }
+
+    [FileKind] #[safe = false, desc = "Returns the kind of an item in the local system", example = "$.filekind(\"file.txt\")"] fn filekind((path): Str) {
+        match fs::metadata(path) {
+            Ok(meta) => {
+                let kind = match meta.file_type() {
+                    _ if meta.is_file() => "file",
+                    _ if meta.is_dir() => "dir",
+                    _ => "unknown",
+                };
+                Value::Str(kind.to_string())
+            }
+            Err(e) => {
+                return Err(RuntimeError::BuiltinError {
+                    builtin,
+                    message: format!("Error when checking file type: {}", e),
+                    info,
+                });
+            },
+        }
+    }
+
+    [ReadDir] #[safe = false, desc = "Reads the contents of a directory in the local system", example = "$.readdir(\"/\")"] fn readdir((path): Str) {
+        let mut arr: Vec<StoredValue> = vec![];
+        for entry in fs::read_dir(path).unwrap() {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(e) => {
+                    return Err(RuntimeError::BuiltinError {
+                        builtin,
+                        message: format!("Error when reading directory: {}", e),
+                        info,
+                    });
+                },
+            };
+            let path = entry.path();
+            let name = path.file_name().unwrap().to_str().unwrap().to_string();
+            arr.push(store_const_value(Value::Str(name), globals, context.start_group, info.position));
+        }
+        Value::Array(arr)
+    }
+
+    [MkDir] #[safe = false, desc = "Creates a directory in the local system", example = "$.mkdir(\"/\")"] fn mkdir((path): Str) {
+        match fs::create_dir(path) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(RuntimeError::BuiltinError {
+                    builtin,
+                    message: format!("Error when creating directory: {}", e),
+                    info,
+                });
+            },
+        };
+        Value::Null
+    }
+
+    [RmDir] #[safe = false, desc = "Removes an empty directory in the local system", example = "$.rmdir(\"folder\")"] fn rmdir((path): Str) {
+        match fs::remove_dir(path) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(RuntimeError::BuiltinError {
+                    builtin,
+                    message: format!("Error when removing directory: {}", e),
+                    info,
+                });
+            },
+        };
+        Value::Null
+    }
+
+    [RmDirAll] #[safe = false, desc = "Removes a directory in the local system", example = "$.rmdirall(\"folder\")"] fn rmdir_all((path): Str) {
+        match fs::remove_dir_all(path) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(RuntimeError::BuiltinError {
+                    builtin,
+                    message: format!("Error when removing directory: {}", e),
+                    info,
+                });
+            },
         };
         Value::Null
     }
