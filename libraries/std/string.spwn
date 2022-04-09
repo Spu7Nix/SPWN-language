@@ -75,13 +75,31 @@ impl @string {
 	split: #[desc("Splits the string by the specified seperator."), example(u"
         $.assert('a b c'.split(' ') == ['a', 'b', 'c'])
         $.assert('example'.split('') == ['e', 'x', 'a', 'm', 'p', 'l', 'e'])
+
+        $.assert('abcdef'.split([3]) == ['abc', 'def'])
+        $.assert('example'.split([3,5]) == ['exa', 'mp', 'le'])
     ")]
-	(self, spstr: @string) -> [@string] {
-		if spstr.length == 0 {
-			return self as @array;
-		} else {
-			return $.split_str(self, spstr);
-		}
+	(self, split: @string | [@number]) -> [@string] {
+        return match split {
+            @string: (){
+                if split.length == 0 {
+                    return self as @array;
+                } else {
+                    return $.split_str(self, split);
+                }
+            }(),
+            [@number]: (){
+                let split = split.filter(>=0).unique().sort()
+                let out = [];
+                let start = 0;
+                for i in 0..split.length {
+                    out.push(self.substr(start, split[i]))
+                    start = split[i];
+                }
+                out.push(self.substr(start, self.length));
+                return out;
+            }(),
+        }
 	},
 	starts_with: #[desc("Checks if the string starts with a string.")]
 	(self, substr: @string) -> @bool {
@@ -90,7 +108,7 @@ impl @string {
 		return self.substr(0, substr.length) == substr;
 	},
 	ends_with: #[desc("Checks if the string starts with a string.")]
-	(self, substr: @string) -> @string {
+	(self, substr: @string) -> @bool {
 		if substr == '' { return true }
 		if substr.length > self.length { return false }
 		return self.substr(self.length-substr.length, self.length) == substr;

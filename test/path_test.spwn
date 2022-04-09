@@ -1,0 +1,7 @@
+$.print("CWD kind: ", @path::new($.cwd()).kind())
+$.print("CWD print: ", @path::new($.cwd()).readdir())
+
+my_file = @path::new($.cwd()).join('test/readfiletest.txt');
+$.print("readfiletest path: ", my_file)
+$.print("does it exists: ", my_file.exists())
+$.print("readfiletest content: ", my_file.read())

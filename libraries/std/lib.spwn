@@ -18,6 +18,7 @@ import "http.spwn"
 import "range.spwn"
 import "set.spwn"
 import "log.spwn"
+import "path.spwn"
 level_info = import "level_info.spwn"
 
 chroma = import "chroma.spwn"

@@ -535,9 +535,11 @@ $.assert(arr.index_all(2) == [2,4])
         $.assert(x.split([5, 7]) == [[0,1,2,3,4],[5,6],[7,8,9]])
     ")]
     (self, indicies: [@number]) -> [@array] {
+        let indicies = indicies.filter(>=0).unique().sort()
+
         let ret_arr = []
 
-        ret_arr.push(self[:indicies[0]])
+        ret_arr.push(self[0:indicies[0]])
 
         for i in 1..indicies.length {
             ret_arr.push(self[indicies[i-1]: indicies[i]])
