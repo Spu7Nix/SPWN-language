@@ -61,12 +61,11 @@ impl @path {
         }
     },
     format: #[desc("Formats a path")] (self) -> @string {
-        return "{}{}{}{}{}".fmt([
+        return "{}{}{}{}".fmt([
             self.root,
             self.dir,
-            "/" if self.dir.length > 0 else "",
-            self.name,
-            self.ext,
+            "/" if self.dir.length > 0 && self.basename().length > 0 else "",
+            self.basename(),
         ])
     },
     basename: #[desc("Returns the basename of the path")] (self) -> @string {
@@ -95,11 +94,11 @@ impl @path {
     (self, mode: @string = "text") -> @array|@bool|@dictionary|@number|@string {
         return $.readfile(self.format(), mode)
     },
-    write: #[desc("Writes the contents of the file (it will overwrite previous contents)")]
+    write: #[desc("Writes the contents to the file (it will overwrite previous contents)")]
     (self, contents: @string) -> @string {
         return $.writefile(self.format(), contents)
     },
-    append: #[desc("Appends the contents of the file")] (self, contents: @string) -> @string {
+    append: #[desc("Appends the contents to the file")] (self, contents: @string) -> @string {
         return $.writefile($.readfile(self.format()) + contents)
     },
     delete: #[desc("Deletes the file")] (self) -> @string {
