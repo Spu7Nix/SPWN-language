@@ -24,10 +24,24 @@ impl @path {
             let base = dirs.pop().split(r".")
             let ext = ".{}".fmt(base.pop()) if base.length > 1 else ""
             let name = base.join(".") if base.length > 1 else base[0]
-            let dirs = dirs.filter(dir => !dir.ends_with("../")).map(dir => dir.r_trim("."))
+            let new_dirs = []
+            for dir in dirs {
+                if dir.ends_with("..") {
+                    if dir.length > 2 {
+                        // "abc../" should be ignored 
+                    } else if new_dirs.length > 0 {
+                        new_dirs.pop()
+                    } else if root == "~/" {
+                        root = "/"
+                        new_dirs.push("home")
+                    }
+                } else if dir != "." {
+                    new_dirs.push(dir)
+                }
+            }
             return {
                 root: root,
-                dir: dirs.join("/"),
+                dir: new_dirs.join("/"),
                 name: name,
                 ext: ext,
             }
