@@ -36,6 +36,13 @@ compiler = { path = "../compiler" }
 optimizer = { path = "../optimizer" }
 docgen = { path = "../docgen" }
 
+[dev-dependencies]
+criterion = "0.3.5"
+
+[[bench]]
+harness = false
+name = "time"
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 levelstring = { path = "../levelstring" }
 pckp = { path = "../pckp" }

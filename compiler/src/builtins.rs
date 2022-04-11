@@ -98,101 +98,60 @@ pub enum Id {
     Arbitrary(ArbitraryId), // will be given specific ids at the end of compilation
 }
 
+macro_rules! id_default_methods {
+    ($id_struct:ident, $short_name:expr) => {
+        impl $id_struct {
+            pub fn new(id: SpecificId) -> $id_struct {
+                //creates new specific group
+                $id_struct {
+                    id: Id::Specific(id),
+                }
+            }
+
+            pub fn next_free(counter: &mut ArbitraryId) -> $id_struct {
+                //creates new specific group
+                (*counter) += 1;
+                $id_struct {
+                    id: Id::Arbitrary(*counter),
+                }
+            }
+        }
+
+        impl std::fmt::Debug for $id_struct {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.id {
+                    Id::Specific(n) => f.write_str(&format!("{}{}", n, $short_name)),
+                    Id::Arbitrary(n) => f.write_str(&format!("{}?{}", n, $short_name)),
+                }
+            }
+        }
+    };
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Group {
     pub id: Id,
 }
 
-impl std::fmt::Debug for Group {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.id {
-            Id::Specific(n) => f.write_str(&format!("{}g", n)),
-            Id::Arbitrary(n) => f.write_str(&format!("{}?g", n)),
-        }
-    }
-}
-
-impl Group {
-    pub fn new(id: SpecificId) -> Self {
-        //creates new specific group
-        Group {
-            id: Id::Specific(id),
-        }
-    }
-
-    pub fn next_free(counter: &mut ArbitraryId) -> Self {
-        //creates new specific group
-        (*counter) += 1;
-        Group {
-            id: Id::Arbitrary(*counter),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Color {
     pub id: Id,
 }
 
-impl Color {
-    pub fn new(id: SpecificId) -> Self {
-        //creates new specific color
-        Self {
-            id: Id::Specific(id),
-        }
-    }
-
-    pub fn next_free(counter: &mut ArbitraryId) -> Self {
-        //creates new specific color
-        (*counter) += 1;
-        Self {
-            id: Id::Arbitrary(*counter),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Block {
     pub id: Id,
 }
 
-impl Block {
-    pub fn new(id: SpecificId) -> Self {
-        //creates new specific block
-        Self {
-            id: Id::Specific(id),
-        }
-    }
-
-    pub fn next_free(counter: &mut ArbitraryId) -> Self {
-        //creates new specific block
-        (*counter) += 1;
-        Self {
-            id: Id::Arbitrary(*counter),
-        }
-    }
-}
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Item {
     pub id: Id,
 }
 
-impl Item {
-    pub fn new(id: SpecificId) -> Self {
-        //creates new specific item id
-        Self {
-            id: Id::Specific(id),
-        }
-    }
-
-    pub fn next_free(counter: &mut ArbitraryId) -> Self {
-        //creates new specific item id
-        (*counter) += 1;
-        Self {
-            id: Id::Arbitrary(*counter),
-        }
-    }
-}
+id_default_methods!(Group, "g");
+id_default_methods!(Color, "c");
+id_default_methods!(Block, "b");
+id_default_methods!(Item, "i");
 
 impl Value {
     pub fn member(
@@ -230,7 +189,7 @@ impl Value {
                 Value::Str(a) => {
                     if member.as_ref() == "length" {
                         return Some(store_const_value(
-                            Value::Number(a.len() as f64),
+                            Value::Number(a.chars().count() as f64),
                             globals,
                             context.start_group,
                             info.position,
@@ -621,82 +580,48 @@ macro_rules! builtins {
         }
 
         pub fn builtin_docs() -> String {
-            let mut all = Vec::new();
-            $(
-                let mut full_out = format!(
-                    "## $.{}\n",
-                    stringify!($name).replace("_", "\\_")
-                );
-                let mut out = String::new();
-
-
-                if !$desc.is_empty() {
-                    out += &format!(
-                        "## Description:\n{} <div>\n",
-                        $desc
-                    );
-                }
-
-                if !$example.is_empty() {
-                    out += &format!(
-                        "## Example:\n```spwn\n{}\n```\n",
-                        $example.trim()
-                    );
-
-                }
-                out += &format!("**Allowed by default:** {}\n", if $safe { "yes" } else { "no" });
-                #[allow(unused_mut, unused_variables)]
-                let mut arg_title_set = false;
+            let all = [
                 $(
-                    out += &format!("## Arguments: \n **{}**\n", $argdesc);
-                    arg_title_set = true;
-                )?
-                $(
-                    let mut args = Vec::<(&str, Option<&str>, bool)>::new();
+                    (stringify!($name),
+                    concat!(
+                        concat!(
+                        "## Description:\n", $desc, "<div>\n",
+                        ),
+                        concat!("## Example:\n```spwn\n", $example, "\n```\n"),
 
-                    $(
-                        #[allow(unused_mut)]
-                        let mut name = stringify!($($arg_name),*);
-                        #[allow(unused_mut, unused_assignments)]
-                        let mut typ: Option<&str> = None;
-                        $(typ = Some(stringify!($arg_type));)?
-                        #[allow(unused_mut, unused_assignments)]
-                        let mut mutable = false;
-                        $(mutable = stringify!($mut) == "mut";)?
-                        args.push((name, typ, mutable));
-                    )+
-                    if !arg_title_set { out += "## Arguments: \n"; }
-                    out += "| # | **Name** | **Type** |\n|-|-|-|\n";
-                    for (i, (name, typ, mutable)) in args.into_iter().enumerate() {
-                        out += &format!("| {} | `{}` | {}{} |\n", i + 1, name, if mutable {"_mutable_ "} else {""}, match typ {
-                            Some(s) => format!("_{}_", s),
-                            None => String::new(),
-                        });
-                    }
-
-
-
-
-
-                )?
-
-                for line in out.lines() {
-                    full_out += &format!("> {}\n", line);
-                }
-
-                all.push((stringify!($name), full_out));
-
-            )*
+                        concat!("**Allowed by default:** ", $safe, "\n"),
+                        concat!(
+                            "## Arguments: \n",
+                            $(
+                                "**", $argdesc, "**\n"
+                            )?
+                        ),
+                        $(
+                            concat!("| **Name** | **Type** |\n|-|-|\n",
+                                $(
+                                    concat!("| ", stringify!($($arg_name),*), " | ", concat!($(concat!("_", stringify!($mut), "able_ "),)? ""), concat!($(concat!("_", stringify!($arg_type), "_"),)? "") , " |\n"),
+                                )+
+                            ),
+                        )?
+                    )),
+                )*
+            ];
             let mut out = String::new();
 
             let mut operators = Vec::new();
             let mut normal_ones = Vec::new();
 
             for (name, doc) in all {
+                let header = format!("## $.{}\n", name);
+                let mut new_doc = String::new();
+                for line in doc.lines() {
+                    new_doc += &format!("> {}\n", line);
+                }
+                new_doc = header + &new_doc;
                 if name.starts_with("_") && name.ends_with("_") {
-                    operators.push((name, doc));
+                    operators.push((name, new_doc));
                 } else {
-                    normal_ones.push((name, doc));
+                    normal_ones.push((name, new_doc));
                 }
             }
 
@@ -998,6 +923,10 @@ $.add(obj {
                 info,
             })
         };
+
+        if obj.is_empty() {
+            return Ok(());
+        }
 
         let mut ignore_context = false;
         if arguments.len() == 2 {
@@ -2122,6 +2051,11 @@ $.assert(name_age == {
             }
         }
     }
+    [InclRangeOp] #[safe = true, desc = "Default implementation of the `..=` operator", example = "$._incl_range_(0, 10)"]
+    fn _incl_range_((val_a): Number, (b): Number) {
+        Value::Range(val_a as i32, (b + 1.0) as i32, 1)
+    }
+
     // unary operators
     [IncrOp] #[safe = true, desc = "Default implementation of the `n++` operator", example = "let n = 0\n$._increment_(n)\n$.assert(n == 1)"]
     fn _increment_(mut (a): Number) { a += 1.0; Value::Number(a - 1.0)}
@@ -2222,7 +2156,22 @@ $.assert(name_age == {
     fn _times_((a), (b): Number) {
         match a {
             Value::Number(a) => Value::Number(a * b),
-            Value::Str(a) => Value::Str(a.repeat(convert_to_int(b, &info)? as usize)),
+            Value::Str(a) => {
+                let number = convert_to_int(b, &info)?;
+                if number >= 0 {
+                    Value::Str(a.repeat(number as usize))
+                } else {
+                    return Err(RuntimeError::BuiltinError {
+                        builtin: builtin,
+                        message: format!(
+                            "Expected {}, found {}",
+                            "a positive number",
+                            b,
+                        ),
+                        info: info,
+                    })
+                }
+            },
             Value::Array(ar) => {
                 let mut new_out = Vec::<StoredValue>::new();
                 for _ in 0..convert_to_int(b, &info)? {
@@ -2479,7 +2428,22 @@ $.assert(name_age == {
     [MultiplyOp] #[safe = true, desc = "Default implementation of the `*=` operator", example = "let val = 5\n$._multiply_(val, 10)\n$.assert(val == 50)"]        fn _multiply_(mut (a), (b): Number)         {
         match &mut a {
             Value::Number(a) => *a *= b,
-            Value::Str(a) => *a = a.repeat(convert_to_int(b, &info)? as usize),
+            Value::Str(a) => {
+                let number = convert_to_int(b, &info)?;
+                if number >= 0 {
+                    *a = a.repeat(number as usize)
+                } else {
+                    return Err(RuntimeError::BuiltinError {
+                        builtin: builtin,
+                        message: format!(
+                            "Expected {}, found {}",
+                            "a positive number",
+                            b,
+                        ),
+                        info: info,
+                    })
+                }
+            },
             _ => {
                 return Err(RuntimeError::CustomError(create_error(
                     info.clone(),

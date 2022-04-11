@@ -141,27 +141,55 @@ pub fn compile_spwn(
     #[cfg(not(target_arch = "wasm32"))]
     {
         // Define the different units
-        let build_time_secs = start_time.elapsed().as_secs();
-        let build_time_millis = start_time.elapsed().as_millis();
+        let elapsed = start_time.elapsed();
+        let build_time_millis = elapsed.as_millis();
+        let build_time_secs: u128 = elapsed.as_secs().into();
         let build_time_mins = build_time_secs / 60;
+        let build_time_hours = build_time_mins / 60;
 
-        // Check which unit to unit to use
-        if build_time_millis < 1000 {
-            print_with_color(
-                &format!("Built in {} milliseconds!", build_time_millis),
-                TColor::Green,
-            );
-        } else if build_time_millis < 60000 {
-            print_with_color(
-                &format!("Built in {} seconds!", build_time_secs),
-                TColor::Green,
-            );
-        } else {
-            print_with_color(
-                &format!("Built in {} minutes!", build_time_mins),
-                TColor::Green,
-            );
+        let times = [
+            build_time_hours,
+            build_time_mins,
+            build_time_secs,
+            build_time_millis,
+        ];
+        let names = [
+            "hour",
+            "minute",
+            "second",
+            "millisecond",
+        ];
+        let modulos = [
+            0,
+            60,
+            60,
+            1000,
+        ];
+
+        let mut count = 0;
+        let max = 2;
+
+        let mut time_string = String::new();
+
+        for i in 0..times.len() {
+            if count > 0 || times[i] > 0 || i == times.len() - 1 && count == 0 {
+                time_string += &format!(
+                    " {} {}{}",
+                    if i == 0 { times[i] } else { times[i] % modulos[i] },
+                    names[i],
+                    if times[i] % 2 == 1 { "" } else { "s" },
+                );
+                count += 1;
+            }
+            if count >= max {
+                break
+            }
         }
+
+        print_with_color(
+            &format!("Built in{}!", time_string),
+            TColor::Green,
+        )
     }
 
     //----------------------------------------------------------------------- **

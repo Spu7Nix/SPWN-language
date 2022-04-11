@@ -1,14 +1,14 @@
-$.print({} == {})
-
-$.print({'a': 10} == {'a': 10})
-
-let name_age = {
-    'Sophia': 34, 
-    'Romulus': 14, 
-    'Remus': 15, 
-}
-$.remove_index(name_age, 'Romulus')
-$.assert(name_age == {
-    'Sophia': 34, 
-    'Remus': 15, 
-})
+frames(10)
+frames(10)
+frames(10)
+frames(10)
+frames(10)
+frames(10)
+@log::runtime::flash(rgb8(255, 0, 100))
+frames(10)
+frames(10)
+frames(10)
+frames(10)
+frames(10)
+frames(10)
+@log::runtime::flash(rgb8(0, 255, 100))

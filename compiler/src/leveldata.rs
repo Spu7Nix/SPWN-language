@@ -454,110 +454,91 @@ pub fn append_objects(
 pub fn apply_fn_ids(func_ids: &[FunctionId]) -> Vec<GdObj> {
     //println!("{:?}", trigger);
 
-    fn apply_fn_id(
-        id_index: usize,
-        func_ids: &[FunctionId],
-        x_offset: u32,
-        y_offset: u16,
-    ) -> (Vec<GdObj>, u32) {
-        let id = func_ids[id_index].clone();
+    let mut objectlist = Vec::new();
 
-        let mut objects = Vec::<GdObj>::new();
-
-        let mut current_x = 0;
-        /*if !id.obj_list.is_empty() {
-            //add label
-            obj_string += &format!(
-                "1,914,2,{},3,{},31,{},32,0.5;",
-                x_offset * 30 + 15,
-                ((81 - START_HEIGHT) - y_offset) * 30 + 15,
-                base64::encode(id.name.as_bytes())
-            );
-        }*/
-
-        //add top layer
-        let possible_height = MAX_HEIGHT - (START_HEIGHT + y_offset); //30 is max (TODO: case for if y_offset is more than 30)
-        let mut objectlist = id.obj_list;
-        objectlist.sort_by(|x, y| x.1.partial_cmp(&y.1).unwrap());
-
-        for (i, (obj, _)) in objectlist.iter().enumerate() {
-            match obj.mode {
-                ObjectMode::Object => {
-                    objects.push(obj.clone());
-                }
-                ObjectMode::Trigger => {
-                    let y_pos = (i as u16) % possible_height + START_HEIGHT + y_offset;
-                    let x_pos = x_offset;
-
-                    let spawned = match obj.params.get(&62) {
-                        Some(ObjParam::Bool(b)) => *b,
-                        _ => match obj.params.get(&57) {
-                            None => false,
-                            // Some(ObjParam::GroupList(l)) => {
-                            //     l.iter().any(|x| x.id != ID::Specific(0))
-                            // }
-                            Some(ObjParam::Group(g)) => g.id != Id::Specific(0),
-                            Some(ObjParam::GroupList(g)) => g[0].id != Id::Specific(0),
-                            _ => unreachable!(),
-                        },
-                    };
-
-                    let mut new_obj = obj.clone();
-
-                    if spawned {
-                        new_obj.params.insert(62, ObjParam::Bool(true));
-                        new_obj.params.insert(87, ObjParam::Bool(true));
-                    }
-
-                    new_obj.params.insert(
-                        2,
-                        if spawned {
-                            ObjParam::Number(
-                                (x_pos * (MAX_HEIGHT - START_HEIGHT) as u32 * DELTA_X as u32
-                                    + 15
-                                    + i as u32 * DELTA_X as u32)
-                                    as f64,
-                            )
-                        } else {
-                            ObjParam::Number(0.0)
-                        },
-                    );
-                    new_obj
-                        .params
-                        .insert(3, ObjParam::Number(((80 - y_pos) * 30 + 15) as f64));
-                    objects.push(new_obj);
-                }
-            }
-        }
-        if !objectlist.is_empty() {
-            current_x += (objectlist.len() as f64 / possible_height as f64).floor() as u32 + 1;
-        }
-
-        //add all children
-        for (i, func_id) in func_ids.iter().enumerate() {
-            if func_id.parent == Some(id_index) {
-                let (obj, new_length) = apply_fn_id(i, func_ids, current_x + x_offset, y_offset);
-                objects.extend(obj);
-
-                if new_length > 0 {
-                    current_x += new_length + 1;
-                }
-            }
-        }
-
-        (objects, current_x)
+    for func_id in func_ids.iter() {
+        objectlist.extend(func_id.obj_list.clone());
     }
 
     let mut full_obj_list = Vec::<GdObj>::new();
 
-    let mut current_x = 0;
-    for (i, func_id) in func_ids.iter().enumerate() {
-        if func_id.parent == None {
-            let (objects, new_length) = apply_fn_id(i, func_ids, current_x, 0);
-            full_obj_list.extend(objects);
+    /*if !id.obj_list.is_empty() {
+        //add label
+        obj_string += &format!(
+            "1,914,2,{},3,{},31,{},32,0.5;",
+            x_offset * 30 + 15,
+            ((81 - START_HEIGHT) - y_offset) * 30 + 15,
+            base64::encode(id.name.as_bytes())
+        );
+    }*/
 
-            current_x += new_length;
+    //add top layer
+    let possible_height = MAX_HEIGHT - START_HEIGHT; //30 is max (TODO: case for if y_offset is more than 30)
+    objectlist.sort_by(|x, y| x.1.partial_cmp(&y.1).unwrap());
+
+    for (i, (obj, _)) in objectlist.iter().enumerate() {
+        match obj.mode {
+            ObjectMode::Object => {
+                full_obj_list.push(obj.clone());
+            }
+            ObjectMode::Trigger => {
+                let y_pos = (i as u16) % possible_height + START_HEIGHT;
+                let x_pos = 0;
+
+                let spawned = match obj.params.get(&62) {
+                    Some(ObjParam::Bool(b)) => *b,
+                    _ => match obj.params.get(&57) {
+                        None => false,
+                        // Some(ObjParam::GroupList(l)) => {
+                        //     l.iter().any(|x| x.id != ID::Specific(0))
+                        // }
+                        Some(ObjParam::Group(g)) => g.id != Id::Specific(0),
+                        Some(ObjParam::GroupList(g)) => g[0].id != Id::Specific(0),
+                        _ => unreachable!(),
+                    },
+                };
+
+                let mut new_obj = obj.clone();
+
+                if spawned {
+                    new_obj.params.insert(62, ObjParam::Bool(true));
+                    new_obj.params.insert(87, ObjParam::Bool(true));
+                }
+
+                new_obj.params.insert(
+                    2,
+                    if spawned {
+                        ObjParam::Number(
+                            (x_pos * (MAX_HEIGHT - START_HEIGHT) as u32 * DELTA_X as u32
+                                + 15
+                                + i as u32 * DELTA_X as u32) as f64,
+                        )
+                    } else {
+                        ObjParam::Number(0.0)
+                    },
+                );
+                new_obj
+                    .params
+                    .insert(3, ObjParam::Number(((80 - y_pos) * 30 + 15) as f64));
+                full_obj_list.push(new_obj);
+            }
         }
     }
+    // if !objectlist.is_empty() {
+    //     current_x += (objectlist.len() as f64 / possible_height as f64).floor() as u32 + 1;
+    // }
+
+    //add all children
+    // for (i, func_id) in func_ids.iter().enumerate() {
+    //     if func_id.parent == Some(id_index) {
+    //         let (obj, new_length) = apply_fn_id(i, func_ids, current_x + x_offset, y_offset);
+    //         objects.extend(obj);
+
+    //         if new_length > 0 {
+    //             current_x += new_length + 1;
+    //         }
+    //     }
+    // }
+
     full_obj_list
 }

@@ -1,6 +1,12 @@
 #[no_std, cache_output]
 let constants = import "constants.spwn"
 
+#[desc(u"
+`counter` is a wrapper around the item ID system in Geometry Dash. In practice, it works as a replacement for numbers.
+The difference between numbers and counters, is that counters can be modified in the level's runtime. 
+")]
+type @counter
+
 //type implementations
 import "counter.spwn"
 import "group.spwn"
@@ -14,6 +20,7 @@ import "string.spwn"
 import "fileio.spwn"
 import "regex.spwn"
 import "number.spwn"
+import "vector.spwn"
 import "http.spwn"
 import "range.spwn"
 import "set.spwn"
@@ -25,6 +32,7 @@ chroma = import "chroma.spwn"
 general = import "general_triggers.spwn"
 events = import "events.spwn"
 ctrl_flow = import "control_flow.spwn"
+frames = import "frames.spwn"
 
 return {
     ..constants.easing_types,
@@ -33,12 +41,12 @@ return {
     ..general,
     ..events,
     ..ctrl_flow,
+    ..frames,
 
     PI: constants.PI,
     EULER: constants.EULER,
 
     counter: @counter::new,
-    on: (event: @event, function, suppress = true) => event.on(function, suppress = suppress), // nobody wants to do anything against this 😭😭😭
     obj_props: constants.obj_props,
     obj_ids: constants.obj_ids,
     open: @file::new,
@@ -49,6 +57,9 @@ return {
     hsv: @chroma::from_hsv,
     hsv2: @chroma::from_hsv2,
     blend_modes: chroma.BLEND_MODES,
+    vec: @vector::new,
+    vec2: @vector::new2,
+    vec3: @vector::new3,
 
     level: level_info,
 }

@@ -92,7 +92,7 @@ impl @textdisplay {
                 -> follow_group.pulse(0,0,0, hold = 0.05, fade_out = 0.15)
             }
 
-            collision(block, writer).on_triggered(lock)
+            collision(block, writer).on(lock)
 
             $.add(obj {
                 OBJ_ID: 1765,

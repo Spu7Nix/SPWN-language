@@ -227,7 +227,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                 Some(&type_name),
             )?;
 
-            sidebar += &format!("- **@{}**\n", type_name.replace("_", "\\_"));
+            sidebar += &format!("- **@{}**\n", type_name.replace('_', "\\_"));
 
             sidebar += &sidebar_content
                 .lines()
@@ -236,7 +236,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                 .join("");
 
             let content = &if let Some(desc) = globals.type_descriptions.get(typ).cloned() {
-                format!("# **@{}**\n?> {}\n{}", type_name, desc, doc_content)
+                format!("# **@{}**\n\n?> {}\n{}", type_name, desc, doc_content)
             } else {
                 format!("# **@{}**\n{}", type_name, doc_content)
             };
@@ -302,7 +302,7 @@ fn document_dict(
                 key
             )
         } else {
-            format!("\t- [{}]({}?id={})\n", key.replace("_", "\\_"), path, key)
+            format!("\t- [{}]({}?id={})\n", key.replace('_', "\\_"), path, key)
         };
         let mut member_doc = String::new();
         let inner_val = globals.stored_values[*val].clone();
@@ -328,7 +328,7 @@ fn document_dict(
 {}
 >
 "#,
-            key.replace("_", "\\_"),
+            key.replace('_', "\\_"),
             formatted
         );
         Ok(member_doc)
@@ -369,7 +369,7 @@ fn document_macro(
             Value::Pattern(ret) => {
                 if ret != Pattern::Type(type_id!(NULL)) {
                     doc += &format!(
-                        "\n**Returns:** \n{}\n",
+                        "\n**Returns:**\n{}\n",
                         display_pattern(&ret, full_context, globals, type_links)?
                     );
                 }
@@ -377,7 +377,7 @@ fn document_macro(
             Value::TypeIndicator(t) => {
                 if t != type_id!(NULL) {
                     doc += &format!(
-                        "\n**Returns:** \n{}\n",
+                        "\n**Returns:**\n{}\n",
                         type_links.get(&t).cloned().unwrap_or_else(|| {
                             String::from("`@")
                                 + &find_key_for_value(&globals.type_ids, t).unwrap().clone()
@@ -388,9 +388,9 @@ fn document_macro(
             }
             a => {
                 doc += &format!(
-                    "\n**Returns:** \n{}\n",
+                    "\n**Returns:**\n{}\n",
                     a.display(full_context, globals, &CompilerInfo::new())?
-                        .replace("|", "\\|")
+                        .replace('|', "\\|")
                 );
             }
         }
@@ -431,7 +431,7 @@ fn document_macro(
                         _ => format!(
                             "`{}`",
                             val.display(full_context, globals, &CompilerInfo::new())?
-                                .replace("|", "\\|")
+                                .replace('|', "\\|")
                         ),
                     }
                 );
@@ -444,7 +444,7 @@ fn document_macro(
                 arg_string += &format!(
                     " `{}` |",
                     val.display(full_context, globals, &CompilerInfo::new())?
-                        .replace("\n", "")
+                        .replace('\n', "")
                 );
             } else {
                 arg_string += " |";

@@ -17,6 +17,7 @@ use shared::FileRange;
 use shared::SpwnSource;
 //use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::Chars;
 
 use errors::SyntaxError;
 use internment::LocalIntern;
@@ -25,6 +26,8 @@ use logos::Lexer;
 use logos::Logos;
 
 use shared::ImportType;
+
+use base64;
 
 macro_rules! expected {
     ($expected:expr, $tokens:expr, $notes:expr, $a:expr) => {
@@ -164,19 +167,19 @@ pub enum Token {
     #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)|\$")]
     Symbol,
 
-    #[regex(r"([0-9][0-9_]*(\.[0-9_]+)?)")]
+    #[regex(r"[0-9][_0-9]*(\.[0-9][_0-9]*)?")]
     Number,
 
-    #[regex("0b[01](_?[01]+)*")]
+    #[regex("0b[01][_01]*")]
     BinaryLiteral,
 
-    #[regex("0x[a-fA-F0-9](_?[a-fA-F0-9]+)*")]
+    #[regex("0x[a-fA-F0-9][_a-fA-F0-9]*")]
     HexLiteral,
 
-    #[regex("0o[0-7](_?[0-7]+)*")]
+    #[regex("0o[0-7][_0-7]*")]
     OctalLiteral,
 
-    #[regex(r#"[a-z]?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
+    #[regex(r#"[a-z0-9]*("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
     StringLiteral,
 
     #[token("true")]
@@ -221,6 +224,9 @@ pub enum Token {
 
     #[token("..")]
     DotDot,
+
+    #[token("..=")]
+    DotDotEq,
 
     #[token("@")]
     At,
@@ -326,7 +332,7 @@ impl Token {
 
             Comma | OpenCurlyBracket | ClosingCurlyBracket | OpenSquareBracket
             | ClosingSquareBracket | OpenBracket | ClosingBracket | Colon | DoubleColon
-            | Period | DotDot | At | Hash | Arrow | ThickArrow => "terminator",
+            | Period | DotDot | DotDotEq | At | Hash | Arrow | ThickArrow => "terminator",
 
             Sync => "reserved keyword (not currently in use, but may be used in future updates)",
             Switch => "Deprecated keyword, use `match` instead",
@@ -669,14 +675,25 @@ pub fn parse_statement(
         // ooh what type of token is it
         Some(Token::Arrow) => {
             //parse async statement
-            if tokens.next(false) == Some(Token::Arrow) {
-                //double arrow (throw error)
-                return Err(SyntaxError::UnexpectedErr {
-                    found: "double arrow (-> ->)".to_string(),
-                    pos: tokens.position(),
-                    file: notes.file.clone(),
-                });
+            match tokens.next(false) {
+                Some(Token::Arrow) => {
+                    return Err(SyntaxError::UnexpectedErr {
+                        found: "double arrow (-> ->)".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                },
+                None => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "statement".to_string(),
+                        found: "EOF".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                },
+                _ => (),
             }
+            
 
             tokens.previous();
 
@@ -1031,7 +1048,7 @@ op_precedence! { // make sure the highest precedence is at the top
     9, Right => Power,
     8, Left => Modulo Star Slash IntDividedBy,
     7, Left => Plus Minus,
-    6, Left => Range,
+    6, Left => Range InclRange,
     5, Left => LessOrEqual MoreOrEqual,
     4, Left => Less More,
     3, Left => Is NotEqual In Equal,
@@ -1340,6 +1357,7 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
     // its just a giant match statement
     match token {
         Token::DotDot => Some(ast::Operator::Range),
+        Token::DotDotEq => Some(ast::Operator::InclRange),
         Token::Or => Some(ast::Operator::Or),
         Token::And => Some(ast::Operator::And),
         Token::Equal => Some(ast::Operator::Equal),
@@ -1471,6 +1489,10 @@ fn parse_dict(
             }
 
             Some(Token::DotDot) => {
+                let expr = parse_expr(tokens, notes, true, true, None)?;
+                defs.push(ast::DictDef::Extract(expr))
+            }
+            Some(Token::DotDotEq) => {
                 let expr = parse_expr(tokens, notes, true, true, None)?;
                 defs.push(ast::DictDef::Extract(expr))
             }
@@ -1829,143 +1851,157 @@ fn check_for_tag(
     }
 }
 
-pub fn str_content(
-    mut inp: String,
+fn char_escape(
+    chars: &mut Chars<'_>,
     tokens: &Tokens,
     notes: &ParseNotes,
+) -> Result<char, SyntaxError> {
+    match chars.next() {
+        Some('n') => Ok('\n'),
+        Some('r') => Ok('\r'),
+        Some('t') => Ok('\t'),
+        Some('"') => Ok('\"'),
+        Some('\'') => Ok('\''),
+        Some('\\') => Ok('\\'),
+        Some('u') => {
+            match chars.next() {
+                Some('{') => {}
+                Some(c) => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'{'".to_string(),
+                        found: format!("'{}'", c),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+                None => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'{'".to_string(),
+                        found: "EOS".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+            };
+
+            let mut hex = String::new();
+
+            for h in chars
+                .clone()
+                .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
+            {
+                hex.push(h);
+            }
+            let mut skipped = chars.by_ref().skip(hex.len());
+
+            match skipped.next() {
+                Some('}') => {}
+                Some(c) => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'}'".to_string(),
+                        found: format!("'{}'", c),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    });
+                }
+                None => {
+                    return Err(SyntaxError::ExpectedErr {
+                        expected: "'}'".to_string(),
+                        found: "EOS".to_string(),
+                        pos: tokens.position(),
+                        file: notes.file.clone(),
+                    })
+                }
+            };
+
+            if hex.is_empty() || hex.len() > 6 {
+                return Err(SyntaxError::ExpectedErr {
+                    expected: "2 to 6 hexadecimal characters".to_string(),
+                    found: hex.len().to_string(),
+                    pos: tokens.position(),
+                    file: notes.file.clone(),
+                });
+            }
+
+            Ok(std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap()).unwrap_or('\0'))
+        }
+        Some(a) => {
+            return Err(SyntaxError::SyntaxError {
+                message: format!("Invalid escape: \\{}", a),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            })
+        }
+        None => unreachable!(),
+    }
+}
+
+pub fn str_content(
+    mut inp: String,
+    tokens: &mut Tokens,
+    notes: &mut ParseNotes,
 ) -> Result<(String, Option<StringFlags>), SyntaxError> {
-    let first = inp.remove(0);
     inp.remove(inp.len() - 1);
 
     let mut out = (String::new(), None);
     let mut chars = inp.chars();
 
-    match first {
-        '\'' | '"' => {
+    let mut string_flag = String::new();
+
+    for c in chars.by_ref() {
+        if c == '\'' || c == '"' {
+            break;
+        } else {
+            string_flag.push(c);
+        }
+    }
+
+    match string_flag.as_str() {
+        "" => {
             while let Some(c) = chars.next() {
                 out.0.push(if c == '\\' {
-                    match chars.next() {
-                        Some('n') => '\n',
-                        Some('r') => '\r',
-                        Some('t') => '\t',
-                        Some('"') => '\"',
-                        Some('\'') => '\'',
-                        Some('\\') => '\\',
-                        Some('u') => {
-                            match chars.next() {
-                                Some('{') => {}
-                                Some(c) => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'{'".to_string(),
-                                        found: format!("'{}'", c),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    });
-                                }
-                                None => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'{'".to_string(),
-                                        found: "EOS".to_string(),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    });
-                                }
-                            };
-
-                            let mut hex = String::new();
-
-                            for h in chars
-                                .clone()
-                                .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
-                            {
-                                hex.push(h);
-                            }
-                            let mut skipped = chars.by_ref().skip(hex.len());
-
-                            match skipped.next() {
-                                Some('}') => {}
-                                Some(c) => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'}'".to_string(),
-                                        found: format!("'{}'", c),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    });
-                                }
-                                None => {
-                                    return Err(SyntaxError::ExpectedErr {
-                                        expected: "'}'".to_string(),
-                                        found: "EOS".to_string(),
-                                        pos: tokens.position(),
-                                        file: notes.file.clone(),
-                                    })
-                                }
-                            };
-
-                            if hex.is_empty() || hex.len() > 6 {
-                                return Err(SyntaxError::ExpectedErr {
-                                    expected: "2 to 6 hexadecimal characters".to_string(),
-                                    found: hex.len().to_string(),
-                                    pos: tokens.position(),
-                                    file: notes.file.clone(),
-                                });
-                            }
-
-                            std::char::from_u32(u32::from_str_radix(&hex, 16).unwrap())
-                                .unwrap_or('\0')
-                        }
-                        Some(a) => {
-                            return Err(SyntaxError::SyntaxError {
-                                message: format!("Invalid escape: \\{}", a),
-                                pos: tokens.position(),
-                                file: notes.file.clone(),
-                            })
-                        }
-                        None => unreachable!(),
-                    }
+                    char_escape(&mut chars, tokens, notes)?
                 } else {
                     c
                 });
             }
         }
-        'r' => {
-            // remove "
-            chars.next();
+        "64" => {
+            out.1 = StringFlags::Base64.into();
 
+            let mut actual_string = String::new();
+
+            while let Some(c) = chars.next() {
+                actual_string.push(if c == '\\' {
+                    char_escape(&mut chars, tokens, notes)?
+                } else {
+                    c
+                });
+            }
+
+            out.0 = base64::encode(actual_string);
+        }
+        "r" => {
             out.1 = StringFlags::Raw.into();
             out.0 = chars.collect()
         }
-        'u' => {
-            chars.next();
-
+        "u" => {
             out.1 = StringFlags::Unindent.into();
 
             let mut out_str = String::new();
 
             while let Some(c) = chars.next() {
                 out_str.push(if c == '\\' {
-                    match chars.next() {
-                        Some('n') => '\n',
-                        Some('r') => '\r',
-                        Some('t') => '\t',
-                        Some('"') => '\"',
-                        Some('\'') => '\'',
-                        Some('\\') => '\\',
-                        Some(a) => {
-                            return Err(SyntaxError::SyntaxError {
-                                message: format!("Invalid escape: \\{}", a),
-                                pos: tokens.position(),
-                                file: notes.file.clone(),
-                            })
-                        }
-                        None => unreachable!(),
-                    }
+                    char_escape(&mut chars, tokens, notes)?
                 } else {
                     c
                 });
             }
 
-            out_str = out_str.replace("\t", "    ");
+            out_str = out_str
+                .replace('\t', "    ")
+                .trim_start_matches(' ')
+                .to_string();
 
             if !out_str.starts_with('\n') {
                 return Err(SyntaxError::SyntaxError {
@@ -2003,7 +2039,7 @@ pub fn str_content(
             return Err(SyntaxError::SyntaxError {
                 file: notes.file.to_owned(),
                 pos: tokens.position(),
-                message: format!("Invalid string flag: {}", first),
+                message: format!("Invalid string flag: {}", string_flag),
             })
         }
     }
@@ -2220,6 +2256,22 @@ fn try_parse_macro(
     };
 }
 
+fn parse_number_radix(
+    tokens: &mut Tokens,
+    notes: &mut ParseNotes,
+    radix: u32,
+    prefix: &str,
+) -> Result<ast::ValueBody, SyntaxError> {
+    match u128::from_str_radix(&tokens.slice().replace('_', "").replace(prefix, ""), radix) {
+        Ok(n) => Ok(ast::ValueBody::Number(n as f64)),
+        Err(err) => return Err(SyntaxError::SyntaxError {
+            message: format!("Error when parsing number: {}", err),
+            pos: tokens.position(),
+            file: notes.file.clone(),
+        }),
+    }
+}
+
 fn parse_variable(
     tokens: &mut Tokens,
     notes: &mut ParseNotes,
@@ -2275,6 +2327,16 @@ fn parse_variable(
                 file: notes.file.clone(),
             });
         }
+        Some(Token::DotDotEq) => {
+            return Err(SyntaxError::SyntaxError {
+                message:
+                    "`..=` is not an unary operator. Replace with 0..= to fix."
+                        .to_string(),
+                pos: tokens.position(),
+                file: notes.file.clone(),
+            });
+        }
+
         Some(Token::Decrement) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Decrement)
@@ -2315,7 +2377,7 @@ fn parse_variable(
     let value = match first_token {
         // what kind of variable is it?
         Some(Token::Number) => {
-            ast::ValueBody::Number(match tokens.slice().replace("_", "").parse() {
+            ast::ValueBody::Number(match tokens.slice().replace('_', "").parse() {
                 Ok(n) => n, // its a valid number
                 Err(err) => {
                     return Err(SyntaxError::SyntaxError {
@@ -2328,46 +2390,22 @@ fn parse_variable(
             })
         }
         Some(Token::BinaryLiteral) => {
-            ast::ValueBody::Number(
-                match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0b", ""), 2) {
-                    Ok(n) => n as f64, // its a valid number
-                    Err(err) => {
-                        return Err(SyntaxError::SyntaxError {
-                            message: format!("Error when parsing number: {}", err),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        });
-                    }
-                },
-            )
+            match parse_number_radix(tokens, notes, 2, "0b") {
+                Ok(n) => n,
+                Err(err) => return Err(err),
+            }
         }
         Some(Token::HexLiteral) => {
-            ast::ValueBody::Number(
-                match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0x", ""), 16) {
-                    Ok(n) => n as f64, // its a valid number
-                    Err(err) => {
-                        return Err(SyntaxError::SyntaxError {
-                            message: format!("Error when parsing number: {}", err),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        });
-                    }
-                },
-            )
+            match parse_number_radix(tokens, notes, 16, "0x") {
+                Ok(n) => n,
+                Err(err) => return Err(err),
+            }
         }
         Some(Token::OctalLiteral) => {
-            ast::ValueBody::Number(
-                match i64::from_str_radix(&tokens.slice().replace("_", "").replace("0o", ""), 8) {
-                    Ok(n) => n as f64, // its a valid number
-                    Err(err) => {
-                        return Err(SyntaxError::SyntaxError {
-                            message: format!("Error when parsing number: {}", err),
-                            pos: tokens.position(),
-                            file: notes.file.clone(),
-                        });
-                    }
-                },
-            )
+            match parse_number_radix(tokens, notes, 8, "0o") {
+                Ok(n) => n,
+                Err(err) => return Err(err),
+            }
         }
         Some(Token::StringLiteral) => {
             // is a string

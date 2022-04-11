@@ -26,6 +26,7 @@ wait = #[desc("Adds a delay before the next triggers"), example(u"
 	}
 
 }
+
 call_with_delay = #[desc("Call a function after a delay"), example(u"
 	BG.set(rgb8(255, 0, 0)) // turn background red
 	call_with_delay(2, !{
@@ -41,27 +42,10 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
 		TARGET: function,
 	})
 }
-call_on_x_position = #[desc("Call a function after an x position"), example("
-BG.set(rgb8(255, 0, 0)) // turn background red
-call_on_x_position(300, !{
-	BG.set(rgb8(0, 255, 0)) // turn background green at x position 300
-})
-")] (
-	#[desc("X position")] position:@number,
-	#[desc("Function to call after reaching x position")] function:@trigger_function|@group,
-) {
-	$.add(obj{
-		OBJ_ID: 1268,
-		X: position,
-		Y: 2145, 
-		TARGET: function,
-	})
-}
+
 -> return {
 	wait: wait,
 	call_with_delay: call_with_delay,
-	call_on_x_position: call_on_x_position,
-
 
 
 	suppress_signal: #[desc("Stops signal from coming past for some time"), example(u"
@@ -156,21 +140,24 @@ call_on_x_position(300, !{
 		#[desc("Group or trigger function to call to stop suppression (default: current context)")]
 		group: @group | @trigger_function = null,
 	) -> @NULL {
+		context_func = match group {
+			@NULL: $.trigger_fn_context(),
+			else: group,
+		}
+
+		if context_func == 0g { -> return }
+
 		// 0 = suppressed
 		// 1 = not suppressed
 		checker = @counter::new(bits = 1, reset = false)
 
 		-> (){
-			context_func = match group {
-				@NULL: $.trigger_fn_context(),
-				else: group,
-			}
 			$.extend_trigger_func(context_func, (){
 				if checker == 0 { checker++ }
 			})
 		}()
 
-		if checker == 1 {
+		if checker > 0 {
 			-> return
 		}
 	},
@@ -186,27 +173,31 @@ call_on_x_position(300, !{
 	")]
     (
         #[desc("Range of values (for example 0..10)")] range: @range,
-	#[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: _ -> @NULL, // supposed to be @counter -> @NULL, but @counter isnt defined lol
+	      #[desc("Macro of the code that gets looped, should take the iterator (a counter) as the first argument.")] code: (@counter -> @NULL) | (() -> @NULL), // supposed to be @counter -> @NULL, but @counter isnt defined lol
         #[desc("Delay between loops (less than 0.05 may be unstable)")] delay: @number | @epsilon = @epsilon::{},
-        #[desc("Whether to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true,
+        //#[desc("Whether to reset the iterator after looping (only disable if the loop is only triggered once)")] reset: @bool = true,
     ) -> @NULL {
 		i = @counter::new(range.start)
 
         func = !{
-            code(i)
+            if code is (@counter -> @NULL) {
+                code(i)
+            } else {
+                code()
+            }
+            wait(delay)
 			i.add(range.step_size)
-			wait()
-            i.item.if_is(SMALLER_THAN, range.end, !{
-                call_with_delay(delay, func)
-            })
-
-            i.item.if_is(LARGER_THAN, range.end - 1, !{
-                if reset {
-					wait()
-                    i.reset()
-                }
-                -> return
-            })
+            if range.step_size > 0 {
+                i.item.if_is(SMALLER_THAN, range.end, func)
+                i.item.if_is(LARGER_THAN, range.end - 1, !{
+                    -> return
+                })
+            } else {
+                i.item.if_is(LARGER_THAN, range.end, func)
+                i.item.if_is(SMALLER_THAN, range.end + 1, !{
+                    -> return
+                })
+            }
         }
 
         func!
@@ -236,7 +227,7 @@ call_on_x_position(300, !{
 			}
         }
 
-        call_with_delay(delay, func)
+        func!
 	},
 
 	do_while_loop: #[desc("Implementation of a conditional spawn loop"), example(u"
@@ -255,15 +246,14 @@ call_on_x_position(300, !{
 	) -> @NULL {
 		func = !{
 			code()
-			wait(delay)
 			if expr() {
-				func!
+				call_with_delay(delay, func)
 			} else {
 				-> return
 			}
         }
 
-        call_with_delay(delay, func)
+        func!
 	},
 
 

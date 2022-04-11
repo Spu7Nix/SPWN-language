@@ -417,7 +417,7 @@ impl SpwnFmt for Expression {
     fn fmt(&self, ind: Indent) -> String {
         let mut out = String::new();
         for (i, op) in self.operators.iter().enumerate() {
-            if let Operator::Range = op {
+            if let Operator::Range|Operator::InclRange = op {
                 out += &format!("{}{}", self.values[i].fmt(ind), (*op).fmt(ind));
             } else {
                 out += &format!("{} {} ", self.values[i].fmt(ind), (*op).fmt(ind));
@@ -432,11 +432,12 @@ impl SpwnFmt for Expression {
 
 impl SpwnFmt for Id {
     fn fmt(&self, ind: Indent) -> String {
-        if self.unspecified {
-            format!("?{}", self.class_name.fmt(ind))
-        } else {
-            format!("{}{}", self.number, self.class_name.fmt(ind))
-        }
+        format!(
+            "{}{}{}",
+            self.number,
+            if self.unspecified { "?" } else { "" },
+            self.class_name.fmt(ind),
+        )
     }
 }
 
@@ -448,6 +449,7 @@ impl SpwnFmt for Operator {
             Operator::Equal => "==",
             Operator::NotEqual => "!=",
             Operator::Range => "..",
+            Operator::InclRange => "..=",
             Operator::MoreOrEqual => ">=",
             Operator::LessOrEqual => "<=",
             Operator::More => ">",

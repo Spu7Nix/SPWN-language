@@ -5,12 +5,6 @@ extract import "constants.spwn".comparisons
 import "events.spwn"
 DEFAULT_BITS = 16
 
-#[desc(u"
-`counter` is a wrapper around the item ID system in Geometry Dash. In practice, it works as a replacement for numbers.
-The difference between numbers and counters, is that counters can be modified in the level's runtime. 
-")]
-type @counter
-
 reset_counter = (
     c, for_each: @number -> @NULL = (n){}
 ){

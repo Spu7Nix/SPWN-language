@@ -10,6 +10,7 @@ matches = (v, p: MATCHER) -> @bool => match p {
 
 return {
 	objects: $.level_objects(),
+
 	get_objects: #[desc("Returns an array of all the objects in the level with a property whose value matches the pattern or macro"), example(u"
 		objects_over_x_50 = level.get_objects(obj_props.X, >50)
 		objects_with_group_2 = level.get_objects(obj_props.GROUPS, g => 2g in g)
@@ -19,6 +20,7 @@ return {
     ) -> [@object] {
 		return $.level_objects().filter(o => prop in o && matches(o[prop], pat))
     },
+
 	get_marker: #[desc("Returns the first text object found with the given text, or null if none are found"), example(u'
 		extract obj_props
 
@@ -34,4 +36,5 @@ return {
 		}
 		return null
 	},
+	
 }

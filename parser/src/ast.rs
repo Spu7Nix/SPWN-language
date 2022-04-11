@@ -143,6 +143,7 @@ pub struct StrInner {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum StringFlags {
+    Base64,
     Raw,
     Unindent,
 }
@@ -154,6 +155,7 @@ pub enum Operator {
     Equal,
     NotEqual,
     Range,
+    InclRange,
     Is,
     MoreOrEqual,
     LessOrEqual,

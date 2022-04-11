@@ -45,10 +45,10 @@ You can either use the installers for your operating system, or build SPWN from 
 
 With Rust installed:
 
-- Run `cargo install spwn`
-- Wait for it to compile
-- Download the [libraries](https://github.com/Spu7Nix/SPWN-language/tree/v0.6-beta/libraries) folder
-- Copy the libraries folder to `$HOME/.cargo/bin/spwn`
+- Run `cargo install spwn`.
+- Wait for it to compile.
+- Download the [libraries](https://github.com/Spu7Nix/SPWN-language/tree/v0.6-beta/libraries) folder.
+- Copy the libraries folder to `$HOME/.cargo/bin/spwn`.
 - Make something awesome!
 
 If you would like a pre-compiled package, look below.
@@ -69,21 +69,28 @@ If you would like a pre-compiled package, look below.
 
 ### Linux
 
+### Generic (any distro)
+- Download `spwn-0.0.8-x86_64.tar.gz` from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases).
+- Extract the tarball using `tar -xvf spwn-0.0.8-x86_64.tar.gz`.
+- Run SPWN using `./spwn`.
+- Optional: add SPWN to path by adding `PATH=$PATH:<where you extracted spwn>` to your `.bashrc` or `.zshrc`.
+
 #### Debian based (Ubuntu, Mint, Elementary, ...)
 
-**No v0.7 installers for Debian based distros have been built yet.**
+**No v0.7 or v0.8 installers for Debian based distros have been built yet.**
 
 You can either:
 
 - Download the .deb file from the [latest release](https://github.com/Spu7Nix/SPWN-language/releases) and install it using dpkg with `sudo dpkg -i spwn_0.0.6-0_amd64.deb`.
-- Use a one-liner to do this faster: `curl -sLO https://github.com/Spu7Nix/SPWN-language/releases/download/v0.6-beta/spwn_0.6.0-0_amd64.deb && sudo dpkg -i spwn_0.6.0-0_amd64.deb`
+- Use a one-liner to do this faster: `curl -sLO https://github.com/Spu7Nix/SPWN-language/releases/download/v0.6-beta/spwn_0.6.0-0_amd64.deb && sudo dpkg -i spwn_0.6.0-0_amd64.deb`.
+- Use the generic install method.
 
 #### Arch based (Manjaro, Artix, ...)
 
 - Install the [arch package](https://github.com/Spu7Nix/SPWN-language/releases) using pacman:
 
 ```cmd
-pacman -U spwn-0.0.7-x86_64-linux_arch.pkg.tar.zst
+pacman -U spwn-0.0.8-x86_64-linux_arch.pkg.tar.zst
 ```
 
 - Alternatively, you can install the SPWN binary from the AUR (replace yay with your helper of choice):
@@ -106,16 +113,19 @@ Once you have these, run:
 cargo install spwn
 ```
 
-Let it compile and you're good to go
+Let it compile and you're good to go.
 
 ### Compiling from source
 
-1. Download source code from this repository
-2. Unzip the .zip file
-3. Install rust if you haven't already
-4. Open the unzipped folder in the terminal
-5. Run `cargo build`
-6. Compiled binary is placed in `target/debug`
+1. [Download](https://github.com/Spu7Nix/SPWN-language/archive/refs/heads/master.zip) the source code from this repository.
+2. Unzip the .zip file.
+3. Install rust (if you haven't already).
+4. Open the unzipped folder in the terminal by
+- Windows: Right click the folder and press `Open command window here`.
+- Mac: Open `Terminal.app` in the `Utilities` folder in the `Applications` folder, then drag and drop the folder onto the terminal window and press enter.
+- Linux: Right click the folder and press `Open in Terminal`.
+6. Run `cargo build --release`.
+7. Compiled binary is placed in the `target/release` directory.
 
 ## Using SPWN
 
@@ -131,7 +141,7 @@ SPWN code can be programmed in any code editor, but the ones that have had SPWN 
 
 #### VSCode
 
-Navigate to [VSCode SPWN language support](https://marketplace.visualstudio.com/items?itemName=Spu7Nix.spwn-language-support) and hit install. In VSCode, hit enable and then create a new file with the extension .spwn
+Navigate to [VSCode SPWN language support](https://marketplace.visualstudio.com/items?itemName=Spu7Nix.spwn-language-support) and hit install. In VSCode, hit enable and then create a new file with the extension .spwn.
 
 > **Note:** Make sure to have the file in the same directory as the libraries folder.
 
@@ -169,49 +179,55 @@ Here is a list of SPWN command line subcommands and flags. This information can 
 
 ### Subcommands
 
-```cmd
-build [script file], b [script file]
-Runs/builds a given file
+```
+build    
+    Runs/builds a given file [aliases: b]
 
-doc [library path]
-Generates documentation for a SPWN library, in the form of a markdown file
+doc      
+    Generates documentation for a SPWN library, in the form of a markdown file
 
-version, -v, --version
-Gets the version of spwn
+eval     
+    Runs/builds the input given in stdin/the console as SPWN code [aliases: b]
+
+help  
+    Print this message or the help of the given subcommand(s)
 ```
 
-### Flags
+### Build Flags
 
-```cmd
---console-output, -c
-Makes the script print the created level into the console instead of
-writing it to your save file
+```
+-a, --allow <allow>...
+    Allow the use of a builtin
 
---no-level, -l
-Only compiles the script, no level creation at all
+-c, --console-output
+    Makes the script print the created level into the console instead of writing it to your
+    save file
 
---no-optimize, -o
-Removes post-optimization of triggers, making the output more readable,
-while also using a lot more objects and groups
+-d, --deny <deny>...
+    Deny the use of a builtin
 
---level-name [name], -n [name]
-Targets a specific level
+-e, --live-editor
+    Instead of writing the level to the save file, the script will use a live editor library
+    if it's installed (Currently works only for MacOS)
 
---live-editor, -e
-Instead of writing the level to the save file, the script will use a
-live editor library if it's installed (Currently works only for MacOS)
+-h, --help
+    Print help information
 
---save-file [file], -s [file]
-Chooses a specific save file to write to
+-i, --include-path <include-path>...
+    Adds a search path to look for librariesAdds a search path to look for libraries
 
---include-path [folder], -i [folder]
-Adds a search path to look for libraries
+-l, --no-level
+    Only compiles the script, no level creation at all
 
---allow [builtin]
-Allow use of a builtin
+-n, --level-name <NAME>...
+    Targets a specific level
 
---deny [builtin]
-Deny use of a builtin
+-o, --no-optimize
+    Removes post-optimization of triggers, making the output more readable, while also using
+    a lot more objects and groups
+
+-s, --save-file <FILE>...
+    Chooses a specific save file to write to
 ```
 
 ### Examples

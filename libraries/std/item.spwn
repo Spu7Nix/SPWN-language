@@ -44,15 +44,19 @@ impl @item {
         on(4i.count(3), !{
             BG.set(rgb(0, 0, 0))
         })
-    ")] (self, hits: @number, multi: @bool = true) -> @event {
+    ")]
+    (
+        self,
+        #[desc("Number to check against")] number: @number = 0
+    ) -> @event {
         event = @event::new()
         $.add( trigger{
             OBJ_ID: 1611,
-            ACTIVATE_GROUP: true,
             TARGET: event.io,
+            COUNT: number,
+            ACTIVATE_GROUP: true,
             ITEM: self,
-            COUNT: hits,
-            COUNT_MULTI_ACTIVATE: multi,
+            COUNT_MULTI_ACTIVATE: true,
         })
         return event
     },
