@@ -15,10 +15,8 @@ impl @path {
             ext: parsed.ext,
         }
     },
-    cwd: #[constructor, desc("Returns the current working directory")]
+    cwd: #[constructor, desc("Returns the current working directory path")]
     () -> @path => @path::new($.cwd()),
-    dirname: #[constructor, desc("Returns the directory name of the path")]
-    () -> @path => @path::new($.dirname()),
 
     parse: #[desc("Parses a path")] (path: @string) -> @dictionary {
         let path = path.replace(r"\\","/").replace(r"/+","/")
