@@ -1,7 +1,16 @@
-$.print("CWD kind: ", @path::new($.cwd()).kind())
-$.print("CWD print: ", @path::new($.cwd()).readdir())
+// cargo run build test/path_test.spwn -l --allow filekind --allow readdir --allow fileexists --allow readfile
 
-my_file = @path::new($.cwd()).join('test/readfiletest.txt');
-$.print("readfiletest path: ", my_file)
-$.print("does it exists: ", my_file.exists())
-$.print("readfiletest content: ", my_file.read())
+cwd = @path::new($.cwd())
+dirname = @path::new($.dirname())
+test = dirname.join('readfiletest.txt')
+
+$.assert(cwd.kind() == "dir")
+$.assert(cwd.is_absolute() == true)
+$.assert(cwd.readdir().contains("README.md"))
+$.assert(dirname.is_relative())
+$.assert(dirname.format() == "test")
+$.assert(test.kind() == "file")
+$.assert(test.exists() == true)
+$.assert(test.read() == "hello uwu")
+
+$.print("everything seems correct! 😎")

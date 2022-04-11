@@ -2,6 +2,7 @@
 #![allow(unused_assignments)]
 use internment::LocalIntern;
 use shared::StoredValue;
+use shared::SpwnSource;
 
 use crate::compiler_types::*;
 use crate::context::*;
@@ -15,6 +16,7 @@ use std::fs;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::path::Path;
+use std::path::PathBuf;
 
 use crate::value::*;
 use crate::value_storage::*;
@@ -1453,8 +1455,18 @@ $.random(1..11) // returns a random integer between 1 and 10
         };
     }
 
-    [CWD] #[safe = true, desc = "returns the current working directory", example = "$.cwd() // \"C:/spwn_projects/current_project/idk_how_to_name_it/\""] fn cwd() {
+    [CWD] #[safe = true, desc = "Returns the current working directory", example = "$.cwd() // \"C:/spwn/\""] fn cwd() {
         Value::Str(env::current_dir().unwrap().to_str().unwrap().to_string())
+    }
+
+    [DirName] #[safe = true, desc = "Returns the directory of the current spwn file", example = "$.dirname() // \"C:/spwn/\""] fn dirname() {
+        let mut path = match info.position.file.as_ref().clone() {
+            SpwnSource::File(f) => f,
+            SpwnSource::BuiltIn(b) => b,
+            SpwnSource::String(s) => PathBuf::from(s.as_ref().clone()),
+        };
+        path.pop(); // remove the basename
+        Value::Str(path.to_str().unwrap().to_string())
     }
 
     [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local system (uses the current directory as base for relative paths)", example = "data = $.readfile(\"file.txt\")"]

@@ -6,7 +6,7 @@ type @path
 absolute_regex = r"^([a-zA-Z]:|~)?[\/]"
 
 impl @path {
-    new: #[desc("Creates a new path")] (path: @string) -> @path {
+    new: #[constructor, desc("Creates a new path")] (path: @string) -> @path {
         parsed = @path::parse(path)
         return @path::{
             root: parsed.root,
@@ -15,6 +15,11 @@ impl @path {
             ext: parsed.ext,
         }
     },
+    cwd: #[constructor, desc("Returns the current working directory")]
+    () -> @path => @path::new($.cwd()),
+    dirname: #[constructor, desc("Returns the directory name of the path")]
+    () -> @path => @path::new($.dirname()),
+
     parse: #[desc("Parses a path")] (path: @string) -> @dictionary {
         let path = path.replace(r"\\","/").replace(r"/+","/")
         let root_find = path.find_all(absolute_regex)
@@ -61,12 +66,14 @@ impl @path {
         }
     },
     format: #[desc("Formats a path")] (self) -> @string {
-        return "{}{}{}{}".fmt([
+        let formatted = "{}{}{}{}".fmt([
             self.root,
             self.dir,
             "/" if self.dir.length > 0 && self.basename().length > 0 else "",
             self.basename(),
         ])
+
+        return formatted if formatted.length > 0 else "./"
     },
     basename: #[desc("Returns the basename of the path")] (self) -> @string {
         return "{}{}".fmt([
@@ -78,6 +85,8 @@ impl @path {
     // helper methods
     is_absolute: #[desc("Returns whether the path is absolute")]
     (self) -> @bool => self.root.length > 0,
+    is_relative: #[desc("Returns whether the path is relative")]
+    (self) -> @bool => self.root.length == 0,
 
     // FS general
     exists: #[desc("Returns whether the path exists")]
