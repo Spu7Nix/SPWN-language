@@ -17,6 +17,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::SystemTime;
 
 use crate::value::*;
 use crate::value_storage::*;
@@ -1684,6 +1685,28 @@ $.random(1..11) // returns a random integer between 1 and 10
                 return Err(RuntimeError::BuiltinError {
                     builtin,
                     message: format!("Error when checking file type: {}", e),
+                    info,
+                });
+            },
+        }
+    }
+
+    [MetaData] #[safe = false, desc = "Returns the metadata of an item in the local system", example = "$.metadata(\"file.txt\")"] fn metadata((path): Str) {
+        match fs::metadata(path) {
+            Ok(meta) => {
+                let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
+                let mut store = |value| store_const_value(value, globals, context.start_group, info.position);
+                dict.insert(LocalIntern::new(String::from("size")), store(Value::Number(meta.len() as f64)));
+                dict.insert(LocalIntern::new(String::from("modified")), store(Value::Number(meta.modified().unwrap().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64())));
+                dict.insert(LocalIntern::new(String::from("accessed")), store(Value::Number(meta.accessed().unwrap().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64())));
+                dict.insert(LocalIntern::new(String::from("created")), store(Value::Number(meta.created().unwrap().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64())));
+                dict.insert(LocalIntern::new(String::from("readonly")), store(Value::Bool(meta.permissions().readonly())));
+                Value::Dict(dict)
+            }
+            Err(e) => {
+                return Err(RuntimeError::BuiltinError {
+                    builtin,
+                    message: format!("Error when checking for file metadata: {}", e),
                     info,
                 });
             },

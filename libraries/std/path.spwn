@@ -5,6 +5,17 @@ type @path
 
 absolute_regex = r"^([a-zA-Z]:|~)?[\/]"
 
+exists_error = (path: @path) {
+    if !path.exists() {
+        throw "File `{}` does not exist".fmt(path.format())
+    }
+}
+readonly_error = (path: @path) {
+    if path.metadata().readonly {
+        throw "File `{}` is readonly".fmt(path.format())
+    }
+}
+
 impl @path {
     new: #[constructor, desc("Creates a new path")] (path: @string) -> @path {
         parsed = @path::parse(path)
@@ -93,27 +104,44 @@ impl @path {
     },
     kind: #[desc("Returns the kind of the file")]
     (self) -> @string {
+        exists_error(self)
         return $.filekind(self.format())
+    },
+    metadata: #[desc("Returns the metadata of the file")]
+    (self) -> @dictionary {
+        exists_error(self)
+        return $.metadata(self.format())
     },
 
     // FS file operations
     read: #[desc("Reads the contents of the file")]
     (self, mode: @string = "text") -> @array|@bool|@dictionary|@number|@string {
+        exists_error(self)
         return $.readfile(self.format(), mode)
     },
     write: #[desc("Writes the contents to the file (it will overwrite previous contents)")]
-    (self, contents: @string) -> @string {
-        return $.writefile(self.format(), contents)
+    (self, contents: @string) -> @NULL {
+        exists_error(self)
+        readonly_error(self)
+        $.writefile(self.format(), contents)
     },
-    append: #[desc("Appends the contents to the file")] (self, contents: @string) -> @string {
-        return $.writefile($.readfile(self.format()) + contents)
+    append: #[desc("Appends the contents to the file")] (self, contents: @string) -> @NULL {
+        exists_error(self)
+        readonly_error(self)
+        $.writefile(
+            self.format(),
+            $.readfile(self.format()) + contents,
+        )
     },
-    delete: #[desc("Deletes the file")] (self) -> @string {
-        return $.deletefile(self.format())
+    delete: #[desc("Deletes the file")] (self) -> @NULL {
+        exists_error(self)
+        readonly_error(self)
+        $.deletefile(self.format())
     },
 
     // FS directory operations
     readdir: #[desc("Reads the contents of the directory")] (self) -> [@string] {
+        exists_error(self)
         return $.readdir(self.format())
     },
     mkdir: #[desc("Creates the directory")] (self) -> @NULL {
@@ -124,6 +152,8 @@ impl @path {
         self,
         #[desc("Removes the entire directory with it's contents if set to true (be careful!)")] recursive = false
     ) -> @NULL {
+        exists_error(self)
+        readonly_error(self)
         if recursive {
             $.rmdir_all(self.format())
         } else {
