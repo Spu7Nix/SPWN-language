@@ -1399,7 +1399,7 @@ $.random(1..11) // returns a random integer between 1 and 10
         Value::Str(path.to_str().unwrap().to_string())
     }
 
-    [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local system (uses the current directory as base for relative paths)", example = "data = $.readfile(\"file.txt\")"]
+    [ReadFile] #[safe = false, desc = "Returns the contents of a file in the local file system (uses the current directory as base for relative paths)", example = "data = $.readfile(\"file.txt\")"]
     fn readfile(#["Path of file to read, and the format it's in (\"text\", \"bin\", \"json\", \"toml\" or \"yaml\")"]) {
         if arguments.is_empty() || arguments.len() > 2 {
             return Err(RuntimeError::BuiltinError {
@@ -1636,7 +1636,7 @@ $.random(1..11) // returns a random integer between 1 and 10
     }
 
 
-    [WriteFile] #[safe = false, desc = "Writes a string to a file in the local system (any previous content will be overwritten, and a new file will be created if it does not already exist)", example = "$.write_file(\"file.txt\", \"Hello\")"]
+    [WriteFile] #[safe = false, desc = "Writes a string to a file in the local file system (any previous content will be overwritten, and a new file will be created if it does not already exist)", example = "$.write_file(\"file.txt\", \"Hello\")"]
     fn writefile((path): Str, (data): Str) {
 
 
@@ -1653,7 +1653,7 @@ $.random(1..11) // returns a random integer between 1 and 10
         Value::Null
     }
 
-    [DeleteFile] #[safe = false, desc = "Deletes a file in the local system", example = "$.deletefile(\"file.txt\")"] fn deletefile((path): Str) {
+    [DeleteFile] #[safe = false, desc = "Deletes a file in the local file system", example = "$.deletefile(\"file.txt\")"] fn deletefile((path): Str) {
         match fs::remove_file(path) {
             Ok(_) => (),
             Err(e) => {
@@ -1667,11 +1667,11 @@ $.random(1..11) // returns a random integer between 1 and 10
         Value::Null
     }
 
-    [FileExists] #[safe = false, desc = "Checks if an item exists in the local system", example = "$.fileexists(\"file.txt\")"] fn fileexists((path): Str) {
+    [FileExists] #[safe = false, desc = "Checks if a member exists in the local file system", example = "$.fileexists(\"file.txt\")"] fn fileexists((path): Str) {
         Value::Bool(fs::metadata(path).is_ok())
     }
 
-    [FileKind] #[safe = false, desc = "Returns the kind of an item in the local system", example = "$.filekind(\"file.txt\")"] fn filekind((path): Str) {
+    [FileKind] #[safe = false, desc = "Returns the kind of a member of the local file system", example = "$.filekind(\"file.txt\")"] fn filekind((path): Str) {
         match fs::metadata(path) {
             Ok(meta) => {
                 let kind = match meta.file_type() {
@@ -1691,7 +1691,7 @@ $.random(1..11) // returns a random integer between 1 and 10
         }
     }
 
-    [MetaData] #[safe = false, desc = "Returns the metadata of an item in the local system", example = "$.metadata(\"file.txt\")"] fn metadata((path): Str) {
+    [MetaData] #[safe = false, desc = "Returns the metadata of a file or directory in the local file system", example = "$.metadata(\"file.txt\")"] fn metadata((path): Str) {
         match fs::metadata(path) {
             Ok(meta) => {
                 let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
@@ -1713,7 +1713,7 @@ $.random(1..11) // returns a random integer between 1 and 10
         }
     }
 
-    [ReadDir] #[safe = false, desc = "Reads the contents of a directory in the local system", example = "$.readdir(\"/\")"] fn readdir((path): Str) {
+    [ReadDir] #[safe = false, desc = "Reads the contents of a directory in the local file system", example = "$.readdir(\"/\")"] fn readdir((path): Str) {
         let mut arr: Vec<StoredValue> = vec![];
         for entry in fs::read_dir(path).unwrap() {
             let entry = match entry {
@@ -1733,7 +1733,7 @@ $.random(1..11) // returns a random integer between 1 and 10
         Value::Array(arr)
     }
 
-    [MkDir] #[safe = false, desc = "Creates a directory in the local system", example = "$.mkdir(\"/\")"] fn mkdir((path): Str) {
+    [MkDir] #[safe = false, desc = "Creates a directory in the local file system", example = "$.mkdir(\"/\")"] fn mkdir((path): Str) {
         match fs::create_dir(path) {
             Ok(_) => (),
             Err(e) => {
@@ -1747,7 +1747,7 @@ $.random(1..11) // returns a random integer between 1 and 10
         Value::Null
     }
 
-    [RmDir] #[safe = false, desc = "Removes an empty directory in the local system", example = "$.rmdir(\"folder\")"] fn rmdir((path): Str) {
+    [RmDir] #[safe = false, desc = "Removes an empty directory in the local file system", example = "$.rmdir(\"folder\")"] fn rmdir((path): Str) {
         match fs::remove_dir(path) {
             Ok(_) => (),
             Err(e) => {
@@ -1761,7 +1761,7 @@ $.random(1..11) // returns a random integer between 1 and 10
         Value::Null
     }
 
-    [RmDirAll] #[safe = false, desc = "Removes a directory in the local system", example = "$.rmdirall(\"folder\")"] fn rmdir_all((path): Str) {
+    [RmDirAll] #[safe = false, desc = "Removes a directory in the local file system", example = "$.rmdirall(\"folder\")"] fn rmdir_all((path): Str) {
         match fs::remove_dir_all(path) {
             Ok(_) => (),
             Err(e) => {
