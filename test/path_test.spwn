@@ -1,0 +1,23 @@
+// cargo run build test/path_test.spwn -l --allow filekind --allow readdir --allow fileexists --allow readfile --allow writefile --allow metadata
+
+cwd = path($.cwd())
+dirname = path($.dirname())
+test = dirname.join('readfiletest.txt')
+
+$.assert(cwd.kind() == "dir")
+$.assert(cwd.is_absolute() == true)
+$.assert(cwd.readdir().contains("README.md"))
+$.assert(dirname.is_relative() == true)
+$.assert(dirname.format() == "test")
+$.assert(test.kind() == "file")
+$.assert(test.exists() == true)
+$.assert(test.metadata().readonly == false)
+if test.metadata().size != 9 { test.write("hello uwu") }
+if test.read() != "hello uwu" { test.write("hello uwu") }
+$.assert(test.read() == "hello uwu")
+test.append("\nhi owo")
+$.assert(test.read() == "hello uwu\nhi owo")
+test.write("hello uwu")
+$.assert(test.read() == "hello uwu")
+
+$.print("everything seems correct! 😎")
