@@ -25,7 +25,7 @@ use crate::value_storage::*;
 use std::io::stdout;
 use std::io::Write;
 
-use std::collections::hash_map::DefaultHasher;
+use std::collections::hash_map::{DefaultHasher, HashMap};
 
 // BUILT IN STD
 use include_dir::{Dir, File};
@@ -162,10 +162,6 @@ impl Value {
         globals: &mut Globals,
         info: CompilerInfo,
     ) -> Option<StoredValue> {
-        let get_impl = |t: u16, m: LocalIntern<String>| match globals.implementations.get(&t) {
-            Some(imp) => imp.get(&m).map(|mem| mem.0),
-            None => None,
-        };
         if member == globals.TYPE_MEMBER_NAME {
             return Some(match self {
                 Value::Dict(dict) => match dict.get(&globals.TYPE_MEMBER_NAME) {
@@ -234,7 +230,51 @@ impl Value {
                     }
                     _ => (),
                 },
+                Value::Macro(m) => {
+
+                    match member.as_ref().as_str() {
+                        "args" => {
+                            let mut args = vec![];
+                            for MacroArgDef {name, default, pattern, ..} in &m.args {
+                                let mut dict_map = FnvHashMap::default();
+                                dict_map.insert(LocalIntern::new(String::from("name")), store_const_value(
+                                    Value::Str(name.to_string()),
+                                    globals,
+                                    context.start_group,
+                                    info.position,
+                                ));
+                                if let Some(v) = default {
+                                    dict_map.insert(LocalIntern::new(String::from("default")), *v);
+                                }
+                                if let Some(v) = pattern {
+                                    dict_map.insert(LocalIntern::new(String::from("pattern")), *v);
+                                }
+                                args.push(
+                                    store_const_value(
+                                        Value::Dict(dict_map),
+                                        globals,
+                                        context.start_group,
+                                        info.position,
+                                    )
+                                )
+                            }
+                            return Some(store_const_value(
+                                Value::Array(args),
+                                globals,
+                                context.start_group,
+                                info.position,
+                            ))
+                        }
+                        _ => (),
+                    }
+
+                }
                 _ => (),
+            };
+
+            let get_impl = |t: u16, m: LocalIntern<String>| match globals.implementations.get(&t) {
+                Some(imp) => imp.get(&m).map(|mem| mem.0),
+                None => None,
             };
 
             match self {
