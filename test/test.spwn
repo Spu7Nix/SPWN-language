@@ -1,14 +1,12 @@
-frames(10)
-frames(10)
-frames(10)
-frames(10)
-frames(10)
-frames(10)
-@log::runtime::flash(rgb8(255, 0, 100))
-frames(10)
-frames(10)
-frames(10)
-frames(10)
-frames(10)
-frames(10)
-@log::runtime::flash(rgb8(0, 255, 100))
+#[no_level]
+
+
+
+a = (a, b, lol: @number, gaga = 4, bruh: @string = "aa") {
+
+}
+
+for arg in a.args {
+    $.print(arg);
+}
+
