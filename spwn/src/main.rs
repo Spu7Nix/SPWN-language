@@ -166,18 +166,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
                 .about("Generates documentation for a SPWN library, in the form of a markdown file"),
 
-                App::new("new")
+            App::new("new")
                 .about("Creates a new SPWN project in the given directory"
             )
                 .args(&[
+                    arg!(-l --"lib" "Creates a PCKP-compatible SPWN library"),
                     arg!(<PATH> "Path to create project in").value_hint(ValueHint::AnyPath),
-                ]),
-
-            App::new("lib")
-                .about("Creates a new PCKP-compatible SPWN library"
-            )
-                .args(&[
-                    arg!(<PATH> "Path to create library in").value_hint(ValueHint::AnyPath),
                 ]),
         ]
     ).global_setting(clap::AppSettings::ArgRequiredElseHelp).get_matches();
@@ -263,33 +257,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         //println!("doc {:?}", documentation);
 
         Ok(())
-    } else if let Some(doc_cmd) = matches.subcommand_matches("new") {
-        let lib_path = doc_cmd.value_of("PATH").unwrap();
+    } else if let Some(new_cmd) = matches.subcommand_matches("new") {
+        let lib_path = new_cmd.value_of("PATH").unwrap();
         let mut path = PathBuf::from(lib_path);
-        fs::create_dir_all(&path).unwrap();
-        path.push("main.spwn");
 
-        fs::write(path, 
+        if !new_cmd.is_present("lib") {
+            fs::create_dir_all(&path).unwrap();
+            path.push("main.spwn");
+
+            fs::write(path, 
 "
 
 $.print(\"Hello world!\")
 
 "
-        ).unwrap();
+            ).unwrap();
 
-        Ok(())
-    } else if let Some(doc_cmd) = matches.subcommand_matches("lib") {
-        let lib_path = doc_cmd.value_of("PATH").unwrap();
-        let path = PathBuf::from(lib_path);
+        } else {
+            let mut src_path = path.clone(); src_path.push("src");
+            let mut yaml_path = path.clone(); yaml_path.push("pckp.yaml");
 
-        let mut src_path = path.clone(); src_path.push("src");
-        let mut yaml_path = path.clone(); yaml_path.push("pckp.yaml");
+            fs::create_dir_all(&src_path).unwrap();
+            src_path.push("lib.spwn");
 
-        fs::create_dir_all(&src_path).unwrap();
-        src_path.push("lib.spwn");
-
-        fs::write(src_path, 
-"
+            fs::write(src_path, 
+    "#[cache_output]
 
 greeting = () {
     $.print(\"Hello world\")
@@ -300,19 +292,20 @@ return {
 }
 
 "
-        ).unwrap();
+            ).unwrap();
 
-        fs::write(yaml_path, 
-format!("%YAML 1.2
+            fs::write(yaml_path, 
+    format!("%YAML 1.2
 ---
 
 name: {}
 version: 1.0.0
 folders:
-  - src
-
-", path.file_name().unwrap().to_str().unwrap())
-        ).unwrap();
+- src
+",
+            path.file_name().unwrap().to_str().unwrap())
+            ).unwrap();
+        }
 
         Ok(())
     } else {
