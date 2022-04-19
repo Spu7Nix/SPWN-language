@@ -1,4 +1,17 @@
 #[no_std, cache_output]
+
+array_callback = (cb: @macro, value, index: @number, array: @array) -> _ {
+    return match cb {
+        ()->_: cb(),
+        (_)->_: cb(value),
+        (_,_)->_: cb(value, index),
+        (_,_,_)->_: cb(value, index, array),
+        else: (){
+            throw "Expected 0 to 3 macro arguments, got {} arguments.".fmt(cb.args.length)
+        }(),
+    }
+}
+
 impl @array {
 
     is_empty: #[desc("Returns true if the array has a length of 0, false otherwise."), example(u"
@@ -143,7 +156,7 @@ $.assert(arr.index_all(2) == [2,4])
     ")]
     (self) -> @number {
         numbers = self.filter(v => (v is @number) && v.is_finite())
-        return numbers.sum() / numbers.length
+        return numbers.sum() / numbers.length if numbers.length > 0 else 0
     },
 
     center: #[desc("Returns the item in the center of the array."), example(u"
@@ -261,68 +274,60 @@ $.assert(arr.index_all(2) == [2,4])
         return $.remove_index(self, index)
     },
 
-    remove: #[desc("Returns array with all elements that match value removed"), example(u"
+    remove: #[desc("Returns array without provided  with all elements that match value removed"), example(u"
         let arr = [1, 2, 3, 4, 5]
         $.assert(arr.remove(3) == [1, 2, 4, 5])
     ")]
-    (self, index: @number) -> @array {
-        return self.map(x => x if x != index else null).filter(el => el != null)
+    (self, value) -> @array {
+        return self.map(x => x if x != value else @NULL::{}).filter(el => el != @NULL::{})
     },
 
     map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results, or modifies in place if specified."), example(u"
         arr = [1, 2, 3, 4, 5]
         $.assert(arr.map(el => el * 2) == [2, 4, 6, 8, 10])
+        $.assert(arr.map((el,ind) => el * ind) == [0, 2, 6, 12, 20])
+        $.assert(arr.map((el,ind,arr) => el * arr[ind*2%arr.length]) == [1, 6, 15, 8, 20])
     ")]
-    (self, cb: _ -> _, in_place: @bool = false) -> @array | @NULL {
-        if !in_place {
-            let output = [];
-            for iter in self {
-                output.push(cb(iter));
-            }
-            return output;
-        } else {
-            for i in 0..self.length {
-                self[i] = cb(self[i])
-            }
+    (
+        self,
+        #[desc("Callback can have from 0 to 3 arguments, `(value, index, array)`")] cb: @macro
+    ) -> @array {
+        let output = [];
+        for index in 0..self.length {
+            value = self[index]
+            current = array_callback(cb, self[index], index, self)
+            output.push(current)
         }
-    },
-
-    map_index: #[desc("Calls a defined callback function on each element of an array along with its index, and returns an array that contains the results, or modifies in place if specified."), example(u"
-        arr = [1, 2, 3, 4, 5]
-        $.assert(arr.map_index((el, i) => el + i) == [1, 3, 5, 7, 9])
-    ")]
-    (self, cb: (_, @number) -> _, in_place: @bool = false) -> @array | @NULL {
-        if !in_place {
-            let output = [];
-            for i in 0..self.length {
-                output.push(cb(self[i],i));
-            }
-            return output;
-        } else {
-            for i in 0..self.length {
-                self[i] = cb(self[i],i)
-            }
-        }
+        return output;
     },
 
     filter: #[desc("Returns the elements of an array that meet the condition specified in the callback function."), example(u"
-        arr = [1, 2, 3, 4, 5]
-        $.assert(arr.filter(el => el > 3) == [4, 5])
+        arr1 = [1, 2, 3, 4, 5]
+        $.assert(arr1.filter(el => el > 3) == [4, 5])
+        $.assert(arr1.filter(>3) == [4, 5])
+
+        arr2 = ['a', 1, true, 'b', 2, false, 'c']
+        $.assert(arr2.filter(@number) == [1, 2])
+        $.assert(arr2.filter(@string) == ['a', 'b', 'c'])
+        $.assert(arr2.filter(@bool) == [true, false])
+
     ")]
-    (self, cb: (_ -> @bool) | @pattern, in_place: @bool = false) -> @array | @NULL {
+    (self, cb: (_ -> @bool) | @pattern | @type_indicator) -> @array | @NULL {
         let output = [];
-        for iter in self {
-            let r = cb(iter) if cb is @macro else iter is cb;
-            if r.type != @bool {
-                throw "Filter must return a boolean value";
-            } else if r {
-                output.push(iter)
+        for index in 0..self.length {
+            value = self[index]
+            if cb is @macro {
+                current = array_callback(cb, value, index, self)
+                if current is @bool {
+                    if current { output.push(value) }
+                } else {
+                    throw "Filter must return a boolean value";
+                }
+            } else {
+                if value is cb { output.push(value) }
             }
         }
-        if !in_place {
-            return output
-        }
-        self = output
+        return output
     },
     reduce: #[desc("Calls the specified callback function for all the elements in an array with a default value. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function."),
     example(u"
@@ -385,13 +390,23 @@ $.assert(arr.index_all(2) == [2,4])
             $.assert(arr.any())
             arr2 = [1, 2, 3, 1, 4, -1, 7]
             $.assert(arr2.any(el => el < 0)) // checks if the array contains any negative elements
+            $.assert(arr2.any(>0) == true)
+            $.assert(arr2.any(@string) == false)
+            $.assert(arr2.any(@number) == true)
         ")
     ]
-    (self, map: (_ -> @bool) | @pattern = (a) => @bool(a)) -> @bool {
-        for item in self {
-            b = map(item) if map is @macro else item is map
-            if b {
-                return true
+    (self, cb: (_ -> @bool) | @pattern | @type_indicator = (a) => @bool(a)) -> @bool {
+        for index in 0..self.length {
+            value = self[index]
+            if cb is @macro {
+                current = array_callback(cb, value, index, self)
+                if current is @bool {
+                    if current { return true }
+                } else {
+                    throw "Filter must return a boolean value";
+                }
+            } else {
+                if value is cb { return true }
             }
         }
         return false
@@ -402,12 +417,20 @@ $.assert(arr.index_all(2) == [2,4])
         $.assert(arr.all())
         arr2 = [1, 2, 3, 1, 4, 7]
         $.assert(arr2.all(el => el > 0)) // checks if the array contains only positive elements
+        $.assert(arr2.all(@number) == true)
     ")]
-    (self, map: (_ -> @bool) | @pattern = (a) => @bool(a)) -> @bool {
-        for item in self {
-            b = map(item) if map is @macro else item is map
-            if !b {
-                return false
+    (self, cb: (_ -> @bool) | @pattern | @type_indicator = (a) => @bool(a)) -> @bool {
+        for index in 0..self.length {
+            value = self[index]
+            if cb is @macro {
+                current = array_callback(cb, value, index, self)
+                if current is @bool {
+                    if !current { return false }
+                } else {
+                    throw "Filter must return a boolean value";
+                }
+            } else {
+                if !(value is cb) { return false }
             }
         }
         return true
@@ -513,20 +536,11 @@ $.assert(arr.index_all(2) == [2,4])
 
     enumerate: #[desc("Returns an array of index-element pairs"), example(u"
         arr = ['a','b','c']
-        for i in arr.enumerate() {
-            $.print(i[0], ': ', i[1])
-        }
-        /* output:
-        0: a
-        1: b
-        2: c
-        */
+        $.assert(arr.enumerate() == [[0,'a'],[1,'b'],[2,'c']])
+        $.assert(arr.enumerate(true) == [{index: 0, value: 'a'},{index: 1, value: 'b'},{index: 2, value: 'c'}])
     ")]
-    (self, #[desc("Return the pair as a dictionary")] dict: @bool = false) -> [@dictionary | @array] {
-        if dict {
-            return @array(0..self.length).map(i => {index: i, value: self[i]})
-        }
-        return @array(0..self.length).map(i => [i, self[i]])
+    (self, #[desc("Return the pair as a dictionary or array")] dict: @bool = false) -> [@dictionary | @array] {
+        return @array(0..self.length).map(i => {index: i, value: self[i]} if dict else [i, self[i]])
     },
 
     split: #[desc("Splits the array on the indicies"), example(u"
