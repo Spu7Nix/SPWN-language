@@ -1,8 +1,6 @@
 #[no_std, cache_output]
 import "array.spwn"
 
-type @dict_not_found;
-
 impl @dictionary {
 	is_empty: #[desc("Returns true if there are no entries in the dictionary, false otherwise."), example(u"
 		dict = {}
@@ -87,11 +85,11 @@ impl @dictionary {
 		$.assert(wares.get('peanuts') == 5)
 		$.assert(wares.get('silver', default = 42) == 42)
 	")]
-	(self, key: @string, default = @dict_not_found::{}) -> _ {
+	(self, key: @string, default = @NULL::{}) -> _ {
 		if key in self {
 			return self[key]
 		} else {
-			if default.type == @dict_not_found {
+			if default == @NULL::{} {
 				throw "Key doesn't exist and no fallback was provided"
 			} else {
 				return default
