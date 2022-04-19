@@ -140,7 +140,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     arg!(-n --"level-name" [NAME] "Targets a specific level"),
                     arg!(-e --"live-editor" "Instead of writing the level to the save file, the script will use a live editor library if it's installed (Currently works only for MacOS)"),
                     arg!(-s --"save-file" [FILE] "Chooses a specific save file to write to"),
-                    arg!(-i --"include-path" "Adds a search path to look for librariesAdds a search path to look for libraries").takes_value(true).multiple_occurrences(true).min_values(0),
+                    arg!(-i --"include-path" "Adds a search path to look for libraries").takes_value(true).multiple_occurrences(true).min_values(0),
                     arg!(-a --allow "Allow the use of a builtin").takes_value(true).multiple_occurrences(true).min_values(0),
                     arg!(-d --deny "Deny the use of a builtin").takes_value(true).multiple_occurrences(true).min_values(0),
                 ]),
@@ -155,7 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     arg!(-n --"level-name" [NAME] "Targets a specific level"),
                     arg!(-e --"live-editor" "Instead of writing the level to the save file, the script will use a live editor library if it's installed (Currently works only for MacOS)"),
                     arg!(-s --"save-file" [FILE] "Chooses a specific save file to write to"),
-                    arg!(-i --"include-path" "Adds a search path to look for librariesAdds a search path to look for libraries").takes_value(true).multiple_occurrences(true).min_values(0),
+                    arg!(-i --"include-path" "Adds a search path to look for libraries").takes_value(true).multiple_occurrences(true).min_values(0),
                     arg!(-a --allow "Allow the use of a builtin").takes_value(true).multiple_occurrences(true).min_values(0),
                     arg!(-d --deny "Deny the use of a builtin").takes_value(true).multiple_occurrences(true).min_values(0),
                 ]),
@@ -165,6 +165,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 arg!(<LIBRARY> "Library to document")
             )
                 .about("Generates documentation for a SPWN library, in the form of a markdown file"),
+
+            App::new("new")
+                .about("Creates a new SPWN project in the given directory"
+            )
+                .args(&[
+                    arg!(-l --"lib" "Creates a PCKP-compatible SPWN library"),
+                    arg!(<PATH> "Path to create project in").value_hint(ValueHint::AnyPath),
+                ]),
         ]
     ).global_setting(clap::AppSettings::ArgRequiredElseHelp).get_matches();
 
@@ -247,6 +255,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         //println!("doc {:?}", documentation);
+
+        Ok(())
+    } else if let Some(new_cmd) = matches.subcommand_matches("new") {
+        let lib_path = new_cmd.value_of("PATH").unwrap();
+        let mut path = PathBuf::from(lib_path);
+
+        if !new_cmd.is_present("lib") {
+            fs::create_dir_all(&path).unwrap();
+            path.push("main.spwn");
+
+            fs::write(path, 
+"
+
+$.print(\"Hello world!\")
+
+"
+            ).unwrap();
+
+        } else {
+            let mut src_path = path.clone(); src_path.push("src");
+            let mut yaml_path = path.clone(); yaml_path.push("pckp.yaml");
+
+            fs::create_dir_all(&src_path).unwrap();
+            src_path.push("lib.spwn");
+
+            fs::write(src_path, 
+    "#[cache_output]
+
+greeting = () {
+    $.print(\"Hello world\")
+}
+
+return {
+    greeting,
+}
+
+"
+            ).unwrap();
+
+            fs::write(yaml_path, 
+    format!("%YAML 1.2
+---
+
+name: {}
+version: 1.0.0
+folders:
+- src
+",
+            path.file_name().unwrap().to_str().unwrap())
+            ).unwrap();
+        }
 
         Ok(())
     } else {
