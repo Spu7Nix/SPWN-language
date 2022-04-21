@@ -1,8 +1,8 @@
 //! Defining all native types (and functions?)
 #![allow(unused_assignments)]
 use internment::LocalIntern;
-use shared::StoredValue;
 use shared::SpwnSource;
+use shared::StoredValue;
 
 use crate::compiler_types::*;
 use crate::context::*;
@@ -25,7 +25,7 @@ use crate::value_storage::*;
 use std::io::stdout;
 use std::io::Write;
 
-use std::collections::hash_map::{DefaultHasher, HashMap};
+use std::collections::hash_map::DefaultHasher;
 
 // BUILT IN STD
 use include_dir::{Dir, File};
@@ -47,7 +47,7 @@ pub fn get_lib_file<'a, S: AsRef<Path>>(path: S) -> Option<File<'a>> {
 
 fn get_file<'a>(dir: &'a Dir, path: &Path) -> Option<File<'a>> {
     for file in dir.files {
-        let replaced = &file.path.replace("\\", "/");
+        let replaced = &file.path.replace('\\', "/");
         let file_path = &Path::new(replaced);
 
         if Path::new(file_path) == path {
@@ -155,6 +155,7 @@ id_default_methods!(Block, "b");
 id_default_methods!(Item, "i");
 
 impl Value {
+    #[allow(clippy::single_match)]
     pub fn member(
         &self,
         member: LocalIntern<String>,
@@ -230,45 +231,48 @@ impl Value {
                     }
                     _ => (),
                 },
-                Value::Macro(m) => {
-
-                    match member.as_ref().as_str() {
-                        "args" => {
-                            let mut args = vec![];
-                            for MacroArgDef {name, default, pattern, ..} in &m.args {
-                                let mut dict_map = FnvHashMap::default();
-                                dict_map.insert(LocalIntern::new(String::from("name")), store_const_value(
+                Value::Macro(m) => match member.as_ref().as_str() {
+                    "args" => {
+                        let mut args = vec![];
+                        for MacroArgDef {
+                            name,
+                            default,
+                            pattern,
+                            ..
+                        } in &m.args
+                        {
+                            let mut dict_map = FnvHashMap::default();
+                            dict_map.insert(
+                                LocalIntern::new(String::from("name")),
+                                store_const_value(
                                     Value::Str(name.to_string()),
                                     globals,
                                     context.start_group,
                                     info.position,
-                                ));
-                                if let Some(v) = default {
-                                    dict_map.insert(LocalIntern::new(String::from("default")), *v);
-                                }
-                                if let Some(v) = pattern {
-                                    dict_map.insert(LocalIntern::new(String::from("pattern")), *v);
-                                }
-                                args.push(
-                                    store_const_value(
-                                        Value::Dict(dict_map),
-                                        globals,
-                                        context.start_group,
-                                        info.position,
-                                    )
-                                )
+                                ),
+                            );
+                            if let Some(v) = default {
+                                dict_map.insert(LocalIntern::new(String::from("default")), *v);
                             }
-                            return Some(store_const_value(
-                                Value::Array(args),
+                            if let Some(v) = pattern {
+                                dict_map.insert(LocalIntern::new(String::from("pattern")), *v);
+                            }
+                            args.push(store_const_value(
+                                Value::Dict(dict_map),
                                 globals,
                                 context.start_group,
                                 info.position,
                             ))
                         }
-                        _ => (),
+                        return Some(store_const_value(
+                            Value::Array(args),
+                            globals,
+                            context.start_group,
+                            info.position,
+                        ));
                     }
-
-                }
+                    _ => (),
+                },
                 _ => (),
             };
 
@@ -314,23 +318,14 @@ use std::str::FromStr;
 macro_rules! typed_argument_check {
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident)  ($($arg_name:ident),*)) => {
-        #[allow(unused_variables)]
-        #[allow(unused_mut)]
-        #[allow(unused_parens)]
         let ( $($arg_name),*) = clone_and_get_value($arguments[$arg_index], $globals, $context.start_group, true);
     };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) mut ($($arg_name:ident),*)) => {
-        #[allow(unused_variables)]
-        #[allow(unused_mut)]
-        #[allow(unused_parens)]
         let ( $(mut $arg_name),*) = $globals.stored_values[$arguments[$arg_index]].clone();
     };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) ($($arg_name:ident),*): $arg_type:ident) => {
-        #[allow(unused_variables)]
-        #[allow(unused_mut)]
-        #[allow(unused_parens)]
 
         let  ( $($arg_name),*) = match clone_and_get_value($arguments[$arg_index], $globals, $context.start_group, true) {
             Value::$arg_type($($arg_name),*) => ($($arg_name),*),
@@ -351,9 +346,6 @@ macro_rules! typed_argument_check {
     };
 
     (($globals:ident, $arg_index:ident, $arguments:ident, $info:ident, $context:ident, $builtin:ident) mut ($($arg_name:ident),*): $arg_type:ident) => {
-        #[allow(unused_variables)]
-        #[allow(unused_mut)]
-        #[allow(unused_parens)]
         let  ( $(mut $arg_name),*) = match $globals.stored_values[$arguments[$arg_index]].clone() {
             Value::$arg_type($($arg_name),*) => ($($arg_name),*),
 
@@ -513,6 +505,8 @@ macro_rules! builtins {
             contexts: &mut FullContext,
         ) -> Result<(), RuntimeError> {
             #![allow(unused_variables)]
+            #![allow(unused_mut)]
+            #![allow(unused_parens)]
             if !$globals.permissions.is_allowed(func) {
                 if !$globals.permissions.is_safe(func) {
                     return Err(RuntimeError::BuiltinError {
@@ -2225,13 +2219,13 @@ $.assert(name_age == {
                     Value::Str(a.repeat(number as usize))
                 } else {
                     return Err(RuntimeError::BuiltinError {
-                        builtin: builtin,
+                        builtin,
                         message: format!(
                             "Expected {}, found {}",
                             "a positive number",
                             b,
                         ),
-                        info: info,
+                        info,
                     })
                 }
             },
@@ -2488,7 +2482,8 @@ $.assert(name_age == {
         }
         Value::Null
     }
-    [MultiplyOp] #[safe = true, desc = "Default implementation of the `*=` operator", example = "let val = 5\n$._multiply_(val, 10)\n$.assert(val == 50)"]        fn _multiply_(mut (a), (b): Number)         {
+    [MultiplyOp] #[safe = true, desc = "Default implementation of the `*=` operator", example = "let val = 5\n$._multiply_(val, 10)\n$.assert(val == 50)"]
+    fn _multiply_(mut (a), (b): Number)         {
         match &mut a {
             Value::Number(a) => *a *= b,
             Value::Str(a) => {
@@ -2497,13 +2492,13 @@ $.assert(name_age == {
                     *a = a.repeat(number as usize)
                 } else {
                     return Err(RuntimeError::BuiltinError {
-                        builtin: builtin,
+                        builtin,
                         message: format!(
                             "Expected {}, found {}",
                             "a positive number",
                             b,
                         ),
-                        info: info,
+                        info,
                     })
                 }
             },

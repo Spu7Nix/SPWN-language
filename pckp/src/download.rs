@@ -14,7 +14,7 @@ lazy_static! {
             .unwrap()
             .text()
             .unwrap()
-            .replace(" ", "")
+            .replace(' ', "")
             .split('\n')
             .map(|x| x.split('|'))
             .map(|mut x| (x.next().unwrap().to_string(), x.next().unwrap().to_string()))

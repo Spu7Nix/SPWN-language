@@ -12,7 +12,6 @@ use compiler::builtins::Color;
 use compiler::builtins::Group;
 use compiler::builtins::Item;
 use compiler::compiler_types::TriggerOrder;
-use fnv::FnvHashMap;
 
 use crate::ReservedIds;
 

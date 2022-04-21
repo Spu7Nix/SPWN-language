@@ -32,7 +32,7 @@ pub fn optimize(
             // }
             let trigger = Trigger {
                 obj: ObjPtr(f, o),
-                role: get_role(obj, &toggle_groups),
+                role: get_role(obj),
                 deleted: false,
             };
             if let Some(ObjParam::Group(group)) = obj.params.get(&obj_props::GROUPS) {
@@ -73,7 +73,7 @@ pub fn optimize(
     for _ in 0..10 {
         clean_network(&mut network, &objects, true);
 
-        dead_code::dead_code_optimization(&mut network, &mut objects, &mut closed_group, &reserved);
+        dead_code::dead_code_optimization(&mut network, &mut objects, &reserved);
 
         clean_network(&mut network, &objects, false);
         //dbg!(&objects.list);
