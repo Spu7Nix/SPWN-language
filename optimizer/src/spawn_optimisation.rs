@@ -235,7 +235,7 @@ pub(crate) fn spawn_optimisation(
                     *v = (b, order);
                 }
             }
-            assert!(swaps.insert(a, (b, order)).is_none());
+            swaps.insert(a, (b, order));
         };
 
         let default = &FnvHashSet::default();
