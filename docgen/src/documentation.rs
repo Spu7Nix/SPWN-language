@@ -297,7 +297,7 @@ fn document_dict(
             format!(
                 "\t- [`@{}::`{}]({}?id={})\n",
                 type_name,
-                key.replace("_", "\\_"),
+                key.replace('_', "\\_"),
                 path,
                 key
             )

@@ -4,7 +4,6 @@ use compiler::{
     leveldata::{self, GdObj, ObjParam},
 };
 use fnv::{FnvHashMap, FnvHashSet};
-use optimize::ToggleGroups;
 
 mod dead_code;
 mod group_toggling;
@@ -185,7 +184,7 @@ impl<'a> std::ops::IndexMut<ObjPtr> for Triggerlist<'a> {
     }
 }
 
-pub fn get_role(obj: &GdObj, toggle_groups: &ToggleGroups) -> TriggerRole {
+pub fn get_role(obj: &GdObj) -> TriggerRole {
     if let Some(ObjParam::Number(obj_id)) = obj.params.get(&1) {
         let mut hd = false;
         if let Some(ObjParam::Bool(hd_val)) = obj.params.get(&103) {

@@ -14,7 +14,7 @@ use crate::{
 pub fn dead_code_optimization(
     network: &mut TriggerNetwork,
     objects: &mut Triggerlist,
-    closed_group: &mut u16,
+    //closed_group: &mut u16,
     reserved: &ReservedIds,
 ) {
     for (group, gang) in network.map.clone() {
@@ -25,10 +25,9 @@ pub fn dead_code_optimization(
                     network,
                     objects,
                     (group, i),
-                    closed_group,
+                    //closed_group,
                     reserved,
                     &mut visited,
-                    0,
                 ) == DeadCodeResult::Keep
                 {
                     (*network.map.get_mut(&group).unwrap()).triggers[i].deleted = false;
@@ -49,10 +48,9 @@ fn check_for_dead_code<'a>(
     network: &'a mut TriggerNetwork,
     objects: &mut Triggerlist,
     start: (Group, usize),
-    closed_group: &mut u16,
+    //closed_group: &mut u16,
     reserved: &ReservedIds,
     visited_stack: &mut Vec<(Group, usize)>,
-    d: u32,
 ) -> DeadCodeResult {
     use DeadCodeResult::*;
     //returns whether to keep or delete the trigger
@@ -131,10 +129,9 @@ fn check_for_dead_code<'a>(
             network,
             objects,
             trigger_ptr,
-            closed_group,
+            //closed_group,
             reserved,
             visited_stack,
-            d + 1,
         ) == Keep
         {
             (*network.map.get_mut(&trigger_ptr.0).unwrap()).triggers[trigger_ptr.1].deleted = false;

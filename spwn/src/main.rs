@@ -190,10 +190,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let pckp_package = match config_file::config_to_package(cfg_file) {
                 Ok(p) => p,
                 Err(e) => {
-                    eprint_with_color(
-                        &format!("Error reading pckp file:\n{}", e.to_string()),
-                        Color::Red,
-                    );
+                    eprint_with_color(&format!("Error reading pckp file:\n{e}"), Color::Red);
 
                     std::process::exit(ERROR_EXIT_CODE);
                 }
@@ -203,7 +200,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(_) => (),
                     Err(e) => {
                         eprint_with_color(
-                            &format!("Error installing dependencies:\n{}", e.to_string()),
+                            &format!("Error installing dependencies:\n{e}"),
                             Color::Red,
                         );
 
@@ -265,23 +262,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             fs::create_dir_all(&path).unwrap();
             path.push("main.spwn");
 
-            fs::write(path, 
-"
+            fs::write(
+                path,
+                "
 
 $.print(\"Hello world!\")
 
-"
-            ).unwrap();
-
+",
+            )
+            .unwrap();
         } else {
-            let mut src_path = path.clone(); src_path.push("src");
-            let mut yaml_path = path.clone(); yaml_path.push("pckp.yaml");
+            let mut src_path = path.clone();
+            src_path.push("src");
+            let mut yaml_path = path.clone();
+            yaml_path.push("pckp.yaml");
 
             fs::create_dir_all(&src_path).unwrap();
             src_path.push("lib.spwn");
 
-            fs::write(src_path, 
-    "#[cache_output]
+            fs::write(
+                src_path,
+                "#[cache_output]
 
 greeting = () {
     $.print(\"Hello world\")
@@ -291,11 +292,14 @@ return {
     greeting,
 }
 
-"
-            ).unwrap();
+",
+            )
+            .unwrap();
 
-            fs::write(yaml_path, 
-    format!("%YAML 1.2
+            fs::write(
+                yaml_path,
+                format!(
+                    "%YAML 1.2
 ---
 
 name: {}
@@ -303,8 +307,10 @@ version: 1.0.0
 folders:
 - src
 ",
-            path.file_name().unwrap().to_str().unwrap())
-            ).unwrap();
+                    path.file_name().unwrap().to_str().unwrap()
+                ),
+            )
+            .unwrap();
         }
 
         Ok(())
