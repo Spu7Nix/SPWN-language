@@ -136,8 +136,7 @@ impl @group {
         wait(duration)
     },
 
-    toggle_on:
-    #[desc("Toggles the group on"), example("10g.toggle_on()")]
+    toggle_on: #[desc("Toggles the group on"), example("10g.toggle_on()")]
     (self) -> @NULL {
         $.add( trigger{
             OBJ_ID: 1049,
@@ -181,8 +180,7 @@ impl @group {
         wait(duration)
     },
 
-    follow:
-    #[desc("Implementation of the follow trigger"), example("10g.follow(11g)")]
+    follow: #[desc("Implementation of the follow trigger"), example("10g.follow(11g)")]
     (
         self,
         #[desc("Group of object to follow")] other: @group,
