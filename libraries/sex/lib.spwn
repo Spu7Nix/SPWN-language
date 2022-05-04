@@ -1,0 +1,37 @@
+let dick = {
+	suck: (times) {
+		for i in 0..times {
+			$.print('slurp');
+		}
+	}, cum: (){
+		$.print('ooh yeah')
+	},
+	stickItIn: function(ass) {
+		ass.onDick()
+	}
+}
+let size = 0
+let ass = {
+	size: size
+	smack: () {
+		$.print('*smack*')
+	},
+	setSize: (n) {
+		size = n;
+	}
+}
+
+let girl = {
+	moan(name) {
+		$.print('oh yeah! ohhh yeah! harder ' + name + '! harder daddy!')
+	},
+	cheatOn: () {
+		$.print('She left you.')
+	}
+}
+
+return {
+	girl: girl,
+	dick: dick,
+	ass: ass
+}
