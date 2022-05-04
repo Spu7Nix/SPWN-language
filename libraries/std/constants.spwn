@@ -4,8 +4,8 @@
 type @comparison
 
 #[desc(u"
-A type of easing used when when moving or rotating objects at runtime. To get a `@easing_type` value, use one of these constants:
-`NONE`, `EASE_IN_OUT`, `EASE_IN`, `EASE_OUT`, `ELASTIC_IN_OUT`, `ELASTIC_IN`, `ELASTIC_OUT`, `BOUNCE_IN_OUT`, `BOUNCE_IN`, `BOUNCE_OUT`, `EXPONENTIAL_IN_OUT`, `EXPONENTIAL_IN`, `EXPONENTIAL_OUT`, `SINE_IN_OUT`, `SINE_IN`, `SINE_OUT`, `BACK_IN_OUT`, `BACK_IN`, or `BACK_OUT`
+    A type of easing used when when moving or rotating objects at runtime. To get a `@easing_type` value, use one of these constants:
+    `NONE`, `EASE_IN_OUT`, `EASE_IN`, `EASE_OUT`, `ELASTIC_IN_OUT`, `ELASTIC_IN`, `ELASTIC_OUT`, `BOUNCE_IN_OUT`, `BOUNCE_IN`, `BOUNCE_OUT`, `EXPONENTIAL_IN_OUT`, `EXPONENTIAL_IN`, `EXPONENTIAL_OUT`, `SINE_IN_OUT`, `SINE_IN`, `SINE_OUT`, `BACK_IN_OUT`, `BACK_IN`, or `BACK_OUT`
 ")]
 type @easing_type
 

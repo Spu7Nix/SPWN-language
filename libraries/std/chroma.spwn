@@ -288,7 +288,7 @@ impl @chroma {
     },
 
     r: #[
-        desc('Gets or sets a chroma\'s red value'),
+        desc("Gets or sets a chroma's red value"),
         example(u"
             let a = rgb(1,1,1,0.5)
             $.print(a.r()) // gets the value
@@ -312,7 +312,7 @@ impl @chroma {
     },
     
     r8: #[
-        desc('Gets or sets a chroma\'s 8-bit red value'),
+        desc("Gets or sets a chroma's 8-bit red value"),
         example(u"
             let a = rgb(1,1,1)
             $.print(a.r8()) // gets the value
@@ -336,7 +336,7 @@ impl @chroma {
     },
     
     h: #[
-        desc('Gets or sets a chroma\'s hue value'),
+        desc("Gets or sets a chroma's hue value"),
         example(u"
             let a = rgb(1,1,1)
             $.print(a.h()) // gets the value
@@ -372,29 +372,29 @@ impl @chroma {
         self = @chroma::from_hsv2(self._h360, self._s100, self._v100, v)
     },
 
-    rgb: #[desc('Returns an array of the chroma\'s RGB values')] 
+    rgb: #[desc("Returns an array of the chroma's RGB values")] 
     (self) -> [@number] {
         return [self._r, self._g, self._b]
     },
-    rgba: #[desc('Returns an array of the chroma\'s RGBA values')] 
+    rgba: #[desc("Returns an array of the chroma's RGBA values")] 
     (self) -> [@number] {
         [self._r, self._g, self._b, self._a]
     },
 
-    rgb8: #[desc('Returns an array of the chroma\'s 8-bit RGB values')] 
+    rgb8: #[desc("Returns an array of the chroma's 8-bit RGB values")] 
     (self) -> [@number] {
         return [self._r8, self._g8, self._b8]
     },
-    rgba8: #[desc('Returns an array of the chroma\'s 8-bit RGBA values')] 
+    rgba8: #[desc("Returns an array of the chroma's 8-bit RGBA values")] 
     (self) -> [@number] {
         return [self._r8, self._g8, self._b8, self._a8]
     },
     
-    hsv: #[desc('Returns an array of the chroma\'s HSV values')] 
+    hsv: #[desc("Returns an array of the chroma's HSV values")] 
     (self) -> [@number] {
         return [self._h, self._s, self._v]
     },
-    hsva: #[desc('Returns an array of the chroma\'s HSVA values')] 
+    hsva: #[desc("Returns an array of the chroma's HSVA values")] 
     (self) -> [@number] {
         return [self._h, self._s, self._v, self._a]
     },
@@ -406,7 +406,7 @@ impl @chroma {
         return [self._h360, self._s100, self._v100, self._a100]
     },
 
-    hex: #[desc('Returns a string of the chroma\'s hex code')] 
+    hex: #[desc("Returns a string of the chroma's hex code")] 
     (self) -> @string {
         return rgb_to_hex(self._r8, self._g8, self._b8, self._a8)
     },
