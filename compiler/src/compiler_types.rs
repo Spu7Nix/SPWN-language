@@ -164,7 +164,7 @@ pub fn handle_unary_operator(
 }
 
 pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError> {
-    if num.fract().abs() > 0.000000001 {
+    if num.fract().abs() > f64::EPSILON {
         return Err(RuntimeError::CustomError(create_error(
             info.clone(),
             &format!("expected integer, found {}", num),
