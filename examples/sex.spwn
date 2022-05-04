@@ -2,7 +2,7 @@ let sex = import sex
 let girl = sex.girl
 let male = sex.male
 girl.ass.onDick = () {
-  girl.moan()
+  girl.moan("bitch")
 }
 male.dick.stickItIn(girl.ass)
 male.dick.suck(10)
