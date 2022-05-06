@@ -1,0 +1,15 @@
+#[no_std, cache_output]
+import "array.spwn"
+
+ASCII = (input) {
+    let ASCII_list = (' !"#$&'+"'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[" + '\\' + "]^_`abcdefghijklmnopqrstuvwxyz{|}~ € ,ƒ„…†‡ˆ‰Š‹Œ Ž  ‘’“”•–—˜™š›œ žŸ ¡¢£¤¥¦§¨©ª«¬ ®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ").split("")
+    if ASCII_list.contains(input) {
+        return ASCII_list.index(input)
+    } else if input.type == @number && input <= 233 {
+        return ASCII_list[input]
+    } else if input.type == @number && input > 233 {
+        throw "Index too high!"
+    } else {
+        throw "This value is not in ASCII" 
+    }
+}
