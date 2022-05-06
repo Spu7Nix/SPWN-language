@@ -2,7 +2,7 @@
 import "array.spwn"
 
 ASCII = (input) {
-    let ASCII_list = (' !"#$&'+"'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[" + '\\' + "]^_`abcdefghijklmnopqrstuvwxyz{|}~ € ,ƒ„…†‡ˆ‰Š‹Œ Ž  ‘’“”•–—˜™š›œ žŸ ¡¢£¤¥¦§¨©ª«¬ ®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ").split("")
+    let ASCII_list = ("NUL SOH STX ETX EOT ENQ ACK BEL BS HT LF VT FF CR SO SI DLE DC1 DC2 DC3 DC4 NAK SYN ETB CAN EM SUB ESC FS GS RS US").split(" ") + (' !"#$&'+"'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[" + '\\' + "]^_`abcdefghijklmnopqrstuvwxyz{|}~").split("") + ["DELETE","€"," "] + (",ƒ„…†‡ˆ‰Š‹Œ Ž  ‘’“”•–—˜™š›œ žŸ").split("") + ["Non-breaking space"] + ("¡¢£¤¥¦§¨©ª«¬").split("") + ["Soft hyphen"] + ("®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ").split("")
     if ASCII_list.contains(input) {
         return ASCII_list.index(input)
     } else if input.type == @number && input <= 233 {
