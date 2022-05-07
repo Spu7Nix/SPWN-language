@@ -184,7 +184,7 @@ impl @string {
         $.assert(str1.l_trim() == 'abcd g    ')
         $.assert(str2.l_trim() == 'pog  __')
     ")]
-    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
+    (self, tokens: @string | [@string] = [' ','\n','\t','\r','\a','\b','\v','\e']) -> @string {
         return trim(self, tokens, left = true)
     },
     r_trim: #[desc("Returns a right-trimmed version of the string"), example(u"
@@ -195,7 +195,7 @@ impl @string {
         $.assert(str2.r_trim() == '      abcd g')
         $.assert(str3.r_trim(tokens = [' ', '_']) == '   pog')    
     ")]
-    (self, tokens: @string | [@string] = [' ','\n','\t','\r']) -> @string {
+    (self, tokens: @string | [@string] = [' ','\n','\t','\r','\a','\b','\v','\e']) -> @string {
         return trim(self, tokens, right = true)
     },
     trim: #[desc("Returns a trimmed version of the string"), example(u"
