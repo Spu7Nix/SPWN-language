@@ -7,7 +7,7 @@ impl @number {
     abs: #[desc("Returns the absolute value of the number"), example("$.assert((-1).abs() == 1)")]
     (self) -> @number => self if self >= 0 else -self,
     sign: #[desc("Returns the sign of the number"), example("$.assert((-69).sign() == -1)")]
-    (self) -> @number => self if self == 0 else (-1 if self < 0 else +1),
+    (self) -> @number => (self if self == 0 else (-1 if self < 0 else +1)),
     round: #[desc("Returns the nearest integer to the number"), example("$.assert((1.5).round() == 2)")]
     (self) -> @number => $.round(self),
     ceil: #[desc("Returns the smallest integer greater than or equal to the number"), example("$.assert((1.5).ceil() == 2)")]
