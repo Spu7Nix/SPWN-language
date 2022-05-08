@@ -60,8 +60,6 @@ impl @number {
     },
     to_precision: #[desc("Turns the number to a specific precision"), example("$.assert((0.12345).to_precision(3) == 0.123)")]
     (self, precision: @number = 0) -> @number => self.to_fixed(precision) as @number,
-    is_finite: #[desc("Checks if the number is finite"), example("$.assert((0/0).is_finite() == false)")]
-    (self) -> @bool => self - self == 0,
 }
 
 
