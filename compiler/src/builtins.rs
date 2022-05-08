@@ -65,7 +65,7 @@ fn get_file<'a>(dir: &'a Dir, path: &Path) -> Option<File<'a>> {
 }
 
 fn div_zero_check(b: f64, op: &str, builtin: &str, info: &CompilerInfo) -> Result<(), RuntimeError> {
-    if b.abs() == 0 {
+    if b.abs() == 0.0 {
         return Err(RuntimeError::BuiltinError {
             builtin: builtin.to_string(),
             message: format!("Cannot {} by 0", op),
