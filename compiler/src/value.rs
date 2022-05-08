@@ -1191,7 +1191,7 @@ pub fn convert_type(
                     _ => {
                         let out: std::result::Result<f64, _> = s.parse();
                         match out {
-                            Ok(n) => Value::Number(n),
+                            Ok(n) if !n.is_nan() && !n.is_infinite() => Value::Number(n),
                             _ => {
                                 
                                 return Err(RuntimeError::CustomError(create_error(

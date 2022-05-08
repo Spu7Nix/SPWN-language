@@ -177,7 +177,7 @@ pub fn compile_spwn(
                     " {} {}{}",
                     if i == 0 { times[i] } else { times[i] % modulos[i] },
                     names[i],
-                    if times[i] % 2 == 1 { "" } else { "s" },
+                    if times[i] == 1 { "" } else { "s" },
                 );
                 count += 1;
             }

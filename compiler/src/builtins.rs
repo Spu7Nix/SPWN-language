@@ -64,6 +64,18 @@ fn get_file<'a>(dir: &'a Dir, path: &Path) -> Option<File<'a>> {
     None
 }
 
+fn div_zero_check(b: f64, op: &str, builtin: &str, info: &CompilerInfo) -> Result<(), RuntimeError> {
+    if b.abs() < std::f64::EPSILON {
+        return Err(RuntimeError::BuiltinError {
+            builtin: builtin.to_string(),
+            message: format!("Cannot {} by 0", op),
+            info: info.clone(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
 //use text_io;
 use errors::compiler_info::{CodeArea, CompilerInfo};
 
@@ -2206,9 +2218,15 @@ $.assert(name_age == {
     }
 
     [DividedByOp] #[safe = true, desc = "Default implementation of the `/` operator", example = "$._divided_by_(64, 8)"]
-    fn _divided_by_((a): Number, (b): Number) { Value::Number(a / b) }
+    fn _divided_by_((a): Number, (b): Number) {
+        div_zero_check(b, "divide", &builtin, &info)?;
+        Value::Number(a / b)
+    }
     [IntdividedByOp] #[safe = true, desc = "Default implementation of the `/%` operator", example = "$._intdivided_by_(64, 8)"]
-    fn _intdivided_by_((a): Number, (b): Number) { Value::Number((a / b).floor()) }
+    fn _intdivided_by_((a): Number, (b): Number) {
+        div_zero_check(b, "divide", &builtin, &info)?;
+        Value::Number((a / b).floor())
+    }
     [TimesOp] #[safe = true, desc = "Default implementation of the `*` operator", example = "$._times_(8, 8)"]
     fn _times_((a), (b): Number) {
         match a {
@@ -2254,7 +2272,7 @@ $.assert(name_age == {
                         (globals.get_area(arguments[1]), &format!("Value defined as {} here", globals.get_type_str(arguments[1]))),
                         (
                             info.position,
-                            &format!("Expected @number and @number or @string and @number, found @{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
+                            &format!("Expected @number and @number, @string and @number or @array and @number, found @{} and @{}", globals.get_type_str(arguments[0]), globals.get_type_str(arguments[1])),
                         ),
                     ],
                     None,
@@ -2264,7 +2282,10 @@ $.assert(name_age == {
         }
     }
     [ModOp] #[safe = true, desc = "Default implementation of the `%` operator", example = "$._mod_(70, 8)"]
-    fn _mod_((a): Number, (b): Number) { Value::Number(a.rem_euclid(b)) }
+    fn _mod_((a): Number, (b): Number) {
+        div_zero_check(b, "modulo", &builtin, &info)?;
+        Value::Number(a.rem_euclid(b))
+    }
     [PowOp] #[safe = true, desc = "Default implementation of the `^` operator", example = "$._pow_(8, 2)"]
     fn _pow_((a): Number, (b): Number) { Value::Number(a.powf(b)) }
     [PlusOp] #[safe = true, desc = "Default implementation of the `+` operator", example = "$._plus_(32, 32)"]
@@ -2522,13 +2543,25 @@ $.assert(name_age == {
         Value::Null
     }
     [DivideOp] #[safe = true, desc = "Default implementation of the `/=` operator", example = "let val = 9\n$._divide_(val, 3)\n$.assert(val == 3)"]
-    fn _divide_(mut (a): Number, (b): Number) { a /= b; Value::Null }
+    fn _divide_(mut (a): Number, (b): Number) {
+        div_zero_check(b, "divide", &builtin, &info)?;
+        a /= b;
+        Value::Null
+    }
     [IntdivideOp] #[safe = true, desc = "Default implementation of the `/%=` operator", example = "let val = 10\n$._intdivide_(val, 3)\n$.assert(val == 3)"]
-    fn _intdivide_(mut (a): Number, (b): Number) { a /= b; a = a.floor(); Value::Null }
+    fn _intdivide_(mut (a): Number, (b): Number) {
+        div_zero_check(b, "divide", &builtin, &info)?;
+        a /= b; a = a.floor();
+        Value::Null
+    }
     [ExponateOp] #[safe = true, desc = "Default implementation of the `^=` operator", example = "let val = 3\n$._exponate_(val, 3)\n$.assert(val == 27)"]
     fn _exponate_(mut (a): Number, (b): Number) { a = a.powf(b); Value::Null }
     [ModulateOp] #[safe = true, desc = "Default implementation of the `%=` operator", example = "let val = 10\n$._modulate_(val, 3)\n$.assert(val == 1)"]
-    fn _modulate_(mut (a): Number, (b): Number) { a = a.rem_euclid(b); Value::Null }
+    fn _modulate_(mut (a): Number, (b): Number) {
+        div_zero_check(b, "modulo", &builtin, &info)?;
+        a = a.rem_euclid(b);
+        Value::Null
+    }
 
     [EitherOp] #[safe = true, desc = "Default implementation of the `|` operator", example = "$._either_(@number, @counter)"]
     fn _either_((a), (b)) {
