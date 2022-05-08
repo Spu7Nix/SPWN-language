@@ -142,7 +142,7 @@ impl Package {
                 let tmp_path = PathBuf::from(".pckp_tmp");
 
                 if tmp_path.exists() {
-                    fs_dir::remove(&tmp_path).unwrap();
+                    fs::remove_dir_all(&tmp_path).unwrap();
                 }
                 let repo = match Repository::clone(&source_url, &tmp_path) {
                     Ok(repo) => repo,
