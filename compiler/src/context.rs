@@ -7,7 +7,7 @@ use crate::value_storage::{clone_value, store_val_m};
 use errors::compiler_info::CodeArea;
 
 //use std::boxed::Box;
-use fnv::FnvHashMap;
+use ahash::AHashMap;
 
 use internment::LocalIntern;
 use shared::{BreakType, StoredValue};
@@ -27,7 +27,7 @@ pub struct Context {
     pub start_group: Group,
     pub func_id: FnIdPtr,
     pub fn_context_change_stack: Vec<CodeArea>,
-    variables: FnvHashMap<LocalIntern<String>, Vec<VariableData>>,
+    variables: AHashMap<LocalIntern<String>, Vec<VariableData>>,
     pub return_value: StoredValue,
     pub return_value2: StoredValue,
     pub root_context_ptr: *mut FullContext,
@@ -298,7 +298,7 @@ impl Context {
         Context {
             start_group: Group::new(0),
             //spawn_triggered: false,
-            variables: FnvHashMap::default(),
+            variables: AHashMap::default(),
             //return_val: Box::new(Value::Null),
 
             //self_val: None,
@@ -372,11 +372,11 @@ impl Context {
         self.new_variable_full(name, val, layer, true)
     }
 
-    pub fn get_variables(&self) -> &FnvHashMap<LocalIntern<String>, Vec<VariableData>> {
+    pub fn get_variables(&self) -> &AHashMap<LocalIntern<String>, Vec<VariableData>> {
         &self.variables
     }
 
-    pub fn set_all_variables(&mut self, vars: FnvHashMap<LocalIntern<String>, Vec<VariableData>>) {
+    pub fn set_all_variables(&mut self, vars: AHashMap<LocalIntern<String>, Vec<VariableData>>) {
         (*self).variables = vars;
     }
 }
@@ -449,7 +449,7 @@ pub fn merge_contexts(
     let new_group = Group::next_free(&mut globals.closed_groups);
     //add spawn triggers
     let mut add_spawn_trigger = |context: &Context| {
-        let mut params = FnvHashMap::default();
+        let mut params = AHashMap::default();
         params.insert(51, ObjParam::Group(new_group));
         params.insert(1, ObjParam::Number(1268.0));
         (*globals).trigger_order += 1.0;

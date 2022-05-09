@@ -10,4 +10,4 @@ edition = "2021"
 compiler = { path = "../compiler" }
 parser = { path = "../parser" }
 
-fnv = "1.0.6"
+ahash = "0.7.6"

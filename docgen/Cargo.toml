@@ -12,4 +12,4 @@ shared = { path = "../shared" }
 errors = { path = "../errors" }
 compiler = { path = "../compiler" }
 
-fnv = "1.0.6"
+ahash = "0.7.6"

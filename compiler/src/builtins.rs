@@ -9,7 +9,7 @@ use crate::context::*;
 use crate::globals::Globals;
 use crate::leveldata::*;
 use errors::{create_error, RuntimeError};
-use fnv::FnvHashMap;
+use ahash::AHashMap;
 use parser::ast::ObjectMode;
 
 use std::fs;
@@ -92,11 +92,11 @@ macro_rules! arg_length {
 }
 
 pub fn context_trigger(context: &Context, uid_counter: &mut usize) -> GdObj {
-    let mut params = FnvHashMap::default();
+    let mut params = AHashMap::default();
     params.insert(57, ObjParam::Group(context.start_group));
     (*uid_counter) += 1;
     GdObj {
-        params: FnvHashMap::default(),
+        params: AHashMap::default(),
         func_id: context.func_id,
         mode: ObjectMode::Trigger,
         unique_id: *uid_counter,
@@ -253,7 +253,7 @@ impl Value {
                             ..
                         } in &m.args
                         {
-                            let mut dict_map = FnvHashMap::default();
+                            let mut dict_map = AHashMap::default();
                             dict_map.insert(
                                 LocalIntern::new(String::from("name")),
                                 store_const_value(
@@ -479,11 +479,11 @@ macro_rules! builtins {
         ];
 
         #[derive(Debug, Clone)]
-        pub struct BuiltinPermissions (FnvHashMap<Builtin, bool>);
+        pub struct BuiltinPermissions (AHashMap<Builtin, bool>);
 
         impl BuiltinPermissions {
             pub fn new() -> Self {
-                let mut map = FnvHashMap::default();
+                let mut map = AHashMap::default();
                 $(
                     map.insert(Builtin::$variant, $safe);
                 )*
@@ -852,7 +852,7 @@ builtins! {
                     }
             };
 
-            let mut output_map = FnvHashMap::default();
+            let mut output_map = AHashMap::default();
 
             let response_status = store_const_value(
                 Value::Number(
@@ -864,7 +864,7 @@ builtins! {
             );
 
             let response_headermap = response.headers();
-            let mut response_headers_value = FnvHashMap::default();
+            let mut response_headers_value = AHashMap::default();
             for (name, value) in response_headermap.iter() {
                 let header_value = store_const_value(
                     Value::Str(String::from(value.to_str().expect("Couldn't parse return header value"))),
@@ -988,7 +988,7 @@ $.add(obj {
             };
         }
 
-        let mut obj_map = FnvHashMap::<u16, ObjParam>::default();
+        let mut obj_map = AHashMap::<u16, ObjParam>::default();
 
         for p in obj {
             obj_map.insert(p.0, p.1.clone());
@@ -1556,7 +1556,7 @@ $.random(1..11) // returns a random integer between 1 and 10
                                     Value::Array(arr)
                                 },
                                 serde_json::Value::Object(x) => {
-                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
+                                    let mut dict: AHashMap<LocalIntern<String>, StoredValue> = AHashMap::default();
                                     for (key, value) in x {
                                         dict.insert(LocalIntern::new(key), store_const_value(parse_json_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
@@ -1604,7 +1604,7 @@ $.random(1..11) // returns a random integer between 1 and 10
                                     Value::Array(arr)
                                 },
                                 toml::Value::Table(x) => {
-                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
+                                    let mut dict: AHashMap<LocalIntern<String>, StoredValue> = AHashMap::default();
                                     for (key, value) in x {
                                         dict.insert(LocalIntern::new(key), store_const_value(parse_toml_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
@@ -1651,7 +1651,7 @@ $.random(1..11) // returns a random integer between 1 and 10
                                     Value::Array(arr)
                                 },
                                 serde_yaml::Value::Mapping(x) => {
-                                    let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
+                                    let mut dict: AHashMap<LocalIntern<String>, StoredValue> = AHashMap::default();
                                     for (key, value) in x.iter() {
                                         dict.insert(LocalIntern::new(key.as_str().unwrap().to_string()), store_const_value(parse_yaml_value(value, globals, context, info), globals, context.start_group, info.position));
                                     }
@@ -1740,7 +1740,7 @@ $.random(1..11) // returns a random integer between 1 and 10
     [MetaData] #[safe = false, desc = "Returns the metadata of a file or directory in the local file system", example = "$.metadata(\"file.txt\")"] fn metadata((path): Str) {
         match fs::metadata(path) {
             Ok(meta) => {
-                let mut dict: FnvHashMap<LocalIntern<String>, StoredValue> = FnvHashMap::default();
+                let mut dict: AHashMap<LocalIntern<String>, StoredValue> = AHashMap::default();
                 let mut store = |value| store_const_value(value, globals, context.start_group, info.position);
                 dict.insert(LocalIntern::new(String::from("size")), store(Value::Number(meta.len() as f64)));
                 dict.insert(LocalIntern::new(String::from("modified")), store(Value::Number(meta.modified().unwrap().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs_f64())));
@@ -2033,7 +2033,7 @@ $.assert(name_age == {
                             }
                             if !found { continue }
 
-                            let mut match_map = FnvHashMap::default();
+                            let mut match_map = AHashMap::default();
                             match_map.insert(
                                 LocalIntern::new("range".to_string()),
                                 store_const_value(Value::Array(range), globals, context.start_group, info.position),
