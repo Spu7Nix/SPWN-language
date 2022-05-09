@@ -5,7 +5,7 @@ use parser::ast::ObjectMode;
 //mod icalgebra;
 use compiler::leveldata::{GdObj, ObjParam};
 
-use fnv::{FnvHashMap, FnvHashSet};
+use ahash::{AHashMap, AHashSet};
 
 use crate::optimize::is_start_group;
 use crate::{
@@ -19,7 +19,7 @@ pub fn group_toggling(
     reserved: &ReservedIds,
     closed_group: &mut u16,
 ) {
-    let mut visited = FnvHashSet::default();
+    let mut visited = AHashSet::default();
     for group in network.map.clone().keys() {
         if is_start_group(*group, reserved) {
             intraframe_grouping(
@@ -51,7 +51,7 @@ fn intraframe_grouping(
     closed_group: &mut u16,
     input: GroupingInput,
     additional_groups: Vec<Group>,
-    visited: &mut FnvHashSet<Group>,
+    visited: &mut AHashSet<Group>,
     toggle_groups: Option<(Group, Group)>,
 ) {
     // if let GroupingInput::ObjList(li, _) = &input {
@@ -176,7 +176,7 @@ fn group_triggers(
     closed_group: &mut u16,
     reserved: &ReservedIds,
     additional_groups: Vec<Group>,
-    visited: &mut FnvHashSet<Group>,
+    visited: &mut AHashSet<Group>,
     toggle_groups: Option<(Group, Group)>,
 ) {
     let mut get_new_group = || {
@@ -415,7 +415,7 @@ pub fn create_toggle_trigger(
     network: &mut TriggerNetwork,
     order: TriggerOrder,
 ) {
-    let mut new_obj_map = FnvHashMap::default();
+    let mut new_obj_map = AHashMap::default();
     new_obj_map.insert(1, ObjParam::Number(obj_ids::TOGGLE as f64));
     new_obj_map.insert(obj_props::TARGET, ObjParam::Group(target_group));
     new_obj_map.insert(56, ObjParam::Bool(enable));

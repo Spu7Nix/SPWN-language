@@ -13,7 +13,7 @@ use shared::BreakType;
 //use std::boxed::Box;
 use crate::value_storage::*;
 use errors::compiler_info::CompilerInfo;
-use fnv::FnvHashMap;
+use ahash::AHashMap;
 
 use crate::compiler::compile_scope;
 
@@ -23,7 +23,7 @@ use shared::StoredValue;
 pub type TypeId = u16;
 //                                                               This bool is for if this value
 //                                                               was implemented in the current module
-pub type Implementations = FnvHashMap<TypeId, FnvHashMap<LocalIntern<String>, (StoredValue, bool)>>;
+pub type Implementations = AHashMap<TypeId, AHashMap<LocalIntern<String>, (StoredValue, bool)>>;
 
 pub type FnIdPtr = usize;
 
@@ -324,9 +324,9 @@ pub fn execute_macro(
             .inner()
             .get_variables()
             .values()
-            .flat_map(|stack| stack.iter().map(|VariableData { val: a, .. }| *a))
+            .flat_map(|stack| stack.iter().map(|VariableData { val: a, .. }| a))
         {
-            globals.push_preserved_val(val)
+            globals.push_preserved_val(*val)
         }
     }
 
@@ -364,7 +364,7 @@ pub fn execute_macro(
     //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
-        let mut new_variables: FnvHashMap<LocalIntern<String>, Vec<VariableData>> =
+        let mut new_variables: AHashMap<LocalIntern<String>, Vec<VariableData>> =
             Default::default();
         let context = full_context.inner();
 
@@ -767,7 +767,7 @@ pub fn eval_dict(
     }
     for (results, full_context) in combinations {
         let context = full_context.inner();
-        let mut dict_out: FnvHashMap<LocalIntern<String>, StoredValue> = Default::default();
+        let mut dict_out: AHashMap<LocalIntern<String>, StoredValue> = Default::default();
         for (expr_index, def) in dict.iter().enumerate() {
             match def {
                 ast::DictDef::Def(d) => {

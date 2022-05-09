@@ -18,7 +18,7 @@ use crate::leveldata::*;
 use crate::value::*;
 use crate::value_storage::*;
 use crate::STD_PATH;
-use fnv::FnvHashMap;
+use ahash::AHashMap;
 
 use std::io::Write;
 use std::mem;
@@ -499,7 +499,7 @@ pub fn compile_scope(
                 //let mut obj_list = Vec::<GDObj>::new();
                 for full_context in contexts.iter() {
                     let (context, func) = full_context.inner_value();
-                    let mut params = FnvHashMap::default();
+                    let mut params = AHashMap::default();
                     params.insert(
                         51,
                         match &globals.stored_values[func] {
@@ -1832,7 +1832,7 @@ pub fn import_module(
         for v in impl_vals {
             globals.push_preserved_val(v);
         }
-        let mut stored = FnvHashMap::default();
+        let mut stored = AHashMap::default();
 
         mem::swap(&mut stored, &mut globals.implementations);
         stored_impl = Some(stored);

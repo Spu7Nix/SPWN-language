@@ -10,7 +10,7 @@ edition = "2021"
 logos = "0.12.0"
 internment = "0.5.4"
 ariadne = "0.1.3" # errors
-fnv = "1.0.6"
+ahash = "0.7.6"
 base64 = "0.13.0"
 
 shared = { path = "../shared" }
