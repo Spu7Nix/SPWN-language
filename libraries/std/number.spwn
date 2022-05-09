@@ -5,17 +5,17 @@ extract import 'constants.spwn'
 
 impl @number {
     abs: #[desc("Returns the absolute value of the number"), example("$.assert((-1).abs() == 1)")]
-    self -> @number => self if self >= 0 else -self,
+    (self) -> @number => self if self >= 0 else -self,
     sign: #[desc("Returns the sign of the number, also works with -0"), example("$.assert((-69).sign() == -1)")]
-    self -> @number => self if self == 0 else ((-1) if self < 0 else 1),
+    (self) -> @number => self if self == 0 else ((-1) if self < 0 else 1),
     round: #[desc("Returns the nearest integer to the number"), example("$.assert((1.5).round() == 2)")]
-    self -> @number => $.round(self),
+    (self) -> @number => $.round(self),
     ceil: #[desc("Returns the smallest integer greater than or equal to the number"), example("$.assert((1.5).ceil() == 2)")]
-    self -> @number => $.ceil(self),
+    (self) -> @number => $.ceil(self),
     floor: #[desc("Returns the largest integer less than or equal to the number"), example("$.assert((1.5).floor() == 1)")]
-    self -> @number => $.floor(self),
+    (self) -> @number => $.floor(self),
     sqrt: #[desc("Returns the square root of the number"), example("$.assert(4.sqrt() == 2)")]
-    self -> @number => $.sqrt(self),
+    (self) -> @number => $.sqrt(self),
     log: #[desc("Returns the logarithm of the number (default: natural logarithm)"), example("$.assert(2.log() == 0.6931471805599453)")]
     (self, base = EULER) -> @number => $.log(self, base),
     lerp: #[desc("Returns the linear interpolation between the two numbers"), example("$.assert((0.7).lerp(0,2) == 1.4)")]
@@ -33,7 +33,7 @@ impl @number {
         return ((self - min) % (max - min)) + min
     },
     ordinal: #[desc("Returns the number in ordinal form"), example("$.assert(1.ordinal() == '1st')")]
-    self -> @string {
+    (self) -> @string {
         number = self.floor() if self >= 0 else self.ceil()
         numb_abs = number.abs()
         return match true {
