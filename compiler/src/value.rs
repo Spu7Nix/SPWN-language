@@ -449,7 +449,7 @@ impl Value {
             Value::Color(v) => v.hash(state),
             Value::Block(v) => v.hash(state),
             Value::Item(v) => v.hash(state),
-            Value::Number(v) => ((v * 100000.0) as usize).hash(state),
+            Value::Number(v) => v.to_ne_bytes().hash(state),
             Value::Bool(v) => v.hash(state),
             Value::TriggerFunc(v) => v.hash(state),
             Value::Dict(v) => {
