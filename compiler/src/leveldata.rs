@@ -30,7 +30,7 @@ impl Hash for ObjParam {
             ObjParam::Color(v) => v.hash(state),
             ObjParam::Block(v) => v.hash(state),
             ObjParam::Item(v) => v.hash(state),
-            ObjParam::Number(v) => ((*v * 100000.0) as usize).hash(state),
+            ObjParam::Number(v) => v.to_ne_bytes().hash(state),
             ObjParam::Bool(v) => v.hash(state),
             ObjParam::Text(v) => v.hash(state),
             ObjParam::GroupList(v) => v.hash(state),
