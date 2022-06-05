@@ -35,7 +35,7 @@ $.add(obj {
 $.add(obj {
 	OBJ_ID: 1,
 	X: 0,
-	Y: 33,
+	Y: 36,
 	GROUPS: [ hidden_group, follow_x_group ],
 })
 $.add(obj {
