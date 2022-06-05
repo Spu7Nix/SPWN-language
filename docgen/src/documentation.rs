@@ -15,7 +15,7 @@ use compiler::{type_id, value::*};
 
 use std::fs::File;
 
-use fnv::FnvHashMap;
+use ahash::AHashMap;
 use std::env::current_dir;
 use std::path::PathBuf;
 fn create_doc_file(mut dir: PathBuf, mut name: String, content: &str) -> String {
@@ -151,8 +151,8 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
         used_groups, used_colors, used_blocks, used_items, total_objects
     );
 
-    let mut type_links = FnvHashMap::<u16, String>::default();
-    let mut type_paths = FnvHashMap::<u16, String>::default();
+    let mut type_links = AHashMap::<u16, String>::default();
+    let mut type_paths = AHashMap::<u16, String>::default();
 
     let mut impl_list = Vec::new();
     let doc_implementations =
@@ -176,7 +176,7 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
                     key,
                     val.iter()
                         .map(|(key, val)| (*key, val.0))
-                        .collect::<FnvHashMap<LocalIntern<String>, StoredValue>>(),
+                        .collect::<AHashMap<LocalIntern<String>, StoredValue>>(),
                 )
             })
             .collect();
@@ -253,10 +253,10 @@ pub fn document_lib(path: &str) -> Result<(), RuntimeError> {
 }
 
 fn document_dict(
-    dict: &FnvHashMap<LocalIntern<String>, StoredValue>,
+    dict: &AHashMap<LocalIntern<String>, StoredValue>,
     globals: &mut Globals,
     full_context: &mut FullContext,
-    type_links: &FnvHashMap<u16, String>,
+    type_links: &AHashMap<u16, String>,
     path: &str,
     type_name: Option<&str>,
 ) -> Result<(String, String), RuntimeError> {
@@ -352,7 +352,7 @@ fn document_macro(
     mac: &Macro,
     globals: &mut Globals,
     full_context: &mut FullContext,
-    type_links: &FnvHashMap<u16, String>,
+    type_links: &AHashMap<u16, String>,
 ) -> Result<String, RuntimeError> {
     //description
     let mut doc = String::new();
@@ -473,7 +473,7 @@ fn display_pattern(
     pat: &Pattern,
     full_context: &mut FullContext,
     globals: &mut Globals,
-    type_links: &FnvHashMap<u16, String>,
+    type_links: &AHashMap<u16, String>,
 ) -> Result<String, RuntimeError> {
     Ok(match pat {
         Pattern::Type(type_id) => type_links.get(type_id).cloned().unwrap_or_else(|| {
@@ -539,7 +539,7 @@ fn document_val(
     val: &Value,
     globals: &mut Globals,
     full_context: &mut FullContext,
-    type_links: &FnvHashMap<u16, String>,
+    type_links: &AHashMap<u16, String>,
     path: &str,
     tn: Option<&str>,
 ) -> Result<(String, String), RuntimeError> {

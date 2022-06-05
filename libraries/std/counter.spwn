@@ -1,7 +1,14 @@
 #[no_std, cache_output]
 
+#[desc(u"
+    `@counter` is a wrapper around the item ID system in Geometry Dash. In practice, it works as a replacement for numbers.
+    The difference between numbers and counters, is that counters can be modified in the level's runtime. 
+")]
+type @counter
+
 extract import "control_flow.spwn"
 extract import "constants.spwn".comparisons
+extract import "constants.spwn".obj_props
 import "events.spwn"
 DEFAULT_BITS = 16
 
@@ -28,9 +35,9 @@ impl @counter {
         @counter::new(true)   // creates a new counter with a starting value of true (1)
     ")] (
         #[desc("Source (can be a number, item ID or boolean)")] source: @number | @item | @counter | @bool = 0,
-        #[desc(
-            "Defines the maximum stable size of the counter. If the counter goes outside of the range from 0 to 2^size, it's behavior will be undefined. Smaller sizes are more group effective."
-        )] bits: @number = DEFAULT_BITS,
+        #[desc(u"
+            Defines the maximum stable size of the counter. If the counter goes outside of the range from 0 to 2^size, it's behavior will be undefined. Smaller sizes are more group effective.
+        ")] bits: @number = DEFAULT_BITS,
         #[desc("Resets the counter in case the item has been used before. This only applies if the `source` argument is not an item.")] reset: @bool = true,
     ) -> @counter {
         return match source {
@@ -86,7 +93,6 @@ impl @counter {
         #[desc("X pos of display in units (1 grid square = 30 units)")] x: @number,
         #[desc("Y pos of display in units")] y: @number
     ) -> @NULL {
-        extract import "constants.spwn".obj_props
         $.add(obj {
             OBJ_ID: 1615,
             X: x,
@@ -106,7 +112,6 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
     (
         self,
     ) -> @object {
-        extract import "constants.spwn".obj_props
         return obj {
             OBJ_ID: 1615,
             ITEM: self.item,

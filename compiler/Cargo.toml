@@ -20,7 +20,7 @@ serde_yaml = "0.8.19"
 toml = "0.5.7"
 itertools = "0.10.1"
 
-fnv = "1.0.6"
+ahash = "0.7.6"
 distance = "0.4.0"
 
 include_dir = "0.6.2"

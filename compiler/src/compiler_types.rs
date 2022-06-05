@@ -13,7 +13,7 @@ use shared::BreakType;
 //use std::boxed::Box;
 use crate::value_storage::*;
 use errors::compiler_info::CompilerInfo;
-use fnv::FnvHashMap;
+use ahash::AHashMap;
 
 use crate::compiler::compile_scope;
 
@@ -23,7 +23,7 @@ use shared::StoredValue;
 pub type TypeId = u16;
 //                                                               This bool is for if this value
 //                                                               was implemented in the current module
-pub type Implementations = FnvHashMap<TypeId, FnvHashMap<LocalIntern<String>, (StoredValue, bool)>>;
+pub type Implementations = AHashMap<TypeId, AHashMap<LocalIntern<String>, (StoredValue, bool)>>;
 
 pub type FnIdPtr = usize;
 
@@ -164,8 +164,7 @@ pub fn handle_unary_operator(
 }
 
 pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError> {
-    let rounded = num.round();
-    if (num - rounded).abs() > 0.000000001 {
+    if num.fract().abs() > f64::EPSILON {
         return Err(RuntimeError::CustomError(create_error(
             info.clone(),
             &format!("expected integer, found {}", num),
@@ -173,7 +172,7 @@ pub fn convert_to_int(num: f64, info: &CompilerInfo) -> Result<i32, RuntimeError
             None,
         )));
     }
-    Ok(rounded as i32)
+    Ok(num as i32)
 }
 
 pub fn stored_to_variable(v: StoredValue, globals: &Globals) -> ast::Variable {
@@ -325,9 +324,9 @@ pub fn execute_macro(
             .inner()
             .get_variables()
             .values()
-            .flat_map(|stack| stack.iter().map(|VariableData { val: a, .. }| *a))
+            .flat_map(|stack| stack.iter().map(|VariableData { val: a, .. }| a))
         {
-            globals.push_preserved_val(val)
+            globals.push_preserved_val(*val)
         }
     }
 
@@ -365,7 +364,7 @@ pub fn execute_macro(
     //dbg!(&combinations);
 
     for (arg_values, full_context) in combinations {
-        let mut new_variables: FnvHashMap<LocalIntern<String>, Vec<VariableData>> =
+        let mut new_variables: AHashMap<LocalIntern<String>, Vec<VariableData>> =
             Default::default();
         let context = full_context.inner();
 
@@ -768,7 +767,7 @@ pub fn eval_dict(
     }
     for (results, full_context) in combinations {
         let context = full_context.inner();
-        let mut dict_out: FnvHashMap<LocalIntern<String>, StoredValue> = Default::default();
+        let mut dict_out: AHashMap<LocalIntern<String>, StoredValue> = Default::default();
         for (expr_index, def) in dict.iter().enumerate() {
             match def {
                 ast::DictDef::Def(d) => {

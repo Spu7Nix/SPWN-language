@@ -6,6 +6,8 @@ extract import 'constants.spwn'
 impl @number {
     abs: #[desc("Returns the absolute value of the number"), example("$.assert((-1).abs() == 1)")]
     (self) -> @number => self if self >= 0 else -self,
+    sign: #[desc("Returns the sign of the number, also works with -0"), example("$.assert((-69).sign() == -1)")]
+    (self) -> @number => self if self == 0 else ((-1) if self < 0 else 1),
     round: #[desc("Returns the nearest integer to the number"), example("$.assert((1.5).round() == 2)")]
     (self) -> @number => $.round(self),
     ceil: #[desc("Returns the smallest integer greater than or equal to the number"), example("$.assert((1.5).ceil() == 2)")]
@@ -58,8 +60,6 @@ impl @number {
     },
     to_precision: #[desc("Turns the number to a specific precision"), example("$.assert((0.12345).to_precision(3) == 0.123)")]
     (self, precision: @number = 0) -> @number => self.to_fixed(precision) as @number,
-    is_finite: #[desc("Checks if the number is finite"), example("$.assert((0/0).is_finite() == false)")]
-    (self) -> @bool => self - self == 0,
 }
 
 

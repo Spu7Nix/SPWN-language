@@ -17,7 +17,7 @@ use crate::leveldata::GdObj;
 use crate::compiler_types::*;
 use crate::value::*;
 
-use fnv::FnvHashMap;
+use ahash::AHashMap;
 
 //use std::boxed::Box;
 use crate::value_storage::*;
@@ -36,20 +36,20 @@ pub struct Globals<'a> {
 
     pub path: LocalIntern<SpwnSource>,
 
-    pub lowest_y: FnvHashMap<u32, u16>,
+    pub lowest_y: AHashMap<u32, u16>,
     pub stored_values: ValStorage,
     //pub val_id: StoredValue,
-    pub type_ids: FnvHashMap<String, (u16, CodeArea)>,
+    pub type_ids: AHashMap<String, (u16, CodeArea)>,
     pub type_id_count: u16,
 
-    pub type_descriptions: FnvHashMap<u16, String>,
+    pub type_descriptions: AHashMap<u16, String>,
 
     pub func_ids: Vec<FunctionId>,
     pub objects: Vec<GdObj>,
     pub initial_string: String,
     pub initial_objects: Option<StoredValue>,
 
-    pub prev_imports: FnvHashMap<ImportType, (StoredValue, Implementations)>,
+    pub prev_imports: AHashMap<ImportType, (StoredValue, Implementations)>,
 
     pub trigger_order: f64,
 
@@ -149,7 +149,7 @@ impl<'a> Globals<'a> {
         std_out: &'a mut impl Write,
     ) -> Self {
         let (storage, builtin_storage, null_storage) = ValStorage::new();
-        let mut type_descriptions = FnvHashMap::<u16, String>::default();
+        let mut type_descriptions = AHashMap::<u16, String>::default();
 
         type_descriptions.insert(type_id!(group), "
 Groups are references to one or more Geometry Dash objects, and are used to make these objects do things like moving, rotating and pulsing.
@@ -237,11 +237,11 @@ Arrays are used to store lists of values at compile time.
             closed_items: 0,
             path: LocalIntern::new(path),
 
-            lowest_y: FnvHashMap::default(),
+            lowest_y: AHashMap::default(),
 
-            type_ids: FnvHashMap::default(),
+            type_ids: AHashMap::default(),
 
-            prev_imports: FnvHashMap::default(),
+            prev_imports: AHashMap::default(),
             type_id_count: 0,
             trigger_order: 0.0,
             uid_counter: 0,
@@ -255,7 +255,7 @@ Arrays are used to store lists of values at compile time.
             }],
             objects: Vec::new(),
             initial_string,
-            implementations: FnvHashMap::default(),
+            implementations: AHashMap::default(),
             sync_groups: vec![SyncGroup {
                 parts: vec![0],
                 groups_used: Vec::new(),

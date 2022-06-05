@@ -11,7 +11,7 @@ use crate::{
 //mod icalgebra;
 use compiler::leveldata::{GdObj, ObjParam};
 
-use fnv::FnvHashMap;
+use ahash::AHashMap;
 
 pub fn optimize(
     mut obj_in: Vec<FunctionId>,
@@ -36,7 +36,7 @@ pub fn optimize(
                 deleted: false,
             };
             if let Some(ObjParam::Group(group)) = obj.params.get(&obj_props::GROUPS) {
-                match network.map.get_mut(group) {
+                match network.map.get_mut(&group) {
                     Some(l) => (*l).triggers.push(trigger),
                     None => {
                         network.map.insert(*group, TriggerGang::new(vec![trigger]));
@@ -141,9 +141,9 @@ pub fn is_start_group(g: Group, reserved: &ReservedIds) -> bool {
 
 #[derive(Default)]
 pub struct ToggleGroups {
-    pub toggles_on: fnv::FnvHashMap<Group, Vec<ObjPtr>>,
-    pub toggles_off: fnv::FnvHashMap<Group, Vec<ObjPtr>>,
-    pub stops: fnv::FnvHashMap<Group, Vec<ObjPtr>>,
+    pub toggles_on: AHashMap<Group, Vec<ObjPtr>>,
+    pub toggles_off: AHashMap<Group, Vec<ObjPtr>>,
+    pub stops: AHashMap<Group, Vec<ObjPtr>>,
 }
 
 fn get_toggle_groups(objects: &[FunctionId]) -> ToggleGroups {
@@ -239,7 +239,7 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
         for trigger in new_triggers {
             let obj = &objects[trigger.obj].0;
             if let Some(ObjParam::Group(group)) = obj.params.get(&obj_props::GROUPS) {
-                match new_network.map.get_mut(group) {
+                match new_network.map.get_mut(&group) {
                     Some(l) => (*l).triggers.push(trigger),
                     None => {
                         new_network
@@ -276,7 +276,7 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
             if let (TriggerRole::Func | TriggerRole::Spawn, Some(ObjParam::Group(id))) =
                 (trigger.role, obj.params.get(&obj_props::TARGET))
             {
-                if let Some(gang) = new_network.map.get_mut(id) {
+                if let Some(gang) = new_network.map.get_mut(&id) {
                     (*gang).connections_in += 1;
 
                     if trigger.role != TriggerRole::Spawn {
@@ -308,7 +308,7 @@ pub fn clean_network(network: &mut TriggerNetwork, objects: &Triggerlist, delete
 // }
 
 pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
-    let mut map: FnvHashMap<Group, (Vec<ObjPtr>, Group, TriggerOrder)> = table
+    let mut map: AHashMap<Group, (Vec<ObjPtr>, Group, TriggerOrder)> = table
         .into_iter()
         .map(|(a, (b, c))| (a, (vec![], b, c)))
         .collect();
@@ -318,7 +318,7 @@ pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
             for (prop, param) in &mut object.params.iter_mut() {
                 match param {
                     ObjParam::Group(g) => {
-                        if let Some(to) = map.get_mut(g) {
+                        if let Some(to) = map.get_mut(&g) {
                             *g = to.1;
                             if *prop == obj_props::GROUPS {
                                 to.0.push(ObjPtr(i, j));
@@ -327,7 +327,7 @@ pub fn replace_groups(table: Swaps, objects: &mut Triggerlist) {
                     }
                     ObjParam::GroupList(list) => {
                         for g in list {
-                            if let Some(to) = map.get_mut(g) {
+                            if let Some(to) = map.get_mut(&g) {
                                 *g = to.1;
                                 if *prop == obj_props::GROUPS {
                                     to.0.push(ObjPtr(i, j));
@@ -394,7 +394,7 @@ pub fn create_spawn_trigger(
     role: TriggerRole,
     deleted: bool,
 ) {
-    let mut new_obj_map = FnvHashMap::default();
+    let mut new_obj_map = AHashMap::default();
     new_obj_map.insert(1, ObjParam::Number(1268.0));
     new_obj_map.insert(obj_props::TARGET, ObjParam::Group(target_group));
     new_obj_map.insert(63, ObjParam::Number(delay));
@@ -426,7 +426,7 @@ pub fn create_spawn_trigger(
     };
 
     if let Some(ObjParam::Group(group)) = new_obj.params.get(&obj_props::GROUPS) {
-        match network.map.get_mut(group) {
+        match network.map.get_mut(&group) {
             Some(gang) => (*gang).triggers.push(new_trigger),
             None => {
                 network

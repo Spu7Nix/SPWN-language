@@ -195,7 +195,7 @@ return {
         }
     },
 
-    move_to_trigger: #[desc("Returns a move trigger that uses \"move to\" as an object"), example("$.add( move_to_trigger(10g,3g).with(obj_props.X,600) ) // Creates a move trigger at X 600 that moves group 10 to group 3")]
+    move_to_trigger: #[desc('Returns a move trigger that uses "move to" as an object'), example("$.add( move_to_trigger(10g,3g).with(obj_props.X,600) ) // Creates a move trigger at X 600 that moves group 10 to group 3")]
     (
         #[desc("Group to move")] group: @group,
         #[desc("Group of the object to move to")] target: @group,
@@ -311,7 +311,10 @@ return {
     },
 
     spawn_trigger: #[desc("Returns a spawn trigger as an object"), example("$.add( spawn_trigger(5g,0.5).with(obj_props.X,600) )")]
-    (#[desc("Group to spawn")] group: @group | @trigger_function, #[desc("Delay")] time: @number | @epsilon = @epsilon::{}) -> @object {
+    (
+        #[desc("Group to spawn")] group: @group | @trigger_function,
+        #[desc("Delay")] time: @number | @epsilon = @epsilon::{}
+    ) -> @object {
         return obj{
 			OBJ_ID: 1268,
 			SPAWN_DURATION: time,

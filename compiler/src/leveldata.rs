@@ -3,7 +3,7 @@
 use crate::builtins::*;
 use crate::compiler_types::FunctionId;
 use crate::context::Context;
-use fnv::{FnvHashMap, FnvHashSet};
+use ahash::{AHashMap, AHashSet};
 use parser::ast::ObjectMode;
 use std::hash::Hash;
 
@@ -83,7 +83,7 @@ impl fmt::Display for ObjParam {
                 _ => write!(f, "0"),
             },
             ObjParam::Number(n) => {
-                if (n.round() - n).abs() < 0.001 {
+                if n.fract().abs() < 0.001 {
                     write!(f, "{}", *n as i32)
                 } else {
                     write!(f, "{:.1$}", n, 3)
@@ -115,7 +115,7 @@ pub struct GdObj {
     pub target: Group,
     pub spawn_triggered: bool,*/
     pub func_id: usize,
-    pub params: FnvHashMap<u16, ObjParam>,
+    pub params: AHashMap<u16, ObjParam>,
     pub mode: ObjectMode,
     pub unique_id: usize,
 }
@@ -128,17 +128,17 @@ impl GdObj {
     }
 }
 
-pub fn get_used_ids(ls: &str) -> [FnvHashSet<u16>; 4] {
+pub fn get_used_ids(ls: &str) -> [AHashSet<u16>; 4] {
     let mut out = [
-        FnvHashSet::<u16>::default(),
-        FnvHashSet::<u16>::default(),
-        FnvHashSet::<u16>::default(),
-        FnvHashSet::<u16>::default(),
+        AHashSet::<u16>::default(),
+        AHashSet::<u16>::default(),
+        AHashSet::<u16>::default(),
+        AHashSet::<u16>::default(),
     ];
     let objects = ls.split(';');
     for obj in objects {
         let props: Vec<&str> = obj.split(',').collect();
-        let mut map = FnvHashMap::default();
+        let mut map = AHashMap::default();
 
         for i in (0..props.len() - 1).step_by(2) {
             map.insert(props[i], props[i + 1]);
@@ -284,11 +284,11 @@ pub fn append_objects(
     }
 
     //find new ids for all the arbitrary ones
-    let mut id_maps: [FnvHashMap<ArbitraryId, SpecificId>; 4] = [
-        FnvHashMap::default(),
-        FnvHashMap::default(),
-        FnvHashMap::default(),
-        FnvHashMap::default(),
+    let mut id_maps: [AHashMap<ArbitraryId, SpecificId>; 4] = [
+        AHashMap::default(),
+        AHashMap::default(),
+        AHashMap::default(),
+        AHashMap::default(),
     ];
 
     const ID_MAX: u16 = 999;
