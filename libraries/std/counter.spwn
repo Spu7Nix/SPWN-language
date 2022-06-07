@@ -18,10 +18,10 @@ reset_counter = (
 
     for i in c.bits..0 {
         x = 2^i
-        c.item.if_is(LARGER_THAN, x - 1, !{
+        if c.item > x - 1 {
             c.item.add(-x)
             for_each(x)
-        })   
+        }
     }
 }
 
@@ -246,38 +246,25 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
         #[desc("Divisor to divide by, either another counter (very expensive) or a normal number")] divisor: @counter | @number,
         #[desc("Counter or item to set to the remainder value")] remainder: @counter | @item = @counter::new(),
     ) -> @NULL {
-
-
-        if divisor.type == @number {
-            result = @counter::new(0, reset = false, bits = self.bits)
-            for i in self.bits..0 {
-                num = 2^i
+        result = @counter::new(0, reset = false, bits = self.bits)
+        for i in self.bits..0 {
+            num = 2^i
+            if divisor is @number {
                 -> if self >= divisor * num {
                     self.add(-divisor * num)
                     result.add(num)
                 }
-            }
-            self.add_to(remainder)
-            result.add_to(self)
-        } else if divisor.type == @counter {
-            result = @counter::new(0, reset = false, bits = self.bits)
-            broken = @counter::new(false)
-            
-            for i in self.bits..0 {
-                num = 2^i
-
+            } else if divisor is @counter {
                 divisor.copy_to(self, factor = -num)
                 result.add(num)
-
                 -> if self < 0 {
                     divisor.copy_to(self, factor = num)
                     result.add(-num)
                 }
             }
-
-            self.add_to(remainder)
-            result.add_to(self)
         }
+        self.add_to(remainder)
+        result.add_to(self)
     },
 
     //will consume both numbers
@@ -292,18 +279,7 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
         self.copy_to(comp)
         other.copy_to(comp, factor = -1)
 
-        comp.item.if_is(EQUAL_TO, 0, !{
-            -> return 0
-        })
-        comp.item.if_is(LARGER_THAN, 0, !{
-            comp.reset()
-            -> return 1
-        }) 
-        comp.item.if_is(SMALLER_THAN, 0, !{
-            comp.reset_negative()
-            -> return -1
-        })
-
+        return comp.item.compare(0)
     },
 
     reset: #[desc("Resets counter to 0."), example(u"
@@ -486,12 +462,12 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
                 -> return false
             }
 
-            self.item.if_is(LARGER_THAN, other, !{
+            if self.item > other {
                 ret_false.start_group.toggle_off()
                 -> return true
-            })
+            }
 
-            self.item.if_is(SMALLER_THAN, other + 1, !{ ret_false! })
+            if self.item < other + 1 { ret_false! }
 
             ret_false.start_group.toggle_on()
             
@@ -514,12 +490,12 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
                 -> return false
             }
 
-            self.item.if_is(SMALLER_THAN, other, !{
+            if self.item < other {
                 ret_false.start_group.toggle_off()
                 -> return true
-            })
+            }
 
-            self.item.if_is(LARGER_THAN, other - 1, !{ ret_false! })
+            if self.item > other - 1 { ret_false! }
 
             ret_false.start_group.toggle_on()
         } else if other.type == @counter {
@@ -541,12 +517,12 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
                 -> return false
             }
 
-            self.item.if_is(LARGER_THAN, other - 1, !{
+            if self.item > other - 1 {
                 ret_false.start_group.toggle_off()
                 -> return true
-            })
+            }
 
-            self.item.if_is(SMALLER_THAN, other, !{ ret_false! })
+            if self.item < other { ret_false! }
 
             ret_false.start_group.toggle_on()
         } else if other.type == @counter {
@@ -568,12 +544,12 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
                 -> return false
             }
 
-            self.item.if_is(SMALLER_THAN, other + 1, !{
+            if self.item < other + 1 {
                 ret_false.start_group.toggle_off()
                 -> return true
-            })
+            }
 
-            self.item.if_is(LARGER_THAN, other, !{ ret_false! })
+            if self.item > other { ret_false! }
 
             ret_false.start_group.toggle_on()
         } else if other.type == @counter {
@@ -594,15 +570,16 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
                 -> return false
             }
 
-            self.item.if_is(EQUAL_TO, other, !{
+            if self.item == other {
                 ret_false.start_group.toggle_off()
                 -> return true
-            })
+            }
 
             activate_group_fix = !{ ret_false! }
 
-            self.item.if_is(LARGER_THAN, other, activate_group_fix)
-            self.item.if_is(SMALLER_THAN, other, activate_group_fix)
+            if self.item != other {
+                activate_group_fix!
+            }
 
             ret_false.start_group.toggle_on()
         } else if other.type == @counter {
@@ -754,7 +731,7 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
 
 
         for val in range {
-            -> self.item.if_is(EQUAL_TO, val, !{
+            -> if self.item == val {
                 for func in funcs {
                     [val2, func] = func
                     if val2 != val {
@@ -764,7 +741,7 @@ $.add( points.to_obj().with(obj_props.GROUPS, 5g) )
                     }
                 }
                 
-            })
+            }
         }
 
         for func in funcs {
