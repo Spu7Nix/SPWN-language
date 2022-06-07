@@ -1,0 +1,12 @@
+- name: secret-search
+  # You may pin to the exact commit or the version.
+  # uses: Hacks4Snacks/secret-search@69068831698338cb39665b3500af25cbff8d1f81
+  uses: Hacks4Snacks/secret-search@v1.1
+  with:
+    # File to Exclude from the scan
+    exclude-file: # optional, default is NOFILETOEXCLUDE
+    # Fail the pipeline if any secrets are detected
+    fail-on-error: # optional, default is true
+    # Number of secrets to fail the pipeline
+    failure-count: # optional, default is 0
+		
