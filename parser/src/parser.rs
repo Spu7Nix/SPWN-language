@@ -1487,11 +1487,7 @@ fn parse_dict(
                 }
             }
 
-            Some(Token::DotDot) => {
-                let expr = parse_expr(tokens, notes, true, true, None)?;
-                defs.push(ast::DictDef::Extract(expr))
-            }
-            Some(Token::DotDotEq) => {
+            Some(Token::DotDot) | Some(Token::DotDotEq) => {
                 let expr = parse_expr(tokens, notes, true, true, None)?;
                 defs.push(ast::DictDef::Extract(expr))
             }

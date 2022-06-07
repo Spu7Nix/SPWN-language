@@ -6,7 +6,7 @@ type @chroma
 import "array.spwn"
 import "number.spwn"
 
-rgb_to_hsv = (r, g, b) {
+rgb_to_hsv = (r: @number, g: @number, b: @number) {
     max = [r, g, b].max()
     min = [r, g, b].min()
     return [
@@ -29,8 +29,7 @@ rgb_to_hsv = (r, g, b) {
     ]
 }
 
-hsv_to_rgb = (h, s, v) {
-
+hsv_to_rgb = (h: @number, s: @number, v: @number) {
     return match h {
         <=60: [255, h.map(0,60,0,255), 0],
         <=120: [h.map(60,120,255,0), 255, 0],
@@ -39,29 +38,17 @@ hsv_to_rgb = (h, s, v) {
         <=300: [h.map(240,300,0,255), 0, 255],
         <=360: [255, 0, h.map(300,360,255,0)],
     }.map(x => s.map(100, 0, x, 255)).map(x => v.map(100, 0, x, 0)).map(x => $.floor(x))
-
 }
 
-hex_value = (c) {
-    if c in '0123456789' {
-        return @number(c)
-    }
-    return match c {
-        =='a'|=='A': 10,
-        =='b'|=='B': 11,
-        =='c'|=='C': 12,
-        =='d'|=='D': 13,
-        =='e'|=='E': 14,
-        =='f'|=='F': 15,
-        else: () {
-            throw "Invalid character {} in hex code".fmt([c])
-        } ()
-    }
+value_hex = @array('0123456789abcdef')
+
+hex_value = (c: @string) {
+    output = value_hex.index(c.lowercase())
+    if output == null { throw "Invalid character `{}` in hex code".fmt(c) }
+    return output
 }
 
-value_hex = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
-
-hex_to_rgb = (s) {
+hex_to_rgb = (s: @string) {
     let s = s.substr(1,s.length) if s[0] == '#' else s
     return match s.length {
         ==6: [
@@ -94,7 +81,7 @@ hex_to_rgb = (s) {
     }
 }
 
-rgb_to_hex = (r, g, b, a) {
+rgb_to_hex = (r: @number, g: @number, b: @number, a: @number) {
     return (
         value_hex[r/%16] +
         value_hex[r%16] +

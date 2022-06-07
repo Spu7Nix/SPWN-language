@@ -9,7 +9,7 @@ fn test_all(input: &str, src: SpwnSource) {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let input = fs::read_to_string("/home/krista/Documents/coding/rust/SPWN-language/test/test.spwn").unwrap();
+    let input = fs::read_to_string("test/test.spwn").unwrap();
     let src = LocalIntern::new("".to_string());
 
     let mut bmg = c.benchmark_group("main");
