@@ -155,7 +155,7 @@ $.assert(arr.index_all(2) == [2,4])
         $.assert(arr.average() == 3.2)
     ")]
     (self) -> @number {
-        numbers = self.filter(v => (v is @number) && v.is_finite())
+        numbers = self.filter(v => (v is @number))
         return numbers.sum() / numbers.length if numbers.length > 0 else 0
     },
 

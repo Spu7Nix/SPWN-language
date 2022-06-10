@@ -69,14 +69,14 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
 		checker = @counter::new(0, reset = false)
 		-> (){
 			wait(delay)
-			checker.item.if_is(EQUAL_TO, 1, !{
+			if checker.item == 1 {
 				checker.item.add(-1)
-			})
+			}
 		}()
-		checker.item.if_is(EQUAL_TO, 0, !{
+		if checker.item == 0 {
 			checker.item.add(1)
 			-> return
-		})
+		}
 
 
 	},
@@ -94,10 +94,10 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
 	")] () -> @NULL {
 
 		checker = @counter::new(0, reset = false)
-		checker.item.if_is(EQUAL_TO, 0, !{
+		if checker.item == 0 {
 			checker.item.add(1)
 			-> return
-		})
+		}
 
 
 	},
@@ -112,13 +112,13 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
 	// 	-> (){
 	// 		checker.item.add(1)
 	// 		wait(delay)
-	// 		checker.item.if_is(EQUAL_TO, 1, !{
+	// 		if checker.item == 1 {
 	// 			-> return
-	// 		})
+	// 		}
 	// 		wait()
-	// 		checker.item.if_is(LARGER_THAN, 1, !{
+	// 		if checker.item > 1 {
 	// 			checker -= 1
-	// 		})
+	// 		}
 
 	// 	}()
 
@@ -188,15 +188,19 @@ call_with_delay = #[desc("Call a function after a delay"), example(u"
             wait(delay)
 			i.add(range.step_size)
             if range.step_size > 0 {
-                i.item.if_is(SMALLER_THAN, range.end, func)
-                i.item.if_is(LARGER_THAN, range.end - 1, !{
+                if i.item < range.end {
+					func!
+				}
+                if i.item > range.end - 1 {
                     -> return
-                })
+                }
             } else {
-                i.item.if_is(LARGER_THAN, range.end, func)
-                i.item.if_is(SMALLER_THAN, range.end + 1, !{
+                if i.item > range.end {
+					func!
+				}
+                if i.item < range.end + 1 {
                     -> return
-                })
+                }
             }
         }
 

@@ -11,8 +11,7 @@ use crate::ast::StringFlags;
 use errors::compiler_info::CodeArea;
 use errors::compiler_info::CompilerInfo;
 use errors::create_error;
-use fnv::FnvHashMap;
-use fnv::FnvHashSet;
+use ahash::{AHashMap, AHashSet};
 use shared::FileRange;
 use shared::SpwnSource;
 //use std::collections::HashMap;
@@ -349,7 +348,7 @@ impl Token {
 pub struct ParseNotes {
     pub tag: ast::Attribute,
     pub file: SpwnSource,
-    pub builtins: FnvHashSet<&'static str>,
+    pub builtins: AHashSet<&'static str>,
 }
 
 impl ParseNotes {
@@ -1399,7 +1398,7 @@ fn parse_dict(
 ) -> Result<Vec<ast::DictDef>, SyntaxError> {
     let mut defs = Vec::<ast::DictDef>::new();
 
-    let mut defined_members = FnvHashMap::<LocalIntern<String>, FileRange>::default();
+    let mut defined_members = AHashMap::<LocalIntern<String>, FileRange>::default();
 
     loop {
         match tokens.next(false) {
@@ -1488,11 +1487,7 @@ fn parse_dict(
                 }
             }
 
-            Some(Token::DotDot) => {
-                let expr = parse_expr(tokens, notes, true, true, None)?;
-                defs.push(ast::DictDef::Extract(expr))
-            }
-            Some(Token::DotDotEq) => {
+            Some(Token::DotDot) | Some(Token::DotDotEq) => {
                 let expr = parse_expr(tokens, notes, true, true, None)?;
                 defs.push(ast::DictDef::Extract(expr))
             }

@@ -1,11 +1,15 @@
 //! Abstract Syntax Tree (AST) type definitions
 
+use ahash::AHashSet;
+
 use internment::LocalIntern;
 
 use crate::fmt::SpwnFmt;
 use shared::FileRange;
 use shared::ImportType;
 use shared::StoredValue;
+
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum DictDef {
     Def((LocalIntern<String>, Expression)),
@@ -281,13 +285,13 @@ impl Default for Attribute {
 }
 
 pub trait CountSymbols {
-    fn symbols(&self) -> fnv::FnvHashSet<LocalIntern<String>>;
+    fn symbols(&self) -> AHashSet<LocalIntern<String>>;
 
-    fn properties(&self) -> fnv::FnvHashSet<LocalIntern<String>> {
+    fn properties(&self) -> AHashSet<LocalIntern<String>> {
         Default::default()
     }
 
-    fn all(&self) -> fnv::FnvHashSet<LocalIntern<String>> {
+    fn all(&self) -> AHashSet<LocalIntern<String>> {
         let mut out = self.symbols();
         out.extend(self.properties());
         out

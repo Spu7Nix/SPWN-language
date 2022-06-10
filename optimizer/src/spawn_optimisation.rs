@@ -12,8 +12,7 @@ use crate::Triggerlist;
 use crate::NO_GROUP;
 use compiler::builtins::Group;
 use compiler::leveldata::ObjParam;
-use fnv::FnvHashMap;
-use fnv::FnvHashSet;
+use ahash::{AHashMap, AHashSet};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 struct SpawnDelay {
@@ -70,11 +69,11 @@ pub(crate) fn spawn_optimisation(
     reserved: &ReservedIds,
     toggle_groups: &ToggleGroups,
 ) {
-    let mut spawn_connections = FnvHashMap::<Group, Vec<SpawnTrigger>>::default();
-    let mut inputs = FnvHashSet::<Group>::default();
-    let mut outputs = FnvHashSet::<Group>::default();
+    let mut spawn_connections = AHashMap::<Group, Vec<SpawnTrigger>>::default();
+    let mut inputs = AHashSet::<Group>::default();
+    let mut outputs = AHashSet::<Group>::default();
 
-    let mut cycle_points = FnvHashSet::<Group>::default();
+    let mut cycle_points = AHashSet::<Group>::default();
     let mut all = Vec::new();
 
     for (group, gang) in network.map.iter_mut() {
@@ -183,7 +182,7 @@ pub(crate) fn spawn_optimisation(
 
     //dbg!(&all);
 
-    let mut deduped = FnvHashMap::default();
+    let mut deduped = AHashMap::default();
 
     for Connection {
         start_group,
@@ -238,7 +237,7 @@ pub(crate) fn spawn_optimisation(
             assert!(swaps.insert(a, (b, order)).is_none());
         };
 
-        let default = &FnvHashSet::default();
+        let default = &AHashSet::default();
         let targeters = network.connectors.get(&start).unwrap_or(default);
 
         let start_can_toggle_off = if let Some(togglers) = toggle_groups.toggles_off.get(&start) {
@@ -283,11 +282,11 @@ pub(crate) fn spawn_optimisation(
 // set triggers that make cycles to inputs and outputs
 fn look_for_cycle(
     current: Group,
-    ictriggers: &FnvHashMap<Group, Vec<SpawnTrigger>>,
+    ictriggers: &AHashMap<Group, Vec<SpawnTrigger>>,
     visited: &mut Vec<Group>,
-    inputs: &mut FnvHashSet<Group>,
-    outputs: &mut FnvHashSet<Group>,
-    cycle_points: &mut FnvHashSet<Group>,
+    inputs: &mut AHashSet<Group>,
+    outputs: &mut AHashSet<Group>,
+    cycle_points: &mut AHashSet<Group>,
     all: &mut Vec<Connection>,
 ) {
     if let Some(connections) = ictriggers.get(&current) {
@@ -327,9 +326,9 @@ fn traverse(
     origin: Group,
     total_delay: SpawnDelay, // delay from the origin to the current trigger
     trigger: Option<Trigger>,
-    outputs: &FnvHashSet<Group>,
-    cycle_points: &FnvHashSet<Group>,
-    spawn_connections: &FnvHashMap<Group, Vec<SpawnTrigger>>,
+    outputs: &AHashSet<Group>,
+    cycle_points: &AHashSet<Group>,
+    spawn_connections: &AHashMap<Group, Vec<SpawnTrigger>>,
     visited: &mut Vec<Group>,
     all: &mut Vec<Connection>,
 ) {

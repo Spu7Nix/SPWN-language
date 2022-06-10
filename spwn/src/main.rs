@@ -1,6 +1,5 @@
 use ariadne::Fmt;
 use clap::arg;
-use clap::AppSettings;
 use clap::ValueHint;
 //#![feature(arbitrary_enum_discriminant)]
 use ::compiler::builtins;
@@ -33,7 +32,7 @@ use ::pckp::config_file;
 
 const ERROR_EXIT_CODE: i32 = 1;
 
-use clap::App;
+use clap::Command;
 use std::io::Write;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -124,13 +123,12 @@ impl<'a> BuildOptions<'a> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let matches = App::new("SPWN")
-    .global_setting(AppSettings::ArgRequiredElseHelp)
+    let matches = Command::new("SPWN")
+    .arg_required_else_help(true)
     .subcommands(
         [
-            App::new("build")
-                .about("Runs/builds a given file"
-            )
+            Command::new("build")
+                .about("Runs/builds a given file")
                 .visible_alias("b")
                 .args(&[
                     arg!(<SCRIPT> "Path to spwn source file").value_hint(ValueHint::AnyPath),
@@ -145,7 +143,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     arg!(-d --deny "Deny the use of a builtin").takes_value(true).multiple_occurrences(true).min_values(0),
                 ]),
 
-            App::new("eval")
+            Command::new("eval")
                 .about("Runs/builds the input given in stdin/the console as SPWN code")
                 .visible_alias("e")
                 .args(&[
@@ -160,21 +158,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     arg!(-d --deny "Deny the use of a builtin").takes_value(true).multiple_occurrences(true).min_values(0),
                 ]),
 
-            App::new("doc")
-            .arg(
-                arg!(<LIBRARY> "Library to document")
-            )
+            Command::new("doc")
+                .arg(arg!(<LIBRARY> "Library to document"))
                 .about("Generates documentation for a SPWN library, in the form of a markdown file"),
 
-            App::new("new")
-                .about("Creates a new SPWN project in the given directory"
-            )
+            Command::new("new")
+                .about("Creates a new SPWN project in the given directory")
                 .args(&[
                     arg!(-l --"lib" "Creates a PCKP-compatible SPWN library"),
                     arg!(<PATH> "Path to create project in").value_hint(ValueHint::AnyPath),
                 ]),
         ]
-    ).global_setting(clap::AppSettings::ArgRequiredElseHelp).get_matches();
+    )
+    .arg_required_else_help(true)
+    .get_matches();
 
     if let Some(build_cmd) = matches.subcommand_matches("build") {
         let script_path = build_cmd.value_of("SCRIPT").ok_or("unreachable")?;
