@@ -1,8 +1,40 @@
-#[no_level]
+#[no_level, no_std]
+
+
+rettest = (n: @number) {
+    match n {
+        <10: {
+            let a = 3;
+            return "less";
+        },
+        >=10: {
+            return "more";
+        }
+    }
+}
+
+$.print(rettest(4));
+$.print(rettest(12));
 
 
 
-f = (a, b, c) => a + b + c;
 
-$.print(f(1, 2, 3))
+matchtest = (n) {
+    let ret = match n {
+        @number: 5,
+        @string: {
+            let a = n * 2;
+            $.print("lol: ", a);
+        },
+        @bool: {
+            a: "aaa",
+        }
+        _: {throw "wtf"}
+    };
+    $.print("ret is ", ret);
+}
 
+matchtest(5);
+matchtest("aaaa");
+matchtest(true);
+matchtest([]);

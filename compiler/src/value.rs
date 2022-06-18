@@ -1,6 +1,7 @@
 use crate::builtins::*;
 use crate::compiler::import_module;
 use crate::compiler::merge_all_contexts;
+use crate::compiler::compile_scope;
 
 use errors::compiler_info::CodeArea;
 use errors::compiler_info::CompilerInfo;
@@ -2589,12 +2590,28 @@ impl VariableFuncs for ast::Variable {
                                             {
                                                 Value::Bool(b) => {
                                                     if *b {
-                                                        case.body.eval(
-                                                            full_context,
-                                                            globals,
-                                                            info.clone(),
-                                                            constant,
-                                                        )?;
+                                                        match &case.body {
+                                                            ast::CaseBody::Expr(expr) => expr.eval(
+                                                                full_context,
+                                                                globals,
+                                                                info.clone(),
+                                                                constant,
+                                                            )?,
+                                                            ast::CaseBody::Block(stmts) => {
+                                                                compile_scope(
+                                                                    &stmts,
+                                                                    full_context,
+                                                                    globals,
+                                                                    info.clone(),
+                                                                )?;
+                                                                store_const_value(
+                                                                    Value::Null,
+                                                                    globals,
+                                                                    full_context.inner().start_group,
+                                                                    info.position,
+                                                                );
+                                                            },
+                                                        }
                                                         for c in full_context.iter() {
                                                             c.inner().broken = Some((
                                                                 BreakType::Switch(
@@ -2625,12 +2642,29 @@ impl VariableFuncs for ast::Variable {
                                 ast::CaseType::Default => {
                                     //this should be the last case, so we just return the body
 
-                                    case.body.eval(
-                                        full_context,
-                                        globals,
-                                        info.clone(),
-                                        constant,
-                                    )?;
+                                    match &case.body {
+                                        ast::CaseBody::Expr(expr) => expr.eval(
+                                            full_context,
+                                            globals,
+                                            info.clone(),
+                                            constant,
+                                        )?,
+                                        ast::CaseBody::Block(stmts) => {
+                                            compile_scope(
+                                                &stmts,
+                                                full_context,
+                                                globals,
+                                                info.clone(),
+                                            )?;
+                                            store_const_value(
+                                                Value::Null,
+                                                globals,
+                                                full_context.inner().start_group,
+                                                info.position,
+                                            );
+                                        },
+                                    }
+
                                     for c in full_context.iter() {
                                         c.inner().broken = Some((
                                             BreakType::Switch(c.inner().return_value),

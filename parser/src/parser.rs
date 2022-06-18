@@ -1153,11 +1153,42 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
 
                 match tokens.next(false) {
                     Some(Token::Colon) => {
-                        let expr = parse_expr(tokens, notes, false, true, None)?; // parse whats after the :
-                        cases.push(ast::Case {
-                            typ: ast::CaseType::Default,
-                            body: expr,
-                        });
+
+                        let mut test_tokens = tokens.clone();
+
+                        match test_tokens.next(false) {
+                            Some(Token::OpenCurlyBracket) => {
+                                match (test_tokens.next(false), test_tokens.next(false)) {
+                                    (
+                                        Some(Token::Symbol | Token::Type | Token::StringLiteral),
+                                        Some(Token::Colon)
+                                    ) | (Some(Token::ClosingCurlyBracket), _) => {
+                                        let expr = parse_expr(tokens, notes, false, true, None)?; // parse whats after the :
+                                        cases.push(ast::Case {
+                                            typ: ast::CaseType::Default,
+                                            body: ast::CaseBody::Expr(expr),
+                                        });
+                                    }
+                                    _ => {
+                                        tokens.next(false);
+
+                                        let case_body = parse_cmp_stmt(tokens, notes)?; // parse whatever is inside block
+                                        cases.push(ast::Case {
+                                            typ: ast::CaseType::Default,
+                                            body: ast::CaseBody::Block(case_body),
+                                        });
+                                    }
+                                }
+                            },
+                            _ => {
+                                let expr = parse_expr(tokens, notes, false, true, None)?; // parse whats after the :
+                                cases.push(ast::Case {
+                                    typ: ast::CaseType::Default,
+                                    body: ast::CaseBody::Expr(expr),
+                                });
+                            }
+                        }
+
                         if tokens.next(false) != Some(Token::Comma) {
                             // for error formatting
                             tokens.previous();
@@ -1180,11 +1211,41 @@ fn parse_cases(tokens: &mut Tokens, notes: &mut ParseNotes) -> Result<Vec<ast::C
                 }
                 match tokens.next(false) {
                     Some(Token::Colon) => {
-                        let expr = parse_expr(tokens, notes, false, true, None)?; // parse whats after the :
-                        cases.push(ast::Case {
-                            typ: ast::CaseType::Pattern(pat),
-                            body: expr,
-                        });
+
+                        let mut test_tokens = tokens.clone();
+
+                        match test_tokens.next(false) {
+                            Some(Token::OpenCurlyBracket) => {
+                                match (test_tokens.next(false), test_tokens.next(false)) {
+                                    (
+                                        Some(Token::Symbol | Token::Type | Token::StringLiteral),
+                                        Some(Token::Colon)
+                                    ) | (Some(Token::ClosingCurlyBracket), _) => {
+                                        let expr = parse_expr(tokens, notes, false, true, None)?; // parse whats after the :
+                                        cases.push(ast::Case {
+                                            typ: ast::CaseType::Pattern(pat),
+                                            body: ast::CaseBody::Expr(expr),
+                                        });
+                                    }
+                                    _ => {
+                                        tokens.next(false);
+
+                                        let case_body = parse_cmp_stmt(tokens, notes)?; // parse whatever is inside block
+                                        cases.push(ast::Case {
+                                            typ: ast::CaseType::Pattern(pat),
+                                            body: ast::CaseBody::Block(case_body),
+                                        });
+                                    }
+                                }
+                            },
+                            _ => {
+                                let expr = parse_expr(tokens, notes, false, true, None)?; // parse whats after the :
+                                cases.push(ast::Case {
+                                    typ: ast::CaseType::Pattern(pat),
+                                    body: ast::CaseBody::Expr(expr),
+                                });
+                            }
+                        }
 
                         if tokens.next(false) != Some(Token::Comma) {
                             // for error formatting

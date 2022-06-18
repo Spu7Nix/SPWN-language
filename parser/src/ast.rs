@@ -400,15 +400,22 @@ pub struct While {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum CaseType {
-    //Value(Expression),
+
     Pattern(Expression),
     Default,
 }
 
 #[derive(Clone, PartialEq, Debug)]
+pub enum CaseBody {
+
+    Expr(Expression),
+    Block(Vec<Statement>),
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub struct Case {
     pub typ: CaseType,
-    pub body: Expression,
+    pub body: CaseBody,
 }
 
 #[derive(Clone, PartialEq, Debug)]
