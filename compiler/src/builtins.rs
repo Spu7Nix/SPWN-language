@@ -2329,6 +2329,41 @@ $.assert(name_age == {
         (*globals.stored_values.map.get_mut(arguments[0]).unwrap()).def_area = info.position;
         Value::Null
     }
+    [RightShiftOp] #[safe = true, desc = "Default implementation of the `>>` operator", example = "$._right_shift_(10, 2)"]
+    fn _right_shift_((a): Number, (b): Number) {
+        let ia: i32 = convert_to_int(a, &info)?;
+        let ib: i32 = convert_to_int(b, &info)?;
+        Value::Number((ia >> ib) as f64)
+    }
+    [LeftShiftOp] #[safe = true, desc = "Default implementation of the `<<` operator", example = "$._left_shift_(3, 1)"]
+    fn _left_shift_((a): Number, (b): Number) { 
+        let ia: i32 = convert_to_int(a, &info)?;
+        let ib: i32 = convert_to_int(b, &info)?;
+        Value::Number((ia << ib) as f64)
+    }
+    [BitNotOp] #[safe = true, desc = "Default implementation of the `~n` operator", example = "$._bit_not_(4)"]
+    fn _bit_not_((a): Number) {
+        let i: i32 = convert_to_int(a, &info)?;
+        Value::Number((!i) as f64)
+    }
+    [BitAndOp] #[safe = true, desc = "Default implementation of the '`' operator", example = "$._bit_and_(6, 12)"]
+    fn _bit_and_((a): Number, (b): Number) {
+        let ia: i32 = convert_to_int(a, &info)?;
+        let ib: i32 = convert_to_int(b, &info)?;
+        Value::Number((ia & ib) as f64)
+    }
+    [BitOrOp] #[safe = true, desc = "Default implementation of the `?` operator", example = "$._bit_or_(7, 5)"]
+    fn _bit_or_((a): Number, (b): Number) {
+        let ia: i32 = convert_to_int(a, &info)?;
+        let ib: i32 = convert_to_int(b, &info)?;
+        Value::Number((ia | ib) as f64)
+    }
+    [BitXorOp] #[safe = true, desc = "Default implementation of the `~?` operator", example = "$._bit_xor_(4, 9)"]
+    fn _bit_xor_((a): Number, (b): Number) {
+        let ia: i32 = convert_to_int(a, &info)?;
+        let ib: i32 = convert_to_int(b, &info)?;
+        Value::Number((ia ^ ib) as f64)
+    }
     [SwapOp] #[safe = true, desc = "Default implementation of the `<=>` operator", example = "let a = 10\nlet b = 5\n$._swap_(a, b)\n$.assert(a == 5)\n$.assert(b == 10)"]
     fn _swap_(mut (a), mut (b)) {
 

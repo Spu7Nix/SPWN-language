@@ -188,6 +188,12 @@ pub enum Operator {
     Exponate,
     Modulate,
     Swap,
+
+    RightShift,
+    LeftShift,
+    BitAnd,
+    BitOr,
+    BitXor
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -204,6 +210,7 @@ pub enum UnaryOperator {
     MoreOrEqPattern,
     LessOrEqPattern,
     InPattern,
+    BitNot,
 }
 
 #[derive(Clone, PartialEq, Debug)]

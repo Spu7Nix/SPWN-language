@@ -227,6 +227,11 @@ impl From<ast::Operator> for Builtin {
             Divide => DivideOp,
             IntDivide => IntdivideOp,
             Is => IsOp,
+            RightShift => RightShiftOp,
+            LeftShift => LeftShiftOp,
+            BitAnd => BitAndOp,
+            BitXor => BitXorOp,
+            BitOr => BitOrOp
         }
     }
 }

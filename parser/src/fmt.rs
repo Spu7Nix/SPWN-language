@@ -475,6 +475,11 @@ impl SpwnFmt for Operator {
             Operator::Modulate => "%=",
             Operator::Swap => "<=>",
             Operator::Is => "is",
+            Operator::RightShift => ">>",
+            Operator::LeftShift => "<<",
+            Operator::BitAnd => "`",
+            Operator::BitOr => "?",
+            Operator::BitXor => "~?"
         }
         .to_string()
     }
@@ -494,6 +499,7 @@ impl SpwnFmt for UnaryOperator {
             UnaryOperator::MoreOrEqPattern => ">=",
             UnaryOperator::LessOrEqPattern => "<=",
             UnaryOperator::InPattern => "in",
+            UnaryOperator::BitNot => "~",
         }
         .to_string()
     }
