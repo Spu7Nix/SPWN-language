@@ -2,7 +2,7 @@
 
 impl @trigger_function {
     extend: #[
-        desc("Extends the trigger function (this is way better than using '$.extend_trigger_func')"),
+        desc("Extends the trigger function via `$.extend_trigger_func`")
         example(u"
             flash = !{
                 @log::runtime::flash()
@@ -10,12 +10,12 @@ impl @trigger_function {
 
             // what if I also want it to flash the ground?
             flash.extend(() {
-                GROUND.pulse(rgb8(255, 255, 255), 0, 0, 0.3)
+                GROUND.pulse(rgb8(255, 255, 255), 0, 0, 0.5)
             })
 
             on(touch(), flash)
         ")
-    ] (self, extender: @group | @trigger_function | @macro) {
+    ] (self, extender: @group|@trigger_function|@macro) {
         $.extend_trigger_func(self, match extender {
             @group|@trigger_function: () { extender! },
             @macro: extender,

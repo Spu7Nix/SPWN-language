@@ -358,7 +358,13 @@ impl @group {
         wait(fade_in + hold + fade_out)
     },
 
-
+    extend: #[desc("Extends the group via `$.extend_trigger_func`")]
+    (self, extender: @group|@trigger_function|@macro) {
+        $.extend_trigger_func(self, match extender {
+            @group|@trigger_function: () { extender! },
+            @macro: extender,
+        })
+    },
 }
 
 
