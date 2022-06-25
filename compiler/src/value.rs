@@ -1,6 +1,7 @@
 use crate::builtins::*;
 use crate::compiler::import_module;
 use crate::compiler::merge_all_contexts;
+use crate::compiler::compile_scope;
 
 use errors::compiler_info::CodeArea;
 use errors::compiler_info::CompilerInfo;
@@ -104,10 +105,11 @@ pub struct TriggerFunction {
     pub start_group: Group,
     //pub all_groups: Vec<Group>,
 }
-#[derive(Clone, Debug, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Pattern {
     Type(TypeId),
     Array(Vec<Pattern>),
+    Dict(AHashMap<LocalIntern<String>, Box<Pattern>>),
 
     Either(Box<Pattern>, Box<Pattern>),
     Both(Box<Pattern>, Box<Pattern>),
@@ -173,6 +175,46 @@ impl Pattern {
             _ => false,
 
         } )
+    }
+
+    pub fn hash<H: std::hash::Hasher>(&self, state: &mut H, globals: &Globals) {
+        match self {
+            Pattern::Type(v) => v.hash(state),
+            Pattern::Array(v) => {
+                for i in v {
+                    i.hash(state, globals);
+                }
+            },
+            Pattern::Dict(v) => {
+                for (k, el) in v {
+                    k.hash(state);
+                    el.hash(state, globals);
+                }
+            },
+            Pattern::Either(a, b) => {
+                a.hash(state, globals);
+                b.hash(state, globals);
+            },
+            Pattern::Both(a, b) => {
+                a.hash(state, globals);
+                b.hash(state, globals);
+            },
+            Pattern::Not(p) => p.hash(state, globals),
+            Pattern::Any => "anypat".hash(state),
+            Pattern::Eq(v) => globals.stored_values[*v].hash(state, globals),
+            Pattern::NotEq(v) => globals.stored_values[*v].hash(state, globals),
+            Pattern::MoreThan(v) => globals.stored_values[*v].hash(state, globals),
+            Pattern::LessThan(v) => globals.stored_values[*v].hash(state, globals),
+            Pattern::MoreOrEq(v) => globals.stored_values[*v].hash(state, globals),
+            Pattern::LessOrEq(v) => globals.stored_values[*v].hash(state, globals),
+            Pattern::In(v) => globals.stored_values[*v].hash(state, globals),
+            Pattern::Macro { args, ret } => {
+                for i in args {
+                    i.hash(state, globals);
+                }
+                ret.hash(state, globals);
+            },
+        }
     }
 }
 
@@ -479,7 +521,7 @@ impl Value {
                 e.hash(state);
                 st.hash(state);
             }
-            Value::Pattern(v) => v.hash(state),
+            Value::Pattern(v) => v.hash(state, globals),
             Value::Null => "null".hash(state),
         }
     }
@@ -681,6 +723,62 @@ impl Value {
                                 None,
                             ))),
                         }
+                    } else {
+                        (*full_context.inner()).return_value = store_const_value(
+                            Value::Bool(false),
+                            globals,
+                            full_context.inner().start_group,
+                            info.position,
+                        );
+                    }
+                }
+                Pattern::Dict(a_pat) => {
+                    if let Value::Dict(a_val) = self {
+
+                        if a_pat.len() != a_val.len() {
+                            (*full_context.inner()).return_value = store_const_value(
+                                Value::Bool(false),
+                                globals,
+                                full_context.inner().start_group,
+                                info.position,
+                            );
+                        } else {
+
+                            // TODO: make sure it always sets the return value
+                            full_context.reset_return_vals(globals);
+
+                            for (k, v) in a_val {
+
+                                for full_context in full_context.iter() {
+                                    if globals.stored_values[full_context.inner().return_value]
+                                        != Value::Bool(false)
+                                    {
+                                        match a_pat.get(k) {
+                                            Some(p) => {
+                                                let val = globals.stored_values[*v].clone();
+                                                val.matches_pat(
+                                                    &Value::Pattern((**p).clone()),
+                                                    info,
+                                                    globals,
+                                                    full_context,
+                                                    allow_side_effect,
+                                                )?;
+                                            },
+                                            None => {
+                                                (*full_context.inner()).return_value = store_const_value(
+                                                    Value::Bool(false),
+                                                    globals,
+                                                    full_context.inner().start_group,
+                                                    info.position,
+                                                );
+                                            },
+                                        }
+                                    }
+                                }
+
+                            }
+                        }
+
                     } else {
                         (*full_context.inner()).return_value = store_const_value(
                             Value::Bool(false),
@@ -987,6 +1085,20 @@ impl Value {
                         out
                     }
                 }
+                Pattern::Dict(map) => {
+                    if map.is_empty() {
+                        "{}".to_string()
+                    } else {
+                        let mut out = String::from("{");
+                        for (k, p) in map {
+                            out += &format!("{}: {},", k, Value::Pattern((**p).clone()).to_str(globals));
+                        }
+                        out.pop();
+                        out += "}";
+
+                        out
+                    }
+                }
                 Pattern::Eq(a) => {
                     format!("=={}", globals.stored_values[*a].to_owned().to_str(globals))
                 }
@@ -1225,6 +1337,21 @@ pub fn convert_type(
                 })
             }
             Value::Pattern(Pattern::Array(new_vec))
+        }
+        (Value::Dict(map), type_id!(pattern)) => {
+            // pattern
+            let mut new_map = AHashMap::default();
+            for (k, el) in map {
+                new_map.insert(*k, Box::new(match globals.stored_values[*el].clone() {
+                    Value::Pattern(p) => p,
+                    a => if let Value::Pattern(p) = convert_type(&a, type_id!(pattern), info, globals, context)? {
+                        p
+                    } else {
+                        unreachable!()
+                    },
+                }));
+            }
+            Value::Pattern(Pattern::Dict(new_map))
         }
 
         
@@ -2589,12 +2716,28 @@ impl VariableFuncs for ast::Variable {
                                             {
                                                 Value::Bool(b) => {
                                                     if *b {
-                                                        case.body.eval(
-                                                            full_context,
-                                                            globals,
-                                                            info.clone(),
-                                                            constant,
-                                                        )?;
+                                                        match &case.body {
+                                                            ast::CaseBody::Expr(expr) => expr.eval(
+                                                                full_context,
+                                                                globals,
+                                                                info.clone(),
+                                                                constant,
+                                                            )?,
+                                                            ast::CaseBody::Block(stmts) => {
+                                                                compile_scope(
+                                                                    &stmts,
+                                                                    full_context,
+                                                                    globals,
+                                                                    info.clone(),
+                                                                )?;
+                                                                store_const_value(
+                                                                    Value::Null,
+                                                                    globals,
+                                                                    full_context.inner().start_group,
+                                                                    info.position,
+                                                                );
+                                                            },
+                                                        }
                                                         for c in full_context.iter() {
                                                             c.inner().broken = Some((
                                                                 BreakType::Switch(
@@ -2625,12 +2768,29 @@ impl VariableFuncs for ast::Variable {
                                 ast::CaseType::Default => {
                                     //this should be the last case, so we just return the body
 
-                                    case.body.eval(
-                                        full_context,
-                                        globals,
-                                        info.clone(),
-                                        constant,
-                                    )?;
+                                    match &case.body {
+                                        ast::CaseBody::Expr(expr) => expr.eval(
+                                            full_context,
+                                            globals,
+                                            info.clone(),
+                                            constant,
+                                        )?,
+                                        ast::CaseBody::Block(stmts) => {
+                                            compile_scope(
+                                                &stmts,
+                                                full_context,
+                                                globals,
+                                                info.clone(),
+                                            )?;
+                                            store_const_value(
+                                                Value::Null,
+                                                globals,
+                                                full_context.inner().start_group,
+                                                info.position,
+                                            );
+                                        },
+                                    }
+
                                     for c in full_context.iter() {
                                         c.inner().broken = Some((
                                             BreakType::Switch(c.inner().return_value),

@@ -1,8 +1,13 @@
-#[no_level]
+#[no_level, no_std]
 
 
 
-f = (a, b, c) => a + b + c;
+let lol = {
+    a: 3,
+    bebe: "shit",
+}
 
-$.print(f(1, 2, 3))
-
+$.print(lol is {
+    a: @number,
+    bebe: @string,
+})
