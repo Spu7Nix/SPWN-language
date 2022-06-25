@@ -920,29 +920,31 @@ builtins! {
     [Acos] #[safe = true, desc = "Calculates the arccos of a number", example = "$.acos(-1)"] fn acos((n): Number) { Value::Number(n.acos()) }
     [Atan] #[safe = true, desc = "Calculates the arctan of a number", example = "$.atan(1)"] fn atan((n): Number) { Value::Number(n.atan()) }
 
-    [Floor] #[safe = true, desc = "Calculates the floor of a number, AKA the number rounded down to the nearest integer", example = "$.assert($.floor(1.5) == 1)"] fn floor((n): Number) { Value::Number(n.floor()) }
-    [Ceil] #[safe = true, desc = "Calculates the ceil of a number, AKA the number rounded up to the nearest integer", example = "$.assert($.ceil(1.5) == 2)"] fn ceil((n): Number) { Value::Number(n.ceil()) }
-
-    [Abs] #[safe = true, desc = "Calculates the absolute value of a number", example = "$.assert($.abs(-100) == 100)"] fn abs((n): Number) {Value::Number(n.abs())}
     [Acosh] #[safe = true, desc = "Calculates the arccosh of a number", example = "$.acosh(1)"] fn acosh((n): Number) {Value::Number(n.acosh())}
     [Asinh] #[safe = true, desc = "Calculates the arcsinh of a number", example = "$.asinh(0)"] fn asinh((n): Number) {Value::Number(n.asinh())}
     [Atan2] #[safe = true, desc = "Calculates the arctan^2 of a number", example = "$.atan2(0, -1)"] fn atan2((x): Number, (y): Number) {Value::Number(x.atan2(y))}
     [Atanh] #[safe = true, desc = "Calculates the arctanh of a number", example = "$.atanh(0.996)"] fn atanh((n): Number) {Value::Number(n.atanh())}
-    [Cbrt] #[safe = true, desc = "Calculates the cube root of a number", example = "$.cbrt(27)"] fn cbrt((n): Number) {Value::Number(n.cbrt())}
     [Cosh] #[safe = true, desc = "Calculates the cosh of a number", example = "$.cosh(0)"] fn cosh((n): Number) {Value::Number(n.cosh())}
+    [Sinh] #[safe = true, desc = "Calculates the hyperbolic sin of a number", example = "$.sinh(0)"] fn sinh((n): Number) {Value::Number(n.sinh())}
+    [Tanh] #[safe = true, desc = "Calculates the hyperbolic tan of a number", example = "$.tanh(0.549)"] fn tanh((n): Number) {Value::Number(n.tanh())}
+    
+    [Abs] #[safe = true, desc = "Calculates the absolute value of a number", example = "$.assert($.abs(-100) == 100)"] fn abs((n): Number) {Value::Number(n.abs())}
+    [Round] #[safe = true, desc = "Rounds a number", example = "$.assert($.round(1.2) == 1)"] fn round((n): Number) {Value::Number(n.round())}
+    [Floor] #[safe = true, desc = "Calculates the floor of a number, AKA the number rounded down to the nearest integer", example = "$.assert($.floor(1.5) == 1)"] fn floor((n): Number) { Value::Number(n.floor()) }
+    [Ceil] #[safe = true, desc = "Calculates the ceil of a number, AKA the number rounded up to the nearest integer", example = "$.assert($.ceil(1.5) == 2)"] fn ceil((n): Number) { Value::Number(n.ceil()) }
+    [Fract] #[safe = true, desc = "Gets the fractional part of a number", example = "$.fract(1.23) == 0.23"] fn fract((n): Number) {Value::Number(n.fract())}
+    [Trunc] #[safe = true, desc = "Gets the integer part of a number", example = "$.trunc(1.23) == 1"] fn trunc((n): Number) {Value::Number(n.trunc())}
+    
+    [Sqrt] #[safe = true, desc = "Calculates the square root of a number", example = "$.sqrt(2)"] fn sqrt((n): Number) {Value::Number(n.sqrt())}
+    [Cbrt] #[safe = true, desc = "Calculates the cube root of a number", example = "$.cbrt(27)"] fn cbrt((n): Number) {Value::Number(n.cbrt())}
     [Exp] #[safe = true, desc = "Calculates the e^x of a number", example = "$.exp(5) // e^5"] fn exp((n): Number) {Value::Number(n.exp())}
     [Exp2] #[safe = true, desc = "Calculates the 2^x of a number", example = "$.assert($.exp2(10) == 1024)"] fn exp2((n): Number) {Value::Number(n.exp2())}
     [Expm1] #[safe = true, desc = "Calculates e^x - 1 in a way that is accurate even if the number is close to zero", example = "$.exp_m1(0.002)"] fn exp_m1((n): Number) {Value::Number(n.exp_m1())}
-    [Fract] #[safe = true, desc = "Gets the fractional part of a number", example = "$.fract(1.23)"] fn fract((n): Number) {Value::Number(n.fract())}
 
-    [Sqrt] #[safe = true, desc = "Calculates the square root of a number", example = "$.sqrt(2)"] fn sqrt((n): Number) {Value::Number(n.sqrt())}
-    [Sinh] #[safe = true, desc = "Calculates the hyperbolic sin of a number", example = "$.sinh(0)"] fn sinh((n): Number) {Value::Number(n.sinh())}
-    [Tanh] #[safe = true, desc = "Calculates the hyperbolic tan of a number", example = "$.tanh(0.549)"] fn tanh((n): Number) {Value::Number(n.tanh())}
     [NaturalLog] #[safe = true, desc = "Calculates the ln (natural log) of a number", example = "$.ln(2.71828)"] fn ln((n): Number) {Value::Number(n.ln())}
     [Log] #[safe = true, desc = "Calculates the log base x of a number", example = "$.assert($.log(1024, 2) == 10)"] fn log((n): Number, (base): Number) {Value::Number(n.log(base))}
     [Min] #[safe = true, desc = "Calculates the min of two numbers", example = "$.assert($.min(1, 2) == 1)"] fn min((a): Number, (b): Number) {Value::Number(a.min(b))}
     [Max] #[safe = true, desc = "Calculates the max of two numbers", example = "$.assert($.max(1, 2) == 2)"] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
-    [Round] #[safe = true, desc = "Rounds a number", example = "$.assert($.round(1.2) == 1)"] fn round((n): Number) {Value::Number(n.round())}
     [Hypot] #[safe = true, desc = "Calculates the hypothenuse in a right triangle with sides a and b", example = "$.assert($.hypot(3, 4) == 5) // because 3^2 + 4^2 = 5^2"] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
 
     [Add] #[safe = true, desc = "Adds a Geometry Dash object or trigger to the target level", example = "

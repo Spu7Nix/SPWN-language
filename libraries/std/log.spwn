@@ -37,6 +37,7 @@ impl @runtime_log {
         fade_out: @number = 0.5,
     ) -> @NULL {
         -> BG.pulse(color, fade_in, hold, fade_out)
+        -> GROUND.pulse(color, fade_in, hold, fade_out)
     },
 }
 
