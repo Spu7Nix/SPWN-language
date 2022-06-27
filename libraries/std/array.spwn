@@ -274,12 +274,24 @@ $.assert(arr.index_all(2) == [2,4])
         return $.remove_index(self, index)
     },
 
-    remove: #[desc("Returns array without provided  with all elements that match value removed"), example(u"
-        let arr = [1, 2, 3, 4, 5]
-        $.assert(arr.remove(3) == [1, 2, 4, 5])
-    ")]
+    remove: #[desc("Returns the array with the elements at the provided index or indices removed"), example(u'
+        let arr = ["a", "b", "c"]
+        $.assert(arr.remove(1) == ["a", "c"])
+
+        let arr = ["a", "b", "c", "d", "e"]
+        $.assert(arr.remove([1, 4]) == ["a", "c", "d"])
+    ')]
+    (self, index: @number | [@number]) -> @array {
+        matches = (i => i == index) if index is @number else (i => i in index)
+        return self.filter((_, i) => !matches(i))
+    },
+    
+    erase: #[desc("Returns the array with the elements that match the value provided removed"), example(u'
+        let arr = ["a", "b", "c"]
+        $.assert(arr.erase("c") == ["a", "b"])
+    ')]
     (self, value) -> @array {
-        return self.map(x => x if x != value else @NULL::{}).filter(el => el != @NULL::{})
+        return self.filter(el => el != value)
     },
 
     map: #[desc("Calls a defined callback function on each element of an array, and returns an array that contains the results, or modifies in place if specified."), example(u"
@@ -312,7 +324,7 @@ $.assert(arr.index_all(2) == [2,4])
         $.assert(arr2.filter(@bool) == [true, false])
 
     ")]
-    (self, cb: (_ -> @bool) | @pattern | @type_indicator) -> @array | @NULL {
+    (self, cb: @macro) -> @array | @NULL {
         let output = [];
         for index in 0..self.length {
             value = self[index]

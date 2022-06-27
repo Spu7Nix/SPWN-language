@@ -1946,6 +1946,30 @@ $.assert(name_age == {
         }
     }
 
+    [Call] #[safe = true, desc = "Calls a macro with the arguments provided in an array", example = "
+m = (x, y) => x + y
+$.assert($.call(m, [1, 2]) == 3)
+    "]
+    fn call((m): Macro, (args): Array) {
+
+        let args = args.iter()
+            .map(|s| parser::ast::Argument::from(*s, globals.stored_values.map.get(*s).unwrap().def_area.pos) )
+            .collect::<Vec<parser::ast::Argument>>();
+            
+
+        let full_context = unsafe { FullContext::from_ptr(full_context) };
+        let parent = full_context.inner().return_value2;
+        execute_macro(
+            (*m, args.clone()),
+            full_context,
+            globals,
+            parent,
+            info.clone(),
+        )?;
+        globals.stored_values[full_context.inner().return_value].clone()
+
+    }
+
     [Regex] #[safe = true, desc = "Performs a regex operation on a string", example = ""]
     fn regex(#["`mode` can be either \"match\", \"replace\", \"find_all\" or \"find_groups\""](regex): Str, (s): Str, (mode): Str, (replace)) {
         use fancy_regex::Regex;

@@ -1,13 +1,15 @@
-#[no_level, no_std]
+#[no_level]
 
 
+let test = (a) => [a]
+$.print(test.partial_call([1, 2, 3]));
+let test = (a, b) => [a, b]
+$.print(test.partial_call([1, 2, 3]));
+let test = (a, b, c) => [a, b, c]
+$.print(test.partial_call([1, 2, 3]));
+$.print(test.partial_call([1, 2]));
+$.print(test.partial_call([]));
 
-let lol = {
-    a: 3,
-    bebe: "shit",
-}
+let test = (a, b) => a + b
+$.print(test.call([1, 2]))
 
-$.print(lol is {
-    a: @number,
-    bebe: @string,
-})
