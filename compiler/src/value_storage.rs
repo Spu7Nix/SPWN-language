@@ -70,7 +70,7 @@ impl ValStorage {
                         self.mark(*e)
                     }
                 }
-                Value::Macro(m) => {
+                Value::Macro(Macro::FuncLike(m)) => {
                     for MacroArgDef {
                         default, pattern, ..
                     } in m.args
@@ -249,7 +249,7 @@ pub fn clone_and_get_value(
             );
         }
 
-        Value::Macro(m) => {
+        Value::Macro(Macro::FuncLike(m)) => {
             for arg in &mut m.args {
                 if let Some(def_val) = &mut arg.default {
                     (*def_val) = clone_value_preserve_area(*def_val, globals, fn_context, constant);
