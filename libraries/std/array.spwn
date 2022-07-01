@@ -352,6 +352,38 @@ $.assert(arr.index_all(2) == [2,4])
         return null
     },
 
+    group: #[desc("Returns a dictionary of arrays, grouped by the result of the callback function."), example(u"
+        arr = [1, 2, 3, 4, 5]
+        $.assert(arr.group(el => 'even' if el % 2 == 0 else 'odd') == {
+            even: [2, 4],
+            odd: [1, 3, 5]
+        })
+        $.assert(arr.group((el) {
+            return match el {
+                <=1: 'small',
+                <=3: 'medium',
+                _: 'big',
+            }
+        }) == {
+            small: [1],
+            medium: [2, 3],
+            big: [4, 5],
+        })
+    ")]
+    (self, cb: @macro) -> @dictionary {
+        let output = {};
+        for index in 0..self.length {
+            value = self[index]
+            current = cb.partial_call([ value, index, self ]) as @string
+            if current in output {
+                output[current].push(value)
+            } else {
+                output.set(current, [ value ])
+            }
+        }
+        return output
+    },
+
     reduce: #[desc("Calls the specified callback function for all the elements in an array with a default value. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function."),
     example(u"
         arr = [1, 2, 3, 4, 5]
