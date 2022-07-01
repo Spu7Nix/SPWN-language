@@ -2,13 +2,13 @@
 let constants = import "constants.spwn"
 
 //type implementations
+import "macro.spwn"
 import "counter.spwn"
 import "group.spwn"
 import "color.spwn"
 import "item.spwn"
 import "block.spwn"
 import "array.spwn"
-import "macro.spwn"
 import "object.spwn"
 import "dictionary.spwn"
 import "string.spwn"

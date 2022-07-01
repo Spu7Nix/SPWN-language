@@ -1,17 +1,5 @@
 #[no_std, cache_output]
 
-array_callback = (cb: @macro, value, index: @number, array: @array) -> _ {
-    return match cb {
-        ()->_: cb(),
-        (_)->_: cb(value),
-        (_,_)->_: cb(value, index),
-        (_,_,_)->_: cb(value, index, array),
-        else: (){
-            throw "Expected 0 to 3 macro arguments, got {} arguments.".fmt(cb.args.length)
-        }(),
-    }
-}
-
 impl @array {
 
     is_empty: #[desc("Returns true if the array has a length of 0, false otherwise."), example(u"
@@ -307,7 +295,7 @@ $.assert(arr.index_all(2) == [2,4])
         let output = [];
         for index in 0..self.length {
             value = self[index]
-            current = array_callback(cb, self[index], index, self)
+            current = cb.partial_call([ self[index], index, self ])
             output.push(current)
         }
         return output;
@@ -324,12 +312,12 @@ $.assert(arr.index_all(2) == [2,4])
         $.assert(arr2.filter(@bool) == [true, false])
 
     ")]
-    (self, cb: @macro) -> @array | @NULL {
+    (self, cb: @macro | @pattern | @type_indicator) -> @array | @NULL {
         let output = [];
         for index in 0..self.length {
             value = self[index]
             if cb is @macro {
-                current = array_callback(cb, value, index, self)
+                current = cb.partial_call([ value, index, self ])
                 if current is @bool {
                     if current { output.push(value) }
                 } else {
@@ -341,6 +329,61 @@ $.assert(arr.index_all(2) == [2,4])
         }
         return output
     },
+
+    find: #[desc("Returns the first element in an array that satisfies the provided testing function."), example(u"
+        arr = [1, 2, 3, 4, 5]
+        $.assert(arr.find(el => el > 3) == 4)
+        $.assert(arr.find(>3) == 4)
+    ")]
+    (self, cb: @macro | @pattern | @type_indicator) -> _ {
+        for index in 0..self.length {
+            value = self[index]
+            if cb is @macro {
+                current = cb.partial_call([ value, index, self ])
+                if current is @bool {
+                    if current { return value }
+                } else {
+                    throw "Filter must return a boolean value";
+                }
+            } else {
+                if value is cb { return value }
+            }
+        }
+        return null
+    },
+
+    group: #[desc("Returns a dictionary of arrays, grouped by the result of the callback function."), example(u"
+        arr = [1, 2, 3, 4, 5]
+        $.assert(arr.group(el => 'even' if el % 2 == 0 else 'odd') == {
+            even: [2, 4],
+            odd: [1, 3, 5]
+        })
+        $.assert(arr.group((el) {
+            return match el {
+                <=1: 'small',
+                <=3: 'medium',
+                _: 'big',
+            }
+        }) == {
+            small: [1],
+            medium: [2, 3],
+            big: [4, 5],
+        })
+    ")]
+    (self, cb: @macro) -> @dictionary {
+        let output = {};
+        for index in 0..self.length {
+            value = self[index]
+            current = cb.partial_call([ value, index, self ]) as @string
+            if current in output {
+                output[current].push(value)
+            } else {
+                output.set(current, [ value ])
+            }
+        }
+        return output
+    },
+
     reduce: #[desc("Calls the specified callback function for all the elements in an array with a default value. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function."),
     example(u"
         arr = [1, 2, 3, 4, 5]
@@ -407,11 +450,11 @@ $.assert(arr.index_all(2) == [2,4])
             $.assert(arr2.any(@number) == true)
         ")
     ]
-    (self, cb: (_ -> @bool) | @pattern | @type_indicator = (a) => @bool(a)) -> @bool {
+    (self, cb: @macro | @pattern | @type_indicator = (a) => @bool(a)) -> @bool {
         for index in 0..self.length {
             value = self[index]
             if cb is @macro {
-                current = array_callback(cb, value, index, self)
+                current = cb.partial_call([ value, index, self ])
                 if current is @bool {
                     if current { return true }
                 } else {
@@ -431,11 +474,11 @@ $.assert(arr.index_all(2) == [2,4])
         $.assert(arr2.all(el => el > 0)) // checks if the array contains only positive elements
         $.assert(arr2.all(@number) == true)
     ")]
-    (self, cb: (_ -> @bool) | @pattern | @type_indicator = (a) => @bool(a)) -> @bool {
+    (self, cb: @macro | @pattern | @type_indicator = (a) => @bool(a)) -> @bool {
         for index in 0..self.length {
             value = self[index]
             if cb is @macro {
-                current = array_callback(cb, value, index, self)
+                current = cb.partial_call([ value, index, self ])
                 if current is @bool {
                     if !current { return false }
                 } else {
