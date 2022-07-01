@@ -14,6 +14,16 @@ impl @number {
     (self) -> @number => $.ceil(self),
     floor: #[desc("Returns the largest integer less than or equal to the number"), example("$.assert((1.5).floor() == 1)")]
     (self) -> @number => $.floor(self),
+    fract: #[desc("Returns the fractional part of the number"), example("$.assert((1.5).fract() == 0.5)")]
+    (self) -> @number => $.fract(self),
+    trunc: #[desc("Returns the integer part of the number"), example("$.assert((1.5).trunc() == 1)")]
+    (self) -> @number => $.trunc(self),
+    sin: #[desc("Returns the sine of the number"), example("$.assert(PI.sin().to_precision(10) == 0)")]
+    (self) -> @number => $.sin(self),
+    cos: #[desc("Returns the cosine of the number"), example("$.assert(PI.cos().to_precision(10) == -1)")]
+    (self) -> @number => $.cos(self),
+    tan: #[desc("Returns the tangent of the number"), example("$.assert(PI.tan().to_precision(10) == 0)")]
+    (self) -> @number => $.tan(self),
     sqrt: #[desc("Returns the square root of the number"), example("$.assert(4.sqrt() == 2)")]
     (self) -> @number => $.sqrt(self),
     log: #[desc("Returns the logarithm of the number (default: natural logarithm)"), example("$.assert(2.log() == 0.6931471805599453)")]
@@ -34,7 +44,7 @@ impl @number {
     },
     ordinal: #[desc("Returns the number in ordinal form"), example("$.assert(1.ordinal() == '1st')")]
     (self) -> @string {
-        number = self.floor() if self >= 0 else self.ceil()
+        number = self.trunc()
         numb_abs = number.abs()
         return match true {
             ==(((numb_abs % 100) / 10).floor() == 1): "{}th",
@@ -48,6 +58,9 @@ impl @number {
     (self, precision: @number = 0) -> @string {
         let precision = precision.ceil()
         let string = self as @string
+        if string == "NaN" {
+            throw "Input number is NaN"
+        }
         let dot_index = string.index(".")
         if dot_index == null {
             dot_index = string.length
