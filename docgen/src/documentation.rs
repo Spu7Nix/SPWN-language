@@ -272,7 +272,7 @@ fn document_dict(
     ];
 
     for (name, x) in dict {
-        if let Value::Macro(m) = &globals.stored_values[*x] {
+        if let Value::Macro(Macro::FuncLike(m)) = &globals.stored_values[*x] {
             if m.tag.get("constructor").is_some() {
                 categories[0].1.push((*name, *x));
             } else if name.starts_with('_') && name.ends_with('_') {
@@ -349,7 +349,7 @@ fn document_dict(
 }
 
 fn document_macro(
-    mac: &Macro,
+    mac: &MacroFuncData,
     globals: &mut Globals,
     full_context: &mut FullContext,
     type_links: &AHashMap<u16, String>,
@@ -576,7 +576,7 @@ fn document_val(
 
     let (new_doc, sidebar) = &match &val {
         Value::Dict(d) => document_dict(d, globals, full_context, type_links, path, tn)?,
-        Value::Macro(m) => (
+        Value::Macro(Macro::FuncLike(m)) => (
             document_macro(m, globals, full_context, type_links)?,
             String::new(),
         ),

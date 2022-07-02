@@ -63,7 +63,7 @@ pub fn handle_operator(
             globals,
             info.clone(),
         ) {
-            if let Value::Macro(m) = globals.stored_values[val].clone() {
+            if let Value::Macro(Macro::FuncLike(m)) = globals.stored_values[val].clone() {
                 if m.args.is_empty() {
                     return Err(RuntimeError::CustomError(create_error(
                         info.clone(),
@@ -91,7 +91,7 @@ pub fn handle_operator(
 
                 execute_macro(
                     (
-                        *m,
+                        m,
                         //copies argument so the original value can't be mutated
                         //prevents side effects and shit
                         vec![ast::Argument::from(
@@ -142,7 +142,7 @@ pub fn handle_unary_operator(
             globals,
             info.clone(),
         ) {
-            if let Value::Macro(m) = globals.stored_values[val].clone() {
+            if let Value::Macro(Macro::FuncLike(m)) = globals.stored_values[val].clone() {
                 if m.args.is_empty() {
                     return Err(RuntimeError::CustomError(create_error(
                         info.clone(),
@@ -152,7 +152,7 @@ pub fn handle_unary_operator(
                     )));
                 }
 
-                execute_macro((*m, Vec::new()), full_context, globals, value, info.clone())?;
+                execute_macro((m, Vec::new()), full_context, globals, value, info.clone())?;
             } else {
                 built_in_function(macro_name, vec![value], info.clone(), globals, full_context)?;
             }
@@ -311,7 +311,7 @@ impl EvalExpression for ast::Expression {
 }
 
 pub fn execute_macro(
-    (m, args): (Macro, Vec<ast::Argument>),
+    (m, args): (MacroFuncData, Vec<ast::Argument>),
     contexts: &mut FullContext,
     globals: &mut Globals,
     parent: StoredValue,

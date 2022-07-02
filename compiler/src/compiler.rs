@@ -302,7 +302,7 @@ pub fn compile_scope(
                         Value::Builtins => {
                             for name in BUILTIN_LIST.iter() {
                                 let p = store_const_value(
-                                    Value::BuiltinFunction(*name),
+                                    Value::Macro(Macro::BuiltinLike(*name)),
                                     globals,
                                     fn_context,
                                     info.position,

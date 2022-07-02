@@ -33,12 +33,12 @@ pub enum Value {
     Bool(bool),
     TriggerFunc(TriggerFunction),
     Dict(AHashMap<LocalIntern<String>, StoredValue>),
-    Macro(Box<Macro>),
+    Macro(Macro),
     Str(String),
     Array(Vec<StoredValue>),
     Obj(Vec<(u16, ObjParam)>, ast::ObjectMode),
     Builtins,
-    BuiltinFunction(Builtin),
+    // BuiltinFunction(Builtin),
     TypeIndicator(TypeId),
     Range(i32, i32, usize), //start, end, step
     Pattern(Pattern),
@@ -50,7 +50,7 @@ pub type Slice = (Option<isize>, Option<isize>, Option<isize>);
 const MAX_DICT_EL_DISPLAY: usize = 10;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Macro {
+pub struct MacroFuncData {
     pub args: Vec<MacroArgDef>,
     pub def_variables: AHashMap<LocalIntern<String>, StoredValue>,
     pub def_file: LocalIntern<SpwnSource>,
@@ -60,22 +60,37 @@ pub struct Macro {
     pub ret_pattern: Option<StoredValue>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum Macro {
+    FuncLike(MacroFuncData),
+    BuiltinLike(Builtin)
+}
+
 #[allow(clippy::derive_hash_xor_eq)]
 impl Hash for Macro {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        //self.args.hash(state);
-        for i in &self.def_variables {
-            i.hash(state);
+
+        match self {
+            Macro::FuncLike(m) => {
+                for i in &m.def_variables {
+                    i.hash(state);
+                }
+                m.def_file.hash(state);
+                //body.hash(state);
+                //tag.hash(state);
+                m.arg_pos.hash(state);
+                m.ret_pattern.hash(state);
+
+                /*
+                    i omitted the stuff that has ast inside cuz it
+                    was too deep of a rabbit hoke to derive Hash for
+                */
+
+            },
+            Macro::BuiltinLike(b) => {
+                b.hash(state)
+            },
         }
-        self.def_file.hash(state);
-        //self.body.hash(state);
-        //self.tag.hash(state);
-        self.arg_pos.hash(state);
-        self.ret_pattern.hash(state);
-        /*
-            i omitted the stuff that has ast inside cuz it
-            was too deep of a rabbit hoke to derive Hash for
-        */
     }
 }
 
@@ -130,6 +145,30 @@ pub enum Pattern {
         ret: Box<Pattern>
     }
 }
+
+pub fn pattern_from_value_variant(s: &str) -> Pattern {
+    match s {
+        "Group" => Pattern::Type(type_id!(group)),
+        "Color" => Pattern::Type(type_id!(color)),
+        "Block" => Pattern::Type(type_id!(block)),
+        "Item" => Pattern::Type(type_id!(item)),
+        "Number" => Pattern::Type(type_id!(number)),
+        "Bool" => Pattern::Type(type_id!(bool)),
+        "TriggerFunc" => Pattern::Type(type_id!(trigger_function)),
+        "Dict" => Pattern::Type(type_id!(dictionary)),
+        "Macro" => Pattern::Type(type_id!(macro)),
+        "Str" => Pattern::Type(type_id!(string)),
+        "Array" => Pattern::Type(type_id!(array)),
+        "Obj" => Pattern::Type(type_id!(object)),
+        "Builtins" => Pattern::Type(type_id!(spwn)),
+        "TypeIndicator" => Pattern::Type(type_id!(type_indicator)),
+        "Range" => Pattern::Type(type_id!(range)),
+        "Pattern" => Pattern::Type(type_id!(pattern)),
+        "Null" => Pattern::Type(type_id!(NULL)),
+        _ => unreachable!()
+    }
+}
+
 
 impl Pattern {
     pub fn in_pat(
@@ -455,7 +494,7 @@ impl Value {
                 ast::ObjectMode::Trigger => type_id!(trigger),
             },
             Value::Builtins => type_id!(spwn),
-            Value::BuiltinFunction(_) => type_id!(builtin),
+            // Value::BuiltinFunction(_) => type_id!(builtin),
             Value::TypeIndicator(_) => type_id!(type_indicator),
             Value::Null => type_id!(NULL),
             Value::Range(_, _, _) => type_id!(range),
@@ -514,7 +553,7 @@ impl Value {
                 m.hash(state);
             }
             Value::Builtins => "spwn".hash(state),
-            Value::BuiltinFunction(v) => v.hash(state),
+            // Value::BuiltinFunction(v) => v.hash(state),
             Value::TypeIndicator(v) => v.hash(state),
             Value::Range(s, e, st) => {
                 s.hash(state);
@@ -790,46 +829,82 @@ impl Value {
                 }
                 Pattern::Macro { args, ret } => {
                     if let Value::Macro(m) = self {
-                        if m.args.len() != args.len() {
-                            (*full_context.inner()).return_value = store_const_value(
-                                Value::Bool(false),
-                                globals,
-                                full_context.inner().start_group,
-                                info.position,
-                            );
-                        } else {
-                            let mut is_matching = true;
-                            for (i, m_arg) in m.args.iter().enumerate() {
-                                if let Some(pat_stored) = m_arg.pattern {
-                                    match &convert_type(&globals.stored_values[pat_stored].clone(), type_id!(pattern), info, globals, full_context.inner())?  {
-                                        Value::Pattern(p) => {
-                                            let matches = p.in_pat(&args[i], globals)?;
-                                            if !matches {
-                                                is_matching = false;
-                                                break;
+
+                        match m {
+                            Macro::FuncLike(m) => {
+                                if m.args.len() != args.len() {
+                                    (*full_context.inner()).return_value = store_const_value(
+                                        Value::Bool(false),
+                                        globals,
+                                        full_context.inner().start_group,
+                                        info.position,
+                                    );
+                                } else {
+                                    let mut is_matching = true;
+                                    for (i, m_arg) in m.args.iter().enumerate() {
+                                        if let Some(pat_stored) = m_arg.pattern {
+                                            match &convert_type(&globals.stored_values[pat_stored].clone(), type_id!(pattern), info, globals, full_context.inner())?  {
+                                                Value::Pattern(p) => {
+                                                    let matches = p.in_pat(&args[i], globals)?;
+                                                    if !matches {
+                                                        is_matching = false;
+                                                        break;
+                                                    }
+                                                },
+                                                _ => unreachable!()
                                             }
-                                        },
-                                        _ => unreachable!()
+                                        }
                                     }
+                                    if is_matching {
+                                        if let Some(ret_stored) = m.ret_pattern {
+                                            match &convert_type(&globals.stored_values[ret_stored].clone(), type_id!(pattern), info, globals, full_context.inner())? {
+                                                Value::Pattern(p) => {
+                                                    is_matching = p.in_pat(&ret, globals)?;
+                                                    
+                                                },
+                                                _ => unreachable!()
+                                            }
+                                        }
+                                    }
+                                    (*full_context.inner()).return_value = store_const_value(
+                                        Value::Bool(is_matching),
+                                        globals,
+                                        full_context.inner().start_group,
+                                        info.position,
+                                    );
                                 }
                             }
-                            if is_matching {
-                                if let Some(ret_stored) = m.ret_pattern {
-                                    match &convert_type(&globals.stored_values[ret_stored].clone(), type_id!(pattern), info, globals, full_context.inner())? {
-                                        Value::Pattern(p) => {
-                                            is_matching = p.in_pat(&ret, globals)?;
-                                            
-                                        },
-                                        _ => unreachable!()
-                                    }
+                            Macro::BuiltinLike(b) => {
+                                match get_builtin_arg_patterns(b) {
+                                    Some(v) => {
+                                        (*full_context.inner()).return_value = store_const_value(
+                                            Value::Bool(
+                                                {
+                                                    let mut matches = true;
+                                                    for (a, b) in v.iter().zip(args) {
+                                                        if !a.in_pat(&b, globals)? {
+                                                            matches = false;
+                                                            break;
+                                                        }
+                                                    }
+                                                    matches
+                                                }
+                                            ),
+                                            globals,
+                                            full_context.inner().start_group,
+                                            info.position,
+                                        );
+                                    },
+                                    None => {
+                                        (*full_context.inner()).return_value = store_const_value(
+                                            Value::Bool(false),
+                                            globals,
+                                            full_context.inner().start_group,
+                                            info.position,
+                                        );
+                                    },
                                 }
                             }
-                            (*full_context.inner()).return_value = store_const_value(
-                                Value::Bool(is_matching),
-                                globals,
-                                full_context.inner().start_group,
-                                info.position,
-                            );
                         }
                     } else {
                         (*full_context.inner()).return_value = store_const_value(
@@ -980,40 +1055,45 @@ impl Value {
                 out
             }
             Value::Macro(m) => {
-                globals.push_new_preserved();
-                for arg in &m.args {
-                    if let Some(v) = &arg.pattern {
-                        globals.push_preserved_val(*v);
-                    }
-                    if let Some(v) = &arg.default {
-                        globals.push_preserved_val(*v);
-                    }
+                match m {
+                    Macro::FuncLike(m) => {
+                        globals.push_new_preserved();
+                        for arg in &m.args {
+                            if let Some(v) = &arg.pattern {
+                                globals.push_preserved_val(*v);
+                            }
+                            if let Some(v) = &arg.default {
+                                globals.push_preserved_val(*v);
+                            }
 
-                }
+                        }
 
-                let mut out = String::from("(");
-                if !m.args.is_empty() {
-                    for arg in m.args.iter() {
-                        out += &arg.name;
-                        if let Some(val) = arg.pattern {
-                            out += &format!(
-                                ": {}",
-                                display_inner(&globals.stored_values[val].clone(), globals)?
-                            )
-                        };
-                        if let Some(val) = arg.default {
-                            out += &format!(
-                                " = {}",
-                                display_inner(&globals.stored_values[val].clone(), globals)?
-                            )
-                        };
-                        out += ", ";
+                        let mut out = String::from("(");
+                        if !m.args.is_empty() {
+                            for arg in m.args.iter() {
+                                out += &arg.name;
+                                if let Some(val) = arg.pattern {
+                                    out += &format!(
+                                        ": {}",
+                                        display_inner(&globals.stored_values[val].clone(), globals)?
+                                    )
+                                };
+                                if let Some(val) = arg.default {
+                                    out += &format!(
+                                        " = {}",
+                                        display_inner(&globals.stored_values[val].clone(), globals)?
+                                    )
+                                };
+                                out += ", ";
+                            }
+                            out.pop();
+                            out.pop();
+                        }
+                        globals.pop_preserved();
+                        out + ") { /* ... */ }"
                     }
-                    out.pop();
-                    out.pop();
+                    Macro::BuiltinLike(b) => format!("$.{}", String::from(*b)),
                 }
-                globals.pop_preserved();
-                out + ") { /* ... */ }"
             }
             Value::Str(s) => format!("'{}'", s),
             Value::Array(a) => {
@@ -1046,7 +1126,6 @@ impl Value {
                 out
             }
             Value::Builtins => "$".to_string(),
-            Value::BuiltinFunction(n) => format!("$.{}", String::from(*n)),
             Value::Null => "null".to_string(),
             Value::TypeIndicator(id) => format!(
                 "@{}",
@@ -1595,7 +1674,7 @@ pub fn macro_to_value(
         };
 
         full_context.inner().return_value = store_const_value(
-            Value::Macro(Box::new(Macro {
+            Value::Macro(Macro::FuncLike(MacroFuncData {
                 args,
                 body: m.body.statements.clone(),
                 def_variables: full_context
@@ -3119,7 +3198,7 @@ impl VariableFuncs for ast::Variable {
                             Value::TypeIndicator(t) => match globals.implementations.get(t) {
                                 Some(imp) => match imp.get(a) {
                                     Some((val, _)) => {
-                                        if let Value::Macro(m) = &globals.stored_values[*val] {
+                                        if let Value::Macro(Macro::FuncLike(m)) = &globals.stored_values[*val] {
                                             if !m.args.is_empty()
                                                 && m.args[0].name == globals.SELF_MEMBER_NAME
                                             {
@@ -3613,15 +3692,37 @@ impl VariableFuncs for ast::Variable {
                         let val_ptr = full_context.inner().return_value;
 
                         match globals.stored_values[val_ptr].clone() {
-                            Value::Macro(m) => {
+                            Value::Macro(Macro::FuncLike(m)) => {
                                 let parent = full_context.inner().return_value2;
                                 execute_macro(
-                                    (*m, args.clone()),
+                                    (m, args.clone()),
                                     full_context,
                                     globals,
                                     parent,
                                     info.clone(),
                                 )?;
+                            }
+                            Value::Macro(Macro::BuiltinLike(name)) => {
+                                let evaled_args = all_combinations(
+                                    args.iter().map(|x| x.value.clone()).collect(),
+                                    full_context,
+                                    globals,
+                                    info.clone(),
+                                    constant,
+                                )?;
+
+                                globals.push_new_preserved();
+                                for (arg_values, _) in &evaled_args {
+                                    for val in arg_values {
+                                        globals.push_preserved_val(*val)
+                                    }
+                                }
+
+                                for (args, context) in evaled_args {
+                                    built_in_function(name, args, info.clone(), globals, context)?;
+                                }
+
+                                globals.pop_preserved();
                             }
 
                             Value::TypeIndicator(_) => {
@@ -3659,28 +3760,6 @@ impl VariableFuncs for ast::Variable {
                                 }
                             }
 
-                            Value::BuiltinFunction(name) => {
-                                let evaled_args = all_combinations(
-                                    args.iter().map(|x| x.value.clone()).collect(),
-                                    full_context,
-                                    globals,
-                                    info.clone(),
-                                    constant,
-                                )?;
-
-                                globals.push_new_preserved();
-                                for (arg_values, _) in &evaled_args {
-                                    for val in arg_values {
-                                        globals.push_preserved_val(*val)
-                                    }
-                                }
-
-                                for (args, context) in evaled_args {
-                                    built_in_function(name, args, info.clone(), globals, context)?;
-                                }
-
-                                globals.pop_preserved();
-                            }
                             _a => {
                                 return Err(RuntimeError::TypeError {
                                     expected: "macro, built-in function or type indicator"
@@ -3752,7 +3831,7 @@ impl VariableFuncs for ast::Variable {
         // }
         if !self.tag.tags.is_empty() {
             for c in contexts.iter() {
-                if let Value::Macro(m) = &mut globals.stored_values[c.inner().return_value] {
+                if let Value::Macro(Macro::FuncLike(m)) = &mut globals.stored_values[c.inner().return_value] {
                     m.tag.tags.extend(self.tag.tags.clone())
                 }
             }

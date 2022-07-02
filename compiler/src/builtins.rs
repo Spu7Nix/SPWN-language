@@ -243,7 +243,7 @@ impl Value {
                     }
                     _ => (),
                 },
-                Value::Macro(m) => match member.as_ref().as_str() {
+                Value::Macro(Macro::FuncLike(m)) => match member.as_ref().as_str() {
                     "args" => {
                         let mut args = vec![];
                         for MacroArgDef {
@@ -297,7 +297,7 @@ impl Value {
                 Value::Builtins => match Builtin::from_str(member.as_str()) {
                     Err(_) => None,
                     Ok(builtin) => Some(store_const_value(
-                        Value::BuiltinFunction(builtin),
+                        Value::Macro(Macro::BuiltinLike(builtin)),
                         globals,
                         context.start_group,
                         info.position,
@@ -508,6 +508,32 @@ macro_rules! builtins {
                 Self::new()
             }
         }
+
+
+        pub fn get_builtin_arg_patterns(b: &Builtin) -> Option<Vec<Pattern>> {
+            match b {
+                $(
+                    Builtin::$variant => {
+                        $( if stringify!($argdesc) == "any" { return None } )?
+                        $( if stringify!($argdesc) == "none" { return Some(vec![]) } )?
+
+                        $(
+                            return Some(vec![$(
+                                loop {
+                                    $( break pattern_from_value_variant(stringify!($arg_type)); )?
+                                    #[allow(unreachable_code)]
+                                    break Pattern::Any
+                                },
+                            )+]);
+                        )?
+
+                        #[allow(unreachable_code)]
+                        None
+                    }
+                )*
+            }
+        }
+
         #[inline]
         pub fn built_in_function(
             func: Builtin,
@@ -1952,21 +1978,29 @@ $.assert($.call(m, [1, 2]) == 3)
     "]
     fn call((m): Macro, (args): Array) {
 
-        let args = args.iter()
-            .map(|s| parser::ast::Argument::from(*s, globals.stored_values.map.get(*s).unwrap().def_area.pos) )
-            .collect::<Vec<parser::ast::Argument>>();
-            
+        if let Macro::FuncLike(m) = m {
+            let args = args.iter()
+                .map(|s| parser::ast::Argument::from(*s, globals.stored_values.map.get(*s).unwrap().def_area.pos) )
+                .collect::<Vec<parser::ast::Argument>>();
+                
 
-        let full_context = unsafe { FullContext::from_ptr(full_context) };
-        let parent = full_context.inner().return_value2;
-        execute_macro(
-            (*m, args.clone()),
-            full_context,
-            globals,
-            parent,
-            info.clone(),
-        )?;
-        globals.stored_values[full_context.inner().return_value].clone()
+            let full_context = unsafe { FullContext::from_ptr(full_context) };
+            let parent = full_context.inner().return_value2;
+            execute_macro(
+                (m, args.clone()),
+                full_context,
+                globals,
+                parent,
+                info.clone(),
+            )?;
+            globals.stored_values[full_context.inner().return_value].clone()
+        } else {
+            return Err(RuntimeError::BuiltinError {
+                builtin,
+                message: format!("Can only dynamically call func-like macros (so far)"),
+                info,
+            })
+        }
 
     }
 

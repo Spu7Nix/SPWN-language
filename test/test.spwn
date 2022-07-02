@@ -1,15 +1,6 @@
 #[no_level]
 
 
-let test = (a) => [a]
-$.print(test.partial_call([1, 2, 3]));
-let test = (a, b) => [a, b]
-$.print(test.partial_call([1, 2, 3]));
-let test = (a, b, c) => [a, b, c]
-$.print(test.partial_call([1, 2, 3]));
-$.print(test.partial_call([1, 2]));
-$.print(test.partial_call([]));
 
-let test = (a, b) => a + b
-$.print(test.call([1, 2]))
+$.print([0, 1, 2].reduce($._plus_))
 
