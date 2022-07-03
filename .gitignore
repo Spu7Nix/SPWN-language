@@ -1,13 +1,1 @@
-target
-.vscode
-**/*.rs.bk
-.DS_Store
-std-docs
-gamescene-docs
-spwn-web/pkg
-spwn-web/ansi_up.js
-*.sublime-workspace
-pckp_libraries
-.pckp_tmp
-test/flow_level
-result/
+/target

@@ -1,4 +1,0 @@
-
-
-let a = @vector::new([4,1,-2,6])
-$.print(a.z)

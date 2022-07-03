@@ -1,22 +1,8 @@
-[workspace]
-members = [
-    "spwn",
-    "parser",
-    "shared",
-    "errors",
-    "levelstring",
-    "editorlive",
-    "compiler",
-    "optimizer",
-    "docgen",
-    "spwn-web",
-    "pckp"
-]
+[package]
+name = "spwn"
+version = "0.0.85"
+edition = "2021"
 
-[profile.dev]
-debug-assertions = true
-opt-level = 2
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[profile.test]
-debug-assertions = false
-opt-level = 2
+[dependencies]
