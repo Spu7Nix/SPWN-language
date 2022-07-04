@@ -1,6 +1,8 @@
 mod lexer;
 mod parser;
 mod error;
+mod compiler;
+mod value;
 
 
 use std::{path::PathBuf, fs, collections::HashMap, io::{self, Write}};

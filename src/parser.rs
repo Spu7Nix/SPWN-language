@@ -5,7 +5,7 @@ use crate::{CodeArea, lexer::Token, SpwnSource, error::SyntaxError};
 
 
 
-
+// contains tokens and their spans
 pub type Tokens = Vec<(Token, (usize, usize))>;
 
 
@@ -14,11 +14,13 @@ new_key_type! {
     pub struct StmtKey;
 }
 
+// just helper for ASTData::area
 enum KeyType {
     Expr(ExprKey),
     StmtKey(StmtKey),
 }
 
+// just helper for ASTData::area
 trait ASTKey {
     fn into_key(self) -> KeyType;
 }
@@ -90,7 +92,7 @@ impl ASTData {
 
 }
 
-
+// holds immutable data relevant to parsing
 pub struct ParseData {
     pub tokens: Tokens,
     pub source: SpwnSource,
@@ -157,39 +159,6 @@ pub enum Statement {
 
 pub type Statements = Vec<StmtKey>;
 
-// impl Expression {
-//     pub fn debug_str(&self, ast_data: &ASTData) -> String {
-//         use ansi_term::Color::*;
-//         match self {
-//             Expression::Literal(l) => format!(
-//                 "{} < {} >",
-//                 Blue.bold().paint("Literal"), l.to_str()
-//             ),
-//             Expression::Op(a, op, b) => format!(
-//                 "{} <\n\ta: {}\n\top: {}\n\tb: {}\n>",
-//                 Blue.bold().paint("Op"),
-//                 ast_data.get_expr(*a).debug_str(ast_data).replace('\n', "\n\t"),
-//                 op.tok_name().replace("\n", "\n\t"),
-//                 ast_data.get_expr(*b).debug_str(ast_data).replace('\n', "\n\t"),
-//             ),
-//             Expression::Unary(op, v) => format!(
-//                 "{} <\n\top: {}\n\tvalue: {}\n>",
-//                 Blue.bold().paint("Unary"),
-//                 op.tok_name().replace("\n", "\n\t"),
-//                 ast_data.get_expr(*v).debug_str(ast_data).replace('\n', "\n\t"),
-//             ),
-//             Expression::Array(arr) => format!(
-//                 "{} <[\n\t{}\n]>",
-//                 Blue.bold().paint("Array"),
-//                 arr.iter().map(
-//                     |k| ast_data.get_expr(*k).debug_str(ast_data).replace('\n', "\n\t")
-//                 ).collect::<Vec<_>>().join(",\n\t"),
-//             ),
-//         }
-//     }
-// }
-
-
 
 
 
@@ -198,6 +167,8 @@ pub type Statements = Vec<StmtKey>;
 macro_rules! parse_util {
     ($parse_data:expr, $ast_data:expr, $pos:expr) => {
         #[allow(unused_macros)]
+
+        // returns an "Expected {}, found {} {}" syntax error
         macro_rules! expected_err {
             ($exp:expr, $tok:expr, $area:expr) => {
                 return Err( SyntaxError::Expected {
@@ -208,6 +179,7 @@ macro_rules! parse_util {
                 } )
             };
         }
+        // gets a token (index 0 means current, index 1 the next one, its all relative)
         #[allow(unused_macros)]
         macro_rules! tok {
             ($index:expr) => {
@@ -217,6 +189,7 @@ macro_rules! parse_util {
                 } as usize].0
             }
         }
+        // gets a token span
         #[allow(unused_macros)]
         macro_rules! span {
             ($index:expr) => {
@@ -226,6 +199,7 @@ macro_rules! parse_util {
                 } as usize].1
             }
         }
+        // gets a token span and turns it into a CodeArea automatically
         #[allow(unused_macros)]
         macro_rules! span_ar {
             ($index:expr) => {
@@ -251,7 +225,9 @@ macro_rules! parse_util {
         //     };
         // }
 
-
+        // checks if the current token is something, other returns an `expected` error
+        // if it matches it moves forwards
+        // can also destructure in case of stuff like Ident token
         #[allow(unused_macros)]
         macro_rules! check_tok {
             ($token:ident else $expected:literal) => {
@@ -277,6 +253,7 @@ macro_rules! parse_util {
                 $pos += 1;
             };
         }
+        // same thing as before but if it matches it doesnt go forwards
         #[allow(unused_macros)]
         macro_rules! check_tok_static {
             ($token:ident else $expected:literal) => {
@@ -300,7 +277,7 @@ macro_rules! parse_util {
             };
         }
 
-        
+        // skips one token if it matches
         #[allow(unused_macros)]
         macro_rules! skip_tok {
             ($token:ident) => {
@@ -309,6 +286,7 @@ macro_rules! parse_util {
                 }
             };
         }
+        // skips all tokens that match
         #[allow(unused_macros)]
         macro_rules! skip_toks {
             ($token:ident) => {
@@ -317,6 +295,7 @@ macro_rules! parse_util {
                 }
             };
         }
+        // executes the code while the current token matches or doesnt match
         #[allow(unused_macros)]
         macro_rules! while_tok {
             (== $token:ident: $code:block) => {
@@ -337,6 +316,7 @@ macro_rules! parse_util {
                 $pos += 1;
             };
         }
+        // runs code if the current token matches or you get it
         #[allow(unused_macros)]
         macro_rules! if_tok {
             (== $token:ident: $code:block) => {
@@ -365,6 +345,8 @@ macro_rules! parse_util {
             };
         }
 
+        // calls a parsing function and automatically handles updating the position and destructuring
+        // can also pass in one argument such as in the case of parse_op
         #[allow(unused_macros)]
         macro_rules! parse {
             ($fn:ident => let $p:pat) => {
@@ -465,6 +447,9 @@ macro_rules! operators {
 }
 
 
+// epic operator precedence macro
+// unary precedence is the difference between for example -3+4 being parsed as (-3)+4 and -3*4 as -(3*4)
+
 operators!(
     // RightAssoc  <==  [ Assign ],
     // RightAssoc  <==  [ PlusEq MinusEq MultEq DivEq ModEq PowEq EuclModEq ],
@@ -488,7 +473,7 @@ operators!(
 
 
 
-
+// parses one unit value
 fn parse_unit(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
@@ -594,7 +579,7 @@ fn parse_unit(
 
 
 
-
+// parses a full value, aka stuff after like indexing, calling, member access etc
 fn parse_value(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
@@ -627,6 +612,7 @@ fn parse_value(
 }
 
 
+// shorthand for expression parsings
 fn parse_expr(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
@@ -638,7 +624,7 @@ fn parse_expr(
 }
 
 
-
+// parses operators and automatically handles precedence
 fn parse_op(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
@@ -680,7 +666,7 @@ fn parse_op(
 
 }
 
-
+// parses statements
 fn parse_statement(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
@@ -782,7 +768,7 @@ fn parse_statement(
 
 }
 
-
+// parses statements lol
 fn parse_statements(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
@@ -800,7 +786,7 @@ fn parse_statements(
     Ok((statements, pos))
 }
 
-
+// beginning parse function
 pub fn parse(
     parse_data: &ParseData,
     ast_data: &mut ASTData

@@ -1,6 +1,6 @@
 use logos::Logos;
 
-
+// to be improved, turns literal escape sequences into the actual character
 fn convert_string(s: &str) -> String {
     s
         .replace("\\n", "\n")
@@ -111,6 +111,7 @@ pub enum Token {
 
 
 impl Token {
+    // used in error messages
     pub fn tok_name(&self) -> String {
         match self {
             Token::Int(v) => return v.to_string(),
@@ -151,6 +152,7 @@ impl Token {
             Token::In => "in",
         }.into()
     }
+    // also used in error messages
     pub fn tok_typ(&self) -> &str {
         use Token::*;
         match self {
