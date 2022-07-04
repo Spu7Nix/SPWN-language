@@ -1,10 +1,5 @@
 use crate::value::Value;
 
-
-
-
-
-
 pub struct Code {
     pub constants: Vec<Value>,
     pub instructions: Vec<Vec<Instruction>>,
@@ -17,11 +12,5 @@ pub enum Instruction {
     Minus,
     Mult,
     Div,
-
     // other shit soon
 }
-
-
-
-
-

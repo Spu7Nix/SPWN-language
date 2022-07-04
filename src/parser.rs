@@ -1,13 +1,9 @@
-use slotmap::{SlotMap, new_key_type};
+use slotmap::{new_key_type, SlotMap};
 
-use crate::{CodeArea, lexer::Token, SpwnSource, error::SyntaxError};
-
-
-
+use crate::{error::SyntaxError, lexer::Token, CodeArea, SpwnSource};
 
 // contains tokens and their spans
 pub type Tokens = Vec<(Token, (usize, usize))>;
-
 
 new_key_type! {
     pub struct ExprKey;
@@ -34,7 +30,6 @@ impl ASTKey for StmtKey {
         KeyType::StmtKey(self)
     }
 }
-
 
 #[derive(Default)]
 pub struct ASTData {
@@ -83,13 +78,22 @@ impl ASTData {
         }
 
         let re = regex::Regex::new(r"(ExprKey\([^)]*\))").unwrap();
-        debug_str = re.replace_all(&debug_str, ansi_term::Color::Yellow.bold().paint("$1").to_string()).into();
+        debug_str = re
+            .replace_all(
+                &debug_str,
+                ansi_term::Color::Yellow.bold().paint("$1").to_string(),
+            )
+            .into();
         let re = regex::Regex::new(r"(StmtKey\([^)]*\))").unwrap();
-        debug_str = re.replace_all(&debug_str, ansi_term::Color::Blue.bold().paint("$1").to_string()).into();
+        debug_str = re
+            .replace_all(
+                &debug_str,
+                ansi_term::Color::Blue.bold().paint("$1").to_string(),
+            )
+            .into();
 
         println!("{}", debug_str);
     }
-
 }
 
 // holds immutable data relevant to parsing
@@ -97,7 +101,6 @@ pub struct ParseData {
     pub tokens: Tokens,
     pub source: SpwnSource,
 }
-
 
 #[derive(Debug, Clone)]
 pub enum Literal {
@@ -117,9 +120,6 @@ impl Literal {
     }
 }
 
-
-
-
 #[derive(Debug, Clone)]
 pub enum Expression {
     Literal(Literal),
@@ -127,13 +127,10 @@ pub enum Expression {
     Unary(Token, ExprKey),
 
     Var(String),
-    
+
     Array(Vec<ExprKey>),
 
-    Index {
-        base: ExprKey,
-        index: ExprKey,
-    },
+    Index { base: ExprKey, index: ExprKey },
 
     Empty,
 }
@@ -154,15 +151,10 @@ pub enum Statement {
         var: String,
         iterator: ExprKey,
         code: Statements,
-    }
+    },
 }
 
 pub type Statements = Vec<StmtKey>;
-
-
-
-
-
 
 macro_rules! parse_util {
     ($parse_data:expr, $ast_data:expr, $pos:expr) => {
@@ -171,12 +163,15 @@ macro_rules! parse_util {
         // returns an "Expected {}, found {} {}" syntax error
         macro_rules! expected_err {
             ($exp:expr, $tok:expr, $area:expr) => {
-                return Err( SyntaxError::Expected {
+                return Err(SyntaxError::Expected {
                     expected: $exp.to_string(),
                     typ: $tok.tok_typ().to_string(),
                     found: $tok.tok_name().to_string(),
-                    area: CodeArea {source: $parse_data.source.clone(), span: $area}
-                } )
+                    area: CodeArea {
+                        source: $parse_data.source.clone(),
+                        span: $area,
+                    },
+                })
             };
         }
         // gets a token (index 0 means current, index 1 the next one, its all relative)
@@ -185,9 +180,14 @@ macro_rules! parse_util {
             ($index:expr) => {
                 &$parse_data.tokens[{
                     let le_index = (($pos as i32) + $index);
-                    if le_index < 0 {0} else {le_index}
-                } as usize].0
-            }
+                    if le_index < 0 {
+                        0
+                    } else {
+                        le_index
+                    }
+                } as usize]
+                    .0
+            };
         }
         // gets a token span
         #[allow(unused_macros)]
@@ -195,9 +195,14 @@ macro_rules! parse_util {
             ($index:expr) => {
                 $parse_data.tokens[{
                     let le_index = (($pos as i32) + $index);
-                    if le_index < 0 {0} else {le_index}
-                } as usize].1
-            }
+                    if le_index < 0 {
+                        0
+                    } else {
+                        le_index
+                    }
+                } as usize]
+                    .1
+            };
         }
         // gets a token span and turns it into a CodeArea automatically
         #[allow(unused_macros)]
@@ -205,20 +210,20 @@ macro_rules! parse_util {
             ($index:expr) => {
                 CodeArea {
                     source: $parse_data.source.clone(),
-                    span: span!($index)
+                    span: span!($index),
                 }
-            }
+            };
         }
         // #[allow(unused_macros)]
         // macro_rules! ret {
         //     ($node_type:expr => $span:expr) => {
-        //         return Ok((ASTNode { 
+        //         return Ok((ASTNode {
         //             node: $node_type,
         //             span: $span,
         //          }, $pos))
         //     };
         //     ($node_type:expr => $start:expr, $end:expr) => {
-        //         return Ok((ASTNode { 
+        //         return Ok((ASTNode {
         //             node: $node_type,
         //             span: ($start, $end),
         //         }, $pos))
@@ -240,7 +245,9 @@ macro_rules! parse_util {
                 let $val;
                 if let Token::$token(v) = tok!(0) {
                     $val = v.clone();
-                } else { expected_err!($expected, tok!(0), span!(0)) }
+                } else {
+                    expected_err!($expected, tok!(0), span!(0))
+                }
                 $pos += 1;
             };
             ($token:ident($val:ident):$sp:ident else $expected:literal) => {
@@ -249,7 +256,9 @@ macro_rules! parse_util {
                 if let (Token::$token(v), sp) = (tok!(0), span!(0)) {
                     $val = v.clone();
                     $sp = sp.clone();
-                } else { expected_err!($expected, tok!(0), span!(0)) }
+                } else {
+                    expected_err!($expected, tok!(0), span!(0))
+                }
                 $pos += 1;
             };
         }
@@ -265,7 +274,9 @@ macro_rules! parse_util {
                 let $val;
                 if let Token::$token(v) = tok!(0) {
                     $val = v.clone();
-                } else { expected_err!($expected, tok!(0), span!(0)) }
+                } else {
+                    expected_err!($expected, tok!(0), span!(0))
+                }
             };
             ($token:ident($val:ident):$sp:ident else $expected:literal) => {
                 let $val;
@@ -273,7 +284,9 @@ macro_rules! parse_util {
                 if let (Token::$token(v), sp) = (tok!(0), span!(0)) {
                     $val = v.clone();
                     $sp = sp.clone();
-                } else { expected_err!($expected, tok!(0), span!(0)) }
+                } else {
+                    expected_err!($expected, tok!(0), span!(0))
+                }
             };
         }
 
@@ -302,7 +315,7 @@ macro_rules! parse_util {
                 loop {
                     match tok!(0) {
                         Token::$token => $code,
-                        _ => break
+                        _ => break,
                     }
                 }
             };
@@ -310,7 +323,7 @@ macro_rules! parse_util {
                 loop {
                     match tok!(0) {
                         Token::$token => break,
-                        _ => $code
+                        _ => $code,
                     }
                 }
                 $pos += 1;
@@ -377,7 +390,7 @@ macro_rules! parse_util {
 enum OpType {
     LeftAssoc,
     RightAssoc,
-    Unary
+    Unary,
 }
 
 macro_rules! operators {
@@ -446,7 +459,6 @@ macro_rules! operators {
     };
 }
 
-
 // epic operator precedence macro
 // unary precedence is the difference between for example -3+4 being parsed as (-3)+4 and -3*4 as -(3*4)
 
@@ -467,12 +479,6 @@ operators!(
     // LeftAssoc   <==  [ As ],
 );
 
-
-
-
-
-
-
 // parses one unit value
 fn parse_unit(
     parse_data: &ParseData,
@@ -484,30 +490,30 @@ fn parse_unit(
     let start = span!(0);
 
     match tok!(0) {
-        Token::Int(n) => Ok((ast_data.insert_expr(
-            Expression::Literal(Literal::Int(*n)),
-            span_ar!(0)
-        ), pos + 1)),
-        Token::Float(n) => Ok((ast_data.insert_expr(
-            Expression::Literal(Literal::Float(*n)),
-            span_ar!(0)
-        ), pos + 1)),
-        Token::True => Ok((ast_data.insert_expr(
-            Expression::Literal(Literal::Bool(true)),
-            span_ar!(0)
-        ), pos + 1)),
-        Token::False => Ok((ast_data.insert_expr(
-            Expression::Literal(Literal::Bool(false)),
-            span_ar!(0)
-        ), pos + 1)),
-        Token::String(s) => Ok((ast_data.insert_expr(
-            Expression::Literal(Literal::String(s.into())),
-            span_ar!(0)
-        ), pos + 1)),
-        Token::Ident(name) => Ok((ast_data.insert_expr(
-            Expression::Var(name.into()),
-            span_ar!(0),
-        ), pos + 1)),
+        Token::Int(n) => Ok((
+            ast_data.insert_expr(Expression::Literal(Literal::Int(*n)), span_ar!(0)),
+            pos + 1,
+        )),
+        Token::Float(n) => Ok((
+            ast_data.insert_expr(Expression::Literal(Literal::Float(*n)), span_ar!(0)),
+            pos + 1,
+        )),
+        Token::True => Ok((
+            ast_data.insert_expr(Expression::Literal(Literal::Bool(true)), span_ar!(0)),
+            pos + 1,
+        )),
+        Token::False => Ok((
+            ast_data.insert_expr(Expression::Literal(Literal::Bool(false)), span_ar!(0)),
+            pos + 1,
+        )),
+        Token::String(s) => Ok((
+            ast_data.insert_expr(Expression::Literal(Literal::String(s.into())), span_ar!(0)),
+            pos + 1,
+        )),
+        Token::Ident(name) => Ok((
+            ast_data.insert_expr(Expression::Var(name.into()), span_ar!(0)),
+            pos + 1,
+        )),
 
         Token::LParen => {
             pos += 1;
@@ -536,32 +542,47 @@ fn parse_unit(
                 skip_tok!(Comma);
             });
 
-            Ok((ast_data.insert_expr(
-                Expression::Array(elements),
-                parse_data.source.to_area( (start.0, span!(-1).1) )
-            ), pos))
+            Ok((
+                ast_data.insert_expr(
+                    Expression::Array(elements),
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                ),
+                pos,
+            ))
         }
 
         unary_op if is_unary(unary_op) => {
             pos += 1;
             let prec = unary_prec(unary_op);
-            let mut next_prec = if prec + 1 < prec_amount() {prec + 1} else {1000000};
+            let mut next_prec = if prec + 1 < prec_amount() {
+                prec + 1
+            } else {
+                1000000
+            };
             while next_prec != 1000000 {
                 if prec_type(next_prec) == OpType::Unary {
                     next_prec += 1
                 } else {
-                    break
+                    break;
                 }
-                if next_prec == prec_amount() { next_prec = 1000000 }
+                if next_prec == prec_amount() {
+                    next_prec = 1000000
+                }
             }
             let value;
-            if next_prec != 1000000 { parse!(parse_op(next_prec) => value); }
-            else { parse!(parse_value => value); }
+            if next_prec != 1000000 {
+                parse!(parse_op(next_prec) => value);
+            } else {
+                parse!(parse_value => value);
+            }
 
-            Ok((ast_data.insert_expr(
-                Expression::Unary(unary_op.clone(), value),
-                parse_data.source.to_area( (start.0, span!(-1).1) )
-            ), pos))
+            Ok((
+                ast_data.insert_expr(
+                    Expression::Unary(unary_op.clone(), value),
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                ),
+                pos,
+            ))
         }
 
         other => expected_err!("expression", other, span!(0)),
@@ -576,9 +597,6 @@ fn parse_unit(
     // todo!()
 }
 
-
-
-
 // parses a full value, aka stuff after like indexing, calling, member access etc
 fn parse_value(
     parse_data: &ParseData,
@@ -586,13 +604,11 @@ fn parse_value(
     mut pos: usize,
 ) -> Result<(ExprKey, usize), SyntaxError> {
     parse_util!(parse_data, ast_data, pos);
-    
+
     parse!(parse_unit => let mut value);
     let start = ast_data.area(value).span;
-    
-    while matches!(tok!(0),
-        Token::LSqBracket
-    ) {
+
+    while matches!(tok!(0), Token::LSqBracket) {
         match tok!(0) {
             Token::LSqBracket => {
                 pos += 1;
@@ -600,17 +616,15 @@ fn parse_value(
                 check_tok!(RSqBracket else "]");
                 value = ast_data.insert_expr(
                     Expression::Index { base: value, index },
-                    parse_data.source.to_area( (start.0, span!(-1).1) )
+                    parse_data.source.to_area((start.0, span!(-1).1)),
                 );
-            },
+            }
             _ => unreachable!(),
         }
     }
 
     Ok((value, pos))
-
 }
-
 
 // shorthand for expression parsings
 fn parse_expr(
@@ -618,11 +632,8 @@ fn parse_expr(
     ast_data: &mut ASTData,
     pos: usize,
 ) -> Result<(ExprKey, usize), SyntaxError> {
-    
-
     parse_op(parse_data, ast_data, pos, 0)
 }
-
 
 // parses operators and automatically handles precedence
 fn parse_op(
@@ -633,37 +644,48 @@ fn parse_op(
 ) -> Result<(ExprKey, usize), SyntaxError> {
     parse_util!(parse_data, ast_data, pos);
 
-    let mut next_prec = if prec + 1 < prec_amount() {prec + 1} else {1000000};
+    let mut next_prec = if prec + 1 < prec_amount() {
+        prec + 1
+    } else {
+        1000000
+    };
     while next_prec != 1000000 {
         if prec_type(next_prec) == OpType::Unary {
             next_prec += 1
         } else {
-            break
+            break;
         }
-        if next_prec == prec_amount() {next_prec = 1000000};
+        if next_prec == prec_amount() {
+            next_prec = 1000000
+        };
     }
     let mut left;
-    if next_prec != 1000000 { parse!(parse_op(next_prec) => left); }
-    else { parse!(parse_value => left); }
+    if next_prec != 1000000 {
+        parse!(parse_op(next_prec) => left);
+    } else {
+        parse!(parse_value => left);
+    }
 
     while infix_prec(tok!(0)) == prec {
         let op = tok!(0).clone();
         pos += 1;
         let right;
         if prec_type(prec) == OpType::LeftAssoc {
-            if next_prec != 1000000 { parse!(parse_op(next_prec) => right); }
-            else { parse!(parse_value => right); }
+            if next_prec != 1000000 {
+                parse!(parse_op(next_prec) => right);
+            } else {
+                parse!(parse_value => right);
+            }
         } else {
             parse!(parse_op(prec) => right);
         }
         let (left_span, right_span) = (ast_data.area(left).span, ast_data.area(right).span);
         left = ast_data.insert_expr(
             Expression::Op(left, op, right),
-            parse_data.source.to_area( ( left_span.0, right_span.1 ) )
+            parse_data.source.to_area((left_span.0, right_span.1)),
         );
     }
     Ok((left, pos))
-
 }
 
 // parses statements
@@ -672,7 +694,6 @@ fn parse_statement(
     ast_data: &mut ASTData,
     mut pos: usize,
 ) -> Result<(StmtKey, usize), SyntaxError> {
-
     parse_util!(parse_data, ast_data, pos);
     let start = span!(0);
 
@@ -698,7 +719,7 @@ fn parse_statement(
 
             let mut branches = vec![];
             let mut else_branch = None;
-            
+
             parse!(parse_expr => let cond);
             check_tok!(LBracket else "{");
             parse!(parse_statements => let code);
@@ -726,7 +747,6 @@ fn parse_statement(
                 branches,
                 else_branch,
             }
-
         }
         Token::While => {
             pos += 1;
@@ -734,10 +754,7 @@ fn parse_statement(
             check_tok!(LBracket else "{");
             parse!(parse_statements => let code);
             check_tok!(RBracket else "}");
-            Statement::While {
-                cond,
-                code,
-            }
+            Statement::While { cond, code }
         }
         Token::For => {
             pos += 1;
@@ -761,11 +778,10 @@ fn parse_statement(
     }
     skip_toks!(Eol);
 
-    Ok((ast_data.insert_stmt(
-        stmt,
-        parse_data.source.to_area( (start.0, span!(-1).1) )
-    ), pos))
-
+    Ok((
+        ast_data.insert_stmt(stmt, parse_data.source.to_area((start.0, span!(-1).1))),
+        pos,
+    ))
 }
 
 // parses statements lol
@@ -781,19 +797,16 @@ fn parse_statements(
     while !matches!(tok!(0), Token::Eof | Token::RBracket) {
         parse!(parse_statement => let stmt);
         statements.push(stmt);
-    };
+    }
 
     Ok((statements, pos))
 }
 
 // beginning parse function
-pub fn parse(
-    parse_data: &ParseData,
-    ast_data: &mut ASTData
-) -> Result<Statements, SyntaxError> {
+pub fn parse(parse_data: &ParseData, ast_data: &mut ASTData) -> Result<Statements, SyntaxError> {
     let mut pos = 0;
     parse_util!(parse_data, ast_data, pos);
-    
+
     parse!(parse_statements => let stmts);
     // check_tok_static!(Eof else "end of file");
     Ok(stmts)

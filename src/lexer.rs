@@ -2,8 +2,7 @@ use logos::Logos;
 
 // to be improved, turns literal escape sequences into the actual character
 fn convert_string(s: &str) -> String {
-    s
-        .replace("\\n", "\n")
+    s.replace("\\n", "\n")
         .replace("\\r", "\r")
         .replace("\\t", "\t")
         .replace("\\\\", "\\")
@@ -11,10 +10,8 @@ fn convert_string(s: &str) -> String {
         .replace("\\\"", "\"")
 }
 
-
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token {
-
     #[regex(r#"\d+"#, |lex| lex.slice().parse(), priority = 2)]
     Int(usize),
     #[regex(r#"\d+(\.[\d]+)?"#, |lex| lex.slice().parse())]
@@ -25,12 +22,10 @@ pub enum Token {
     )]
     String(String),
 
-
     #[token("let")]
     Let,
     #[token("mut")]
     Mut,
-
 
     #[token("true")]
     True,
@@ -95,20 +90,15 @@ pub enum Token {
     #[token("=")]
     Assign,
 
-
-
     #[regex(r"[a-zA-Z_ඞ][a-zA-Z_0-9ඞ]*", |lex| lex.slice().to_string())]
     Ident(String),
 
     #[regex(r"[ \t\f\n\r]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*", logos::skip)]
-    
     #[error]
     Error,
 
     Eof,
 }
-
-
 
 impl Token {
     // used in error messages
@@ -150,14 +140,15 @@ impl Token {
             Token::While => "while",
             Token::For => "for",
             Token::In => "in",
-        }.into()
+        }
+        .into()
     }
     // also used in error messages
     pub fn tok_typ(&self) -> &str {
         use Token::*;
         match self {
-            Plus | Minus | Mult | Div | Mod | Pow | PlusEq |
-            MinusEq | MultEq | DivEq | ModEq | PowEq | Assign => "operator",
+            Plus | Minus | Mult | Div | Mod | Pow | PlusEq | MinusEq | MultEq | DivEq | ModEq
+            | PowEq | Assign => "operator",
 
             Int(_) | Float(_) | String(_) | True | False => "literal",
 
@@ -169,8 +160,6 @@ impl Token {
             Eol => "end of line",
 
             LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma => "terminator",
-
-
         }
     }
 }
