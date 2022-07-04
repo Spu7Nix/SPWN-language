@@ -2,77 +2,18 @@ mod compiler;
 mod error;
 mod lexer;
 mod parser;
+mod sources;
 mod value;
 
-use std::{
-    collections::HashMap,
-    fs,
-    io::{self, Write},
-    path::PathBuf,
-};
+use std::fs;
+use std::io::{self, Write};
+use std::path::PathBuf;
 
-use ariadne::Source;
-use error::ToReport;
+use ariadne::Cache;
 use logos::Logos;
+
 use parser::{parse, ASTData, ParseData};
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum SpwnSource {
-    File(PathBuf),
-}
-
-impl SpwnSource {
-    fn to_area(&self, span: (usize, usize)) -> CodeArea {
-        CodeArea {
-            source: self.clone(),
-            span,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct CodeArea {
-    source: SpwnSource,
-    span: (usize, usize),
-}
-
-impl ariadne::Span for CodeArea {
-    type SourceId = SpwnSource;
-
-    fn source(&self) -> &Self::SourceId {
-        &self.source
-    }
-
-    fn start(&self) -> usize {
-        self.span.0
-    }
-
-    fn end(&self) -> usize {
-        self.span.1
-    }
-}
-
-#[derive(Default)]
-pub struct SpwnCache {
-    files: HashMap<SpwnSource, Source>,
-}
-
-impl ariadne::Cache<SpwnSource> for SpwnCache {
-    fn fetch(&mut self, id: &SpwnSource) -> Result<&Source, Box<dyn std::fmt::Debug + '_>> {
-        Ok(match self.files.entry(id.clone()) {
-            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
-            std::collections::hash_map::Entry::Vacant(e) => e.insert(Source::from(match id {
-                SpwnSource::File(path) => fs::read_to_string(path).map_err(|e| Box::new(e) as _)?,
-            })),
-        })
-    }
-
-    fn display<'a>(&self, id: &'a SpwnSource) -> Option<Box<dyn std::fmt::Display + 'a>> {
-        match id {
-            SpwnSource::File(f) => Some(Box::new(f.display())),
-        }
-    }
-}
+use sources::{SpwnCache, SpwnSource};
 
 fn run(code: String, source: SpwnSource) {
     let code = code.trim_end().to_string();
@@ -83,8 +24,8 @@ fn run(code: String, source: SpwnSource) {
     }
     tokens.push((lexer::Token::Eof, (code.len(), code.len())));
 
-    let cache = SpwnCache::default();
-    // cache.fetch(&source).unwrap();
+    let mut cache = SpwnCache::default();
+    cache.fetch(&source).expect("File does not exist!");
 
     let mut ast_data = ASTData::default();
     let parse_data = ParseData { source, tokens };
@@ -111,8 +52,7 @@ fn run(code: String, source: SpwnSource) {
             // }
         }
         Err(e) => {
-            let gaga = e.to_report();
-            gaga.print_error(cache);
+            e.raise(cache);
         }
     }
 }

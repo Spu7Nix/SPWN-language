@@ -1,32 +1,53 @@
-use ariadne::{Fmt, Label, Report, ReportBuilder, ReportKind};
+use ariadne::{Label, Report, ReportKind};
 
-use crate::{lexer::Token, CodeArea, SpwnCache, SpwnSource};
+use thiserror::Error;
 
-#[derive(Debug, Clone)]
+use crate::sources::{CodeArea, SpwnCache};
+
+const ERROR_S: f64 = 0.4;
+const ERROR_V: f64 = 1.0;
+
+#[derive(Error, Debug)]
 pub enum SyntaxError {
+    #[error("Expected `{expected}`, found {typ} `{found}`")]
     Expected {
         expected: String,
-        typ: String,
         found: String,
+        typ: String,
         area: CodeArea,
     },
 }
 
-pub trait ToReport {
-    fn to_report(&self) -> ErrorReport;
-}
+impl SyntaxError {
+    const MESSAGE: &'static str = "Syntax Error";
 
-#[derive(Debug)]
-pub struct ErrorReport {
-    source: CodeArea,
-    message: String,
-    labels: Vec<(CodeArea, String)>,
-    note: Option<String>,
-}
+    pub fn raise(self, cache: SpwnCache) {
+        let mut colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 20.0);
 
-impl From<CodeArea> for SpwnSource {
-    fn from(area: CodeArea) -> Self {
-        area.source
+        let (area, labels, note): (_, _, Option<String>) = match self {
+            SyntaxError::Expected { ref area, .. } => {
+                let labels = vec![(area, self.to_string())];
+
+                (area, labels, None)
+            }
+        };
+
+        let mut report = Report::build(ReportKind::Error, area.source.clone(), area.span.0)
+            .with_message(Self::MESSAGE.to_string() + "\n");
+
+        for (c, s) in labels {
+            report = report.with_label(
+                Label::new(c.to_owned())
+                    .with_message(s)
+                    .with_color(colors.next()),
+            )
+        }
+
+        if let Some(m) = &note {
+            report = report.with_note(m)
+        }
+
+        report.finish().eprint(cache).unwrap();
     }
 }
 
@@ -78,56 +99,5 @@ impl RainbowColorGenerator {
     }
 }
 
-const ERROR_S: f64 = 0.4;
-const ERROR_V: f64 = 1.0;
-
-impl ErrorReport {
-    pub fn print_error(&self, cache: SpwnCache) {
-        let mut colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 60.0);
-
-        let mut report: ReportBuilder<CodeArea> =
-            Report::build(ReportKind::Error, self.source.clone(), self.source.span.0)
-                .with_message(self.message.clone() + "\n");
-
-        for (c, s) in &self.labels {
-            report = report.with_label(
-                Label::new(c.clone())
-                    .with_message(s)
-                    .with_color(colors.next()),
-            )
-        }
-
-        if let Some(m) = &self.note {
-            report = report.with_note(m)
-        }
-        report.finish().print(cache).unwrap();
-    }
-}
-
-impl ToReport for SyntaxError {
-    fn to_report(&self) -> ErrorReport {
-        let mut colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 20.0);
-
-        match self {
-            SyntaxError::Expected {
-                expected,
-                typ,
-                found,
-                area,
-            } => ErrorReport {
-                source: area.clone(),
-                message: "Syntax error".to_string(),
-                labels: vec![(
-                    area.clone(),
-                    format!(
-                        "Expected {}, found {} {}",
-                        expected.fg(colors.next()),
-                        typ.fg(colors.next()),
-                        found.fg(colors.next())
-                    ),
-                )],
-                note: None,
-            },
-        }
-    }
-}
+// Custom wrapper `Result` type as all errors will be syntax errors.
+pub type Result<T> = std::result::Result<T, SyntaxError>;

@@ -1,6 +1,8 @@
 use slotmap::{new_key_type, SlotMap};
 
-use crate::{error::SyntaxError, lexer::Token, CodeArea, SpwnSource};
+use crate::error::{Result, SyntaxError};
+use crate::lexer::Token;
+use crate::sources::{CodeArea, SpwnSource};
 
 // contains tokens and their spans
 pub type Tokens = Vec<(Token, (usize, usize))>;
@@ -484,7 +486,7 @@ fn parse_unit(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
     mut pos: usize,
-) -> Result<(ExprKey, usize), SyntaxError> {
+) -> Result<(ExprKey, usize)> {
     parse_util!(parse_data, ast_data, pos);
 
     let start = span!(0);
@@ -602,7 +604,7 @@ fn parse_value(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
     mut pos: usize,
-) -> Result<(ExprKey, usize), SyntaxError> {
+) -> Result<(ExprKey, usize)> {
     parse_util!(parse_data, ast_data, pos);
 
     parse!(parse_unit => let mut value);
@@ -631,7 +633,7 @@ fn parse_expr(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
     pos: usize,
-) -> Result<(ExprKey, usize), SyntaxError> {
+) -> Result<(ExprKey, usize)> {
     parse_op(parse_data, ast_data, pos, 0)
 }
 
@@ -641,7 +643,7 @@ fn parse_op(
     ast_data: &mut ASTData,
     mut pos: usize,
     prec: usize,
-) -> Result<(ExprKey, usize), SyntaxError> {
+) -> Result<(ExprKey, usize)> {
     parse_util!(parse_data, ast_data, pos);
 
     let mut next_prec = if prec + 1 < prec_amount() {
@@ -693,7 +695,7 @@ fn parse_statement(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
     mut pos: usize,
-) -> Result<(StmtKey, usize), SyntaxError> {
+) -> Result<(StmtKey, usize)> {
     parse_util!(parse_data, ast_data, pos);
     let start = span!(0);
 
@@ -789,7 +791,7 @@ fn parse_statements(
     parse_data: &ParseData,
     ast_data: &mut ASTData,
     mut pos: usize,
-) -> Result<(Statements, usize), SyntaxError> {
+) -> Result<(Statements, usize)> {
     parse_util!(parse_data, ast_data, pos);
 
     let mut statements = vec![];
@@ -803,7 +805,7 @@ fn parse_statements(
 }
 
 // beginning parse function
-pub fn parse(parse_data: &ParseData, ast_data: &mut ASTData) -> Result<Statements, SyntaxError> {
+pub fn parse(parse_data: &ParseData, ast_data: &mut ASTData) -> Result<Statements> {
     let mut pos = 0;
     parse_util!(parse_data, ast_data, pos);
 
