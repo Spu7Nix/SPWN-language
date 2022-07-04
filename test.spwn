@@ -1,7 +1,11 @@
 
-let bruh = [1, 2, 3];
-for i in bruh {
-    let a = i + 5;
+let a = true;
+if @shit {
+    b = [1, 2, 3];
+} else {
+    a = 1 + 2;
+    c = "aaa";
 }
-let h = bruh[2];
-
+while a > 0 {
+    a = a - 1;
+}

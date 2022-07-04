@@ -1,5 +1,6 @@
 mod compiler;
 mod error;
+mod interpreter;
 mod lexer;
 mod parser;
 mod sources;
@@ -10,6 +11,8 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 use ariadne::Cache;
+
+use compiler::Compiler;
 use logos::Logos;
 
 use parser::{parse, ASTData, ParseData};
@@ -34,7 +37,14 @@ fn run(code: String, source: SpwnSource) {
 
     match ast {
         Ok(stmts) => {
-            ast_data.debug(&stmts)
+            ast_data.debug(&stmts);
+
+            let mut compiler = Compiler::new(ast_data);
+            compiler.code.instructions.push(vec![]);
+
+            compiler.compile_stmts(stmts, 0);
+
+            compiler.code.debug();
 
             // match gen(stmts) {
             //     Ok(code) => {

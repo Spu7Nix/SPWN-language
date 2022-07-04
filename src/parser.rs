@@ -3,6 +3,7 @@ use slotmap::{new_key_type, SlotMap};
 use crate::error::{Result, SyntaxError};
 use crate::lexer::Token;
 use crate::sources::{CodeArea, SpwnSource};
+use crate::value::Value;
 
 // contains tokens and their spans
 pub type Tokens = Vec<(Token, (usize, usize))>;
@@ -48,11 +49,11 @@ impl ASTData {
             KeyType::StmtKey(k) => &self.stmts[k].1,
         }
     }
-    pub fn get_expr(&self, k: ExprKey) -> &Expression {
-        &self.exprs[k].0
+    pub fn get_expr(&self, k: ExprKey) -> Expression {
+        self.exprs[k].0.clone()
     }
-    pub fn get_stmt(&self, k: StmtKey) -> &Statement {
-        &self.stmts[k].0
+    pub fn get_stmt(&self, k: StmtKey) -> Statement {
+        self.stmts[k].0.clone()
     }
     pub fn insert_expr(&mut self, expr: Expression, area: CodeArea) -> ExprKey {
         self.exprs.insert((expr, area))
@@ -120,6 +121,14 @@ impl Literal {
             Literal::Bool(v) => v.to_string(),
         }
     }
+    pub fn to_value(&self) -> Value {
+        match self {
+            Literal::Int(v) => Value::Int(*v as isize),
+            Literal::Float(v) => Value::Float(*v),
+            Literal::String(v) => Value::String(v.clone()),
+            Literal::Bool(v) => Value::Bool(*v),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -132,15 +141,14 @@ pub enum Expression {
 
     Array(Vec<ExprKey>),
 
-    Index { base: ExprKey, index: ExprKey },
-
+    // Index { base: ExprKey, index: ExprKey },
     Empty,
 }
 
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expr(ExprKey),
-    Declaration(String, ExprKey),
+    Let(String, ExprKey),
     If {
         branches: Vec<(ExprKey, Statements)>,
         else_branch: Option<Statements>,
@@ -465,12 +473,12 @@ macro_rules! operators {
 // unary precedence is the difference between for example -3+4 being parsed as (-3)+4 and -3*4 as -(3*4)
 
 operators!(
-    // RightAssoc  <==  [ Assign ],
+    RightAssoc  <==  [ Assign ],
     // RightAssoc  <==  [ PlusEq MinusEq MultEq DivEq ModEq PowEq EuclModEq ],
     // LeftAssoc   <==  [ And Or ],
     // LeftAssoc   <==  [ Pipe ],
     // Unary       <==  [ ExclMark ],
-    // LeftAssoc   <==  [ Eq NotEq Greater GreaterEq Lesser LesserEq ],
+    LeftAssoc   <==  [ Eq NotEq Greater GreaterEq Lesser LesserEq ],
     // LeftAssoc   <==  [ DoubleDot ],
     // Unary       <==  [ DoubleDot ],
     // Unary       <==  [ TripleDot ],
@@ -610,20 +618,20 @@ fn parse_value(
     parse!(parse_unit => let mut value);
     let start = ast_data.area(value).span;
 
-    while matches!(tok!(0), Token::LSqBracket) {
-        match tok!(0) {
-            Token::LSqBracket => {
-                pos += 1;
-                parse!(parse_expr => let index);
-                check_tok!(RSqBracket else "]");
-                value = ast_data.insert_expr(
-                    Expression::Index { base: value, index },
-                    parse_data.source.to_area((start.0, span!(-1).1)),
-                );
-            }
-            _ => unreachable!(),
-        }
-    }
+    // while matches!(tok!(0), Token::LSqBracket) {
+    //     match tok!(0) {
+    //         Token::LSqBracket => {
+    //             pos += 1;
+    //             parse!(parse_expr => let index);
+    //             check_tok!(RSqBracket else "]");
+    //             value = ast_data.insert_expr(
+    //                 Expression::Index { base: value, index },
+    //                 parse_data.source.to_area((start.0, span!(-1).1)),
+    //             );
+    //         }
+    //         _ => unreachable!(),
+    //     }
+    // }
 
     Ok((value, pos))
 }
@@ -714,7 +722,7 @@ fn parse_statement(
             check_tok!(Ident(var_name) else "variable name");
             check_tok!(Assign else "=");
             parse!(parse_expr => let value);
-            Statement::Declaration(var_name, value)
+            Statement::Let(var_name, value)
         }
         Token::If => {
             pos += 1;

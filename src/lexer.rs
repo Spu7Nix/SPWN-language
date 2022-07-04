@@ -87,8 +87,24 @@ pub enum Token {
     #[token(",")]
     Comma,
 
+    #[token("==")]
+    Eq,
+    #[token("!=")]
+    NotEq,
+    #[token(">")]
+    Greater,
+    #[token(">=")]
+    GreaterEq,
+    #[token("<")]
+    Lesser,
+    #[token("<=")]
+    LesserEq,
+
     #[token("=")]
     Assign,
+
+    #[regex(r"@[a-zA-Z_]\w*", |lex| lex.slice()[1..].to_string())]
+    TypeIndicator(String),
 
     #[regex(r"[a-zA-Z_ඞ][a-zA-Z_0-9ඞ]*", |lex| lex.slice().to_string())]
     Ident(String),
@@ -107,6 +123,7 @@ impl Token {
             Token::Int(v) => return v.to_string(),
             Token::Float(v) => return v.to_string(),
             Token::String(v) => v,
+            Token::TypeIndicator(v) => return format!("@{}", v),
             Token::Let => "let",
             Token::Mut => "mut",
             Token::Ident(n) => n,
@@ -140,6 +157,13 @@ impl Token {
             Token::While => "while",
             Token::For => "for",
             Token::In => "in",
+            Token::Eq => "==",
+            Token::NotEq => "!=",
+            Token::Greater => ">",
+            Token::GreaterEq => ">=",
+            Token::Lesser => "<",
+            Token::LesserEq => "<=",
+            Token::LesserEq => "<=",
         }
         .into()
     }
@@ -148,7 +172,7 @@ impl Token {
         use Token::*;
         match self {
             Plus | Minus | Mult | Div | Mod | Pow | PlusEq | MinusEq | MultEq | DivEq | ModEq
-            | PowEq | Assign => "operator",
+            | PowEq | Assign | Eq | NotEq | Greater | GreaterEq | Lesser | LesserEq => "operator",
 
             Int(_) | Float(_) | String(_) | True | False => "literal",
 
@@ -158,6 +182,7 @@ impl Token {
             Error => "unknown",
             Eof => "end of file",
             Eol => "end of line",
+            TypeIndicator(_) => "type indicator",
 
             LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma => "terminator",
         }
