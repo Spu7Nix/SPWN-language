@@ -1,0 +1,7 @@
+
+let bruh = [1, 2, 3];
+for i in bruh {
+    let a = i + 5;
+}
+let h = bruh[2];
+

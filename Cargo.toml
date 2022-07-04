@@ -7,3 +7,7 @@ edition = "2021"
 
 [dependencies]
 logos = "0.12.1"
+ariadne = "0.1.5"
+slotmap = "1.0.6"
+ansi_term = "0.12.1"
+regex = "1.5.6"
