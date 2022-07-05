@@ -23,7 +23,6 @@ use lexer::lex;
 use parser::{parse, ASTData, ParseData};
 use slotmap::SlotMap;
 use sources::SpwnSource;
-use sources::{SpwnCache, SpwnSource};
 
 use crate::compiler::Instruction;
 
