@@ -1,14 +1,9 @@
-use std::collections::HashMap;
-
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::error::{Result, SyntaxError};
-use crate::lexer::Token;
+use crate::lexer::{Token, Tokens};
 use crate::sources::{CodeArea, SpwnSource};
 use crate::value::Value;
-
-// contains tokens and their spans
-pub type Tokens = Vec<(Token, (usize, usize))>;
 
 new_key_type! {
     pub struct ExprKey;

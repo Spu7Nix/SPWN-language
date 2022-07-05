@@ -228,3 +228,18 @@ impl Token {
         }
     }
 }
+
+pub type Span = (usize, usize);
+pub type Tokens = Vec<(Token, Span)>;
+
+pub fn lex(code: String) -> Tokens {
+    let mut tokens_iter = Token::lexer(&code);
+
+    let mut tokens = vec![];
+    while let Some(t) = tokens_iter.next() {
+        tokens.push((t, (tokens_iter.span().start, tokens_iter.span().end)))
+    }
+    tokens.push((Token::Eof, (code.len(), code.len() + 1)));
+
+    tokens
+}
