@@ -154,8 +154,8 @@ impl Token {
             Token::Let => "let",
             Token::Mut => "mut",
             Token::Ident(n) => n,
-            Token::Error => "",
-            Token::Eof => "",
+            Token::Error => "unknown",
+            Token::Eof => "end of file",
             Token::True => "true",
             Token::False => "false",
             Token::Plus => "+",
@@ -178,7 +178,7 @@ impl Token {
             Token::LBracket => "{",
             Token::RBracket => "}",
             Token::Comma => ",",
-            Token::Eol => "",
+            Token::Eol => "end of line",
             Token::If => "if",
             Token::Else => "else",
             Token::While => "while",
@@ -218,13 +218,11 @@ impl Token {
             Let | Mut | For | While | If | Else | In | Return | Break | Continue | TypeDef
             | Impl => "keyword",
 
-            Error => "unknown",
-            Eof => "end of file",
-            Eol => "end of line",
+            Error => "",
             TypeIndicator(_) => "type indicator",
 
             LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma | Colon
-            | DoubleColon | FatArrow | Arrow | QMark | ExclMark => "terminator",
+            | DoubleColon | FatArrow | Arrow | QMark | ExclMark | Eol | Eof => "terminator",
         }
     }
 }

@@ -17,6 +17,7 @@ use ariadne::Cache;
 use compiler::Compiler;
 use contexts::Context;
 use converter::to_bytes;
+use interpreter::{execute, Globals};
 use logos::Logos;
 
 use lexer::lex;
@@ -25,6 +26,7 @@ use slotmap::SlotMap;
 use sources::SpwnSource;
 
 use crate::compiler::{Code, Instruction};
+use crate::converter::from_bytes;
 
 fn run(code: String, source: SpwnSource) {
     let tokens = lex(code);
@@ -48,16 +50,27 @@ fn run(code: String, source: SpwnSource) {
 
             compiler.code.debug();
 
-            let encoded: Vec<u8> = bincode::serialize(&compiler.code).unwrap();
-            let decoded: Code = bincode::deserialize(&encoded[..]).unwrap();
-            println!("{}", encoded.len());
-
-            decoded.debug();
-
             // let bytes = to_bytes(&compiler.code);
+            // println!("bytes: {}", bytes.len());
 
             // let mut file = File::create("test.spwnc").unwrap();
             // file.write_all(&bytes).unwrap();
+
+            // let compressed = lz4_compression::prelude::compress(&bytes);
+            // println!(
+            //     "lz4 bytes: {}, {:.2}%",
+            //     compressed.len(),
+            //     (compressed.len() as f64) / (bytes.len() as f64) * 100.0
+            // );
+
+            // let compressed =
+            //     yazi::compress(&bytes, yazi::Format::Raw, yazi::CompressionLevel::BestSize)
+            //         .unwrap();
+            // println!(
+            //     "zlib bytes: {}, {:.2}%",
+            //     compressed.len(),
+            //     (compressed.len() as f64) / (bytes.len() as f64) * 100.0
+            // );
 
             // println!("{:?}", bytes);
 
@@ -66,7 +79,9 @@ fn run(code: String, source: SpwnSource) {
             //     contexts: contexts::FullContext::Single(Context::default()),
             // };
 
-            // execute(&mut globals, &compiler.code, 0)
+            // if let Err(e) = execute(&mut globals, &compiler.code, 0) {
+            //     e.raise(source);
+            // }
         }
         Err(e) => {
             e.raise(source);
@@ -82,6 +97,5 @@ fn main() {
     buf.push("test.spwn");
     let code = fs::read_to_string(buf.clone()).unwrap();
     run(code, SpwnSource::File(buf));
-
-    println!("{}", std::mem::size_of::<Instruction>());
+    // println!("{}", std::mem::size_of::<Instruction>());
 }

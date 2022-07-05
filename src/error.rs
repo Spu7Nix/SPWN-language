@@ -1,68 +1,135 @@
 use std::fmt::Debug;
 
-use ariadne::{Label, Report, ReportKind, Source, Color};
-use thiserror::Error;
+use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 
-use crate::sources::{CodeArea, SpwnSource};
+use crate::{
+    interpreter::StoredValue,
+    sources::{CodeArea, SpwnSource},
+};
 
 const ERROR_S: f64 = 0.4;
 const ERROR_V: f64 = 1.0;
 
-#[derive(Error, Debug)]
-pub enum SyntaxError {
-    #[error("Expected `{expected}`, found {typ} `{found}`")]
-    Expected {
-        expected: String,
-        found: String,
-        typ: String,
-        area: CodeArea,
-    },
-    #[error("Couldn't find matching `{not_found}` for this `{for_char}`")]
-    UnmatchedChar {
-        for_char: String,
-        not_found: String,
-        area: CodeArea,
-    },
+macro_rules! error_maker {
+    (
+
+        pub enum $err_type:ident {
+            $(
+                #[
+                    Message = $msg:expr, Area = $area:expr, Note = $note:expr,
+                    Labels = [
+                        $(
+                            $l_area:expr => $fmt:literal: $( $(@($c_e:expr))? $($e:expr)? ),*;
+                        )+
+                    ]
+                ]
+                $variant:ident {
+                    $(
+                        $field:ident: $typ:ty,
+                    )+
+                },
+            )*
+        }
+    ) => {
+        pub enum $err_type {
+            $(
+                $variant {
+                    $(
+                        $field: $typ,
+                    )+
+                },
+            )*
+        }
+
+        impl $err_type {
+            pub fn raise(self, source: SpwnSource) {
+                let mut label_colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 20.0);
+                let mut item_colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 20.0);
+
+
+                let (message, area, labels, note): (_, _, _, Option<String>) = match self {
+                    $(
+                        $err_type::$variant { $($field),+ } => {
+                            let err_area = $area.clone();
+                            let labels = vec![
+                                $(
+                                    ( $l_area, format!($fmt, $(   $($c_e.fg(item_colors.next()))? $($e)?       ,)*) ),
+                                )+
+                            ];
+
+                            ($msg, err_area, labels, $note)
+                        }
+                    )*
+                };
+
+                let mut report = Report::build(ReportKind::Error, area.name(), area.span.0)
+                    .with_message(message.to_string() + "\n");
+
+                for (c, s) in labels {
+                    report = report.with_label(
+                        Label::new(c.label())
+                            .with_message(s)
+                            .with_color(label_colors.next()),
+                    )
+                }
+
+                if let Some(m) = &note {
+                    report = report.with_note(m)
+                }
+
+                report
+                    .finish()
+                    .eprint((source.name(), Source::from(source.contents())))
+                    .unwrap();
+            }
+        }
+    };
 }
 
-impl SyntaxError {
-    const MESSAGE: &'static str = "Syntax Error";
+error_maker! {
+    pub enum SyntaxError {
+        #[
+            Message = "Unexpected character", Area = area, Note = None,
+            Labels = [
+                area => "Expected `{}` found {} `{}`": @(expected), @(typ), @(found);
+            ]
+        ]
+        Expected {
+            expected: String,
+            found: String,
+            typ: String,
+            area: CodeArea,
+        },
+        #[
+            Message = "Unmatched character", Area = area, Note = None,
+            Labels = [
+                area => "Couldn't find matching `{}` for this `{}`": @(not_found), @(for_char);
+            ]
+        ]
+        UnmatchedChar {
+            for_char: String,
+            not_found: String,
+            area: CodeArea,
+        },
+    }
+}
 
-    pub fn raise(self, source: SpwnSource) {
-        let mut colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 20.0);
-
-        let (area, labels, note): (_, _, Option<String>) = match self {
-            SyntaxError::Expected { ref area, .. } => {
-                let labels = vec![(area, self.to_string())];
-
-                (area, labels, None)
-            }
-            SyntaxError::UnmatchedChar { ref area, .. } => {
-                let labels = vec![(area, self.to_string())];
-
-                (area, labels, None)
-            }
-        };
-
-        let mut report = Report::build(ReportKind::Error, area.name(), area.span.0)
-            .with_message(Self::MESSAGE.to_string() + "\n");
-
-        for (c, s) in labels {
-            report = report.with_label(
-                Label::new(c.label())
-                    .with_message(s)
-                    .with_color(colors.next()),
-            )
-        }
-
-        if let Some(m) = &note {
-            report = report.with_note(m)
-        }
-
-        report.finish().eprint((
-            source.name(), 
-            Source::from(source.contents())
-        )).unwrap();
+error_maker! {
+    pub enum RuntimeError {
+        #[
+            Message = "Invalid operands", Area = area, Note = None,
+            Labels = [
+                area => "Operator `{}` cannot be used on {} and {}": @(op), @(a.value.get_type().to_str()), @(b.value.get_type().to_str());
+                a.def_area => "This is of type {}": @(a.value.get_type().to_str());
+                b.def_area => "This is of type {}": @(b.value.get_type().to_str());
+            ]
+        ]
+        InvalidOperands {
+            a: StoredValue,
+            b: StoredValue,
+            op: String,
+            area: CodeArea,
+        },
     }
 }
 

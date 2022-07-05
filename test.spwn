@@ -1,12 +1,2 @@
 
-
-
-yooo = (funy: @int, yo: @string = "aaa") => {
-    if true {
-        let a = 5;
-    } else {
-        return 3;
-    }
-}
-
-print(yoo(2));
+1 + (;
