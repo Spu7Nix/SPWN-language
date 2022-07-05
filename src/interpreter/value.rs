@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{interpreter::StoredValue, sources::CodeArea};
+use super::interpreter::StoredValue;
+
+use crate::sources::CodeArea;
 
 pub type ArbitraryId = u16;
 pub type SpecificId = u16;
@@ -101,13 +103,12 @@ pub enum Pattern {
 
 // ok so this is a temporary thing until we get builtins and i can replace this with _plus_ and such
 pub mod value_ops {
-    use crate::{
-        error::RuntimeError,
-        interpreter::{Globals, StoredValue},
-        sources::CodeArea,
-    };
-
     use super::Value;
+    use super::super::error::RuntimeError;
+    use super::super::interpreter::{Globals, StoredValue};
+
+    use crate::sources::CodeArea;
+
 
     pub fn plus(
         a: &StoredValue,

@@ -1,9 +1,11 @@
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
-use crate::error::{Result, SyntaxError};
-use crate::lexer::{Token, Tokens};
+use super::error::{Result, SyntaxError};
+use super::lexer::{Token, Tokens};
+
+use crate::interpreter::value::Value;
+
 use crate::sources::{CodeArea, SpwnSource};
-use crate::value::Value;
 
 new_key_type! {
     pub struct ExprKey;

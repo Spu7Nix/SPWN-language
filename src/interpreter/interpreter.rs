@@ -1,15 +1,12 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
-use crate::{
-    compiler::{Code, Instruction},
-    contexts::FullContext,
-    error::RuntimeError,
-    sources::CodeArea,
-    value::{value_ops, Value},
-};
+use super::contexts::FullContext;
+use super::value::{value_ops, Value};
+use super::error::Result;
+
+use crate::compiler::compiler::{Instruction, Code};
+use crate::sources::CodeArea;
 
 new_key_type! {
     pub struct ValueKey;
@@ -27,7 +24,7 @@ pub struct Globals {
     pub contexts: FullContext,
 }
 
-pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), RuntimeError> {
+pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<()> {
     let mut stack: Vec<*mut StoredValue> = vec![];
 
     let mut i = 0;

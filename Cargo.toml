@@ -3,7 +3,11 @@ name = "spwn"
 version = "0.0.85"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+readme = "README.md"
+description = "A language for Geometry Dash triggers"
+repository = "https://github.com/Spu7Nix/SPWN-language"
+
+license = "MIT"
 
 [dependencies]
 logos = "0.12.1"

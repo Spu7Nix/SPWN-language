@@ -1,5 +1,6 @@
-use crate::interpreter::ValueKey;
 use std::collections::HashMap;
+
+use super::interpreter::ValueKey;
 
 #[derive(Default, Debug, Clone)]
 pub struct VarData {

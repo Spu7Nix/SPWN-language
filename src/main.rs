@@ -1,32 +1,16 @@
 mod compiler;
-mod contexts;
-mod converter;
-mod error;
 mod interpreter;
-mod lexer;
-mod parser;
 mod sources;
-mod value;
+mod error;
 
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use ariadne::Cache;
-
-use compiler::Compiler;
-use contexts::Context;
-use converter::to_bytes;
-use interpreter::{execute, Globals};
-use logos::Logos;
-
-use lexer::lex;
-use parser::{parse, ASTData, ParseData};
-use slotmap::SlotMap;
+use compiler::lexer::lex;
+use compiler::parser::{parse, ASTData, ParseData};
+use compiler::compiler::Compiler;
 use sources::SpwnSource;
-
-use crate::compiler::{Code, Instruction};
-use crate::converter::from_bytes;
 
 fn run(code: String, source: SpwnSource) {
     let tokens = lex(code);

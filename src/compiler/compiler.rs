@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    lexer::Token,
-    parser::{ASTData, ExprKey, Expression, Statement, Statements, StmtKey},
-    sources::CodeArea,
-    value::Value,
-};
+use super::lexer::Token;
+use super::parser::{ASTData, ExprKey, Expression, Statement, Statements, StmtKey};
+
+use crate::interpreter::value::Value;
+use crate::sources::CodeArea;
+
 
 pub type InstrNum = u16;
 
