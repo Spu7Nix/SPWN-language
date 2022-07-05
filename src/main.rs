@@ -1,4 +1,5 @@
 mod compiler;
+mod contexts;
 mod error;
 mod interpreter;
 mod lexer;
@@ -17,6 +18,8 @@ use logos::Logos;
 
 use parser::{parse, ASTData, ParseData};
 use sources::{SpwnCache, SpwnSource};
+
+use crate::compiler::Instruction;
 
 fn run(code: String, source: SpwnSource) {
     let code = code.trim_end().to_string();
@@ -45,21 +48,6 @@ fn run(code: String, source: SpwnSource) {
             compiler.compile_stmts(stmts, 0);
 
             compiler.code.debug();
-
-            // match gen(stmts) {
-            //     Ok(code) => {
-            //         println!("{:?}", code.consts);
-            //         for (pos, i) in code.instructions.iter().enumerate() {
-            //             println!("{}: {:?}", pos, i);
-            //         }
-            //         println!("\n\n\n");
-            //         // execute(&code);
-            //     },
-            //     Err(e) => {
-            //         let gaga = e.to_report();
-            //         gaga.print_error(cache);
-            //     },
-            // }
         }
         Err(e) => {
             e.raise(cache);
@@ -75,4 +63,6 @@ fn main() {
     buf.push("test.spwn");
     let code = fs::read_to_string(buf.clone()).unwrap();
     run(code, SpwnSource::File(buf));
+
+    println!("{}", std::mem::size_of::<Instruction>());
 }

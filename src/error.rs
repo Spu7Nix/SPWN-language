@@ -16,6 +16,12 @@ pub enum SyntaxError {
         typ: String,
         area: CodeArea,
     },
+    #[error("Couldn't find matching `{not_found}` for this `{for_char}`")]
+    UnmatchedChar {
+        for_char: String,
+        not_found: String,
+        area: CodeArea,
+    },
 }
 
 impl SyntaxError {
@@ -26,6 +32,11 @@ impl SyntaxError {
 
         let (area, labels, note): (_, _, Option<String>) = match self {
             SyntaxError::Expected { ref area, .. } => {
+                let labels = vec![(area, self.to_string())];
+
+                (area, labels, None)
+            }
+            SyntaxError::UnmatchedChar { ref area, .. } => {
                 let labels = vec![(area, self.to_string())];
 
                 (area, labels, None)

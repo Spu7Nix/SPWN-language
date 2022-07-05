@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use slotmap::{new_key_type, SlotMap};
 
 use crate::error::{Result, SyntaxError};
@@ -138,17 +140,48 @@ pub enum Expression {
     Unary(Token, ExprKey),
 
     Var(String),
+    Type(String),
 
     Array(Vec<ExprKey>),
+    Dict(Vec<(String, ExprKey)>),
 
     // Index { base: ExprKey, index: ExprKey },
     Empty,
+
+    Block(Statements),
+
+    Func {
+        args: Vec<(String, Option<ExprKey>, Option<ExprKey>)>,
+        ret_type: Option<ExprKey>,
+        code: ExprKey,
+    },
+    FuncPattern {
+        args: Vec<ExprKey>,
+        ret_type: ExprKey,
+    },
+
+    Ternary {
+        cond: ExprKey,
+        if_true: ExprKey,
+        if_false: ExprKey,
+    },
+
+    Index {
+        base: ExprKey,
+        index: ExprKey,
+    },
+    Call {
+        base: ExprKey,
+        params: Vec<ExprKey>,
+        named_params: Vec<(String, ExprKey)>,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expr(ExprKey),
     Let(String, ExprKey),
+    Assign(String, ExprKey),
     If {
         branches: Vec<(ExprKey, Statements)>,
         else_branch: Option<Statements>,
@@ -162,6 +195,9 @@ pub enum Statement {
         iterator: ExprKey,
         code: Statements,
     },
+    Return(Option<ExprKey>),
+    Break,
+    Continue,
 }
 
 pub type Statements = Vec<StmtKey>;
@@ -473,7 +509,7 @@ macro_rules! operators {
 // unary precedence is the difference between for example -3+4 being parsed as (-3)+4 and -3*4 as -(3*4)
 
 operators!(
-    RightAssoc  <==  [ Assign ],
+    // RightAssoc  <==  [ Assign ],
     // RightAssoc  <==  [ PlusEq MinusEq MultEq DivEq ModEq PowEq EuclModEq ],
     // LeftAssoc   <==  [ And Or ],
     // LeftAssoc   <==  [ Pipe ],
@@ -488,6 +524,23 @@ operators!(
     RightAssoc  <==  [ Pow ],
     // LeftAssoc   <==  [ As ],
 );
+
+fn can_be_expr(tok: &Token) -> bool {
+    use Token::*;
+    matches!(
+        tok,
+        Int(_)
+            | Float(_)
+            | True
+            | False
+            | String(_)
+            | Ident(_)
+            | TypeIndicator(_)
+            | LParen
+            | LBracket
+            | LSqBracket
+    ) || is_unary(tok)
+}
 
 // parses one unit value
 fn parse_unit(
@@ -520,23 +573,169 @@ fn parse_unit(
             ast_data.insert_expr(Expression::Literal(Literal::String(s.into())), span_ar!(0)),
             pos + 1,
         )),
-        Token::Ident(name) => Ok((
-            ast_data.insert_expr(Expression::Var(name.into()), span_ar!(0)),
+        Token::Ident(name) => {
+            pos += 1;
+            if_tok!(== FatArrow: {
+                pos += 1;
+                parse!(parse_expr => let code);
+                Ok((
+                    ast_data.insert_expr(
+                        Expression::Func {
+                            args: vec![(name.clone(), None, None)],
+                            ret_type: None,
+                            code,
+                        },
+                        parse_data.source.to_area((start.0, span!(-1).1)),
+                    ),
+                    pos,
+                ))
+            } else {
+                pos -= 1;
+                Ok((
+                    ast_data.insert_expr(Expression::Var(name.into()), span_ar!(0)),
+                    pos + 1,
+                ))
+            })
+        }
+        Token::TypeIndicator(name) => Ok((
+            ast_data.insert_expr(Expression::Type(name.into()), span_ar!(0)),
             pos + 1,
         )),
 
         Token::LParen => {
             pos += 1;
-            if_tok!(== RParen: {
-                Ok((ast_data.insert_expr(
-                    Expression::Empty,
-                    parse_data.source.to_area( (start.0, span!(-1).1) )
-                ), pos + 1))
+
+            if matches!(tok!(0), Token::RParen) && !matches!(tok!(1), Token::FatArrow) {
+                pos += 1;
+                Ok((
+                    ast_data.insert_expr(
+                        Expression::Empty,
+                        parse_data.source.to_area((start.0, span!(-1).1)),
+                    ),
+                    pos,
+                ))
             } else {
-                parse!(parse_expr => let value);
-                check_tok!(RParen else ")");
-                Ok((value, pos))
-            })
+                let mut i = 0;
+                let mut depth = 1;
+
+                loop {
+                    match tok!(i) {
+                        Token::LParen => depth += 1,
+                        Token::RParen => {
+                            depth -= 1;
+                            if depth == 0 {
+                                i += 1;
+                                break;
+                            }
+                        }
+                        Token::Eof => {
+                            return Err(SyntaxError::UnmatchedChar {
+                                for_char: "(".to_string(),
+                                not_found: ")".to_string(),
+                                area: parse_data.source.to_area(start),
+                            })
+                        }
+                        _ => (),
+                    }
+                    i += 1;
+                }
+
+                let is_pattern;
+
+                match tok!(i) {
+                    Token::FatArrow => {
+                        is_pattern = false;
+                    }
+                    Token::Arrow => {
+                        let prev_pos = pos;
+                        pos = pos + i as usize + 1;
+
+                        // its ok to parse here as an expression since we'll do it anyway
+                        // later, so if we catch an error here everything is fine
+                        parse!(parse_expr => let _);
+
+                        is_pattern = !matches!(tok!(0), Token::FatArrow);
+                        pos = prev_pos;
+                    }
+                    _ => {
+                        parse!(parse_expr => let value);
+                        check_tok!(RParen else ")");
+                        return Ok((value, pos));
+                    }
+                }
+
+                if !is_pattern {
+                    let mut args = vec![];
+                    while_tok!(!= RParen: {
+                        check_tok!(Ident(arg) else "argument name");
+                        let mut arg_type = None;
+                        if_tok!(== Colon: {
+                            pos += 1;
+                            parse!(parse_expr => let temp); arg_type = Some(temp);
+                        });
+                        let mut arg_default = None;
+                        if_tok!(== Assign: {
+                            pos += 1;
+                            parse!(parse_expr => let temp); arg_default = Some(temp);
+                        });
+                        args.push((arg, arg_type, arg_default));
+                        if !matches!(tok!(0), Token::RParen | Token::Comma) {
+                            expected_err!(") or ,", tok!(0), span!(0))
+                        }
+                        skip_tok!(Comma);
+                    });
+                    let mut ret_type = None;
+                    if_tok!(== Arrow: {
+                        pos += 1;
+                        parse!(parse_expr => let temp); ret_type = Some(temp);
+                    });
+                    check_tok!(FatArrow else "=>");
+                    parse!(parse_expr => let code);
+
+                    Ok((
+                        ast_data.insert_expr(
+                            Expression::Func {
+                                args,
+                                ret_type,
+                                code,
+                            },
+                            parse_data.source.to_area((start.0, span!(-1).1)),
+                        ),
+                        pos,
+                    ))
+                } else {
+                    let mut args = vec![];
+                    while_tok!(!= RParen: {
+                        parse!(parse_expr => let arg);
+                        args.push(arg);
+                        if !matches!(tok!(0), Token::RParen | Token::Comma) {
+                            expected_err!(") or ,", tok!(0), span!(0))
+                        }
+                        skip_tok!(Comma);
+                    });
+                    check_tok!(Arrow else "->");
+                    parse!(parse_expr => let ret_type);
+
+                    Ok((
+                        ast_data.insert_expr(
+                            Expression::FuncPattern { args, ret_type },
+                            parse_data.source.to_area((start.0, span!(-1).1)),
+                        ),
+                        pos,
+                    ))
+                }
+            }
+
+            // if_tok!(== RParen: {
+            //     Ok((ast_data.insert_expr(
+            //         Expression::Empty,
+            //         parse_data.source.to_area( (start.0, span!(-1).1) )
+            //     ), pos + 1))
+            // } else {
+            //     parse!(parse_expr => let value);
+            //     check_tok!(RParen else ")");
+            //     Ok((value, pos))
+            // })
         }
 
         Token::LSqBracket => {
@@ -559,6 +758,54 @@ fn parse_unit(
                 ),
                 pos,
             ))
+        }
+
+        Token::LBracket => {
+            pos += 1;
+
+            if_tok!(== RBracket: {
+                pos += 1;
+                return Ok((
+                    ast_data.insert_expr(
+                        Expression::Dict(vec![]),
+                        parse_data.source.to_area((start.0, span!(-1).1)),
+                    ),
+                    pos,
+                ))
+            });
+
+            if !(matches!(tok!(0), Token::Ident(_)) && matches!(tok!(1), Token::Colon)) {
+                parse!(parse_statements => let code);
+                check_tok!(RBracket else "}");
+                Ok((
+                    ast_data.insert_expr(
+                        Expression::Block(code),
+                        parse_data.source.to_area((start.0, span!(-1).1)),
+                    ),
+                    pos,
+                ))
+            } else {
+                let mut items = vec![];
+
+                while_tok!(!= RBracket: {
+                    check_tok!(Ident(key) else "key");
+                    check_tok!(Colon else ":");
+                    parse!(parse_expr => let elem);
+                    items.push((key, elem));
+                    if !matches!(tok!(0), Token::RBracket | Token::Comma) {
+                        expected_err!("} or ,", tok!(0), span!(0))
+                    }
+                    skip_tok!(Comma);
+                });
+
+                Ok((
+                    ast_data.insert_expr(
+                        Expression::Dict(items),
+                        parse_data.source.to_area((start.0, span!(-1).1)),
+                    ),
+                    pos,
+                ))
+            }
         }
 
         unary_op if is_unary(unary_op) => {
@@ -618,20 +865,76 @@ fn parse_value(
     parse!(parse_unit => let mut value);
     let start = ast_data.area(value).span;
 
-    // while matches!(tok!(0), Token::LSqBracket) {
-    //     match tok!(0) {
-    //         Token::LSqBracket => {
-    //             pos += 1;
-    //             parse!(parse_expr => let index);
-    //             check_tok!(RSqBracket else "]");
-    //             value = ast_data.insert_expr(
-    //                 Expression::Index { base: value, index },
-    //                 parse_data.source.to_area((start.0, span!(-1).1)),
-    //             );
-    //         }
-    //         _ => unreachable!(),
-    //     }
-    // }
+    while matches!(tok!(0), Token::LSqBracket | Token::If | Token::LParen) {
+        match tok!(0) {
+            Token::LSqBracket => {
+                pos += 1;
+                parse!(parse_expr => let index);
+                check_tok!(RSqBracket else "]");
+                value = ast_data.insert_expr(
+                    Expression::Index { base: value, index },
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                );
+            }
+            Token::If => {
+                pos += 1;
+                parse!(parse_expr => let cond);
+                check_tok!(Else else "else");
+                parse!(parse_expr => let if_false);
+                value = ast_data.insert_expr(
+                    Expression::Ternary {
+                        cond,
+                        if_true: value,
+                        if_false,
+                    },
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                );
+            }
+            Token::LParen => {
+                pos += 1;
+                let mut params = vec![];
+                let mut named_params = vec![];
+                let mut started_named = false;
+
+                while_tok!(!= RParen: {
+
+                    if !started_named {
+                        match (tok!(0), tok!(1)) {
+                            (Token::Ident(name), Token::Assign) => {
+                                started_named = true;
+                                pos += 2;
+                                parse!(parse_expr => let arg);
+                                named_params.push((name.into(), arg));
+                            }
+                            _ => {
+                                parse!(parse_expr => let arg);
+                                params.push(arg);
+                            }
+                        }
+                    } else {
+                        check_tok!(Ident(name) else "parameter name");
+                        check_tok!(Assign else "=");
+                        parse!(parse_expr => let arg);
+                        named_params.push((name, arg));
+                    }
+
+                    if !matches!(tok!(0), Token::RParen | Token::Comma) {
+                        expected_err!(") or ,", tok!(0), span!(0))
+                    }
+                    skip_tok!(Comma);
+                });
+                value = ast_data.insert_expr(
+                    Expression::Call {
+                        base: value,
+                        params,
+                        named_params,
+                    },
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                );
+            }
+            _ => unreachable!(),
+        }
+    }
 
     Ok((value, pos))
 }
@@ -780,6 +1083,31 @@ fn parse_statement(
                 iterator,
             }
         }
+        Token::Return => {
+            pos += 1;
+            if matches!(tok!(0), Token::Eol | Token::RBracket) {
+                Statement::Return(None)
+            } else {
+                parse!(parse_expr => let val);
+                Statement::Return(Some(val))
+            }
+        }
+        Token::Continue => {
+            pos += 1;
+            Statement::Continue
+        }
+        Token::Break => {
+            pos += 1;
+            Statement::Break
+        }
+        Token::Ident(name) => match tok!(1) {
+            Token::Assign => {
+                pos += 2;
+                parse!(parse_expr => let val);
+                Statement::Assign(name.clone(), val)
+            }
+            _ => expr_stmt!(),
+        },
         _ => expr_stmt!(),
     };
 
@@ -818,6 +1146,6 @@ pub fn parse(parse_data: &ParseData, ast_data: &mut ASTData) -> Result<Statement
     parse_util!(parse_data, ast_data, pos);
 
     parse!(parse_statements => let stmts);
-    // check_tok_static!(Eof else "end of file");
+    check_tok_static!(Eof else "end of file");
     Ok(stmts)
 }

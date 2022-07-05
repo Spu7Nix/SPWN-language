@@ -1,11 +1,8 @@
 
-let a = true;
-if @shit {
-    b = [1, 2, 3];
-} else {
-    a = 1 + 2;
-    c = "aaa";
-}
-while a > 0 {
-    a = a - 1;
-}
+
+
+a = 5;
+
+
+
+

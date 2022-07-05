@@ -43,6 +43,13 @@ pub enum Token {
     #[token("in")]
     In,
 
+    #[token("return")]
+    Return,
+    #[token("break")]
+    Break,
+    #[token("continue")]
+    Continue,
+
     #[token("+")]
     Plus,
     #[token("-")]
@@ -103,6 +110,14 @@ pub enum Token {
     #[token("=")]
     Assign,
 
+    #[token(":")]
+    Colon,
+
+    #[token("=>")]
+    FatArrow,
+    #[token("->")]
+    Arrow,
+
     #[regex(r"@[a-zA-Z_]\w*", |lex| lex.slice()[1..].to_string())]
     TypeIndicator(String),
 
@@ -157,13 +172,18 @@ impl Token {
             Token::While => "while",
             Token::For => "for",
             Token::In => "in",
+            Token::Return => "return",
+            Token::Break => "break",
+            Token::Continue => "continue",
             Token::Eq => "==",
             Token::NotEq => "!=",
             Token::Greater => ">",
             Token::GreaterEq => ">=",
             Token::Lesser => "<",
             Token::LesserEq => "<=",
-            Token::LesserEq => "<=",
+            Token::Colon => ":",
+            Token::FatArrow => "=>",
+            Token::Arrow => "->",
         }
         .into()
     }
@@ -178,13 +198,14 @@ impl Token {
 
             Ident(_) => "identifier",
 
-            Let | Mut | For | While | If | Else | In => "keyword",
+            Let | Mut | For | While | If | Else | In | Return | Break | Continue => "keyword",
             Error => "unknown",
             Eof => "end of file",
             Eol => "end of line",
             TypeIndicator(_) => "type indicator",
 
-            LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma => "terminator",
+            LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma | Colon
+            | FatArrow | Arrow => "terminator",
         }
     }
 }
