@@ -32,7 +32,7 @@ pub struct Code {
     pub names: UniqueRegister<String>,
     pub destinations: UniqueRegister<usize>,
     pub name_sets: UniqueRegister<Vec<String>>,
-    pub func_info: UniqueRegister<Vec<(String, bool, bool)>>,
+    pub func_info: UniqueRegister<(usize, Vec<(String, bool, bool)>)>,
 
     pub instructions: Vec<Vec<Instruction>>,
 }
@@ -113,7 +113,11 @@ impl Code {
                     }
                     Instruction::MakeMacro(idx) => {
                         s += &col
-                            .paint(format!("args: {:?}", self.func_info.get(*idx)))
+                            .paint(format!(
+                                "Func {:?}, args: {:?}",
+                                self.func_info.get(*idx).0,
+                                self.func_info.get(*idx).1
+                            ))
                             .to_string()
                     }
                     Instruction::Call(idx) => {
@@ -184,6 +188,14 @@ pub enum Instruction {
 
     Index,
     Call(InstrNum),
+
+    SaveContexts,
+    ReviseContexts,
+
+    MergeContexts,
+
+    PushNone,
+    WrapMaybe,
 }
 // impl Instruction {
 //     pub fn load_const_mapped(v: Value, compiler: &mut Compiler) -> Self {
@@ -313,11 +325,17 @@ impl Compiler {
                 ret_type,
                 code,
             } => {
-                let idx = self.code.func_info.add(
+                self.code.instructions.push(vec![]);
+                let func_id = self.code.instructions.len() - 1;
+
+                self.compile_expr(code, func_id);
+
+                let idx = self.code.func_info.add((
+                    func_id,
                     args.iter()
                         .map(|(s, t, d)| (s.clone(), t.is_some(), d.is_some()))
                         .collect(),
-                );
+                ));
 
                 for (_, t, d) in args {
                     if let Some(t) = t {
@@ -335,11 +353,6 @@ impl Compiler {
                 }
 
                 self.push_instr(Instruction::MakeMacro(idx), func);
-
-                self.code.instructions.push(vec![]);
-                let func_id = self.code.instructions.len() - 1;
-
-                self.compile_expr(code, func_id);
             }
             Expression::FuncPattern { args, ret_type } => {
                 for i in &args {
@@ -398,11 +411,24 @@ impl Compiler {
                 }
                 self.push_instr(Instruction::Call(idx), func);
             }
+            Expression::Maybe(expr) => {
+                if let Some(expr) = expr {
+                    self.compile_expr(expr, func);
+                    self.push_instr(Instruction::WrapMaybe, func);
+                } else {
+                    self.push_instr(Instruction::PushNone, func);
+                }
+            }
         }
     }
 
     fn compile_stmt(&mut self, stmt: StmtKey, func: usize) {
+        let is_arrow = self.ast_data.stmt_arrows[stmt];
         let stmt = self.ast_data.get_stmt(stmt);
+
+        if is_arrow {
+            self.push_instr(Instruction::SaveContexts, func);
+        }
 
         match stmt {
             Statement::Expr(expr) => {
@@ -504,6 +530,12 @@ impl Compiler {
                 self.push_instr(Instruction::Continue, func);
             }
         }
+
+        if is_arrow {
+            self.push_instr(Instruction::ReviseContexts, func);
+        }
+
+        self.push_instr(Instruction::MergeContexts, func);
     }
 
     pub fn compile_stmts(&mut self, stmts: Statements, func: usize) {

@@ -118,6 +118,9 @@ pub enum Token {
     #[token("->")]
     Arrow,
 
+    #[token("?")]
+    QMark,
+
     #[regex(r"@[a-zA-Z_]\w*", |lex| lex.slice()[1..].to_string())]
     TypeIndicator(String),
 
@@ -184,6 +187,7 @@ impl Token {
             Token::Colon => ":",
             Token::FatArrow => "=>",
             Token::Arrow => "->",
+            Token::QMark => "?",
         }
         .into()
     }
@@ -205,7 +209,7 @@ impl Token {
             TypeIndicator(_) => "type indicator",
 
             LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma | Colon
-            | FatArrow | Arrow => "terminator",
+            | FatArrow | Arrow | QMark => "terminator",
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::error::{Result, SyntaxError};
 use crate::lexer::Token;
@@ -40,6 +40,8 @@ impl ASTKey for StmtKey {
 pub struct ASTData {
     pub exprs: SlotMap<ExprKey, (Expression, CodeArea)>,
     pub stmts: SlotMap<StmtKey, (Statement, CodeArea)>,
+
+    pub stmt_arrows: SecondaryMap<StmtKey, bool>,
 }
 impl ASTData {
     // pub fn insert<T: ASTNode + 'static>(&mut self, node: T, area: CodeArea) -> ASTKey {
@@ -175,6 +177,8 @@ pub enum Expression {
         params: Vec<ExprKey>,
         named_params: Vec<(String, ExprKey)>,
     },
+
+    Maybe(Option<ExprKey>),
 }
 
 #[derive(Debug, Clone)]
@@ -808,6 +812,11 @@ fn parse_unit(
             }
         }
 
+        Token::QMark => Ok((
+            ast_data.insert_expr(Expression::Maybe(None), span_ar!(0)),
+            pos + 1,
+        )),
+
         unary_op if is_unary(unary_op) => {
             pos += 1;
             let prec = unary_prec(unary_op);
@@ -865,7 +874,10 @@ fn parse_value(
     parse!(parse_unit => let mut value);
     let start = ast_data.area(value).span;
 
-    while matches!(tok!(0), Token::LSqBracket | Token::If | Token::LParen) {
+    while matches!(
+        tok!(0),
+        Token::LSqBracket | Token::If | Token::LParen | Token::QMark
+    ) {
         match tok!(0) {
             Token::LSqBracket => {
                 pos += 1;
@@ -929,6 +941,13 @@ fn parse_value(
                         params,
                         named_params,
                     },
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                );
+            }
+            Token::QMark => {
+                pos += 1;
+                value = ast_data.insert_expr(
+                    Expression::Maybe(Some(value)),
                     parse_data.source.to_area((start.0, span!(-1).1)),
                 );
             }
@@ -1018,6 +1037,13 @@ fn parse_statement(
             }
         };
     }
+
+    let is_arrow = if let Token::Arrow = tok!(0) {
+        pos += 1;
+        true
+    } else {
+        false
+    };
 
     let stmt = match tok!(0) {
         Token::Let => {
@@ -1116,10 +1142,10 @@ fn parse_statement(
     }
     skip_toks!(Eol);
 
-    Ok((
-        ast_data.insert_stmt(stmt, parse_data.source.to_area((start.0, span!(-1).1))),
-        pos,
-    ))
+    let key = ast_data.insert_stmt(stmt, parse_data.source.to_area((start.0, span!(-1).1)));
+    ast_data.stmt_arrows.insert(key, is_arrow);
+
+    Ok((key, pos))
 }
 
 // parses statements lol
