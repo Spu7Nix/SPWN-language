@@ -14,27 +14,18 @@ use std::path::PathBuf;
 use ariadne::Cache;
 
 use compiler::Compiler;
-use logos::Logos;
 
+use lexer::lex;
 use parser::{parse, ASTData, ParseData};
-use sources::{SpwnCache, SpwnSource};
+use sources::SpwnSource;
 
 use crate::compiler::Instruction;
 
 fn run(code: String, source: SpwnSource) {
-    let code = code.trim_end().to_string();
-    let mut tokens_iter = lexer::Token::lexer(&code);
-    let mut tokens = vec![];
-    while let Some(t) = tokens_iter.next() {
-        tokens.push((t, (tokens_iter.span().start, tokens_iter.span().end)))
-    }
-    tokens.push((lexer::Token::Eof, (code.len(), code.len())));
-
-    let mut cache = SpwnCache::default();
-    cache.fetch(&source).expect("File does not exist!");
+    let tokens = lex(code);
 
     let mut ast_data = ASTData::default();
-    let parse_data = ParseData { source, tokens };
+    let parse_data = ParseData { source: source.clone(), tokens };
 
     let ast = parse(&parse_data, &mut ast_data);
 
@@ -50,7 +41,7 @@ fn run(code: String, source: SpwnSource) {
             compiler.code.debug();
         }
         Err(e) => {
-            e.raise(cache);
+            e.raise(source);
         }
     }
 }

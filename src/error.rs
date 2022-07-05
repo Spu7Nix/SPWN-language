@@ -1,8 +1,9 @@
-use ariadne::{Label, Report, ReportKind};
+use std::fmt::Debug;
 
+use ariadne::{Label, Report, ReportKind, Source, Color};
 use thiserror::Error;
 
-use crate::sources::{CodeArea, SpwnCache};
+use crate::sources::{CodeArea, SpwnSource};
 
 const ERROR_S: f64 = 0.4;
 const ERROR_V: f64 = 1.0;
@@ -27,7 +28,7 @@ pub enum SyntaxError {
 impl SyntaxError {
     const MESSAGE: &'static str = "Syntax Error";
 
-    pub fn raise(self, cache: SpwnCache) {
+    pub fn raise(self, source: SpwnSource) {
         let mut colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 20.0);
 
         let (area, labels, note): (_, _, Option<String>) = match self {
@@ -43,12 +44,12 @@ impl SyntaxError {
             }
         };
 
-        let mut report = Report::build(ReportKind::Error, area.source.clone(), area.span.0)
+        let mut report = Report::build(ReportKind::Error, area.name(), area.span.0)
             .with_message(Self::MESSAGE.to_string() + "\n");
 
         for (c, s) in labels {
             report = report.with_label(
-                Label::new(c.to_owned())
+                Label::new(c.label())
                     .with_message(s)
                     .with_color(colors.next()),
             )
@@ -58,7 +59,10 @@ impl SyntaxError {
             report = report.with_note(m)
         }
 
-        report.finish().eprint(cache).unwrap();
+        report.finish().eprint((
+            source.name(), 
+            Source::from(source.contents())
+        )).unwrap();
     }
 }
 
@@ -74,7 +78,7 @@ impl RainbowColorGenerator {
     pub fn new(h: f64, s: f64, v: f64, shift: f64) -> Self {
         Self { h, s, v, shift }
     }
-    pub fn next(&mut self) -> ariadne::Color {
+    pub fn next(&mut self) -> Color {
         // thanks wikipedia
 
         self.h = self.h.rem_euclid(360.0);
