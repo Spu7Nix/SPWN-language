@@ -13,6 +13,8 @@ use std::path::PathBuf;
 
 use ariadne::Cache;
 
+use clap::{Parser, Subcommand};
+
 use compiler::Compiler;
 
 use lexer::lex;
@@ -25,7 +27,10 @@ fn run(code: String, source: SpwnSource) {
     let tokens = lex(code);
 
     let mut ast_data = ASTData::default();
-    let parse_data = ParseData { source: source.clone(), tokens };
+    let parse_data = ParseData {
+        source: source.clone(),
+        tokens,
+    };
 
     let ast = parse(&parse_data, &mut ast_data);
 
@@ -46,14 +51,34 @@ fn run(code: String, source: SpwnSource) {
     }
 }
 
+#[derive(Parser)]
+#[clap(author, version, about = "A language for Geometry Dash triggers")]
+#[clap(propagate_version = true)]
+struct SPWN {
+    #[clap(subcommand)]
+    command: Subcommands,
+}
+
+#[derive(Subcommand)]
+enum Subcommands {
+    /// Builds a .spwn file
+    Build {
+        #[clap(value_parser)]
+        file: String,
+    },
+}
+
 fn main() {
     print!("\x1B[2J\x1B[1;1H");
-
     io::stdout().flush().unwrap();
-    let mut buf = PathBuf::new();
-    buf.push("test.spwn");
-    let code = fs::read_to_string(buf.clone()).unwrap();
-    run(code, SpwnSource::File(buf));
 
-    println!("{}", std::mem::size_of::<Instruction>());
+    let args = SPWN::parse();
+    match &args.command {
+        Subcommands::Build { file } => {
+            let buf = PathBuf::from(file);
+            let code = fs::read_to_string(buf.clone()).unwrap();
+            run(code, SpwnSource::File(buf));
+            println!("{}", std::mem::size_of::<Instruction>());
+        }
+    }
 }
