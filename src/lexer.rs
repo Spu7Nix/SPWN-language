@@ -50,6 +50,11 @@ pub enum Token {
     #[token("continue")]
     Continue,
 
+    #[token("type")]
+    TypeDef,
+    #[token("impl")]
+    Impl,
+
     #[token("+")]
     Plus,
     #[token("-")]
@@ -112,6 +117,8 @@ pub enum Token {
 
     #[token(":")]
     Colon,
+    #[token("::")]
+    DoubleColon,
 
     #[token("=>")]
     FatArrow,
@@ -120,6 +127,8 @@ pub enum Token {
 
     #[token("?")]
     QMark,
+    #[token("!")]
+    ExclMark,
 
     #[regex(r"@[a-zA-Z_]\w*", |lex| lex.slice()[1..].to_string())]
     TypeIndicator(String),
@@ -185,9 +194,13 @@ impl Token {
             Token::Lesser => "<",
             Token::LesserEq => "<=",
             Token::Colon => ":",
+            Token::DoubleColon => "::",
             Token::FatArrow => "=>",
             Token::Arrow => "->",
             Token::QMark => "?",
+            Token::ExclMark => "!",
+            Token::TypeDef => "type",
+            Token::Impl => "impl",
         }
         .into()
     }
@@ -202,14 +215,16 @@ impl Token {
 
             Ident(_) => "identifier",
 
-            Let | Mut | For | While | If | Else | In | Return | Break | Continue => "keyword",
+            Let | Mut | For | While | If | Else | In | Return | Break | Continue | TypeDef
+            | Impl => "keyword",
+
             Error => "unknown",
             Eof => "end of file",
             Eol => "end of line",
             TypeIndicator(_) => "type indicator",
 
             LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma | Colon
-            | FatArrow | Arrow | QMark => "terminator",
+            | DoubleColon | FatArrow | Arrow | QMark | ExclMark => "terminator",
         }
     }
 }

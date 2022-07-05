@@ -20,6 +20,10 @@ pub enum FullContext {
 }
 
 impl FullContext {
+    pub fn new() -> Self {
+        Self::Single(Context::default())
+    }
+
     pub fn inner(&self) -> &Context {
         if let FullContext::Single(c) = self {
             c

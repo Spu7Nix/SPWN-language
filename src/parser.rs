@@ -16,13 +16,13 @@ new_key_type! {
 }
 
 // just helper for ASTData::area
-enum KeyType {
+pub enum KeyType {
     Expr(ExprKey),
     StmtKey(StmtKey),
 }
 
 // just helper for ASTData::area
-trait ASTKey {
+pub trait ASTKey {
     fn into_key(self) -> KeyType;
 }
 impl ASTKey for ExprKey {
@@ -47,7 +47,7 @@ impl ASTData {
     // pub fn insert<T: ASTNode + 'static>(&mut self, node: T, area: CodeArea) -> ASTKey {
     //     self.map.insert((Box::new(node), area))
     // }
-    fn area<K: ASTKey>(&self, k: K) -> &CodeArea {
+    pub fn get_area<K: ASTKey>(&self, k: K) -> &CodeArea {
         match k.into_key() {
             KeyType::Expr(k) => &self.exprs[k].1,
             KeyType::StmtKey(k) => &self.stmts[k].1,
@@ -145,7 +145,7 @@ pub enum Expression {
     Type(String),
 
     Array(Vec<ExprKey>),
-    Dict(Vec<(String, ExprKey)>),
+    Dict(Vec<(String, Option<ExprKey>)>),
 
     // Index { base: ExprKey, index: ExprKey },
     Empty,
@@ -177,8 +177,13 @@ pub enum Expression {
         params: Vec<ExprKey>,
         named_params: Vec<(String, ExprKey)>,
     },
+    TriggerFuncCall(ExprKey),
 
     Maybe(Option<ExprKey>),
+
+    TriggerFunc(Statements),
+
+    Instance(ExprKey, Vec<(String, Option<ExprKey>)>),
 }
 
 #[derive(Debug, Clone)]
@@ -202,6 +207,9 @@ pub enum Statement {
     Return(Option<ExprKey>),
     Break,
     Continue,
+
+    TypeDef(String),
+    Impl(ExprKey, Vec<(String, ExprKey)>),
 }
 
 pub type Statements = Vec<StmtKey>;
@@ -793,8 +801,11 @@ fn parse_unit(
 
                 while_tok!(!= RBracket: {
                     check_tok!(Ident(key) else "key");
-                    check_tok!(Colon else ":");
-                    parse!(parse_expr => let elem);
+                    let mut elem = None;
+                    if_tok!(== Colon: {
+                        pos += 1;
+                        parse!(parse_expr => let temp); elem = Some(temp);
+                    });
                     items.push((key, elem));
                     if !matches!(tok!(0), Token::RBracket | Token::Comma) {
                         expected_err!("} or ,", tok!(0), span!(0))
@@ -816,6 +827,19 @@ fn parse_unit(
             ast_data.insert_expr(Expression::Maybe(None), span_ar!(0)),
             pos + 1,
         )),
+
+        Token::ExclMark if matches!(tok!(1), Token::LBracket) => {
+            pos += 2;
+            parse!(parse_statements => let code);
+            check_tok!(RBracket else "}");
+            Ok((
+                ast_data.insert_expr(
+                    Expression::TriggerFunc(code),
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                ),
+                pos,
+            ))
+        }
 
         unary_op if is_unary(unary_op) => {
             pos += 1;
@@ -872,11 +896,16 @@ fn parse_value(
     parse_util!(parse_data, ast_data, pos);
 
     parse!(parse_unit => let mut value);
-    let start = ast_data.area(value).span;
+    let start = ast_data.get_area(value).span;
 
     while matches!(
         tok!(0),
-        Token::LSqBracket | Token::If | Token::LParen | Token::QMark
+        Token::LSqBracket
+            | Token::If
+            | Token::LParen
+            | Token::QMark
+            | Token::DoubleColon
+            | Token::ExclMark
     ) {
         match tok!(0) {
             Token::LSqBracket => {
@@ -951,6 +980,38 @@ fn parse_value(
                     parse_data.source.to_area((start.0, span!(-1).1)),
                 );
             }
+            Token::DoubleColon => {
+                pos += 1;
+                check_tok!(LBracket else "{");
+
+                let mut items = vec![];
+
+                while_tok!(!= RBracket: {
+                    check_tok!(Ident(key) else "key");
+                    let mut elem = None;
+                    if_tok!(== Colon: {
+                        pos += 1;
+                        parse!(parse_expr => let temp); elem = Some(temp);
+                    });
+                    items.push((key, elem));
+                    if !matches!(tok!(0), Token::RBracket | Token::Comma) {
+                        expected_err!("} or ,", tok!(0), span!(0))
+                    }
+                    skip_tok!(Comma);
+                });
+
+                value = ast_data.insert_expr(
+                    Expression::Instance(value, items),
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                );
+            }
+            Token::ExclMark => {
+                pos += 1;
+                value = ast_data.insert_expr(
+                    Expression::TriggerFuncCall(value),
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                );
+            }
             _ => unreachable!(),
         }
     }
@@ -1011,7 +1072,7 @@ fn parse_op(
         } else {
             parse!(parse_op(prec) => right);
         }
-        let (left_span, right_span) = (ast_data.area(left).span, ast_data.area(right).span);
+        let (left_span, right_span) = (ast_data.get_area(left).span, ast_data.get_area(right).span);
         left = ast_data.insert_expr(
             Expression::Op(left, op, right),
             parse_data.source.to_area((left_span.0, right_span.1)),
@@ -1125,6 +1186,30 @@ fn parse_statement(
         Token::Break => {
             pos += 1;
             Statement::Break
+        }
+        Token::TypeDef => {
+            pos += 1;
+            check_tok!(TypeIndicator(name) else "type indicator");
+            Statement::TypeDef(name)
+        }
+        Token::Impl => {
+            pos += 1;
+            parse!(parse_expr => let typ);
+            check_tok!(LBracket else "{");
+
+            let mut items = vec![];
+
+            while_tok!(!= RBracket: {
+                check_tok!(Ident(key) else "key");
+                check_tok!(Colon else ":");
+                parse!(parse_expr => let elem);
+                items.push((key, elem));
+                if !matches!(tok!(0), Token::RBracket | Token::Comma) {
+                    expected_err!("} or ,", tok!(0), span!(0))
+                }
+                skip_tok!(Comma);
+            });
+            Statement::Impl(typ, items)
         }
         Token::Ident(name) => match tok!(1) {
             Token::Assign => {

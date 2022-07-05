@@ -1,10 +1,25 @@
+use std::collections::HashMap;
+
 use crate::{
     lexer::Token,
     parser::{ASTData, ExprKey, Expression, Statement, Statements, StmtKey},
+    sources::CodeArea,
     value::Value,
 };
 
 pub type InstrNum = u16;
+
+#[derive(Clone)]
+pub enum InstrArea {
+    Simple(CodeArea),
+}
+impl InstrArea {
+    pub fn into_simple(self) -> CodeArea {
+        match self {
+            InstrArea::Simple(area) => area,
+        }
+    }
+}
 
 pub struct UniqueRegister<T> {
     vec: Vec<T>,
@@ -32,9 +47,12 @@ pub struct Code {
     pub names: UniqueRegister<String>,
     pub destinations: UniqueRegister<usize>,
     pub name_sets: UniqueRegister<Vec<String>>,
+    #[allow(clippy::type_complexity)]
     pub func_info: UniqueRegister<(usize, Vec<(String, bool, bool)>)>,
 
     pub instructions: Vec<Vec<Instruction>>,
+
+    pub instr_areas: HashMap<(usize, usize), InstrArea>,
 }
 impl Code {
     pub fn new() -> Self {
@@ -45,19 +63,15 @@ impl Code {
             name_sets: UniqueRegister::new(),
             func_info: UniqueRegister::new(),
             instructions: vec![],
+            instr_areas: HashMap::new(),
         }
     }
 
-    pub fn debug(&self) {
-        // println!("-------- constants --------");
-        // println!("{:?}", self.constants.vec);
-        // println!("--------   names   --------");
-        // println!("{:?}", self.names.vec);
-        // println!("--------   dests   --------");
-        // println!("{:?}", self.destinations.vec);
-        // println!("-------- name sets --------");
-        // println!("{:?}\n", self.name_sets.vec);
+    pub fn get_instr_area(&self, func: usize, i: usize) -> InstrArea {
+        self.instr_areas.get(&(func, i)).unwrap().clone()
+    }
 
+    pub fn debug(&self) {
         for (i, instrs) in self.instructions.iter().enumerate() {
             println!("============================> Func {}", i);
             for (i, instr) in instrs.iter().enumerate() {
@@ -125,6 +139,19 @@ impl Code {
                             .paint(format!("params: {:?}", self.name_sets.get(*idx)))
                             .to_string()
                     }
+                    Instruction::TypeDef(idx) => {
+                        s += &col.paint(format!("@{}", self.names.get(*idx))).to_string()
+                    }
+                    Instruction::Impl(idx) => {
+                        s += &col
+                            .paint(format!("with {:?}", self.name_sets.get(*idx)))
+                            .to_string()
+                    }
+                    Instruction::Instance(idx) => {
+                        s += &col
+                            .paint(format!("with {:?}", self.name_sets.get(*idx)))
+                            .to_string()
+                    }
                     _ => (),
                 }
 
@@ -188,6 +215,7 @@ pub enum Instruction {
 
     Index,
     Call(InstrNum),
+    TriggerFuncCall,
 
     SaveContexts,
     ReviseContexts,
@@ -196,38 +224,15 @@ pub enum Instruction {
 
     PushNone,
     WrapMaybe,
-}
-// impl Instruction {
-//     pub fn load_const_mapped(v: Value, compiler: &mut Compiler) -> Self {
-//         let idx = compiler.code.add_const(v);
-//         Self::LoadConst(idx)
-//     }
-//     pub fn load_var_mapped(n: String, compiler: &mut Compiler) -> Self {
-//         let idx = compiler.code.add_name(n);
-//         Self::LoadVar(idx)
-//     }
-//     pub fn set_var_mapped(n: String, mutable: bool, compiler: &mut Compiler) -> Self {
-//         let idx = compiler.code.add_name(n);
-//         Self::SetVar(idx, mutable)
-//     }
-//     pub fn load_type_mapped(n: String, compiler: &mut Compiler) -> Self {
-//         let idx = compiler.code.add_name(n);
-//         Self::LoadType(idx)
-//     }
 
-//     pub fn jump_mapped(pos: usize, compiler: &mut Compiler) -> Self {
-//         let idx = compiler.code.add_destination(pos);
-//         Self::IterNext(idx)
-//     }
-//     pub fn jump_false_mapped(pos: usize, compiler: &mut Compiler) -> Self {
-//         let idx = compiler.code.add_destination(pos);
-//         Self::IterNext(idx)
-//     }
-//     pub fn iter_next_mapped(pos: usize, compiler: &mut Compiler) -> Self {
-//         let idx = compiler.code.add_destination(pos);
-//         Self::IterNext(idx)
-//     }
-// }
+    PushContextGroup,
+    PopContextGroup,
+    PushTriggerFnValue,
+
+    TypeDef(InstrNum),
+    Impl(InstrNum),
+    Instance(InstrNum),
+}
 
 pub struct Compiler {
     pub ast_data: ASTData,
@@ -246,6 +251,12 @@ impl Compiler {
         self.code.instructions[func].push(i);
         self.code.instructions[func].len() - 1
     }
+    fn push_instr_with_area(&mut self, i: Instruction, area: InstrArea, func: usize) -> usize {
+        let key = (func, self.code.instructions[func].len());
+        self.code.instr_areas.insert(key, area);
+        self.code.instructions[func].push(i);
+        self.code.instructions[func].len() - 1
+    }
     fn set_instr(&mut self, i: Instruction, func: usize, n: usize) {
         self.code.instructions[func][n] = i;
     }
@@ -253,14 +264,19 @@ impl Compiler {
         self.code.instructions[func].len()
     }
 
-    fn compile_expr(&mut self, expr: ExprKey, func: usize) {
-        let expr = self.ast_data.get_expr(expr);
+    fn compile_expr(&mut self, expr_key: ExprKey, func: usize) {
+        let expr = self.ast_data.get_expr(expr_key);
+        let expr_area = self.ast_data.get_area(expr_key).clone();
 
         match expr {
             Expression::Literal(l) => {
                 let val = l.to_value();
                 let c_id = self.code.constants.add(val);
-                self.push_instr(Instruction::LoadConst(c_id), func);
+                self.push_instr_with_area(
+                    Instruction::LoadConst(c_id),
+                    InstrArea::Simple(expr_area),
+                    func,
+                );
             }
             Expression::Type(name) => {
                 let v_id = self.code.names.add(name);
@@ -274,7 +290,11 @@ impl Compiler {
                     ( $($v:ident)* ) => {
                         match op {
                             $(
-                                Token::$v => self.push_instr(Instruction::$v, func),
+                                Token::$v => self.push_instr_with_area(
+                                    Instruction::$v,
+                                    InstrArea::Simple(expr_area.clone()),
+                                    func
+                                ),
                             )*
                             _ => unreachable!(),
                         }
@@ -309,8 +329,13 @@ impl Compiler {
                     .code
                     .name_sets
                     .add(items.iter().map(|(s, _)| s.clone()).collect());
-                for (_, v) in items {
-                    self.compile_expr(v, func);
+                for (name, v) in items {
+                    if let Some(v) = v {
+                        self.compile_expr(v, func);
+                    } else {
+                        let v_id = self.code.names.add(name);
+                        self.push_instr(Instruction::LoadVar(v_id), func);
+                    }
                 }
                 self.push_instr(Instruction::BuildDict(idx), func);
             }
@@ -411,6 +436,10 @@ impl Compiler {
                 }
                 self.push_instr(Instruction::Call(idx), func);
             }
+            Expression::TriggerFuncCall(v) => {
+                self.compile_expr(v, func);
+                self.push_instr(Instruction::TriggerFuncCall, func);
+            }
             Expression::Maybe(expr) => {
                 if let Some(expr) = expr {
                     self.compile_expr(expr, func);
@@ -418,6 +447,30 @@ impl Compiler {
                 } else {
                     self.push_instr(Instruction::PushNone, func);
                 }
+            }
+            Expression::TriggerFunc(code) => {
+                self.push_instr(Instruction::PushContextGroup, func);
+                self.push_instr(Instruction::DeriveScope, func);
+                self.compile_stmts(code, func);
+                self.push_instr(Instruction::PopScope, func);
+                self.push_instr(Instruction::PopContextGroup, func);
+                self.push_instr(Instruction::PushTriggerFnValue, func);
+            }
+            Expression::Instance(typ, items) => {
+                let idx = self
+                    .code
+                    .name_sets
+                    .add(items.iter().map(|(s, _)| s.clone()).collect());
+                for (name, v) in items {
+                    if let Some(v) = v {
+                        self.compile_expr(v, func);
+                    } else {
+                        let v_id = self.code.names.add(name);
+                        self.push_instr(Instruction::LoadVar(v_id), func);
+                    }
+                }
+                self.compile_expr(typ, func);
+                self.push_instr(Instruction::Instance(idx), func);
             }
         }
     }
@@ -467,15 +520,16 @@ impl Compiler {
                     self.set_instr(Instruction::JumpIfFalse(idx), func, jump_idx);
                 }
 
-                let next_pos = self.instr_len(func);
-                for i in end_jumps {
-                    let idx = self.code.destinations.add(next_pos);
-                    self.set_instr(Instruction::Jump(idx), func, i);
-                }
                 if let Some(code) = else_branch {
                     self.push_instr(Instruction::DeriveScope, func);
                     self.compile_stmts(code, func);
                     self.push_instr(Instruction::PopScope, func);
+                }
+
+                let next_pos = self.instr_len(func);
+                for i in end_jumps {
+                    let idx = self.code.destinations.add(next_pos);
+                    self.set_instr(Instruction::Jump(idx), func, i);
                 }
             }
             Statement::While { cond, code } => {
@@ -528,6 +582,21 @@ impl Compiler {
             }
             Statement::Continue => {
                 self.push_instr(Instruction::Continue, func);
+            }
+            Statement::TypeDef(name) => {
+                let v_id = self.code.names.add(name);
+                self.push_instr(Instruction::TypeDef(v_id), func);
+            }
+            Statement::Impl(typ, impls) => {
+                let idx = self
+                    .code
+                    .name_sets
+                    .add(impls.iter().map(|(s, _)| s.clone()).collect());
+                for (_, v) in impls {
+                    self.compile_expr(v, func);
+                }
+                self.compile_expr(typ, func);
+                self.push_instr(Instruction::Impl(idx), func);
             }
         }
 
