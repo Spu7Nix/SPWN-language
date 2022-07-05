@@ -1,17 +1,19 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{interpreter::StoredValue, sources::CodeArea};
 
 pub type ArbitraryId = u16;
 pub type SpecificId = u16;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Id {
     Specific(SpecificId),
     ArbitraryId(ArbitraryId),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Value {
     Int(isize),
     Float(f64),
@@ -41,7 +43,7 @@ impl Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum ValueType {
     Int,
     Float,
@@ -53,7 +55,7 @@ pub enum ValueType {
     // more soon
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Pattern {
     Any,
 }

@@ -2,8 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::lexer::Span;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SpwnSource {
     File(PathBuf),
 }
@@ -11,7 +12,7 @@ pub enum SpwnSource {
 impl SpwnSource {
     pub fn name(&self) -> String {
         match self {
-            Self::File(f) => f.display().to_string()
+            Self::File(f) => f.display().to_string(),
         }
     }
 
@@ -29,8 +30,7 @@ impl SpwnSource {
     }
 }
 
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CodeArea {
     pub(crate) source: SpwnSource,
     pub(crate) span: Span,

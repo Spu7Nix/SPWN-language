@@ -24,7 +24,7 @@ use parser::{parse, ASTData, ParseData};
 use slotmap::SlotMap;
 use sources::SpwnSource;
 
-use crate::compiler::Instruction;
+use crate::compiler::{Code, Instruction};
 
 fn run(code: String, source: SpwnSource) {
     let tokens = lex(code);
@@ -48,12 +48,18 @@ fn run(code: String, source: SpwnSource) {
 
             compiler.code.debug();
 
-            let bytes = to_bytes(&compiler.code);
+            let encoded: Vec<u8> = bincode::serialize(&compiler.code).unwrap();
+            let decoded: Code = bincode::deserialize(&encoded[..]).unwrap();
+            println!("{}", encoded.len());
 
-            let mut file = File::create("test.spwnc").unwrap();
-            file.write_all(&bytes).unwrap();
+            decoded.debug();
 
-            println!("{:?}", bytes);
+            // let bytes = to_bytes(&compiler.code);
+
+            // let mut file = File::create("test.spwnc").unwrap();
+            // file.write_all(&bytes).unwrap();
+
+            // println!("{:?}", bytes);
 
             // let mut globals = Globals {
             //     memory: SlotMap::default(),

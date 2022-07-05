@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
 use crate::{
@@ -13,7 +14,7 @@ new_key_type! {
     pub struct ValueKey;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct StoredValue {
     pub value: Value,
     pub def_area: CodeArea,

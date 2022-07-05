@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     lexer::Token,
     parser::{ASTData, ExprKey, Expression, Statement, Statements, StmtKey},
@@ -9,7 +11,7 @@ use crate::{
 
 pub type InstrNum = u16;
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum InstrArea {
     Simple(CodeArea),
 }
@@ -21,6 +23,7 @@ impl InstrArea {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct UniqueRegister<T> {
     vec: Vec<T>,
 }
@@ -42,6 +45,7 @@ impl<T: PartialEq> UniqueRegister<T> {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Code {
     pub constants: UniqueRegister<Value>,
     pub names: UniqueRegister<String>,
@@ -161,7 +165,7 @@ impl Code {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Instruction {
     LoadConst(InstrNum),
 
