@@ -26,5 +26,15 @@ error_maker! {
             not_found: String,
             area: CodeArea,
         },
+        #[
+            Message = "Invalid string escape sequence", Area = area, Note = None,
+            Labels = [
+                area => "Unknown escape sequence: \\`{}`": @(character);
+            ]
+        ]
+        InvalidEscape {
+            character: char,
+            area: CodeArea,
+        },
     }
 }

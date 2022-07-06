@@ -241,7 +241,7 @@ fn parse_unit(
             pos + 1,
         )),
         Token::String(s) => Ok((
-            ast_data.insert_expr(Expression::Literal(Literal::String(s.into())), span_ar!(0)),
+            ast_data.insert_expr(Expression::Literal(Literal::String(parse_string(s, span_ar!(0))?)), span_ar!(0)),
             pos + 1,
         )),
         Token::Ident(name) => {
@@ -902,6 +902,30 @@ pub fn parse_statements(
     }
 
     Ok((statements, pos))
+}
+
+// deals with parsing string escape sequences
+fn parse_string(s: &String, area: CodeArea) -> Result<String, SyntaxError> {
+
+    let mut out = String::new();
+    let mut chars = s.chars();
+
+    match chars.next() {
+        Some('\\') => {
+            out.push(match chars.next() {
+                Some('n') => '\n',
+                Some(a) => return Err(SyntaxError::InvalidEscape {
+                    character: a,
+                    area
+                }),
+                None => unreachable!()
+            })
+        },
+        Some(c) => out.push(c),
+        None => {},
+    }
+
+    Ok(out)
 }
 
 // beginning parse function

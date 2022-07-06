@@ -1,26 +1,44 @@
 use logos::Logos;
 
-// to be improved, turns literal escape sequences into the actual character
-fn convert_string(s: &str) -> String {
-    s.replace("\\n", "\n")
-        .replace("\\r", "\r")
-        .replace("\\t", "\t")
-        .replace("\\\\", "\\")
-        .replace("\\'", "'")
-        .replace("\\\"", "\"")
-}
+
+// // ew
+// fn string_flag<'s>(tok: &mut logos::Lexer<'s, Token>) -> String {
+//     let sliced = tok.slice();
+
+//     // get location of `"` or `'` in the token (end of string flag)
+//     // this will never be called on a string without a flag as a normal string has higher priority
+//     // so we can `.unwrap()` without issue
+
+//     let end = sliced.find("\"").unwrap_or_else(|| sliced.find("'").unwrap());
+
+//     let flag = &sliced[0..end];
+//     let string = &sliced[end+1..sliced.len()];
+
+//     String::new()
+// }
 
 #[derive(Logos, Debug, PartialEq, Clone)]
+#[logos(subpattern string = r#""(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
 pub enum Token {
     #[regex(r#"\d+"#, |lex| lex.slice().parse(), priority = 2)]
     Int(usize),
     #[regex(r#"\d+(\.[\d]+)?"#, |lex| lex.slice().parse())]
     Float(f64),
 
-    #[regex(r#""(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#, 
-        |s| convert_string(&s.slice()[1..s.slice().len()-1])
+    #[regex(r#"(?&string)"#, 
+        //|s| convert_string(&s.slice()[1..s.slice().len()-1]),
+        |s| s.slice().parse(),
+        priority = 2 // prioritise normal string over string flags
     )]
     String(String),
+
+    #[regex(r#"(\w*)?(?&string)"#,
+        //|s| s.slice()[0..s.slice().find('"').unwrap_or_else(|| s.slice().find("'").unwrap())].parse(), // take up to `"` or `'`
+       // |s| string_flag(s),
+       |s| s.slice().parse(),
+        priority = 1,
+    )]
+    StringFlag(String),
 
     #[token("let")]
     Let,
@@ -205,6 +223,7 @@ impl Token {
             Token::ExclMark => "!",
             Token::TypeDef => "type",
             Token::Impl => "impl",
+            Token::StringFlag(v) => v,
         }
         .into()
     }
@@ -215,7 +234,7 @@ impl Token {
             Plus | Minus | Mult | Div | Mod | Pow | PlusEq | MinusEq | MultEq | DivEq | ModEq
             | PowEq | Assign | Eq | NotEq | Greater | GreaterEq | Lesser | LesserEq => "operator",
 
-            Int(_) | Float(_) | String(_) | True | False => "literal",
+            Int(_) | Float(_) | String(_) | StringFlag(_) | True | False => "literal",
 
             Ident(_) => "identifier",
 
