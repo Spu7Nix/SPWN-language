@@ -55,6 +55,9 @@ pub enum Token {
     #[token("impl")]
     Impl,
 
+    #[token("print")]
+    Print,
+
     #[token("+")]
     Plus,
     #[token("-")]
@@ -187,6 +190,7 @@ impl Token {
             Token::Return => "return",
             Token::Break => "break",
             Token::Continue => "continue",
+            Token::Print => "print",
             Token::Eq => "==",
             Token::NotEq => "!=",
             Token::Greater => ">",
@@ -216,7 +220,7 @@ impl Token {
             Ident(_) => "identifier",
 
             Let | Mut | For | While | If | Else | In | Return | Break | Continue | TypeDef
-            | Impl => "keyword",
+            | Impl | Print => "keyword",
 
             Error => "",
             TypeIndicator(_) => "type indicator",

@@ -55,78 +55,86 @@ impl RainbowColorGenerator {
 macro_rules! error_maker {
     (
 
-        pub enum $err_type:ident {
-            $(
-                #[
-                    Message = $msg:expr, Area = $area:expr, Note = $note:expr,
-                    Labels = [
-                        $(
-                            $l_area:expr => $fmt:literal: $( $(@($c_e:expr))? $($e:expr)? ),*;
-                        )+
+        $(
+            pub enum $err_type:ident {
+                $(
+                    #[
+                        Message = $msg:expr, Area = $area:expr, Note = $note:expr,
+                        Labels = [
+                            $(
+                                $l_area:expr => $fmt:literal $(: $( $(@($c_e:expr))? $($e:expr)? ),* )?;
+                            )+
+                        ]
                     ]
-                ]
-                $variant:ident {
-                    $(
-                        $field:ident: $typ:ty,
-                    )+
-                },
-            )*
-        }
+                    $variant:ident {
+                        $(
+                            $field:ident: $typ:ty,
+                        )+
+                    },
+                )*
+            }
+        )*
+
+
+
     ) => {
-        use crate::error::*;
+        use $crate::error::*;
         use ariadne::{Report, ReportKind, Label, Source, Fmt};
 
-        pub enum $err_type {
-            $(
-                $variant {
-                    $(
-                        $field: $typ,
-                    )+
-                },
-            )*
-        }
-
-        impl $err_type {
-            pub fn raise(self, source: crate::sources::SpwnSource) {
-                let mut label_colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 20.0);
-                let mut item_colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 20.0);
-
-
-                let (message, area, labels, note): (_, _, _, Option<String>) = match self {
-                    $(
-                        $err_type::$variant { $($field),+ } => {
-                            let err_area = $area.clone();
-                            let labels = vec![
-                                $(
-                                    ( $l_area, format!($fmt, $(   $($c_e.fg(item_colors.next()))? $($e)?       ,)*) ),
-                                )+
-                            ];
-
-                            ($msg, err_area, labels, $note)
-                        }
-                    )*
-                };
-
-                let mut report = Report::build(ReportKind::Error, area.name(), area.span.0)
-                    .with_message(message.to_string() + "\n");
-
-                for (c, s) in labels {
-                    report = report.with_label(
-                        Label::new(c.label())
-                            .with_message(s)
-                            .with_color(label_colors.next()),
-                    )
-                }
-
-                if let Some(m) = &note {
-                    report = report.with_note(m)
-                }
-
-                report
-                    .finish()
-                    .eprint((source.name(), Source::from(source.contents())))
-                    .unwrap();
+        $(
+            pub enum $err_type {
+                $(
+                    $variant {
+                        $(
+                            $field: $typ,
+                        )+
+                    },
+                )*
             }
-        }
+
+            impl $err_type {
+                pub fn raise(self, source: $crate::sources::SpwnSource) {
+                    let mut label_colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 45.0);
+                    let mut item_colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 15.0);
+
+
+                    let (message, area, labels, note): (_, _, _, Option<String>) = match self {
+                        $(
+                            $err_type::$variant { $($field),+ } => {
+                                let err_area = $area.clone();
+                                let labels = vec![
+                                    $(
+                                        ( $l_area, format!($fmt  $( , $(   $($c_e.fg(item_colors.next()))? $($e)?       ,)* )? ) ),
+                                    )+
+                                ];
+
+                                ($msg, err_area, labels, $note)
+                            }
+                        )*
+                    };
+
+                    let mut report = Report::build(ReportKind::Error, area.name(), area.span.0)
+                        .with_message(message.to_string() + "\n");
+
+                    for (c, s) in labels {
+                        report = report.with_label(
+                            Label::new(c.label())
+                                .with_message(s)
+                                .with_color(label_colors.next()),
+                        )
+                    }
+
+                    if let Some(m) = &note {
+                        report = report.with_note(m)
+                    }
+
+                    report
+                        .finish()
+                        .eprint((source.name(), Source::from(source.contents())))
+                        .unwrap();
+                }
+            }
+        )*
+
     };
 }

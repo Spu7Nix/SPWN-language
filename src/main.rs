@@ -1,15 +1,20 @@
 mod compiler;
-mod interpreter;
-mod sources;
 mod error;
+mod interpreter;
+mod parser;
+mod sources;
 
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use compiler::lexer::lex;
-use compiler::parser::{parse, ASTData, ParseData};
-use compiler::compiler::Compiler;
+use ahash::AHashMap;
+use compiler::compiler::{Compiler, Scope};
+use interpreter::contexts::{Context, FullContext};
+use interpreter::interpreter::{execute, Globals};
+use parser::lexer::lex;
+use parser::parser::{parse, ASTData, ParseData};
+use slotmap::SlotMap;
 use sources::SpwnSource;
 
 fn run(code: String, source: SpwnSource) {
@@ -28,44 +33,58 @@ fn run(code: String, source: SpwnSource) {
             ast_data.debug(&stmts);
 
             let mut compiler = Compiler::new(ast_data);
-            compiler.code.instructions.push(vec![]);
+            compiler.code.instructions.push((vec![], vec![]));
 
-            compiler.compile_stmts(stmts, 0);
+            let mut base_scope = compiler.scopes.insert(Scope::base());
 
-            compiler.code.debug();
+            match compiler.compile_stmts(stmts, base_scope, 0) {
+                Ok(_) => {
+                    compiler.code.debug();
 
-            // let bytes = to_bytes(&compiler.code);
-            // println!("bytes: {}", bytes.len());
+                    // let bytes = to_bytes(&compiler.code);
+                    // println!("bytes: {}", bytes.len());
 
-            // let mut file = File::create("test.spwnc").unwrap();
-            // file.write_all(&bytes).unwrap();
+                    // let mut file = File::create("test.spwnc").unwrap();
+                    // file.write_all(&bytes).unwrap();
 
-            // let compressed = lz4_compression::prelude::compress(&bytes);
-            // println!(
-            //     "lz4 bytes: {}, {:.2}%",
-            //     compressed.len(),
-            //     (compressed.len() as f64) / (bytes.len() as f64) * 100.0
-            // );
+                    // let compressed = lz4_compression::prelude::compress(&bytes);
+                    // println!(
+                    //     "lz4 bytes: {}, {:.2}%",
+                    //     compressed.len(),
+                    //     (compressed.len() as f64) / (bytes.len() as f64) * 100.0
+                    // );
 
-            // let compressed =
-            //     yazi::compress(&bytes, yazi::Format::Raw, yazi::CompressionLevel::BestSize)
-            //         .unwrap();
-            // println!(
-            //     "zlib bytes: {}, {:.2}%",
-            //     compressed.len(),
-            //     (compressed.len() as f64) / (bytes.len() as f64) * 100.0
-            // );
+                    // let compressed =
+                    //     yazi::compress(&bytes, yazi::Format::Raw, yazi::CompressionLevel::BestSize)
+                    //         .unwrap();
+                    // println!(
+                    //     "zlib bytes: {}, {:.2}%",
+                    //     compressed.len(),
+                    //     (compressed.len() as f64) / (bytes.len() as f64) * 100.0
+                    // );
 
-            // println!("{:?}", bytes);
+                    // println!("{:?}", bytes);
 
-            // let mut globals = Globals {
-            //     memory: SlotMap::default(),
-            //     contexts: contexts::FullContext::Single(Context::default()),
-            // };
+                    let mut globals = Globals {
+                        memory: SlotMap::default(),
+                        types: AHashMap::new(),
+                        contexts: FullContext::single(compiler.code.var_count),
+                    };
+                    globals.init();
+                    // let mut globals = Globals {
+                    //     memory: SlotMap::default(),
+                    //     contexts: FullContext::Split(
+                    //         Box::new(FullContext::single(compiler.code.var_count)),
+                    //         Box::new(FullContext::single(compiler.code.var_count)),
+                    //     ),
+                    // };
 
-            // if let Err(e) = execute(&mut globals, &compiler.code, 0) {
-            //     e.raise(source);
-            // }
+                    if let Err(e) = execute(&mut globals, &compiler.code, 0) {
+                        e.raise(source);
+                    }
+                }
+                Err(e) => e.raise(source),
+            }
         }
         Err(e) => {
             e.raise(source);
