@@ -45,4 +45,11 @@ impl CodeArea {
     pub fn label(&self) -> (String, std::ops::Range<usize>) {
         (self.name(), self.span.0..self.span.1)
     }
+
+    pub fn stretch(&self, other: &CodeArea) -> CodeArea {
+        CodeArea {
+            source: self.source.clone(),
+            span: (self.span.0, other.span.1),
+        }
+    }
 }

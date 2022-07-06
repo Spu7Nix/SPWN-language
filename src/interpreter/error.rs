@@ -1,6 +1,7 @@
 use super::interpreter::StoredValue;
 
 use crate::error_maker;
+use crate::interpreter::value::ValueType;
 use crate::sources::CodeArea;
 
 error_maker! {
@@ -32,13 +33,14 @@ error_maker! {
             area: CodeArea,
         },
         #[
-            Message = "Cannot convert to bool", Area = a.def_area, Note = None,
+            Message = "Cannot convert type", Area = a.def_area, Note = None,
             Labels = [
-                a.def_area => "{} can't be converted to a boolean": @(a.value.get_type().to_str());
+                a.def_area => "{} can't be converted to a {}": @(a.value.get_type().to_str()), @(to.to_str());
             ]
         ]
-        BoolConversion {
+        CannotConvert {
             a: StoredValue,
+            to: ValueType,
         },
         #[
             Message = "Use of undefined type", Area = area, Note = None,
@@ -59,6 +61,43 @@ error_maker! {
         ]
         CannotCall {
             base: StoredValue,
+            area: CodeArea,
+        },
+        #[
+            Message = "Use of undefined macro argument", Area = area, Note = None,
+            Labels = [
+                area => "Argument `{}` is undefined": @(name);
+                macr.def_area => "Macro defined here";
+            ]
+        ]
+        UndefinedArgument {
+            name: String,
+            macr: StoredValue,
+            area: CodeArea,
+        },
+        #[
+            Message = "Type mismatch", Area = area, Note = None,
+            Labels = [
+                area => "Expected {}, found {}": @(expected), @(v.value.get_type().to_str());
+                v.def_area => "This is of type {}": @(v.value.get_type().to_str());
+            ]
+        ]
+        TypeMismatch {
+            v: StoredValue,
+            expected: String,
+            area: CodeArea,
+        },
+        #[
+            Message = "Pattern mismatch", Area = area, Note = None,
+            Labels = [
+                area => "This {} is not {}": @(v.value.get_type().to_str()), @(pat.value.to_str());
+                v.def_area => "This is of type {}": @(v.value.get_type().to_str());
+                pat.def_area => "Pattern defined as {} here": @(pat.value.to_str());
+            ]
+        ]
+        PatternMismatch {
+            v: StoredValue,
+            pat: StoredValue,
             area: CodeArea,
         },
     }

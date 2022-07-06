@@ -28,7 +28,7 @@ macro_rules! escapes {
                     ),*
                     Some(a) => return Err(SyntaxError::InvalidEscape {
                         character: a,
-                        area: 
+                        area:
                     })
                     None => unreachable!()
                 })
@@ -359,6 +359,7 @@ operators!(
     // RightAssoc  <==  [ PlusEq MinusEq MultEq DivEq ModEq PowEq EuclModEq ],
     // LeftAssoc   <==  [ And Or ],
     // LeftAssoc   <==  [ Pipe ],
+    LeftAssoc   <==  [ Is ],
     Unary       <==  [ ExclMark ],
     LeftAssoc   <==  [ Eq NotEq Greater GreaterEq Lesser LesserEq ],
     // LeftAssoc   <==  [ DoubleDot ],

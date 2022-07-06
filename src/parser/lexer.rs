@@ -1,6 +1,5 @@
 use logos::Logos;
 
-
 // // ew
 // fn string_flag<'s>(tok: &mut logos::Lexer<'s, Token>) -> String {
 //     let sliced = tok.slice();
@@ -19,27 +18,35 @@ use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(subpattern string = r#""(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
+#[logos(subpattern digits = r#"(\d)([\d_]+)?"#)]
 pub enum Token {
-    #[regex(r#"\d+"#, |lex| lex.slice().parse(), priority = 2)]
+    #[regex(r#"(?&digits)"#, |lex| lex.slice().parse(), priority = 2)]
     Int(usize),
-    #[regex(r#"\d+(\.[\d]+)?"#, |lex| lex.slice().parse())]
+    #[regex(r#"(?&digits)(\.[\d_]+)?"#, |lex| lex.slice().parse(), priority = 1)]
     Float(f64),
+
+    // number literals don't match their correct values as their converted (and validated) in the parser
+    #[regex(r#"0b\w+"#, |lex| lex.slice().parse())]
+    BinaryLiteral(String),
+    #[regex(r#"0x\w+"#, |lex| lex.slice().parse())]
+    HexLiteral(String),
+    #[regex(r#"0o\w+"#, |lex| lex.slice().parse(), priority = 1)]
+    OctalLiteral(String),
 
     #[regex(r#"(?&string)"#, 
         //|s| convert_string(&s.slice()[1..s.slice().len()-1]),
         |s| s.slice().parse(),
-        priority = 2 // prioritise normal string over string flags
+        priority = 3 // prioritise normal string over string flags
     )]
     String(String),
 
-    #[regex(r#"(\w*)?(?&string)"#,
-        //|s| s.slice()[0..s.slice().find('"').unwrap_or_else(|| s.slice().find("'").unwrap())].parse(), // take up to `"` or `'`
-       // |s| string_flag(s),
-       |s| s.slice().parse(),
-        priority = 1,
-    )]
-    StringFlag(String),
-
+    // #[regex(r#"_(\w*)?(?&string)"#,
+    //     //|s| s.slice()[0..s.slice().find('"').unwrap_or_else(|| s.slice().find("'").unwrap())].parse(), // take up to `"` or `'`
+    //    // |s| string_flag(s),
+    //    |s| s.slice().parse(),
+    //     priority = 1,
+    // )]
+    // StringFlag(String),
     #[token("let")]
     Let,
     #[token("mut")]
@@ -75,6 +82,9 @@ pub enum Token {
 
     #[token("print")]
     Print,
+
+    #[token("is")]
+    Is,
 
     #[token("+")]
     Plus,
@@ -170,6 +180,9 @@ impl Token {
         match self {
             Token::Int(v) => return v.to_string(),
             Token::Float(v) => return v.to_string(),
+            Token::BinaryLiteral(b) => b,
+            Token::HexLiteral(h) => h,
+            Token::OctalLiteral(o) => o,
             Token::String(v) => v,
             Token::TypeIndicator(v) => return format!("@{}", v),
             Token::Let => "let",
@@ -209,6 +222,7 @@ impl Token {
             Token::Break => "break",
             Token::Continue => "continue",
             Token::Print => "print",
+            Token::Is => "is",
             Token::Eq => "==",
             Token::NotEq => "!=",
             Token::Greater => ">",
@@ -223,7 +237,7 @@ impl Token {
             Token::ExclMark => "!",
             Token::TypeDef => "type",
             Token::Impl => "impl",
-            Token::StringFlag(v) => v,
+            //Token::StringFlag(v) => v,
         }
         .into()
     }
@@ -232,9 +246,12 @@ impl Token {
         use Token::*;
         match self {
             Plus | Minus | Mult | Div | Mod | Pow | PlusEq | MinusEq | MultEq | DivEq | ModEq
-            | PowEq | Assign | Eq | NotEq | Greater | GreaterEq | Lesser | LesserEq => "operator",
+            | PowEq | Assign | Eq | NotEq | Greater | GreaterEq | Lesser | LesserEq | Is => {
+                "operator"
+            }
 
-            Int(_) | Float(_) | String(_) | StringFlag(_) | True | False => "literal",
+            Int(_) | Float(_) | BinaryLiteral(_) | HexLiteral(_) | OctalLiteral(_) | String(_)
+            | True | False => "literal",
 
             Ident(_) => "identifier",
 

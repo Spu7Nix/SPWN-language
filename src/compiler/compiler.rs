@@ -50,7 +50,7 @@ pub struct Code {
 
     pub bytecode_areas: HashMap<(usize, usize), CodeArea>,
 
-    pub path_base_areas: HashMap<(usize, usize), CodeArea>,
+    pub macro_arg_areas: HashMap<(usize, usize), Vec<CodeArea>>,
 }
 impl Code {
     pub fn new() -> Self {
@@ -63,7 +63,7 @@ impl Code {
             instructions: vec![],
             var_count: 0,
             bytecode_areas: HashMap::new(),
-            path_base_areas: HashMap::new(),
+            macro_arg_areas: HashMap::new(),
         }
     }
 
@@ -171,6 +171,8 @@ pub enum Instruction {
 
     Negate,
     Not,
+
+    Is,
 
     LoadVar(InstrNum),
     SetVar(InstrNum),
@@ -364,7 +366,7 @@ impl Compiler {
                     };
                 }
 
-                op_helper!(Plus Minus Mult Div Mod Pow Eq NotEq Greater GreaterEq Lesser LesserEq);
+                op_helper!(Plus Minus Mult Div Mod Pow Eq NotEq Greater GreaterEq Lesser LesserEq Is);
             }
             Expression::Unary(op, v) => {
                 self.compile_expr(v, scope, func)?;
@@ -451,10 +453,9 @@ impl Compiler {
                         .collect(),
                 ));
 
-                let arg_areas = self.ast_data.func_arg_areas[expr_key].clone();
-
-                for ((n, t, d), area) in args.into_iter().zip(arg_areas) {
-                    let arg_id = self.new_var(n.clone(), derived_scope, false, area);
+                let mut arg_areas = self.ast_data.func_arg_areas[expr_key].clone();
+                for ((n, t, d), area) in args.into_iter().zip(&arg_areas) {
+                    let arg_id = self.new_var(n.clone(), derived_scope, false, area.clone());
                     arg_ids.push(arg_id);
                     if let Some(t) = t {
                         self.compile_expr(t, scope, func)?;
@@ -470,7 +471,10 @@ impl Compiler {
                 } else {
                     self.push_instr_with_area(Instruction::PushAnyPattern, expr_area.clone(), func);
                 }
-
+                arg_areas.reverse();
+                self.code
+                    .macro_arg_areas
+                    .insert((func, self.func_len(func)), arg_areas);
                 self.push_instr_with_area(Instruction::MakeMacro(idx), expr_area, func);
             }
             Expression::FuncPattern { args, ret_type } => {
@@ -514,6 +518,7 @@ impl Compiler {
                 params,
                 named_params,
             } => {
+                let mut param_areas = self.ast_data.func_arg_areas[expr_key].clone();
                 let idx = self.code.name_sets.add(
                     params
                         .iter()
@@ -528,11 +533,11 @@ impl Compiler {
                 for (_, v) in named_params {
                     self.compile_expr(v, scope, func)?;
                 }
+                param_areas.reverse();
                 self.compile_expr(base, scope, func)?;
-                self.code.path_base_areas.insert(
-                    (func, self.func_len(func) + 1),
-                    self.ast_data.get_area(base).clone(),
-                );
+                self.code
+                    .macro_arg_areas
+                    .insert((func, self.func_len(func)), param_areas);
                 self.push_instr_with_area(Instruction::Call(idx), expr_area, func);
             }
             Expression::TriggerFuncCall(v) => {

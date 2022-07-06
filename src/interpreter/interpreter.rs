@@ -106,6 +106,7 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                 GreaterEq: greater_eq,
                 Lesser: lesser,
                 LesserEq: lesser_eq,
+                Is: is_op,
             };
 
             match &code.instructions[func].0[i] {
@@ -194,13 +195,14 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                 Instruction::Break => todo!(),
                 Instruction::MakeMacro(id) => {
                     let area = code.get_bytecode_area(func, i);
+                    let arg_areas = code.macro_arg_areas.get(&(func, i)).unwrap();
                     let (func_id, arg_info) = code.macro_build_info.get(*id);
                     let ret_type = Box::new(pop_clone!());
                     let mut args = vec![];
-                    for (name, typ, def) in arg_info {
+                    for ((name, typ, def), area) in arg_info.iter().zip(arg_areas) {
                         let def = if *def { Some(pop_clone!()) } else { None };
                         let typ = if *typ { Some(pop_clone!()) } else { None };
-                        args.push((name.clone(), typ, def));
+                        args.push(((name.clone(), area.clone()), typ, def));
                     }
                     args.reverse();
                     push!(Value::Macro(Macro {
@@ -221,16 +223,106 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                     let base = pop!(&);
                     match &base.value {
                         Value::Macro(m) => {
-                            let mut params = vec![];
-                            let mut named_params = AHashMap::new();
+                            let param_areas = code.macro_arg_areas.get(&(func, i)).unwrap();
                             let param_list = code.name_sets.get(*id);
-                            for i in param_list {
-                                if i.is_empty() {
+
+                            let mut param_map = AHashMap::new();
+
+                            let mut params = vec![];
+                            let mut named_params = vec![];
+
+                            println!("sex1 {}", param_list.len());
+                            println!("sex2 {}", param_areas.len());
+
+                            for (name, name_area) in param_list.iter().zip(param_areas) {
+                                if name.is_empty() {
                                     params.push(pop_clone!());
                                 } else {
-                                    named_params.insert(i.clone(), pop_clone!());
+                                    if let Some(p) =
+                                        m.args.iter().position(|((s, _), ..)| s == name)
+                                    {
+                                        param_map.insert(name.clone(), p);
+                                    } else {
+                                        return Err(RuntimeError::UndefinedArgument {
+                                            name: name.into(),
+                                            macr: base.clone(),
+                                            area: name_area.clone(),
+                                        });
+                                    }
+                                    named_params.push((name.clone(), pop_clone!()));
                                 }
                             }
+                            println!("param areas length: {:?}", param_areas.len());
+                            let mut arg_fill = m
+                                .args
+                                .iter()
+                                .map(|((_, _), t, d)| (t.clone(), d.clone()))
+                                .collect::<Vec<_>>();
+                            params.reverse();
+                            named_params.reverse();
+
+                            let params_len = params.len();
+                            for (i, (val, param_area)) in params
+                                .into_iter()
+                                .zip(param_areas.iter().take(params_len))
+                                .enumerate()
+                            {
+                                if let Some(pat) = &arg_fill[i].0 {
+                                    if !value_ops::matches_pat(&val.value, &value_ops::to_pat(pat)?)
+                                    {
+                                        return Err(RuntimeError::PatternMismatch {
+                                            v: val,
+                                            pat: pat.clone(),
+                                            area: param_area.clone(),
+                                        });
+                                    }
+                                }
+                                println!("balls {}", i);
+                                arg_fill[i].1 = Some(val);
+                            }
+
+                            println!("------ arg fill 1");
+                            for (t, v) in &arg_fill {
+                                println!(
+                                    "{:?}",
+                                    if let Some(v) = v {
+                                        v.value.to_str()
+                                    } else {
+                                        "None".into()
+                                    }
+                                );
+                            }
+
+                            for ((name, val), param_area) in
+                                named_params.into_iter().zip(param_areas)
+                            {
+                                let arg_pos = param_map[&name];
+                                if let Some(pat) = &arg_fill[arg_pos].0 {
+                                    if !value_ops::matches_pat(&val.value, &value_ops::to_pat(pat)?)
+                                    {
+                                        return Err(RuntimeError::PatternMismatch {
+                                            v: val,
+                                            pat: pat.clone(),
+                                            area: param_area.clone(),
+                                        });
+                                    }
+                                }
+                                println!("bruh {}, {:?}", arg_pos, val);
+                                arg_fill[arg_pos].1 = Some(val);
+                            }
+
+                            println!("------ arg fill 2");
+                            for (t, v) in arg_fill {
+                                println!(
+                                    "{:?}",
+                                    if let Some(v) = v {
+                                        v.value.to_str()
+                                    } else {
+                                        "None".into()
+                                    }
+                                );
+                            }
+
                             todo!()
                         }
                         _ => {
@@ -265,7 +357,8 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                 | Instruction::Greater
                 | Instruction::GreaterEq
                 | Instruction::Lesser
-                | Instruction::LesserEq => (),
+                | Instruction::LesserEq
+                | Instruction::Is => (),
 
                 Instruction::EnterScope => {}
                 Instruction::ExitScope => {}

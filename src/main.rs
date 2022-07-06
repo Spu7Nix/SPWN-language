@@ -79,9 +79,9 @@ fn run(code: String, source: SpwnSource) {
                     //     ),
                     // };
 
-                    // if let Err(e) = execute(&mut globals, &compiler.code, 0) {
-                    //     e.raise(source);
-                    // }
+                    if let Err(e) = execute(&mut globals, &compiler.code, 0) {
+                        e.raise(source);
+                    }
                 }
                 Err(e) => e.raise(source),
             }

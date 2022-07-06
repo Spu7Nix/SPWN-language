@@ -1,3 +1,5 @@
+use std::str::Chars;
+
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use super::error::SyntaxError;
@@ -228,6 +230,27 @@ fn parse_unit(
             ast_data.insert_expr(Expression::Literal(Literal::Int(*n)), span_ar!(0)),
             pos + 1,
         )),
+        Token::BinaryLiteral(b) => Ok((
+            ast_data.insert_expr(
+                Expression::Literal(Literal::Int(parse_number_radix(b, 2, "0b", span_ar!(0))?)),
+                span_ar!(0),
+            ),
+            pos + 1,
+        )),
+        Token::HexLiteral(h) => Ok((
+            ast_data.insert_expr(
+                Expression::Literal(Literal::Int(parse_number_radix(h, 16, "0x", span_ar!(0))?)),
+                span_ar!(0),
+            ),
+            pos + 1,
+        )),
+        Token::OctalLiteral(o) => Ok((
+            ast_data.insert_expr(
+                Expression::Literal(Literal::Int(parse_number_radix(o, 8, "0o", span_ar!(0))?)),
+                span_ar!(0),
+            ),
+            pos + 1,
+        )),
         Token::Float(n) => Ok((
             ast_data.insert_expr(Expression::Literal(Literal::Float(*n)), span_ar!(0)),
             pos + 1,
@@ -241,7 +264,10 @@ fn parse_unit(
             pos + 1,
         )),
         Token::String(s) => Ok((
-            ast_data.insert_expr(Expression::Literal(Literal::String(parse_string(s, span_ar!(0))?)), span_ar!(0)),
+            ast_data.insert_expr(
+                Expression::Literal(Literal::String(parse_string(&s, span_ar!(0))?)),
+                span_ar!(0),
+            ),
             pos + 1,
         )),
         Token::Ident(name) => {
@@ -340,7 +366,6 @@ fn parse_unit(
                     let mut arg_areas = vec![];
                     while_tok!(!= RParen: {
                         check_tok!(Ident(arg):arg_span else "argument name");
-                        arg_areas.push(parse_data.source.to_area(arg_span));
 
                         let mut arg_type = None;
                         if_tok!(== Colon: {
@@ -353,6 +378,7 @@ fn parse_unit(
                             parse!(parse_expr => let temp); arg_default = Some(temp);
                         });
                         args.push((arg, arg_type, arg_default));
+                        arg_areas.push(parse_data.source.to_area(arg_span));
                         if !matches!(tok!(0), Token::RParen | Token::Comma) {
                             expected_err!(") or ,", tok!(0), span!(0))
                         }
@@ -588,6 +614,7 @@ fn parse_value(
                 let mut params = vec![];
                 let mut named_params = vec![];
                 let mut started_named = false;
+                let mut param_areas = vec![];
 
                 while_tok!(!= RParen: {
 
@@ -595,19 +622,25 @@ fn parse_value(
                         match (tok!(0), tok!(1)) {
                             (Token::Ident(name), Token::Assign) => {
                                 started_named = true;
+                                let start = span!(0);
                                 pos += 2;
                                 parse!(parse_expr => let arg);
+                                param_areas.push(parse_data.source.to_area((start.0, span!(-1).1)));
                                 named_params.push((name.into(), arg));
                             }
                             _ => {
+                                let start = span!(0);
                                 parse!(parse_expr => let arg);
+                                param_areas.push(parse_data.source.to_area((start.0, span!(-1).1)));
                                 params.push(arg);
                             }
                         }
                     } else {
+                        let start = span!(0);
                         check_tok!(Ident(name) else "parameter name");
                         check_tok!(Assign else "=");
                         parse!(parse_expr => let arg);
+                        param_areas.push(parse_data.source.to_area((start.0, span!(-1).1)));
                         named_params.push((name, arg));
                     }
 
@@ -616,7 +649,8 @@ fn parse_value(
                     }
                     skip_tok!(Comma);
                 });
-                value = ast_data.insert_expr(
+
+                let key = ast_data.insert_expr(
                     Expression::Call {
                         base: value,
                         params,
@@ -624,6 +658,10 @@ fn parse_value(
                     },
                     parse_data.source.to_area((start.0, span!(-1).1)),
                 );
+
+                ast_data.func_arg_areas.insert(key, param_areas);
+
+                value = key;
             }
             Token::QMark => {
                 pos += 1;
@@ -904,26 +942,63 @@ pub fn parse_statements(
     Ok((statements, pos))
 }
 
-// deals with parsing string escape sequences
-fn parse_string(s: &String, area: CodeArea) -> Result<String, SyntaxError> {
+fn parse_number_radix(
+    string: &String,
+    radix: u32,
+    prefix: &str,
+    area: CodeArea,
+) -> Result<usize, SyntaxError> {
+    let mut mstring = string.clone();
+    usize::from_str_radix(&mstring.replace(prefix, ""), radix).map_err(|_| {
+        SyntaxError::InvalidLiteral {
+            literal: string.to_owned(),
+            area,
+        }
+    })
+}
 
+fn parse_unicode(chars: &mut Chars, area: CodeArea) -> Result<char, SyntaxError> {
     let mut out = String::new();
-    let mut chars = s.chars();
 
-    match chars.next() {
-        Some('\\') => {
-            out.push(match chars.next() {
-                Some('n') => '\n',
-                Some(a) => return Err(SyntaxError::InvalidEscape {
-                    character: a,
-                    area
-                }),
-                None => unreachable!()
-            })
-        },
-        Some(c) => out.push(c),
-        None => {},
+    for c in chars.take(4) {
+        out.push(c);
     }
+
+    let hex = parse_number_radix(&out, 16, "", area)?;
+
+    Ok(char::from_u32(hex as u32).unwrap_or('�'))
+}
+
+// deals with parsing string escape sequences
+fn parse_string(s: &str, area: CodeArea) -> Result<String, SyntaxError> {
+    let mut out = String::new();
+    let mut chars = s[1..s.len() - 1].chars();
+
+    loop {
+        match chars.next() {
+            // skip quotes
+            Some('"') => {}
+            Some('\'') => {}
+
+            Some('\\') => out.push(match chars.next() {
+                Some('n') => '\n',
+                Some('r') => '\r',
+                Some('t') => '\t',
+                Some('"') => '"',
+                Some('\'') => '\'',
+                Some('\\') => '\\',
+                // parse it as in a separate fn for readability
+                Some('u') => parse_unicode(&mut chars, area.clone())?,
+                Some(a) => return Err(SyntaxError::InvalidEscape { character: a, area }),
+
+                None => unreachable!(),
+            }),
+            Some(c) => out.push(c),
+            None => break,
+        }
+    }
+
+    println!("{out}");
 
     Ok(out)
 }

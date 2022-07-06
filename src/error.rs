@@ -54,7 +54,6 @@ impl RainbowColorGenerator {
 #[macro_export]
 macro_rules! error_maker {
     (
-
         $(
             pub enum $err_type:ident {
                 $(
@@ -74,8 +73,6 @@ macro_rules! error_maker {
                 )*
             }
         )*
-
-
 
     ) => {
         use $crate::error::*;

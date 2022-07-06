@@ -42,7 +42,7 @@ pub enum Value {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Macro {
     pub func_id: usize,
-    pub args: Vec<(String, Option<StoredValue>, Option<StoredValue>)>,
+    pub args: Vec<((String, CodeArea), Option<StoredValue>, Option<StoredValue>)>,
     pub ret_type: Box<StoredValue>,
 }
 
@@ -105,7 +105,7 @@ impl Value {
                 format!(
                     "({}) -> {} {{...}}",
                     args.iter()
-                        .map(|(n, t, d)| {
+                        .map(|((n, _), t, d)| {
                             format!(
                                 "{}{}{}",
                                 n,
@@ -173,11 +173,13 @@ impl ValueType {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Pattern {
     Any,
+    Type(ValueType),
 }
 impl Pattern {
     pub fn to_str(&self) -> String {
         match self {
             Pattern::Any => "_".into(),
+            Pattern::Type(t) => t.to_str(),
         }
     }
 }
@@ -186,12 +188,14 @@ impl Pattern {
 pub mod value_ops {
     use super::super::error::RuntimeError;
     use super::super::interpreter::StoredValue;
+    use super::Pattern;
     use super::Value;
+    use super::ValueType;
 
     use crate::sources::CodeArea;
 
-    pub fn equality(a: &StoredValue, b: &StoredValue) -> bool {
-        match (&a.value, &b.value) {
+    pub fn equality(a: &Value, b: &Value) -> bool {
+        match (a, b) {
             (Value::Int(n1), Value::Float(n2)) => *n1 as f64 == *n2,
             (Value::Float(n1), Value::Int(n2)) => *n1 == *n2 as f64,
 
@@ -199,7 +203,9 @@ pub mod value_ops {
                 if arr1.len() != arr2.len() {
                     false
                 } else {
-                    arr1.iter().zip(arr2).all(|(a, b)| equality(a, b))
+                    arr1.iter()
+                        .zip(arr2)
+                        .all(|(a, b)| equality(&a.value, &b.value))
                 }
             }
             (Value::Dict(map1), Value::Dict(map2)) => {
@@ -209,7 +215,7 @@ pub mod value_ops {
                     for (k, a) in map1 {
                         match map2.get(k) {
                             Some(b) => {
-                                if !equality(a, b) {
+                                if !equality(&a.value, &b.value) {
                                     return false;
                                 }
                             }
@@ -221,16 +227,37 @@ pub mod value_ops {
             }
 
             (Value::Maybe(None), Value::Maybe(None)) => true,
-            (Value::Maybe(Some(a)), Value::Maybe(Some(b))) => equality(a, b),
+            (Value::Maybe(Some(a)), Value::Maybe(Some(b))) => equality(&a.value, &b.value),
 
             _ => a == b,
+        }
+    }
+
+    pub fn matches_pat(val: &Value, pat: &Pattern) -> bool {
+        match (val, pat) {
+            (_, Pattern::Any) => true,
+            (_, Pattern::Type(t)) => &val.get_type() == t,
         }
     }
 
     pub fn to_bool(a: &StoredValue) -> Result<bool, RuntimeError> {
         match &a.value {
             Value::Bool(b) => Ok(*b),
-            _ => Err(RuntimeError::BoolConversion { a: a.clone() }),
+            _ => Err(RuntimeError::CannotConvert {
+                a: a.clone(),
+                to: ValueType::Bool,
+            }),
+        }
+    }
+
+    pub fn to_pat(a: &StoredValue) -> Result<Pattern, RuntimeError> {
+        match &a.value {
+            Value::TypeIndicator(typ) => Ok(Pattern::Type(*typ)),
+            Value::Pattern(p) => Ok(p.clone()),
+            _ => Err(RuntimeError::CannotConvert {
+                a: a.clone(),
+                to: ValueType::Bool,
+            }),
         }
     }
 
@@ -380,14 +407,14 @@ pub mod value_ops {
         b: &StoredValue,
         area: CodeArea,
     ) -> Result<StoredValue, RuntimeError> {
-        Ok(Value::Bool(equality(a, b)).into_stored(area))
+        Ok(Value::Bool(equality(&a.value, &b.value)).into_stored(area))
     }
     pub fn not_eq(
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
     ) -> Result<StoredValue, RuntimeError> {
-        Ok(Value::Bool(!equality(a, b)).into_stored(area))
+        Ok(Value::Bool(!equality(&a.value, &b.value)).into_stored(area))
     }
     pub fn greater(
         a: &StoredValue,
@@ -495,6 +522,24 @@ pub mod value_ops {
                 return Err(RuntimeError::InvalidUnaryOperand {
                     a: a.clone(),
                     op: "-".into(),
+                    area,
+                })
+            }
+        };
+        Ok(value.into_stored(area))
+    }
+    pub fn is_op(
+        a: &StoredValue,
+        b: &StoredValue,
+        area: CodeArea,
+    ) -> Result<StoredValue, RuntimeError> {
+        let value = match (&a.value, &b.value) {
+            (a, Value::TypeIndicator(typ)) => Value::Bool(&a.get_type() == typ),
+            (a, Value::Pattern(pat)) => Value::Bool(matches_pat(a, pat)),
+            (_, _) => {
+                return Err(RuntimeError::TypeMismatch {
+                    v: b.clone(),
+                    expected: "@type_indicator or @pattern".into(),
                     area,
                 })
             }

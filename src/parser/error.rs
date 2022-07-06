@@ -1,3 +1,5 @@
+use std::string::ToString;
+
 use crate::error_maker;
 use crate::sources::CodeArea;
 
@@ -27,13 +29,23 @@ error_maker! {
             area: CodeArea,
         },
         #[
-            Message = "Invalid string escape sequence", Area = area, Note = None,
+            Message = "Error parsing escape sequence", Area = area, Note = None,
             Labels = [
                 area => "Unknown escape sequence: \\`{}`": @(character);
             ]
         ]
         InvalidEscape {
             character: char,
+            area: CodeArea,
+        },
+        #[
+            Message = "Error parsing literal", Area = area, Note = None,
+            Labels = [
+                area => "Expected valid literal, found: `{}`": @(literal);
+            ]
+        ]
+        InvalidLiteral {
+            literal: String,
             area: CodeArea,
         },
     }
