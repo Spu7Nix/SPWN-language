@@ -243,6 +243,7 @@ new_key_type! { pub struct ScopeKey; }
 pub struct Compiler {
     pub ast_data: ASTData,
     pub code: Code,
+    #[allow(clippy::type_complexity)]
     pub code_exec_queue: Vec<Vec<(Box<dyn ASTKey>, usize, ScopeKey)>>,
 
     pub scopes: SlotMap<ScopeKey, Scope>,
@@ -753,14 +754,10 @@ impl Compiler {
             self.compile_stmt(i, scope, func)?;
         }
         for (k, func_id, scope) in self.code_exec_queue.pop().unwrap() {
-            unsafe {
-                match k.into_key() {
-                    crate::parser::parser::KeyType::Expr(k) => {
-                        self.compile_expr(k, scope, func_id)?
-                    }
-                    crate::parser::parser::KeyType::StmtKey(k) => {
-                        self.compile_stmt(k, scope, func_id)?
-                    }
+            match k.to_key() {
+                crate::parser::parser::KeyType::Expr(k) => self.compile_expr(k, scope, func_id)?,
+                crate::parser::parser::KeyType::StmtKey(k) => {
+                    self.compile_stmt(k, scope, func_id)?
                 }
             }
         }

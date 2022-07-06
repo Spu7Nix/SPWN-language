@@ -1,13 +1,6 @@
-use std::collections::HashMap;
-
 use crate::compiler::compiler::InstrNum;
 
 use super::interpreter::ValueKey;
-
-#[derive(Default, Debug, Clone)]
-pub struct VarData {
-    key: ValueKey,
-}
 
 #[derive(Default, Debug, Clone)]
 pub struct Context {

@@ -24,15 +24,15 @@ pub enum KeyType {
 
 // just helper for ASTData::area
 pub trait ASTKey {
-    fn into_key(&self) -> KeyType;
+    fn to_key(&self) -> KeyType;
 }
 impl ASTKey for ExprKey {
-    fn into_key(&self) -> KeyType {
+    fn to_key(&self) -> KeyType {
         KeyType::Expr(*self)
     }
 }
 impl ASTKey for StmtKey {
-    fn into_key(&self) -> KeyType {
+    fn to_key(&self) -> KeyType {
         KeyType::StmtKey(*self)
     }
 }
@@ -54,7 +54,7 @@ impl ASTData {
     //     self.map.insert((Box::new(node), area))
     // }
     pub fn get_area<K: ASTKey>(&self, k: K) -> &CodeArea {
-        match k.into_key() {
+        match k.to_key() {
             KeyType::Expr(k) => &self.exprs[k].1,
             KeyType::StmtKey(k) => &self.stmts[k].1,
         }
@@ -123,14 +123,6 @@ pub enum Literal {
     Bool(bool),
 }
 impl Literal {
-    pub fn to_str(&self) -> String {
-        match self {
-            Literal::Int(v) => v.to_string(),
-            Literal::Float(v) => v.to_string(),
-            Literal::String(v) => v.to_string(),
-            Literal::Bool(v) => v.to_string(),
-        }
-    }
     pub fn to_value(&self) -> Value {
         match self {
             Literal::Int(v) => Value::Int(*v as isize),
