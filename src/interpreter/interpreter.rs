@@ -220,7 +220,7 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                 Instruction::Index => todo!(),
                 Instruction::Call(id) => {
                     let area = code.get_bytecode_area(func, i);
-                    let base = pop!(&);
+                    let base = pop_clone!();
                     match &base.value {
                         Value::Macro(m) => {
                             let param_areas = code.macro_arg_areas.get(&(func, i)).unwrap();
@@ -231,12 +231,9 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                             let mut params = vec![];
                             let mut named_params = vec![];
 
-                            println!("sex1 {}", param_list.len());
-                            println!("sex2 {}", param_areas.len());
-
-                            for (name, name_area) in param_list.iter().zip(param_areas) {
+                            for (name, param_area) in param_list.iter().zip(param_areas) {
                                 if name.is_empty() {
-                                    params.push(pop_clone!());
+                                    params.push((pop_clone!(), param_area));
                                 } else {
                                     if let Some(p) =
                                         m.args.iter().position(|((s, _), ..)| s == name)
@@ -246,13 +243,23 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                                         return Err(RuntimeError::UndefinedArgument {
                                             name: name.into(),
                                             macr: base.clone(),
-                                            area: name_area.clone(),
+                                            area: param_area.clone(),
                                         });
                                     }
-                                    named_params.push((name.clone(), pop_clone!()));
+                                    named_params.push((name.clone(), pop_clone!(), param_area));
                                 }
                             }
-                            println!("param areas length: {:?}", param_areas.len());
+
+                            if params.len() > m.args.len() {
+                                let call_area = code.get_bytecode_area(func, i);
+                                return Err(RuntimeError::TooManyArguments {
+                                    expected: m.args.len(),
+                                    provided: params.len(),
+                                    call_area,
+                                    func: base.clone(),
+                                });
+                            }
+
                             let mut arg_fill = m
                                 .args
                                 .iter()
@@ -261,12 +268,7 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                             params.reverse();
                             named_params.reverse();
 
-                            let params_len = params.len();
-                            for (i, (val, param_area)) in params
-                                .into_iter()
-                                .zip(param_areas.iter().take(params_len))
-                                .enumerate()
-                            {
+                            for (i, (val, param_area)) in params.into_iter().enumerate() {
                                 if let Some(pat) = &arg_fill[i].0 {
                                     if !value_ops::matches_pat(&val.value, &value_ops::to_pat(pat)?)
                                     {
@@ -277,25 +279,10 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                                         });
                                     }
                                 }
-                                println!("balls {}", i);
                                 arg_fill[i].1 = Some(val);
                             }
 
-                            println!("------ arg fill 1");
-                            for (t, v) in &arg_fill {
-                                println!(
-                                    "{:?}",
-                                    if let Some(v) = v {
-                                        v.value.to_str()
-                                    } else {
-                                        "None".into()
-                                    }
-                                );
-                            }
-
-                            for ((name, val), param_area) in
-                                named_params.into_iter().zip(param_areas)
-                            {
+                            for (name, val, param_area) in named_params.into_iter() {
                                 let arg_pos = param_map[&name];
                                 if let Some(pat) = &arg_fill[arg_pos].0 {
                                     if !value_ops::matches_pat(&val.value, &value_ops::to_pat(pat)?)
@@ -309,6 +296,18 @@ pub fn execute(globals: &mut Globals, code: &Code, func: usize) -> Result<(), Ru
                                 }
                                 println!("bruh {}, {:?}", arg_pos, val);
                                 arg_fill[arg_pos].1 = Some(val);
+                            }
+
+                            for ((_, arg), ((name, area), ..)) in arg_fill.iter().zip(&m.args) {
+                                if let Some(arg) = arg {
+                                } else {
+                                    let call_area = code.get_bytecode_area(func, i);
+                                    return Err(RuntimeError::ArgumentNotSatisfied {
+                                        arg_name: name.clone(),
+                                        call_area,
+                                        arg_area: area.clone(),
+                                    });
+                                }
                             }
 
                             println!("------ arg fill 2");

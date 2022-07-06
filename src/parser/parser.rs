@@ -265,7 +265,7 @@ fn parse_unit(
         )),
         Token::String(s) => Ok((
             ast_data.insert_expr(
-                Expression::Literal(Literal::String(parse_string(&s, span_ar!(0))?)),
+                Expression::Literal(Literal::String(parse_string(s, span_ar!(0))?)),
                 span_ar!(0),
             ),
             pos + 1,
@@ -948,7 +948,7 @@ fn parse_number_radix(
     prefix: &str,
     area: CodeArea,
 ) -> Result<usize, SyntaxError> {
-    let mut mstring = string.clone();
+    let mstring = string.clone();
     usize::from_str_radix(&mstring.replace(prefix, ""), radix).map_err(|_| {
         SyntaxError::InvalidLiteral {
             literal: string.to_owned(),
@@ -976,10 +976,6 @@ fn parse_string(s: &str, area: CodeArea) -> Result<String, SyntaxError> {
 
     loop {
         match chars.next() {
-            // skip quotes
-            Some('"') => {}
-            Some('\'') => {}
-
             Some('\\') => out.push(match chars.next() {
                 Some('n') => '\n',
                 Some('r') => '\r',

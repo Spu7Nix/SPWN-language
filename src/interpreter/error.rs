@@ -100,5 +100,30 @@ error_maker! {
             pat: StoredValue,
             area: CodeArea,
         },
+        #[
+            Message = "Argument not satisfied", Area = call_area, Note = None,
+            Labels = [
+                arg_area => "Argument `{}` defined as mandatory here": @(arg_name);
+                call_area => "Argument not provided here";
+            ]
+        ]
+        ArgumentNotSatisfied {
+            arg_name: String,
+            call_area: CodeArea,
+            arg_area: CodeArea,
+        },
+        #[
+            Message = "Too many arguments!", Area = call_area, Note = None,
+            Labels = [
+                func.def_area => "Macro defined to take {} arguments here": @(expected);
+                call_area => "Called with {} arguments": @(provided);
+            ]
+        ]
+        TooManyArguments {
+            expected: usize,
+            provided: usize,
+            call_area: CodeArea,
+            func: StoredValue,
+        },
     }
 }
