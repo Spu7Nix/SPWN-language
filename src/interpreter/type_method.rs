@@ -1,21 +1,22 @@
+use std::fmt;
 use std::sync::Arc;
 
 use ahash::AHashMap;
+use serde::{Deserialize, Serialize};
 
-use super::from_value::{FromValueList, Error};
+use super::from_value::{Error, FromValueList};
 use super::interpreter::Globals;
 use super::method::{Function, Method};
 use super::to_value::ToValueResult;
 use super::types::Instance;
 use super::value::Value;
 
-
 type StaticMethodType<T> = Arc<dyn Fn(Vec<Value>) -> Result<T, Error> + Send + Sync>;
 type SelfMethodType<T> =
     Arc<dyn Fn(&Instance, Vec<Value>, &mut Globals) -> Result<T, Error> + Send + Sync>;
 
 // `SelfMethod` i.e. a instance method (where `self` is the first argument)
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SelfMethod(SelfMethodType<Value>);
 
 impl SelfMethod {
@@ -54,10 +55,18 @@ impl SelfMethod {
         self.0(instance, args, globals)
     }
 }
+
+// need to manually implement cause the traits dont implement debug
+impl fmt::Debug for SelfMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SelfMethod(...)")
+    }
+}
+
 pub type SelfMethods = AHashMap<String, SelfMethod>;
 
 // `StaticMethod` where `self` isnt the first argument
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct StaticMethod(StaticMethodType<Value>);
 
 impl StaticMethod {
@@ -76,6 +85,13 @@ impl StaticMethod {
         self.0(args)
     }
 }
+
+impl fmt::Debug for StaticMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StaticMethod(...)")
+    }
+}
+
 pub type StaticMethods = AHashMap<String, StaticMethod>;
 
 #[derive(Clone)]
@@ -101,6 +117,12 @@ impl AttributeGetter {
     }
 }
 
+impl fmt::Debug for AttributeGetter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AttributeGetter(...)")
+    }
+}
+
 pub type Attributes = AHashMap<String, AttributeGetter>;
 
 #[derive(Clone)]
@@ -123,5 +145,11 @@ impl Constructor {
 
     pub fn invoke(&self, args: Vec<Value>) -> Result<Instance, Error> {
         self.0(args)
+    }
+}
+
+impl fmt::Debug for Constructor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Constructor(...)")
     }
 }

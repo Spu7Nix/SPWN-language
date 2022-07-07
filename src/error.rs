@@ -1,10 +1,10 @@
 use std::fmt::Display;
 use std::io::Write;
 
-use ariadne::Color;
-use crate::parser::error::SyntaxError;
-use crate::interpreter::error::RuntimeError;
 use crate::compiler::error::CompilerError;
+use crate::interpreter::error::RuntimeError;
+use crate::parser::error::SyntaxError;
+use ariadne::Color;
 
 pub const ERROR_S: f64 = 0.4;
 pub const ERROR_V: f64 = 1.0;
@@ -31,7 +31,6 @@ impl Display for self::Error {
 }
 
 impl std::error::Error for self::Error {}
-
 
 pub type Result<T> = std::result::Result<T, self::Error>;
 
@@ -138,6 +137,7 @@ macro_rules! error_maker {
                         )*
                     };
 
+                    // epic
                     let mut report = Report::build(ReportKind::Error, area.name(), area.span.0)
                         .with_message(message.to_string() + "\n");
 
@@ -167,7 +167,3 @@ macro_rules! error_maker {
 
     };
 }
-
-
-
-

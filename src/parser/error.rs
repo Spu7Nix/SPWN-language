@@ -7,7 +7,7 @@ use crate::sources::CodeArea;
 error_maker! {
     pub enum SyntaxError {
         #[
-            Message = "Unexpected character", Area = match area {}, Note = None,
+            Message = "Unexpected character", Area = area, Note = None,
             Labels = [
                 area => "Expected `{}` found {} `{}`": @(expected), @(typ), @(found);
             ]

@@ -1,8 +1,10 @@
-use std::any::{Any, type_name};
+use std::any::{type_name, Any};
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use super::from_value::{FromValueList, Error};
+use serde::{Deserialize, Serialize};
+
+use super::from_value::{Error, FromValueList};
 use super::interpreter::Globals;
 use super::method::{Function, Method};
 use super::to_value::{ToValue, ToValueResult};
@@ -11,7 +13,7 @@ use super::type_method::{
 };
 use super::value::Value;
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Type {
     pub name: String,
     constructor: Option<Constructor>,
@@ -22,10 +24,7 @@ pub struct Type {
 
 impl Type {
     pub fn call_static(&self, name: &str, args: Vec<Value>) -> Result<Value, Error> {
-        let attr = self
-            .static_methods
-            .get(name)
-            .ok_or_else(|| todo!())?;
+        let attr = self.static_methods.get(name).ok_or_else(|| todo!())?;
 
         attr.clone().invoke(args)
     }
@@ -159,11 +158,8 @@ impl Instance {
     }
 
     pub fn inner_type<'a>(&self, globals: &'a Globals) -> Result<&'a Type, Error> {
-        globals
-            .types
-            .get(&self.type_id)
-            .ok_or_else(|| todo!())?
-            //format!("Type '{:?}' is undefined!", self.debug_type_name)
+        globals.types.get(&self.type_id).ok_or_else(|| todo!())?
+        //format!("Type '{:?}' is undefined!", self.debug_type_name)
     }
 
     pub fn name<'a>(&self, globals: &'a Globals) -> &'a str {
@@ -176,10 +172,8 @@ impl Instance {
         let attr = self
             .inner_type(globals)
             .and_then(|c| {
-                c.attributes
-                    .get(name)
-                    .ok_or_else(|| todo!())
-                    //format!("Attribute '{}' is undefined!", name)
+                c.attributes.get(name).ok_or_else(|| todo!())
+                //format!("Attribute '{}' is undefined!", name)
             })?
             .clone();
         attr.invoke(self, globals)
@@ -204,18 +198,11 @@ impl Instance {
 
         let expected_name = globals
             .as_ref()
-            .and_then(|g| {
-                g.types
-                    .get(name)
-                    .map(|ty| ty.name.clone())
-            })
+            .and_then(|g| g.types.get(name).map(|ty| ty.name.clone()))
             .unwrap_or_else(|| self.debug_type_name.to_owned());
 
-        self.inner
-            .as_ref()
-            .downcast_ref()
-            .ok_or_else(|| todo!())
-            //format!("Expected type '{}', got '{}'!", expected_name, name)
+        self.inner.as_ref().downcast_ref().ok_or_else(|| todo!())
+        //format!("Expected type '{}', got '{}'!", expected_name, name)
     }
 
     pub fn raw<T: Send + Sync + 'static>(&self) -> Result<&T, Error> {

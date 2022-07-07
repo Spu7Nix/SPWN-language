@@ -116,11 +116,15 @@ error_maker! {
                 call_area => "Argument not provided here";
             ]
         ]
+
         ArgumentNotSatisfied {
             arg_name: String,
             call_area: CodeArea,
             arg_area: CodeArea,
         },
+
+        // what if the errors just carry the file too
+        // and rest is spans
 
         #[
             Message = "Too many arguments!", Area = call_area, Note = None,

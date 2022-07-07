@@ -4,7 +4,7 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::contexts::{Context, FullContext};
 use super::error::RuntimeError;
-// use super::types::{Instance, Type};
+use super::types::{Instance, Type};
 use super::value::{value_ops, Value, ValueType};
 
 use crate::compiler::compiler::{Code, Instruction};
@@ -24,16 +24,17 @@ pub struct StoredValue {
 pub struct Globals {
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    pub types: AHashMap<String, ValueType>,
-    // pub types: AHashMap<String, String>,
-    //pub instances: AHashMap<Instance, Type>,
+    //pub types: AHashMap<String, ValueType>,
+    pub types: AHashMap<String, String>,
+    pub instances: AHashMap<Instance, Type>,
 }
+
 impl Globals {
     pub fn new() -> Self {
         Self {
             memory: SlotMap::default(),
             types: AHashMap::new(),
-            //instances: AHashMap::new(),
+            instances: AHashMap::new(),
         }
     }
     pub fn init(&mut self) {
