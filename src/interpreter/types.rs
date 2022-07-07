@@ -1,8 +1,8 @@
-use std::any::Any;
+use std::any::{Any, type_name};
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use super::from_value::FromValueList;
+use super::from_value::{FromValueList, Error};
 use super::interpreter::Globals;
 use super::method::{Function, Method};
 use super::to_value::{ToValue, ToValueResult};
@@ -10,14 +10,10 @@ use super::type_method::{
     AttributeGetter, Attributes, Constructor, SelfMethod, SelfMethods, StaticMethod, StaticMethods,
 };
 use super::value::Value;
-use super::error::RuntimeError;
-
-use crate::sources::CodeArea;
 
 #[derive(Clone)]
 pub struct Type {
     pub name: String,
-    //pub type_id: HashId,
     constructor: Option<Constructor>,
     attributes: Attributes,
     self_methods: SelfMethods,
@@ -29,7 +25,7 @@ impl Type {
         let attr = self
             .static_methods
             .get(name)
-            .ok_or_else(|| format!("Static method '{}' is undefined!", name))?;
+            .ok_or_else(|| todo!())?;
 
         attr.clone().invoke(args)
     }
@@ -42,7 +38,9 @@ impl Type {
         if let Some(method) = self.static_methods.get(&name).cloned() {
             return Ok(SelfMethod::from_static_method(method));
         }
-        Err(format!("Self method '{}' is undefined!", name))
+        //Err(format!("Self method '{}' is undefined!", name))
+
+        todo!("idk errors will happen later")
     }
 }
 
@@ -118,7 +116,6 @@ where
         Args: FromValueList,
         F: Method<T, Args, Result = R>,
         R: ToValueResult + 'static,
-        T: Hash,
         S: ToString,
     {
         self.typ
@@ -141,11 +138,11 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn of(typ: &Type, fields: Vec<Value>) -> Result<Self, RuntimeError> {
+    pub fn of(typ: &Type, fields: Vec<Value>) -> Result<Self, Error> {
         if let Some(ctor) = &typ.constructor {
             ctor.invoke(fields)
         } else {
-            Err(RuntimeError::)
+            todo!()
         }
     }
 
@@ -165,7 +162,8 @@ impl Instance {
         globals
             .types
             .get(&self.type_id)
-            .ok_or_else(|| format!("Type '{:?}' is undefined!", self.debug_type_name))
+            .ok_or_else(|| todo!())?
+            //format!("Type '{:?}' is undefined!", self.debug_type_name)
     }
 
     pub fn name<'a>(&self, globals: &'a Globals) -> &'a str {
@@ -180,7 +178,8 @@ impl Instance {
             .and_then(|c| {
                 c.attributes
                     .get(name)
-                    .ok_or_else(|| format!("Attribute '{}' is undefined!", name))
+                    .ok_or_else(|| todo!())
+                    //format!("Attribute '{}' is undefined!", name)
             })?
             .clone();
         attr.invoke(self, globals)
@@ -207,7 +206,7 @@ impl Instance {
             .as_ref()
             .and_then(|g| {
                 g.types
-                    .get(&hash_type_name::<T>())
+                    .get(name)
                     .map(|ty| ty.name.clone())
             })
             .unwrap_or_else(|| self.debug_type_name.to_owned());
@@ -215,7 +214,8 @@ impl Instance {
         self.inner
             .as_ref()
             .downcast_ref()
-            .ok_or_else(|| format!("Expected type '{}', got '{}'!", expected_name, name))
+            .ok_or_else(|| todo!())
+            //format!("Expected type '{}', got '{}'!", expected_name, name)
     }
 
     pub fn raw<T: Send + Sync + 'static>(&self) -> Result<&T, Error> {

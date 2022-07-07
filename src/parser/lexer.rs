@@ -1,4 +1,10 @@
+use std::{ops::Range, path::PathBuf};
+
 use logos::Logos;
+
+use crate::interpreter::value::Value;
+
+use super::parser::{ASTData, ExprKey};
 
 // // ew
 // fn string_flag<'s>(tok: &mut logos::Lexer<'s, Token>) -> String {
@@ -17,28 +23,16 @@ use logos::Logos;
 // }
 
 #[derive(Logos, Debug, PartialEq, Clone)]
-#[logos(subpattern string = r#""(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
+#[logos(subpattern string = r#""\w?((?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
 #[logos(subpattern digits = r#"(\d)([\d_]+)?"#)]
 pub enum Token {
-    #[regex(r#"(?&digits)"#, |lex| lex.slice().parse(), priority = 2)]
-    Int(usize),
-    #[regex(r#"(?&digits)(\.[\d_]+)?"#, |lex| lex.slice().parse(), priority = 1)]
-    Float(f64),
+    #[regex(r#"(0[box])(?&digits)"#)]
+    Int,
+    #[regex(r#"(?&digits)(\.[\d_]+)?"#)]
+    Float,
 
-    // number literals don't match their correct values as their converted (and validated) in the parser
-    #[regex(r#"0b\w+"#, |lex| lex.slice().parse())]
-    BinaryLiteral(String),
-    #[regex(r#"0x\w+"#, |lex| lex.slice().parse())]
-    HexLiteral(String),
-    #[regex(r#"0o\w+"#, |lex| lex.slice().parse(), priority = 1)]
-    OctalLiteral(String),
-
-    #[regex(r#"(?&string)"#, 
-        //|s| convert_string(&s.slice()[1..s.slice().len()-1]),
-        |s| s.slice().parse(),
-        priority = 3 // prioritise normal string over string flags
-    )]
-    String(String),
+    #[regex(r#"(?&string)"#)]
+    String,
 
     // #[regex(r#"_(\w*)?(?&string)"#,
     //     //|s| s.slice()[0..s.slice().find('"').unwrap_or_else(|| s.slice().find("'").unwrap())].parse(), // take up to `"` or `'`
@@ -163,11 +157,11 @@ pub enum Token {
     #[token("!")]
     ExclMark,
 
-    #[regex(r"@[a-zA-Z_]\w*", |lex| lex.slice()[1..].to_string())]
-    TypeIndicator(String),
+    #[regex(r"@[a-zA-Z_]\w*")]
+    TypeIndicator,
 
-    #[regex(r"[a-zA-Z_ඞ][a-zA-Z_0-9ඞ]*", |lex| lex.slice().to_string())]
-    Ident(String),
+    #[regex(r"[a-zA-Z_ඞ][a-zA-Z_0-9ඞ]*")]
+    Ident,
 
     #[regex(r"[ \t\f\n\r]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*", logos::skip)]
     #[error]
@@ -180,17 +174,14 @@ impl Token {
     // used in error messages
     pub fn tok_name(&self) -> String {
         match self {
-            Token::Int(v) => return v.to_string(),
-            Token::Float(v) => return v.to_string(),
-            Token::BinaryLiteral(b) => b,
-            Token::HexLiteral(h) => h,
-            Token::OctalLiteral(o) => o,
-            Token::String(v) => v,
-            Token::TypeIndicator(v) => return format!("@{}", v),
+            Token::Int => "int",
+            Token::Float => "float",
+            Token::String => "string",
+            Token::TypeIndicator => "type indicator",
             Token::Let => "let",
             Token::Mut => "mut",
-            Token::Ident(n) => n,
-            Token::Error => "unknown",
+            Token::Ident => "identifier",
+            Token::Error => "invalid",
             Token::Eof => "end of file",
             Token::True => "true",
             Token::False => "false",
@@ -253,16 +244,15 @@ impl Token {
                 "operator"
             }
 
-            Int(_) | Float(_) | BinaryLiteral(_) | HexLiteral(_) | OctalLiteral(_) | String(_)
-            | True | False => "literal",
+            Int | Float | String | True | False => "literal",
 
-            Ident(_) => "identifier",
+            Ident => "identifier",
 
             Let | Mut | For | While | If | Else | In | Return | Break | Continue | TypeDef
             | Impl | Print | Split => "keyword",
 
             Error => "",
-            TypeIndicator(_) => "type indicator",
+            TypeIndicator => "type indicator",
 
             LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma | Colon
             | DoubleColon | FatArrow | Arrow | QMark | ExclMark | Eol | Eof => "terminator",
@@ -272,6 +262,8 @@ impl Token {
 
 pub type Span = (usize, usize);
 pub type Tokens = Vec<(Token, Span)>;
+
+const EOL: &[Token] = &[Token::Eol];
 
 pub fn lex(code: String) -> Tokens {
     let mut tokens_iter = Token::lexer(&code);
@@ -283,4 +275,105 @@ pub fn lex(code: String) -> Tokens {
     tokens.push((Token::Eof, (code.len(), code.len() + 1)));
 
     tokens
+}
+
+#[derive(Clone)]
+pub struct Lexer {
+    tokens: logos::Lexer<'static, Token>,
+    file: Option<PathBuf>,
+}
+
+use super::error::SyntaxError;
+impl Lexer {
+    pub fn new<S: AsRef<str>, P: Into<PathBuf>>(src: S, file: Option<P>) -> Self {
+        let src = unsafe { Lexer::make_static(src.as_ref()) };
+
+        let file = file.map(|p| p.into());
+        let tokens = logos::Lexer::new(src);
+
+        Lexer { tokens, file }
+    }
+
+    pub fn next(&mut self) -> Option<Spanned<Token>> {
+        let next_token = self.tokens.next()?;
+        let span = self.tokens.span();
+
+        Some(Spanned::<Token> {
+            data: next_token,
+            span: span.into(),
+        })
+    }
+
+    pub fn peek(&mut self) -> Option<Spanned<Token>> {
+        let tokens = self.clone();
+        tokens.next()
+    }
+
+    pub fn parse(&mut self) -> ASTData {
+        let mut data = ASTData::default();
+        todo!()
+    }
+
+    pub fn parse_int(&mut self, ast_data: &mut ASTData) -> crate::error::Result<ExprKey> {
+        let next_token = self.next().unwrap_or_else(|| todo!("unexpected eof (syntax)"));
+
+        let codespan = &self.tokens.source()[next_token.span.to_range()];
+        let int = match &codespan[0..2] {
+            "0x" => todo!(),
+            "0b" => todo!(),
+            "0o" => todo!(),
+            n if n.chars().all(char::is_numeric) => n.parse::<u32>(),
+            other => return Err(SyntaxError::InvalidLiteral {
+                literal: other.to_string(),
+                area: todo!(),
+            }.wrap()),
+        };
+
+        todo!()
+    }
+
+    pub fn parse_expr(&mut self, ast_data: &mut ASTData) -> crate::error::Result<ExprKey> {
+        match self.peek().unwrap_or_else(|| todo!("unexpected eof (syntax)")).data {
+            Token::Int => self.parse_int(ast_data),
+            // haven't removed yet because there's so much code that uses it and that code can be reused here with necessary changes
+            _ => todo!(),
+        }
+    }
+
+    /// Used to eliminate having 'a lifetime on Lexer
+    unsafe fn make_static<'a>(d: &'a str) -> &'static str {
+        std::mem::transmute::<&'a str, &'static str>(d)
+    }
+}
+
+pub struct CodeSpan {
+    start: usize,
+    end: usize,
+}
+
+pub struct Spanned<T> {
+    data: T,
+    span: CodeSpan,
+}
+
+impl CodeSpan {
+    pub fn len(&self) -> usize {
+        self.end - self.start
+    }
+
+    pub fn to_range(self) -> Range<usize> {
+        self.into()
+    }
+}
+
+impl From<Range<usize>> for CodeSpan {
+    fn from(Range { start, end }: Range<usize>) -> Self {
+        Self { start, end }
+    }
+}
+
+impl From<CodeSpan> for Range<usize> {
+    fn from(CodeSpan { start, end }: CodeSpan) -> Self {
+        start..end
+    }
 }

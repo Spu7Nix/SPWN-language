@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use ahash::AHashMap;
 
-use super::from_value::FromValueList;
+use super::from_value::{FromValueList, Error};
 use super::interpreter::Globals;
 use super::method::{Function, Method};
 use super::to_value::ToValueResult;
 use super::types::Instance;
 use super::value::Value;
+
 
 type StaticMethodType<T> = Arc<dyn Fn(Vec<Value>) -> Result<T, Error> + Send + Sync>;
 type SelfMethodType<T> =
@@ -115,8 +116,7 @@ impl Constructor {
         Constructor(Arc::new(move |args: Vec<Value>| {
             Args::from_value_list(&args).map(|args| {
                 let s = f.invoke(args);
-                let id = (&s).hash_id();
-                Instance::new(s, id)
+                Instance::new(s, s.name)
             })
         }))
     }

@@ -1,2 +1,2 @@
 pub mod compiler;
-mod error;
+pub mod error;

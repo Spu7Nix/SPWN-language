@@ -8,18 +8,21 @@ use crate::parser::lexer::Span;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SpwnSource {
     File(PathBuf),
+    Repl(String),
 }
 
 impl SpwnSource {
     pub fn name(&self) -> String {
         match self {
             Self::File(f) => f.display().to_string(),
+            Self::Repl(_) => "repl".to_string(),
         }
     }
 
     pub fn contents(&self) -> String {
         match self {
             Self::File(f) => fs::read_to_string(f).unwrap(), // existance of file should have been already checked beforehand
+            Self::Repl(src) => src.to_string()
         }
     }
 

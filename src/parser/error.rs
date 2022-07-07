@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::string::ToString;
 
 use crate::error_maker;
@@ -6,7 +7,7 @@ use crate::sources::CodeArea;
 error_maker! {
     pub enum SyntaxError {
         #[
-            Message = "Unexpected character", Area = area, Note = None,
+            Message = "Unexpected character", Area = match area {}, Note = None,
             Labels = [
                 area => "Expected `{}` found {} `{}`": @(expected), @(typ), @(found);
             ]
@@ -15,7 +16,7 @@ error_maker! {
             expected: String,
             found: String,
             typ: String,
-            area: CodeArea,
+            area: Option<PathBuf>,
         },
         #[
             Message = "Unmatched character", Area = area, Note = None,
@@ -48,5 +49,11 @@ error_maker! {
             literal: String,
             area: CodeArea,
         },
+    }
+}
+
+impl SyntaxError {
+    pub fn wrap(self) -> Error {
+        Error::Syntax(self)
     }
 }

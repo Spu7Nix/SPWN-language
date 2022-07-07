@@ -232,27 +232,6 @@ fn parse_unit(
             ast_data.insert_expr(Expression::Literal(Literal::Int(*n)), span_ar!(0)),
             pos + 1,
         )),
-        Token::BinaryLiteral(b) => Ok((
-            ast_data.insert_expr(
-                Expression::Literal(Literal::Int(parse_number_radix(b, 2, "0b", span_ar!(0))?)),
-                span_ar!(0),
-            ),
-            pos + 1,
-        )),
-        Token::HexLiteral(h) => Ok((
-            ast_data.insert_expr(
-                Expression::Literal(Literal::Int(parse_number_radix(h, 16, "0x", span_ar!(0))?)),
-                span_ar!(0),
-            ),
-            pos + 1,
-        )),
-        Token::OctalLiteral(o) => Ok((
-            ast_data.insert_expr(
-                Expression::Literal(Literal::Int(parse_number_radix(o, 8, "0o", span_ar!(0))?)),
-                span_ar!(0),
-            ),
-            pos + 1,
-        )),
         Token::Float(n) => Ok((
             ast_data.insert_expr(Expression::Literal(Literal::Float(*n)), span_ar!(0)),
             pos + 1,

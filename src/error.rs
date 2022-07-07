@@ -1,4 +1,10 @@
+use std::fmt::Display;
+use std::io::Write;
+
 use ariadne::Color;
+use crate::parser::error::SyntaxError;
+use crate::interpreter::error::RuntimeError;
+use crate::compiler::error::CompilerError;
 
 pub const ERROR_S: f64 = 0.4;
 pub const ERROR_V: f64 = 1.0;
@@ -10,6 +16,24 @@ pub struct RainbowColorGenerator {
     v: f64,
     shift: f64,
 }
+
+#[derive(Debug)]
+pub enum Error {
+    Syntax(SyntaxError),
+    Runtime(RuntimeError),
+    Compiler(CompilerError),
+}
+
+impl Display for self::Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl std::error::Error for self::Error {}
+
+
+pub type Result<T> = std::result::Result<T, self::Error>;
 
 impl RainbowColorGenerator {
     pub fn new(h: f64, s: f64, v: f64, shift: f64) -> Self {
@@ -82,6 +106,7 @@ macro_rules! error_maker {
         use $crate::Globals;
 
         $(
+            #[derive(Debug)]
             pub enum $err_type {
                 $(
                     $variant {
@@ -93,7 +118,7 @@ macro_rules! error_maker {
             }
 
             impl $err_type {
-                pub fn raise(self, source: $crate::sources::SpwnSource $(, $globals: &Globals)?) {
+                pub fn raise(self, source: $crate::sources::SpwnSource $(, $globals: &Globals)?) -> String {
                     let mut label_colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 45.0);
                     let mut item_colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 15.0);
 
@@ -128,13 +153,21 @@ macro_rules! error_maker {
                         report = report.with_note(m)
                     }
 
+                    let ret = vec![];
+
                     report
                         .finish()
-                        .eprint((source.name(), Source::from(source.contents())))
+                        .write((source.name(), Source::from(source.contents())), &mut ret)
                         .unwrap();
+
+                    std::str::from_utf8(&ret).unwrap().to_string()
                 }
             }
         )*
 
     };
 }
+
+
+
+
