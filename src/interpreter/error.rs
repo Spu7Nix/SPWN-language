@@ -5,6 +5,7 @@ use crate::interpreter::value::ValueType;
 use crate::sources::CodeArea;
 
 error_maker! {
+    Globals: globals;
     pub enum RuntimeError {
         #[
             Message = "Invalid operands", Area = area, Note = None,
@@ -20,6 +21,7 @@ error_maker! {
             op: String,
             area: CodeArea,
         },
+
         #[
             Message = "Invalid unary operand", Area = area, Note = None,
             Labels = [
@@ -32,6 +34,7 @@ error_maker! {
             op: String,
             area: CodeArea,
         },
+
         #[
             Message = "Cannot convert type", Area = a.def_area, Note = None,
             Labels = [
@@ -42,6 +45,7 @@ error_maker! {
             a: StoredValue,
             to: ValueType,
         },
+
         #[
             Message = "Use of undefined type", Area = area, Note = None,
             Labels = [
@@ -52,6 +56,7 @@ error_maker! {
             name: String,
             area: CodeArea,
         },
+
         #[
             Message = "Invalid call base", Area = area, Note = None,
             Labels = [
@@ -63,6 +68,7 @@ error_maker! {
             base: StoredValue,
             area: CodeArea,
         },
+
         #[
             Message = "Use of undefined macro argument", Area = area, Note = None,
             Labels = [
@@ -75,6 +81,7 @@ error_maker! {
             macr: StoredValue,
             area: CodeArea,
         },
+
         #[
             Message = "Type mismatch", Area = area, Note = None,
             Labels = [
@@ -87,12 +94,13 @@ error_maker! {
             expected: String,
             area: CodeArea,
         },
+
         #[
             Message = "Pattern mismatch", Area = area, Note = None,
             Labels = [
-                area => "This {} is not {}": @(v.value.get_type().to_str()), @(pat.value.to_str());
+                area => "This {} is not {}": @(v.value.get_type().to_str()), @(pat.value.to_str(globals));
                 v.def_area => "This is of type {}": @(v.value.get_type().to_str());
-                pat.def_area => "Pattern defined as {} here": @(pat.value.to_str());
+                pat.def_area => "Pattern defined as {} here": @(pat.value.to_str(globals));
             ]
         ]
         PatternMismatch {
@@ -100,6 +108,7 @@ error_maker! {
             pat: StoredValue,
             area: CodeArea,
         },
+
         #[
             Message = "Argument not satisfied", Area = call_area, Note = None,
             Labels = [
@@ -112,6 +121,7 @@ error_maker! {
             call_area: CodeArea,
             arg_area: CodeArea,
         },
+
         #[
             Message = "Too many arguments!", Area = call_area, Note = None,
             Labels = [
@@ -124,6 +134,17 @@ error_maker! {
             provided: usize,
             call_area: CodeArea,
             func: StoredValue,
+        },
+
+        #[
+            Message = "Type has no constructor!", Area = area, Note = None,
+            Labels = [
+                area => "Tried to call `{}`'s constructor here": @(typ);
+            ]
+        ]
+        NoConstructor {
+            typ: String,
+            area: CodeArea,
         },
     }
 }

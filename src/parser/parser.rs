@@ -184,6 +184,8 @@ pub enum Expression {
     TriggerFunc(Statements),
 
     Instance(ExprKey, Vec<(String, Option<ExprKey>)>),
+
+    Split(ExprKey, ExprKey),
 }
 
 #[derive(Debug, Clone)]
@@ -513,6 +515,20 @@ fn parse_unit(
             Ok((
                 ast_data.insert_expr(
                     Expression::TriggerFunc(code),
+                    parse_data.source.to_area((start.0, span!(-1).1)),
+                ),
+                pos,
+            ))
+        }
+
+        Token::Split => {
+            pos += 1;
+            parse!(parse_expr => let a);
+            check_tok!(Colon else ":");
+            parse!(parse_expr => let b);
+            Ok((
+                ast_data.insert_expr(
+                    Expression::Split(a, b),
                     parse_data.source.to_area((start.0, span!(-1).1)),
                 ),
                 pos,

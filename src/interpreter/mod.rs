@@ -1,5 +1,10 @@
-pub mod interpreter;
 pub mod contexts;
 pub mod converter;
-pub mod value;
 mod error;
+mod from_value;
+pub mod interpreter;
+mod method;
+mod to_value;
+// mod type_method;
+// mod types;
+pub mod value;

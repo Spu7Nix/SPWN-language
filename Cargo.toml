@@ -12,7 +12,7 @@ license = "MIT"
 [dependencies]
 logos = "0.12.1"
 ariadne = "0.1.5"
-slotmap = "1.0.6"
+slotmap = { version = "1.0.6", features = ["serde"] }
 ansi_term = "0.12.1"
 regex = "1.5.6"
 thiserror = "1.0.31"

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::interpreter::{StoredValue, ValueKey};
+use super::interpreter::{Globals, StoredValue, ValueKey};
 
 use crate::sources::CodeArea;
 
@@ -26,9 +26,9 @@ pub enum Value {
 
     Empty,
 
-    Array(Vec<StoredValue>),
-    Dict(HashMap<String, StoredValue>),
-    Maybe(Option<Box<StoredValue>>),
+    Array(Vec<ValueKey>),
+    Dict(HashMap<String, ValueKey>),
+    Maybe(Option<ValueKey>),
 
     TypeIndicator(ValueType),
     Pattern(Pattern),
@@ -42,8 +42,8 @@ pub enum Value {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Macro {
     pub func_id: usize,
-    pub args: Vec<((String, CodeArea), Option<StoredValue>, Option<StoredValue>)>,
-    pub ret_type: Box<StoredValue>,
+    pub args: Vec<((String, CodeArea), Option<ValueKey>, Option<ValueKey>)>,
+    pub ret_type: ValueKey,
 }
 
 impl Value {
@@ -70,7 +70,7 @@ impl Value {
             Value::Macro(_) => ValueType::Macro,
         }
     }
-    pub fn to_str(&self) -> String {
+    pub fn to_str(&self, globals: &Globals) -> String {
         match self {
             Value::Int(v) => v.to_string(),
             Value::Float(v) => v.to_string(),
@@ -80,19 +80,19 @@ impl Value {
             Value::Array(arr) => format!(
                 "[{}]",
                 arr.iter()
-                    .map(|v| v.value.to_str())
+                    .map(|v| globals.memory[*v].value.to_str(globals))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
             Value::Dict(map) => format!(
                 "{{{}}}",
                 map.iter()
-                    .map(|(k, v)| format!("{}: {}", k, v.value.to_str()))
+                    .map(|(k, v)| format!("{}: {}", k, globals.memory[*v].value.to_str(globals)))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
             Value::Maybe(None) => "?".into(),
-            Value::Maybe(Some(v)) => format!("{}?", v.value.to_str()),
+            Value::Maybe(Some(v)) => format!("{}?", globals.memory[*v].value.to_str(globals)),
             Value::TypeIndicator(typ) => typ.to_str(),
             Value::Pattern(p) => p.to_str(),
             Value::Group(_) => todo!(),
@@ -110,12 +110,12 @@ impl Value {
                                 "{}{}{}",
                                 n,
                                 if let Some(t) = t {
-                                    format!(": {}", t.value.to_str())
+                                    format!(": {}", globals.memory[*t].value.to_str(globals))
                                 } else {
                                     "".into()
                                 },
                                 if let Some(d) = d {
-                                    format!(" = {}", d.value.to_str())
+                                    format!(" = {}", globals.memory[*d].value.to_str(globals))
                                 } else {
                                     "".into()
                                 },
@@ -123,9 +123,64 @@ impl Value {
                         })
                         .collect::<Vec<_>>()
                         .join(", "),
-                    ret_type.value.to_str(),
+                    globals.memory[*ret_type].value.to_str(globals),
                 )
             }
+        }
+    }
+    pub fn deep_clone(&self, globals: &mut Globals) -> Value {
+        match self {
+            Value::Int(_)
+            | Value::Float(_)
+            | Value::String(_)
+            | Value::Bool(_)
+            | Value::Empty
+            | Value::TypeIndicator(_)
+            | Value::Pattern(_)
+            | Value::Group(_)
+            | Value::TriggerFunc { .. } => self.clone(),
+            Value::Array(arr) => Value::Array(
+                arr.iter()
+                    .map(|v| globals.key_deep_clone(*v))
+                    .collect::<Vec<_>>(),
+            ),
+            Value::Dict(map) => Value::Dict(
+                map.iter()
+                    .map(|(k, v)| (k.clone(), globals.key_deep_clone(*v)))
+                    .collect(),
+            ),
+            Value::Maybe(v) => Value::Maybe(v.map(|v| globals.key_deep_clone(v))),
+            Value::Macro(Macro {
+                func_id,
+                args,
+                ret_type,
+            }) => {
+                let args = args
+                    .iter()
+                    .map(|(s, t, d)| {
+                        (
+                            s.clone(),
+                            t.map(|t| globals.key_deep_clone(t)),
+                            d.map(|d| globals.key_deep_clone(d)),
+                        )
+                    })
+                    .collect();
+                let ret_type = globals.key_deep_clone(*ret_type);
+                Value::Macro(Macro {
+                    func_id: *func_id,
+                    args,
+                    ret_type,
+                })
+            }
+        }
+    }
+}
+
+impl StoredValue {
+    pub fn deep_clone(&self, globals: &mut Globals) -> StoredValue {
+        StoredValue {
+            value: self.value.deep_clone(globals),
+            def_area: self.def_area.clone(),
         }
     }
 }
@@ -192,9 +247,10 @@ pub mod value_ops {
     use super::Value;
     use super::ValueType;
 
+    use crate::interpreter::interpreter::Globals;
     use crate::sources::CodeArea;
 
-    pub fn equality(a: &Value, b: &Value) -> bool {
+    pub fn equality(a: &Value, b: &Value, globals: &Globals) -> bool {
         match (a, b) {
             (Value::Int(n1), Value::Float(n2)) => *n1 as f64 == *n2,
             (Value::Float(n1), Value::Int(n2)) => *n1 == *n2 as f64,
@@ -203,9 +259,13 @@ pub mod value_ops {
                 if arr1.len() != arr2.len() {
                     false
                 } else {
-                    arr1.iter()
-                        .zip(arr2)
-                        .all(|(a, b)| equality(&a.value, &b.value))
+                    arr1.iter().zip(arr2).all(|(a, b)| {
+                        equality(
+                            &globals.memory[*a].value,
+                            &globals.memory[*b].value,
+                            globals,
+                        )
+                    })
                 }
             }
             (Value::Dict(map1), Value::Dict(map2)) => {
@@ -215,7 +275,11 @@ pub mod value_ops {
                     for (k, a) in map1 {
                         match map2.get(k) {
                             Some(b) => {
-                                if !equality(&a.value, &b.value) {
+                                if !equality(
+                                    &globals.memory[*a].value,
+                                    &globals.memory[*b].value,
+                                    globals,
+                                ) {
                                     return false;
                                 }
                             }
@@ -227,7 +291,11 @@ pub mod value_ops {
             }
 
             (Value::Maybe(None), Value::Maybe(None)) => true,
-            (Value::Maybe(Some(a)), Value::Maybe(Some(b))) => equality(&a.value, &b.value),
+            (Value::Maybe(Some(a)), Value::Maybe(Some(b))) => equality(
+                &globals.memory[*a].value,
+                &globals.memory[*b].value,
+                globals,
+            ),
 
             _ => a == b,
         }
@@ -265,6 +333,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 + *n2),
@@ -292,6 +361,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 - *n2),
@@ -313,6 +383,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 * *n2),
@@ -341,6 +412,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 / *n2),
@@ -362,6 +434,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 % *n2),
@@ -383,6 +456,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => {
@@ -406,20 +480,23 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
-        Ok(Value::Bool(equality(&a.value, &b.value)).into_stored(area))
+        Ok(Value::Bool(equality(&a.value, &b.value, globals)).into_stored(area))
     }
     pub fn not_eq(
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
-        Ok(Value::Bool(!equality(&a.value, &b.value)).into_stored(area))
+        Ok(Value::Bool(!equality(&a.value, &b.value, globals)).into_stored(area))
     }
     pub fn greater(
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 > *n2),
@@ -441,6 +518,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 >= *n2),
@@ -462,6 +540,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 < *n2),
@@ -483,6 +562,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 <= *n2),
@@ -532,6 +612,7 @@ pub mod value_ops {
         a: &StoredValue,
         b: &StoredValue,
         area: CodeArea,
+        globals: &Globals,
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (a, Value::TypeIndicator(typ)) => Value::Bool(&a.get_type() == typ),

@@ -1,6 +1,14 @@
 
-f = (a, b, c: @int) => ();
+
+
+// debug splitting syntax
+let a = split 0:1;
+if a == 1 {
+    a = split 1:2;
+}
+
+print a;
 
 
 
-f(1, 2, 3, c = 1.5);
+

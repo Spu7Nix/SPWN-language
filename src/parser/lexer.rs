@@ -82,6 +82,8 @@ pub enum Token {
 
     #[token("print")]
     Print,
+    #[token("split")]
+    Split,
 
     #[token("is")]
     Is,
@@ -222,6 +224,7 @@ impl Token {
             Token::Break => "break",
             Token::Continue => "continue",
             Token::Print => "print",
+            Token::Split => "split",
             Token::Is => "is",
             Token::Eq => "==",
             Token::NotEq => "!=",
@@ -256,7 +259,7 @@ impl Token {
             Ident(_) => "identifier",
 
             Let | Mut | For | While | If | Else | In | Return | Break | Continue | TypeDef
-            | Impl | Print => "keyword",
+            | Impl | Print | Split => "keyword",
 
             Error => "",
             TypeIndicator(_) => "type indicator",

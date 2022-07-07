@@ -225,6 +225,7 @@ pub enum Instruction {
     ExitScope,
 
     Print,
+    Split,
 }
 
 pub struct Scope {
@@ -578,6 +579,11 @@ impl Compiler {
                 }
                 self.compile_expr(typ, scope, func)?;
                 self.push_instr(Instruction::Instance(idx), func);
+            }
+            Expression::Split(a, b) => {
+                self.compile_expr(a, scope, func)?;
+                self.compile_expr(b, scope, func)?;
+                self.push_instr(Instruction::Split, func);
             }
         }
 

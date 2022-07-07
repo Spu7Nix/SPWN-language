@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use ahash::AHashMap;
 use compiler::compiler::{Compiler, Scope};
 use interpreter::contexts::{Context, FullContext};
-use interpreter::interpreter::{execute, Globals};
+use interpreter::interpreter::{execute_code, Globals};
 use parser::lexer::lex;
 use parser::parser::{parse, ASTData, ParseData};
 use slotmap::SlotMap;
@@ -65,12 +65,6 @@ fn run(code: String, source: SpwnSource) {
 
                     // println!("{:?}", bytes);
 
-                    let mut globals = Globals {
-                        memory: SlotMap::default(),
-                        types: AHashMap::new(),
-                        contexts: FullContext::single(compiler.code.var_count),
-                    };
-                    globals.init();
                     // let mut globals = Globals {
                     //     memory: SlotMap::default(),
                     //     contexts: FullContext::Split(
@@ -79,8 +73,11 @@ fn run(code: String, source: SpwnSource) {
                     //     ),
                     // };
 
-                    if let Err(e) = execute(&mut globals, &compiler.code, 0) {
-                        e.raise(source);
+                    let mut globals = Globals::new();
+                    globals.init();
+
+                    if let Err(e) = execute_code(&mut globals, &compiler.code) {
+                        e.raise(source, &globals);
                     }
                 }
                 Err(e) => e.raise(source),

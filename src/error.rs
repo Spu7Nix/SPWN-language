@@ -55,6 +55,7 @@ impl RainbowColorGenerator {
 macro_rules! error_maker {
     (
         $(
+            $( Globals: $globals:ident; )?
             pub enum $err_type:ident {
                 $(
                     #[
@@ -77,6 +78,8 @@ macro_rules! error_maker {
     ) => {
         use $crate::error::*;
         use ariadne::{Report, ReportKind, Label, Source, Fmt};
+        #[allow(unused_imports)]
+        use $crate::Globals;
 
         $(
             pub enum $err_type {
@@ -90,7 +93,7 @@ macro_rules! error_maker {
             }
 
             impl $err_type {
-                pub fn raise(self, source: $crate::sources::SpwnSource) {
+                pub fn raise(self, source: $crate::sources::SpwnSource $(, $globals: &Globals)?) {
                     let mut label_colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 45.0);
                     let mut item_colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 15.0);
 
