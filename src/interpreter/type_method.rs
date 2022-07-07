@@ -4,16 +4,34 @@ use std::sync::Arc;
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 
-use super::from_value::{Error, FromValueList};
+use super::from_value::FromValueList;
 use super::interpreter::Globals;
 use super::method::{Function, Method};
 use super::to_value::ToValueResult;
 use super::types::Instance;
 use super::value::Value;
 
-type StaticMethodType<T> = Arc<dyn Fn(Vec<Value>) -> Result<T, Error> + Send + Sync>;
-type SelfMethodType<T> =
-    Arc<dyn Fn(&Instance, Vec<Value>, &mut Globals) -> Result<T, Error> + Send + Sync>;
+type Error = dyn std::error::Error;
+
+trait StaticMethodTrait<T>:
+    Fn(Vec<Value>) -> Result<T, Error>
+    + Send
+    + Sync
+    + erased_serde::Serialize
+    + erased_serde::Deserializer<'static>
+{
+}
+trait SelfMethodTrait<T>:
+    Fn(&Instance, Vec<Value>, &mut Globals) -> Result<T, Error>
+    + Send
+    + Sync
+    + erased_serde::Serialize
+    + erased_serde::Deserializer<'static>
+{
+}
+
+type StaticMethodType<T> = Arc<dyn StaticMethodTrait<T>>;
+type SelfMethodType<T> = Arc<dyn SelfMethodTrait<T>>;
 
 // `SelfMethod` i.e. a instance method (where `self` is the first argument)
 #[derive(Serialize, Deserialize, Clone)]

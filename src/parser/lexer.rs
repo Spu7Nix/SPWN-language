@@ -4,12 +4,13 @@ use std::{ops::Range, path::PathBuf};
 use base64;
 use lasso::{Rodeo, Spur};
 use logos::Logos;
+use serde::{Deserialize, Serialize};
 
 use super::ast::{ASTData, ExprKey, Expression};
 
 const INVALID_CHARACTER: char = '\u{FFFD}'; // `�`
 
-#[derive(Logos, Debug, PartialEq, Clone)]
+#[derive(Logos, Debug, PartialEq, Clone, Copy)]
 #[logos(subpattern digits = r#"(\d)([\d_])*"#)]
 pub enum Token {
     #[regex(r#"(0[b])(?&digits)"#)]
@@ -153,7 +154,7 @@ pub enum Token {
 
 impl Token {
     // used in error messages
-    pub fn tok_name(&self) -> String {
+    pub fn tok_name(&self) -> &str {
         match self {
             Token::Int => "int",
             Token::Float => "float",
@@ -215,7 +216,6 @@ impl Token {
             Token::Impl => "impl",
             //Token::StringFlag(v) => v,
         }
-        .into()
     }
     // also used in error messages
     pub fn tok_typ(&self) -> &str {
@@ -293,11 +293,10 @@ impl Lexer {
         let tokens = self.clone();
         tokens.next()
     }
-    pub fn peek_n(&mut self, n: u32) -> Option<Spanned<Token>> {
+    pub fn peek_2(&mut self, n: u32) -> Option<Spanned<Token>> {
         let tokens = self.clone();
-        for _ in n {
-            tokens.next()
-        }
+        tokens.next();
+        tokens.next()
     }
 
     pub fn expected_err(
@@ -305,27 +304,44 @@ impl Lexer {
         expected: String,
         found: Option<Spanned<Token>>,
     ) -> crate::error::Error {
+        let (tok_name, tok_typ, span) = if let Some(t) = found {
+            (t.data.tok_name(), t.data.tok_typ(), t.span)
+        } else {
+            (
+                "end of file",
+                "",
+                (self.tokens.source().len()..self.tokens.source().len()).into(),
+            )
+        };
         SyntaxError::Expected {
             expected,
-            found: if let Some(t),
-            typ: found.tok_typ(),
+            found: tok_name.into(),
+            typ: tok_typ.into(),
             area: CodeArea {
                 span,
-                source: self.tokens.source(),
+                source: self.file,
             },
         }
         .wrap()
     }
 
     pub fn expect(&mut self, expected: Token) -> crate::error::Result<CodeSpan> {
-        let next = self.next().unwrap_or_else(todo!("dfgsdfgdf"));
-        if !matches!(self.next(), tok) {
-            return Err(self.expected_err(expected.tok_name(), next.data, next.span));
+        let next = self.next();
+        if !matches!(next, Some(expected)) {
+            return Err(self.expected_err(expected.tok_name().into(), next));
         }
-        Ok(next.span)
+        Ok(next.unwrap().span)
     }
+
     pub fn slice(&self, span: CodeSpan) -> &str {
-        self.tokens.source()[span]
+        &self.tokens.source()[span.to_range()]
+    }
+
+    pub fn make_area(&self, span: CodeSpan) -> CodeArea {
+        CodeArea {
+            span,
+            source: self.file,
+        }
     }
 
     pub fn parse(&mut self) -> ASTData {
@@ -341,9 +357,9 @@ impl Lexer {
         let src = &self.tokens.source()[span.to_range()];
 
         let int: u64 = match &src[0..2] {
-            "0x" => self.parse_int_radix(&src[2..], 16, span)?,
-            "0o" => self.parse_int_radix(&src[2..], 8, span)?,
-            "0b" => self.parse_int_radix(&src[2..], 2, span)?,
+            "0x" => self.parse_int_radix(&src[2..], 16, span),
+            "0o" => self.parse_int_radix(&src[2..], 8, span),
+            "0b" => self.parse_int_radix(&src[2..], 2, span),
             n if n.chars().all(char::is_numeric) => n.parse::<u64>().unwrap(),
             other => {
                 return Err(SyntaxError::InvalidLiteral {
@@ -383,7 +399,7 @@ impl Lexer {
         Ok(ast_data
             .exprs
             .insert((Expression::Bool(src.parse::<bool>().unwrap()), span)))
-    } // wa
+    }
 
     pub fn parse_string(&mut self, ast_data: &mut ASTData) -> crate::error::Result<ExprKey> {
         let next_token = self.next().unwrap();
@@ -403,22 +419,31 @@ impl Lexer {
                 let b_array = chars.collect::<String>().as_bytes();
                 let b_expr_array = b_array
                     .iter()
-                    .map(|b| ast_data.exprs.insert(Expression::Byte(b)))
+                    .map(|b| ast_data.exprs.insert((Expression::Byte(*b), span)))
                     .collect();
 
-                Ok(ast_data.exprs.insert(Expression::Array(b_expr_array)))
+                Ok(ast_data
+                    .exprs
+                    .insert((Expression::Array(b_expr_array), span)))
             }
             "r" => todo!("All escapes but \""),
-            "u" => { // "Unindents the string" (wish me luck)
+            "u" => {
+                // "Unindents the string" (wish me luck)
+                todo!()
             }
             "b64" => {
+                // yo problem, doesnt the chars iterator also have the final `"`?
                 let content = chars.collect::<String>();
-                let out_string = base64::encode(&content).unwrap();
-                Ok(ast_data.exprs.insert(Expression::String(out_string)))
+                let out_string = base64::encode(&content);
+                Ok(ast_data
+                    .exprs
+                    .insert((Expression::String(out_string), span)))
             }
             "\"" => {
                 let out_string: String = chars.collect();
-                Ok(ast_data.exprs.insert(Expression::String(out_string)))
+                Ok(ast_data
+                    .exprs
+                    .insert((Expression::String(out_string), span)))
             }
             _ => todo!("Invalid string flag"),
         }
@@ -431,18 +456,20 @@ impl Lexer {
         loop {
             match chars.next() {
                 Some('\\') => out.push(match chars.next() {
+                    // afpdluih
                     Some('n') => '\n',
                     Some('r') => '\r',
                     Some('t') => '\t',
                     Some('"') => '"',
                     Some('\'') => '\'',
                     Some('\\') => '\\',
-                    Some('u') => self.parse_unicode(span, &mut chars),
+                    Some('u') => self.parse_unicode(span, &mut chars)?,
                     Some(c) => {
                         return Err(SyntaxError::InvalidEscape {
                             character: c,
-                            area: span,
-                        })
+                            area: self.make_area(span),
+                        }
+                        .wrap())
                     }
 
                     None => unreachable!(),
@@ -455,32 +482,19 @@ impl Lexer {
         Ok(out)
     }
 
-    fn parse_unicode(&self, span: CodeSpan, chars: &mut Chars) -> crate::error::Result<String> {
-        let opening_brace = chars.next().unwrap();
-
-        if !matches!(opening_brace, Some('{')) {
-            return Err(SyntaxError::ExpectedErr {
-                expected: "{".into(),
-                found: opening_brace,
-                area: span,
-            });
-        }
+    fn parse_unicode(&self, span: CodeSpan, chars: &mut Chars) -> crate::error::Result<char> {
+        self.expect(Token::RBracket)?;
 
         let hex = chars
             .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
             .collect::<String>();
 
-        let closing_brace = chars.next().unwrap();
+        self.expect(Token::LBracket)?;
 
-        if !matches!(closing_brace, Some('}')) {
-            return Err(SyntaxError::ExpectedErr {
-                expected: "}".into(),
-                found: closing_brace.to_string(),
-                area: span,
-            });
-        }
-
-        Ok(char::from_u32(self.parse_int_radix(&hex, 16, span)?).unwrap_or(INVALID_CHARACTER))
+        Ok(
+            char::from_u32(self.parse_int_radix(&hex, 16, span) as u32)
+                .unwrap_or(INVALID_CHARACTER),
+        )
     }
 
     pub fn parse_identifier(
@@ -566,7 +580,7 @@ impl Lexer {
             args.push((name.into(), arg_type, arg_default));
             arg_spans.push(ident);
             if !matches!(self.peek(), Token::Comma | Token::RParen) {
-                return Err(self.expected_err(") or ,", self.next(), ));
+                return Err(self.expected_err(") or ,", self.next()));
             }
         }
     }
@@ -651,12 +665,13 @@ impl Lexer {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Copy)]
 pub struct CodeSpan {
     start: usize,
     end: usize,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct Spanned<T> {
     data: T,
     span: CodeSpan,

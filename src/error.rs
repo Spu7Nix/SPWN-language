@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::io::Write;
 
-use crate::compiler::error::CompilerError;
+// use crate::compiler::error::CompilerError;
 use crate::interpreter::error::RuntimeError;
 use crate::parser::error::SyntaxError;
 use ariadne::Color;
@@ -21,7 +21,7 @@ pub struct RainbowColorGenerator {
 pub enum Error {
     Syntax(SyntaxError),
     Runtime(RuntimeError),
-    Compiler(CompilerError),
+    // Compiler(CompilerError),
 }
 
 impl Display for self::Error {
@@ -99,10 +99,11 @@ macro_rules! error_maker {
         )*
 
     ) => {
+        use std::path::PathBuf;
         use $crate::error::*;
         use ariadne::{Report, ReportKind, Label, Source, Fmt};
-        #[allow(unused_imports)]
-        use $crate::Globals;
+        // #[allow(unused_imports)]
+        // use $crate::Globals;
 
         $(
             #[derive(Debug)]
@@ -117,7 +118,7 @@ macro_rules! error_maker {
             }
 
             impl $err_type {
-                pub fn raise(self, source: $crate::sources::SpwnSource $(, $globals: &Globals)?) -> String {
+                pub fn raise(self, code: String, source: Option<PathBuf> /*$(, $globals: &Globals)?*/) -> String {
                     let mut label_colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 45.0);
                     let mut item_colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 15.0);
 
@@ -157,7 +158,7 @@ macro_rules! error_maker {
 
                     report
                         .finish()
-                        .write((source.name(), Source::from(source.contents())), &mut ret)
+                        .write((source.name(), Source::from(code)), &mut ret)
                         .unwrap();
 
                     std::str::from_utf8(&ret).unwrap().to_string()

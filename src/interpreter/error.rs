@@ -95,19 +95,19 @@ error_maker! {
             area: CodeArea,
         },
 
-        #[
-            Message = "Pattern mismatch", Area = area, Note = None,
-            Labels = [
-                area => "This {} is not {}": @(v.value.get_type().to_str()), @(pat.value.to_str(globals));
-                v.def_area => "This is of type {}": @(v.value.get_type().to_str());
-                pat.def_area => "Pattern defined as {} here": @(pat.value.to_str(globals));
-            ]
-        ]
-        PatternMismatch {
-            v: StoredValue,
-            pat: StoredValue,
-            area: CodeArea,
-        },
+        // #[
+        //     Message = "Pattern mismatch", Area = area, Note = None,
+        //     Labels = [
+        //         area => "This {} is not {}": @(v.value.get_type().to_str()), @(pat.value.to_str(globals));
+        //         v.def_area => "This is of type {}": @(v.value.get_type().to_str());
+        //         pat.def_area => "Pattern defined as {} here": @(pat.value.to_str(globals));
+        //     ]
+        // ]
+        // PatternMismatch {
+        //     v: StoredValue,
+        //     pat: StoredValue,
+        //     area: CodeArea,
+        // },
 
         #[
             Message = "Argument not satisfied", Area = call_area, Note = None,

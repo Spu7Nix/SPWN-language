@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::string::ToString;
 
 use crate::error_maker;
@@ -16,7 +15,7 @@ error_maker! {
             expected: String,
             found: String,
             typ: String,
-            area: Option<PathBuf>,
+            area: CodeArea,
         },
         #[
             Message = "Unmatched character", Area = area, Note = None,
