@@ -8,11 +8,11 @@ pub trait ToValue {
 }
 
 pub trait ToValueResult {
-    fn to_value_result(self) -> Result<Value, Error>;
+    fn try_to_value(self) -> Result<Value, Error>;
 }
 
 impl<R: ToValue> ToValueResult for R {
-    fn to_value_result(self) -> Result<Value, Error> {
+    fn try_to_value(self) -> Result<Value, Error> {
         Ok(self.to_value())
     }
 }

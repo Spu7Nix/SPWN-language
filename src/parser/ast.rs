@@ -67,7 +67,7 @@ pub enum Expression {
     Block(Statements),
 
     Func {
-        args: Vec<(String, Option<ExprKey>, Option<ExprKey>)>,
+        args: Vec<(ExprKey, Option<ExprKey>, Option<ExprKey>)>,
         ret_type: Option<ExprKey>,
         code: ExprKey,
     },
@@ -89,7 +89,7 @@ pub enum Expression {
     Call {
         base: ExprKey,
         params: Vec<ExprKey>,
-        named_params: Vec<(String, ExprKey)>,
+        named_params: Vec<(ExprKey, ExprKey)>,
     },
     TriggerFuncCall(ExprKey),
 
@@ -97,7 +97,7 @@ pub enum Expression {
 
     TriggerFunc(Statements),
 
-    Instance(ExprKey, Vec<(String, Option<ExprKey>)>),
+    Instance(ExprKey, Vec<(ExprKey, Option<ExprKey>)>),
 
     Split(ExprKey, ExprKey),
 }
@@ -105,8 +105,8 @@ pub enum Expression {
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expr(ExprKey),
-    Let(String, ExprKey),
-    Assign(String, ExprKey),
+    Let(ExprKey, ExprKey),
+    Assign(ExprKey, ExprKey),
     If {
         branches: Vec<(ExprKey, Statements)>,
         else_branch: Option<Statements>,
@@ -116,7 +116,7 @@ pub enum Statement {
         code: Statements,
     },
     For {
-        var: String,
+        var: ExprKey,
         iterator: ExprKey,
         code: Statements,
     },
@@ -124,8 +124,8 @@ pub enum Statement {
     Break,
     Continue,
 
-    TypeDef(String),
-    Impl(ExprKey, Vec<(String, ExprKey)>),
+    TypeDef(ExprKey),
+    Impl(ExprKey, Vec<(ExprKey, ExprKey)>),
     Print(ExprKey),
 }
 

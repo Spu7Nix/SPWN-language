@@ -293,10 +293,16 @@ impl Lexer {
         let tokens = self.clone();
         tokens.next()
     }
-    pub fn peek_2(&mut self, n: u32) -> Option<Spanned<Token>> {
-        let tokens = self.clone();
-        tokens.next();
-        tokens.next()
+
+    pub fn peek_many(&self, n: u32) -> Option<Spanned<Token>> {
+        let mut tokens = self.clone();
+        let last;
+        
+        for _ in 0..n {
+            last = tokens.next();
+        }
+
+        last
     }
 
     pub fn expected_err(
@@ -354,7 +360,7 @@ impl Lexer {
         let next_token = self.next().unwrap();
 
         let span = next_token.span;
-        let src = &self.tokens.source()[span.to_range()];
+        let src: &'static str = &self.tokens.source()[span.to_range()];
 
         let int: u64 = match &src[0..2] {
             "0x" => self.parse_int_radix(&src[2..], 16, span),
@@ -407,7 +413,7 @@ impl Lexer {
         let span = next_token.span;
         let src = &self.tokens.source()[span.to_range()];
 
-        let mut chars = src.chars();
+        let mut chars: Chars = src.chars();
         chars.next_back();
 
         let flag = &*chars
@@ -426,7 +432,7 @@ impl Lexer {
                     .exprs
                     .insert((Expression::Array(b_expr_array), span)))
             }
-            "r" => todo!("All escapes but \""),
+            "r" => todo!("remove all escapes but \""),
             "u" => {
                 // "Unindents the string" (wish me luck)
                 todo!()
@@ -439,7 +445,7 @@ impl Lexer {
                     .exprs
                     .insert((Expression::String(out_string), span)))
             }
-            "\"" => {
+            "" => {
                 let out_string: String = chars.collect();
                 Ok(ast_data
                     .exprs

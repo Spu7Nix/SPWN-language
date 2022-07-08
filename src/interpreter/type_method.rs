@@ -53,7 +53,7 @@ impl SelfMethod {
 
                 instance
                     .and_then(|i| args.map(|a| (i, a)))
-                    .and_then(|(instance, args)| f.invoke(instance, args).to_value_result())
+                    .and_then(|(instance, args)| f.invoke(instance, args).try_to_value())
             },
         ))
     }
@@ -95,7 +95,7 @@ impl StaticMethod {
         F::Result: ToValueResult,
     {
         Self(Arc::new(move |args: Vec<Value>| {
-            Args::from_value_list(&args).and_then(|args| f.invoke(args).to_value_result())
+            Args::from_value_list(&args).and_then(|args| f.invoke(args).try_to_value())
         }))
     }
 
@@ -126,7 +126,7 @@ impl AttributeGetter {
     {
         Self(Arc::new(move |instance, globals: &mut Globals| {
             let instance = instance.downcast(Some(globals));
-            instance.map(&f).and_then(|v| v.to_value_result())
+            instance.map(&f).and_then(|v| v.try_to_value())
         }))
     }
 

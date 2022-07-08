@@ -21,7 +21,9 @@ pub struct StoredValue {
     pub def_area: CodeArea,
 }
 
-pub struct Globals {
+pub struct Globals
+    where Self: Send + Sync
+{
     pub memory: SlotMap<ValueKey, StoredValue>,
 
     //pub types: AHashMap<String, ValueType>,

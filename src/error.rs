@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::io::Write;
 
 // use crate::compiler::error::CompilerError;
 use crate::interpreter::error::RuntimeError;
