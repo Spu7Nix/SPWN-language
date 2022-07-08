@@ -9,39 +9,6 @@ use super::{
 };
 
 #[macro_export]
-// deals with parsing escape characters in strings
-macro_rules! escapes {
-    (
-        $str:ident
-        $(
-            $c:ident:$rep:literal
-        ),
-    *) => {{
-        let out = String::new();
-        let chars = $str.chars();
-
-        match chars.next() {
-            Some('\\') => {
-                out.push(match chars.next() {
-                    $(
-                        Some(c) if c.to_string() == stringify!($c) => $rep
-                    ),*
-                    Some(a) => return Err(SyntaxError::InvalidEscape {
-                        character: a,
-                        area:
-                    })
-                    None => unreachable!()
-                })
-            },
-            Some(c) => out.push(c),
-            None => {},
-        }
-
-        out
-    }}
-}
-
-#[macro_export]
 macro_rules! parse_util {
     ($parse_data:expr, $ast_data:expr, $pos:expr) => {
         #[allow(unused_macros)]

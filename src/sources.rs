@@ -3,53 +3,30 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::parser::lexer::Span;
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub enum SpwnSource {
-    File(PathBuf),
-}
-
-impl SpwnSource {
-    pub fn name(&self) -> String {
-        match self {
-            Self::File(f) => f.display().to_string(),
-        }
-    }
-
-    pub fn contents(&self) -> String {
-        match self {
-            Self::File(f) => fs::read_to_string(f).unwrap(), // existance of file should have been already checked beforehand
-        }
-    }
-
-    pub fn to_area(&self, span: (usize, usize)) -> CodeArea {
-        CodeArea {
-            source: self.clone(),
-            span,
-        }
-    }
-}
+use crate::parser::lexer::{CodeSpan, Span};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CodeArea {
-    pub(crate) source: SpwnSource,
-    pub(crate) span: Span,
+    span: CodeSpan,
+    source: Option<PathBuf>,
 }
 
 impl CodeArea {
     pub fn name(&self) -> String {
-        self.source.name()
+        match self.source {
+            Some(s) => s.display().to_string(),
+            None => "idfk",
+        }
     }
 
     pub fn label(&self) -> (String, std::ops::Range<usize>) {
         (self.name(), self.span.0..self.span.1)
     }
 
-    pub fn stretch(&self, other: &CodeArea) -> CodeArea {
-        CodeArea {
-            source: self.source.clone(),
-            span: (self.span.0, other.span.1),
-        }
-    }
+    // pub fn stretch(&self, other: &CodeArea) -> CodeArea {
+    //     CodeArea {
+    //         source: self.source.clone(),
+    //         span: (self.span.0, other.span.1),
+    //     }
+    // }
 }

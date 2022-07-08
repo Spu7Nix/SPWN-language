@@ -1,16 +1,18 @@
 use super::error::RuntimeError;
 use super::value::Value;
 
+use super::from_value::Error;
+
 pub trait ToValue {
     fn to_value(self) -> Value;
 }
 
 pub trait ToValueResult {
-    fn to_value_result(self) -> Result<Value, RuntimeError>;
+    fn try_to_value(self) -> Result<Value, Error>;
 }
 
 impl<R: ToValue> ToValueResult for R {
-    fn to_value_result(self) -> Result<Value, RuntimeError> {
+    fn try_to_value(self) -> Result<Value, Error> {
         Ok(self.to_value())
     }
 }

@@ -50,3 +50,9 @@ error_maker! {
         },
     }
 }
+
+impl SyntaxError {
+    pub fn wrap(self) -> Error {
+        Error::Syntax(self)
+    }
+}

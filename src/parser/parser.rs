@@ -13,209 +13,7 @@ use crate::sources::{CodeArea, SpwnSource};
 
 use super::parse_util::{operators, OpType};
 
-new_key_type! {
-    pub struct ExprKey;
-    pub struct StmtKey;
-}
-
-// just helper for ASTData::area
-pub enum KeyType {
-    Expr(ExprKey),
-    StmtKey(StmtKey),
-}
-
-// just helper for ASTData::area
-pub trait ASTKey {
-    fn to_key(&self) -> KeyType;
-}
-impl ASTKey for ExprKey {
-    fn to_key(&self) -> KeyType {
-        KeyType::Expr(*self)
-    }
-}
-impl ASTKey for StmtKey {
-    fn to_key(&self) -> KeyType {
-        KeyType::StmtKey(*self)
-    }
-}
-
-#[derive(Default)]
-pub struct ASTData {
-    pub exprs: SlotMap<ExprKey, (Expression, CodeArea)>,
-    pub stmts: SlotMap<StmtKey, (Statement, CodeArea)>,
-
-    pub stmt_arrows: SecondaryMap<StmtKey, bool>,
-
-    pub for_loop_iter_areas: SecondaryMap<StmtKey, CodeArea>,
-    pub func_arg_areas: SecondaryMap<ExprKey, Vec<CodeArea>>,
-
-    pub dictlike_areas: SecondaryMap<ExprKey, Vec<CodeArea>>,
-}
-impl ASTData {
-    // pub fn insert<T: ASTNode + 'static>(&mut self, node: T, area: CodeArea) -> ASTKey {
-    //     self.map.insert((Box::new(node), area))
-    // }
-    pub fn get_area<K: ASTKey>(&self, k: K) -> &CodeArea {
-        match k.to_key() {
-            KeyType::Expr(k) => &self.exprs[k].1,
-            KeyType::StmtKey(k) => &self.stmts[k].1,
-        }
-    }
-    pub fn get_expr(&self, k: ExprKey) -> Expression {
-        self.exprs[k].0.clone()
-    }
-    pub fn get_stmt(&self, k: StmtKey) -> Statement {
-        self.stmts[k].0.clone()
-    }
-    pub fn insert_expr(&mut self, expr: Expression, area: CodeArea) -> ExprKey {
-        self.exprs.insert((expr, area))
-    }
-    pub fn insert_stmt(&mut self, stmt: Statement, area: CodeArea) -> StmtKey {
-        self.stmts.insert((stmt, area))
-    }
-
-    pub fn debug(&self, stmts: &Statements) {
-        let mut debug_str = String::new();
-        use std::fmt::Write;
-
-        debug_str += "-------- exprs --------\n";
-        for (k, (e, _)) in &self.exprs {
-            writeln!(&mut debug_str, "{:?}:\t\t{:?}", k, e).unwrap();
-        }
-        debug_str += "-------- stmts --------\n";
-        for (k, (e, _)) in &self.stmts {
-            writeln!(&mut debug_str, "{:?}:\t\t{:?}", k, e).unwrap();
-        }
-        debug_str += "-----------------------\n";
-
-        for i in stmts {
-            writeln!(&mut debug_str, "{:?}", i).unwrap();
-        }
-
-        let re = regex::Regex::new(r"(ExprKey\([^)]*\))").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow.bold().paint("$1").to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"(StmtKey\([^)]*\))").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Blue.bold().paint("$1").to_string(),
-            )
-            .into();
-
-        println!("{}", debug_str);
-    }
-}
-
-// holds immutable data relevant to parsing
-pub struct ParseData {
-    pub tokens: Tokens,
-    pub source: SpwnSource,
-}
-
-#[derive(Debug, Clone)]
-pub enum Literal {
-    Int(usize),
-    Float(f64),
-    String(String),
-    Bool(bool),
-}
-impl Literal {
-    pub fn to_value(&self) -> Value {
-        match self {
-            Literal::Int(v) => Value::Int(*v as isize),
-            Literal::Float(v) => Value::Float(*v),
-            Literal::String(v) => Value::String(v.clone()),
-            Literal::Bool(v) => Value::Bool(*v),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Expression {
-    Literal(Literal),
-    Op(ExprKey, Token, ExprKey),
-    Unary(Token, ExprKey),
-
-    Var(String),
-    Type(String),
-
-    Array(Vec<ExprKey>),
-    Dict(Vec<(String, Option<ExprKey>)>),
-
-    // Index { base: ExprKey, index: ExprKey },
-    Empty,
-
-    Block(Statements),
-
-    Func {
-        args: Vec<(String, Option<ExprKey>, Option<ExprKey>)>,
-        ret_type: Option<ExprKey>,
-        code: ExprKey,
-    },
-    FuncPattern {
-        args: Vec<ExprKey>,
-        ret_type: ExprKey,
-    },
-
-    Ternary {
-        cond: ExprKey,
-        if_true: ExprKey,
-        if_false: ExprKey,
-    },
-
-    Index {
-        base: ExprKey,
-        index: ExprKey,
-    },
-    Call {
-        base: ExprKey,
-        params: Vec<ExprKey>,
-        named_params: Vec<(String, ExprKey)>,
-    },
-    TriggerFuncCall(ExprKey),
-
-    Maybe(Option<ExprKey>),
-
-    TriggerFunc(Statements),
-
-    Instance(ExprKey, Vec<(String, Option<ExprKey>)>),
-
-    Split(ExprKey, ExprKey),
-}
-
-#[derive(Debug, Clone)]
-pub enum Statement {
-    Expr(ExprKey),
-    Let(String, ExprKey),
-    Assign(String, ExprKey),
-    If {
-        branches: Vec<(ExprKey, Statements)>,
-        else_branch: Option<Statements>,
-    },
-    While {
-        cond: ExprKey,
-        code: Statements,
-    },
-    For {
-        var: String,
-        iterator: ExprKey,
-        code: Statements,
-    },
-    Return(Option<ExprKey>),
-    Break,
-    Continue,
-
-    TypeDef(String),
-    Impl(ExprKey, Vec<(String, ExprKey)>),
-    Print(ExprKey),
-}
-
-pub type Statements = Vec<StmtKey>;
+const INVALID_CHARACTER: char = '\u{FFFD}';
 
 // parses one unit value
 fn parse_unit(
@@ -230,27 +28,6 @@ fn parse_unit(
     match tok!(0) {
         Token::Int(n) => Ok((
             ast_data.insert_expr(Expression::Literal(Literal::Int(*n)), span_ar!(0)),
-            pos + 1,
-        )),
-        Token::BinaryLiteral(b) => Ok((
-            ast_data.insert_expr(
-                Expression::Literal(Literal::Int(parse_number_radix(b, 2, "0b", span_ar!(0))?)),
-                span_ar!(0),
-            ),
-            pos + 1,
-        )),
-        Token::HexLiteral(h) => Ok((
-            ast_data.insert_expr(
-                Expression::Literal(Literal::Int(parse_number_radix(h, 16, "0x", span_ar!(0))?)),
-                span_ar!(0),
-            ),
-            pos + 1,
-        )),
-        Token::OctalLiteral(o) => Ok((
-            ast_data.insert_expr(
-                Expression::Literal(Literal::Int(parse_number_radix(o, 8, "0o", span_ar!(0))?)),
-                span_ar!(0),
-            ),
             pos + 1,
         )),
         Token::Float(n) => Ok((
@@ -805,7 +582,8 @@ pub fn parse_statement(
 
     let stmt = match tok!(0) {
         Token::Let => {
-            pos += 1;
+            //
+            pos += 1; // here krista, sometimes you need to give a string
             check_tok!(Ident(var_name) else "variable name");
             check_tok!(Assign else "=");
             parse!(parse_expr => let value);
@@ -905,7 +683,6 @@ pub fn parse_statement(
             check_tok!(LBracket else "{");
 
             let mut items = vec![];
-
             while_tok!(!= RBracket: {
                 check_tok!(Ident(key) else "key");
                 check_tok!(Colon else ":");
@@ -982,7 +759,7 @@ fn parse_unicode(chars: &mut Chars, area: CodeArea) -> Result<char, SyntaxError>
 
     let hex = parse_number_radix(&out, 16, "", area)?;
 
-    Ok(char::from_u32(hex as u32).unwrap_or('�'))
+    Ok(char::from_u32(hex as u32).unwrap_or(INVALID_CHARACTER))
 }
 
 // deals with parsing string escape sequences

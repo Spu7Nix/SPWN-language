@@ -1,52 +1,26 @@
+use std::str::Chars;
+use std::{ops::Range, path::PathBuf};
+
+use base64;
+use lasso::{Rodeo, Spur};
 use logos::Logos;
+use serde::{Deserialize, Serialize};
 
-// // ew
-// fn string_flag<'s>(tok: &mut logos::Lexer<'s, Token>) -> String {
-//     let sliced = tok.slice();
+use super::ast::{ASTData, ExprKey, Expression};
 
-//     // get location of `"` or `'` in the token (end of string flag)
-//     // this will never be called on a string without a flag as a normal string has higher priority
-//     // so we can `.unwrap()` without issue
+const INVALID_CHARACTER: char = '\u{FFFD}'; // `�`
 
-//     let end = sliced.find("\"").unwrap_or_else(|| sliced.find("'").unwrap());
-
-//     let flag = &sliced[0..end];
-//     let string = &sliced[end+1..sliced.len()];
-
-//     String::new()
-// }
-
-#[derive(Logos, Debug, PartialEq, Clone)]
-#[logos(subpattern string = r#""(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
-#[logos(subpattern digits = r#"(\d)([\d_]+)?"#)]
+#[derive(Logos, Debug, PartialEq, Clone, Copy)]
+#[logos(subpattern digits = r#"(\d)([\d_])*"#)]
 pub enum Token {
-    #[regex(r#"(?&digits)"#, |lex| lex.slice().parse(), priority = 2)]
-    Int(usize),
-    #[regex(r#"(?&digits)(\.[\d_]+)?"#, |lex| lex.slice().parse(), priority = 1)]
-    Float(f64),
+    #[regex(r#"(0[b])(?&digits)"#)]
+    Int,
+    #[regex(r#"(?&digits)(\.[\d_])*"#)]
+    Float,
 
-    // number literals don't match their correct values as their converted (and validated) in the parser
-    #[regex(r#"0b\w+"#, |lex| lex.slice().parse())]
-    BinaryLiteral(String),
-    #[regex(r#"0x\w+"#, |lex| lex.slice().parse())]
-    HexLiteral(String),
-    #[regex(r#"0o\w+"#, |lex| lex.slice().parse(), priority = 1)]
-    OctalLiteral(String),
+    #[regex(r#""\w*((?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#)]
+    String,
 
-    #[regex(r#"(?&string)"#, 
-        //|s| convert_string(&s.slice()[1..s.slice().len()-1]),
-        |s| s.slice().parse(),
-        priority = 3 // prioritise normal string over string flags
-    )]
-    String(String),
-
-    // #[regex(r#"_(\w*)?(?&string)"#,
-    //     //|s| s.slice()[0..s.slice().find('"').unwrap_or_else(|| s.slice().find("'").unwrap())].parse(), // take up to `"` or `'`
-    //    // |s| string_flag(s),
-    //    |s| s.slice().parse(),
-    //     priority = 1,
-    // )]
-    // StringFlag(String),
     #[token("let")]
     Let,
     #[token("mut")]
@@ -128,6 +102,8 @@ pub enum Token {
     LBracket,
     #[token("}")]
     RBracket,
+    #[token("!{")]
+    TrigFnBracket,
 
     #[token(",")]
     Comma,
@@ -163,11 +139,11 @@ pub enum Token {
     #[token("!")]
     ExclMark,
 
-    #[regex(r"@[a-zA-Z_]\w*", |lex| lex.slice()[1..].to_string())]
-    TypeIndicator(String),
+    #[regex(r"@[a-zA-Z_]\w*")]
+    TypeIndicator,
 
-    #[regex(r"[a-zA-Z_ඞ][a-zA-Z_0-9ඞ]*", |lex| lex.slice().to_string())]
-    Ident(String),
+    #[regex(r"[a-zA-Z_ඞ][a-zA-Z_0-9ඞ]*")]
+    Ident,
 
     #[regex(r"[ \t\f\n\r]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*", logos::skip)]
     #[error]
@@ -178,19 +154,16 @@ pub enum Token {
 
 impl Token {
     // used in error messages
-    pub fn tok_name(&self) -> String {
+    pub fn tok_name(&self) -> &str {
         match self {
-            Token::Int(v) => return v.to_string(),
-            Token::Float(v) => return v.to_string(),
-            Token::BinaryLiteral(b) => b,
-            Token::HexLiteral(h) => h,
-            Token::OctalLiteral(o) => o,
-            Token::String(v) => v,
-            Token::TypeIndicator(v) => return format!("@{}", v),
+            Token::Int => "int",
+            Token::Float => "float",
+            Token::String => "string",
+            Token::TypeIndicator => "type indicator",
             Token::Let => "let",
             Token::Mut => "mut",
-            Token::Ident(n) => n,
-            Token::Error => "unknown",
+            Token::Ident => "identifier",
+            Token::Error => "invalid",
             Token::Eof => "end of file",
             Token::True => "true",
             Token::False => "false",
@@ -213,6 +186,7 @@ impl Token {
             Token::RSqBracket => "]",
             Token::LBracket => "{",
             Token::RBracket => "}",
+            Token::TrigFnBracket => "!{",
             Token::Comma => ",",
             Token::Eol => "end of line",
             Token::If => "if",
@@ -242,7 +216,6 @@ impl Token {
             Token::Impl => "impl",
             //Token::StringFlag(v) => v,
         }
-        .into()
     }
     // also used in error messages
     pub fn tok_typ(&self) -> &str {
@@ -253,25 +226,28 @@ impl Token {
                 "operator"
             }
 
-            Int(_) | Float(_) | BinaryLiteral(_) | HexLiteral(_) | OctalLiteral(_) | String(_)
-            | True | False => "literal",
+            Int | Float | String | True | False => "literal",
 
-            Ident(_) => "identifier",
+            Ident => "identifier",
 
             Let | Mut | For | While | If | Else | In | Return | Break | Continue | TypeDef
             | Impl | Print | Split => "keyword",
 
             Error => "",
-            TypeIndicator(_) => "type indicator",
+            TypeIndicator => "type indicator",
 
             LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma | Colon
-            | DoubleColon | FatArrow | Arrow | QMark | ExclMark | Eol | Eof => "terminator",
+            | DoubleColon | FatArrow | Arrow | QMark | ExclMark | Eol | Eof | TrigFnBracket => {
+                "terminator"
+            }
         }
     }
 }
 
 pub type Span = (usize, usize);
 pub type Tokens = Vec<(Token, Span)>;
+
+const EOL: &[Token] = &[Token::Eol];
 
 pub fn lex(code: String) -> Tokens {
     let mut tokens_iter = Token::lexer(&code);
@@ -283,4 +259,448 @@ pub fn lex(code: String) -> Tokens {
     tokens.push((Token::Eof, (code.len(), code.len() + 1)));
 
     tokens
+}
+
+#[derive(Clone)]
+pub struct Lexer {
+    tokens: logos::Lexer<'static, Token>,
+    file: Option<PathBuf>,
+}
+
+use super::error::SyntaxError;
+use crate::sources::CodeArea;
+impl Lexer {
+    pub fn new<S: AsRef<str>, P: Into<PathBuf>>(src: S, file: Option<P>) -> Self {
+        let src = unsafe { Lexer::make_static(src.as_ref()) };
+
+        let file = file.map(|p| p.into());
+        let tokens = logos::Lexer::new(src);
+
+        Lexer { tokens, file }
+    }
+
+    pub fn next(&mut self) -> Option<Spanned<Token>> {
+        let next_token = self.tokens.next()?;
+        let span = self.tokens.span();
+
+        Some(Spanned::<Token> {
+            data: next_token,
+            span: span.into(),
+        })
+    }
+
+    pub fn peek(&mut self) -> Option<Spanned<Token>> {
+        let tokens = self.clone();
+        tokens.next()
+    }
+
+    pub fn peek_many(&self, n: u32) -> Option<Spanned<Token>> {
+        let mut tokens = self.clone();
+        let last;
+        
+        for _ in 0..n {
+            last = tokens.next();
+        }
+
+        last
+    }
+
+    pub fn expected_err(
+        &mut self,
+        expected: String,
+        found: Option<Spanned<Token>>,
+    ) -> crate::error::Error {
+        let (tok_name, tok_typ, span) = if let Some(t) = found {
+            (t.data.tok_name(), t.data.tok_typ(), t.span)
+        } else {
+            (
+                "end of file",
+                "",
+                (self.tokens.source().len()..self.tokens.source().len()).into(),
+            )
+        };
+        SyntaxError::Expected {
+            expected,
+            found: tok_name.into(),
+            typ: tok_typ.into(),
+            area: CodeArea {
+                span,
+                source: self.file,
+            },
+        }
+        .wrap()
+    }
+
+    pub fn expect(&mut self, expected: Token) -> crate::error::Result<CodeSpan> {
+        let next = self.next();
+        if !matches!(next, Some(expected)) {
+            return Err(self.expected_err(expected.tok_name().into(), next));
+        }
+        Ok(next.unwrap().span)
+    }
+
+    pub fn slice(&self, span: CodeSpan) -> &str {
+        &self.tokens.source()[span.to_range()]
+    }
+
+    pub fn make_area(&self, span: CodeSpan) -> CodeArea {
+        CodeArea {
+            span,
+            source: self.file,
+        }
+    }
+
+    pub fn parse(&mut self) -> ASTData {
+        let mut data = ASTData::default();
+        let r: Rodeo<Spur> = Rodeo::new();
+        todo!()
+    }
+
+    pub fn parse_int(&mut self, ast_data: &mut ASTData) -> crate::error::Result<ExprKey> {
+        let next_token = self.next().unwrap();
+
+        let span = next_token.span;
+        let src: &'static str = &self.tokens.source()[span.to_range()];
+
+        let int: u64 = match &src[0..2] {
+            "0x" => self.parse_int_radix(&src[2..], 16, span),
+            "0o" => self.parse_int_radix(&src[2..], 8, span),
+            "0b" => self.parse_int_radix(&src[2..], 2, span),
+            n if n.chars().all(char::is_numeric) => n.parse::<u64>().unwrap(),
+            other => {
+                return Err(SyntaxError::InvalidLiteral {
+                    literal: other.to_string(),
+                    area: CodeArea {
+                        span,
+                        source: self.file,
+                    },
+                }
+                .wrap());
+            }
+        };
+        Ok(ast_data.exprs.insert((Expression::Int(int), span)))
+    }
+
+    pub fn parse_int_radix(&self, src: &str, radix: u32, span: CodeSpan) -> u64 {
+        u64::from_str_radix(src, radix).unwrap()
+    }
+
+    pub fn parse_float(&mut self, ast_data: &mut ASTData) -> crate::error::Result<ExprKey> {
+        let next_token = self.next().unwrap();
+
+        let span = next_token.span;
+        let src = &self.tokens.source()[span.to_range()];
+
+        Ok(ast_data
+            .exprs
+            .insert((Expression::Float(src.parse::<f64>().unwrap()), span)))
+    }
+
+    pub fn parse_bool(&mut self, ast_data: &mut ASTData) -> crate::error::Result<ExprKey> {
+        let next_token = self.next().unwrap();
+
+        let span = next_token.span;
+        let src = &self.tokens.source()[span.to_range()];
+
+        Ok(ast_data
+            .exprs
+            .insert((Expression::Bool(src.parse::<bool>().unwrap()), span)))
+    }
+
+    pub fn parse_string(&mut self, ast_data: &mut ASTData) -> crate::error::Result<ExprKey> {
+        let next_token = self.next().unwrap();
+
+        let span = next_token.span;
+        let src = &self.tokens.source()[span.to_range()];
+
+        let mut chars: Chars = src.chars();
+        chars.next_back();
+
+        let flag = &*chars
+            .take_while(|c| !matches!(c, '"' | '\''))
+            .collect::<String>();
+
+        match flag {
+            "b" => {
+                let b_array = chars.collect::<String>().as_bytes();
+                let b_expr_array = b_array
+                    .iter()
+                    .map(|b| ast_data.exprs.insert((Expression::Byte(*b), span)))
+                    .collect();
+
+                Ok(ast_data
+                    .exprs
+                    .insert((Expression::Array(b_expr_array), span)))
+            }
+            "r" => todo!("remove all escapes but \""),
+            "u" => {
+                // "Unindents the string" (wish me luck)
+                todo!()
+            }
+            "b64" => {
+                // yo problem, doesnt the chars iterator also have the final `"`?
+                let content = chars.collect::<String>();
+                let out_string = base64::encode(&content);
+                Ok(ast_data
+                    .exprs
+                    .insert((Expression::String(out_string), span)))
+            }
+            "" => {
+                let out_string: String = chars.collect();
+                Ok(ast_data
+                    .exprs
+                    .insert((Expression::String(out_string), span)))
+            }
+            _ => todo!("Invalid string flag"),
+        }
+    }
+
+    fn parse_escapes(&self, span: CodeSpan, string: String) -> crate::error::Result<String> {
+        let mut out = String::new();
+        let mut chars = string.chars();
+
+        loop {
+            match chars.next() {
+                Some('\\') => out.push(match chars.next() {
+                    // afpdluih
+                    Some('n') => '\n',
+                    Some('r') => '\r',
+                    Some('t') => '\t',
+                    Some('"') => '"',
+                    Some('\'') => '\'',
+                    Some('\\') => '\\',
+                    Some('u') => self.parse_unicode(span, &mut chars)?,
+                    Some(c) => {
+                        return Err(SyntaxError::InvalidEscape {
+                            character: c,
+                            area: self.make_area(span),
+                        }
+                        .wrap())
+                    }
+
+                    None => unreachable!(),
+                }),
+                Some(c) => out.push(c),
+                None => break,
+            }
+        }
+
+        Ok(out)
+    }
+
+    fn parse_unicode(&self, span: CodeSpan, chars: &mut Chars) -> crate::error::Result<char> {
+        self.expect(Token::RBracket)?;
+
+        let hex = chars
+            .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
+            .collect::<String>();
+
+        self.expect(Token::LBracket)?;
+
+        Ok(
+            char::from_u32(self.parse_int_radix(&hex, 16, span) as u32)
+                .unwrap_or(INVALID_CHARACTER),
+        )
+    }
+
+    pub fn parse_identifier(
+        &mut self,
+        ast_data: &mut ASTData,
+        r: &mut Rodeo,
+    ) -> crate::error::Result<ExprKey> {
+        let next_token = self.next().unwrap();
+
+        let span = next_token.span;
+        let src = &self.tokens.source()[span.to_range()];
+        let s = r.get_or_intern(src);
+
+        Ok(ast_data.exprs.insert((Expression::Ident(s), span)))
+    }
+
+    pub fn parse_var_or_macro(
+        &mut self,
+        ast_data: &mut ASTData,
+        interner: &mut Rodeo,
+    ) -> crate::error::Result<ExprKey> {
+        let span = self.next().unwrap().span;
+        let name = interner.get_or_intern(&self.tokens.source()[span.to_range()]);
+
+        match self
+            .peek()
+            .unwrap_or_else(|| todo!("unexpected eof (syntax)"))
+            .data
+        {
+            Token::FatArrow => {
+                self.next();
+                let code = self.parse_expr(ast_data, interner)?;
+                Ok(ast_data.exprs.insert((
+                    Expression::Func {
+                        args: vec![(name.into(), None, None)],
+                        ret_type: None,
+                        code,
+                    },
+                    span.start..ast_data.exprs[code].1,
+                )))
+            }
+            _ => Ok(ast_data.exprs.insert((Expression::Var(name), span))),
+        }
+    }
+
+    pub fn parse_type_indicator(
+        &mut self,
+        ast_data: &mut ASTData,
+        interner: &mut Rodeo,
+    ) -> crate::error::Result<ExprKey> {
+        let next_token = self.next().unwrap();
+
+        let span = next_token.span;
+        let name = interner.get_or_intern(&self.tokens.source()[span.to_range()]);
+
+        Ok(ast_data.exprs.insert((Expression::Type(name), span)))
+    }
+
+    pub fn parse_macro(
+        &mut self,
+        ast_data: &mut ASTData,
+        interner: &mut Rodeo,
+    ) -> crate::error::Result<ExprKey> {
+        self.next();
+        let mut args = vec![];
+        let mut arg_spans = vec![];
+        while self.peek() != Token::RParen {
+            let ident = self.expect(Token::Ident)?;
+            let name = self.slice(ident);
+
+            let arg_type = if self.peek() == Token::Colon {
+                self.next();
+                Some(self.parse_expr(ast_data, interner)?)
+            } else {
+                None
+            };
+            let arg_default = if self.peek() == Token::Assign {
+                self.next();
+                Some(self.parse_expr(ast_data, interner)?)
+            } else {
+                None
+            };
+            args.push((name.into(), arg_type, arg_default));
+            arg_spans.push(ident);
+            if !matches!(self.peek(), Token::Comma | Token::RParen) {
+                return Err(self.expected_err(") or ,", self.next()));
+            }
+        }
+    }
+
+    pub fn parse_paren_or_macro(
+        &mut self,
+        ast_data: &mut ASTData,
+        interner: &mut Rodeo,
+    ) -> crate::error::Result<ExprKey> {
+        let depth = 0;
+        let check = self.clone();
+        loop {
+            match check.next().unwrap_or_else(|| todo!("unmatched char")).data {
+                Token::LParen => depth += 1,
+                Token::RParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                _ => (),
+            }
+        }
+        let is_pattern;
+        match check.next() {
+            Token::FatArrow => is_pattern = false,
+            Token::Arrow => {
+                check.parse_expr(ast_data, interner)?;
+                is_pattern = matches!(check.next(), Token::FatArrow);
+            }
+            _ => {
+                self.next();
+                let value = self.parse_expr(ast_data, interner)?;
+                self.expect(Token::RParen);
+
+                return Ok(value);
+            }
+        }
+        if is_pattern {
+            self.parse_macro(ast_data, interner)
+        } else {
+            self.parse_macro_pattern(ast_data, interner)
+        }
+    }
+
+    pub fn parse_expr(
+        &mut self,
+        ast_data: &mut ASTData,
+        interner: &mut Rodeo,
+    ) -> crate::error::Result<ExprKey> {
+        match self
+            .peek()
+            .unwrap_or_else(|| todo!("unexpected eof (syntax)"))
+            .data
+        {
+            Token::Int => self.parse_int(ast_data),
+            Token::Float => self.parse_float(ast_data),
+            Token::True => {
+                let span = self.next().unwrap().span;
+                Ok(ast_data.exprs.insert((Expression::Bool(true), span)))
+            }
+            Token::False => {
+                let span = self.next().unwrap().span;
+                Ok(ast_data.exprs.insert((Expression::Bool(false), span)))
+            }
+            Token::String => self.parse_string(ast_data),
+            Token::Ident => self.parse_var_or_macro(ast_data, interner),
+            Token::TypeIndicator => self.parse_type_indicator(ast_data, interner),
+            Token::LParen => self.parse_type_indicator(ast_data, interner),
+            Token::LSqBracket => todo!(),
+            Token::LBracket => todo!(),
+            Token::QMark => todo!(),
+            Token::TrigFnBracket => todo!(),
+            Token::Split => todo!(),
+            _ => todo!(),
+        }
+    }
+
+    /// Used to eliminate having 'a lifetime on Lexer
+    unsafe fn make_static<'a>(d: &'a str) -> &'static str {
+        std::mem::transmute::<&'a str, &'static str>(d)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Copy)]
+pub struct CodeSpan {
+    start: usize,
+    end: usize,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub struct Spanned<T> {
+    data: T,
+    span: CodeSpan,
+}
+
+impl CodeSpan {
+    pub fn len(&self) -> usize {
+        self.end - self.start
+    }
+
+    pub fn to_range(self) -> Range<usize> {
+        self.into()
+    }
+}
+
+impl From<Range<usize>> for CodeSpan {
+    fn from(Range { start, end }: Range<usize>) -> Self {
+        Self { start, end }
+    }
+}
+
+impl From<CodeSpan> for Range<usize> {
+    fn from(CodeSpan { start, end }: CodeSpan) -> Self {
+        start..end
+    }
 }

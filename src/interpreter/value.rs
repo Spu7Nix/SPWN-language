@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use super::interpreter::{Globals, StoredValue, ValueKey};
+use super::types::Type;
 
 use crate::sources::CodeArea;
 
@@ -30,7 +31,7 @@ pub enum Value {
     Dict(HashMap<String, ValueKey>),
     Maybe(Option<ValueKey>),
 
-    TypeIndicator(ValueType),
+    TypeIndicator(Type),
     Pattern(Pattern),
 
     Group(Id),

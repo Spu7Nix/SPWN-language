@@ -1,6 +1,8 @@
+use std::fmt;
 use std::sync::Arc;
 
 use ahash::AHashMap;
+use serde::{Deserialize, Serialize};
 
 use super::from_value::FromValueList;
 use super::interpreter::Globals;
@@ -9,12 +11,30 @@ use super::to_value::ToValueResult;
 use super::types::Instance;
 use super::value::Value;
 
-type StaticMethodType<T> = Arc<dyn Fn(Vec<Value>) -> Result<T, Error> + Send + Sync>;
-type SelfMethodType<T> =
-    Arc<dyn Fn(&Instance, Vec<Value>, &mut Globals) -> Result<T, Error> + Send + Sync>;
+type Error = dyn std::error::Error;
+
+trait StaticMethodTrait<T>:
+    Fn(Vec<Value>) -> Result<T, Error>
+    + Send
+    + Sync
+    + erased_serde::Serialize
+    + erased_serde::Deserializer<'static>
+{
+}
+trait SelfMethodTrait<T>:
+    Fn(&Instance, Vec<Value>, &mut Globals) -> Result<T, Error>
+    + Send
+    + Sync
+    + erased_serde::Serialize
+    + erased_serde::Deserializer<'static>
+{
+}
+
+type StaticMethodType<T> = Arc<dyn StaticMethodTrait<T>>;
+type SelfMethodType<T> = Arc<dyn SelfMethodTrait<T>>;
 
 // `SelfMethod` i.e. a instance method (where `self` is the first argument)
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SelfMethod(SelfMethodType<Value>);
 
 impl SelfMethod {
@@ -33,7 +53,7 @@ impl SelfMethod {
 
                 instance
                     .and_then(|i| args.map(|a| (i, a)))
-                    .and_then(|(instance, args)| f.invoke(instance, args).to_value_result())
+                    .and_then(|(instance, args)| f.invoke(instance, args).try_to_value())
             },
         ))
     }
@@ -53,10 +73,18 @@ impl SelfMethod {
         self.0(instance, args, globals)
     }
 }
+
+// need to manually implement cause the traits dont implement debug
+impl fmt::Debug for SelfMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SelfMethod(...)")
+    }
+}
+
 pub type SelfMethods = AHashMap<String, SelfMethod>;
 
 // `StaticMethod` where `self` isnt the first argument
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct StaticMethod(StaticMethodType<Value>);
 
 impl StaticMethod {
@@ -67,7 +95,7 @@ impl StaticMethod {
         F::Result: ToValueResult,
     {
         Self(Arc::new(move |args: Vec<Value>| {
-            Args::from_value_list(&args).and_then(|args| f.invoke(args).to_value_result())
+            Args::from_value_list(&args).and_then(|args| f.invoke(args).try_to_value())
         }))
     }
 
@@ -75,6 +103,13 @@ impl StaticMethod {
         self.0(args)
     }
 }
+
+impl fmt::Debug for StaticMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StaticMethod(...)")
+    }
+}
+
 pub type StaticMethods = AHashMap<String, StaticMethod>;
 
 #[derive(Clone)]
@@ -91,12 +126,18 @@ impl AttributeGetter {
     {
         Self(Arc::new(move |instance, globals: &mut Globals| {
             let instance = instance.downcast(Some(globals));
-            instance.map(&f).and_then(|v| v.to_value_result())
+            instance.map(&f).and_then(|v| v.try_to_value())
         }))
     }
 
     pub fn invoke(&self, instance: &Instance, globals: &mut Globals) -> Result<Value, Error> {
         self.0(instance, globals)
+    }
+}
+
+impl fmt::Debug for AttributeGetter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AttributeGetter(...)")
     }
 }
 
@@ -115,13 +156,18 @@ impl Constructor {
         Constructor(Arc::new(move |args: Vec<Value>| {
             Args::from_value_list(&args).map(|args| {
                 let s = f.invoke(args);
-                let id = (&s).hash_id();
-                Instance::new(s, id)
+                Instance::new(s, s.name)
             })
         }))
     }
 
     pub fn invoke(&self, args: Vec<Value>) -> Result<Instance, Error> {
         self.0(args)
+    }
+}
+
+impl fmt::Debug for Constructor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Constructor(...)")
     }
 }

@@ -3,7 +3,7 @@ use super::value::Value;
 // can't return a `RuntimeError` cause can't get an `area` here
 // instead return a tuple of arguments to be formatted into error at a different place that
 // has an `area`
-type Error = (String, &'static str);
+pub type Error = (String, &'static str);
 
 pub trait FromValue: Clone {
     fn from_value(val: Value) -> Result<Self, Error>;
