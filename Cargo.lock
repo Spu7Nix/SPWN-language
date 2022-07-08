@@ -41,6 +41,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "base64"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
+
+[[package]]
 name = "beef"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -192,11 +198,12 @@ dependencies = [
 
 [[package]]
 name = "spwn"
-version = "0.0.85"
+version = "0.0.9"
 dependencies = [
  "ahash",
  "ansi_term",
  "ariadne",
+ "base64",
  "bincode",
  "logos",
  "lz4-compression",

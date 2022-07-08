@@ -7,8 +7,8 @@ use super::error::RuntimeError;
 // use super::types::{Instance, Type};
 use super::value::{value_ops, Value, ValueType};
 
-use crate::compiler::compiler::{Code, Instruction};
-use crate::interpreter::value::{Macro, Pattern};
+use crate::compiler::compiler::{Code, InstrNum, Instruction};
+use crate::interpreter::value::{Macro, MacroArg, Pattern};
 use crate::sources::CodeArea;
 
 new_key_type! {
@@ -63,21 +63,20 @@ impl Globals {
         val.deep_clone(self)
     }
 }
-// 😎
 
 pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeError> {
     let mut contexts = FullContext::single(code.var_count);
-    // brb
+
     loop {
         let mut finished = true;
         'out_for: for context in contexts.iter() {
-            if !context.inner().finished {
+            if !context.inner().pos.is_empty() {
                 finished = false;
             } else {
                 continue;
             }
 
-            let (func, mut i) = context.inner().pos;
+            let (func, mut i) = *context.inner().pos();
 
             macro_rules! pop_deep_clone {
                 () => {{
@@ -123,13 +122,13 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 (
                     $($instr:ident: $func:ident,)*
                 ) => {
-                    match &code.instructions[func].0[i] {
+                    match &code.bytecode_funcs[func].instructions[i] {
                         $(
                             Instruction::$instr => {
-                                let area = code.get_bytecode_area(func, i);
+                                let span = code.get_bytecode_span(func, i);
                                 let b = pop_ref!();
                                 let a = pop_ref!();
-                                let key = globals.memory.insert(value_ops::$func(a, b, area, globals)?);
+                                let key = globals.memory.insert(value_ops::$func(a, b, code.make_area(span), globals)?);
                                 context.inner().stack.push(key);
                             }
                         )*
@@ -154,23 +153,27 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 Is: is_op,
             };
 
-            match &code.instructions[func].0[i] {
+            match &code.bytecode_funcs[func].instructions[i] {
                 Instruction::LoadConst(id) => {
-                    let area = code.get_bytecode_area(func, i);
-                    let key = globals
-                        .memory
-                        .insert(code.constants.get(*id).clone().into_stored(area));
+                    let span = code.get_bytecode_span(func, i);
+                    let key = globals.memory.insert(
+                        code.constants
+                            .get(*id)
+                            .clone()
+                            .to_value()
+                            .into_stored(code.make_area(span)),
+                    );
                     context.inner().stack.push(key);
                 }
                 Instruction::Negate => {
-                    let area = code.get_bytecode_area(func, i);
+                    let span = code.get_bytecode_span(func, i);
                     let a = pop_ref!();
-                    push_store!(value_ops::unary_negate(a, area)?);
+                    push_store!(value_ops::unary_negate(a, code.make_area(span))?);
                 }
                 Instruction::Not => {
-                    let area = code.get_bytecode_area(func, i);
+                    let span = code.get_bytecode_span(func, i);
                     let a = pop_ref!();
-                    push_store!(value_ops::unary_not(a, area)?);
+                    push_store!(value_ops::unary_not(a, code.make_area(span))?);
                 }
                 Instruction::LoadVar(id) => {
                     let a = context.inner().get_var(*id);
@@ -178,8 +181,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 }
                 Instruction::SetVar(id) => {
                     let top = pop_deep_clone!();
-                    let key = globals.memory.insert(top);
-                    context.inner().set_var(*id, key);
+                    context.inner().set_var(*id, top, globals);
                 }
                 Instruction::Print => {
                     let top = pop_ref!();
@@ -191,32 +193,32 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     )
                 }
                 Instruction::LoadType(id) => {
-                    let area = code.get_bytecode_area(func, i);
+                    let span = code.get_bytecode_span(func, i);
                     let name = code.names.get(*id);
                     match globals.types.get(name) {
                         Some(typ) => {
-                            push!(Value::TypeIndicator(*typ).into_stored(area))
+                            push!(Value::TypeIndicator(*typ).into_stored(code.make_area(span)))
                         }
                         None => {
                             return Err(RuntimeError::UndefinedType {
                                 name: name.clone(),
-                                area,
+                                area: code.make_area(span),
                             })
                         }
                     }
                 }
                 Instruction::BuildArray(len) => {
-                    let area = code.get_bytecode_area(func, i);
+                    let span = code.get_bytecode_span(func, i);
                     let mut elems = vec![];
                     for _ in 0..*len {
                         elems.push(pop_deep_clone!(Store));
                     }
                     elems.reverse();
-                    push!(Value::Array(elems).into_stored(area));
+                    push!(Value::Array(elems).into_stored(code.make_area(span)));
                 }
                 Instruction::PushEmpty => {
-                    let area = code.get_bytecode_area(func, i);
-                    push!(Value::Empty.into_stored(area));
+                    let span = code.get_bytecode_span(func, i);
+                    push!(Value::Empty.into_stored(code.make_area(span)));
                 }
                 Instruction::PopTop => {
                     context.inner().stack.pop();
@@ -224,33 +226,33 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 Instruction::Jump(id) => {
                     i = *code.destinations.get(*id) - 1;
                 }
-                Instruction::JumpIfFalse(id) => unsafe {
+                Instruction::JumpIfFalse(id) => {
                     if !value_ops::to_bool(pop_ref!())? {
                         i = *code.destinations.get(*id) - 1;
                     }
-                },
+                }
                 Instruction::ToIter => todo!(),
                 Instruction::IterNext(_) => todo!(),
                 Instruction::BuildDict(id) => {
-                    let area = code.get_bytecode_area(func, i);
+                    let span = code.get_bytecode_span(func, i);
                     let keys = code.name_sets.get(*id);
                     let map = keys
                         .iter()
                         .cloned()
                         .zip((0..keys.len()).map(|_| pop_deep_clone!(Store)))
                         .collect();
-                    push!(Value::Dict(map).into_stored(area));
+                    push!(Value::Dict(map).into_stored(code.make_area(span)));
                 }
                 Instruction::Return => todo!(),
                 Instruction::Continue => todo!(),
                 Instruction::Break => todo!(),
                 Instruction::MakeMacro(id) => {
-                    let area = code.get_bytecode_area(func, i);
-                    let arg_areas = code.macro_arg_areas.get(&(func, i)).unwrap();
+                    let span = code.get_bytecode_span(func, i);
+                    let arg_spans = code.macro_arg_spans.get(&(func, i)).unwrap();
                     let (func_id, arg_info) = code.macro_build_info.get(*id);
                     let ret_type = pop_deep_clone!(Store);
                     let mut args = vec![];
-                    for ((name, typ, def), area) in arg_info.iter().zip(arg_areas) {
+                    for ((name, typ, def), span) in arg_info.iter().zip(arg_spans) {
                         let def = if *def {
                             Some(pop_deep_clone!(Store))
                         } else {
@@ -261,28 +263,53 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         } else {
                             None
                         };
-                        args.push(((name.clone(), area.clone()), typ, def));
+                        args.push(MacroArg {
+                            name: name.clone(),
+                            area: code.make_area(*span),
+                            pattern: typ,
+                            default: def,
+                        });
                     }
                     args.reverse();
+                    // println!("balls {:?}", )
+                    let capture = code.bytecode_funcs[*func_id]
+                        .capture_ids
+                        .iter()
+                        .map(|id| context.inner().get_var(*id))
+                        .collect::<Vec<_>>();
                     push!(Value::Macro(Macro {
                         func_id: *func_id,
                         args,
-                        ret_type
+                        ret_type,
+                        capture,
                     })
-                    .into_stored(area));
+                    .into_stored(code.make_area(span)));
                 }
                 Instruction::PushAnyPattern => {
-                    let area = code.get_bytecode_area(func, i);
-                    push!(Value::Pattern(Pattern::Any).into_stored(area));
+                    let span = code.get_bytecode_span(func, i);
+                    push!(Value::Pattern(Pattern::Any).into_stored(code.make_area(span)));
                 }
                 Instruction::MakeMacroPattern(_) => todo!(),
-                Instruction::Index => todo!(),
+                Instruction::Index => {
+                    let idx = pop_shallow!();
+                    let base = pop_shallow!();
+                    match &base.value {
+                        Value::Array(arr) => match idx.value {
+                            Value::Int(n) => {
+                                let k = globals.deep_clone(arr[n as usize]);
+                                push!(k);
+                            }
+                            _ => todo!(),
+                        },
+                        _ => todo!(),
+                    }
+                }
                 Instruction::Call(id) => {
-                    let area = code.get_bytecode_area(func, i);
+                    let span = code.get_bytecode_span(func, i);
                     let base = pop_shallow!();
                     match &base.value {
                         Value::Macro(m) => {
-                            let param_areas = code.macro_arg_areas.get(&(func, i)).unwrap();
+                            let param_spans = code.macro_arg_spans.get(&(func, i)).unwrap();
                             let param_list = code.name_sets.get(*id);
 
                             let mut param_map = AHashMap::new();
@@ -290,35 +317,35 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             let mut params = vec![];
                             let mut named_params = vec![];
 
-                            for (name, param_area) in param_list.iter().zip(param_areas) {
+                            for (name, param_span) in param_list.iter().zip(param_spans) {
                                 if name.is_empty() {
-                                    params.push((pop_deep_clone!(), param_area));
+                                    params.push((pop_deep_clone!(), param_span));
                                 } else {
                                     if let Some(p) =
-                                        m.args.iter().position(|((s, _), ..)| s == name)
+                                        m.args.iter().position(|MacroArg { name: s, .. }| s == name)
                                     {
                                         param_map.insert(name.clone(), p);
                                     } else {
                                         return Err(RuntimeError::UndefinedArgument {
                                             name: name.into(),
                                             macr: base.clone(),
-                                            area: param_area.clone(),
+                                            area: code.make_area(*param_span),
                                         });
                                     }
                                     named_params.push((
                                         name.clone(),
                                         pop_deep_clone!(),
-                                        param_area,
+                                        param_span,
                                     ));
                                 }
                             }
 
                             if params.len() > m.args.len() {
-                                let call_area = code.get_bytecode_area(func, i);
+                                let call_span = code.get_bytecode_span(func, i);
                                 return Err(RuntimeError::TooManyArguments {
                                     expected: m.args.len(),
                                     provided: params.len(),
-                                    call_area,
+                                    call_area: code.make_area(call_span),
                                     func: base.clone(),
                                 });
                             }
@@ -326,31 +353,35 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             let mut arg_fill = m
                                 .args
                                 .iter()
-                                .map(|((_, _), t, d)| {
-                                    (
-                                        t.map(|id| globals.deep_clone(id)),
-                                        d.map(|id| globals.deep_clone(id)),
-                                    )
-                                })
+                                .map(
+                                    |MacroArg {
+                                         pattern, default, ..
+                                     }| {
+                                        (
+                                            pattern.map(|id| globals.deep_clone(id)),
+                                            default.map(|id| globals.deep_clone(id)),
+                                        )
+                                    },
+                                )
                                 .collect::<Vec<_>>();
                             params.reverse();
                             named_params.reverse();
 
-                            for (i, (val, param_area)) in params.into_iter().enumerate() {
+                            for (i, (val, param_span)) in params.into_iter().enumerate() {
                                 if let Some(pat) = &arg_fill[i].0 {
                                     if !value_ops::matches_pat(&val.value, &value_ops::to_pat(pat)?)
                                     {
                                         return Err(RuntimeError::PatternMismatch {
                                             v: val,
                                             pat: pat.clone(),
-                                            area: param_area.clone(),
+                                            area: code.make_area(*param_span),
                                         });
                                     }
                                 }
                                 arg_fill[i].1 = Some(val);
                             }
 
-                            for (name, val, param_area) in named_params.into_iter() {
+                            for (name, val, param_span) in named_params.into_iter() {
                                 let arg_pos = param_map[&name];
                                 if let Some(pat) = &arg_fill[arg_pos].0 {
                                     if !value_ops::matches_pat(&val.value, &value_ops::to_pat(pat)?)
@@ -358,43 +389,70 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                                         return Err(RuntimeError::PatternMismatch {
                                             v: val,
                                             pat: pat.clone(),
-                                            area: param_area.clone(),
+                                            area: code.make_area(*param_span),
                                         });
                                     }
                                 }
                                 arg_fill[arg_pos].1 = Some(val);
                             }
 
-                            for ((_, arg), ((name, area), ..)) in arg_fill.iter().zip(&m.args) {
-                                if let Some(arg) = arg {
-                                } else {
-                                    let call_area = code.get_bytecode_area(func, i);
+                            for ((_, arg), MacroArg { name, area, .. }) in
+                                arg_fill.iter().zip(&m.args)
+                            {
+                                if arg.is_none() {
+                                    let call_area = code.get_bytecode_span(func, i);
                                     return Err(RuntimeError::ArgumentNotSatisfied {
                                         arg_name: name.clone(),
-                                        call_area,
+                                        call_area: code.make_area(call_area),
                                         arg_area: area.clone(),
                                     });
                                 }
                             }
 
-                            println!("------ arg fill 2");
-                            for (t, v) in arg_fill {
-                                println!(
-                                    "{:?}",
-                                    if let Some(v) = v {
-                                        v.value.to_str(globals)
-                                    } else {
-                                        "None".into()
-                                    }
-                                );
+                            /*
+                                this whole calling part is long and ugly af dont worry will refactor
+                            */
+
+                            // context.inner().push_vars();
+
+                            // println!("capture: {:?}", m.capture);
+                            // println!("context vars: {:?}", context.inner().vars);
+                            // println!("func data: {:#?}", code.bytecode_funcs[func]);
+
+                            context.inner().push_vars(
+                                &code.bytecode_funcs[m.func_id].scoped_var_ids,
+                                code,
+                                globals,
+                            );
+                            context.inner().push_vars(
+                                &code.bytecode_funcs[m.func_id].capture_ids,
+                                code,
+                                globals,
+                            );
+                            // println!("context vars 2: {:?}", context.inner().vars);
+
+                            for ((_, arg), id) in arg_fill
+                                .into_iter()
+                                .zip(&code.bytecode_funcs[m.func_id].arg_ids)
+                            {
+                                context.inner().set_var(*id, arg.unwrap(), globals);
                             }
 
-                            todo!()
+                            for (v, id) in m
+                                .capture
+                                .iter()
+                                .zip(&code.bytecode_funcs[m.func_id].capture_ids)
+                            {
+                                context.inner().replace_var(*id, *v);
+                            }
+
+                            context.inner().pos.push((m.func_id, 0));
+                            continue;
                         }
                         _ => {
                             return Err(RuntimeError::CannotCall {
                                 base: base.clone(),
-                                area,
+                                area: code.make_area(span),
                             })
                         }
                     }
@@ -428,6 +486,17 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     }
                 }
 
+                Instruction::PushVars(idx) => {
+                    let vars = code.scope_vars.get(*idx);
+                    context
+                        .inner()
+                        .push_vars(code.scope_vars.get(*idx), code, globals);
+                }
+                Instruction::PopVars(idx) => {
+                    let vars = code.scope_vars.get(*idx);
+                    context.inner().pop_vars(code.scope_vars.get(*idx));
+                }
+
                 Instruction::Plus
                 | Instruction::Minus
                 | Instruction::Mult
@@ -441,9 +510,6 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 | Instruction::Lesser
                 | Instruction::LesserEq
                 | Instruction::Is => (),
-
-                Instruction::EnterScope => {}
-                Instruction::ExitScope => {}
             }
 
             context.inner().advance_to(code, i + 1);

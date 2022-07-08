@@ -4,17 +4,17 @@ use crate::error_maker;
 use crate::sources::CodeArea;
 
 error_maker! {
+    Module: syntax_errors;
     pub enum SyntaxError {
         #[
             Message = "Unexpected character", Area = area, Note = None,
             Labels = [
-                area => "Expected `{}` found {} `{}`": @(expected), @(typ), @(found);
+                area => "Expected `{}` found `{}`": @(expected), @(found);
             ]
         ]
-        Expected {
+        ExpectedToken {
             expected: String,
             found: String,
-            typ: String,
             area: CodeArea,
         },
         #[
@@ -46,6 +46,17 @@ error_maker! {
         ]
         InvalidLiteral {
             literal: String,
+            area: CodeArea,
+        },
+
+        #[
+            Message = "Unexpected string flag", Area = area, Note = None,
+            Labels = [
+                area => "Expected valid string flag, found: `{}`": @(flag);
+            ]
+        ]
+        UnexpectedFlag {
+            flag: String,
             area: CodeArea,
         },
     }

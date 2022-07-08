@@ -17,7 +17,7 @@ pub enum Id {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Value {
-    Int(isize),
+    Int(i128),
     Float(f64),
 
     String(String),
@@ -40,9 +40,18 @@ pub enum Value {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct MacroArg {
+    pub name: String,
+    pub area: CodeArea,
+    pub pattern: Option<ValueKey>,
+    pub default: Option<ValueKey>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Macro {
     pub func_id: usize,
-    pub args: Vec<((String, CodeArea), Option<ValueKey>, Option<ValueKey>)>,
+    pub args: Vec<MacroArg>,
+    pub capture: Vec<ValueKey>,
     pub ret_type: ValueKey,
 }
 
@@ -101,26 +110,34 @@ impl Value {
                 func_id,
                 args,
                 ret_type,
+                ..
             }) => {
                 format!(
                     "({}) -> {} {{...}}",
                     args.iter()
-                        .map(|((n, _), t, d)| {
-                            format!(
-                                "{}{}{}",
-                                n,
-                                if let Some(t) = t {
-                                    format!(": {}", globals.memory[*t].value.to_str(globals))
-                                } else {
-                                    "".into()
-                                },
-                                if let Some(d) = d {
-                                    format!(" = {}", globals.memory[*d].value.to_str(globals))
-                                } else {
-                                    "".into()
-                                },
-                            )
-                        })
+                        .map(
+                            |MacroArg {
+                                 name: n,
+                                 pattern: t,
+                                 default: d,
+                                 ..
+                             }| {
+                                format!(
+                                    "{}{}{}",
+                                    n,
+                                    if let Some(t) = t {
+                                        format!(": {}", globals.memory[*t].value.to_str(globals))
+                                    } else {
+                                        "".into()
+                                    },
+                                    if let Some(d) = d {
+                                        format!(" = {}", globals.memory[*d].value.to_str(globals))
+                                    } else {
+                                        "".into()
+                                    },
+                                )
+                            }
+                        )
                         .collect::<Vec<_>>()
                         .join(", "),
                     globals.memory[*ret_type].value.to_str(globals),
@@ -154,15 +171,15 @@ impl Value {
                 func_id,
                 args,
                 ret_type,
+                capture,
             }) => {
                 let args = args
                     .iter()
-                    .map(|(s, t, d)| {
-                        (
-                            s.clone(),
-                            t.map(|t| globals.key_deep_clone(t)),
-                            d.map(|d| globals.key_deep_clone(d)),
-                        )
+                    .map(|m| MacroArg {
+                        name: m.name.clone(),
+                        area: m.area.clone(),
+                        pattern: m.pattern.map(|t| globals.key_deep_clone(t)),
+                        default: m.default.map(|d| globals.key_deep_clone(d)),
                     })
                     .collect();
                 let ret_type = globals.key_deep_clone(*ret_type);
@@ -170,6 +187,7 @@ impl Value {
                     func_id: *func_id,
                     args,
                     ret_type,
+                    capture: capture.clone(),
                 })
             }
         }
@@ -460,7 +478,7 @@ pub mod value_ops {
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => {
-                Value::Int((*n1 as f64).powf(*n2 as f64).floor() as isize)
+                Value::Int((*n1 as f64).powf(*n2 as f64).floor() as i128)
             }
             (Value::Int(n1), Value::Float(n2)) => Value::Float((*n1 as f64).powf(*n2)),
             (Value::Float(n1), Value::Int(n2)) => Value::Float((*n1).powf(*n2 as f64)),

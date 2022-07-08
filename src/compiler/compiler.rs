@@ -5,11 +5,16 @@ use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
 use super::error::CompilerError;
-use crate::parser::lexer::Token;
-use crate::parser::parser::{ASTData, ASTKey, ExprKey, Expression, Statement, Statements, StmtKey};
+use crate::{
+    interpreter::{interpreter::StoredValue, value::Value},
+    parser::{
+        ast::{ASTData, ASTKey, ExprKey, Expression, KeyType, Statement, Statements, StmtKey},
+        lexer::Token,
+    },
+    sources::{CodeArea, CodeSpan, SpwnSource},
+};
 
-use crate::interpreter::value::Value;
-use crate::sources::CodeArea;
+// use crate::interpreter::value::Value;
 
 pub type InstrNum = u16;
 
@@ -35,46 +40,97 @@ impl<T: PartialEq> UniqueRegister<T> {
     }
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+pub enum Const {
+    Int(u64),
+    Float(f64),
+    String(String),
+    Bool(bool),
+}
+impl Const {
+    pub fn to_value(&self) -> Value {
+        match self {
+            Const::Int(v) => Value::Int(*v as i128),
+            Const::Float(v) => Value::Float(*v),
+            Const::String(v) => Value::String(v.clone()),
+            Const::Bool(v) => Value::Bool(*v),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug)]
+pub struct BytecodeFunc {
+    pub instructions: Vec<Instruction>,
+    pub arg_ids: Vec<InstrNum>,
+    pub capture_ids: Vec<InstrNum>,
+    pub scoped_var_ids: Vec<InstrNum>,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Code {
-    pub constants: UniqueRegister<Value>,
+    pub source: SpwnSource,
+
+    pub constants: UniqueRegister<Const>,
     pub names: UniqueRegister<String>,
     pub destinations: UniqueRegister<usize>,
     pub name_sets: UniqueRegister<Vec<String>>,
+    pub scope_vars: UniqueRegister<Vec<InstrNum>>,
     #[allow(clippy::type_complexity)]
     pub macro_build_info: UniqueRegister<(usize, Vec<(String, bool, bool)>)>,
 
     pub var_count: usize,
 
-    pub instructions: Vec<(Vec<Instruction>, Vec<u16>)>,
+    pub bytecode_funcs: Vec<BytecodeFunc>,
 
-    pub bytecode_areas: HashMap<(usize, usize), CodeArea>,
-
-    pub macro_arg_areas: HashMap<(usize, usize), Vec<CodeArea>>,
+    pub bytecode_spans: HashMap<(usize, usize), CodeSpan>,
+    pub macro_arg_spans: HashMap<(usize, usize), Vec<CodeSpan>>,
 }
 impl Code {
-    pub fn new() -> Self {
+    pub fn new(source: SpwnSource) -> Self {
         Self {
+            source,
             constants: UniqueRegister::new(),
             names: UniqueRegister::new(),
             destinations: UniqueRegister::new(),
             name_sets: UniqueRegister::new(),
             macro_build_info: UniqueRegister::new(),
-            instructions: vec![],
+            scope_vars: UniqueRegister::new(),
+            bytecode_funcs: vec![],
             var_count: 0,
-            bytecode_areas: HashMap::new(),
-            macro_arg_areas: HashMap::new(),
+            bytecode_spans: HashMap::new(),
+            macro_arg_spans: HashMap::new(),
         }
     }
+    pub fn make_area(&self, span: CodeSpan) -> CodeArea {
+        CodeArea {
+            span,
+            source: self.source.clone(),
+        }
+    }
+    pub fn dummy_value(&self) -> StoredValue {
+        Value::Empty.into_stored(self.make_area((0..0).into()))
+    }
 
-    pub fn get_bytecode_area(&self, func: usize, i: usize) -> CodeArea {
-        self.bytecode_areas.get(&(func, i)).unwrap().clone()
+    pub fn get_bytecode_span(&self, func: usize, i: usize) -> CodeSpan {
+        *self.bytecode_spans.get(&(func, i)).unwrap()
     }
 
     pub fn debug(&self) {
-        for (i, (instrs, args)) in self.instructions.iter().enumerate() {
-            println!("============================> Func {}\t{:? }", i, args);
-            for (i, instr) in instrs.iter().enumerate() {
+        for (
+            i,
+            BytecodeFunc {
+                instructions,
+                arg_ids,
+                capture_ids,
+                scoped_var_ids,
+            },
+        ) in self.bytecode_funcs.iter().enumerate()
+        {
+            println!(
+                "============================> Func {}      {:?}      {:?}      {:?}",
+                i, arg_ids, capture_ids, scoped_var_ids
+            );
+            for (i, instr) in instructions.iter().enumerate() {
                 use ansi_term::Color::Yellow;
                 let instr_len = 25;
 
@@ -88,59 +144,47 @@ impl Code {
 
                 match instr {
                     Instruction::LoadConst(idx) => {
-                        s += &col
-                            .paint(format!("{:?}", self.constants.get(*idx)))
-                            .to_string()
+                        s += &col.paint(format!("{:?}", self.constants.get(*idx)))
                     }
                     Instruction::LoadType(idx) => {
                         s += &col.paint(format!("@{}", self.names.get(*idx))).to_string()
                     }
                     Instruction::Jump(idx) => {
-                        s += &col
-                            .paint(format!("to {:?}", self.destinations.get(*idx)))
-                            .to_string()
+                        s += &col.paint(format!("to {:?}", self.destinations.get(*idx)))
                     }
                     Instruction::JumpIfFalse(idx) => {
-                        s += &col
-                            .paint(format!("to {:?}", self.destinations.get(*idx)))
-                            .to_string()
+                        s += &col.paint(format!("to {:?}", self.destinations.get(*idx)))
                     }
                     Instruction::IterNext(idx) => {
-                        s += &col
-                            .paint(format!("to {:?}", self.destinations.get(*idx)))
-                            .to_string()
+                        s += &col.paint(format!("to {:?}", self.destinations.get(*idx)))
                     }
                     Instruction::BuildDict(idx) => {
-                        s += &col
-                            .paint(format!("with {:?}", self.name_sets.get(*idx)))
-                            .to_string()
+                        s += &col.paint(format!("with {:?}", self.name_sets.get(*idx)))
                     }
                     Instruction::MakeMacro(idx) => {
-                        s += &col
-                            .paint(format!(
-                                "Func {:?}, args: {:?}",
-                                self.macro_build_info.get(*idx).0,
-                                self.macro_build_info.get(*idx).1
-                            ))
-                            .to_string()
+                        s += &col.paint(format!(
+                            "Func {:?}, args: {:?}",
+                            self.macro_build_info.get(*idx).0,
+                            self.macro_build_info.get(*idx).1
+                        ))
                     }
                     Instruction::Call(idx) => {
-                        s += &col
-                            .paint(format!("params: {:?}", self.name_sets.get(*idx)))
-                            .to_string()
+                        s += &col.paint(format!("params: {:?}", self.name_sets.get(*idx)))
                     }
                     Instruction::TypeDef(idx) => {
-                        s += &col.paint(format!("@{}", self.names.get(*idx))).to_string()
+                        s += &col.paint(format!("@{}", self.names.get(*idx)))
                     }
                     Instruction::Impl(idx) => {
-                        s += &col
-                            .paint(format!("with {:?}", self.name_sets.get(*idx)))
-                            .to_string()
+                        s += &col.paint(format!("with {:?}", self.name_sets.get(*idx)))
                     }
                     Instruction::Instance(idx) => {
-                        s += &col
-                            .paint(format!("with {:?}", self.name_sets.get(*idx)))
-                            .to_string()
+                        s += &col.paint(format!("with {:?}", self.name_sets.get(*idx)))
+                    }
+                    Instruction::PushVars(idx) => {
+                        s += &col.paint(format!("scope vars: {:?}", self.scope_vars.get(*idx)))
+                    }
+                    Instruction::PopVars(idx) => {
+                        s += &col.paint(format!("scope vars: {:?}", self.scope_vars.get(*idx)))
                     }
                     _ => (),
                 }
@@ -153,15 +197,24 @@ impl Code {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Instruction {
+    // ok am writing docstring for each instruction so i understand
+    /// loads constant value and pushes to stack ???
     LoadConst(InstrNum),
 
+    /// pops two elements from the stack and pushes their sum
     Plus,
+    /// pops two elements from the stack and pushes their difference
     Minus,
+    /// pops two elements from the stack and pushes their product
     Mult,
+    /// pops two elements from the stack and pushes their quotient
     Div,
+    /// pops two elements from the stack and pushes their modulatoratron (yes that is the same; source: i made it the fuck up)
     Mod,
+    /// pops two elements from the stack and pushes their supernumber
     Pow,
 
+    // these are all the same i suppose
     Eq,
     NotEq,
     Greater,
@@ -174,42 +227,57 @@ pub enum Instruction {
 
     Is,
 
+    /// loads mutable variable and pushes to stack
     LoadVar(InstrNum),
+    /// mutates variable
     SetVar(InstrNum),
-
+    /// loads type and then pushes type inddicator to stack maybe ??
     LoadType(InstrNum),
-
+    /// makes array from last n elements on the stack
     BuildArray(InstrNum),
 
+    /// pushes () to the stack
     PushEmpty,
+    /// pops stack
     PopTop,
 
+    /// jumps to instruction at index
     Jump(InstrNum),
+    /// jumps to instruction at index if top of stack is false
     JumpIfFalse(InstrNum),
-
+    /// lol what
     ToIter,
+    /// for loop something something
     IterNext(InstrNum),
-
+    /// makes dict from last n elements on the stack
     BuildDict(InstrNum),
-
+    /// returns to callsite
     Return,
+    /// returns to loop start
     Continue,
+    /// goes to loop end
     Break,
 
+    /// ig it takes the elements on the stack and uses them to make macro value
     MakeMacro(InstrNum),
+    /// pushes wildcard patterbn
     PushAnyPattern,
-
+    /// makes macro patern
     MakeMacroPattern(InstrNum),
-
+    /// pushes nth index of array where n and array are on the stack
     Index,
+    /// calls macro with n elements on the stack
     Call(InstrNum),
+    /// calls trigger function
     TriggerFuncCall,
 
+    /// saves context for arrow statement (should probably be something like pushcontexts wwhere its on a stack or something lmao idk)
     SaveContexts,
+    /// pops contexts off stack presumably idk
     ReviseContexts,
-
+    /// merges contexts
     MergeContexts,
-
+    // wait is this the ? Option syntax thing lol
     PushNone,
     WrapMaybe,
 
@@ -217,20 +285,24 @@ pub enum Instruction {
     PopContextGroup,
     PushTriggerFnValue,
 
+    /// make type
     TypeDef(InstrNum),
+    /// make impl ?? wwhy is this a bytecode instruction shouldnt this be compiletime or somethinghb
+    /// // wait is it for like @aa::b = v
     Impl(InstrNum),
+    /// ???????
     Instance(InstrNum),
-
-    EnterScope,
-    ExitScope,
 
     Print,
     Split,
+
+    PushVars(InstrNum),
+    PopVars(InstrNum),
 }
 
 pub struct Scope {
-    vars: AHashMap<String, (InstrNum, bool, CodeArea)>,
-    parent: Option<ScopeKey>,
+    pub vars: AHashMap<String, (InstrNum, bool, CodeSpan)>,
+    pub parent: Option<ScopeKey>,
 }
 impl Scope {
     pub fn base() -> Scope {
@@ -239,27 +311,93 @@ impl Scope {
             parent: None,
         }
     }
+    pub fn var_ids(&self) -> Vec<InstrNum> {
+        self.vars
+            .iter()
+            .map(|(_, (id, ..))| *id)
+            .collect::<Vec<_>>()
+    }
 }
 
 new_key_type! { pub struct ScopeKey; }
 
+#[derive(Debug)]
+pub struct MacroQueuedExec {
+    code_key: ExprKey,
+    func_id: usize,
+    derived_scope: ScopeKey,
+    original_scope: ScopeKey,
+}
+
 pub struct Compiler {
+    pub source: SpwnSource,
+
     pub ast_data: ASTData,
     pub code: Code,
     #[allow(clippy::type_complexity)]
-    pub code_exec_queue: Vec<Vec<(Box<dyn ASTKey>, usize, ScopeKey)>>,
+    pub macro_exec_queue: Vec<Vec<MacroQueuedExec>>,
 
     pub scopes: SlotMap<ScopeKey, Scope>,
 }
 
 impl Compiler {
-    pub fn new(data: ASTData) -> Self {
+    pub fn new(data: ASTData, source: SpwnSource) -> Self {
         Self {
+            code: Code::new(source.clone()),
+            source,
             ast_data: data,
-            code: Code::new(),
-            code_exec_queue: vec![],
+            macro_exec_queue: vec![],
             scopes: SlotMap::default(),
         }
+    }
+    pub fn make_area(&self, span: CodeSpan) -> CodeArea {
+        CodeArea {
+            span,
+            source: self.source.clone(),
+        }
+    }
+
+    // pub fn run_stmts_scoped(
+    //     &mut self,
+    //     code: Statements,
+    //     scope: ScopeKey,
+    //     func: usize,
+    // ) -> Result<(), CompilerError> {
+    //     let enter = self.push_instr(Instruction::PushVars(0), func);
+    //     self.compile_stmts(code, scope, func)?;
+
+    //     let vars = self.scopes[scope]
+    //         .vars
+    //         .iter()
+    //         .map(|(_, (id, _, _))| *id)
+    //         .collect();
+
+    //     let idx = self.code.scope_vars.add(vars);
+
+    //     self.set_instr(Instruction::PushVars(idx), func, enter);
+    //     self.push_instr(Instruction::PopVars(idx), func);
+
+    //     Ok(())
+    // }
+
+    pub fn run_scoped<F>(&mut self, scope: ScopeKey, func: usize, f: F) -> Result<(), CompilerError>
+    where
+        F: FnOnce(&mut Compiler) -> Result<(), CompilerError>,
+    {
+        let enter = self.push_instr(Instruction::PushVars(0), func);
+        f(self)?;
+        let vars = self.scopes[scope]
+            .vars
+            .iter()
+            .map(|(_, (id, _, _))| *id)
+            .collect();
+
+        let idx = self.code.scope_vars.add(vars);
+
+        self.set_instr(Instruction::PushVars(idx), func, enter);
+        self.push_instr(Instruction::PopVars(idx), func);
+
+        Ok(())
     }
 
     pub fn derived(&mut self, key: ScopeKey) -> ScopeKey {
@@ -272,10 +410,10 @@ impl Compiler {
         &self,
         name: &String,
         scope: ScopeKey,
-    ) -> Option<(InstrNum, bool, CodeArea)> {
+    ) -> Option<(InstrNum, bool, CodeSpan)> {
         let scope = &self.scopes[scope];
         match scope.vars.get(name) {
-            Some((n, m, a)) => Some((*n, *m, a.clone())),
+            Some((n, m, a)) => Some((*n, *m, *a)),
             None => match scope.parent {
                 Some(parent) => self.get_var_data(name, parent),
                 None => None,
@@ -287,11 +425,11 @@ impl Compiler {
         name: String,
         scope: ScopeKey,
         mutable: bool,
-        area: CodeArea,
+        span: CodeSpan,
     ) -> InstrNum {
         self.scopes[scope]
             .vars
-            .insert(name, (self.code.var_count as InstrNum, mutable, area));
+            .insert(name, (self.code.var_count as InstrNum, mutable, span));
         self.code.var_count += 1;
         self.code.var_count as InstrNum - 1
     }
@@ -310,23 +448,23 @@ impl Compiler {
     }
 
     fn push_instr(&mut self, i: Instruction, func: usize) -> usize {
-        self.code.instructions[func].0.push(i);
-        self.code.instructions[func].0.len() - 1
+        self.code.bytecode_funcs[func].instructions.push(i);
+        self.code.bytecode_funcs[func].instructions.len() - 1
     }
-    fn push_instr_with_area(&mut self, i: Instruction, area: CodeArea, func: usize) -> usize {
+    fn push_instr_with_span(&mut self, i: Instruction, span: CodeSpan, func: usize) -> usize {
         let key = (func, self.func_len(func));
-        self.code.bytecode_areas.insert(key, area);
-        self.code.instructions[func].0.push(i);
-        self.code.instructions[func].0.len() - 1
+        self.code.bytecode_spans.insert(key, span);
+        self.code.bytecode_funcs[func].instructions.push(i);
+        self.code.bytecode_funcs[func].instructions.len() - 1
     }
     fn set_instr(&mut self, i: Instruction, func: usize, n: usize) {
-        self.code.instructions[func].0[n] = i;
+        self.code.bytecode_funcs[func].instructions[n] = i;
     }
     fn instr_len(&mut self, func: usize) -> usize {
-        self.code.instructions[func].0.len()
+        self.code.bytecode_funcs[func].instructions.len()
     }
     fn func_len(&self, func: usize) -> usize {
-        self.code.instructions[func].0.len()
+        self.code.bytecode_funcs[func].instructions.len()
     }
 
     fn compile_expr(
@@ -336,17 +474,21 @@ impl Compiler {
         func: usize,
     ) -> Result<(), CompilerError> {
         let expr = self.ast_data.get_expr(expr_key);
-        let expr_area = self.ast_data.get_area(expr_key).clone();
+        let expr_span = self.ast_data.get_span(expr_key);
+
+        let constant = |s: &mut Compiler, c| {
+            let c_id = s.code.constants.add(c);
+            s.push_instr_with_span(Instruction::LoadConst(c_id), expr_span, func);
+        };
 
         match expr {
-            Expression::Literal(l) => {
-                let val = l.to_value();
-                let c_id = self.code.constants.add(val);
-                self.push_instr_with_area(Instruction::LoadConst(c_id), expr_area, func);
-            }
+            Expression::Int(n) => constant(self, Const::Int(n)),
+            Expression::Float(n) => constant(self, Const::Float(n)),
+            Expression::String(s) => constant(self, Const::String(s)),
+            Expression::Bool(b) => constant(self, Const::Bool(b)),
             Expression::Type(name) => {
                 let v_id = self.code.names.add(name);
-                self.push_instr_with_area(Instruction::LoadType(v_id), expr_area, func);
+                self.push_instr_with_span(Instruction::LoadType(v_id), expr_span, func);
             }
             Expression::Op(a, op, b) => {
                 self.compile_expr(a, scope, func)?;
@@ -356,9 +498,9 @@ impl Compiler {
                     ( $($v:ident)* ) => {
                         match op {
                             $(
-                                Token::$v => self.push_instr_with_area(
+                                Token::$v => self.push_instr_with_span(
                                     Instruction::$v,
-                                    expr_area.clone(),
+                                    expr_span,
                                     func
                                 ),
                             )*
@@ -378,7 +520,7 @@ impl Compiler {
                     _ => unreachable!(),
                 };
 
-                self.push_instr_with_area(instr, expr_area, func);
+                self.push_instr_with_span(instr, expr_span, func);
             }
             Expression::Var(v) => {
                 if let Some((id, _, _)) = self.get_var_data(&v, scope) {
@@ -386,7 +528,7 @@ impl Compiler {
                 } else {
                     return Err(CompilerError::NonexistentVar {
                         name: v,
-                        area: expr_area,
+                        area: self.make_area(expr_span),
                     });
                 }
             }
@@ -394,38 +536,42 @@ impl Compiler {
                 for i in &v {
                     self.compile_expr(*i, scope, func)?;
                 }
-                self.push_instr_with_area(
+                self.push_instr_with_span(
                     Instruction::BuildArray(v.len() as InstrNum),
-                    expr_area,
+                    expr_span,
                     func,
                 );
             }
             Expression::Empty => {
-                self.push_instr_with_area(Instruction::PushEmpty, expr_area, func);
+                self.push_instr_with_span(Instruction::PushEmpty, expr_span, func);
             }
             Expression::Dict(items) => {
-                let key_areas = self.ast_data.dictlike_areas[expr_key].clone();
+                let key_spans = self.ast_data.dictlike_spans[expr_key].clone();
                 let idx = self
                     .code
                     .name_sets
                     .add(items.iter().map(|(s, _)| s.clone()).rev().collect());
-                for ((name, v), area) in items.into_iter().zip(key_areas) {
+                for ((name, v), span) in items.into_iter().zip(key_spans) {
                     if let Some(v) = v {
                         self.compile_expr(v, scope, func)?;
                     } else if let Some((id, _, _)) = self.get_var_data(&name, scope) {
                         self.push_instr(Instruction::LoadVar(id), func);
                     } else {
-                        return Err(CompilerError::NonexistentVar { name, area });
+                        return Err(CompilerError::NonexistentVar {
+                            name,
+                            area: self.make_area(span),
+                        });
                     }
                 }
-                self.push_instr_with_area(Instruction::BuildDict(idx), expr_area, func);
+                self.push_instr_with_span(Instruction::BuildDict(idx), expr_span, func);
             }
             Expression::Block(code) => {
                 let derived = self.derived(scope);
-                self.push_instr(Instruction::EnterScope, func);
-                self.compile_stmts(code, derived, func)?;
-                self.push_instr(Instruction::ExitScope, func);
-                self.push_instr(Instruction::PushEmpty, func);
+                self.run_scoped(derived, func, |comp| {
+                    comp.compile_stmts(code, derived, func)?;
+                    Ok(())
+                })?;
+                self.push_instr_with_span(Instruction::PushEmpty, expr_span, func);
             }
             Expression::Func {
                 args,
@@ -434,16 +580,22 @@ impl Compiler {
             } => {
                 let mut arg_ids = vec![];
 
-                self.code.instructions.push((vec![], vec![]));
-                let func_id = self.code.instructions.len() - 1;
+                self.code.bytecode_funcs.push(BytecodeFunc::default());
+                let func_id = self.code.bytecode_funcs.len() - 1;
 
                 let derived_scope = self.derived(scope);
 
-                self.code_exec_queue.last_mut().unwrap().push((
-                    Box::new(code),
-                    func_id,
-                    derived_scope,
-                ));
+                println!("cCoke {:?}", self.macro_exec_queue);
+
+                self.macro_exec_queue
+                    .last_mut()
+                    .unwrap()
+                    .push(MacroQueuedExec {
+                        code_key: code,
+                        func_id,
+                        derived_scope,
+                        original_scope: scope,
+                    });
                 // self.compile_expr(code, &mut scope.derived(), func_id)?;
 
                 let idx = self.code.macro_build_info.add((
@@ -454,9 +606,9 @@ impl Compiler {
                         .collect(),
                 ));
 
-                let mut arg_areas = self.ast_data.func_arg_areas[expr_key].clone();
-                for ((n, t, d), area) in args.into_iter().zip(&arg_areas) {
-                    let arg_id = self.new_var(n.clone(), derived_scope, false, area.clone());
+                let mut arg_spans = self.ast_data.func_arg_spans[expr_key].clone();
+                for ((n, t, d), span) in args.into_iter().zip(&arg_spans) {
+                    let arg_id = self.new_var(n.clone(), derived_scope, false, *span);
                     arg_ids.push(arg_id);
                     if let Some(t) = t {
                         self.compile_expr(t, scope, func)?;
@@ -465,18 +617,18 @@ impl Compiler {
                         self.compile_expr(d, scope, func)?;
                     }
                 }
-                self.code.instructions[func_id].1 = arg_ids;
+                self.code.bytecode_funcs[func_id].arg_ids = arg_ids;
 
                 if let Some(ret) = ret_type {
                     self.compile_expr(ret, scope, func)?;
                 } else {
-                    self.push_instr_with_area(Instruction::PushAnyPattern, expr_area.clone(), func);
+                    self.push_instr_with_span(Instruction::PushAnyPattern, expr_span, func);
                 }
-                arg_areas.reverse();
+                arg_spans.reverse();
                 self.code
-                    .macro_arg_areas
-                    .insert((func, self.func_len(func)), arg_areas);
-                self.push_instr_with_area(Instruction::MakeMacro(idx), expr_area, func);
+                    .macro_arg_spans
+                    .insert((func, self.func_len(func)), arg_spans);
+                self.push_instr_with_span(Instruction::MakeMacro(idx), expr_span, func);
             }
             Expression::FuncPattern { args, ret_type } => {
                 for i in &args {
@@ -519,7 +671,7 @@ impl Compiler {
                 params,
                 named_params,
             } => {
-                let mut param_areas = self.ast_data.func_arg_areas[expr_key].clone();
+                let mut param_spans = self.ast_data.func_arg_spans[expr_key].clone();
                 let idx = self.code.name_sets.add(
                     params
                         .iter()
@@ -534,12 +686,12 @@ impl Compiler {
                 for (_, v) in named_params {
                     self.compile_expr(v, scope, func)?;
                 }
-                param_areas.reverse();
+                param_spans.reverse();
                 self.compile_expr(base, scope, func)?;
                 self.code
-                    .macro_arg_areas
-                    .insert((func, self.func_len(func)), param_areas);
-                self.push_instr_with_area(Instruction::Call(idx), expr_area, func);
+                    .macro_arg_spans
+                    .insert((func, self.func_len(func)), param_spans);
+                self.push_instr_with_span(Instruction::Call(idx), expr_span, func);
             }
             Expression::TriggerFuncCall(v) => {
                 self.compile_expr(v, scope, func)?;
@@ -556,25 +708,26 @@ impl Compiler {
             Expression::TriggerFunc(code) => {
                 self.push_instr(Instruction::PushContextGroup, func);
                 let derived = self.derived(scope);
-                self.push_instr(Instruction::EnterScope, func);
                 self.compile_stmts(code, derived, func)?;
-                self.push_instr(Instruction::ExitScope, func);
                 self.push_instr(Instruction::PopContextGroup, func);
                 self.push_instr(Instruction::PushTriggerFnValue, func);
             }
             Expression::Instance(typ, items) => {
-                let key_areas = self.ast_data.dictlike_areas[expr_key].clone();
+                let key_spans = self.ast_data.dictlike_spans[expr_key].clone();
                 let idx = self
                     .code
                     .name_sets
                     .add(items.iter().map(|(s, _)| s.clone()).collect());
-                for ((name, v), area) in items.into_iter().zip(key_areas) {
+                for ((name, v), span) in items.into_iter().zip(key_spans) {
                     if let Some(v) = v {
                         self.compile_expr(v, scope, func)?;
                     } else if let Some((id, _, _)) = self.get_var_data(&name, scope) {
                         self.push_instr(Instruction::LoadVar(id), func);
                     } else {
-                        return Err(CompilerError::NonexistentVar { name, area });
+                        return Err(CompilerError::NonexistentVar {
+                            name,
+                            area: self.make_area(span),
+                        });
                     }
                 }
                 self.compile_expr(typ, scope, func)?;
@@ -598,7 +751,7 @@ impl Compiler {
     ) -> Result<(), CompilerError> {
         let is_arrow = self.ast_data.stmt_arrows[stmt_key];
         let stmt = self.ast_data.get_stmt(stmt_key);
-        let stmt_area = self.ast_data.get_area(stmt_key).clone();
+        let stmt_span = self.ast_data.get_span(stmt_key);
 
         if is_arrow {
             self.push_instr(Instruction::SaveContexts, func);
@@ -616,24 +769,24 @@ impl Compiler {
             Statement::Let(name, value) => {
                 self.compile_expr(value, scope, func)?;
 
-                let var_id = self.new_var(name, scope, true, stmt_area);
+                let var_id = self.new_var(name, scope, true, stmt_span);
 
                 self.push_instr(Instruction::SetVar(var_id), func);
             }
             Statement::Assign(name, value) => {
                 self.compile_expr(value, scope, func)?;
 
-                if let Some((id, mutable, area)) = self.get_var_data(&name, scope) {
+                if let Some((id, mutable, span)) = self.get_var_data(&name, scope) {
                     if !mutable {
                         return Err(CompilerError::ModifyImmutable {
                             name,
-                            area: stmt_area,
-                            def_area: area,
+                            area: self.make_area(stmt_span),
+                            def_area: self.make_area(span),
                         });
                     }
                     self.push_instr(Instruction::SetVar(id), func);
                 } else {
-                    let var_id = self.new_var(name, scope, false, stmt_area);
+                    let var_id = self.new_var(name, scope, false, stmt_span);
                     self.push_instr(Instruction::SetVar(var_id), func);
                 }
             }
@@ -648,9 +801,10 @@ impl Compiler {
                     let jump_idx = self.push_instr(Instruction::JumpIfFalse(0), func);
 
                     let derived = self.derived(scope);
-                    self.push_instr(Instruction::EnterScope, func);
-                    self.compile_stmts(code, derived, func)?;
-                    self.push_instr(Instruction::ExitScope, func);
+                    self.run_scoped(derived, func, |comp| {
+                        comp.compile_stmts(code, derived, func)?;
+                        Ok(())
+                    })?;
 
                     let j = self.push_instr(Instruction::Jump(0), func);
                     end_jumps.push(j);
@@ -662,9 +816,10 @@ impl Compiler {
 
                 if let Some(code) = else_branch {
                     let derived = self.derived(scope);
-                    self.push_instr(Instruction::EnterScope, func);
-                    self.compile_stmts(code, derived, func)?;
-                    self.push_instr(Instruction::ExitScope, func);
+                    self.run_scoped(derived, func, |comp| {
+                        comp.compile_stmts(code, derived, func)?;
+                        Ok(())
+                    })?;
                 }
 
                 let next_pos = self.instr_len(func);
@@ -679,9 +834,10 @@ impl Compiler {
                 let jump_pos = self.push_instr(Instruction::JumpIfFalse(0), func);
 
                 let derived = self.derived(scope);
-                self.push_instr(Instruction::EnterScope, func);
-                self.compile_stmts(code, derived, func)?;
-                self.push_instr(Instruction::ExitScope, func);
+                self.run_scoped(derived, func, |comp| {
+                    comp.compile_stmts(code, derived, func)?;
+                    Ok(())
+                })?;
 
                 let idx = self.code.destinations.add(cond_pos);
                 self.push_instr(Instruction::Jump(idx), func);
@@ -695,19 +851,20 @@ impl Compiler {
                 iterator,
                 code,
             } => {
-                let var_area = self.ast_data.for_loop_iter_areas[stmt_key].clone();
+                let var_span = self.ast_data.for_loop_iter_spans[stmt_key];
 
                 self.compile_expr(iterator, scope, func)?;
                 self.push_instr(Instruction::ToIter, func);
                 let iter_pos = self.push_instr(Instruction::IterNext(0), func);
 
                 let derived_scope = self.derived(scope);
-                let var_id = self.new_var(var, derived_scope, false, var_area);
+                let var_id = self.new_var(var, derived_scope, false, var_span);
 
-                self.push_instr(Instruction::EnterScope, func);
-                self.push_instr(Instruction::SetVar(var_id), func);
-                self.compile_stmts(code, derived_scope, func)?;
-                self.push_instr(Instruction::ExitScope, func);
+                self.run_scoped(derived_scope, func, |comp| {
+                    comp.push_instr(Instruction::SetVar(var_id), func);
+                    comp.compile_stmts(code, derived_scope, func)?;
+                    Ok(())
+                })?;
 
                 let idx = self.code.destinations.add(iter_pos);
                 let jump_pos = self.push_instr(Instruction::Jump(idx), func);
@@ -734,12 +891,22 @@ impl Compiler {
                 self.push_instr(Instruction::TypeDef(v_id), func);
             }
             Statement::Impl(typ, impls) => {
+                let key_spans = self.ast_data.impl_spans[stmt_key].clone();
                 let idx = self
                     .code
                     .name_sets
                     .add(impls.iter().map(|(s, _)| s.clone()).collect());
-                for (_, v) in impls {
-                    self.compile_expr(v, scope, func)?;
+                for ((key, v), span) in impls.into_iter().zip(key_spans) {
+                    if let Some(v) = v {
+                        self.compile_expr(v, scope, func)?;
+                    } else if let Some((id, _, _)) = self.get_var_data(&key, scope) {
+                        self.push_instr(Instruction::LoadVar(id), func);
+                    } else {
+                        return Err(CompilerError::NonexistentVar {
+                            name: key,
+                            area: self.make_area(span),
+                        });
+                    }
                 }
                 self.compile_expr(typ, scope, func)?;
                 self.push_instr(Instruction::Impl(idx), func);
@@ -749,8 +916,26 @@ impl Compiler {
         if is_arrow {
             self.push_instr(Instruction::ReviseContexts, func);
         }
-
+        // really this should be done every time a variable is removed (or changed?)
         self.push_instr(Instruction::MergeContexts, func);
+        Ok(())
+    }
+
+    pub fn resolve_queued(&mut self) -> Result<(), CompilerError> {
+        for MacroQueuedExec {
+            code_key,
+            func_id,
+            derived_scope,
+            original_scope,
+        } in self.macro_exec_queue.pop().unwrap()
+        {
+            self.macro_exec_queue.push(vec![]);
+            self.compile_expr(code_key, derived_scope, func_id)?;
+            self.resolve_queued();
+            self.code.bytecode_funcs[func_id].capture_ids =
+                self.get_accessible_vars(original_scope);
+            self.code.bytecode_funcs[func_id].scoped_var_ids = self.scopes[derived_scope].var_ids();
+        }
         Ok(())
     }
 
@@ -760,18 +945,23 @@ impl Compiler {
         scope: ScopeKey,
         func: usize,
     ) -> Result<(), CompilerError> {
-        self.code_exec_queue.push(vec![]);
+        self.macro_exec_queue.push(vec![]);
         for i in stmts {
             self.compile_stmt(i, scope, func)?;
         }
-        for (k, func_id, scope) in self.code_exec_queue.pop().unwrap() {
-            match k.to_key() {
-                crate::parser::parser::KeyType::Expr(k) => self.compile_expr(k, scope, func_id)?,
-                crate::parser::parser::KeyType::StmtKey(k) => {
-                    self.compile_stmt(k, scope, func_id)?
-                }
-            }
-        }
+        self.resolve_queued();
         Ok(())
+    }
+
+    pub fn start_compile(&mut self, stmts: Statements) -> Result<ScopeKey, CompilerError> {
+        let base_scope = self.scopes.insert(Scope::base());
+        self.code.bytecode_funcs.push(BytecodeFunc::default());
+
+        self.run_scoped(base_scope, 0, |comp| {
+            comp.compile_stmts(stmts, base_scope, 0)?;
+            Ok(())
+        })?;
+
+        Ok(base_scope)
     }
 }

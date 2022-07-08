@@ -1,52 +1,16 @@
 use logos::Logos;
 
-// // ew
-// fn string_flag<'s>(tok: &mut logos::Lexer<'s, Token>) -> String {
-//     let sliced = tok.slice();
-
-//     // get location of `"` or `'` in the token (end of string flag)
-//     // this will never be called on a string without a flag as a normal string has higher priority
-//     // so we can `.unwrap()` without issue
-
-//     let end = sliced.find("\"").unwrap_or_else(|| sliced.find("'").unwrap());
-
-//     let flag = &sliced[0..end];
-//     let string = &sliced[end+1..sliced.len()];
-
-//     String::new()
-// }
-
-#[derive(Logos, Debug, PartialEq, Clone)]
-#[logos(subpattern string = r#""(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
+#[derive(Logos, Debug, PartialEq, Eq, Clone, Copy)]
 #[logos(subpattern digits = r#"(\d)([\d_]+)?"#)]
 pub enum Token {
-    #[regex(r#"(?&digits)"#, |lex| lex.slice().parse(), priority = 2)]
-    Int(usize),
-    #[regex(r#"(?&digits)(\.[\d_]+)?"#, |lex| lex.slice().parse(), priority = 1)]
-    Float(f64),
+    #[regex(r#"(0[b])?(?&digits)"#, priority = 2)]
+    Int,
+    #[regex(r#"(?&digits)(\.[\d_]+)?"#)]
+    Float,
 
-    // number literals don't match their correct values as their converted (and validated) in the parser
-    #[regex(r#"0b\w+"#, |lex| lex.slice().parse())]
-    BinaryLiteral(String),
-    #[regex(r#"0x\w+"#, |lex| lex.slice().parse())]
-    HexLiteral(String),
-    #[regex(r#"0o\w+"#, |lex| lex.slice().parse(), priority = 1)]
-    OctalLiteral(String),
+    #[regex(r#"\w*"(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
+    String,
 
-    #[regex(r#"(?&string)"#, 
-        //|s| convert_string(&s.slice()[1..s.slice().len()-1]),
-        |s| s.slice().parse(),
-        priority = 3 // prioritise normal string over string flags
-    )]
-    String(String),
-
-    // #[regex(r#"_(\w*)?(?&string)"#,
-    //     //|s| s.slice()[0..s.slice().find('"').unwrap_or_else(|| s.slice().find("'").unwrap())].parse(), // take up to `"` or `'`
-    //    // |s| string_flag(s),
-    //    |s| s.slice().parse(),
-    //     priority = 1,
-    // )]
-    // StringFlag(String),
     #[token("let")]
     Let,
     #[token("mut")]
@@ -128,6 +92,8 @@ pub enum Token {
     LBracket,
     #[token("}")]
     RBracket,
+    #[token("!{")]
+    TrigFnBracket,
 
     #[token(",")]
     Comma,
@@ -163,11 +129,11 @@ pub enum Token {
     #[token("!")]
     ExclMark,
 
-    #[regex(r"@[a-zA-Z_]\w*", |lex| lex.slice()[1..].to_string())]
-    TypeIndicator(String),
+    #[regex(r"@[a-zA-Z_]\w*")]
+    TypeIndicator,
 
-    #[regex(r"[a-zA-Z_ඞ][a-zA-Z_0-9ඞ]*", |lex| lex.slice().to_string())]
-    Ident(String),
+    #[regex(r"[a-zA-Z_ඞ][a-zA-Z_0-9ඞ]*")]
+    Ident,
 
     #[regex(r"[ \t\f\n\r]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*", logos::skip)]
     #[error]
@@ -176,21 +142,17 @@ pub enum Token {
     Eof,
 }
 
-impl Token {
-    // used in error messages
-    pub fn tok_name(&self) -> String {
+impl Into<&str> for Token {
+    fn into(self) -> &'static str {
         match self {
-            Token::Int(v) => return v.to_string(),
-            Token::Float(v) => return v.to_string(),
-            Token::BinaryLiteral(b) => b,
-            Token::HexLiteral(h) => h,
-            Token::OctalLiteral(o) => o,
-            Token::String(v) => v,
-            Token::TypeIndicator(v) => return format!("@{}", v),
+            Token::Int => "int literal",
+            Token::Float => "float literal",
+            Token::String => "string literal",
+            Token::TypeIndicator => "type indicator",
             Token::Let => "let",
             Token::Mut => "mut",
-            Token::Ident(n) => n,
-            Token::Error => "unknown",
+            Token::Ident => "identifier",
+            Token::Error => "invalid",
             Token::Eof => "end of file",
             Token::True => "true",
             Token::False => "false",
@@ -213,8 +175,9 @@ impl Token {
             Token::RSqBracket => "]",
             Token::LBracket => "{",
             Token::RBracket => "}",
+            Token::TrigFnBracket => "!{",
             Token::Comma => ",",
-            Token::Eol => "end of line",
+            Token::Eol => ";",
             Token::If => "if",
             Token::Else => "else",
             Token::While => "while",
@@ -240,47 +203,77 @@ impl Token {
             Token::ExclMark => "!",
             Token::TypeDef => "type",
             Token::Impl => "impl",
-            //Token::StringFlag(v) => v,
-        }
-        .into()
-    }
-    // also used in error messages
-    pub fn tok_typ(&self) -> &str {
-        use Token::*;
-        match self {
-            Plus | Minus | Mult | Div | Mod | Pow | PlusEq | MinusEq | MultEq | DivEq | ModEq
-            | PowEq | Assign | Eq | NotEq | Greater | GreaterEq | Lesser | LesserEq | Is => {
-                "operator"
-            }
-
-            Int(_) | Float(_) | BinaryLiteral(_) | HexLiteral(_) | OctalLiteral(_) | String(_)
-            | True | False => "literal",
-
-            Ident(_) => "identifier",
-
-            Let | Mut | For | While | If | Else | In | Return | Break | Continue | TypeDef
-            | Impl | Print | Split => "keyword",
-
-            Error => "",
-            TypeIndicator(_) => "type indicator",
-
-            LParen | RParen | RSqBracket | LSqBracket | RBracket | LBracket | Comma | Colon
-            | DoubleColon | FatArrow | Arrow | QMark | ExclMark | Eol | Eof => "terminator",
         }
     }
 }
 
-pub type Span = (usize, usize);
-pub type Tokens = Vec<(Token, Span)>;
-
-pub fn lex(code: String) -> Tokens {
-    let mut tokens_iter = Token::lexer(&code);
-
-    let mut tokens = vec![];
-    while let Some(t) = tokens_iter.next() {
-        tokens.push((t, (tokens_iter.span().start, tokens_iter.span().end)))
+// converts tokens to a string
+impl ToString for Token {
+    fn to_string(&self) -> String {
+        let t: &'static str = (*self).into();
+        t.to_string()
     }
-    tokens.push((Token::Eof, (code.len(), code.len() + 1)));
+}
 
-    tokens
+// have to use a wrapper struct since it isn't possible to implement on types you dont own (including built-ins)
+#[derive(Clone, Debug)]
+pub struct Tokens(pub Vec<Token>);
+
+// converts a single token into a `Tokens` instance
+impl Into<Tokens> for Token {
+    fn into(self) -> Tokens {
+        Tokens(Vec::from([self]))
+    }
+}
+
+// formats the tokens in a readable way:
+// single token -> `<token>`
+// 2 tokens -> `<token> or <token>`
+// n tokens `<token>, <token>, ...., or <final token>`
+impl ToString for Tokens {
+    fn to_string(&self) -> String {
+        if self.0.len() == 1 {
+            self.0[0].to_string()
+        } else {
+            let comma = &self.0[..(self.0.len() - 1)];
+            // we know there is always going to be a last element in the array
+            // since it will never check for less than 1 tokens
+            // (and a length 1 array has its own formatting above anyway)
+            let last = self.0.last().unwrap();
+            format!(
+                "{} or {}",
+                comma
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                last.to_string()
+            )
+        }
+    }
+}
+
+// implementes bitwise or to allow multiple tokens to be chained together like
+// `Token::A | Token::B`
+// this impl alone only allows 2 tokens to be chained together
+impl std::ops::BitOr<Token> for Token {
+    type Output = Tokens;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Tokens(Vec::from([self, rhs]))
+    }
+}
+
+// `Token::A | Token::B` becomes a `Vec[Token::A, Token::B]`
+// that means if you chain together 3 tokens (or more) it becomes
+// `Vec[Token::A, Token::B] | Token::C`
+// so that has to have its own implementation directly on the vector
+impl std::ops::BitOr<Token> for Vec<Token> {
+    type Output = Tokens;
+
+    fn bitor(self, rhs: Token) -> Self::Output {
+        let mut out = self;
+        out.push(rhs);
+        Tokens(out)
+    }
 }

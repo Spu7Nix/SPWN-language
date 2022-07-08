@@ -1,55 +1,57 @@
-use std::fs;
-use std::path::PathBuf;
+use std::{ops::Range, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::parser::lexer::Span;
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub enum SpwnSource {
-    File(PathBuf),
-}
-
-impl SpwnSource {
-    pub fn name(&self) -> String {
-        match self {
-            Self::File(f) => f.display().to_string(),
-        }
-    }
-
-    pub fn contents(&self) -> String {
-        match self {
-            Self::File(f) => fs::read_to_string(f).unwrap(), // existance of file should have been already checked beforehand
-        }
-    }
-
-    pub fn to_area(&self, span: (usize, usize)) -> CodeArea {
-        CodeArea {
-            source: self.clone(),
-            span,
-        }
-    }
-}
+pub type SpwnSource = Option<PathBuf>;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CodeArea {
-    pub(crate) source: SpwnSource,
-    pub(crate) span: Span,
+    pub source: Option<PathBuf>,
+    pub span: CodeSpan,
+}
+
+pub fn source_name(source: &SpwnSource) -> String {
+    match source {
+        Some(f) => f.display().to_string(),
+        None => "eval".into(),
+    }
 }
 
 impl CodeArea {
     pub fn name(&self) -> String {
-        self.source.name()
+        source_name(&self.source)
     }
 
-    pub fn label(&self) -> (String, std::ops::Range<usize>) {
-        (self.name(), self.span.0..self.span.1)
+    pub fn label(&self) -> (String, Range<usize>) {
+        (self.name(), self.span.into())
     }
+}
 
-    pub fn stretch(&self, other: &CodeArea) -> CodeArea {
-        CodeArea {
-            source: self.source.clone(),
-            span: (self.span.0, other.span.1),
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Copy)]
+pub struct CodeSpan {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl CodeSpan {
+    pub fn extend(&self, other: CodeSpan) -> CodeSpan {
+        CodeSpan {
+            start: self.start,
+            end: other.end,
         }
+    }
+}
+
+impl From<Range<usize>> for CodeSpan {
+    fn from(r: Range<usize>) -> Self {
+        CodeSpan {
+            start: r.start,
+            end: r.end,
+        }
+    }
+}
+impl From<CodeSpan> for Range<usize> {
+    fn from(s: CodeSpan) -> Self {
+        s.start..s.end
     }
 }

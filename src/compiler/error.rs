@@ -2,6 +2,7 @@ use crate::error_maker;
 use crate::sources::CodeArea;
 
 error_maker! {
+    Module: compiler_errors;
     pub enum CompilerError {
         #[
             Message = "Nonexistent variable", Area = area, Note = None,

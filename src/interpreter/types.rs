@@ -2,6 +2,7 @@ use std::any::Any;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use super::error::RuntimeError;
 use super::from_value::FromValueList;
 use super::interpreter::Globals;
 use super::method::{Function, Method};
@@ -10,7 +11,6 @@ use super::type_method::{
     AttributeGetter, Attributes, Constructor, SelfMethod, SelfMethods, StaticMethod, StaticMethods,
 };
 use super::value::Value;
-use super::error::RuntimeError;
 
 use crate::sources::CodeArea;
 
@@ -141,11 +141,14 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn of(typ: &Type, fields: Vec<Value>) -> Result<Self, RuntimeError> {
+    pub fn of(typ: &Type, fields: Vec<Value>, area: CodeArea) -> Result<Self, RuntimeError> {
         if let Some(ctor) = &typ.constructor {
             ctor.invoke(fields)
         } else {
-            Err(RuntimeError::)
+            Err(RuntimeError::NoConstructor {
+                typ: typ.name,
+                area,
+            })
         }
     }
 
@@ -157,15 +160,22 @@ impl Instance {
         }
     }
 
-    pub fn instance_of<T>(&self, typ: &Type) -> bool {
-        self.name == typ.name
-    }
+    // pub fn instance_of<T>(&self, typ: &Type) -> bool {
+    //     self.name == typ.name
+    // }
 
-    pub fn inner_type<'a>(&self, globals: &'a Globals) -> Result<&'a Type, Error> {
+    pub fn inner_type<'a>(
+        &self,
+        globals: &'a Globals,
+        area: CodeArea,
+    ) -> Result<&'a Type, RuntimeError> {
         globals
             .types
             .get(&self.type_id)
-            .ok_or_else(|| format!("Type '{:?}' is undefined!", self.debug_type_name))
+            .ok_or_else(|| RuntimeError::UndefinedType {
+                typ: self.name,
+                area,
+            })
     }
 
     pub fn name<'a>(&self, globals: &'a Globals) -> &'a str {

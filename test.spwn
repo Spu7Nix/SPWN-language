@@ -1,13 +1,7 @@
 
 
 
-// debug splitting syntax
-let a = split 0:1;
-if a == 1 {
-    a = split 1:2;
-}
-
-print a;
+print (a => b => c => a + b + c)(1)(2)(3);
 
 
 

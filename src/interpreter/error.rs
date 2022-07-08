@@ -6,6 +6,7 @@ use crate::sources::CodeArea;
 
 error_maker! {
     Globals: globals;
+    Module: runtime_errors;
     pub enum RuntimeError {
         #[
             Message = "Invalid operands", Area = area, Note = None,
@@ -146,5 +147,16 @@ error_maker! {
             typ: String,
             area: CodeArea,
         },
+
+        // #[
+        //     Message = "", Area = area, Note = None,
+        //     Labels = [
+        //         area => "";
+        //     ]
+        // ]
+        // Wrapper {
+        //     err: RuntimeError,
+        //     area: CodeArea,
+        // },
     }
 }
