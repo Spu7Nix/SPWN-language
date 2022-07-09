@@ -9,8 +9,9 @@ use logos::Logos;
 // macros
 
 #[derive(Logos, Debug, PartialEq, Eq, Clone, Copy)]
+#[logos(subpattern digits = r#"(\d)([\d_]+)?"#)]
 pub enum Token {
-    #[regex(r#"(?:\/\/\/).*$"#)]
+    #[regex(r#"(?:///).*"#)]
     DocComment,
 
     #[regex(r#"(0[b])?(?&digits)"#, priority = 2)]
@@ -76,8 +77,8 @@ pub enum Token {
     Eof,
 }
 
-impl Into<&str> for Token {
-    fn into(self) -> &'static str {
-        match self {}
-    }
-}
+// impl Into<&str> for Token {
+//     fn into(self) -> &'static str {
+//         match self {}
+//     }
+// }

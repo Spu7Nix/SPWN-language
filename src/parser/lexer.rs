@@ -142,9 +142,9 @@ pub enum Token {
     Eof,
 }
 
-impl Into<&str> for Token {
-    fn into(self) -> &'static str {
-        match self {
+impl From<Token> for &str {
+    fn from(tok: Token) -> Self {
+        match tok {
             Token::Int => "int literal",
             Token::Float => "float literal",
             Token::String => "string literal",
@@ -219,10 +219,9 @@ impl ToString for Token {
 #[derive(Clone, Debug)]
 pub struct Tokens(pub Vec<Token>);
 
-// converts a single token into a `Tokens` instance
-impl Into<Tokens> for Token {
-    fn into(self) -> Tokens {
-        Tokens(Vec::from([self]))
+impl From<Token> for Tokens {
+    fn from(tok: Token) -> Self {
+        Self(vec![tok])
     }
 }
 

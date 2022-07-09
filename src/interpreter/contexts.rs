@@ -25,17 +25,21 @@ impl Context {
         self.pos().1 = i;
         let (func, i) = *self.pos();
         if i >= code.bytecode_funcs[func].instructions.len() {
-            self.pos.pop();
-            self.pop_vars(&code.bytecode_funcs[func].scoped_var_ids);
-            self.pop_vars(&code.bytecode_funcs[func].capture_ids);
-            if !self.pos.is_empty() {
-                self.advance_by(code, 1);
-            }
+            self.return_out(code);
         }
     }
     pub fn advance_by(&mut self, code: &Code, n: usize) {
         let (_, i) = *self.pos();
         self.advance_to(code, i + n)
+    }
+    pub fn return_out(&mut self, code: &Code) {
+        let (func, _) = *self.pos();
+        self.pos.pop();
+        self.pop_vars(&code.bytecode_funcs[func].scoped_var_ids);
+        self.pop_vars(&code.bytecode_funcs[func].capture_ids);
+        if !self.pos.is_empty() {
+            self.advance_by(code, 1);
+        }
     }
 
     pub fn push_vars(&mut self, vars: &[InstrNum], code: &Code, globals: &mut Globals) {
@@ -127,19 +131,17 @@ impl FullContext {
     }
 
     pub fn iter(&mut self) -> ContextIter {
-        ContextIter::new(self, false)
+        ContextIter::new(self)
     }
 }
 
 pub struct ContextIter<'a> {
-    with_breaks: bool,
     current_node: Option<&'a mut FullContext>,
     right_nodes: Vec<&'a mut FullContext>,
 }
 impl<'a> ContextIter<'a> {
-    fn new(node: &'a mut FullContext, with_breaks: bool) -> Self {
+    fn new(node: &'a mut FullContext) -> Self {
         let mut iter = Self {
-            with_breaks,
             current_node: None,
             right_nodes: vec![],
         };

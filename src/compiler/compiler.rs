@@ -8,7 +8,7 @@ use super::error::CompilerError;
 use crate::{
     interpreter::{interpreter::StoredValue, value::Value},
     parser::{
-        ast::{ASTData, ASTKey, ExprKey, Expression, KeyType, Statement, Statements, StmtKey},
+        ast::{ASTData, ExprKey, Expression, Statement, Statements, StmtKey},
         lexer::Token,
     },
     sources::{CodeArea, CodeSpan, SpwnSource},
@@ -79,7 +79,6 @@ pub struct Code {
     pub macro_build_info: UniqueRegister<(usize, Vec<(String, bool, bool)>)>,
 
     pub var_count: usize,
-
     pub bytecode_funcs: Vec<BytecodeFunc>,
 
     pub bytecode_spans: HashMap<(usize, usize), CodeSpan>,
@@ -147,7 +146,7 @@ impl Code {
                         s += &col.paint(format!("{:?}", self.constants.get(*idx)))
                     }
                     Instruction::LoadType(idx) => {
-                        s += &col.paint(format!("@{}", self.names.get(*idx))).to_string()
+                        s += &col.paint(format!("@{}", self.names.get(*idx)))
                     }
                     Instruction::Jump(idx) => {
                         s += &col.paint(format!("to {:?}", self.destinations.get(*idx)))
@@ -252,11 +251,7 @@ pub enum Instruction {
     /// makes dict from last n elements on the stack
     BuildDict(InstrNum),
     /// returns to callsite
-    Return,
-    /// returns to loop start
-    Continue,
-    /// goes to loop end
-    Break,
+    ReturnValue(bool),
 
     /// ig it takes the elements on the stack and uses them to make macro value
     MakeMacro(InstrNum),
@@ -329,6 +324,32 @@ pub struct MacroQueuedExec {
     original_scope: ScopeKey,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
+pub enum ExecLayer {
+    Loop {
+        breaks: Vec<usize>,
+        continues: Vec<usize>,
+    },
+    Func,
+}
+impl ExecLayer {
+    pub fn new_loop() -> Self {
+        ExecLayer::Loop {
+            breaks: vec![],
+            continues: vec![],
+        }
+    }
+    pub fn new_func() -> Self {
+        ExecLayer::Func
+    }
+    pub fn into_loop(self) -> Self {
+        match self {
+            ExecLayer::Loop { .. } => self,
+            ExecLayer::Func => panic!("called into_loop on func layer"),
+        }
+    }
+}
+
 pub struct Compiler {
     pub source: SpwnSource,
 
@@ -338,6 +359,7 @@ pub struct Compiler {
     pub macro_exec_queue: Vec<Vec<MacroQueuedExec>>,
 
     pub scopes: SlotMap<ScopeKey, Scope>,
+    pub layers: Vec<ExecLayer>,
 }
 
 impl Compiler {
@@ -348,6 +370,7 @@ impl Compiler {
             ast_data: data,
             macro_exec_queue: vec![],
             scopes: SlotMap::default(),
+            layers: vec![],
         }
     }
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
@@ -749,11 +772,11 @@ impl Compiler {
         scope: ScopeKey,
         func: usize,
     ) -> Result<(), CompilerError> {
-        let is_arrow = self.ast_data.stmt_arrows[stmt_key];
+        let mut is_arrow = self.ast_data.stmt_arrows[stmt_key];
         let stmt = self.ast_data.get_stmt(stmt_key);
         let stmt_span = self.ast_data.get_span(stmt_key);
 
-        if is_arrow {
+        if is_arrow && !matches!(&stmt, Statement::Return(_)) {
             self.push_instr(Instruction::SaveContexts, func);
         }
 
@@ -801,6 +824,7 @@ impl Compiler {
                     let jump_idx = self.push_instr(Instruction::JumpIfFalse(0), func);
 
                     let derived = self.derived(scope);
+                    // self.layers.push
                     self.run_scoped(derived, func, |comp| {
                         comp.compile_stmts(code, derived, func)?;
                         Ok(())
@@ -834,17 +858,31 @@ impl Compiler {
                 let jump_pos = self.push_instr(Instruction::JumpIfFalse(0), func);
 
                 let derived = self.derived(scope);
+
+                self.layers.push(ExecLayer::new_loop());
                 self.run_scoped(derived, func, |comp| {
                     comp.compile_stmts(code, derived, func)?;
                     Ok(())
                 })?;
 
-                let idx = self.code.destinations.add(cond_pos);
-                self.push_instr(Instruction::Jump(idx), func);
+                let start_idx = self.code.destinations.add(cond_pos);
+                self.push_instr(Instruction::Jump(start_idx), func);
 
                 let next_pos = self.instr_len(func);
-                let idx = self.code.destinations.add(next_pos);
-                self.set_instr(Instruction::JumpIfFalse(idx), func, jump_pos);
+                let end_idx = self.code.destinations.add(next_pos);
+                self.set_instr(Instruction::JumpIfFalse(end_idx), func, jump_pos);
+
+                match self.layers.pop().unwrap() {
+                    ExecLayer::Loop { breaks, continues } => {
+                        for i in continues {
+                            self.set_instr(Instruction::Jump(start_idx), func, i);
+                        }
+                        for i in breaks {
+                            self.set_instr(Instruction::Jump(end_idx), func, i);
+                        }
+                    }
+                    ExecLayer::Func => unreachable!(),
+                }
             }
             Statement::For {
                 var,
@@ -860,31 +898,71 @@ impl Compiler {
                 let derived_scope = self.derived(scope);
                 let var_id = self.new_var(var, derived_scope, false, var_span);
 
+                self.layers.push(ExecLayer::new_loop());
                 self.run_scoped(derived_scope, func, |comp| {
                     comp.push_instr(Instruction::SetVar(var_id), func);
                     comp.compile_stmts(code, derived_scope, func)?;
                     Ok(())
                 })?;
 
-                let idx = self.code.destinations.add(iter_pos);
-                let jump_pos = self.push_instr(Instruction::Jump(idx), func);
+                let start_idx = self.code.destinations.add(iter_pos);
+                let jump_pos = self.push_instr(Instruction::Jump(start_idx), func);
 
-                let idx = self.code.destinations.add(jump_pos + 1);
-                self.set_instr(Instruction::IterNext(idx), func, iter_pos);
+                let end_idx = self.code.destinations.add(jump_pos + 1);
+                self.set_instr(Instruction::IterNext(end_idx), func, iter_pos);
+
+                match self.layers.pop().unwrap() {
+                    ExecLayer::Loop { breaks, continues } => {
+                        for i in continues {
+                            self.set_instr(Instruction::Jump(start_idx), func, i);
+                        }
+                        for i in breaks {
+                            self.set_instr(Instruction::Jump(end_idx), func, i);
+                        }
+                    }
+                    ExecLayer::Func => unreachable!(),
+                }
             }
             Statement::Return(val) => {
+                if !self.layers.iter().any(|l| matches!(l, ExecLayer::Func)) {
+                    return Err(CompilerError::ReturnOutsideMacro {
+                        area: self.make_area(stmt_span),
+                    });
+                }
+
                 if let Some(val) = val {
                     self.compile_expr(val, scope, func)?;
                 } else {
                     self.push_instr(Instruction::PushEmpty, func);
                 }
-                self.push_instr(Instruction::Return, func);
+                self.push_instr(Instruction::ReturnValue(is_arrow), func);
+                is_arrow = false;
             }
             Statement::Break => {
-                self.push_instr(Instruction::Break, func);
+                let idx = self.push_instr(Instruction::Jump(0), func);
+                match self.layers.last_mut() {
+                    Some(ExecLayer::Loop { breaks, .. }) => {
+                        breaks.push(idx);
+                    }
+                    _ => {
+                        return Err(CompilerError::BreakOutsideLoop {
+                            area: self.make_area(stmt_span),
+                        })
+                    }
+                }
             }
             Statement::Continue => {
-                self.push_instr(Instruction::Continue, func);
+                let idx = self.push_instr(Instruction::Jump(0), func);
+                match self.layers.last_mut() {
+                    Some(ExecLayer::Loop { continues, .. }) => {
+                        continues.push(idx);
+                    }
+                    _ => {
+                        return Err(CompilerError::ContinueOutsideLoop {
+                            area: self.make_area(stmt_span),
+                        })
+                    }
+                }
             }
             Statement::TypeDef(name) => {
                 let v_id = self.code.names.add(name);
@@ -930,8 +1008,10 @@ impl Compiler {
         } in self.macro_exec_queue.pop().unwrap()
         {
             self.macro_exec_queue.push(vec![]);
+            self.layers.push(ExecLayer::Func);
             self.compile_expr(code_key, derived_scope, func_id)?;
-            self.resolve_queued();
+            self.layers.pop();
+            self.resolve_queued()?;
             self.code.bytecode_funcs[func_id].capture_ids =
                 self.get_accessible_vars(original_scope);
             self.code.bytecode_funcs[func_id].scoped_var_ids = self.scopes[derived_scope].var_ids();
@@ -949,7 +1029,7 @@ impl Compiler {
         for i in stmts {
             self.compile_stmt(i, scope, func)?;
         }
-        self.resolve_queued();
+        self.resolve_queued()?;
         Ok(())
     }
 

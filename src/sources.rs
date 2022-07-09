@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 pub type SpwnSource = Option<PathBuf>;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct CodeArea {
     pub source: Option<PathBuf>,
     pub span: CodeSpan,

@@ -26,5 +26,32 @@ error_maker! {
             area: CodeArea,
             def_area: CodeArea,
         },
+        #[
+            Message = "`break` used outside of loop", Area = area, Note = None,
+            Labels = [
+                area => "`break` used here";
+            ]
+        ]
+        BreakOutsideLoop {
+            area: CodeArea,
+        },
+        #[
+            Message = "`continue` used outside of loop", Area = area, Note = None,
+            Labels = [
+                area => "`continue` used here";
+            ]
+        ]
+        ContinueOutsideLoop {
+            area: CodeArea,
+        },
+        #[
+            Message = "`return` used outside of loop", Area = area, Note = None,
+            Labels = [
+                area => "`return` used here";
+            ]
+        ]
+        ReturnOutsideMacro {
+            area: CodeArea,
+        },
     }
 }

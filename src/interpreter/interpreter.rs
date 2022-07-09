@@ -21,7 +21,10 @@ pub struct StoredValue {
     pub def_area: CodeArea,
 }
 
-pub struct Globals {
+pub struct Globals
+where
+    Self: Send + Sync,
+{
     pub memory: SlotMap<ValueKey, StoredValue>,
 
     pub types: AHashMap<String, ValueType>,
@@ -243,9 +246,6 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         .collect();
                     push!(Value::Dict(map).into_stored(code.make_area(span)));
                 }
-                Instruction::Return => todo!(),
-                Instruction::Continue => todo!(),
-                Instruction::Break => todo!(),
                 Instruction::MakeMacro(id) => {
                     let span = code.get_bytecode_span(func, i);
                     let arg_spans = code.macro_arg_spans.get(&(func, i)).unwrap();
@@ -413,12 +413,6 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                                 this whole calling part is long and ugly af dont worry will refactor
                             */
 
-                            // context.inner().push_vars();
-
-                            // println!("capture: {:?}", m.capture);
-                            // println!("context vars: {:?}", context.inner().vars);
-                            // println!("func data: {:#?}", code.bytecode_funcs[func]);
-
                             context.inner().push_vars(
                                 &code.bytecode_funcs[m.func_id].scoped_var_ids,
                                 code,
@@ -457,6 +451,23 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         }
                     }
                 }
+                Instruction::ReturnValue(arrow) => {
+                    if !arrow {
+                        context.inner().return_out(code);
+                        continue;
+                    } else {
+                        context.split_context(globals);
+                        match context {
+                            FullContext::Single(_) => unreachable!(),
+                            FullContext::Split(ret, cont) => {
+                                ret.inner().return_out(code);
+                                cont.inner().advance_to(code, i + 1);
+                                finished = false;
+                                break 'out_for;
+                            }
+                        }
+                    }
+                }
                 Instruction::TriggerFuncCall => todo!(),
                 Instruction::SaveContexts => todo!(),
                 Instruction::ReviseContexts => todo!(),
@@ -487,13 +498,11 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 }
 
                 Instruction::PushVars(idx) => {
-                    let vars = code.scope_vars.get(*idx);
                     context
                         .inner()
                         .push_vars(code.scope_vars.get(*idx), code, globals);
                 }
                 Instruction::PopVars(idx) => {
-                    let vars = code.scope_vars.get(*idx);
                     context.inner().pop_vars(code.scope_vars.get(*idx));
                 }
 

@@ -1,6 +1,7 @@
 use std::{fs, path::PathBuf};
 
 mod compiler;
+mod docgen;
 mod error;
 mod interpreter;
 mod parser;
@@ -107,11 +108,13 @@ fn run_spwn(code: String, source: SpwnSource) {
             let mut compiler = Compiler::new(ast_data, source.clone());
 
             match compiler.start_compile(stmts) {
-                Ok(base_scope) => {
+                Ok(_) => {
                     compiler.code.debug();
 
                     let mut globals = Globals::new();
                     globals.init();
+
+                    println!("\n\n\n");
 
                     if let Err(e) = execute_code(&mut globals, &compiler.code) {
                         e.raise(&code, source, &globals);

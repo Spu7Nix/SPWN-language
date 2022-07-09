@@ -1,4 +1,4 @@
-use crate::{parser::lexer::Token, sources::CodeArea};
+use crate::parser::lexer::Token;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::sources::{CodeSpan, SpwnSource};

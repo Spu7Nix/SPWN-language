@@ -2,7 +2,7 @@ use crate::sources::CodeSpan;
 
 use super::ast::ExprKey;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum OpType {
     LeftAssoc,
     RightAssoc,

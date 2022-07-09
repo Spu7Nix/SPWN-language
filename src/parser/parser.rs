@@ -29,10 +29,15 @@ impl Parser<'_> {
         peek.next();
         peek.span().into()
     }
-    pub fn peek_2(&mut self) -> Token {
+    pub fn peek_many(&mut self, n: usize) -> Token {
         let mut peek = self.lexer.clone();
-        peek.next();
-        peek.next().unwrap_or(Token::Eof)
+        let mut last = peek.next();
+
+        for _ in 0..(n - 1) {
+            last = peek.next();
+        }
+
+        last.unwrap_or(Token::Eof)
     }
 
     pub fn span(&self) -> CodeSpan {
@@ -315,7 +320,7 @@ impl Parser<'_> {
 
             Token::LParen => {
                 self.next();
-                if self.peek() == Token::RParen && self.peek_2() != Token::FatArrow {
+                if self.peek() == Token::RParen && self.peek_many(2) != Token::FatArrow {
                     self.next();
                     Ok(data.insert_expr(Expression::Empty, start.extend(self.span())))
                 } else {
@@ -456,7 +461,7 @@ impl Parser<'_> {
                     );
                 }
 
-                if !(self.peek() == Token::Ident && self.peek_2() == Token::Colon) {
+                if !(self.peek() == Token::Ident && self.peek_many(2) == Token::Colon) {
                     let code = self.parse_statements(data)?;
                     self.expect_tok(Token::RBracket)?;
                     Ok(data.insert_expr(Expression::Block(code), start.extend(self.span())))
@@ -574,7 +579,7 @@ impl Parser<'_> {
 
                     while self.peek() != Token::RParen {
                         if !started_named {
-                            match (self.peek(), self.peek_2()) {
+                            match (self.peek(), self.peek_many(2)) {
                                 (Token::Ident, Token::Assign) => {
                                     started_named = true;
                                     self.next();
@@ -812,7 +817,7 @@ impl Parser<'_> {
                 Statement::Impl(typ, dictlike.items)
             }
             Token::Ident => {
-                if self.peek_2() == Token::Assign {
+                if self.peek_many(2) == Token::Assign {
                     self.next();
                     let var = self.slice().to_string();
                     self.next();

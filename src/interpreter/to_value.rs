@@ -6,11 +6,11 @@ pub trait ToValue {
 }
 
 pub trait ToValueResult {
-    fn to_value_result(self) -> Result<Value, RuntimeError>;
+    fn try_to_value(self) -> Result<Value, RuntimeError>;
 }
 
 impl<R: ToValue> ToValueResult for R {
-    fn to_value_result(self) -> Result<Value, RuntimeError> {
+    fn try_to_value(self) -> Result<Value, RuntimeError> {
         Ok(self.to_value())
     }
 }

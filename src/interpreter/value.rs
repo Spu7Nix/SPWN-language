@@ -203,7 +203,7 @@ impl StoredValue {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Copy)]
 pub enum ValueType {
     Int,
     Float,
