@@ -236,7 +236,7 @@ impl ToString for Tokens {
         } else {
             let comma = &self.0[..(self.0.len() - 1)];
             // we know there is always going to be a last element in the array
-            // since it will never check for less than 1 tokens
+            // since the parser will never check for less than 1 tokens
             // (and a length 1 array has its own formatting above anyway)
             let last = self.0.last().unwrap();
             format!(
@@ -263,15 +263,15 @@ impl std::ops::BitOr<Token> for Token {
     }
 }
 
-// `Token::A | Token::B` becomes a `Vec[Token::A, Token::B]`
+// `Token::A | Token::B` becomes a `Tokens(Vec[Token::A, Token::B])`
 // that means if you chain together 3 tokens (or more) it becomes
-// `Vec[Token::A, Token::B] | Token::C`
-// so that has to have its own implementation directly on the vector
-impl std::ops::BitOr<Token> for Vec<Token> {
+// `Tokens(Vec[Token::A, Token::B]) | Token::C`
+// so that has to have its own implementation directly on the struct
+impl std::ops::BitOr<Token> for Tokens {
     type Output = Tokens;
 
     fn bitor(self, rhs: Token) -> Self::Output {
-        let mut out = self;
+        let mut out = self.0;
         out.push(rhs);
         Tokens(out)
     }

@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 mod compiler;
-mod docgen;
+// mod docgen;
 mod error;
 mod interpreter;
 mod parser;

@@ -1,6 +1,7 @@
 use logos::{Lexer, Logos};
 
 use super::lexer::Token;
+use super::ast::{Statements, DocData};
 
 #[derive(Clone)]
 pub struct Parser<'a> {
@@ -41,9 +42,55 @@ impl Parser<'_> {
         self.lexer.slice()
     }
 
-    pub fn parse(&mut self, data: &mut ASTData) -> Result<Statements, SyntaxError> {
-        let stmts = self.parse_statements(data)?;
-        self.expect_tok(Token::Eof)?;
-        Ok(stmts)
+    pub fn parse_statement(&mut self, data: &mut DocData) -> StmtKey {
+        let stmt = match self.peek() {
+            Token::TypeDef => {
+                // self.next();
+                // self.expect_tok(Token::TypeIndicator)?;
+                // let typ_name = self.slice()[1..].to_string();
+                // Statement::TypeDef(typ_name)
+            }
+            Token::Impl => {
+                // self.next();
+
+                // let typ = self.parse_expr(data)?;
+
+                // self.expect_tok(Token::LBracket)?;
+                // let dictlike = self.parse_dictlike(data)?;
+
+                // data.impl_spans.insert(stmt_key, dictlike.item_spans);
+
+                // Statement::Impl(typ, dictlike.items)
+            }
+            Token::Ident => {
+                // if self.peek_many(2) == Token::Assign {
+                //     self.next();
+                //     let var = self.slice().to_string();
+                //     self.next();
+                //     let value = self.parse_expr(data)?;
+                //     Statement::Assign(var, value)
+                // } else {
+                //     Statement::Expr(self.parse_expr(data)?)
+                // }
+            }
+            _ => todo!(), //Statement::Expr(self.parse_expr(data)?),
+        };
+
+        // data.stmts[stmt_key] = (stmt, start.extend(self.span()));
+
+        // Ok(stmt_key)
+    }
+
+    pub fn parse_statements(&mut self, data: &mut DocData) -> Statements {
+        let mut statements = vec![];
+        while !matches!(self.peek(), Token::Eof | Token::RBracket) {
+            statements.push(self.parse_statement(data));
+        }
+        statements
+    }
+
+    pub fn parse(&mut self, data: &mut DocData) -> Statements {
+        let stmts = self.parse_statements(data);
+        stmts
     }
 }

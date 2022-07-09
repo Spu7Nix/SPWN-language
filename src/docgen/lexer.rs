@@ -22,11 +22,6 @@ pub enum Token {
     #[regex(r#"\w*"(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
     String,
 
-    #[token("let")]
-    Let,
-    #[token("mut")]
-    Mut,
-
     #[token("true")]
     True,
     #[token("false")]
@@ -34,6 +29,8 @@ pub enum Token {
 
     #[token("type")]
     TypeDef,
+    #[token("impl")]
+    Impl,
 
     #[token(";")]
     Eol,
