@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 mod compiler;
-//mod docgen;
+mod docgen;
 mod error;
 mod interpreter;
 mod parser;
@@ -14,6 +14,8 @@ use interpreter::interpreter::{execute_code, Globals};
 use parser::ast::ASTData;
 use parser::parser::Parser;
 use sources::SpwnSource;
+
+use docgen::docgen::parse_doc_comments;
 
 // use ahash::AHashMap;
 // use compiler::compiler::{Compiler, Scope};
@@ -97,6 +99,8 @@ use sources::SpwnSource;
 // }
 
 fn run_spwn(code: String, source: SpwnSource) {
+    //parse_doc_comments(code.clone());
+
     let mut parser = Parser::new(&code, source.clone());
 
     let mut ast_data = ASTData::default();

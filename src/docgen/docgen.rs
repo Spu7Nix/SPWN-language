@@ -16,12 +16,14 @@ pub struct Source {
 //     fn base()
 // }
 
-fn parse_doc_comments(code: String) {
+pub fn parse_doc_comments(code: String) {
     let mut parser = Parser::new(&code, Source::default());
 
     let mut data = DocData::default();
 
     let stmts = parser.parse(&mut data);
+
+    println!("{:#?}", stmts);
 }
 
 fn main() {}

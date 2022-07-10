@@ -61,6 +61,8 @@ pub enum Token {
 
     #[token("=>")]
     FatArrow,
+    #[token("->")]
+    Arrow,
 
     #[regex(r"@[a-zA-Z_]\w*")]
     TypeIndicator,
@@ -95,6 +97,7 @@ impl ToString for Token {
             Token::Assign => "=",
             Token::Colon => ":",
             Token::FatArrow => "=>",
+            Token::Arrow => "->",
             Token::TypeIndicator => "type indicator",
             Token::Ident => "identifier",
             _ => unreachable!(),

@@ -7,9 +7,10 @@ new_key_type! {
     pub struct LineKey;
 }
 
-struct MacroArg {
-    name: String,
-    typ: Vec<Box<Value>>,
+pub struct MacroArg {
+    pub name: Option<String>,
+    pub typ: Option<Values>,
+    pub default: Option<Values>,
 }
 
 #[derive(Default)]
@@ -18,7 +19,7 @@ pub struct DocData {
 
     // stores every ident found in every file so it can get the source, and subsequently link to it
     // TODO: same ident name in diff files - store source?
-    known_idents: AHashMap<String, LineKey>,
+    pub known_idents: AHashMap<String, Source>,
 }
 
 // a variable cannot be set to a constant that's defined elsewhere in the file (without using a variable which is the purpose of the `Values` enum)
@@ -30,6 +31,9 @@ pub enum Constant {
     Int(String),
     Float(String),
     TriggerFunc,
+    // `()`
+    Empty,
+    // `{ ... }`
     Block,
 
     // a value that's unknown (such as `1 + 2` or `(if y { z } else { a })`)
@@ -43,10 +47,9 @@ pub enum Value {
     Array(Vec<Box<Values>>),
 
     Macro {
-        name: String,
         args: Vec<MacroArg>,
         // the value can only be a type indicator or macro
-        ret: Vec<Box<Values>>,
+        ret: Option<Box<Values>>,
     },
 }
 

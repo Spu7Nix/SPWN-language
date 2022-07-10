@@ -1,6 +1,6 @@
 use logos::{Lexer, Logos, Span};
 
-use super::ast::{Constant, DocData, Line, LineKey, Lines, Value, Values};
+use super::ast::{Constant, DocData, Line, LineKey, Lines, Value, Values, MacroArg};
 use super::docgen::Source;
 use super::lexer::Token;
 
@@ -33,14 +33,27 @@ impl Parser<'_> {
         peek.next().unwrap_or(Token::Eof)
     }
 
-    pub fn expected_err(&mut self, expected: Token, found: &str) {
+    pub fn peek_many(&mut self, n: usize) -> Token {
+        let mut peek = self.lexer.clone();
+        let mut last = peek.next();
+
+        for _ in 0..(n - 1) {
+            last = peek.next();
+        }
+
+        last.unwrap_or(Token::Eof)
+    }
+
+    fn err_file_pos(&mut self) -> String {
+        format!("{} @ l{}:c{}", self.source.source.display(), self.span().start, self.span().end)
+    } 
+
+    pub fn expected_err(&mut self, expected: &str, found: &str) {
         panic!(
-            "expected token: `{}`, found: `{}` ({} @ l{}:c{})!",
-            expected.to_string(),
+            "expected token: `{}`, found: `{}` ({})!",
+            expected,
             found.to_string(),
-            self.source.source.display(),
-            self.span().start,
-            self.span().end,
+            self.err_file_pos(),
         )
     }
 
@@ -50,7 +63,15 @@ impl Parser<'_> {
         if next != tok {
             self.next();
 
-            self.expected_err(tok, &next.to_string());
+            self.expected_err(&tok.to_string(), &next.to_string());
+        }
+    }
+
+    pub fn expect_or_tok(&mut self, tok: Token, or: &str) {
+        let next = self.next();
+
+        if next != tok {
+            self.expected_err(&tok.to_string(), or);
         }
     }
 
@@ -58,7 +79,7 @@ impl Parser<'_> {
         let next = self.next();
 
         if next != tok {
-            self.expected_err(tok, &next.to_string());
+            self.expected_err(&tok.to_string(), &next.to_string());
         }
     }
 
@@ -114,131 +135,136 @@ impl Parser<'_> {
                     // TODO: Update when fn syntax changed
                     self.parse_value(data)
                 } else {
+                    data.known_idents.insert(var_name.clone(), self.source.clone());
+
                     Values::Value(Value::Ident(var_name))
                 }
             }
             Token::TypeIndicator => {
                 self.next();
-                let typ_name = self.slice().to_string();
+                let type_name = self.slice().to_string();
 
-                Values::Value(Value::TypeIndicator(typ_name))
+                data.known_idents.insert(type_name.clone(), self.source.clone());
+
+                Values::Value(Value::TypeIndicator(type_name))
             }
+            Token::LParen => {
+                self.next();
 
-            // Token::LParen => {
-            //     self.next();
-            //     if self.peek() == Token::RParen && self.peek_many(2) != Token::FatArrow {
-            //         self.next();
-            //         Ok(data.insert_expr(Expression::Empty, start.extend(self.span())))
-            //     } else {
-            //         let mut depth = 1;
-            //         let mut check = self.clone();
+                if self.peek() == Token::RParen && self.peek_many(2) != Token::FatArrow {
+                    self.next();
 
-            //         loop {
-            //             match check.peek() {
-            //                 Token::LParen => {
-            //                     check.next();
-            //                     depth += 1;
-            //                 }
-            //                 Token::RParen => {
-            //                     check.next();
-            //                     depth -= 1;
-            //                     if depth == 0 {
-            //                         break;
-            //                     }
-            //                 }
-            //                 Token::Eof => {
-            //                     return Err(SyntaxError::UnmatchedChar {
-            //                         for_char: "(".into(),
-            //                         not_found: ")".into(),
-            //                         area: self.make_area(start),
-            //                     })
-            //                 }
-            //                 _ => {
-            //                     check.next();
-            //                 }
-            //             }
-            //         }
+                    Values::Constant(Constant::Empty)
+                } else {
+                    let mut depth = 1;
+                    let mut check = self.clone();
 
-            //         let is_pattern = match check.peek() {
-            //             Token::FatArrow => false,
-            //             Token::Arrow => {
-            //                 check.next();
-            //                 check.parse_expr(data)?;
+                    loop {
+                        match check.peek() {
+                            Token::LParen => {
+                                check.next();
+                                depth += 1;
+                            }
+                            Token::RParen => {
+                                check.next();
+                                depth -= 1;
+                                if depth == 0 {
+                                    break;
+                                }
+                            }
+                            Token::Eof => self.expected_err("closing paren `)`", "EOF"),
+                            _ => {
+                                check.next();
+                            }
+                        }
+                    }
 
-            //                 check.peek() != Token::FatArrow
-            //             }
-            //             _ => {
-            //                 let value = self.parse_expr(data)?;
-            //                 self.expect_tok(Token::RParen)?;
-            //                 return Ok(value);
-            //             }
-            //         };
+                    let is_pattern = match check.peek() {
+                        Token::FatArrow => false,
+                        Token::Arrow => {
+                            check.next();
+                            check.parse_value(data);
 
-            //         if !is_pattern {
-            //             let mut args = vec![];
-            //             let mut arg_areas = vec![];
-            //             while self.peek() != Token::RParen {
-            //                 self.expect_or_tok(Token::Ident, "argument name")?;
-            //                 let arg_name = self.slice().to_string();
-            //                 let arg_span = self.span();
-            //                 let arg_type = if self.peek() == Token::Colon {
-            //                     self.next();
-            //                     Some(self.parse_expr(data)?)
-            //                 } else {
-            //                     None
-            //                 };
-            //                 let arg_default = if self.peek() == Token::Assign {
-            //                     self.next();
-            //                     Some(self.parse_expr(data)?)
-            //                 } else {
-            //                     None
-            //                 };
-            //                 args.push((arg_name, arg_type, arg_default));
-            //                 arg_areas.push(arg_span);
-            //                 self.peek_expect_tok(Token::RParen | Token::Comma)?;
-            //                 self.skip_tok(Token::Comma);
-            //             }
-            //             self.next();
-            //             let ret_type = if self.peek() == Token::Arrow {
-            //                 self.next();
-            //                 Some(self.parse_expr(data)?)
-            //             } else {
-            //                 None
-            //             };
-            //             self.expect_tok(Token::FatArrow)?;
-            //             let code = self.parse_expr(data)?;
+                            check.peek() != Token::FatArrow
+                        }
+                        _ => {
+                            let value = self.parse_value(data);
+                            self.expect_tok(Token::RParen);
 
-            //             let key = data.insert_expr(
-            //                 Expression::Func {
-            //                     args,
-            //                     ret_type,
-            //                     code,
-            //                 },
-            //                 start.extend(self.span()),
-            //             );
+                            return value;
+                        }
+                    };
 
-            //             data.func_arg_spans.insert(key, arg_areas);
+                    if !is_pattern {
+                        let mut args = vec![];
 
-            //             Ok(key)
-            //         } else {
-            //             let mut args = vec![];
-            //             while self.peek() != Token::RParen {
-            //                 let arg = self.parse_expr(data)?;
-            //                 args.push(arg);
-            //                 self.peek_expect_tok(Token::RParen | Token::Comma)?;
-            //                 self.skip_tok(Token::Comma);
-            //             }
-            //             self.next();
-            //             self.expect_tok(Token::Arrow)?;
-            //             let ret_type = self.parse_expr(data)?;
+                        while self.peek() != Token::RParen {
+                            self.expect_or_tok(Token::Ident, "argument name");
 
-            //             Ok(data.insert_expr(
-            //                 Expression::FuncPattern { args, ret_type },
-            //                 start.extend(self.span()),
-            //             ))
-            //         }
-            //     }
-            // }
+                            let arg_name = Some(self.slice().to_string());
+                            let arg_type = if self.peek() == Token::Colon {
+                                self.next();
+
+                                Some(self.parse_value(data))
+                            } else {
+                                None
+                            };
+                            let arg_default = if self.peek() == Token::Assign {
+                                self.next();
+
+                                Some(self.parse_value(data))
+                            } else {
+                                None
+                            };
+                            args.push(MacroArg { name: arg_name, typ: arg_type, default: arg_default });
+
+                            if !matches!(self.peek(), Token::RParen | Token::Comma) {
+                                let found = self.next();
+
+                                self.expected_err(", or ]", &found.to_string());
+                            }
+
+                            self.skip_tok(Token::Comma);
+                        }
+
+                        self.next();
+
+                        let ret_type = if self.peek() == Token::Arrow {
+                            self.next();
+                            Some(Box::new(self.parse_value(data)))
+                        } else {
+                            None
+                        };
+
+                        self.expect_tok(Token::FatArrow);
+      
+                        Values::Value(Value::Macro { args, ret: ret_type })
+                    } else {
+                        let mut args = vec![];
+
+                        while self.peek() != Token::RParen {
+                            let arg_typ = Some(self.parse_value(data));
+
+                            args.push(MacroArg { name: None, typ: arg_typ, default: None });
+
+                            if !matches!(self.peek(), Token::RParen | Token::Comma) {
+                                let found = self.next();
+
+                                self.expected_err(", or ]", &found.to_string())
+                            }
+
+                            self.skip_tok(Token::Comma);
+                        }
+
+                        self.next();
+                        self.expect_tok(Token::Arrow);
+
+                        let ret_type = Some(Box::new(self.parse_value(data)));
+
+                        Values::Value(Value::Macro { args, ret: ret_type })
+                    }
+                }
+            }
             Token::LSqBracket => {
                 self.next();
 
@@ -247,7 +273,9 @@ impl Parser<'_> {
                     elems.push(Box::new(self.parse_value(data)));
 
                     if !matches!(self.peek(), Token::RSqBracket | Token::Comma) {
-                        self.expected_err(self.next(), ", or ]");
+                        let found = self.next();
+
+                        self.expected_err(", or ]", &found.to_string())
                     }
 
                     self.skip_tok(Token::Comma);
@@ -273,7 +301,7 @@ impl Parser<'_> {
         }
     }
 
-    pub fn parse_statement(&mut self, data: &mut DocData) -> LineKey {
+    pub fn parse_statement(&mut self, data: &'_ mut DocData) -> LineKey {
         let first_comment_span = self.span();
 
         let mut comments = Vec::new();
@@ -285,16 +313,20 @@ impl Parser<'_> {
             Token::TypeDef => {
                 self.next();
                 self.expect_tok(Token::TypeIndicator);
-                let typ_name = self.slice().to_string();
+                let type_name = self.slice().to_string();
+
+                data.known_idents.insert(type_name.clone(), self.source.clone());
 
                 Line::Type {
-                    ident: Value::TypeIndicator(typ_name),
+                    ident: Value::TypeIndicator(type_name),
                 }
             }
             Token::Impl => {
                 self.next();
 
                 let type_name = self.slice().to_string();
+
+                data.known_idents.insert(type_name.clone(), self.source.clone());
 
                 Line::Impl {
                     ident: Value::TypeIndicator(type_name),
@@ -305,6 +337,8 @@ impl Parser<'_> {
                 let var_name = self.slice().to_string();
                 self.next();
                 let value = self.parse_value(data);
+
+                data.known_idents.insert(var_name.clone(), self.source.clone());
 
                 Line::AssociatedConst {
                     ident: Value::Ident(var_name),
@@ -326,9 +360,11 @@ impl Parser<'_> {
 
     pub fn parse(&mut self, data: &mut DocData) -> Lines {
         let mut statements = vec![];
+
         while !matches!(self.peek(), Token::Eof | Token::RBracket) {
             statements.push(self.parse_statement(data));
         }
+
         statements
     }
 }

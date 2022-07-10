@@ -1,9 +1,3 @@
-f = () => {
-    a = !{
-        -> return 10;
-    }
-}
-
-while true {
-    f();
-}
+///sdfsdfdsf
+//sdfsdfsdfsdf
+//hhhhhhhhhhhhhh
