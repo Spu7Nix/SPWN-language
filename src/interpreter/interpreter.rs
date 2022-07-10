@@ -320,9 +320,13 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 Instruction::AddObject => {
                     let object = pop_shallow!();
                     match object.value {
-                        Value::Object(obj) => match obj.mode {
+                        Value::Object(mut obj) => match obj.mode {
                             ObjectMode::Object => globals.objects.push(obj),
-                            ObjectMode::Trigger => globals.triggers.push(obj),
+                            ObjectMode::Trigger => {
+                                obj.params
+                                    .insert(57, ObjParam::Group(context.inner().group));
+                                globals.triggers.push(obj)
+                            }
                         },
                         _ => todo!(),
                     };
@@ -441,7 +445,22 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         }
                     }
                 }
-                Instruction::TriggerFuncCall => todo!(),
+                Instruction::TriggerFuncCall => {
+                    let trigger_func = match pop_shallow!().value {
+                        Value::TriggerFunc { start_group } => start_group,
+                        _ => todo!(),
+                    };
+                    let mut obj = GdObj {
+                        params: HashMap::new(),
+                        mode: ObjectMode::Trigger,
+                    };
+
+                    obj.params.insert(1, ObjParam::Number(1268.0));
+                    obj.params.insert(51, ObjParam::Group(trigger_func));
+                    obj.params
+                        .insert(57, ObjParam::Group(context.inner().group));
+                    globals.triggers.push(obj);
+                }
                 Instruction::MergeContexts => {}
                 Instruction::PushNone => {
                     let span = code.get_bytecode_span(func, i);

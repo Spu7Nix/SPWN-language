@@ -1,7 +1,19 @@
+wait = (delay) {
+    add trigger {
+        1: 1268,
+        62: delay,
+        51: !{
+            -> return;
+        }
+    };
+}
 
+m = !{
+    add trigger {
+        1: 900,
+    };
+}
 
-a = (a: 3) -> 3 {
-    print h;
-};
-
-print a();
+wait(1);
+wait(2);
+m!;
