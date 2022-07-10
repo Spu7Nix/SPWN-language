@@ -224,7 +224,7 @@ $.assert(arr.index_all(2) == [2,4])
     ")]
     (self) {
     	let dict = {}
-	for key in self.enumerate() {
+	for key in self.enumerate(true) {
 	    dict[key.index as @string] = key.value
 	}
 	return dict
