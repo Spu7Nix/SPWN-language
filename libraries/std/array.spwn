@@ -223,11 +223,9 @@ $.assert(arr.index_all(2) == [2,4])
 	$.assert(dictionary == {1: "h"})
     ")]
     (self) {
-    	let i = 0
     	let dict = {}
-	for key in self {
-	    dict[i as @string] = key
-	    i += 1
+	for key in self.enumerate() {
+	    dict[key.index as @string] = key.value
 	}
 	return dict
     },
