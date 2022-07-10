@@ -226,7 +226,7 @@ $.assert(arr.index_all(2) == [2,4])
     	let i = 0
     	let dict = {}
 	for key in self {
-	    dict[i] = key
+	    dict[i as @string] = key
 	    i += 1
 	}
 	return dict
