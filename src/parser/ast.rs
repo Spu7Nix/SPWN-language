@@ -1,4 +1,4 @@
-use crate::parser::lexer::Token;
+use crate::{leveldata::object_data::ObjectMode, parser::lexer::Token};
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::sources::{CodeSpan, SpwnSource};
@@ -39,6 +39,7 @@ pub struct ASTData {
     pub func_arg_spans: SecondaryMap<ExprKey, Vec<CodeSpan>>,
 
     pub dictlike_spans: SecondaryMap<ExprKey, Vec<CodeSpan>>,
+    pub objlike_spans: SecondaryMap<ExprKey, Vec<CodeSpan>>,
     pub impl_spans: SecondaryMap<StmtKey, Vec<CodeSpan>>,
 
     pub stmt_arrows: SecondaryMap<StmtKey, bool>,
@@ -120,6 +121,8 @@ pub enum Expression {
     Array(Vec<ExprKey>),
     Dict(Vec<(String, Option<ExprKey>)>),
 
+    Obj(ObjectMode, Vec<(ExprKey, ExprKey)>),
+
     // Index { base: ExprKey, index: ExprKey },
     Empty,
 
@@ -186,6 +189,7 @@ pub enum Statement {
     TypeDef(String),
     Impl(ExprKey, Vec<(String, Option<ExprKey>)>),
     Print(ExprKey),
+    Add(ExprKey),
 }
 
 pub type Statements = Vec<StmtKey>;

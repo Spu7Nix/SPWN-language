@@ -1,7 +1,7 @@
 use super::interpreter::StoredValue;
 
 use crate::error_maker;
-use crate::interpreter::value::ValueType;
+use crate::interpreter::value::{Pattern, ValueType};
 use crate::sources::CodeArea;
 
 error_maker! {
@@ -45,6 +45,16 @@ error_maker! {
         CannotConvert {
             a: StoredValue,
             to: ValueType,
+        },
+
+        #[
+            Message = "Not an iterator", Area = a.def_area, Note = None,
+            Labels = [
+                a.def_area => "Cannot iterate over {}": @(a.value.get_type().to_str());
+            ]
+        ]
+        CannotIterate {
+            a: StoredValue,
         },
 
         #[
@@ -99,14 +109,14 @@ error_maker! {
         #[
             Message = "Pattern mismatch", Area = area, Note = None,
             Labels = [
-                area => "This {} is not {}": @(v.value.get_type().to_str()), @(pat.value.to_str(globals));
+                area => "This {} is not {}": @(v.value.get_type().to_str()), @(pat.0.to_str());
                 v.def_area => "This is of type {}": @(v.value.get_type().to_str());
-                pat.def_area => "Pattern defined as {} here": @(pat.value.to_str(globals));
+                pat.1 => "Pattern defined as {} here": @(pat.0.to_str());
             ]
         ]
         PatternMismatch {
             v: StoredValue,
-            pat: StoredValue,
+            pat: (Pattern, CodeArea),
             area: CodeArea,
         },
 

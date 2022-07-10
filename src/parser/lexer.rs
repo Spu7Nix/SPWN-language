@@ -20,6 +20,10 @@ pub enum Token {
     True,
     #[token("false")]
     False,
+    #[token("obj")]
+    Obj,
+    #[token("trigger")]
+    Trigger,
 
     #[token("if")]
     If,
@@ -48,6 +52,8 @@ pub enum Token {
     Print,
     #[token("split")]
     Split,
+    #[token("add")]
+    Add,
 
     #[token("is")]
     Is,
@@ -156,6 +162,8 @@ impl From<Token> for &str {
             Token::Eof => "end of file",
             Token::True => "true",
             Token::False => "false",
+            Token::Obj => "obj",
+            Token::Trigger => "trigger",
             Token::Plus => "+",
             Token::Minus => "-",
             Token::Mult => "*",
@@ -187,6 +195,7 @@ impl From<Token> for &str {
             Token::Break => "break",
             Token::Continue => "continue",
             Token::Print => "print",
+            Token::Add => "add",
             Token::Split => "split",
             Token::Is => "is",
             Token::Eq => "==",

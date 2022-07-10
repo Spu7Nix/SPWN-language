@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
 use ahash::{AHashMap, AHashSet};
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
+
+use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
 
 use super::contexts::{Context, FullContext};
 use super::error::RuntimeError;
@@ -36,6 +40,9 @@ where
 
     pub calls: AHashSet<CallId>,
     pub call_counter: CallId,
+
+    pub objects: Vec<GdObj>,
+    pub triggers: Vec<GdObj>,
     // pub types: AHashMap<String, String>,
     //pub instances: AHashMap<Instance, Type>,
 }
@@ -47,6 +54,8 @@ impl Globals {
             arbitrary_groups: 0,
             calls: AHashSet::new(),
             call_counter: CallId(1),
+            objects: vec![],
+            triggers: vec![],
             //instances: AHashMap::new(),
         }
     }
@@ -82,12 +91,9 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
     let mut contexts = FullContext::single(code.var_count);
 
     loop {
-        let mut finished = true;
         let mut any_finished = false;
         'out_for: for context in contexts.iter() {
-            if !context.inner().pos.is_empty() {
-                finished = false;
-            } else {
+            if context.inner().pos.is_empty() {
                 any_finished = true;
                 continue;
             }
@@ -250,8 +256,21 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         i = *code.destinations.get(*id) - 1;
                     }
                 }
-                Instruction::ToIter => todo!(),
-                Instruction::IterNext(_) => todo!(),
+                Instruction::ToIter => {
+                    let span = code.get_bytecode_span(func, i);
+                    let iter = value_ops::to_iter(&pop_shallow!(), code.make_area(span))?;
+                    context.inner().iter_stack.push(iter);
+                }
+                Instruction::IterNext(to) => {
+                    if let Some(v) = context.inner().iter_stack.last_mut().unwrap().next(globals) {
+                        push_store!(v);
+                    } else {
+                        i = *code.destinations.get(*to) - 1;
+                    }
+                }
+                Instruction::PopIter => {
+                    context.inner().iter_stack.pop();
+                }
                 Instruction::BuildDict(id) => {
                     let span = code.get_bytecode_span(func, i);
                     let keys = code.name_sets.get(*id);
@@ -262,11 +281,60 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         .collect();
                     push!(Value::Dict(map).into_stored(code.make_area(span)));
                 }
+                mode @ (Instruction::BuildObject(n) | Instruction::BuildTrigger(n)) => {
+                    let span = code.get_bytecode_span(func, i);
+                    let mut obj = GdObj {
+                        params: HashMap::new(),
+                        mode: match mode {
+                            Instruction::BuildObject(_) => ObjectMode::Object,
+                            Instruction::BuildTrigger(_) => ObjectMode::Trigger,
+                            _ => unreachable!(),
+                        },
+                    };
+                    for _ in 0..*n {
+                        let val = pop_deep_clone!();
+                        let key = pop_ref!();
+                        // make sure key is number (for now)
+                        let key = match key.value {
+                            Value::Int(n) => n as u16,
+                            _ => {
+                                // error
+                                todo!();
+                            }
+                        };
+                        // convert to obj param
+                        let param = match val.value {
+                            Value::Int(n) => ObjParam::Number(n as f64),
+                            Value::Float(x) => ObjParam::Number(x),
+                            Value::String(s) => ObjParam::Text(s),
+                            Value::Bool(b) => ObjParam::Bool(b),
+                            Value::Group(g) => ObjParam::Group(g),
+                            Value::TriggerFunc { start_group } => ObjParam::Group(start_group),
+                            _ => todo!(),
+                        };
+                        obj.params.insert(key, param);
+                    }
+                    push!(Value::Object(obj).into_stored(code.make_area(span)));
+                }
+
+                Instruction::AddObject => {
+                    let object = pop_shallow!();
+                    match object.value {
+                        Value::Object(obj) => match obj.mode {
+                            ObjectMode::Object => globals.objects.push(obj),
+                            ObjectMode::Trigger => globals.triggers.push(obj),
+                        },
+                        _ => todo!(),
+                    };
+                }
                 Instruction::MakeMacro(id) => {
                     let span = code.get_bytecode_span(func, i);
                     let arg_spans = code.macro_arg_spans.get(&(func, i)).unwrap();
                     let (func_id, arg_info) = code.macro_build_info.get(*id);
-                    let ret_type = pop_deep_clone!(Store);
+                    let ret_type = {
+                        let value = pop_shallow!();
+                        (value_ops::to_pat(&value)?, value.def_area)
+                    };
                     let mut args = vec![];
                     for ((name, typ, def), span) in arg_info.iter().zip(arg_spans) {
                         let def = if *def {
@@ -275,7 +343,9 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             None
                         };
                         let typ = if *typ {
-                            Some(pop_deep_clone!(Store))
+                            let value = pop_shallow!();
+
+                            Some((value_ops::to_pat(&value)?, value.def_area))
                         } else {
                             None
                         };
@@ -305,7 +375,20 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     let span = code.get_bytecode_span(func, i);
                     push!(Value::Pattern(Pattern::Any).into_stored(code.make_area(span)));
                 }
-                Instruction::MakeMacroPattern(_) => todo!(),
+                Instruction::MakeMacroPattern(arg_amount) => {
+                    let span = code.get_bytecode_span(func, i);
+                    let ret = value_ops::to_pat(&pop_shallow!())?;
+                    let mut args = vec![];
+                    for i in 0..*arg_amount {
+                        args.push(value_ops::to_pat(&pop_shallow!())?);
+                    }
+                    args.reverse();
+                    push!(Value::Pattern(Pattern::Macro {
+                        args,
+                        ret: Box::new(ret)
+                    })
+                    .into_stored(code.make_area(span)));
+                }
                 Instruction::Index => {
                     let idx = pop_shallow!();
                     let base = pop_shallow!();
@@ -325,145 +408,11 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     let base = pop_shallow!();
                     match &base.value {
                         Value::Macro(m) => {
-                            let param_spans = code.macro_arg_spans.get(&(func, i)).unwrap();
-                            let param_list = code.name_sets.get(*id);
-
-                            let mut param_map = AHashMap::new();
-
-                            let mut params = vec![];
-                            let mut named_params = vec![];
-
-                            for (name, param_span) in param_list.iter().zip(param_spans) {
-                                if name.is_empty() {
-                                    params.push((pop_deep_clone!(), param_span));
-                                } else {
-                                    if let Some(p) =
-                                        m.args.iter().position(|MacroArg { name: s, .. }| s == name)
-                                    {
-                                        param_map.insert(name.clone(), p);
-                                    } else {
-                                        return Err(RuntimeError::UndefinedArgument {
-                                            name: name.into(),
-                                            macr: base.clone(),
-                                            area: code.make_area(*param_span),
-                                        });
-                                    }
-                                    named_params.push((
-                                        name.clone(),
-                                        pop_deep_clone!(),
-                                        param_span,
-                                    ));
-                                }
-                            }
-
-                            if params.len() > m.args.len() {
-                                let call_span = code.get_bytecode_span(func, i);
-                                return Err(RuntimeError::TooManyArguments {
-                                    expected: m.args.len(),
-                                    provided: params.len(),
-                                    call_area: code.make_area(call_span),
-                                    func: base.clone(),
-                                });
-                            }
-
-                            let mut arg_fill = m
-                                .args
-                                .iter()
-                                .map(
-                                    |MacroArg {
-                                         pattern, default, ..
-                                     }| {
-                                        (
-                                            pattern.map(|id| globals.deep_clone(id)),
-                                            default.map(|id| globals.deep_clone(id)),
-                                        )
-                                    },
-                                )
-                                .collect::<Vec<_>>();
-                            params.reverse();
-                            named_params.reverse();
-
-                            for (i, (val, param_span)) in params.into_iter().enumerate() {
-                                if let Some(pat) = &arg_fill[i].0 {
-                                    if !value_ops::matches_pat(&val.value, &value_ops::to_pat(pat)?)
-                                    {
-                                        return Err(RuntimeError::PatternMismatch {
-                                            v: val,
-                                            pat: pat.clone(),
-                                            area: code.make_area(*param_span),
-                                        });
-                                    }
-                                }
-                                arg_fill[i].1 = Some(val);
-                            }
-
-                            for (name, val, param_span) in named_params.into_iter() {
-                                let arg_pos = param_map[&name];
-                                if let Some(pat) = &arg_fill[arg_pos].0 {
-                                    if !value_ops::matches_pat(&val.value, &value_ops::to_pat(pat)?)
-                                    {
-                                        return Err(RuntimeError::PatternMismatch {
-                                            v: val,
-                                            pat: pat.clone(),
-                                            area: code.make_area(*param_span),
-                                        });
-                                    }
-                                }
-                                arg_fill[arg_pos].1 = Some(val);
-                            }
-
-                            for ((_, arg), MacroArg { name, area, .. }) in
-                                arg_fill.iter().zip(&m.args)
+                            if let Some(value) =
+                                macro_call(code, func, i, id, m, &base, globals, context)
                             {
-                                if arg.is_none() {
-                                    let call_area = code.get_bytecode_span(func, i);
-                                    return Err(RuntimeError::ArgumentNotSatisfied {
-                                        arg_name: name.clone(),
-                                        call_area: code.make_area(call_area),
-                                        arg_area: area.clone(),
-                                    });
-                                }
+                                return value;
                             }
-
-                            /*
-                                this whole calling part is long and ugly af dont worry will refactor
-                            */
-
-                            context.inner().push_vars(
-                                &code.bytecode_funcs[m.func_id].scoped_var_ids,
-                                code,
-                                globals,
-                            );
-                            context.inner().push_vars(
-                                &code.bytecode_funcs[m.func_id].capture_ids,
-                                code,
-                                globals,
-                            );
-                            // println!("context vars 2: {:?}", context.inner().vars);
-
-                            for ((_, arg), id) in arg_fill
-                                .into_iter()
-                                .zip(&code.bytecode_funcs[m.func_id].arg_ids)
-                            {
-                                context.inner().set_var(*id, arg.unwrap(), globals);
-                            }
-
-                            for (v, id) in m
-                                .capture
-                                .iter()
-                                .zip(&code.bytecode_funcs[m.func_id].capture_ids)
-                            {
-                                context.inner().replace_var(*id, *v);
-                            }
-
-                            globals.call_counter.0 += 1;
-
-                            context
-                                .inner()
-                                .pos
-                                .push((m.func_id, 0, globals.call_counter));
-
-                            globals.calls.insert(globals.call_counter);
 
                             continue;
                         }
@@ -487,7 +436,6 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             FullContext::Split(ret, cont) => {
                                 ret.inner().return_out(code, globals);
                                 cont.inner().advance_to(code, i + 1, globals);
-                                finished = false;
                                 break 'out_for;
                             }
                         }
@@ -495,10 +443,16 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 }
                 Instruction::TriggerFuncCall => todo!(),
                 Instruction::MergeContexts => {}
-                Instruction::PushNone => todo!(),
-                Instruction::WrapMaybe => todo!(),
-                // Instruction::PushContextGroup => todo!(),
-                // Instruction::PopContextGroup => todo!(),
+                Instruction::PushNone => {
+                    let span = code.get_bytecode_span(func, i);
+                    push!(Value::Maybe(None).into_stored(code.make_area(span)));
+                }
+                Instruction::WrapMaybe => {
+                    let top = pop_deep_clone!();
+                    let span = code.get_bytecode_span(func, i);
+                    let key = store!(top);
+                    push!(Value::Maybe(Some(key)).into_stored(code.make_area(span)));
+                }
                 Instruction::EnterTriggerFunction(id) => {
                     // gets the area of the trigger function
                     let trig_fn_span = code.get_bytecode_span(func, i);
@@ -566,7 +520,6 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             c_b.inner().stack.push(b);
                             c_a.inner().advance_to(code, i + 1, globals);
                             c_b.inner().advance_to(code, i + 1, globals);
-                            finished = false;
                             break 'out_for;
                         }
                     }
@@ -598,13 +551,136 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
 
             context.inner().advance_to(code, i + 1, globals);
         }
-        if any_finished {
-            contexts.remove_finished();
-        }
-        dbg!(contexts.iter().count());
-        if finished {
+        if any_finished && !contexts.remove_finished() {
             break;
         }
     }
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn macro_call(
+    code: &Code,
+    func: usize,
+    i: usize,
+    id: &u16,
+    m: &Macro,
+    base: &StoredValue,
+    globals: &mut Globals,
+    context: &mut FullContext,
+) -> Option<Result<(), RuntimeError>> {
+    macro_rules! pop_deep_clone {
+        () => {{
+            let val = globals.memory[context.inner().stack.pop().unwrap()].clone();
+            val.deep_clone(globals)
+        }};
+        (Store) => {{
+            globals.key_deep_clone(context.inner().stack.pop().unwrap())
+        }};
+    }
+
+    let param_spans = code.macro_arg_spans.get(&(func, i)).unwrap();
+    let param_list = code.name_sets.get(*id);
+    let mut param_map = AHashMap::new();
+    let mut params = vec![];
+    let mut named_params = vec![];
+    for (name, param_span) in param_list.iter().zip(param_spans) {
+        if name.is_empty() {
+            params.push((pop_deep_clone!(), param_span));
+        } else {
+            if let Some(p) = m.args.iter().position(|MacroArg { name: s, .. }| s == name) {
+                param_map.insert(name.clone(), p);
+            } else {
+                return Some(Err(RuntimeError::UndefinedArgument {
+                    name: name.into(),
+                    macr: base.clone(),
+                    area: code.make_area(*param_span),
+                }));
+            }
+            named_params.push((name.clone(), pop_deep_clone!(), param_span));
+        }
+    }
+    if params.len() > m.args.len() {
+        let call_span = code.get_bytecode_span(func, i);
+        return Some(Err(RuntimeError::TooManyArguments {
+            expected: m.args.len(),
+            provided: params.len(),
+            call_area: code.make_area(call_span),
+            func: base.clone(),
+        }));
+    }
+    let mut arg_fill = m
+        .args
+        .iter()
+        .map(
+            |MacroArg {
+                 pattern, default, ..
+             }| { (pattern.clone(), default.map(|id| globals.deep_clone(id))) },
+        )
+        .collect::<Vec<_>>();
+    params.reverse();
+    named_params.reverse();
+    for (i, (val, param_span)) in params.into_iter().enumerate() {
+        if let Some(pat) = &arg_fill[i].0 {
+            if !value_ops::matches_pat(&val.value, &pat.0) {
+                return Some(Err(RuntimeError::PatternMismatch {
+                    v: val,
+                    pat: pat.clone(),
+                    area: code.make_area(*param_span),
+                }));
+            }
+        }
+        arg_fill[i].1 = Some(val);
+    }
+    for (name, val, param_span) in named_params.into_iter() {
+        let arg_pos = param_map[&name];
+        if let Some(pat) = &arg_fill[arg_pos].0 {
+            if !value_ops::matches_pat(&val.value, &pat.0) {
+                return Some(Err(RuntimeError::PatternMismatch {
+                    v: val,
+                    pat: pat.clone(),
+                    area: code.make_area(*param_span),
+                }));
+            }
+        }
+        arg_fill[arg_pos].1 = Some(val);
+    }
+    for ((_, arg), MacroArg { name, area, .. }) in arg_fill.iter().zip(&m.args) {
+        if arg.is_none() {
+            let call_area = code.get_bytecode_span(func, i);
+            return Some(Err(RuntimeError::ArgumentNotSatisfied {
+                arg_name: name.clone(),
+                call_area: code.make_area(call_area),
+                arg_area: area.clone(),
+            }));
+        }
+    }
+    context.inner().push_vars(
+        &code.bytecode_funcs[m.func_id].scoped_var_ids,
+        code,
+        globals,
+    );
+    context
+        .inner()
+        .push_vars(&code.bytecode_funcs[m.func_id].capture_ids, code, globals);
+    for ((_, arg), id) in arg_fill
+        .into_iter()
+        .zip(&code.bytecode_funcs[m.func_id].arg_ids)
+    {
+        context.inner().set_var(*id, arg.unwrap(), globals);
+    }
+    for (v, id) in m
+        .capture
+        .iter()
+        .zip(&code.bytecode_funcs[m.func_id].capture_ids)
+    {
+        context.inner().replace_var(*id, *v);
+    }
+    globals.call_counter.0 += 1;
+    context
+        .inner()
+        .pos
+        .push((m.func_id, 0, globals.call_counter));
+    globals.calls.insert(globals.call_counter);
+    None
 }

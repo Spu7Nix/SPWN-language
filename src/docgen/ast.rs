@@ -7,6 +7,7 @@ new_key_type! {
     pub struct LineKey;
 }
 
+#[derive(Debug)]
 pub struct MacroArg {
     pub name: Option<String>,
     pub typ: Option<Values>,
@@ -24,6 +25,7 @@ pub struct DocData {
 
 // a variable cannot be set to a constant that's defined elsewhere in the file (without using a variable which is the purpose of the `Values` enum)
 // therefore these do not need to anchor / redirect on the docs page
+#[derive(Debug)]
 pub enum Constant {
     True,
     False,
@@ -41,6 +43,7 @@ pub enum Constant {
 }
 
 // any values here should be anchors on the docs page / redirect to the values' defitinion
+#[derive(Debug)]
 pub enum Value {
     Ident(String),
     TypeIndicator(String),
@@ -53,11 +56,13 @@ pub enum Value {
     },
 }
 
+#[derive(Debug)]
 pub enum Values {
     Constant(Constant),
     Value(Value),
 }
 
+#[derive(Debug)]
 pub enum Line {
     // module doc comment (very top of file)
     Empty,

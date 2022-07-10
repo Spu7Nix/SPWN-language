@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use super::ast::DocData;
 use super::parser::Parser;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Source {
     // location of var/type/etc in source code
     pub source: PathBuf,

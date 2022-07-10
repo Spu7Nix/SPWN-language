@@ -1,6 +1,6 @@
 use logos::{Lexer, Logos, Span};
 
-use super::ast::{Constant, DocData, Line, LineKey, Lines, Value, Values, MacroArg};
+use super::ast::{Constant, DocData, Line, LineKey, Lines, MacroArg, Value, Values};
 use super::docgen::Source;
 use super::lexer::Token;
 
@@ -45,8 +45,13 @@ impl Parser<'_> {
     }
 
     fn err_file_pos(&mut self) -> String {
-        format!("{} @ l{}:c{}", self.source.source.display(), self.span().start, self.span().end)
-    } 
+        format!(
+            "{} @ l{}:c{}",
+            self.source.source.display(),
+            self.span().start,
+            self.span().end
+        )
+    }
 
     pub fn expected_err(&mut self, expected: &str, found: &str) {
         panic!(
@@ -135,7 +140,8 @@ impl Parser<'_> {
                     // TODO: Update when fn syntax changed
                     self.parse_value(data)
                 } else {
-                    data.known_idents.insert(var_name.clone(), self.source.clone());
+                    data.known_idents
+                        .insert(var_name.clone(), self.source.clone());
 
                     Values::Value(Value::Ident(var_name))
                 }
@@ -144,7 +150,8 @@ impl Parser<'_> {
                 self.next();
                 let type_name = self.slice().to_string();
 
-                data.known_idents.insert(type_name.clone(), self.source.clone());
+                data.known_idents
+                    .insert(type_name.clone(), self.source.clone());
 
                 Values::Value(Value::TypeIndicator(type_name))
             }
@@ -216,7 +223,11 @@ impl Parser<'_> {
                             } else {
                                 None
                             };
-                            args.push(MacroArg { name: arg_name, typ: arg_type, default: arg_default });
+                            args.push(MacroArg {
+                                name: arg_name,
+                                typ: arg_type,
+                                default: arg_default,
+                            });
 
                             if !matches!(self.peek(), Token::RParen | Token::Comma) {
                                 let found = self.next();
@@ -237,15 +248,22 @@ impl Parser<'_> {
                         };
 
                         self.expect_tok(Token::FatArrow);
-      
-                        Values::Value(Value::Macro { args, ret: ret_type })
+
+                        Values::Value(Value::Macro {
+                            args,
+                            ret: ret_type,
+                        })
                     } else {
                         let mut args = vec![];
 
                         while self.peek() != Token::RParen {
                             let arg_typ = Some(self.parse_value(data));
 
-                            args.push(MacroArg { name: None, typ: arg_typ, default: None });
+                            args.push(MacroArg {
+                                name: None,
+                                typ: arg_typ,
+                                default: None,
+                            });
 
                             if !matches!(self.peek(), Token::RParen | Token::Comma) {
                                 let found = self.next();
@@ -261,7 +279,10 @@ impl Parser<'_> {
 
                         let ret_type = Some(Box::new(self.parse_value(data)));
 
-                        Values::Value(Value::Macro { args, ret: ret_type })
+                        Values::Value(Value::Macro {
+                            args,
+                            ret: ret_type,
+                        })
                     }
                 }
             }
@@ -301,69 +322,80 @@ impl Parser<'_> {
         }
     }
 
-    pub fn parse_statement(&mut self, data: &'_ mut DocData) -> LineKey {
-        let first_comment_span = self.span();
+    pub fn parse_statement(&mut self, data: &'_ mut DocData) -> Option<LineKey> {
+        let mut comments = vec![];
 
-        let mut comments = Vec::new();
-        while matches!(self.peek(), Token::DocComment) {
-            comments.push(self.slice().to_string());
+        match self.peek() {
+            Token::DocComment => {
+                let first_comment_span = self.span();
+
+                while matches!(self.next(), Token::DocComment) {
+                    comments.push(self.slice().to_string());
+                }
+
+                let line = match self.next() {
+                    Token::TypeDef => {
+                        self.expect_tok(Token::TypeIndicator);
+                        let type_name = self.slice().to_string();
+
+                        data.known_idents
+                            .insert(type_name.clone(), self.source.clone());
+
+                        Line::Type {
+                            ident: Value::TypeIndicator(type_name),
+                        }
+                    }
+                    Token::Impl => {
+                        let type_name = self.slice().to_string();
+
+                        data.known_idents
+                            .insert(type_name.clone(), self.source.clone());
+
+                        Line::Impl {
+                            ident: Value::TypeIndicator(type_name),
+                        }
+                    }
+                    Token::Ident => {
+                        let var_name = self.slice().to_string();
+                        self.next();
+                        let value = self.parse_value(data);
+
+                        data.known_idents
+                            .insert(var_name.clone(), self.source.clone());
+
+                        Line::AssociatedConst {
+                            ident: Value::Ident(var_name),
+                            value,
+                        }
+                    }
+                    _ => {
+                        // module comment (first line)
+                        if first_comment_span.start == 0 {
+                            Line::Empty
+                        } else {
+                            panic!("doc comments can only be added to:\n - top of file (module comment)\n  - global constant variables\n - type definitions\n - type members");
+                        }
+                    }
+                };
+
+                return Some(data.data.insert((comments, line, self.source.clone())));
+            }
+            _ => None,
         }
-
-        let line = match self.peek() {
-            Token::TypeDef => {
-                self.next();
-                self.expect_tok(Token::TypeIndicator);
-                let type_name = self.slice().to_string();
-
-                data.known_idents.insert(type_name.clone(), self.source.clone());
-
-                Line::Type {
-                    ident: Value::TypeIndicator(type_name),
-                }
-            }
-            Token::Impl => {
-                self.next();
-
-                let type_name = self.slice().to_string();
-
-                data.known_idents.insert(type_name.clone(), self.source.clone());
-
-                Line::Impl {
-                    ident: Value::TypeIndicator(type_name),
-                }
-            }
-            Token::Ident => {
-                self.next();
-                let var_name = self.slice().to_string();
-                self.next();
-                let value = self.parse_value(data);
-
-                data.known_idents.insert(var_name.clone(), self.source.clone());
-
-                Line::AssociatedConst {
-                    ident: Value::Ident(var_name),
-                    value,
-                }
-            }
-            _ => {
-                // module comment (first line)
-                if first_comment_span.start == 0 {
-                    Line::Empty
-                } else {
-                    panic!("doc comments can only be added to:\n - top of file (module comment)\n  - global constant variables\n - type definitions\n - type members");
-                }
-            }
-        };
-
-        data.data.insert((comments, line, self.source.clone()))
     }
 
     pub fn parse(&mut self, data: &mut DocData) -> Lines {
         let mut statements = vec![];
 
         while !matches!(self.peek(), Token::Eof | Token::RBracket) {
-            statements.push(self.parse_statement(data));
+            //println!("{:#?}", data.data);
+
+            if let Some(key) = self.parse_statement(data) {
+                statements.push(key);
+            }
         }
+
+        self.expect_tok(Token::Eof);
 
         statements
     }

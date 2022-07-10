@@ -1,3 +1,7 @@
-///sdfsdfdsf
-//sdfsdfsdfsdf
-//hhhhhhhhhhhhhh
+
+
+a = (a: 3) -> 3 {
+    print h;
+};
+
+print a();

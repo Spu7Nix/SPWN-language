@@ -2,9 +2,12 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::interpreter::{Globals, StoredValue, ValueKey};
+use super::{
+    error::RuntimeError,
+    interpreter::{Globals, StoredValue, ValueKey},
+};
 
-use crate::sources::CodeArea;
+use crate::{leveldata::object_data::GdObj, sources::CodeArea};
 
 pub type ArbitraryId = u16;
 pub type SpecificId = u16;
@@ -13,6 +16,14 @@ pub type SpecificId = u16;
 pub enum Id {
     Specific(SpecificId),
     Arbitrary(ArbitraryId),
+}
+impl Id {
+    pub fn to_str(&self) -> String {
+        match self {
+            Id::Specific(n) => n.to_string(),
+            Id::Arbitrary(_) => "?".to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -37,14 +48,69 @@ pub enum Value {
     TriggerFunc { start_group: Id },
 
     Macro(Macro),
+    Object(GdObj),
+}
+
+#[derive(Debug, Clone)]
+pub enum ValueIter {
+    Array(Vec<ValueKey>, usize),
+    Dict {
+        dict_area: CodeArea,
+        for_area: CodeArea,
+        idx: usize,
+        elems: Vec<(String, ValueKey)>,
+    },
+    String(String, CodeArea, usize),
+}
+
+impl ValueIter {
+    pub fn next(&mut self, globals: &mut Globals) -> Option<StoredValue> {
+        match self {
+            ValueIter::Array(v, idx) => {
+                *idx += 1;
+                v.get(*idx - 1).map(|k| globals.deep_clone(*k))
+            }
+            ValueIter::Dict {
+                dict_area,
+                for_area,
+                idx,
+                elems,
+            } => {
+                *idx += 1;
+                elems.get(*idx - 1).map(|(k, v)| {
+                    Value::Array(vec![
+                        globals
+                            .memory
+                            .insert(Value::String(k.clone()).into_stored(dict_area.clone())),
+                        {
+                            let val = globals.deep_clone(*v);
+                            globals.memory.insert(val)
+                        },
+                    ])
+                    .into_stored(for_area.clone())
+                })
+            }
+            ValueIter::String(s, area, idx) => {
+                *idx += 1;
+                s.chars()
+                    .nth(*idx - 1)
+                    .map(|s| Value::String(s.to_string()).into_stored(area.clone()))
+            }
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct MacroArg {
     pub name: String,
     pub area: CodeArea,
-    pub pattern: Option<ValueKey>,
+    pub pattern: Option<(Pattern, CodeArea)>,
     pub default: Option<ValueKey>,
+}
+impl MacroArg {
+    pub fn get_pattern(&self) -> Pattern {
+        self.pattern.clone().map_or(Pattern::Any, |p| p.0)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -52,7 +118,7 @@ pub struct Macro {
     pub func_id: usize,
     pub args: Vec<MacroArg>,
     pub capture: Vec<ValueKey>,
-    pub ret_type: ValueKey,
+    pub ret_type: (Pattern, CodeArea),
 }
 
 impl Value {
@@ -77,6 +143,7 @@ impl Value {
             Value::Group(_) => ValueType::Group,
             Value::TriggerFunc { .. } => ValueType::TriggerFunc,
             Value::Macro(_) => ValueType::Macro,
+            Value::Object(_) => ValueType::Object,
         }
     }
     pub fn to_str(&self, globals: &Globals) -> String {
@@ -104,14 +171,9 @@ impl Value {
             Value::Maybe(Some(v)) => format!("{}?", globals.memory[*v].value.to_str(globals)),
             Value::TypeIndicator(typ) => typ.to_str(),
             Value::Pattern(p) => p.to_str(),
-            Value::Group(_) => todo!(),
-            Value::TriggerFunc { start_group } => todo!(),
-            Value::Macro(Macro {
-                func_id,
-                args,
-                ret_type,
-                ..
-            }) => {
+            Value::Group(id) => format!("{}g", id.to_str()),
+            Value::TriggerFunc { .. } => "!{...}".into(),
+            Value::Macro(Macro { args, ret_type, .. }) => {
                 format!(
                     "({}) -> {} {{...}}",
                     args.iter()
@@ -125,8 +187,8 @@ impl Value {
                                 format!(
                                     "{}{}{}",
                                     n,
-                                    if let Some(t) = t {
-                                        format!(": {}", globals.memory[*t].value.to_str(globals))
+                                    if let Some((t, _)) = t {
+                                        format!(": {}", t.to_str())
                                     } else {
                                         "".into()
                                     },
@@ -140,9 +202,10 @@ impl Value {
                         )
                         .collect::<Vec<_>>()
                         .join(", "),
-                    globals.memory[*ret_type].value.to_str(globals),
+                    ret_type.0.to_str(),
                 )
             }
+            Value::Object(a) => format!("{:?}", a),
         }
     }
     pub fn deep_clone(&self, globals: &mut Globals) -> Value {
@@ -155,7 +218,8 @@ impl Value {
             | Value::TypeIndicator(_)
             | Value::Pattern(_)
             | Value::Group(_)
-            | Value::TriggerFunc { .. } => self.clone(),
+            | Value::TriggerFunc { .. }
+            | Value::Object(_) => self.clone(),
             Value::Array(arr) => Value::Array(
                 arr.iter()
                     .map(|v| globals.key_deep_clone(*v))
@@ -178,15 +242,14 @@ impl Value {
                     .map(|m| MacroArg {
                         name: m.name.clone(),
                         area: m.area.clone(),
-                        pattern: m.pattern.map(|t| globals.key_deep_clone(t)),
+                        pattern: m.pattern.clone(),
                         default: m.default.map(|d| globals.key_deep_clone(d)),
                     })
                     .collect();
-                let ret_type = globals.key_deep_clone(*ret_type);
                 Value::Macro(Macro {
                     func_id: *func_id,
                     args,
-                    ret_type,
+                    ret_type: ret_type.clone(),
                     capture: capture.clone(),
                 })
             }
@@ -218,6 +281,7 @@ pub enum ValueType {
     Group,
     TriggerFunc,
     Macro,
+    Object,
     // more soon
 }
 impl ValueType {
@@ -238,6 +302,7 @@ impl ValueType {
                 ValueType::Group => "group",
                 ValueType::TriggerFunc => "trigger_function",
                 ValueType::Macro => "macro",
+                ValueType::Object => "object",
             }
         )
     }
@@ -247,12 +312,24 @@ impl ValueType {
 pub enum Pattern {
     Any,
     Type(ValueType),
+    Macro {
+        args: Vec<Pattern>,
+        ret: Box<Pattern>,
+    },
 }
 impl Pattern {
     pub fn to_str(&self) -> String {
         match self {
             Pattern::Any => "_".into(),
             Pattern::Type(t) => t.to_str(),
+            Pattern::Macro { args, ret } => format!(
+                "({}) -> {}",
+                args.iter()
+                    .map(|arg| arg.to_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                ret.to_str(),
+            ),
         }
     }
 }
@@ -261,8 +338,10 @@ impl Pattern {
 pub mod value_ops {
     use super::super::error::RuntimeError;
     use super::super::interpreter::StoredValue;
+    use super::Macro;
     use super::Pattern;
     use super::Value;
+    use super::ValueIter;
     use super::ValueType;
 
     use crate::interpreter::interpreter::Globals;
@@ -323,6 +402,25 @@ pub mod value_ops {
         match (val, pat) {
             (_, Pattern::Any) => true,
             (_, Pattern::Type(t)) => &val.get_type() == t,
+            (
+                Value::Macro(Macro {
+                    func_id,
+                    args,
+                    capture,
+                    ret_type,
+                }),
+                Pattern::Macro {
+                    args: arg_patterns,
+                    ret: ret_pattern,
+                },
+            ) => {
+                &ret_type.0 == &**ret_pattern
+                    && args
+                        .iter()
+                        .zip(arg_patterns)
+                        .all(|(a, p)| &a.get_pattern() == p)
+            }
+            (_, _) => false,
         }
     }
 
@@ -342,8 +440,22 @@ pub mod value_ops {
             Value::Pattern(p) => Ok(p.clone()),
             _ => Err(RuntimeError::CannotConvert {
                 a: a.clone(),
-                to: ValueType::Bool,
+                to: ValueType::Pattern,
             }),
+        }
+    }
+
+    pub fn to_iter(a: &StoredValue, for_area: CodeArea) -> Result<ValueIter, RuntimeError> {
+        match &a.value {
+            Value::Array(v) => Ok(ValueIter::Array(v.clone(), 0)),
+            Value::String(s) => Ok(ValueIter::String(s.clone(), a.def_area.clone(), 0)),
+            Value::Dict(map) => Ok(ValueIter::Dict {
+                dict_area: a.def_area.clone(),
+                for_area,
+                idx: 0,
+                elems: map.iter().map(|(k, v)| (k.clone(), *v)).collect::<Vec<_>>(),
+            }),
+            _ => Err(RuntimeError::CannotIterate { a: a.clone() }),
         }
     }
 

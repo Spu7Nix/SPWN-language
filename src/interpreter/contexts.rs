@@ -2,7 +2,7 @@ use crate::compiler::compiler::{Code, InstrNum};
 
 use super::{
     interpreter::{CallId, Globals, StoredValue, ValueKey},
-    value::Id,
+    value::{Id, ValueIter},
 };
 
 #[derive(Debug, Clone)]
@@ -12,6 +12,7 @@ pub struct Context {
     pub pos: Vec<(usize, usize, CallId)>,
     pub vars: Vec<Vec<ValueKey>>,
     pub stack: Vec<ValueKey>,
+    pub iter_stack: Vec<ValueIter>,
 }
 impl Context {
     pub fn new(var_count: usize) -> Self {
@@ -21,6 +22,7 @@ impl Context {
             vars: vec![vec![]; var_count],
             pos: vec![(0, 0, CallId(0))],
             stack: vec![],
+            iter_stack: vec![],
         }
     }
     pub fn pos(&mut self) -> &mut (usize, usize, CallId) {
@@ -107,6 +109,7 @@ impl Context {
             pos: self.pos.clone(),
             vars,
             stack,
+            iter_stack: self.iter_stack.clone(),
         }
     }
 }
@@ -122,15 +125,20 @@ impl FullContext {
         Self::Single(Context::new(var_count))
     }
 
-    pub fn remove_finished(&mut self) {
-        *self = Self::stack(&mut self.iter().filter_map(|c| {
+    pub fn remove_finished(&mut self) -> bool {
+        let stack = Self::stack(&mut self.iter().filter_map(|c| {
             if c.inner().pos.is_empty() {
                 None
             } else {
                 Some(c.clone())
             }
-        }))
-        .unwrap()
+        }));
+        if let Some(c) = stack {
+            *self = c;
+            true
+        } else {
+            false
+        }
     }
 
     pub fn stack(list: &mut impl Iterator<Item = Self>) -> Option<Self> {

@@ -7,6 +7,7 @@ use slotmap::{new_key_type, SlotMap};
 use super::error::CompilerError;
 use crate::{
     interpreter::{interpreter::StoredValue, value::Value},
+    leveldata::object_data::ObjectMode,
     parser::{
         ast::{ASTData, ExprKey, Expression, Statement, Statements, StmtKey},
         lexer::Token,
@@ -248,8 +249,15 @@ pub enum Instruction {
     ToIter,
     /// for loop something something
     IterNext(InstrNum),
+    /// removes iterator
+    PopIter,
     /// makes dict from last n elements on the stack
     BuildDict(InstrNum),
+    /// makes gd object data structure from last n elements on the stack
+    BuildObject(InstrNum),
+    BuildTrigger(InstrNum),
+    AddObject,
+
     /// returns to callsite
     ReturnValue(bool),
 
@@ -662,8 +670,9 @@ impl Compiler {
                     self.compile_expr(*i, scope, func)?;
                 }
                 self.compile_expr(ret_type, scope, func)?;
-                self.push_instr(
-                    Instruction::MakeMacroPattern(args.len() as InstrNum + 1),
+                self.push_instr_with_span(
+                    Instruction::MakeMacroPattern(args.len() as InstrNum),
+                    expr_span,
                     func,
                 );
             }
@@ -727,9 +736,9 @@ impl Compiler {
             Expression::Maybe(expr) => {
                 if let Some(expr) = expr {
                     self.compile_expr(expr, scope, func)?;
-                    self.push_instr(Instruction::WrapMaybe, func);
+                    self.push_instr_with_span(Instruction::WrapMaybe, expr_span, func);
                 } else {
-                    self.push_instr(Instruction::PushNone, func);
+                    self.push_instr_with_span(Instruction::PushNone, expr_span, func);
                 }
             }
             Expression::TriggerFunc(code) => {
@@ -777,6 +786,21 @@ impl Compiler {
                 self.compile_expr(b, scope, func)?;
                 self.push_instr(Instruction::Split, func);
             }
+            Expression::Obj(mode, vals) => {
+                let l = vals.len() as InstrNum;
+                for (k, v) in vals.into_iter() {
+                    self.compile_expr(k, scope, func)?;
+                    self.compile_expr(v, scope, func)?;
+                }
+                self.push_instr_with_span(
+                    match mode {
+                        ObjectMode::Object => Instruction::BuildObject(l),
+                        ObjectMode::Trigger => Instruction::BuildTrigger(l),
+                    },
+                    expr_span,
+                    func,
+                );
+            }
         }
 
         Ok(())
@@ -811,6 +835,10 @@ impl Compiler {
             Statement::Print(expr) => {
                 self.compile_expr(expr, scope, func)?;
                 self.push_instr(Instruction::Print, func);
+            }
+            Statement::Add(expr) => {
+                self.compile_expr(expr, scope, func)?;
+                self.push_instr(Instruction::AddObject, func);
             }
             Statement::Let(name, value) => {
                 self.compile_expr(value, scope, func)?;
@@ -916,7 +944,7 @@ impl Compiler {
                 let var_span = self.ast_data.for_loop_iter_spans[stmt_key];
 
                 self.compile_expr(iterator, scope, func)?;
-                self.push_instr(Instruction::ToIter, func);
+                self.push_instr_with_span(Instruction::ToIter, stmt_span, func);
                 let iter_pos = self.push_instr(Instruction::IterNext(0), func);
 
                 let derived_scope = self.derived(scope);
@@ -930,7 +958,8 @@ impl Compiler {
                 })?;
 
                 let start_idx = self.code.destinations.add(iter_pos);
-                let jump_pos = self.push_instr(Instruction::Jump(start_idx), func);
+                self.push_instr(Instruction::Jump(start_idx), func);
+                let jump_pos = self.push_instr(Instruction::PopIter, func);
 
                 let end_idx = self.code.destinations.add(jump_pos + 1);
                 self.set_instr(Instruction::IterNext(end_idx), func, iter_pos);
@@ -958,7 +987,7 @@ impl Compiler {
                 if let Some(val) = val {
                     self.compile_expr(val, scope, func)?;
                 } else {
-                    self.push_instr(Instruction::PushEmpty, func);
+                    self.push_instr_with_span(Instruction::PushEmpty, stmt_span, func);
                 }
                 self.push_instr(Instruction::ReturnValue(is_arrow), func);
             }

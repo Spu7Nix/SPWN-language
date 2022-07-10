@@ -83,6 +83,7 @@ macro_rules! error_maker {
         use $crate::interpreter::interpreter::Globals;
         use $crate::sources::{SpwnSource, source_name};
         $(
+            #[derive(Debug)]
             pub enum $err_type {
                 $(
                     $variant {

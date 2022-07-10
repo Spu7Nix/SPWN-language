@@ -1,9 +1,9 @@
 use std::{fs, path::PathBuf};
-
 mod compiler;
 mod docgen;
 mod error;
 mod interpreter;
+mod leveldata;
 mod parser;
 mod sources;
 
@@ -16,6 +16,8 @@ use parser::parser::Parser;
 use sources::SpwnSource;
 
 use docgen::docgen::parse_doc_comments;
+
+use crate::leveldata::object_data::serialize_obj;
 
 // use ahash::AHashMap;
 // use compiler::compiler::{Compiler, Scope};
@@ -98,8 +100,11 @@ use docgen::docgen::parse_doc_comments;
 //     }
 // }
 
-fn run_spwn(code: String, source: SpwnSource) {
-    //parse_doc_comments(code.clone());
+fn run_spwn(code: String, source: SpwnSource, doctest: bool) {
+    if doctest {
+        parse_doc_comments(code.clone());
+        return;
+    }
 
     let mut parser = Parser::new(&code, source.clone());
 
@@ -123,6 +128,11 @@ fn run_spwn(code: String, source: SpwnSource) {
                     if let Err(e) = execute_code(&mut globals, &compiler.code) {
                         e.raise(&code, source, &globals);
                     }
+
+                    println!("Triggers:");
+                    for trigger in globals.triggers.iter() {
+                        println!("{}", serialize_obj(trigger.clone()));
+                    }
                 }
                 Err(e) => e.raise(&code, source),
             }
@@ -135,8 +145,16 @@ fn main() {
     print!("\x1B[2J\x1B[1;1H");
 
     io::stdout().flush().unwrap();
-    let buf = PathBuf::from("test.spwn");
+
+    let file = std::env::args().nth(1).expect("no filename given");
+    let doctest: bool = std::env::args()
+        .nth(2)
+        .unwrap_or("false".to_string())
+        .parse()
+        .expect("expected bool for doctest");
+    let buf = PathBuf::from(file);
+
     let code = fs::read_to_string(&buf).unwrap();
-    run_spwn(code, Some(buf));
+    run_spwn(code, Some(buf), doctest);
     // println!("{}", std::mem::size_of::<Instruction>());
 }

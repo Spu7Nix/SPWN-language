@@ -110,8 +110,8 @@ pub struct ParsedDictlike {
     pub item_spans: Vec<CodeSpan>,
 }
 
-pub enum StringType {
-    Normal(String),
-    Byte(Vec<u8>),
-    FString(String),
+pub struct ParsedObjlike {
+    pub items: Vec<(ExprKey, ExprKey)>,
+    pub item_spans: Vec<CodeSpan>,
 }
+
