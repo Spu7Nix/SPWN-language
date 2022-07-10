@@ -23,7 +23,7 @@ pub fn parse_doc_comments(code: String) {
 
     let stmts = parser.parse(&mut data);
 
-    println!("{:#?}", stmts);
+    println!("{:#?}", data);
 }
 
 fn main() {}

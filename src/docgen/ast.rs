@@ -14,12 +14,11 @@ pub struct MacroArg {
     pub default: Option<Values>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct DocData {
     pub data: SlotMap<LineKey, (Vec<String>, Line, Source)>,
 
     // stores every ident found in every file so it can get the source, and subsequently link to it
-    // TODO: same ident name in diff files - store source?
     pub known_idents: AHashMap<String, Source>,
 }
 
@@ -47,7 +46,7 @@ pub enum Constant {
 pub enum Value {
     Ident(String),
     TypeIndicator(String),
-    Array(Vec<Box<Values>>),
+    Array(Vec<Values>),
 
     Macro {
         args: Vec<MacroArg>,

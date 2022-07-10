@@ -46,7 +46,7 @@ impl Parser<'_> {
 
     fn err_file_pos(&mut self) -> String {
         format!(
-            "{} @ l{}:c{}",
+            "{} @ line {}, col {}",
             self.source.source.display(),
             self.span().start,
             self.span().end
@@ -60,16 +60,6 @@ impl Parser<'_> {
             found.to_string(),
             self.err_file_pos(),
         )
-    }
-
-    pub fn peek_expect_tok(&mut self, tok: Token) {
-        let next = self.peek();
-
-        if next != tok {
-            self.next();
-
-            self.expected_err(&tok.to_string(), &next.to_string());
-        }
     }
 
     pub fn expect_or_tok(&mut self, tok: Token, or: &str) {
@@ -291,7 +281,7 @@ impl Parser<'_> {
 
                 let mut elems = vec![];
                 while self.peek() != Token::RSqBracket {
-                    elems.push(Box::new(self.parse_value(data)));
+                    elems.push(self.parse_value(data));
 
                     if !matches!(self.peek(), Token::RSqBracket | Token::Comma) {
                         let found = self.next();
@@ -329,8 +319,11 @@ impl Parser<'_> {
             Token::DocComment => {
                 let first_comment_span = self.span();
 
-                while matches!(self.next(), Token::DocComment) {
-                    comments.push(self.slice().to_string());
+                while matches!(self.peek(), Token::DocComment) { 
+                    println!("{:#?}", self.peek());
+                    comments.push(self.slice().to_string().trim().into());
+
+                    self.next();
                 }
 
                 let line = match self.next() {
@@ -373,14 +366,17 @@ impl Parser<'_> {
                         if first_comment_span.start == 0 {
                             Line::Empty
                         } else {
-                            panic!("doc comments can only be added to:\n - top of file (module comment)\n  - global constant variables\n - type definitions\n - type members");
+                            panic!("\ndoc comments can only be added to:\n - top of file (module comment)\n - global constant variables\n - type definitions\n - type members\n({})\n", self.err_file_pos());
                         }
                     }
                 };
 
-                return Some(data.data.insert((comments, line, self.source.clone())));
+                Some(data.data.insert((comments, line, self.source.clone())))
             }
-            _ => None,
+            _ => {
+                self.next();
+                None
+            },
         }
     }
 
@@ -388,8 +384,6 @@ impl Parser<'_> {
         let mut statements = vec![];
 
         while !matches!(self.peek(), Token::Eof | Token::RBracket) {
-            //println!("{:#?}", data.data);
-
             if let Some(key) = self.parse_statement(data) {
                 statements.push(key);
             }

@@ -11,12 +11,12 @@ use logos::Logos;
 #[derive(Logos, Debug, PartialEq, Eq, Clone, Copy)]
 #[logos(subpattern digits = r#"(\d)([\d_]+)?"#)]
 pub enum Token {
-    #[regex(r#"(?:///).*"#)]
+    #[regex(r#"(?:///).*"#, priority = 3)]
     DocComment,
 
-    #[regex(r#"(0[b])?(?&digits)"#, priority = 2)]
+    #[regex(r"(0[b])?(?&digits)", priority = 2)]
     Int,
-    #[regex(r#"(?&digits)(\.[\d_]+)?"#)]
+    #[regex(r"(?&digits)(\.[\d_]+)?")]
     Float,
 
     #[regex(r#"\w*"(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*'"#)]
@@ -70,6 +70,7 @@ pub enum Token {
     #[regex(r"[a-zA-Z_ඞ][a-zA-Z_0-9ඞ]*")]
     Ident,
 
+    #[regex(r"[ \t\f\n\r]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*", logos::skip)]
     #[error]
     Error,
 

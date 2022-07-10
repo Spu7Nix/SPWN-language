@@ -149,7 +149,7 @@ fn main() {
     let file = std::env::args().nth(1).expect("no filename given");
     let doctest: bool = std::env::args()
         .nth(2)
-        .unwrap_or("false".to_string())
+        .unwrap_or_else(|| "false".to_string())
         .parse()
         .expect("expected bool for doctest");
     let buf = PathBuf::from(file);
