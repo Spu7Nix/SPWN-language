@@ -220,7 +220,7 @@ $.assert(arr.index_all(2) == [2,4])
     to_dictionary: #[desc("Converts an array to a dictionary"), example(u"
 	array = ["h"]
 	dictionary = array.to_dictionary()
-	$.assert(dictionary == {1: "h"})
+	$.print(dictionary == {1: "h"}) // true
     ")]
     (self) {
     	let dict = {}
