@@ -216,7 +216,21 @@ $.assert(arr.index_all(2) == [2,4])
         }
         return partition
     },
-
+    
+    to_dictionary: #[desc("Converts an array to a dictionary"), example(u"
+	array = ["a:1"]
+	dictionary = array.to_dictionary()
+	$.assert(dictionary == {a: 1})
+    ")]
+    (self) {
+    	let dict = {}
+	for key in self {
+	    split = key.split(':')
+	    dict[split[0]] = dict[split[1]]
+	}
+	return dict
+    },
+    
     shuffle: #[desc("Returns the array in random order."), example(u"
         let arr = [5, 1, 5, 3, 2]
         $.print(arr.shuffle())
