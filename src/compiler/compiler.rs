@@ -42,7 +42,7 @@ impl<T: PartialEq> UniqueRegister<T> {
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
 pub enum Const {
-    Int(u64),
+    Int(u32),
     Float(f64),
     String(String),
     Bool(bool),
@@ -50,7 +50,7 @@ pub enum Const {
 impl Const {
     pub fn to_value(&self) -> Value {
         match self {
-            Const::Int(v) => Value::Int(*v as i128),
+            Const::Int(v) => Value::Int(*v as i64),
             Const::Float(v) => Value::Float(*v),
             Const::String(v) => Value::String(v.clone()),
             Const::Bool(v) => Value::Bool(*v),
@@ -266,19 +266,20 @@ pub enum Instruction {
     /// calls trigger function
     TriggerFuncCall,
 
-    /// saves context for arrow statement (should probably be something like pushcontexts wwhere its on a stack or something lmao idk)
-    SaveContexts,
-    /// pops contexts off stack presumably idk
-    ReviseContexts,
     /// merges contexts
     MergeContexts,
     // wait is this the ? Option syntax thing lol
     PushNone,
     WrapMaybe,
 
-    PushContextGroup,
-    PopContextGroup,
-    PushTriggerFnValue,
+    /// ?g basically
+    LoadArbitraryGroup,
+    /// Splits context, sends one to the end of the trigger func, sets the group of the other
+    EnterArrowStatement(InstrNum),
+    // aaa
+    EnterTriggerFunction(InstrNum),
+    /// stops and deletes the context
+    YeetContext,
 
     /// make type
     TypeDef(InstrNum),
@@ -330,7 +331,8 @@ pub enum ExecLayer {
         breaks: Vec<usize>,
         continues: Vec<usize>,
     },
-    Func,
+    Async,
+    Macro,
 }
 impl ExecLayer {
     pub fn new_loop() -> Self {
@@ -340,12 +342,16 @@ impl ExecLayer {
         }
     }
     pub fn new_func() -> Self {
-        ExecLayer::Func
+        ExecLayer::Macro
+    }
+    pub fn new_async() -> Self {
+        ExecLayer::Async
     }
     pub fn into_loop(self) -> Self {
         match self {
             ExecLayer::Loop { .. } => self,
-            ExecLayer::Func => panic!("called into_loop on func layer"),
+            ExecLayer::Async => self,
+            ExecLayer::Macro => panic!("called into_loop on func layer"),
         }
     }
 }
@@ -608,8 +614,6 @@ impl Compiler {
 
                 let derived_scope = self.derived(scope);
 
-                println!("cCoke {:?}", self.macro_exec_queue);
-
                 self.macro_exec_queue
                     .last_mut()
                     .unwrap()
@@ -729,11 +733,23 @@ impl Compiler {
                 }
             }
             Expression::TriggerFunc(code) => {
-                self.push_instr(Instruction::PushContextGroup, func);
+                // self.push_instr(Instruction::LoadArbitraryGroup, func);
+                // self.push_instr(Instruction::PushTriggerFnValue, func);
+                self.layers.push(ExecLayer::new_async());
+
+                let enter = self.push_instr(Instruction::EnterTriggerFunction(0), func);
+
                 let derived = self.derived(scope);
                 self.compile_stmts(code, derived, func)?;
-                self.push_instr(Instruction::PopContextGroup, func);
-                self.push_instr(Instruction::PushTriggerFnValue, func);
+
+                self.push_instr(Instruction::YeetContext, func);
+                self.layers.pop();
+
+                let next_pos = self.instr_len(func);
+                let idx = self.code.destinations.add(next_pos);
+
+                self.code.bytecode_spans.insert((func, enter), expr_span);
+                self.set_instr(Instruction::EnterTriggerFunction(idx), func, enter);
             }
             Expression::Instance(typ, items) => {
                 let key_spans = self.ast_data.dictlike_spans[expr_key].clone();
@@ -772,13 +788,20 @@ impl Compiler {
         scope: ScopeKey,
         func: usize,
     ) -> Result<(), CompilerError> {
-        let mut is_arrow = self.ast_data.stmt_arrows[stmt_key];
+        let is_arrow = self.ast_data.stmt_arrows[stmt_key];
         let stmt = self.ast_data.get_stmt(stmt_key);
         let stmt_span = self.ast_data.get_span(stmt_key);
 
-        if is_arrow && !matches!(&stmt, Statement::Return(_)) {
-            self.push_instr(Instruction::SaveContexts, func);
-        }
+        // if is_arrow && !matches!(&stmt, Statement::Return(_)) {
+        //     self.push_instr(Instruction::SaveContexts, func);
+        // }
+
+        let enter = if is_arrow {
+            self.layers.push(ExecLayer::new_async());
+            Some(self.push_instr(Instruction::EnterArrowStatement(0), func))
+        } else {
+            None
+        };
 
         match stmt {
             Statement::Expr(expr) => {
@@ -881,7 +904,8 @@ impl Compiler {
                             self.set_instr(Instruction::Jump(end_idx), func, i);
                         }
                     }
-                    ExecLayer::Func => unreachable!(),
+                    ExecLayer::Macro => unreachable!(),
+                    ExecLayer::Async => unreachable!(),
                 }
             }
             Statement::For {
@@ -920,11 +944,12 @@ impl Compiler {
                             self.set_instr(Instruction::Jump(end_idx), func, i);
                         }
                     }
-                    ExecLayer::Func => unreachable!(),
+                    ExecLayer::Macro => unreachable!(),
+                    ExecLayer::Async => unreachable!(),
                 }
             }
             Statement::Return(val) => {
-                if !self.layers.iter().any(|l| matches!(l, ExecLayer::Func)) {
+                if !self.layers.iter().any(|l| matches!(l, ExecLayer::Macro)) {
                     return Err(CompilerError::ReturnOutsideMacro {
                         area: self.make_area(stmt_span),
                     });
@@ -936,7 +961,6 @@ impl Compiler {
                     self.push_instr(Instruction::PushEmpty, func);
                 }
                 self.push_instr(Instruction::ReturnValue(is_arrow), func);
-                is_arrow = false;
             }
             Statement::Break => {
                 let idx = self.push_instr(Instruction::Jump(0), func);
@@ -991,8 +1015,16 @@ impl Compiler {
             }
         }
 
-        if is_arrow {
-            self.push_instr(Instruction::ReviseContexts, func);
+        // if is_arrow {
+        //     self.push_instr(Instruction::ReviseContexts, func);
+        // }
+        if let Some(enter) = enter {
+            self.layers.pop();
+            self.push_instr(Instruction::YeetContext, func);
+
+            let next_pos = self.instr_len(func);
+            let idx = self.code.destinations.add(next_pos);
+            self.set_instr(Instruction::EnterArrowStatement(idx), func, enter)
         }
         // really this should be done every time a variable is removed (or changed?)
         self.push_instr(Instruction::MergeContexts, func);
@@ -1008,7 +1040,7 @@ impl Compiler {
         } in self.macro_exec_queue.pop().unwrap()
         {
             self.macro_exec_queue.push(vec![]);
-            self.layers.push(ExecLayer::Func);
+            self.layers.push(ExecLayer::Macro);
             self.compile_expr(code_key, derived_scope, func_id)?;
             self.layers.pop();
             self.resolve_queued()?;

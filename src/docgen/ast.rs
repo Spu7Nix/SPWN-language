@@ -4,26 +4,21 @@ use slotmap::{new_key_type, SlotMap};
 use super::docgen::Source;
 
 new_key_type! {
-    pub struct StmtKey;
+    pub struct LineKey;
 }
-
-
-pub struct DocComment(String);
-pub struct DocLine(String);
 
 struct MacroArg {
     name: String,
     typ: Vec<Box<Value>>,
 }
 
-
 #[derive(Default)]
 pub struct DocData {
-    data: SlotMap<StmtKey, (Vec<DocComment>, DocLine, Source)>,
+    pub data: SlotMap<LineKey, (Vec<String>, Line, Source)>,
 
     // stores every ident found in every file so it can get the source, and subsequently link to it
     // TODO: same ident name in diff files - store source?
-    known_idents: AHashMap<String, StmtKey>,
+    known_idents: AHashMap<String, LineKey>,
 }
 
 // a variable cannot be set to a constant that's defined elsewhere in the file (without using a variable which is the purpose of the `Values` enum)
@@ -32,12 +27,12 @@ pub enum Constant {
     True,
     False,
     String(String),
-    Int(i64),
-    Float(f64),
+    Int(String),
+    Float(String),
     TriggerFunc,
     Block,
 
-    // a value thats unknown (such as `1 + 2` or `(if y { z } else { a })`)
+    // a value that's unknown (such as `1 + 2` or `(if y { z } else { a })`)
     Unknown,
 }
 
@@ -45,13 +40,14 @@ pub enum Constant {
 pub enum Value {
     Ident(String),
     TypeIndicator(String),
+    Array(Vec<Box<Values>>),
 
     Macro {
         name: String,
         args: Vec<MacroArg>,
         // the value can only be a type indicator or macro
-        ret: Vec<Box<Value>>,
-    }
+        ret: Vec<Box<Values>>,
+    },
 }
 
 pub enum Values {
@@ -59,14 +55,13 @@ pub enum Values {
     Value(Value),
 }
 
-
 pub enum Line {
     // module doc comment (very top of file)
     Empty,
 
     // `x = 20`
     AssociatedConst {
-        ident: Value, // `x`
+        ident: Value,  // `x`
         value: Values, // `20`
     },
 
@@ -77,10 +72,8 @@ pub enum Line {
 
     // `impl @xyz { }`
     Impl {
-       ident: Value, // `@xyz`
-       block: Constant, // `{ ... }`
+        ident: Value, // `@xyz`
     },
 }
 
-
-pub type Statements = Vec<StmtKey>;
+pub type Lines = Vec<LineKey>;

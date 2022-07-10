@@ -9,15 +9,15 @@ use crate::sources::CodeArea;
 pub type ArbitraryId = u16;
 pub type SpecificId = u16;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Copy)]
 pub enum Id {
     Specific(SpecificId),
-    ArbitraryId(ArbitraryId),
+    Arbitrary(ArbitraryId),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Value {
-    Int(i128),
+    Int(i64),
     Float(f64),
 
     String(String),
@@ -478,7 +478,7 @@ pub mod value_ops {
     ) -> Result<StoredValue, RuntimeError> {
         let value = match (&a.value, &b.value) {
             (Value::Int(n1), Value::Int(n2)) => {
-                Value::Int((*n1 as f64).powf(*n2 as f64).floor() as i128)
+                Value::Int((*n1 as f64).powf(*n2 as f64).floor() as i64)
             }
             (Value::Int(n1), Value::Float(n2)) => Value::Float((*n1 as f64).powf(*n2)),
             (Value::Float(n1), Value::Int(n2)) => Value::Float((*n1).powf(*n2 as f64)),

@@ -74,8 +74,31 @@ pub enum Token {
     Eof,
 }
 
-// impl Into<&str> for Token {
-//     fn into(self) -> &'static str {
-//         match self {}
-//     }
-// }
+impl ToString for Token {
+    fn to_string(&self) -> String {
+        (match self {
+            Token::Int => "int literal",
+            Token::Float => "float literal",
+            Token::String => "string literal",
+            Token::True => "true",
+            Token::False => "false",
+            Token::TypeDef => "type",
+            Token::Impl => "impl",
+            Token::Eol => ";",
+            Token::LParen => ")",
+            Token::RParen => "(",
+            Token::LSqBracket => "]",
+            Token::RSqBracket => "[",
+            Token::RBracket => "}",
+            Token::LBracket => "{",
+            Token::Comma => ",",
+            Token::Assign => "=",
+            Token::Colon => ":",
+            Token::FatArrow => "=>",
+            Token::TypeIndicator => "type indicator",
+            Token::Ident => "identifier",
+            _ => unreachable!(),
+        })
+        .into()
+    }
+}

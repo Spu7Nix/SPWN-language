@@ -122,19 +122,19 @@ impl Parser<'_> {
         }
     }
 
-    pub fn parse_int(&self, literal: &str) -> Result<u64, SyntaxError> {
+    pub fn parse_int(&self, literal: &str) -> Result<u32, SyntaxError> {
         if literal.len() > 2 {
             Ok(match &literal[0..2] {
                 "0b" => self.to_int_radix(&literal[2..], 2)?,
                 _ => self.to_int_radix(literal, 10)?,
             })
         } else {
-            Ok(literal.parse::<u64>().unwrap())
+            Ok(literal.parse::<u32>().unwrap())
         }
     }
 
-    fn to_int_radix(&self, from: &str, radix: u32) -> Result<u64, SyntaxError> {
-        u64::from_str_radix(from, radix).map_err(|_| SyntaxError::InvalidLiteral {
+    fn to_int_radix(&self, from: &str, radix: u32) -> Result<u32, SyntaxError> {
+        u32::from_str_radix(from, radix).map_err(|_| SyntaxError::InvalidLiteral {
             literal: from.into(),
             area: self.make_area(self.span()),
         })

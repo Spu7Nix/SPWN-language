@@ -1,45 +1,61 @@
 use crate::compiler::compiler::{Code, InstrNum};
 
-use super::interpreter::{Globals, StoredValue, ValueKey};
+use super::{
+    interpreter::{CallId, Globals, StoredValue, ValueKey},
+    value::Id,
+};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct Context {
+    pub group: Id,
     pub id: String,
-    pub pos: Vec<(usize, usize)>,
+    pub pos: Vec<(usize, usize, CallId)>,
     pub vars: Vec<Vec<ValueKey>>,
     pub stack: Vec<ValueKey>,
 }
 impl Context {
     pub fn new(var_count: usize) -> Self {
         Self {
+            group: Id::Specific(0),
             id: "O".into(),
             vars: vec![vec![]; var_count],
-            pos: vec![(0, 0)],
+            pos: vec![(0, 0, CallId(0))],
             stack: vec![],
         }
     }
-    pub fn pos(&mut self) -> &mut (usize, usize) {
+    pub fn pos(&mut self) -> &mut (usize, usize, CallId) {
         self.pos.last_mut().unwrap()
     }
-    pub fn advance_to(&mut self, code: &Code, i: usize) {
+    pub fn advance_to(&mut self, code: &Code, i: usize, globals: &mut Globals) {
         self.pos().1 = i;
-        let (func, i) = *self.pos();
+        let (func, i, call_id) = *self.pos();
         if i >= code.bytecode_funcs[func].instructions.len() {
-            self.return_out(code);
+            if !globals.calls.contains(&call_id) {
+                self.yeet();
+                return;
+            }
+            self.return_out(code, globals);
         }
     }
-    pub fn advance_by(&mut self, code: &Code, n: usize) {
-        let (_, i) = *self.pos();
-        self.advance_to(code, i + n)
+    pub fn advance_by(&mut self, code: &Code, n: usize, globals: &mut Globals) {
+        let (_, i, _) = *self.pos();
+        self.advance_to(code, i + n, globals)
     }
-    pub fn return_out(&mut self, code: &Code) {
-        let (func, _) = *self.pos();
+
+    pub fn set_group(&mut self, group: Id) {
+        self.group = group;
+    }
+    pub fn return_out(&mut self, code: &Code, globals: &mut Globals) {
+        let (func, _, _) = *self.pos();
         self.pos.pop();
         self.pop_vars(&code.bytecode_funcs[func].scoped_var_ids);
         self.pop_vars(&code.bytecode_funcs[func].capture_ids);
         if !self.pos.is_empty() {
-            self.advance_by(code, 1);
+            self.advance_by(code, 1, globals);
         }
+    }
+    pub fn yeet(&mut self) {
+        self.pos = vec![];
     }
 
     pub fn push_vars(&mut self, vars: &[InstrNum], code: &Code, globals: &mut Globals) {
@@ -86,6 +102,7 @@ impl Context {
             .collect::<Vec<_>>();
 
         Context {
+            group: self.group,
             id: self.id.clone(),
             pos: self.pos.clone(),
             vars,
@@ -103,6 +120,25 @@ pub enum FullContext {
 impl FullContext {
     pub fn single(var_count: usize) -> Self {
         Self::Single(Context::new(var_count))
+    }
+
+    pub fn remove_finished(&mut self) {
+        *self = Self::stack(&mut self.iter().filter_map(|c| {
+            if c.inner().pos.is_empty() {
+                None
+            } else {
+                Some(c.clone())
+            }
+        }))
+        .unwrap()
+    }
+
+    pub fn stack(list: &mut impl Iterator<Item = Self>) -> Option<Self> {
+        let first = list.next()?;
+        match Self::stack(list) {
+            Some(second) => Some(FullContext::Split(first.into(), second.into())),
+            None => Some(first),
+        }
     }
 
     pub fn inner(&mut self) -> &mut Context {

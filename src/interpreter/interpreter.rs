@@ -1,14 +1,14 @@
-use ahash::AHashMap;
+use ahash::{AHashMap, AHashSet};
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
 use super::contexts::{Context, FullContext};
 use super::error::RuntimeError;
 // use super::types::{Instance, Type};
-use super::value::{value_ops, Value, ValueType};
+use super::value::{value_ops, ArbitraryId, Value, ValueType};
 
 use crate::compiler::compiler::{Code, InstrNum, Instruction};
-use crate::interpreter::value::{Macro, MacroArg, Pattern};
+use crate::interpreter::value::{Id, Macro, MacroArg, Pattern};
 use crate::sources::CodeArea;
 
 new_key_type! {
@@ -21,6 +21,9 @@ pub struct StoredValue {
     pub def_area: CodeArea,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CallId(pub usize);
+
 pub struct Globals
 where
     Self: Send + Sync,
@@ -28,6 +31,11 @@ where
     pub memory: SlotMap<ValueKey, StoredValue>,
 
     pub types: AHashMap<String, ValueType>,
+
+    pub arbitrary_groups: ArbitraryId,
+
+    pub calls: AHashSet<CallId>,
+    pub call_counter: CallId,
     // pub types: AHashMap<String, String>,
     //pub instances: AHashMap<Instance, Type>,
 }
@@ -36,6 +44,9 @@ impl Globals {
         Self {
             memory: SlotMap::default(),
             types: AHashMap::new(),
+            arbitrary_groups: 0,
+            calls: AHashSet::new(),
+            call_counter: CallId(1),
             //instances: AHashMap::new(),
         }
     }
@@ -72,14 +83,16 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
 
     loop {
         let mut finished = true;
+        let mut any_finished = false;
         'out_for: for context in contexts.iter() {
             if !context.inner().pos.is_empty() {
                 finished = false;
             } else {
+                any_finished = true;
                 continue;
             }
 
-            let (func, mut i) = *context.inner().pos();
+            let (func, mut i, _) = *context.inner().pos();
 
             macro_rules! pop_deep_clone {
                 () => {{
@@ -189,10 +202,13 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 Instruction::Print => {
                     let top = pop_ref!();
                     println!(
-                        "{}",
+                        "{}, ctx: {}",
                         ansi_term::Color::Green
                             .bold()
-                            .paint(top.value.to_str(globals))
+                            .paint(top.value.to_str(globals)),
+                        ansi_term::Color::Blue
+                            .bold()
+                            .paint(format!("{:?}", context.inner().group))
                     )
                 }
                 Instruction::LoadType(id) => {
@@ -440,7 +456,15 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                                 context.inner().replace_var(*id, *v);
                             }
 
-                            context.inner().pos.push((m.func_id, 0));
+                            globals.call_counter.0 += 1;
+
+                            context
+                                .inner()
+                                .pos
+                                .push((m.func_id, 0, globals.call_counter));
+
+                            globals.calls.insert(globals.call_counter);
+
                             continue;
                         }
                         _ => {
@@ -452,16 +476,17 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     }
                 }
                 Instruction::ReturnValue(arrow) => {
+                    globals.calls.remove(&context.inner().pos().2);
                     if !arrow {
-                        context.inner().return_out(code);
+                        context.inner().return_out(code, globals);
                         continue;
                     } else {
                         context.split_context(globals);
                         match context {
                             FullContext::Single(_) => unreachable!(),
                             FullContext::Split(ret, cont) => {
-                                ret.inner().return_out(code);
-                                cont.inner().advance_to(code, i + 1);
+                                ret.inner().return_out(code, globals);
+                                cont.inner().advance_to(code, i + 1, globals);
                                 finished = false;
                                 break 'out_for;
                             }
@@ -469,14 +494,64 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     }
                 }
                 Instruction::TriggerFuncCall => todo!(),
-                Instruction::SaveContexts => todo!(),
-                Instruction::ReviseContexts => todo!(),
                 Instruction::MergeContexts => {}
                 Instruction::PushNone => todo!(),
                 Instruction::WrapMaybe => todo!(),
-                Instruction::PushContextGroup => todo!(),
-                Instruction::PopContextGroup => todo!(),
-                Instruction::PushTriggerFnValue => todo!(),
+                // Instruction::PushContextGroup => todo!(),
+                // Instruction::PopContextGroup => todo!(),
+                Instruction::EnterTriggerFunction(id) => {
+                    // gets the area of the trigger function
+                    let trig_fn_span = code.get_bytecode_span(func, i);
+                    let trig_fn_group = Id::Arbitrary(globals.arbitrary_groups);
+                    globals.arbitrary_groups += 1;
+
+                    context.split_context(globals);
+                    match context {
+                        FullContext::Single(_) => unreachable!(),
+                        FullContext::Split(outside, inside) => {
+                            outside
+                                .inner()
+                                .advance_to(code, *code.destinations.get(*id), globals);
+                            inside
+                                .inner()
+                                .set_group(Id::Arbitrary(globals.arbitrary_groups));
+
+                            outside.inner().stack.push(store!(Value::TriggerFunc {
+                                start_group: trig_fn_group
+                            }
+                            .into_stored(code.make_area(trig_fn_span))));
+                            inside.inner().advance_to(code, i + 1, globals);
+
+                            break 'out_for;
+                        }
+                    }
+                }
+
+                Instruction::EnterArrowStatement(id) => {
+                    context.split_context(globals);
+                    match context {
+                        FullContext::Single(_) => unreachable!(),
+                        FullContext::Split(outside, inside) => {
+                            outside
+                                .inner()
+                                .advance_to(code, *code.destinations.get(*id), globals);
+                            inside.inner().advance_to(code, i + 1, globals);
+                            break 'out_for;
+                        }
+                    }
+                }
+                // ?g
+                Instruction::LoadArbitraryGroup => {
+                    let group = Id::Arbitrary(globals.arbitrary_groups);
+                    globals.arbitrary_groups += 1;
+                    //store!(Value::Group(group))
+                    todo!()
+                }
+                Instruction::YeetContext => {
+                    context.inner().pos = vec![];
+                    continue;
+                }
+
                 Instruction::TypeDef(_) => todo!(),
                 Instruction::Impl(_) => todo!(),
                 Instruction::Instance(_) => todo!(),
@@ -489,8 +564,8 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         FullContext::Split(c_a, c_b) => {
                             c_a.inner().stack.push(a);
                             c_b.inner().stack.push(b);
-                            c_a.inner().advance_to(code, i + 1);
-                            c_b.inner().advance_to(code, i + 1);
+                            c_a.inner().advance_to(code, i + 1, globals);
+                            c_b.inner().advance_to(code, i + 1, globals);
                             finished = false;
                             break 'out_for;
                         }
@@ -521,8 +596,12 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 | Instruction::Is => (),
             }
 
-            context.inner().advance_to(code, i + 1);
+            context.inner().advance_to(code, i + 1, globals);
         }
+        if any_finished {
+            contexts.remove_finished();
+        }
+        dbg!(contexts.iter().count());
         if finished {
             break;
         }

@@ -106,7 +106,7 @@ impl ASTData {
 
 #[derive(Debug, Clone)]
 pub enum Expression {
-    Int(u64),
+    Int(u32),
     Float(f64),
     String(String),
     Bool(bool),

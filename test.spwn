@@ -1,8 +1,9 @@
-
-
-
 f = () => {
-    -> return 0;
+    a = !{
+        -> return 10;
+    }
 }
 
-print f();
+while true {
+    f();
+}
