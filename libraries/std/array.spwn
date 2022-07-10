@@ -218,15 +218,16 @@ $.assert(arr.index_all(2) == [2,4])
     },
     
     to_dictionary: #[desc("Converts an array to a dictionary"), example(u"
-	array = ["a:1"]
+	array = ["h"]
 	dictionary = array.to_dictionary()
-	$.assert(dictionary == {a: "1"})
+	$.assert(dictionary == {1: "h"})
     ")]
     (self) {
+    	let i = 0
     	let dict = {}
 	for key in self {
-	    split = key.split(':')
-	    dict[split[0]] = dict[split[1]]
+	    dict[i] = key
+	    i += 1
 	}
 	return dict
     },
