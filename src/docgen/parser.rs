@@ -46,7 +46,7 @@ impl Parser<'_> {
 
     fn err_file_pos(&mut self) -> String {
         format!(
-            "{} @ line {}, col {}",
+            "{} @ col: {} to {}",
             self.source.source.display(),
             self.span().start,
             self.span().end
@@ -169,7 +169,7 @@ impl Parser<'_> {
                                     break;
                                 }
                             }
-                            Token::Eof => self.expected_err("closing paren `)`", "EOF"),
+                            Token::Eof => self.expected_err("closing paren )", "EOF"),
                             _ => {
                                 check.next();
                             }
@@ -295,13 +295,11 @@ impl Parser<'_> {
 
                 Values::Value(Value::Array(elems))
             }
-
             Token::LBracket => {
                 self.next();
 
                 Values::Constant(Constant::Block)
             }
-
             Token::TrigFnBracket => {
                 self.next();
 
@@ -312,19 +310,19 @@ impl Parser<'_> {
         }
     }
 
-    pub fn parse_statement(&mut self, data: &'_ mut DocData) -> Option<LineKey> {
+    pub fn parse_statement(&mut self, data: &mut DocData) -> Option<LineKey> {
         let mut comments = vec![];
 
         match self.peek() {
             Token::DocComment => {
                 let first_comment_span = self.span();
 
-                while matches!(self.peek(), Token::DocComment) { 
-                    println!("{:#?}", self.peek());
-                    comments.push(self.slice().to_string().trim().into());
-
+                while matches!(self.peek(), Token::DocComment) {
                     self.next();
+                    comments.push(self.slice().to_string().trim().into());
                 }
+
+                println!("{:?}", self.peek());
 
                 let line = match self.next() {
                     Token::TypeDef => {
