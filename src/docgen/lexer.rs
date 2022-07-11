@@ -159,9 +159,9 @@ pub enum Token {
     Eof,
 }
 
-impl ToString for Token {
-    fn to_string(&self) -> String {
-        (match self {
+impl From<Token> for &str {
+    fn from(tok: Token) -> Self {
+        match tok {
             Token::Int => "int literal",
             Token::Float => "float literal",
             Token::String => "string literal",
@@ -223,8 +223,48 @@ impl ToString for Token {
             Token::ExclMark => "!",
             Token::TypeDef => "type",
             Token::Impl => "impl",
-            Token::DocComment => unreachable!(),
-        })
-        .into()
+            _ => unreachable!(),
+        }
+    }
+}
+
+// code explained in `parser/lexer.rs`
+impl ToString for Token {
+    fn to_string(&self) -> String {
+        let t: &'static str = (*self).into();
+        t.to_string()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Tokens(pub Vec<Token>);
+
+impl From<Token> for Tokens {
+    fn from(tok: Token) -> Self {
+        Self(vec![tok])
+    }
+}
+
+impl ToString for Tokens {
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+impl std::ops::BitOr<Token> for Token {
+    type Output = Tokens;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Tokens(Vec::from([self, rhs]))
+    }
+}
+
+impl std::ops::BitOr<Token> for Tokens {
+    type Output = Tokens;
+
+    fn bitor(self, rhs: Token) -> Self::Output {
+        let mut out = self.0;
+        out.push(rhs);
+        Tokens(out)
     }
 }

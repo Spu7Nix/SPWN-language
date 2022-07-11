@@ -249,8 +249,6 @@ pub enum Instruction {
     ToIter,
     /// for loop something something
     IterNext(InstrNum),
-    /// removes iterator
-    PopIter,
     /// makes dict from last n elements on the stack
     BuildDict(InstrNum),
     /// makes gd object data structure from last n elements on the stack
@@ -302,6 +300,11 @@ pub enum Instruction {
 
     PushVars(InstrNum),
     PopVars(InstrNum),
+
+    PushWhile,
+
+    /// pops from the block stack. if `true`, it will keep popping until it pops a For or While block
+    PopBlock(bool),
 }
 
 pub struct Scope {
@@ -904,6 +907,7 @@ impl Compiler {
                 }
             }
             Statement::While { cond, code } => {
+                self.push_instr(Instruction::PushWhile, func);
                 let cond_pos = self.instr_len(func);
                 self.compile_expr(cond, scope, func)?;
                 let jump_pos = self.push_instr(Instruction::JumpIfFalse(0), func);
@@ -921,6 +925,7 @@ impl Compiler {
 
                 let next_pos = self.instr_len(func);
                 let end_idx = self.code.destinations.add(next_pos);
+                self.push_instr(Instruction::PopBlock(false), func);
                 self.set_instr(Instruction::JumpIfFalse(end_idx), func, jump_pos);
 
                 match self.layers.pop().unwrap() {
@@ -959,9 +964,9 @@ impl Compiler {
 
                 let start_idx = self.code.destinations.add(iter_pos);
                 self.push_instr(Instruction::Jump(start_idx), func);
-                let jump_pos = self.push_instr(Instruction::PopIter, func);
+                let jump_pos = self.push_instr(Instruction::PopBlock(false), func);
 
-                let end_idx = self.code.destinations.add(jump_pos + 1);
+                let end_idx = self.code.destinations.add(jump_pos);
                 self.set_instr(Instruction::IterNext(end_idx), func, iter_pos);
 
                 match self.layers.pop().unwrap() {
@@ -992,6 +997,7 @@ impl Compiler {
                 self.push_instr(Instruction::ReturnValue(is_arrow), func);
             }
             Statement::Break => {
+                self.push_instr(Instruction::PopBlock(true), func);
                 let idx = self.push_instr(Instruction::Jump(0), func);
                 match self.layers.last_mut() {
                     Some(ExecLayer::Loop { breaks, .. }) => {
@@ -1042,6 +1048,11 @@ impl Compiler {
                 self.compile_expr(typ, scope, func)?;
                 self.push_instr(Instruction::Impl(idx), func);
             }
+            Statement::TryCatch {
+                try_branch,
+                catch,
+                catch_var,
+            } => todo!(),
         }
 
         // if is_arrow {

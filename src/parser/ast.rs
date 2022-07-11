@@ -173,6 +173,11 @@ pub enum Statement {
         branches: Vec<(ExprKey, Statements)>,
         else_branch: Option<Statements>,
     },
+    TryCatch {
+        try_branch: Statements,
+        catch: Statements,
+        catch_var: String,
+    },
     While {
         cond: ExprKey,
         code: Statements,

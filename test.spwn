@@ -1,19 +1,14 @@
-wait = (delay) {
-    add trigger {
-        1: 1268,
-        62: delay,
-        51: !{
-            -> return;
-        }
-    };
+
+
+
+f = () {
+    for i in [1, 2] {
+        -> return i;
+    }
 }
 
-m = !{
-    add trigger {
-        1: 900,
-    };
-}
+print f();
+print f();
+// merge ???1
+print "a";
 
-wait(1);
-wait(2);
-m!;

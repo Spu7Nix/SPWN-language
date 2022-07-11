@@ -36,6 +36,10 @@ pub enum Constant {
     Empty,
     // `{ ... }`
     Block,
+    // `obj { }`
+    Object,
+    // `trigger { }`
+    Trigger,
 
     // a value that's unknown (such as `1 + 2` or `(if y { z } else { a })`)
     Unknown,
@@ -47,6 +51,8 @@ pub enum Value {
     Ident(String),
     TypeIndicator(String),
     Array(Vec<Values>),
+    // `?g`, `3c`, `2b`...
+    Id((String, String)),
 
     Macro {
         args: Vec<MacroArg>,
@@ -79,7 +85,8 @@ pub enum Line {
 
     // `impl @xyz { }`
     Impl {
-        ident: Value, // `@xyz`
+        ident: Value,                   // `@xyz`
+        members: Vec<(String, Values)>, // members defined in the impl block
     },
 }
 

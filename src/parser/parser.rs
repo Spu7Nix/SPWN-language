@@ -449,7 +449,10 @@ impl Parser<'_> {
         self.next();
         let start = self.span();
         if self.peek() == Token::RParen
-            && !matches!(self.peek_many(2), Token::FatArrow | Token::LBracket)
+            && !matches!(
+                self.peek_many(2),
+                Token::FatArrow | Token::Arrow | Token::LBracket
+            )
         {
             self.next();
             Ok(data.insert_expr(Expression::Empty, start.extend(self.span())))
@@ -487,17 +490,27 @@ impl Parser<'_> {
                 No,
                 Yes { has_arrow: bool },
             }
-            // todo!()
+
             let is_macro = match check.peek() {
+                // `() => {} ` = `IsMacro::Yes { has_arrow: true }`,
                 Token::FatArrow => IsMacro::Yes { has_arrow: true },
+                //`() {} ` = `IsMacro::Yes { has_arrow: false }`,
                 Token::LBracket => IsMacro::Yes { has_arrow: false },
+                // `(...) ->`
                 Token::Arrow => {
+                    // skips the arrow (`->`)
                     check.next();
+                    // parses value following arrow
                     check.parse_expr(data)?;
 
+                    // if the next token is `=>` or `{` the previous value was a return type,
+                    // otherwise it's a macro pattern
                     match check.peek() {
+                        // `() -> @string => {} ` = `IsMacro::Yes { has_arrow: true }`,
                         Token::FatArrow => IsMacro::Yes { has_arrow: true },
+                        //`() -> @string {} ` = `IsMacro::Yes { has_arrow: false }`,
                         Token::LBracket => IsMacro::Yes { has_arrow: false },
+                        // `() -> @string` = `IsMacro::No` (pattern)
                         _ => IsMacro::No,
                     }
                 }
@@ -832,6 +845,20 @@ impl Parser<'_> {
                 Statement::If {
                     branches,
                     else_branch,
+                }
+            }
+            Token::Try => {
+                self.next();
+                let try_branch = self.parse_block(data)?;
+                self.expect_tok(Token::Catch);
+                self.expect_or_tok(Token::Ident, "variable name");
+                let catch_var = self.slice().to_string();
+                let catch = self.parse_block(data)?;
+
+                Statement::TryCatch {
+                    try_branch,
+                    catch,
+                    catch_var,
                 }
             }
             Token::While => {

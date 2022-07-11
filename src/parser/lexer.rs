@@ -35,6 +35,10 @@ pub enum Token {
     For,
     #[token("in")]
     In,
+    #[token("try")]
+    Try,
+    #[token("catch")]
+    Catch,
 
     #[token("return")]
     Return,
@@ -191,6 +195,8 @@ impl From<Token> for &str {
             Token::While => "while",
             Token::For => "for",
             Token::In => "in",
+            Token::Try => "try",
+            Token::Catch => "catch",
             Token::Return => "return",
             Token::Break => "break",
             Token::Continue => "continue",

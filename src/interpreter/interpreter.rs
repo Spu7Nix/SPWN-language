@@ -4,6 +4,7 @@ use ahash::{AHashMap, AHashSet};
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
+use crate::interpreter::contexts::{Block, Frame};
 use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
 
 use super::contexts::{Context, FullContext};
@@ -28,6 +29,8 @@ pub struct StoredValue {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CallId(pub usize);
 
+type InstructionPos = (usize, usize);
+
 pub struct Globals
 where
     Self: Send + Sync,
@@ -45,6 +48,7 @@ where
     pub triggers: Vec<GdObj>,
     // pub types: AHashMap<String, String>,
     //pub instances: AHashMap<Instance, Type>,
+    merge_points: AHashMap<(InstructionPos, CallId), Vec<(Context, Id)>>,
 }
 impl Globals {
     pub fn new() -> Self {
@@ -57,6 +61,7 @@ impl Globals {
             objects: vec![],
             triggers: vec![],
             //instances: AHashMap::new(),
+            merge_points: AHashMap::default(),
         }
     }
     pub fn init(&mut self) {
@@ -92,13 +97,14 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
 
     loop {
         let mut any_finished = false;
+        let is_split = contexts.is_split();
         'out_for: for context in contexts.iter() {
-            if context.inner().pos.is_empty() {
+            if context.inner().frames.is_empty() {
                 any_finished = true;
                 continue;
             }
 
-            let (func, mut i, _) = *context.inner().pos();
+            let (func, mut i) = context.inner().frame().position;
 
             macro_rules! pop_deep_clone {
                 () => {{
@@ -259,17 +265,26 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 Instruction::ToIter => {
                     let span = code.get_bytecode_span(func, i);
                     let iter = value_ops::to_iter(&pop_shallow!(), code.make_area(span))?;
-                    context.inner().iter_stack.push(iter);
+                    context.inner().frame().block_stack.push(Block::For(iter))
                 }
                 Instruction::IterNext(to) => {
-                    if let Some(v) = context.inner().iter_stack.last_mut().unwrap().next(globals) {
+                    if let Some(v) = context.inner().frame().block().get_iter().next(globals) {
                         push_store!(v);
                     } else {
                         i = *code.destinations.get(*to) - 1;
                     }
                 }
-                Instruction::PopIter => {
-                    context.inner().iter_stack.pop();
+                Instruction::PopBlock(break_like) => {
+                    if *break_like {
+                        loop {
+                            let pop = context.inner().frame().block_stack.pop().unwrap();
+                            if !matches!(pop, Block::For(_) | Block::While) {
+                                break;
+                            }
+                        }
+                    } else {
+                        context.inner().frame().block_stack.pop();
+                    }
                 }
                 Instruction::BuildDict(id) => {
                     let span = code.get_bytecode_span(func, i);
@@ -293,13 +308,16 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     };
                     for _ in 0..*n {
                         let val = pop_deep_clone!();
-                        let key = pop_ref!();
+                        let key = pop_shallow!();
                         // make sure key is number (for now)
                         let key = match key.value {
                             Value::Int(n) => n as u16,
                             _ => {
-                                // error
-                                todo!();
+                                return Err(RuntimeError::TypeMismatch {
+                                    v: key.clone(),
+                                    expected: "integer".to_string(),
+                                    area: key.def_area,
+                                })
                             }
                         };
                         // convert to obj param
@@ -310,7 +328,13 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             Value::Bool(b) => ObjParam::Bool(b),
                             Value::Group(g) => ObjParam::Group(g),
                             Value::TriggerFunc { start_group } => ObjParam::Group(start_group),
-                            _ => todo!(),
+                            _ => {
+                                return Err(RuntimeError::TypeMismatch {
+                                    v: val.clone(),
+                                    expected: "valid object property value".to_string(),
+                                    area: val.def_area,
+                                })
+                            }
                         };
                         obj.params.insert(key, param);
                     }
@@ -323,12 +347,24 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         Value::Object(mut obj) => match obj.mode {
                             ObjectMode::Object => globals.objects.push(obj),
                             ObjectMode::Trigger => {
-                                obj.params
-                                    .insert(57, ObjParam::Group(context.inner().group));
+                                obj.params.insert(
+                                    57,
+                                    ObjParam::Group({
+                                        let group = context.inner().group;
+                                        dbg!(group);
+                                        group
+                                    }),
+                                );
                                 globals.triggers.push(obj)
                             }
                         },
-                        _ => todo!(),
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: object.clone(),
+                                expected: "obj or trigger".to_string(),
+                                area: object.def_area,
+                            })
+                        }
                     };
                 }
                 Instruction::MakeMacro(id) => {
@@ -402,9 +438,21 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                                 let k = globals.deep_clone(arr[n as usize]);
                                 push!(k);
                             }
-                            _ => todo!(),
+                            _ => {
+                                return Err(RuntimeError::TypeMismatch {
+                                    v: idx.clone(),
+                                    expected: "integer".to_string(),
+                                    area: idx.def_area,
+                                })
+                            }
                         },
-                        _ => todo!(),
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: base.clone(),
+                                expected: "array".to_string(),
+                                area: base.def_area,
+                            })
+                        }
                     }
                 }
                 Instruction::Call(id) => {
@@ -429,7 +477,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     }
                 }
                 Instruction::ReturnValue(arrow) => {
-                    globals.calls.remove(&context.inner().pos().2);
+                    globals.calls.remove(&context.inner().frame().call_id);
                     if !arrow {
                         context.inner().return_out(code, globals);
                         continue;
@@ -446,9 +494,16 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     }
                 }
                 Instruction::TriggerFuncCall => {
-                    let trigger_func = match pop_shallow!().value {
+                    let v = pop_shallow!();
+                    let trigger_func = match v.value {
                         Value::TriggerFunc { start_group } => start_group,
-                        _ => todo!(),
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: v.clone(),
+                                expected: "trigger function".to_string(),
+                                area: v.def_area,
+                            })
+                        }
                     };
                     let mut obj = GdObj {
                         params: HashMap::new(),
@@ -461,7 +516,39 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         .insert(57, ObjParam::Group(context.inner().group));
                     globals.triggers.push(obj);
                 }
-                Instruction::MergeContexts => {}
+                Instruction::MergeContexts => {
+                    if is_split {
+                        let call_id = context.inner().frame().call_id;
+                        // check if can merge
+                        if let Some(cs) = globals.merge_points.get(&((func, i), call_id)) {
+                            for (c, group) in cs {
+                                if context.inner().is_mergable_with(c, globals) {
+                                    // add spawn trigger
+                                    add_spawn_trigger(*group, context, globals);
+
+                                    // yeet merged context
+                                    context.inner().yeet();
+                                    break 'out_for;
+                                }
+                            }
+                        }
+
+                        // otherwise
+                        let new_context = Id::Arbitrary(globals.arbitrary_groups);
+                        globals.arbitrary_groups += 1;
+
+                        // add spawn trigger
+                        add_spawn_trigger(new_context, context, globals);
+
+                        context.inner().set_group(new_context);
+
+                        globals
+                            .merge_points
+                            .entry(((func, i), call_id))
+                            .or_insert(vec![])
+                            .push((context.inner().clone(), new_context));
+                    }
+                }
                 Instruction::PushNone => {
                     let span = code.get_bytecode_span(func, i);
                     push!(Value::Maybe(None).into_stored(code.make_area(span)));
@@ -485,9 +572,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             outside
                                 .inner()
                                 .advance_to(code, *code.destinations.get(*id), globals);
-                            inside
-                                .inner()
-                                .set_group(Id::Arbitrary(globals.arbitrary_groups));
+                            inside.inner().set_group(trig_fn_group);
 
                             outside.inner().stack.push(store!(Value::TriggerFunc {
                                 start_group: trig_fn_group
@@ -521,7 +606,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     todo!()
                 }
                 Instruction::YeetContext => {
-                    context.inner().pos = vec![];
+                    context.inner().yeet();
                     continue;
                 }
 
@@ -566,6 +651,10 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 | Instruction::Lesser
                 | Instruction::LesserEq
                 | Instruction::Is => (),
+
+                Instruction::PushWhile => {
+                    context.inner().frame().block_stack.push(Block::While);
+                }
             }
 
             context.inner().advance_to(code, i + 1, globals);
@@ -575,6 +664,18 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
         }
     }
     Ok(())
+}
+
+fn add_spawn_trigger(target: Id, context: &mut FullContext, globals: &mut Globals) {
+    let mut obj = GdObj {
+        params: HashMap::new(),
+        mode: ObjectMode::Trigger,
+    };
+    obj.params.insert(1, ObjParam::Number(1268.0));
+    obj.params.insert(51, ObjParam::Group(target));
+    obj.params
+        .insert(57, ObjParam::Group(context.inner().group));
+    globals.triggers.push(obj);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -696,10 +797,11 @@ fn macro_call(
         context.inner().replace_var(*id, *v);
     }
     globals.call_counter.0 += 1;
-    context
-        .inner()
-        .pos
-        .push((m.func_id, 0, globals.call_counter));
+    context.inner().frames.push(Frame {
+        position: (m.func_id, 0),
+        call_id: globals.call_counter,
+        block_stack: vec![],
+    });
     globals.calls.insert(globals.call_counter);
     None
 }

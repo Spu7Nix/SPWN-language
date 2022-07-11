@@ -2,17 +2,44 @@ use crate::compiler::compiler::{Code, InstrNum};
 
 use super::{
     interpreter::{CallId, Globals, StoredValue, ValueKey},
-    value::{Id, ValueIter},
+    value::{value_ops, Id, ValueIter},
 };
+
+#[derive(Debug, Clone)]
+pub enum Block {
+    For(ValueIter),
+    While,
+    Try(InstrNum),
+}
+impl Block {
+    pub fn get_iter(&mut self) -> &mut ValueIter {
+        if let Block::For(iter) = self {
+            iter
+        } else {
+            panic!("tried to get iterator of non-for block")
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Frame {
+    pub position: (usize, usize),
+    pub call_id: CallId,
+    pub block_stack: Vec<Block>,
+}
+impl Frame {
+    pub fn block(&mut self) -> &mut Block {
+        self.block_stack.last_mut().unwrap()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Context {
     pub group: Id,
     pub id: String,
-    pub pos: Vec<(usize, usize, CallId)>,
+    pub frames: Vec<Frame>,
     pub vars: Vec<Vec<ValueKey>>,
     pub stack: Vec<ValueKey>,
-    pub iter_stack: Vec<ValueIter>,
 }
 impl Context {
     pub fn new(var_count: usize) -> Self {
@@ -20,18 +47,24 @@ impl Context {
             group: Id::Specific(0),
             id: "O".into(),
             vars: vec![vec![]; var_count],
-            pos: vec![(0, 0, CallId(0))],
+            frames: vec![Frame {
+                position: (0, 0),
+                call_id: CallId(0),
+                block_stack: vec![],
+            }],
             stack: vec![],
-            iter_stack: vec![],
         }
     }
-    pub fn pos(&mut self) -> &mut (usize, usize, CallId) {
-        self.pos.last_mut().unwrap()
+    pub fn frame(&mut self) -> &mut Frame {
+        self.frames.last_mut().unwrap()
     }
     pub fn advance_to(&mut self, code: &Code, i: usize, globals: &mut Globals) {
-        self.pos().1 = i;
-        let (func, i, call_id) = *self.pos();
-        if i >= code.bytecode_funcs[func].instructions.len() {
+        let frame = self.frame();
+        let pos = &mut frame.position;
+        let call_id = frame.call_id;
+        pos.1 = i;
+        let (func, i) = pos;
+        if *i >= code.bytecode_funcs[*func].instructions.len() {
             if !globals.calls.contains(&call_id) {
                 self.yeet();
                 return;
@@ -40,7 +73,7 @@ impl Context {
         }
     }
     pub fn advance_by(&mut self, code: &Code, n: usize, globals: &mut Globals) {
-        let (_, i, _) = *self.pos();
+        let i = self.frame().position.1;
         self.advance_to(code, i + n, globals)
     }
 
@@ -48,16 +81,16 @@ impl Context {
         self.group = group;
     }
     pub fn return_out(&mut self, code: &Code, globals: &mut Globals) {
-        let (func, _, _) = *self.pos();
-        self.pos.pop();
+        let func = self.frame().position.0;
+        self.frames.pop();
         self.pop_vars(&code.bytecode_funcs[func].scoped_var_ids);
         self.pop_vars(&code.bytecode_funcs[func].capture_ids);
-        if !self.pos.is_empty() {
+        if !self.frames.is_empty() {
             self.advance_by(code, 1, globals);
         }
     }
     pub fn yeet(&mut self) {
-        self.pos = vec![];
+        self.frames = vec![];
     }
 
     pub fn push_vars(&mut self, vars: &[InstrNum], code: &Code, globals: &mut Globals) {
@@ -106,11 +139,46 @@ impl Context {
         Context {
             group: self.group,
             id: self.id.clone(),
-            pos: self.pos.clone(),
+            frames: self.frames.clone(),
             vars,
             stack,
-            iter_stack: self.iter_stack.clone(),
         }
+    }
+
+    pub fn is_mergable_with(&self, other: &Self, globals: &Globals) -> bool {
+        // check if stack is equal:
+        if self.stack.len() != other.stack.len() {
+            return false;
+        }
+        for i in 0..self.stack.len() {
+            if !value_ops::equality(
+                &globals.memory[self.stack[i]].value,
+                &globals.memory[other.stack[i]].value,
+                globals,
+            ) {
+                return false;
+            }
+        }
+        // check if vars are equal
+        if self.vars.len() != other.vars.len() {
+            return false;
+        }
+
+        for y in 0..self.vars.len() {
+            if self.vars[y].len() != other.vars[y].len() {
+                return false;
+            }
+            for x in 0..self.vars[0].len() {
+                if !value_ops::equality(
+                    &globals.memory[self.vars[y][x]].value,
+                    &globals.memory[other.vars[y][x]].value,
+                    globals,
+                ) {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
@@ -124,10 +192,13 @@ impl FullContext {
     pub fn single(var_count: usize) -> Self {
         Self::Single(Context::new(var_count))
     }
+    pub fn is_split(&self) -> bool {
+        matches!(self, FullContext::Split(..))
+    }
 
     pub fn remove_finished(&mut self) -> bool {
         let stack = Self::stack(&mut self.iter().filter_map(|c| {
-            if c.inner().pos.is_empty() {
+            if c.inner().frames.is_empty() {
                 None
             } else {
                 Some(c.clone())
