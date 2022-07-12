@@ -40,7 +40,7 @@ macro_rules! num_to_value {
         $(
             impl ToValue for $in {
                 fn to_value(self) -> Value {
-                    Value::Int(self as isize)
+                    Value::Int(self as i64)
                 }
             }
         )*

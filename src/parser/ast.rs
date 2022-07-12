@@ -104,13 +104,25 @@ impl ASTData {
         println!("{}", debug_str);
     }
 }
+use serde::{Deserialize, Serialize};
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Copy)]
+pub enum IdClass {
+    Group = 0,
+    Color = 1,
+    Block = 2,
+    Item = 3,
+}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Int(u32),
     Float(f64),
     String(String),
     Bool(bool),
+    Id {
+        class: IdClass,
+        value: Option<u16>, // None = ? (arbirtary)
+    },
 
     Op(ExprKey, Token, ExprKey),
     Unary(Token, ExprKey),
@@ -164,7 +176,7 @@ pub enum Expression {
     Split(ExprKey, ExprKey),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Expr(ExprKey),
     Let(String, ExprKey),

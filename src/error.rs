@@ -51,11 +51,16 @@ impl RainbowColorGenerator {
     }
 }
 
+use crate::SpwnSource;
+
+pub trait RaiseError {
+    fn raise(self, code: &str, source: SpwnSource);
+}
+
 #[macro_export]
 macro_rules! error_maker {
     (
         $(
-            $( Globals: $globals:ident; )?
             Module: $module_name:ident;
             pub enum $err_type:ident {
                 $(
@@ -82,6 +87,7 @@ macro_rules! error_maker {
         #[allow(unused_imports)]
         use $crate::interpreter::interpreter::Globals;
         use $crate::sources::{SpwnSource, source_name};
+
         $(
             #[derive(Debug)]
             pub enum $err_type {
@@ -94,8 +100,8 @@ macro_rules! error_maker {
                 )*
             }
 
-            impl $err_type {
-                pub fn raise(self, code: &str, source: SpwnSource $(, $globals: &Globals)?) {
+            impl RaiseError for $err_type {
+                fn raise(self, code: &str, source: SpwnSource) {
                     let mut label_colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 45.0);
                     let mut item_colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 15.0);
 

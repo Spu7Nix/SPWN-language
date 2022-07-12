@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -17,7 +16,6 @@ use crate::sources::CodeArea;
 #[derive(Clone)]
 pub struct Type {
     pub name: String,
-    //pub type_id: HashId,
     constructor: Option<Constructor>,
     attributes: Attributes,
     self_methods: SelfMethods,
@@ -25,24 +23,39 @@ pub struct Type {
 }
 
 impl Type {
-    pub fn call_static(&self, name: &str, args: Vec<Value>) -> Result<Value, Error> {
+    pub fn call_static(
+        &self,
+        name: &str,
+        args: Vec<Value>,
+        area: CodeArea,
+    ) -> Result<Value, RuntimeError> {
         let attr = self
             .static_methods
             .get(name)
-            .ok_or_else(|| format!("Static method '{}' is undefined!", name))?;
+            .ok_or_else(|| RuntimeError::UndefinedMember {
+                name: name.into(),
+                area: area.clone(),
+            })?;
 
-        attr.clone().invoke(args)
+        attr.clone().invoke(args, area)
     }
 
-    pub fn get_self_method(&self, name: String) -> Result<SelfMethod, Error> {
+    pub fn get_self_method(
+        &self,
+        name: &String,
+        area: CodeArea,
+    ) -> Result<SelfMethod, RuntimeError> {
         // if the self method doesnt exist check if it's a static method as they also can be called from `self.`
-        if let Some(method) = self.self_methods.get(&name).cloned() {
+        if let Some(method) = self.self_methods.get(name).cloned() {
             return Ok(method);
         }
-        if let Some(method) = self.static_methods.get(&name).cloned() {
+        if let Some(method) = self.static_methods.get(name).cloned() {
             return Ok(SelfMethod::from_static_method(method));
         }
-        Err(format!("Self method '{}' is undefined!", name))
+        Err(RuntimeError::UndefinedMember {
+            name: name.clone(),
+            area,
+        })
     }
 }
 
@@ -53,7 +66,7 @@ pub struct TypeBuilder<T> {
 
 impl<T> TypeBuilder<T>
 where
-    T: 'static,
+    T: Send + Sync + 'static,
 {
     pub fn name<U: ToString>(name: U) -> Self {
         Self {
@@ -118,7 +131,6 @@ where
         Args: FromValueList,
         F: Method<T, Args, Result = R>,
         R: ToValueResult + 'static,
-        T: Hash,
         S: ToString,
     {
         self.typ
@@ -131,22 +143,45 @@ where
         self.typ
     }
 }
-////////////////////////////////////////////////////////////////////
+
+pub trait AnyUID<'a>: Send + Sync + 'a {
+    fn uid(&self) -> u64;
+}
+
+impl<'a, T: Send + Sync + Sized + 'a> AnyUID<'a> for T {
+    fn uid(&self) -> u64 {
+        self as *const T as u64
+    }
+}
+
+impl<'a> dyn AnyUID<'a> + Send + Sync {
+    fn downcast_ref<T: AnyUID<'a>>(&self) -> Option<&T> {
+        // saftey: checking that both types are
+        // TODO: does this check pass?
+        //! both structs might have diff addresses
+        // dbg!(self.id(), UniqueId::of::<T>());
+
+        // if self.id() == UniqueId::of::<T>() {
+        Some(unsafe { &*(self as *const Self as *const T) })
+        // } else {
+        //     None
+        // }
+    }
+}
 
 #[derive(Clone)]
 pub struct Instance {
-    inner: Arc<dyn Any + Send + Sync>,
+    inner: Arc<dyn AnyUID<'static> + Send + Sync>,
     name: String,
-    debug_type_name: &'static str,
 }
 
 impl Instance {
     pub fn of(typ: &Type, fields: Vec<Value>, area: CodeArea) -> Result<Self, RuntimeError> {
         if let Some(ctor) = &typ.constructor {
-            ctor.invoke(fields)
+            ctor.invoke(fields, area)
         } else {
             Err(RuntimeError::NoConstructor {
-                typ: typ.name,
+                typ: typ.name.clone(),
                 area,
             })
         }
@@ -155,14 +190,9 @@ impl Instance {
     pub fn new<T: Send + Sync + 'static>(instance: T, name: String) -> Self {
         Self {
             inner: Arc::new(instance),
-            debug_type_name: type_name::<T>(),
             name,
         }
     }
-
-    // pub fn instance_of<T>(&self, typ: &Type) -> bool {
-    //     self.name == typ.name
-    // }
 
     pub fn inner_type<'a>(
         &self,
@@ -171,28 +201,31 @@ impl Instance {
     ) -> Result<&'a Type, RuntimeError> {
         globals
             .types
-            .get(&self.type_id)
+            .get(&self.name)
             .ok_or_else(|| RuntimeError::UndefinedType {
-                typ: self.name,
+                name: self.name.clone(),
                 area,
             })
     }
 
-    pub fn name<'a>(&self, globals: &'a Globals) -> &'a str {
-        self.inner_type(globals)
-            .map(|ty| ty.name.as_ref())
-            .unwrap_or_else(|_| self.debug_type_name)
-    }
-
-    pub fn get_attr(&self, name: &str, globals: &mut Globals) -> Result<Value, Error> {
+    pub fn get_attr(
+        &self,
+        name: &str,
+        globals: &mut Globals,
+        area: CodeArea,
+    ) -> Result<Value, RuntimeError> {
         let attr = self
-            .inner_type(globals)
+            .inner_type(globals, area.clone())
             .and_then(|c| {
                 c.attributes
                     .get(name)
-                    .ok_or_else(|| format!("Attribute '{}' is undefined!", name))
+                    .ok_or_else(|| RuntimeError::UndefinedMember {
+                        name: name.into(),
+                        area,
+                    })
             })?
             .clone();
+
         attr.invoke(self, globals)
     }
 
@@ -201,34 +234,286 @@ impl Instance {
         name: String,
         args: Vec<Value>,
         globals: &mut Globals,
-    ) -> Result<Value, Error> {
+        area: CodeArea,
+    ) -> Result<Value, RuntimeError> {
         let method = self
-            .inner_type(globals)
-            .and_then(|c| c.get_self_method(name.clone()))?;
-        method.invoke(self, args, globals)
+            .inner_type(globals, area.clone())
+            .and_then(|c| c.get_self_method(&name, area.clone()))?;
+
+        method.invoke(self, args, globals, area)
     }
 
-    pub fn downcast<T: 'static>(&self, globals: Option<&mut Globals>) -> Result<&T, Error> {
-        let name = globals.as_ref().map(|g| self.name(g).to_owned()).expect(
-            "tried to get inner type name of instance from a type that is not stored in globals!",
-        );
-
-        let expected_name = globals
-            .as_ref()
-            .and_then(|g| {
-                g.types
-                    .get(&hash_type_name::<T>())
-                    .map(|ty| ty.name.clone())
-            })
-            .unwrap_or_else(|| self.debug_type_name.to_owned());
-
+    pub fn downcast<T: 'static + Send + Sync>(&self) -> &T {
         self.inner
             .as_ref()
             .downcast_ref()
-            .ok_or_else(|| format!("Expected type '{}', got '{}'!", expected_name, name))
+            .expect("downcast error please report")
     }
 
-    pub fn raw<T: Send + Sync + 'static>(&self) -> Result<&T, Error> {
-        self.downcast::<T>(None)
+    pub fn raw<T: 'static + Send + Sync>(&self) -> &T {
+        self.downcast::<T>()
     }
 }
+
+// #[derive(Clone)]
+// pub struct Type<'t> {
+//     pub name: String,
+//     constructor: Option<Constructor<'t>>,
+//     attributes: Attributes,
+//     self_methods: SelfMethods,
+//     static_methods: StaticMethods,
+// }
+
+// impl<'t> Type<'t> {
+//     pub fn call_static(
+//         &self,
+//         name: &str,
+//         args: Vec<Value>,
+//         area: CodeArea,
+//     ) -> Result<Value, RuntimeError> {
+//         let attr = self
+//             .static_methods
+//             .get(name)
+//             .ok_or_else(|| RuntimeError::UndefinedMember {
+//                 name: name.into(),
+//                 area,
+//             })?;
+
+//         attr.clone().invoke(args, area)
+//     }
+
+//     pub fn get_self_method(
+//         &self,
+//         name: &String,
+//         area: CodeArea,
+//     ) -> Result<SelfMethod, RuntimeError> {
+//         // if the self method doesnt exist check if it's a static method as they also can be called from `self.`
+//         if let Some(method) = self.self_methods.get(name).cloned() {
+//             return Ok(method);
+//         }
+//         if let Some(method) = self.static_methods.get(name).cloned() {
+//             return Ok(SelfMethod::from_static_method(method));
+//         }
+//         Err(RuntimeError::UndefinedMember {
+//             name: name.clone(),
+//             area,
+//         })
+//     }
+// }
+
+// pub struct TypeBuilder<'tb, T> {
+//     typ: Type<'tb>,
+//     ty: PhantomData<T>,
+// }
+
+// impl<'tb, T> TypeBuilder<'tb, T>
+// where
+//     T: 'tb + Send + Sync,
+// {
+//     pub fn name<U: ToString>(name: U) -> Self {
+//         Self {
+//             typ: Type {
+//                 name: name.to_string(),
+//                 constructor: None,
+//                 attributes: Attributes::new(),
+//                 //type_id: hashed,
+//                 static_methods: StaticMethods::new(),
+//                 self_methods: SelfMethods::new(),
+//             },
+//             ty: PhantomData,
+//         }
+//     }
+
+//     pub fn from(typ: Type<'tb>) -> Self {
+//         Self {
+//             typ,
+//             ty: PhantomData,
+//         }
+//     }
+
+//     pub fn add_attribute<F, R, S>(mut self, name: S, f: F) -> Self
+//     where
+//         F: Fn(&T) -> R + Send + Sync + 'tb,
+//         R: ToValue,
+//         T: 'tb,
+//         S: ToString,
+//     {
+//         self.typ
+//             .attributes
+//             .insert(name.to_string(), AttributeGetter::new(f));
+//         self
+//     }
+
+//     pub fn set_constructor<F, Args, R>(mut self, f: F) -> Self
+//     where
+//         F: Function<Args, Result = R>,
+//         T: Send + Sync,
+//         R: Send + Sync + 'tb,
+//         Args: FromValueList,
+//     {
+//         self.typ.constructor = Some(Constructor::new(f));
+//         self
+//     }
+
+//     pub fn add_static_method<F, Args, R, S>(mut self, name: S, f: F) -> Self
+//     where
+//         F: Function<Args, Result = R>,
+//         Args: FromValueList,
+//         R: ToValueResult + 'tb,
+//         S: ToString,
+//     {
+//         self.typ
+//             .static_methods
+//             .insert(name.to_string(), StaticMethod::new(f));
+//         self
+//     }
+
+//     pub fn add_self_method<F, Args, R, S>(mut self, name: S, f: F) -> Self
+//     where
+//         Args: FromValueList,
+//         F: Method<T, Args, Result = R>,
+//         R: ToValueResult + 'tb,
+//         S: ToString,
+//     {
+//         self.typ
+//             .self_methods
+//             .insert(name.to_string(), SelfMethod::new(f));
+//         self
+//     }
+
+//     pub fn finish(self) -> Type<'tb> {
+//         self.typ
+//     }
+// }
+
+// // struct UniqueId {
+// //     i: u64,
+// // }
+
+// // impl UniqueId {
+// //     pub const fn of<T: ?Sized>() -> UniqueId {
+// //         // addresses can never be above 64 bitsă
+// //         Self {
+// //             i: Self as *const T,
+// //         }
+// //     }
+// // }
+
+// pub trait AnyUID<'a>: Send + Sync + 'a {
+//     //fn uid(&self) -> UniqueId;
+//     fn uid(&self) -> u64;
+// }
+
+// impl<'a, T: Send + Sync + Sized + 'a> AnyUID<'a> for T {
+//     // fn uid(&self) -> UniqueId {
+//     //     UniqueId::of::<T>()
+//     // }
+//     fn uid(&self) -> u64 {
+//         self as *const T as u64
+//     }
+// }
+
+// impl<'a> dyn AnyUID<'a> + Send + Sync {
+//     fn downcast_ref<T: AnyUID<'a>>(&self) -> Option<&T> {
+//         // saftey: checking that both types are
+//         // TODO: does this check pass?
+//         //! both structs might have diff addresses
+//         // dbg!(self.id(), UniqueId::of::<T>());
+
+//         // if self.id() == UniqueId::of::<T>() {
+//         Some(unsafe { &*(self as *const Self as *const T) })
+//         // } else {
+//         //     None
+//         // }
+//     }
+// }
+
+// #[derive(Clone)]
+// pub struct Instance<'i> {
+//     inner: Arc<dyn AnyUID<'i> + Send + Sync>,
+//     name: String,
+// }
+
+// impl<'i> Instance<'i> {
+//     pub fn of<'a>(typ: &Type<'i>, fields: Vec<Value>, area: CodeArea) -> Result<Self, RuntimeError>
+//     where
+//         'a: 'i,
+//     {
+//         if let Some(ctor) = &typ.constructor {
+//             ctor.invoke(fields, area)
+//         } else {
+//             Err(RuntimeError::NoConstructor {
+//                 typ: typ.name,
+//                 area,
+//             })
+//         }
+//     }
+
+//     pub fn new<T: Send + Sync + 'i>(instance: T, name: String) -> Self {
+//         Self {
+//             inner: Arc::new(instance),
+//             name,
+//         }
+//     }
+
+//     pub fn inner_type(
+//         &self,
+//         globals: &'i Globals<'i>,
+//         area: CodeArea,
+//     ) -> Result<&'i Type, RuntimeError> {
+//         globals
+//             .types
+//             .get(&self.name)
+//             .ok_or_else(|| RuntimeError::UndefinedType {
+//                 name: self.name,
+//                 area,
+//             })
+//     }
+
+//     pub fn get_attr(
+//         &'i self,
+//         name: &str,
+//         globals: &'i mut Globals<'i>,
+//         area: CodeArea,
+//     ) -> Result<Value, RuntimeError> {
+//         let attr = self
+//             .inner_type(globals, area)
+//             .and_then(|c| {
+//                 c.attributes
+//                     .get(name)
+//                     .ok_or_else(|| RuntimeError::UndefinedMember {
+//                         name: name.into(),
+//                         area,
+//                     })
+//             })?
+//             .clone();
+
+//         attr.invoke(self, globals)
+//     }
+
+//     pub fn call_self(
+//         &'i self,
+//         name: String,
+//         args: Vec<Value>,
+//         globals: &'i mut Globals<'i>,
+//         area: CodeArea,
+//     ) -> Result<Value, RuntimeError> {
+//         let method = self
+//             .inner_type(globals, area)
+//             .and_then(|c| c.get_self_method(&name, area))?;
+
+//         method.invoke(self, args, globals, area)
+//     }
+
+//     pub fn downcast<T: Send + Sync>(self) -> T {
+//         self.inner
+//             .as_ref()
+//             .downcast_ref()
+//             .expect("downcast error please report")
+//             .clone()
+//     }
+
+//     pub fn raw<'a, T: Send + Sync + 'a>(&'i self) -> T {
+//         self.downcast::<T>()
+//     }
+// }

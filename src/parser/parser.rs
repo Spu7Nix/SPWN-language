@@ -2,7 +2,7 @@ use std::str::Chars;
 
 use logos::{Lexer, Logos};
 
-use super::ast::ASTData;
+use super::ast::{ASTData, IdClass};
 use super::ast::{ExprKey, Expression, Statement, Statements, StmtKey};
 use super::error::SyntaxError;
 use super::lexer::{Token, Tokens};
@@ -138,6 +138,21 @@ impl Parser<'_> {
         };
 
         Ok(ast_data.insert_expr(Expression::Int(int), span))
+    }
+
+    fn parse_id(&mut self, data: &mut ASTData) -> Result<ExprKey> {
+        self.next();
+        let span = self.span();
+        let content: &str = self.lexer.slice();
+        let class = match &content[(content.len() - 1)..(content.len())] {
+            "g" => IdClass::Group,
+            "c" => IdClass::Color,
+            "b" => IdClass::Block,
+            "i" => IdClass::Item,
+            _ => unreachable!(),
+        };
+        let value = content[0..(content.len() - 1)].parse::<u16>().ok();
+        Ok(data.insert_expr(Expression::Id { class, value }, span))
     }
 
     pub fn parse_float(&mut self, ast_data: &mut ASTData) -> Result<ExprKey> {
@@ -306,6 +321,7 @@ impl Parser<'_> {
             Token::Int => self.parse_int(data),
             Token::Float => self.parse_float(data),
             Token::String => self.parse_string(data),
+            Token::Id => self.parse_id(data),
             Token::True => {
                 self.next();
                 Ok(data.insert_expr(Expression::Bool(true), start))
@@ -850,8 +866,8 @@ impl Parser<'_> {
             Token::Try => {
                 self.next();
                 let try_branch = self.parse_block(data)?;
-                self.expect_tok(Token::Catch);
-                self.expect_or_tok(Token::Ident, "variable name");
+                self.expect_tok(Token::Catch)?;
+                self.expect_or_tok(Token::Ident, "variable name")?;
                 let catch_var = self.slice().to_string();
                 let catch = self.parse_block(data)?;
 

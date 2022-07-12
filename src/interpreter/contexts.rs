@@ -9,7 +9,7 @@ use super::{
 pub enum Block {
     For(ValueIter),
     While,
-    Try(InstrNum),
+    Try(usize),
 }
 impl Block {
     pub fn get_iter(&mut self) -> &mut ValueIter {

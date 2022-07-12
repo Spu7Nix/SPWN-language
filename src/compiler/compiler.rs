@@ -6,10 +6,13 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::error::CompilerError;
 use crate::{
-    interpreter::{interpreter::StoredValue, value::Value},
+    interpreter::{
+        interpreter::StoredValue,
+        value::{Id, Value},
+    },
     leveldata::object_data::ObjectMode,
     parser::{
-        ast::{ASTData, ExprKey, Expression, Statement, Statements, StmtKey},
+        ast::{ASTData, ExprKey, Expression, IdClass, Statement, Statements, StmtKey},
         lexer::Token,
     },
     sources::{CodeArea, CodeSpan, SpwnSource},
@@ -47,6 +50,7 @@ pub enum Const {
     Float(f64),
     String(String),
     Bool(bool),
+    SpecificId(IdClass, u16),
 }
 impl Const {
     pub fn to_value(&self) -> Value {
@@ -55,6 +59,16 @@ impl Const {
             Const::Float(v) => Value::Float(*v),
             Const::String(v) => Value::String(v.clone()),
             Const::Bool(v) => Value::Bool(*v),
+            Const::SpecificId(class, v) => {
+                let id = Id::Specific(*v);
+                use IdClass::*;
+                match class {
+                    Group => Value::Group(id),
+                    Color => Value::Color(id),
+                    Block => Value::Block(id),
+                    Item => Value::Item(id),
+                }
+            }
         }
     }
 }
@@ -158,6 +172,9 @@ impl Code {
                     Instruction::IterNext(idx) => {
                         s += &col.paint(format!("to {:?}", self.destinations.get(*idx)))
                     }
+                    Instruction::PushTry(idx) => {
+                        s += &col.paint(format!("to {:?}", self.destinations.get(*idx)))
+                    }
                     Instruction::BuildDict(idx) => {
                         s += &col.paint(format!("with {:?}", self.name_sets.get(*idx)))
                     }
@@ -197,7 +214,6 @@ impl Code {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Instruction {
-    // ok am writing docstring for each instruction so i understand
     /// loads constant value and pushes to stack ???
     LoadConst(InstrNum),
 
@@ -257,7 +273,7 @@ pub enum Instruction {
     AddObject,
 
     /// returns to callsite
-    ReturnValue(bool),
+    ReturnValue,
 
     /// ig it takes the elements on the stack and uses them to make macro value
     MakeMacro(InstrNum),
@@ -278,8 +294,8 @@ pub enum Instruction {
     PushNone,
     WrapMaybe,
 
-    /// ?g basically
-    LoadArbitraryGroup,
+    /// ?g basically, pushes integer to stack
+    LoadArbitraryId(IdClass),
     /// Splits context, sends one to the end of the trigger func, sets the group of the other
     EnterArrowStatement(InstrNum),
     // aaa
@@ -296,26 +312,57 @@ pub enum Instruction {
     Instance(InstrNum),
 
     Print,
+    /// ăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăă
     Split,
 
     PushVars(InstrNum),
     PopVars(InstrNum),
 
-    PushWhile,
+    PushTry(InstrNum),
 
-    /// pops from the block stack. if `true`, it will keep popping until it pops a For or While block
-    PopBlock(bool),
+    /// pops n blocks from the stack
+    PopBlock(u16),
+}
+
+#[derive(Clone)]
+struct BreakData {
+    pos: usize,
+    scope_trace: Vec<ScopeKey>,
+    pop_blocks: usize,
+}
+
+#[derive(Clone)]
+pub enum BlockType {
+    Loop {
+        breaks: Vec<BreakData>,
+        continues: Vec<BreakData>,
+    },
+    Macro,
+    Simple,
+    Try,
+}
+impl BlockType {
+    fn get_loop(&mut self) -> (&mut Vec<BreakData>, &mut Vec<BreakData>) {
+        match self {
+            BlockType::Loop { breaks, continues } => (breaks, continues),
+            _ => panic!("not a loop block"),
+        }
+    }
 }
 
 pub struct Scope {
     pub vars: AHashMap<String, (InstrNum, bool, CodeSpan)>,
     pub parent: Option<ScopeKey>,
+    pub block_type: BlockType,
+    pub is_async: bool,
 }
 impl Scope {
     pub fn base() -> Scope {
         Self {
             vars: AHashMap::new(),
             parent: None,
+            block_type: BlockType::Simple,
+            is_async: false,
         }
     }
     pub fn var_ids(&self) -> Vec<InstrNum> {
@@ -336,37 +383,6 @@ pub struct MacroQueuedExec {
     original_scope: ScopeKey,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq)]
-pub enum ExecLayer {
-    Loop {
-        breaks: Vec<usize>,
-        continues: Vec<usize>,
-    },
-    Async,
-    Macro,
-}
-impl ExecLayer {
-    pub fn new_loop() -> Self {
-        ExecLayer::Loop {
-            breaks: vec![],
-            continues: vec![],
-        }
-    }
-    pub fn new_func() -> Self {
-        ExecLayer::Macro
-    }
-    pub fn new_async() -> Self {
-        ExecLayer::Async
-    }
-    pub fn into_loop(self) -> Self {
-        match self {
-            ExecLayer::Loop { .. } => self,
-            ExecLayer::Async => self,
-            ExecLayer::Macro => panic!("called into_loop on func layer"),
-        }
-    }
-}
-
 pub struct Compiler {
     pub source: SpwnSource,
 
@@ -376,7 +392,6 @@ pub struct Compiler {
     pub macro_exec_queue: Vec<Vec<MacroQueuedExec>>,
 
     pub scopes: SlotMap<ScopeKey, Scope>,
-    pub layers: Vec<ExecLayer>,
 }
 
 impl Compiler {
@@ -387,7 +402,6 @@ impl Compiler {
             ast_data: data,
             macro_exec_queue: vec![],
             scopes: SlotMap::default(),
-            layers: vec![],
         }
     }
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
@@ -440,10 +454,17 @@ impl Compiler {
         Ok(())
     }
 
-    pub fn derived(&mut self, key: ScopeKey) -> ScopeKey {
+    pub fn derive_scope(
+        &mut self,
+        key: ScopeKey,
+        block_type: BlockType,
+        is_async: bool,
+    ) -> ScopeKey {
         self.scopes.insert(Scope {
             vars: AHashMap::new(),
             parent: Some(key),
+            block_type,
+            is_async,
         })
     }
     pub fn get_var_data(
@@ -486,6 +507,50 @@ impl Compiler {
             }
         }
     }
+    fn find_loop(&mut self, scope: ScopeKey) -> Option<(ScopeKey, Vec<ScopeKey>, usize)> {
+        let mut key = scope;
+        let mut scope_trace = vec![];
+        let mut pop_blocks = 0;
+        loop {
+            scope_trace.push(key);
+            if self.scopes[key].is_async {
+                return None;
+            }
+            match &self.scopes[key].block_type {
+                BlockType::Loop { .. } => return Some((key, scope_trace, pop_blocks)),
+                BlockType::Macro => return None,
+                other => {
+                    if matches!(other, BlockType::Try) {
+                        pop_blocks += 1;
+                    }
+                    match self.scopes[key].parent {
+                        Some(p) => key = p,
+                        None => return None,
+                    }
+                }
+            }
+        }
+    }
+    fn find_macro(&mut self, scope: ScopeKey) -> Option<(ScopeKey, Vec<ScopeKey>, usize)> {
+        let mut key = scope;
+        let mut scope_trace = vec![];
+        let mut pop_blocks = 0;
+        loop {
+            match &self.scopes[key].block_type {
+                BlockType::Macro => return Some((key, scope_trace, pop_blocks)),
+                other => {
+                    scope_trace.push(key);
+                    if matches!(other, BlockType::Try | BlockType::Loop { .. }) {
+                        pop_blocks += 1;
+                    }
+                    match self.scopes[key].parent {
+                        Some(p) => key = p,
+                        None => return None,
+                    }
+                }
+            }
+        }
+    }
 
     fn push_instr(&mut self, i: Instruction, func: usize) -> usize {
         self.code.bytecode_funcs[func].instructions.push(i);
@@ -520,17 +585,23 @@ impl Compiler {
             let c_id = s.code.constants.add(c);
             s.push_instr_with_span(Instruction::LoadConst(c_id), expr_span, func);
         };
-
+        use Expression::*;
         match expr {
-            Expression::Int(n) => constant(self, Const::Int(n)),
-            Expression::Float(n) => constant(self, Const::Float(n)),
-            Expression::String(s) => constant(self, Const::String(s)),
-            Expression::Bool(b) => constant(self, Const::Bool(b)),
-            Expression::Type(name) => {
+            Int(n) => constant(self, Const::Int(n)),
+            Float(n) => constant(self, Const::Float(n)),
+            String(s) => constant(self, Const::String(s)),
+            Bool(b) => constant(self, Const::Bool(b)),
+            Id { class, value } => match value {
+                Some(n) => constant(self, Const::SpecificId(class, n)),
+                None => {
+                    self.push_instr_with_span(Instruction::LoadArbitraryId(class), expr_span, func);
+                }
+            },
+            Type(name) => {
                 let v_id = self.code.names.add(name);
                 self.push_instr_with_span(Instruction::LoadType(v_id), expr_span, func);
             }
-            Expression::Op(a, op, b) => {
+            Op(a, op, b) => {
                 self.compile_expr(a, scope, func)?;
                 self.compile_expr(b, scope, func)?;
 
@@ -551,7 +622,7 @@ impl Compiler {
 
                 op_helper!(Plus Minus Mult Div Mod Pow Eq NotEq Greater GreaterEq Lesser LesserEq Is);
             }
-            Expression::Unary(op, v) => {
+            Unary(op, v) => {
                 self.compile_expr(v, scope, func)?;
 
                 let instr = match op {
@@ -562,7 +633,7 @@ impl Compiler {
 
                 self.push_instr_with_span(instr, expr_span, func);
             }
-            Expression::Var(v) => {
+            Var(v) => {
                 if let Some((id, _, _)) = self.get_var_data(&v, scope) {
                     self.push_instr(Instruction::LoadVar(id), func);
                 } else {
@@ -572,7 +643,7 @@ impl Compiler {
                     });
                 }
             }
-            Expression::Array(v) => {
+            Array(v) => {
                 for i in &v {
                     self.compile_expr(*i, scope, func)?;
                 }
@@ -582,10 +653,10 @@ impl Compiler {
                     func,
                 );
             }
-            Expression::Empty => {
+            Empty => {
                 self.push_instr_with_span(Instruction::PushEmpty, expr_span, func);
             }
-            Expression::Dict(items) => {
+            Dict(items) => {
                 let key_spans = self.ast_data.dictlike_spans[expr_key].clone();
                 let idx = self
                     .code
@@ -605,15 +676,15 @@ impl Compiler {
                 }
                 self.push_instr_with_span(Instruction::BuildDict(idx), expr_span, func);
             }
-            Expression::Block(code) => {
-                let derived = self.derived(scope);
+            Block(code) => {
+                let derived = self.derive_scope(scope, BlockType::Simple, false);
                 self.run_scoped(derived, func, |comp| {
                     comp.compile_stmts(code, derived, func)?;
                     Ok(())
                 })?;
                 self.push_instr_with_span(Instruction::PushEmpty, expr_span, func);
             }
-            Expression::Func {
+            Func {
                 args,
                 ret_type,
                 code,
@@ -623,7 +694,7 @@ impl Compiler {
                 self.code.bytecode_funcs.push(BytecodeFunc::default());
                 let func_id = self.code.bytecode_funcs.len() - 1;
 
-                let derived_scope = self.derived(scope);
+                let derived_scope = self.derive_scope(scope, BlockType::Macro, false);
 
                 self.macro_exec_queue
                     .last_mut()
@@ -668,7 +739,7 @@ impl Compiler {
                     .insert((func, self.func_len(func)), arg_spans);
                 self.push_instr_with_span(Instruction::MakeMacro(idx), expr_span, func);
             }
-            Expression::FuncPattern { args, ret_type } => {
+            FuncPattern { args, ret_type } => {
                 for i in &args {
                     self.compile_expr(*i, scope, func)?;
                 }
@@ -679,7 +750,7 @@ impl Compiler {
                     func,
                 );
             }
-            Expression::Ternary {
+            Ternary {
                 cond,
                 if_true,
                 if_false,
@@ -699,13 +770,13 @@ impl Compiler {
                 let idx = self.code.destinations.add(next_pos);
                 self.set_instr(Instruction::Jump(idx), func, jump);
             }
-            Expression::Index { base, index } => {
+            Index { base, index } => {
                 self.compile_expr(base, scope, func)?;
                 self.compile_expr(index, scope, func)?;
 
                 self.push_instr(Instruction::Index, func);
             }
-            Expression::Call {
+            Call {
                 base,
                 params,
                 named_params,
@@ -732,11 +803,11 @@ impl Compiler {
                     .insert((func, self.func_len(func)), param_spans);
                 self.push_instr_with_span(Instruction::Call(idx), expr_span, func);
             }
-            Expression::TriggerFuncCall(v) => {
+            TriggerFuncCall(v) => {
                 self.compile_expr(v, scope, func)?;
                 self.push_instr(Instruction::TriggerFuncCall, func);
             }
-            Expression::Maybe(expr) => {
+            Maybe(expr) => {
                 if let Some(expr) = expr {
                     self.compile_expr(expr, scope, func)?;
                     self.push_instr_with_span(Instruction::WrapMaybe, expr_span, func);
@@ -744,18 +815,13 @@ impl Compiler {
                     self.push_instr_with_span(Instruction::PushNone, expr_span, func);
                 }
             }
-            Expression::TriggerFunc(code) => {
-                // self.push_instr(Instruction::LoadArbitraryGroup, func);
-                // self.push_instr(Instruction::PushTriggerFnValue, func);
-                self.layers.push(ExecLayer::new_async());
-
+            TriggerFunc(code) => {
                 let enter = self.push_instr(Instruction::EnterTriggerFunction(0), func);
 
-                let derived = self.derived(scope);
+                let derived = self.derive_scope(scope, BlockType::Simple, true);
                 self.compile_stmts(code, derived, func)?;
 
                 self.push_instr(Instruction::YeetContext, func);
-                self.layers.pop();
 
                 let next_pos = self.instr_len(func);
                 let idx = self.code.destinations.add(next_pos);
@@ -763,7 +829,7 @@ impl Compiler {
                 self.code.bytecode_spans.insert((func, enter), expr_span);
                 self.set_instr(Instruction::EnterTriggerFunction(idx), func, enter);
             }
-            Expression::Instance(typ, items) => {
+            Instance(typ, items) => {
                 let key_spans = self.ast_data.dictlike_spans[expr_key].clone();
                 let idx = self
                     .code
@@ -784,12 +850,12 @@ impl Compiler {
                 self.compile_expr(typ, scope, func)?;
                 self.push_instr(Instruction::Instance(idx), func);
             }
-            Expression::Split(a, b) => {
+            Split(a, b) => {
                 self.compile_expr(a, scope, func)?;
                 self.compile_expr(b, scope, func)?;
                 self.push_instr(Instruction::Split, func);
             }
-            Expression::Obj(mode, vals) => {
+            Obj(mode, vals) => {
                 let l = vals.len() as InstrNum;
                 for (k, v) in vals.into_iter() {
                     self.compile_expr(k, scope, func)?;
@@ -819,38 +885,41 @@ impl Compiler {
         let stmt = self.ast_data.get_stmt(stmt_key);
         let stmt_span = self.ast_data.get_span(stmt_key);
 
-        // if is_arrow && !matches!(&stmt, Statement::Return(_)) {
+        // if is_arrow && !matches!(&stmt, Return(_)) {
         //     self.push_instr(Instruction::SaveContexts, func);
         // }
 
         let enter = if is_arrow {
-            self.layers.push(ExecLayer::new_async());
-            Some(self.push_instr(Instruction::EnterArrowStatement(0), func))
+            let backup = self.scopes[scope].is_async;
+            self.scopes[scope].is_async = true;
+            let enter = self.push_instr(Instruction::EnterArrowStatement(0), func);
+            Some((enter, backup))
         } else {
             None
         };
+        use Statement::*;
 
         match stmt {
-            Statement::Expr(expr) => {
+            Expr(expr) => {
                 self.compile_expr(expr, scope, func)?;
                 self.push_instr(Instruction::PopTop, func);
             }
-            Statement::Print(expr) => {
+            Print(expr) => {
                 self.compile_expr(expr, scope, func)?;
                 self.push_instr(Instruction::Print, func);
             }
-            Statement::Add(expr) => {
+            Add(expr) => {
                 self.compile_expr(expr, scope, func)?;
                 self.push_instr(Instruction::AddObject, func);
             }
-            Statement::Let(name, value) => {
+            Let(name, value) => {
                 self.compile_expr(value, scope, func)?;
 
                 let var_id = self.new_var(name, scope, true, stmt_span);
 
                 self.push_instr(Instruction::SetVar(var_id), func);
             }
-            Statement::Assign(name, value) => {
+            Assign(name, value) => {
                 self.compile_expr(value, scope, func)?;
 
                 if let Some((id, mutable, span)) = self.get_var_data(&name, scope) {
@@ -867,7 +936,7 @@ impl Compiler {
                     self.push_instr(Instruction::SetVar(var_id), func);
                 }
             }
-            Statement::If {
+            If {
                 branches,
                 else_branch,
             } => {
@@ -877,7 +946,7 @@ impl Compiler {
                     self.compile_expr(cond, scope, func)?;
                     let jump_idx = self.push_instr(Instruction::JumpIfFalse(0), func);
 
-                    let derived = self.derived(scope);
+                    let derived = self.derive_scope(scope, BlockType::Simple, false);
                     // self.layers.push
                     self.run_scoped(derived, func, |comp| {
                         comp.compile_stmts(code, derived, func)?;
@@ -893,7 +962,7 @@ impl Compiler {
                 }
 
                 if let Some(code) = else_branch {
-                    let derived = self.derived(scope);
+                    let derived = self.derive_scope(scope, BlockType::Simple, false);
                     self.run_scoped(derived, func, |comp| {
                         comp.compile_stmts(code, derived, func)?;
                         Ok(())
@@ -906,15 +975,20 @@ impl Compiler {
                     self.set_instr(Instruction::Jump(idx), func, i);
                 }
             }
-            Statement::While { cond, code } => {
-                self.push_instr(Instruction::PushWhile, func);
+            While { cond, code } => {
                 let cond_pos = self.instr_len(func);
                 self.compile_expr(cond, scope, func)?;
                 let jump_pos = self.push_instr(Instruction::JumpIfFalse(0), func);
 
-                let derived = self.derived(scope);
+                let derived = self.derive_scope(
+                    scope,
+                    BlockType::Loop {
+                        breaks: vec![],
+                        continues: vec![],
+                    },
+                    false,
+                );
 
-                self.layers.push(ExecLayer::new_loop());
                 self.run_scoped(derived, func, |comp| {
                     comp.compile_stmts(code, derived, func)?;
                     Ok(())
@@ -925,23 +999,45 @@ impl Compiler {
 
                 let next_pos = self.instr_len(func);
                 let end_idx = self.code.destinations.add(next_pos);
-                self.push_instr(Instruction::PopBlock(false), func);
                 self.set_instr(Instruction::JumpIfFalse(end_idx), func, jump_pos);
 
-                match self.layers.pop().unwrap() {
-                    ExecLayer::Loop { breaks, continues } => {
-                        for i in continues {
-                            self.set_instr(Instruction::Jump(start_idx), func, i);
+                match self.scopes[derived].block_type.clone() {
+                    BlockType::Loop { breaks, continues } => {
+                        for BreakData {
+                            pos,
+                            scope_trace,
+                            pop_blocks,
+                        } in continues
+                        {
+                            let mut vars = vec![];
+                            for i in scope_trace {
+                                vars.append(&mut self.scopes[i].var_ids())
+                            }
+                            let vars_id = self.code.scope_vars.add(vars);
+                            self.set_instr(Instruction::PopVars(vars_id), func, pos);
+                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos + 1);
+                            self.set_instr(Instruction::Jump(start_idx), func, pos + 2);
                         }
-                        for i in breaks {
-                            self.set_instr(Instruction::Jump(end_idx), func, i);
+                        for BreakData {
+                            pos,
+                            scope_trace,
+                            pop_blocks,
+                        } in breaks
+                        {
+                            let mut vars = vec![];
+                            for i in scope_trace {
+                                vars.append(&mut self.scopes[i].var_ids())
+                            }
+                            let vars_id = self.code.scope_vars.add(vars);
+                            self.set_instr(Instruction::PopVars(vars_id), func, pos);
+                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos + 1);
+                            self.set_instr(Instruction::Jump(end_idx), func, pos + 2);
                         }
                     }
-                    ExecLayer::Macro => unreachable!(),
-                    ExecLayer::Async => unreachable!(),
+                    _ => unreachable!(),
                 }
             }
-            Statement::For {
+            For {
                 var,
                 iterator,
                 code,
@@ -952,82 +1048,143 @@ impl Compiler {
                 self.push_instr_with_span(Instruction::ToIter, stmt_span, func);
                 let iter_pos = self.push_instr(Instruction::IterNext(0), func);
 
-                let derived_scope = self.derived(scope);
-                let var_id = self.new_var(var, derived_scope, false, var_span);
+                let derived = self.derive_scope(
+                    scope,
+                    BlockType::Loop {
+                        breaks: vec![],
+                        continues: vec![],
+                    },
+                    false,
+                );
+                let var_id = self.new_var(var, derived, false, var_span);
 
-                self.layers.push(ExecLayer::new_loop());
-                self.run_scoped(derived_scope, func, |comp| {
+                self.run_scoped(derived, func, |comp| {
                     comp.push_instr(Instruction::SetVar(var_id), func);
-                    comp.compile_stmts(code, derived_scope, func)?;
+                    comp.compile_stmts(code, derived, func)?;
                     Ok(())
                 })?;
 
                 let start_idx = self.code.destinations.add(iter_pos);
                 self.push_instr(Instruction::Jump(start_idx), func);
-                let jump_pos = self.push_instr(Instruction::PopBlock(false), func);
+                let jump_pos = self.push_instr(Instruction::PopBlock(1), func);
 
                 let end_idx = self.code.destinations.add(jump_pos);
                 self.set_instr(Instruction::IterNext(end_idx), func, iter_pos);
 
-                match self.layers.pop().unwrap() {
-                    ExecLayer::Loop { breaks, continues } => {
-                        for i in continues {
-                            self.set_instr(Instruction::Jump(start_idx), func, i);
+                match self.scopes[derived].block_type.clone() {
+                    BlockType::Loop { breaks, continues } => {
+                        for BreakData {
+                            pos,
+                            scope_trace,
+                            pop_blocks,
+                        } in continues
+                        {
+                            let mut vars = vec![];
+                            for i in scope_trace {
+                                vars.append(&mut self.scopes[i].var_ids())
+                            }
+                            let vars_id = self.code.scope_vars.add(vars);
+                            self.set_instr(Instruction::PopVars(vars_id), func, pos);
+                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos + 1);
+                            self.set_instr(Instruction::Jump(start_idx), func, pos + 2);
                         }
-                        for i in breaks {
-                            self.set_instr(Instruction::Jump(end_idx), func, i);
+                        for BreakData {
+                            pos,
+                            scope_trace,
+                            pop_blocks,
+                        } in breaks
+                        {
+                            let mut vars = vec![];
+                            for i in scope_trace {
+                                vars.append(&mut self.scopes[i].var_ids())
+                            }
+                            let vars_id = self.code.scope_vars.add(vars);
+                            self.set_instr(Instruction::PopVars(vars_id), func, pos);
+                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos + 1);
+                            self.set_instr(Instruction::Jump(end_idx), func, pos + 2);
                         }
                     }
-                    ExecLayer::Macro => unreachable!(),
-                    ExecLayer::Async => unreachable!(),
+                    _ => unreachable!(),
                 }
             }
-            Statement::Return(val) => {
-                if !self.layers.iter().any(|l| matches!(l, ExecLayer::Macro)) {
-                    return Err(CompilerError::ReturnOutsideMacro {
-                        area: self.make_area(stmt_span),
-                    });
-                }
+            Return(val) => {
+                // if !self.layers.iter().any(|l| matches!(l, ExecLayer::Macro)) {
+                //     return Err(CompilerError::ReturnOutsideMacro {
+                //         area: self.make_area(stmt_span),
+                //     });
+                // }
 
-                if let Some(val) = val {
-                    self.compile_expr(val, scope, func)?;
-                } else {
-                    self.push_instr_with_span(Instruction::PushEmpty, stmt_span, func);
-                }
-                self.push_instr(Instruction::ReturnValue(is_arrow), func);
-            }
-            Statement::Break => {
-                self.push_instr(Instruction::PopBlock(true), func);
-                let idx = self.push_instr(Instruction::Jump(0), func);
-                match self.layers.last_mut() {
-                    Some(ExecLayer::Loop { breaks, .. }) => {
-                        breaks.push(idx);
+                match self.find_macro(scope) {
+                    Some((_, scope_trace, pop_blocks)) => {
+                        let mut vars = vec![];
+                        for i in scope_trace {
+                            vars.append(&mut self.scopes[i].var_ids())
+                        }
+                        let vars_id = self.code.scope_vars.add(vars);
+                        self.push_instr(Instruction::PopVars(vars_id), func);
+                        self.push_instr(Instruction::PopBlock(pop_blocks as u16), func);
+
+                        if let Some(val) = val {
+                            self.compile_expr(val, scope, func)?;
+                        } else {
+                            self.push_instr_with_span(Instruction::PushEmpty, stmt_span, func);
+                        }
+                        self.push_instr(Instruction::ReturnValue, func);
                     }
-                    _ => {
+                    None => {
+                        return Err(CompilerError::ReturnOutsideMacro {
+                            area: self.make_area(stmt_span),
+                        })
+                    }
+                }
+            }
+            Break => {
+                let idx = self.push_instr(Instruction::PopVars(0), func);
+                self.push_instr(Instruction::PopBlock(0), func);
+                self.push_instr(Instruction::Jump(0), func);
+
+                match self.find_loop(scope) {
+                    Some((scope, scope_trace, pop_blocks)) => {
+                        let (breaks, _) = self.scopes[scope].block_type.get_loop();
+                        breaks.push(BreakData {
+                            pos: idx,
+                            scope_trace,
+                            pop_blocks,
+                        });
+                    }
+                    None => {
                         return Err(CompilerError::BreakOutsideLoop {
                             area: self.make_area(stmt_span),
                         })
                     }
                 }
             }
-            Statement::Continue => {
-                let idx = self.push_instr(Instruction::Jump(0), func);
-                match self.layers.last_mut() {
-                    Some(ExecLayer::Loop { continues, .. }) => {
-                        continues.push(idx);
+            Continue => {
+                let idx = self.push_instr(Instruction::PopVars(0), func);
+                self.push_instr(Instruction::PopBlock(0), func);
+                self.push_instr(Instruction::Jump(0), func);
+
+                match self.find_loop(scope) {
+                    Some((scope, scope_trace, pop_blocks)) => {
+                        let (_, continues) = self.scopes[scope].block_type.get_loop();
+                        continues.push(BreakData {
+                            pos: idx,
+                            scope_trace,
+                            pop_blocks,
+                        });
                     }
-                    _ => {
+                    None => {
                         return Err(CompilerError::ContinueOutsideLoop {
                             area: self.make_area(stmt_span),
                         })
                     }
                 }
             }
-            Statement::TypeDef(name) => {
+            TypeDef(name) => {
                 let v_id = self.code.names.add(name);
                 self.push_instr(Instruction::TypeDef(v_id), func);
             }
-            Statement::Impl(typ, impls) => {
+            Impl(typ, impls) => {
                 let key_spans = self.ast_data.impl_spans[stmt_key].clone();
                 let idx = self
                     .code
@@ -1048,18 +1205,42 @@ impl Compiler {
                 self.compile_expr(typ, scope, func)?;
                 self.push_instr(Instruction::Impl(idx), func);
             }
-            Statement::TryCatch {
+            TryCatch {
                 try_branch,
                 catch,
                 catch_var,
-            } => todo!(),
+            } => {
+                let start_try = self.push_instr(Instruction::PushTry(0), func);
+
+                let derived = self.derive_scope(scope, BlockType::Try, false);
+                self.run_scoped(derived, func, |comp| {
+                    comp.compile_stmts(try_branch, derived, func)?;
+                    Ok(())
+                })?;
+                self.push_instr(Instruction::PopBlock(1), func);
+                let skip_catch = self.push_instr(Instruction::Jump(0), func);
+
+                let next_pos = self.instr_len(func);
+                let start_try_idx = self.code.destinations.add(next_pos);
+                self.set_instr(Instruction::PushTry(start_try_idx), func, start_try);
+
+                let derived = self.derive_scope(scope, BlockType::Simple, false);
+                self.run_scoped(derived, func, |comp| {
+                    comp.compile_stmts(catch, derived, func)?;
+                    Ok(())
+                })?;
+
+                let next_pos = self.instr_len(func);
+                let skip_catch_idx = self.code.destinations.add(next_pos);
+                self.set_instr(Instruction::Jump(skip_catch_idx), func, skip_catch);
+            }
         }
 
         // if is_arrow {
         //     self.push_instr(Instruction::ReviseContexts, func);
         // }
-        if let Some(enter) = enter {
-            self.layers.pop();
+        if let Some((enter, backup)) = enter {
+            self.scopes[scope].is_async = backup;
             self.push_instr(Instruction::YeetContext, func);
 
             let next_pos = self.instr_len(func);
@@ -1080,9 +1261,7 @@ impl Compiler {
         } in self.macro_exec_queue.pop().unwrap()
         {
             self.macro_exec_queue.push(vec![]);
-            self.layers.push(ExecLayer::Macro);
             self.compile_expr(code_key, derived_scope, func_id)?;
-            self.layers.pop();
             self.resolve_queued()?;
             self.code.bytecode_funcs[func_id].capture_ids =
                 self.get_accessible_vars(original_scope);

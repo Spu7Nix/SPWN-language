@@ -5,7 +5,6 @@ use crate::interpreter::value::{Pattern, ValueType};
 use crate::sources::CodeArea;
 
 error_maker! {
-    Globals: globals;
     Module: runtime_errors;
     pub enum RuntimeError {
         #[
@@ -158,15 +157,15 @@ error_maker! {
             area: CodeArea,
         },
 
-        // #[
-        //     Message = "", Area = area, Note = None,
-        //     Labels = [
-        //         area => "";
-        //     ]
-        // ]
-        // Wrapper {
-        //     err: RuntimeError,
-        //     area: CodeArea,
-        // },
+        #[
+            Message = "Use of undefined member!", Area = area, Note = None,
+            Labels = [
+                area => "`{}` is undefined": @(name);
+            ]
+        ]
+        UndefinedMember {
+            name: String,
+            area: CodeArea,
+        },
     }
 }

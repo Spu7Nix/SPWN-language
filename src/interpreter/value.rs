@@ -45,6 +45,10 @@ pub enum Value {
     Pattern(Pattern),
 
     Group(Id),
+    Color(Id),
+    Block(Id),
+    Item(Id),
+
     TriggerFunc { start_group: Id },
 
     Macro(Macro),
@@ -144,6 +148,9 @@ impl Value {
             Value::TriggerFunc { .. } => ValueType::TriggerFunc,
             Value::Macro(_) => ValueType::Macro,
             Value::Object(_) => ValueType::Object,
+            Value::Color(_) => todo!(),
+            Value::Block(_) => todo!(),
+            Value::Item(_) => todo!(),
         }
     }
     pub fn to_str(&self, globals: &Globals) -> String {
@@ -172,6 +179,9 @@ impl Value {
             Value::TypeIndicator(typ) => typ.to_str(),
             Value::Pattern(p) => p.to_str(),
             Value::Group(id) => format!("{}g", id.to_str()),
+            Value::Color(id) => format!("{}c", id.to_str()),
+            Value::Item(id) => format!("{}i", id.to_str()),
+            Value::Block(id) => format!("{}b", id.to_str()),
             Value::TriggerFunc { .. } => "!{...}".into(),
             Value::Macro(Macro { args, ret_type, .. }) => {
                 format!(
@@ -218,6 +228,9 @@ impl Value {
             | Value::TypeIndicator(_)
             | Value::Pattern(_)
             | Value::Group(_)
+            | Value::Color(_)
+            | Value::Block(_)
+            | Value::Item(_)
             | Value::TriggerFunc { .. }
             | Value::Object(_) => self.clone(),
             Value::Array(arr) => Value::Array(

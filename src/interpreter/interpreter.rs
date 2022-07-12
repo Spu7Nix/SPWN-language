@@ -4,15 +4,17 @@ use ahash::{AHashMap, AHashSet};
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
+use crate::parser::ast::IdClass;
+
 use crate::interpreter::contexts::{Block, Frame};
 use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
 
 use super::contexts::{Context, FullContext};
 use super::error::RuntimeError;
-// use super::types::{Instance, Type};
-use super::value::{value_ops, ArbitraryId, Value, ValueType};
+//use super::types::{Instance, Type};
+use super::value::{value_ops, ArbitraryId, Value};
 
-use crate::compiler::compiler::{Code, InstrNum, Instruction};
+use crate::compiler::compiler::{Code, Instruction};
 use crate::interpreter::value::{Id, Macro, MacroArg, Pattern};
 use crate::sources::CodeArea;
 
@@ -37,31 +39,34 @@ where
 {
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    pub types: AHashMap<String, ValueType>,
+    //pub types: AHashMap<String, Type>,
+    // pub instances: AHashMap<u32, Instance>,
+    pub instance_id: u32,
 
-    pub arbitrary_groups: ArbitraryId,
+    pub arbitrary_ids: [ArbitraryId; 4],
 
     pub calls: AHashSet<CallId>,
     pub call_counter: CallId,
 
     pub objects: Vec<GdObj>,
     pub triggers: Vec<GdObj>,
-    // pub types: AHashMap<String, String>,
-    //pub instances: AHashMap<Instance, Type>,
+
     merge_points: AHashMap<(InstructionPos, CallId), Vec<(Context, Id)>>,
 }
 impl Globals {
     pub fn new() -> Self {
         Self {
             memory: SlotMap::default(),
-            types: AHashMap::new(),
-            arbitrary_groups: 0,
+            // types: AHashMap::new(),
+            // instances: AHashMap::new(),
+            instance_id: 0,
+            arbitrary_ids: [0; 4],
             calls: AHashSet::new(),
             call_counter: CallId(1),
             objects: vec![],
             triggers: vec![],
-            //instances: AHashMap::new(),
             merge_points: AHashMap::default(),
+            // types: todo!(),
         }
     }
     pub fn init(&mut self) {
@@ -146,6 +151,36 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 };
             }
 
+            macro_rules! try_err {
+                ($err:expr) => {
+                    loop {
+                        match context.inner().frame().block_stack.pop() {
+                            Some(Block::Try(to)) => {
+                                context.inner().advance_to(code, to, globals);
+                                break 'out_for;
+                            }
+                            None => return Err($err),
+                            _ => (),
+                        }
+                    }
+                };
+                (?: $e:expr) => {
+                    match $e {
+                        Ok(e) => e,
+                        Err(err) => loop {
+                            match context.inner().frame().block_stack.pop() {
+                                Some(Block::Try(to)) => {
+                                    context.inner().advance_to(code, to, globals);
+                                    break 'out_for;
+                                }
+                                None => return Err(err),
+                                _ => (),
+                            }
+                        },
+                    }
+                };
+            }
+
             macro_rules! op_helper {
                 (
                     $($instr:ident: $func:ident,)*
@@ -156,7 +191,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                                 let span = code.get_bytecode_span(func, i);
                                 let b = pop_ref!();
                                 let a = pop_ref!();
-                                let key = globals.memory.insert(value_ops::$func(a, b, code.make_area(span), globals)?);
+                                let key = globals.memory.insert(try_err!(?: value_ops::$func(a, b, code.make_area(span), globals)));
                                 context.inner().stack.push(key);
                             }
                         )*
@@ -196,12 +231,12 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 Instruction::Negate => {
                     let span = code.get_bytecode_span(func, i);
                     let a = pop_ref!();
-                    push_store!(value_ops::unary_negate(a, code.make_area(span))?);
+                    push_store!(try_err!(?: value_ops::unary_negate(a, code.make_area(span))));
                 }
                 Instruction::Not => {
                     let span = code.get_bytecode_span(func, i);
                     let a = pop_ref!();
-                    push_store!(value_ops::unary_not(a, code.make_area(span))?);
+                    push_store!(try_err!(?: value_ops::unary_not(a, code.make_area(span))));
                 }
                 Instruction::LoadVar(id) => {
                     let a = context.inner().get_var(*id);
@@ -221,22 +256,33 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         ansi_term::Color::Blue
                             .bold()
                             .paint(format!("{:?}", context.inner().group))
-                    )
+                    );
+                    for (i, vars) in context.inner().vars.iter().enumerate() {
+                        println!(
+                            "{} [{}]",
+                            i,
+                            vars.iter()
+                                .map(|k| globals.memory[*k].value.to_str(globals))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    }
                 }
                 Instruction::LoadType(id) => {
-                    let span = code.get_bytecode_span(func, i);
-                    let name = code.names.get(*id);
-                    match globals.types.get(name) {
-                        Some(typ) => {
-                            push!(Value::TypeIndicator(*typ).into_stored(code.make_area(span)))
-                        }
-                        None => {
-                            return Err(RuntimeError::UndefinedType {
-                                name: name.clone(),
-                                area: code.make_area(span),
-                            })
-                        }
-                    }
+                    todo!()
+                    // let span = code.get_bytecode_span(func, i);
+                    // let name = code.names.get(*id);
+                    // match globals.types.get(name) {
+                    //     Some(typ) => {
+                    //         push!(Value::TypeIndicator(*typ).into_stored(code.make_area(span)))
+                    //     }
+                    //     None => {
+                    //         try_err!(RuntimeError::UndefinedType {
+                    //             name: name.clone(),
+                    //             area: code.make_area(span),
+                    //         })
+                    //     }
+                    // }
                 }
                 Instruction::BuildArray(len) => {
                     let span = code.get_bytecode_span(func, i);
@@ -258,13 +304,14 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     i = *code.destinations.get(*id) - 1;
                 }
                 Instruction::JumpIfFalse(id) => {
-                    if !value_ops::to_bool(pop_ref!())? {
+                    if !try_err!(?: value_ops::to_bool(pop_ref!())) {
                         i = *code.destinations.get(*id) - 1;
                     }
                 }
                 Instruction::ToIter => {
                     let span = code.get_bytecode_span(func, i);
-                    let iter = value_ops::to_iter(&pop_shallow!(), code.make_area(span))?;
+                    let iter =
+                        try_err!(?: value_ops::to_iter(&pop_shallow!(), code.make_area(span)));
                     context.inner().frame().block_stack.push(Block::For(iter))
                 }
                 Instruction::IterNext(to) => {
@@ -274,15 +321,8 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         i = *code.destinations.get(*to) - 1;
                     }
                 }
-                Instruction::PopBlock(break_like) => {
-                    if *break_like {
-                        loop {
-                            let pop = context.inner().frame().block_stack.pop().unwrap();
-                            if !matches!(pop, Block::For(_) | Block::While) {
-                                break;
-                            }
-                        }
-                    } else {
+                Instruction::PopBlock(amount) => {
+                    for _ in 0..*amount {
                         context.inner().frame().block_stack.pop();
                     }
                 }
@@ -313,7 +353,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         let key = match key.value {
                             Value::Int(n) => n as u16,
                             _ => {
-                                return Err(RuntimeError::TypeMismatch {
+                                try_err!(RuntimeError::TypeMismatch {
                                     v: key.clone(),
                                     expected: "integer".to_string(),
                                     area: key.def_area,
@@ -329,7 +369,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             Value::Group(g) => ObjParam::Group(g),
                             Value::TriggerFunc { start_group } => ObjParam::Group(start_group),
                             _ => {
-                                return Err(RuntimeError::TypeMismatch {
+                                try_err!(RuntimeError::TypeMismatch {
                                     v: val.clone(),
                                     expected: "valid object property value".to_string(),
                                     area: val.def_area,
@@ -347,19 +387,13 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         Value::Object(mut obj) => match obj.mode {
                             ObjectMode::Object => globals.objects.push(obj),
                             ObjectMode::Trigger => {
-                                obj.params.insert(
-                                    57,
-                                    ObjParam::Group({
-                                        let group = context.inner().group;
-                                        dbg!(group);
-                                        group
-                                    }),
-                                );
+                                obj.params
+                                    .insert(57, ObjParam::Group(context.inner().group));
                                 globals.triggers.push(obj)
                             }
                         },
                         _ => {
-                            return Err(RuntimeError::TypeMismatch {
+                            try_err!(RuntimeError::TypeMismatch {
                                 v: object.clone(),
                                 expected: "obj or trigger".to_string(),
                                 area: object.def_area,
@@ -373,7 +407,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     let (func_id, arg_info) = code.macro_build_info.get(*id);
                     let ret_type = {
                         let value = pop_shallow!();
-                        (value_ops::to_pat(&value)?, value.def_area)
+                        (try_err!(?: value_ops::to_pat(&value)), value.def_area)
                     };
                     let mut args = vec![];
                     for ((name, typ, def), span) in arg_info.iter().zip(arg_spans) {
@@ -385,7 +419,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         let typ = if *typ {
                             let value = pop_shallow!();
 
-                            Some((value_ops::to_pat(&value)?, value.def_area))
+                            Some((try_err!(?: value_ops::to_pat(&value)), value.def_area))
                         } else {
                             None
                         };
@@ -417,10 +451,10 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 }
                 Instruction::MakeMacroPattern(arg_amount) => {
                     let span = code.get_bytecode_span(func, i);
-                    let ret = value_ops::to_pat(&pop_shallow!())?;
+                    let ret = try_err!(?: value_ops::to_pat(&pop_shallow!()));
                     let mut args = vec![];
                     for i in 0..*arg_amount {
-                        args.push(value_ops::to_pat(&pop_shallow!())?);
+                        args.push(try_err!(?: value_ops::to_pat(&pop_shallow!())));
                     }
                     args.reverse();
                     push!(Value::Pattern(Pattern::Macro {
@@ -439,7 +473,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                                 push!(k);
                             }
                             _ => {
-                                return Err(RuntimeError::TypeMismatch {
+                                try_err!(RuntimeError::TypeMismatch {
                                     v: idx.clone(),
                                     expected: "integer".to_string(),
                                     area: idx.def_area,
@@ -447,7 +481,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             }
                         },
                         _ => {
-                            return Err(RuntimeError::TypeMismatch {
+                            try_err!(RuntimeError::TypeMismatch {
                                 v: base.clone(),
                                 expected: "array".to_string(),
                                 area: base.def_area,
@@ -469,36 +503,24 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             continue;
                         }
                         _ => {
-                            return Err(RuntimeError::CannotCall {
+                            try_err!(RuntimeError::CannotCall {
                                 base: base.clone(),
                                 area: code.make_area(span),
                             })
                         }
                     }
                 }
-                Instruction::ReturnValue(arrow) => {
+                Instruction::ReturnValue => {
                     globals.calls.remove(&context.inner().frame().call_id);
-                    if !arrow {
-                        context.inner().return_out(code, globals);
-                        continue;
-                    } else {
-                        context.split_context(globals);
-                        match context {
-                            FullContext::Single(_) => unreachable!(),
-                            FullContext::Split(ret, cont) => {
-                                ret.inner().return_out(code, globals);
-                                cont.inner().advance_to(code, i + 1, globals);
-                                break 'out_for;
-                            }
-                        }
-                    }
+                    context.inner().return_out(code, globals);
+                    continue;
                 }
                 Instruction::TriggerFuncCall => {
                     let v = pop_shallow!();
                     let trigger_func = match v.value {
                         Value::TriggerFunc { start_group } => start_group,
                         _ => {
-                            return Err(RuntimeError::TypeMismatch {
+                            try_err!(RuntimeError::TypeMismatch {
                                 v: v.clone(),
                                 expected: "trigger function".to_string(),
                                 area: v.def_area,
@@ -534,8 +556,9 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                         }
 
                         // otherwise
-                        let new_context = Id::Arbitrary(globals.arbitrary_groups);
-                        globals.arbitrary_groups += 1;
+                        let new_context =
+                            Id::Arbitrary(globals.arbitrary_ids[IdClass::Group as usize]);
+                        globals.arbitrary_ids[IdClass::Group as usize] += 1;
 
                         // add spawn trigger
                         add_spawn_trigger(new_context, context, globals);
@@ -562,8 +585,9 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 Instruction::EnterTriggerFunction(id) => {
                     // gets the area of the trigger function
                     let trig_fn_span = code.get_bytecode_span(func, i);
-                    let trig_fn_group = Id::Arbitrary(globals.arbitrary_groups);
-                    globals.arbitrary_groups += 1;
+                    let trig_fn_group =
+                        Id::Arbitrary(globals.arbitrary_ids[IdClass::Group as usize]);
+                    globals.arbitrary_ids[IdClass::Group as usize] += 1;
 
                     context.split_context(globals);
                     match context {
@@ -599,11 +623,17 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     }
                 }
                 // ?g
-                Instruction::LoadArbitraryGroup => {
-                    let group = Id::Arbitrary(globals.arbitrary_groups);
-                    globals.arbitrary_groups += 1;
-                    //store!(Value::Group(group))
-                    todo!()
+                Instruction::LoadArbitraryId(class) => {
+                    let span = code.get_bytecode_span(func, i);
+                    let id = Id::Arbitrary(globals.arbitrary_ids[*class as usize]);
+                    globals.arbitrary_ids[*class as usize] += 1;
+                    push!(match class {
+                        IdClass::Group => Value::Group(id),
+                        IdClass::Color => Value::Color(id),
+                        IdClass::Block => Value::Block(id),
+                        IdClass::Item => Value::Item(id),
+                    }
+                    .into_stored(code.make_area(span)));
                 }
                 Instruction::YeetContext => {
                     context.inner().yeet();
@@ -652,8 +682,9 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 | Instruction::LesserEq
                 | Instruction::Is => (),
 
-                Instruction::PushWhile => {
-                    context.inner().frame().block_stack.push(Block::While);
+                Instruction::PushTry(to) => {
+                    let to = *code.destinations.get(*to);
+                    context.inner().frame().block_stack.push(Block::Try(to));
                 }
             }
 
