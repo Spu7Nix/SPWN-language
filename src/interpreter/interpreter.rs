@@ -4,19 +4,16 @@ use ahash::{AHashMap, AHashSet};
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
-use crate::parser::ast::IdClass;
-
-use crate::interpreter::contexts::{Block, Frame};
-use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
-
 use super::contexts::{Context, FullContext};
 use super::error::RuntimeError;
-//use super::types::{Instance, Type};
 use super::value::{value_ops, ArbitraryId, Value};
 
 use crate::compiler::compiler::{Code, Instruction};
 use crate::interpreter::value::{Id, Macro, MacroArg, Pattern};
 use crate::sources::CodeArea;
+use crate::parser::ast::IdClass;
+use crate::interpreter::contexts::{Block, Frame};
+use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
 
 new_key_type! {
     pub struct ValueKey;
@@ -39,7 +36,7 @@ where
 {
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    //pub types: AHashMap<String, Type>,
+    // pub types: AHashMap<String, Type>,
     // pub instances: AHashMap<u32, Instance>,
     pub instance_id: u32,
 
@@ -66,7 +63,6 @@ impl Globals {
             objects: vec![],
             triggers: vec![],
             merge_points: AHashMap::default(),
-            // types: todo!(),
         }
     }
     pub fn init(&mut self) {

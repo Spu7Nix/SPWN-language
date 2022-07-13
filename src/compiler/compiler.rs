@@ -305,10 +305,9 @@ pub enum Instruction {
 
     /// make type
     TypeDef(InstrNum),
-    /// make impl ?? wwhy is this a bytecode instruction shouldnt this be compiletime or somethinghb
-    /// // wait is it for like @aa::b = v
+    
     Impl(InstrNum),
-    /// ???????
+    
     Instance(InstrNum),
 
     Print,
