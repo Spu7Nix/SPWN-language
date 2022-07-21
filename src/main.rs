@@ -17,6 +17,7 @@ use compiler::compiler::{Compiler, Scope};
 
 use compiler::error::CompilerError;
 use error::RaiseError;
+use interpreter::contexts::FullContext;
 use interpreter::error::RuntimeError;
 use interpreter::interpreter::{execute_code, Globals};
 use parser::ast::ASTData;
@@ -82,7 +83,15 @@ fn post_stage(globals: Globals) {
 fn interpret_stage(compiler: Compiler) -> Result<Globals, RuntimeError> {
     let mut globals = Globals::new();
     globals.init();
-    execute_code(&mut globals, &compiler.code)?;
+    let mut context = FullContext::single();
+    execute_code(
+        &mut globals,
+        &compiler.code,
+        0,
+        &mut context,
+        vec![],
+        vec![],
+    )?;
     Ok(globals)
 }
 

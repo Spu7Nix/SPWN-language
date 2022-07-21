@@ -197,12 +197,12 @@ impl Code {
                     Instruction::Instance(idx) => {
                         s += &col.paint(format!("with {:?}", self.name_sets.get(*idx)))
                     }
-                    Instruction::PushVars(idx) => {
-                        s += &col.paint(format!("scope vars: {:?}", self.scope_vars.get(*idx)))
-                    }
-                    Instruction::PopVars(idx) => {
-                        s += &col.paint(format!("scope vars: {:?}", self.scope_vars.get(*idx)))
-                    }
+                    // Instruction::PushVars(idx) => {
+                    //     s += &col.paint(format!("scope vars: {:?}", self.scope_vars.get(*idx)))
+                    // }
+                    // Instruction::PopVars(idx) => {
+                    //     s += &col.paint(format!("scope vars: {:?}", self.scope_vars.get(*idx)))
+                    // }
                     _ => (),
                 }
 
@@ -305,18 +305,17 @@ pub enum Instruction {
 
     /// make type
     TypeDef(InstrNum),
-    
+
     Impl(InstrNum),
-    
+
     Instance(InstrNum),
 
     Print,
     /// ăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăăă
     Split,
 
-    PushVars(InstrNum),
-    PopVars(InstrNum),
-
+    // PushVars(InstrNum),
+    // PopVars(InstrNum),
     PushTry(InstrNum),
 
     /// pops n blocks from the stack
@@ -324,7 +323,7 @@ pub enum Instruction {
 }
 
 #[derive(Clone)]
-struct BreakData {
+pub struct BreakData {
     pos: usize,
     scope_trace: Vec<ScopeKey>,
     pop_blocks: usize,
@@ -437,7 +436,7 @@ impl Compiler {
     where
         F: FnOnce(&mut Compiler) -> Result<(), CompilerError>,
     {
-        let enter = self.push_instr(Instruction::PushVars(0), func);
+        // let enter = self.push_instr(Instruction::PushVars(0), func);
         f(self)?;
         let vars = self.scopes[scope]
             .vars
@@ -447,8 +446,8 @@ impl Compiler {
 
         let idx = self.code.scope_vars.add(vars);
 
-        self.set_instr(Instruction::PushVars(idx), func, enter);
-        self.push_instr(Instruction::PopVars(idx), func);
+        // self.set_instr(Instruction::PushVars(idx), func, enter);
+        // self.push_instr(Instruction::PopVars(idx), func);
 
         Ok(())
     }
@@ -1013,9 +1012,9 @@ impl Compiler {
                                 vars.append(&mut self.scopes[i].var_ids())
                             }
                             let vars_id = self.code.scope_vars.add(vars);
-                            self.set_instr(Instruction::PopVars(vars_id), func, pos);
-                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos + 1);
-                            self.set_instr(Instruction::Jump(start_idx), func, pos + 2);
+                            // self.set_instr(Instruction::PopVars(vars_id), func, pos);
+                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos);
+                            self.set_instr(Instruction::Jump(start_idx), func, pos + 1);
                         }
                         for BreakData {
                             pos,
@@ -1028,9 +1027,9 @@ impl Compiler {
                                 vars.append(&mut self.scopes[i].var_ids())
                             }
                             let vars_id = self.code.scope_vars.add(vars);
-                            self.set_instr(Instruction::PopVars(vars_id), func, pos);
-                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos + 1);
-                            self.set_instr(Instruction::Jump(end_idx), func, pos + 2);
+                            // self.set_instr(Instruction::PopVars(vars_id), func, pos);
+                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos);
+                            self.set_instr(Instruction::Jump(end_idx), func, pos + 1);
                         }
                     }
                     _ => unreachable!(),
@@ -1083,9 +1082,9 @@ impl Compiler {
                                 vars.append(&mut self.scopes[i].var_ids())
                             }
                             let vars_id = self.code.scope_vars.add(vars);
-                            self.set_instr(Instruction::PopVars(vars_id), func, pos);
-                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos + 1);
-                            self.set_instr(Instruction::Jump(start_idx), func, pos + 2);
+                            // self.set_instr(Instruction::PopVars(vars_id), func, pos);
+                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos);
+                            self.set_instr(Instruction::Jump(start_idx), func, pos + 1);
                         }
                         for BreakData {
                             pos,
@@ -1098,9 +1097,9 @@ impl Compiler {
                                 vars.append(&mut self.scopes[i].var_ids())
                             }
                             let vars_id = self.code.scope_vars.add(vars);
-                            self.set_instr(Instruction::PopVars(vars_id), func, pos);
-                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos + 1);
-                            self.set_instr(Instruction::Jump(end_idx), func, pos + 2);
+                            // self.set_instr(Instruction::PopVars(vars_id), func, pos);
+                            self.set_instr(Instruction::PopBlock(pop_blocks as u16), func, pos);
+                            self.set_instr(Instruction::Jump(end_idx), func, pos + 1);
                         }
                     }
                     _ => unreachable!(),
@@ -1120,7 +1119,7 @@ impl Compiler {
                             vars.append(&mut self.scopes[i].var_ids())
                         }
                         let vars_id = self.code.scope_vars.add(vars);
-                        self.push_instr(Instruction::PopVars(vars_id), func);
+                        // self.push_instr(Instruction::PopVars(vars_id), func);
                         self.push_instr(Instruction::PopBlock(pop_blocks as u16), func);
 
                         if let Some(val) = val {
@@ -1138,8 +1137,7 @@ impl Compiler {
                 }
             }
             Break => {
-                let idx = self.push_instr(Instruction::PopVars(0), func);
-                self.push_instr(Instruction::PopBlock(0), func);
+                let idx = self.push_instr(Instruction::PopBlock(0), func);
                 self.push_instr(Instruction::Jump(0), func);
 
                 match self.find_loop(scope) {
@@ -1159,8 +1157,7 @@ impl Compiler {
                 }
             }
             Continue => {
-                let idx = self.push_instr(Instruction::PopVars(0), func);
-                self.push_instr(Instruction::PopBlock(0), func);
+                let idx = self.push_instr(Instruction::PopBlock(0), func);
                 self.push_instr(Instruction::Jump(0), func);
 
                 match self.find_loop(scope) {

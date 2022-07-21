@@ -4,16 +4,16 @@ use ahash::{AHashMap, AHashSet};
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
-use super::contexts::{Context, FullContext};
+use super::contexts::{Context, FullContext, SkipMode};
 use super::error::RuntimeError;
 use super::value::{value_ops, ArbitraryId, Value};
 
 use crate::compiler::compiler::{Code, Instruction};
+use crate::interpreter::contexts::{Block, Frame, ReturnType};
 use crate::interpreter::value::{Id, Macro, MacroArg, Pattern};
-use crate::sources::CodeArea;
-use crate::parser::ast::IdClass;
-use crate::interpreter::contexts::{Block, Frame};
 use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
+use crate::parser::ast::IdClass;
+use crate::sources::CodeArea;
 
 new_key_type! {
     pub struct ValueKey;
@@ -42,13 +42,9 @@ where
 
     pub arbitrary_ids: [ArbitraryId; 4],
 
-    pub calls: AHashSet<CallId>,
-    pub call_counter: CallId,
-
     pub objects: Vec<GdObj>,
     pub triggers: Vec<GdObj>,
-
-    merge_points: AHashMap<(InstructionPos, CallId), Vec<(Context, Id)>>,
+    // merge_points: AHashMap<(InstructionPos, CallId), Vec<(Context, Id)>>,
 }
 impl Globals {
     pub fn new() -> Self {
@@ -58,11 +54,8 @@ impl Globals {
             // instances: AHashMap::new(),
             instance_id: 0,
             arbitrary_ids: [0; 4],
-            calls: AHashSet::new(),
-            call_counter: CallId(1),
             objects: vec![],
             triggers: vec![],
-            merge_points: AHashMap::default(),
         }
     }
     pub fn init(&mut self) {
@@ -93,20 +86,28 @@ impl Globals {
     }
 }
 
-pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeError> {
-    let mut contexts = FullContext::single(code.var_count);
+pub fn execute_code(
+    globals: &mut Globals,
+    code: &Code,
+    func: usize,
+    contexts: &mut FullContext,
+    args: Vec<StoredValue>,
+    captured: Vec<ValueKey>,
+) -> Result<(), RuntimeError> {
+    for context in contexts.iter(SkipMode::IncludeReturns) {
+        assert!(context.inner().returned.is_none());
+        // todo: clone vars and shit to clean up later
+
+        for (arg, id) in args.iter().zip(&code.bytecode_funcs[func].arg_ids) {
+            let k = globals.memory.insert(arg.clone()); // deep clone ??
+            context.inner().set_var(*id, k);
+        }
+    }
 
     loop {
-        let mut any_finished = false;
-        let is_split = contexts.is_split();
-        'out_for: for context in contexts.iter() {
-            if context.inner().frames.is_empty() {
-                any_finished = true;
-                continue;
-            }
-
-            let (func, mut i) = context.inner().frame().position;
-
+        let mut all_returned = true;
+        'out_for: for context in contexts.iter(SkipMode::SkipReturns) {
+            all_returned = false;
             macro_rules! pop_deep_clone {
                 () => {{
                     let val = globals.memory[context.inner().stack.pop().unwrap()].clone();
@@ -116,11 +117,13 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     globals.key_deep_clone(context.inner().stack.pop().unwrap())
                 }};
             }
+
             macro_rules! pop_ref {
                 () => {
                     &globals.memory[context.inner().stack.pop().unwrap()]
                 };
             }
+
             macro_rules! pop_shallow {
                 () => {
                     globals.memory[context.inner().stack.pop().unwrap()].clone()
@@ -141,19 +144,19 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     context.inner().stack.push(key);
                 }};
             }
+
             macro_rules! store {
                 ($v:expr) => {
                     globals.memory.insert($v)
                 };
             }
-
             macro_rules! try_err {
                 ($err:expr) => {
                     loop {
-                        match context.inner().frame().block_stack.pop() {
+                        match context.inner().block_stack.pop() {
                             Some(Block::Try(to)) => {
-                                context.inner().advance_to(code, to, globals);
-                                break 'out_for;
+                                context.inner().jump_to(code, to, func);
+                                //break 'out_for;
                             }
                             None => return Err($err),
                             _ => (),
@@ -164,9 +167,9 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     match $e {
                         Ok(e) => e,
                         Err(err) => loop {
-                            match context.inner().frame().block_stack.pop() {
+                            match context.inner().block_stack.pop() {
                                 Some(Block::Try(to)) => {
-                                    context.inner().advance_to(code, to, globals);
+                                    context.inner().jump_to(code, to, func);
                                     break 'out_for;
                                 }
                                 None => return Err(err),
@@ -176,15 +179,14 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     }
                 };
             }
-
             macro_rules! op_helper {
                 (
                     $($instr:ident: $func:ident,)*
                 ) => {
-                    match &code.bytecode_funcs[func].instructions[i] {
+                    match &code.bytecode_funcs[func].instructions[context.inner().pos] {
                         $(
                             Instruction::$instr => {
-                                let span = code.get_bytecode_span(func, i);
+                                let span = code.get_bytecode_span(func, context.inner().pos);
                                 let b = pop_ref!();
                                 let a = pop_ref!();
                                 let key = globals.memory.insert(try_err!(?: value_ops::$func(a, b, code.make_area(span), globals)));
@@ -212,9 +214,9 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                 Is: is_op,
             };
 
-            match &code.bytecode_funcs[func].instructions[i] {
+            match &code.bytecode_funcs[func].instructions[*(&mut context.inner().pos)] {
                 Instruction::LoadConst(id) => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     let key = globals.memory.insert(
                         code.constants
                             .get(*id)
@@ -225,22 +227,26 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     context.inner().stack.push(key);
                 }
                 Instruction::Negate => {
-                    let span = code.get_bytecode_span(func, i);
-                    let a = pop_ref!();
-                    push_store!(try_err!(?: value_ops::unary_negate(a, code.make_area(span))));
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
+
+                    push_store!(
+                        try_err!(?: value_ops::unary_negate(pop_ref!(), code.make_area(span)))
+                    );
                 }
                 Instruction::Not => {
-                    let span = code.get_bytecode_span(func, i);
-                    let a = pop_ref!();
-                    push_store!(try_err!(?: value_ops::unary_not(a, code.make_area(span))));
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
+
+                    push_store!(
+                        try_err!(?: value_ops::unary_not(pop_ref!(), code.make_area(span)))
+                    );
                 }
                 Instruction::LoadVar(id) => {
-                    let a = context.inner().get_var(*id);
-                    context.inner().stack.push(a)
+                    let v = context.inner().get_var(*id);
+                    context.inner().stack.push(v)
                 }
                 Instruction::SetVar(id) => {
-                    let top = pop_deep_clone!();
-                    context.inner().set_var(*id, top, globals);
+                    let v = pop_deep_clone!();
+                    context.inner().modify_var(*id, v, globals)
                 }
                 Instruction::Print => {
                     let top = pop_ref!();
@@ -253,16 +259,16 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                             .bold()
                             .paint(format!("{:?}", context.inner().group))
                     );
-                    for (i, vars) in context.inner().vars.iter().enumerate() {
-                        println!(
-                            "{} [{}]",
-                            i,
-                            vars.iter()
-                                .map(|k| globals.memory[*k].value.to_str(globals))
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        )
-                    }
+                    // for (i, vars) in context.inner().vars.iter().enumerate() {
+                    //     println!(
+                    //         "{} [{}]",
+                    //         i,
+                    //         vars.iter()
+                    //             .map(|k| globals.memory[*k].value.to_str(globals))
+                    //             .collect::<Vec<_>>()
+                    //             .join(", ")
+                    //     )
+                    // }
                 }
                 Instruction::LoadType(id) => {
                     todo!()
@@ -281,7 +287,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     // }
                 }
                 Instruction::BuildArray(len) => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     let mut elems = vec![];
                     for _ in 0..*len {
                         elems.push(pop_deep_clone!(Store));
@@ -290,40 +296,40 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     push!(Value::Array(elems).into_stored(code.make_area(span)));
                 }
                 Instruction::PushEmpty => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     push!(Value::Empty.into_stored(code.make_area(span)));
                 }
                 Instruction::PopTop => {
                     context.inner().stack.pop();
                 }
                 Instruction::Jump(id) => {
-                    i = *code.destinations.get(*id) - 1;
+                    *(&mut context.inner().pos) = *code.destinations.get(*id) - 1;
                 }
                 Instruction::JumpIfFalse(id) => {
                     if !try_err!(?: value_ops::to_bool(pop_ref!())) {
-                        i = *code.destinations.get(*id) - 1;
+                        *(&mut context.inner().pos) = *code.destinations.get(*id) - 1;
                     }
                 }
                 Instruction::ToIter => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     let iter =
                         try_err!(?: value_ops::to_iter(&pop_shallow!(), code.make_area(span)));
-                    context.inner().frame().block_stack.push(Block::For(iter))
+                    context.inner().block_stack.push(Block::For(iter))
                 }
                 Instruction::IterNext(to) => {
-                    if let Some(v) = context.inner().frame().block().get_iter().next(globals) {
+                    if let Some(v) = context.inner().block().get_iter().next(globals) {
                         push_store!(v);
                     } else {
-                        i = *code.destinations.get(*to) - 1;
+                        *(&mut context.inner().pos) = *code.destinations.get(*to) - 1;
                     }
                 }
                 Instruction::PopBlock(amount) => {
                     for _ in 0..*amount {
-                        context.inner().frame().block_stack.pop();
+                        context.inner().block_stack.pop();
                     }
                 }
                 Instruction::BuildDict(id) => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     let keys = code.name_sets.get(*id);
                     let map = keys
                         .iter()
@@ -333,7 +339,7 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     push!(Value::Dict(map).into_stored(code.make_area(span)));
                 }
                 mode @ (Instruction::BuildObject(n) | Instruction::BuildTrigger(n)) => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     let mut obj = GdObj {
                         params: HashMap::new(),
                         mode: match mode {
@@ -398,8 +404,11 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     };
                 }
                 Instruction::MakeMacro(id) => {
-                    let span = code.get_bytecode_span(func, i);
-                    let arg_spans = code.macro_arg_spans.get(&(func, i)).unwrap();
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
+                    let arg_spans = code
+                        .macro_arg_spans
+                        .get(&(func, *(&mut context.inner().pos)))
+                        .unwrap();
                     let (func_id, arg_info) = code.macro_build_info.get(*id);
                     let ret_type = {
                         let value = pop_shallow!();
@@ -442,11 +451,11 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     .into_stored(code.make_area(span)));
                 }
                 Instruction::PushAnyPattern => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     push!(Value::Pattern(Pattern::Any).into_stored(code.make_area(span)));
                 }
                 Instruction::MakeMacroPattern(arg_amount) => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     let ret = try_err!(?: value_ops::to_pat(&pop_shallow!()));
                     let mut args = vec![];
                     for i in 0..*arg_amount {
@@ -486,29 +495,29 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     }
                 }
                 Instruction::Call(id) => {
-                    let span = code.get_bytecode_span(func, i);
-                    let base = pop_shallow!();
-                    match &base.value {
-                        Value::Macro(m) => {
-                            if let Some(value) =
-                                macro_call(code, func, i, id, m, &base, globals, context)
-                            {
-                                return value;
-                            }
+                    todo!()
+                    // let span = code.get_bytecode_span(func, *pos);
+                    // let base = pop_shallow!();
+                    // match &base.value {
+                    //     Value::Macro(m) => {
+                    //         if let Some(value) =
+                    //             macro_call(code, func, *pos, id, m, &base, globals, context)
+                    //         {
+                    //             return value;
+                    //         }
 
-                            continue;
-                        }
-                        _ => {
-                            try_err!(RuntimeError::CannotCall {
-                                base: base.clone(),
-                                area: code.make_area(span),
-                            })
-                        }
-                    }
+                    //         continue;
+                    //     }
+                    //     _ => {
+                    //         try_err!(RuntimeError::CannotCall {
+                    //             base: base.clone(),
+                    //             area: code.make_area(span),
+                    //         })
+                    //     }
+                    // }
                 }
                 Instruction::ReturnValue => {
-                    globals.calls.remove(&context.inner().frame().call_id);
-                    context.inner().return_out(code, globals);
+                    context.inner().returned = Some(ReturnType::Explicit);
                     continue;
                 }
                 Instruction::TriggerFuncCall => {
@@ -535,70 +544,72 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     globals.triggers.push(obj);
                 }
                 Instruction::MergeContexts => {
-                    if is_split {
-                        let call_id = context.inner().frame().call_id;
-                        // check if can merge
-                        if let Some(cs) = globals.merge_points.get(&((func, i), call_id)) {
-                            for (c, group) in cs {
-                                if context.inner().is_mergable_with(c, globals) {
-                                    // add spawn trigger
-                                    add_spawn_trigger(*group, context, globals);
 
-                                    // yeet merged context
-                                    context.inner().yeet();
-                                    break 'out_for;
-                                }
-                            }
-                        }
+                    // if context.is_split() {
+                    //     let call_id = context.inner().call_id;
+                    //     // check if can merge
+                    //     if let Some(cs) = globals.merge_points.get(&((func, *pos), call_id)) {
+                    //         for (c, group) in cs {
+                    //             if context.inner().is_mergable_with(c, globals) {
+                    //                 // add spawn trigger
+                    //                 add_spawn_trigger(*group, context, globals);
 
-                        // otherwise
-                        let new_context =
-                            Id::Arbitrary(globals.arbitrary_ids[IdClass::Group as usize]);
-                        globals.arbitrary_ids[IdClass::Group as usize] += 1;
+                    //                 // yeet merged context
+                    //                 context.inner().yeet();
+                    //                 break 'out_for;
+                    //             }
+                    //         }
+                    //     }
 
-                        // add spawn trigger
-                        add_spawn_trigger(new_context, context, globals);
+                    //     // otherwise
+                    //     let new_context =
+                    //         Id::Arbitrary(globals.arbitrary_ids[IdClass::Group as usize]);
+                    //     globals.arbitrary_ids[IdClass::Group as usize] += 1;
 
-                        context.inner().set_group(new_context);
+                    //     // add spawn trigger
+                    //     add_spawn_trigger(new_context, context, globals);
 
-                        globals
-                            .merge_points
-                            .entry(((func, i), call_id))
-                            .or_insert(vec![])
-                            .push((context.inner().clone(), new_context));
-                    }
+                    //     context.inner().set_group(new_context);
+
+                    //     globals
+                    //         .merge_points
+                    //         .entry(((func, *pos), call_id))
+                    //         .or_insert(vec![])
+                    //         .push((context.inner().clone(), new_context));
+                    // }
                 }
                 Instruction::PushNone => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     push!(Value::Maybe(None).into_stored(code.make_area(span)));
                 }
                 Instruction::WrapMaybe => {
                     let top = pop_deep_clone!();
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, *(&mut context.inner().pos));
                     let key = store!(top);
                     push!(Value::Maybe(Some(key)).into_stored(code.make_area(span)));
                 }
                 Instruction::EnterTriggerFunction(id) => {
                     // gets the area of the trigger function
-                    let trig_fn_span = code.get_bytecode_span(func, i);
+                    let trig_fn_span = code.get_bytecode_span(func, context.inner().pos);
                     let trig_fn_group =
                         Id::Arbitrary(globals.arbitrary_ids[IdClass::Group as usize]);
                     globals.arbitrary_ids[IdClass::Group as usize] += 1;
 
                     context.split_context(globals);
+                    let current_pos = context.inner().pos;
                     match context {
                         FullContext::Single(_) => unreachable!(),
                         FullContext::Split(outside, inside) => {
                             outside
                                 .inner()
-                                .advance_to(code, *code.destinations.get(*id), globals);
+                                .jump_to(code, *code.destinations.get(*id), func);
                             inside.inner().set_group(trig_fn_group);
 
                             outside.inner().stack.push(store!(Value::TriggerFunc {
                                 start_group: trig_fn_group
                             }
                             .into_stored(code.make_area(trig_fn_span))));
-                            inside.inner().advance_to(code, i + 1, globals);
+                            inside.inner().jump_to(code, current_pos + 1, func);
 
                             break 'out_for;
                         }
@@ -607,20 +618,21 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
 
                 Instruction::EnterArrowStatement(id) => {
                     context.split_context(globals);
+                    let current_pos = context.inner().pos;
                     match context {
                         FullContext::Single(_) => unreachable!(),
                         FullContext::Split(outside, inside) => {
                             outside
                                 .inner()
-                                .advance_to(code, *code.destinations.get(*id), globals);
-                            inside.inner().advance_to(code, i + 1, globals);
+                                .jump_to(code, *code.destinations.get(*id), func);
+                            inside.inner().jump_to(code, current_pos + 1, func);
                             break 'out_for;
                         }
                     }
                 }
                 // ?g
                 Instruction::LoadArbitraryId(class) => {
-                    let span = code.get_bytecode_span(func, i);
+                    let span = code.get_bytecode_span(func, context.inner().pos);
                     let id = Id::Arbitrary(globals.arbitrary_ids[*class as usize]);
                     globals.arbitrary_ids[*class as usize] += 1;
                     push!(match class {
@@ -643,27 +655,27 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
                     let b = pop_deep_clone!(Store);
                     let a = pop_deep_clone!(Store);
                     context.split_context(globals);
+                    let current_pos = context.inner().pos;
                     match context {
                         FullContext::Single(_) => unreachable!(),
                         FullContext::Split(c_a, c_b) => {
                             c_a.inner().stack.push(a);
                             c_b.inner().stack.push(b);
-                            c_a.inner().advance_to(code, i + 1, globals);
-                            c_b.inner().advance_to(code, i + 1, globals);
+                            c_a.inner().jump_to(code, current_pos + 1, func);
+                            c_b.inner().jump_to(code, current_pos + 1, func);
                             break 'out_for;
                         }
                     }
                 }
 
-                Instruction::PushVars(idx) => {
-                    context
-                        .inner()
-                        .push_vars(code.scope_vars.get(*idx), code, globals);
-                }
-                Instruction::PopVars(idx) => {
-                    context.inner().pop_vars(code.scope_vars.get(*idx));
-                }
-
+                // Instruction::PushVars(idx) => {
+                //     context
+                //         .inner()
+                //         .push_vars(code.scope_vars.get(*idx), code, globals);
+                // }
+                // Instruction::PopVars(idx) => {
+                //     context.inner().pop_vars(code.scope_vars.get(*idx));
+                // }
                 Instruction::Plus
                 | Instruction::Minus
                 | Instruction::Mult
@@ -680,16 +692,34 @@ pub fn execute_code(globals: &mut Globals, code: &Code) -> Result<(), RuntimeErr
 
                 Instruction::PushTry(to) => {
                     let to = *code.destinations.get(*to);
-                    context.inner().frame().block_stack.push(Block::Try(to));
+                    context.inner().block_stack.push(Block::Try(to));
                 }
             }
 
-            context.inner().advance_to(code, i + 1, globals);
+            let new_pos = context.inner().pos + 1;
+            context.inner().jump_to(code, new_pos, func);
         }
-        if any_finished && !contexts.remove_finished() {
+
+        contexts.clean_yeeted();
+        if all_returned {
             break;
         }
     }
+
+    let explicitly_returned = contexts
+        .iter(SkipMode::IncludeReturns)
+        .any(|c| matches!(c.inner().returned, Some(ReturnType::Explicit)));
+
+    if explicitly_returned {
+        contexts.yeet_implicit();
+        contexts.clean_yeeted();
+    }
+
+    // reset return states
+    for context in contexts.iter(SkipMode::IncludeReturns) {
+        context.inner().returned = None;
+    }
+
     Ok(())
 }
 
@@ -705,130 +735,130 @@ fn add_spawn_trigger(target: Id, context: &mut FullContext, globals: &mut Global
     globals.triggers.push(obj);
 }
 
-#[allow(clippy::too_many_arguments)]
-fn macro_call(
-    code: &Code,
-    func: usize,
-    i: usize,
-    id: &u16,
-    m: &Macro,
-    base: &StoredValue,
-    globals: &mut Globals,
-    context: &mut FullContext,
-) -> Option<Result<(), RuntimeError>> {
-    macro_rules! pop_deep_clone {
-        () => {{
-            let val = globals.memory[context.inner().stack.pop().unwrap()].clone();
-            val.deep_clone(globals)
-        }};
-        (Store) => {{
-            globals.key_deep_clone(context.inner().stack.pop().unwrap())
-        }};
-    }
+// #[allow(clippy::too_many_arguments)]
+// fn macro_call(
+//     code: &Code,
+//     func: usize,
+//     i: usize,
+//     id: &u16,
+//     m: &Macro,
+//     base: &StoredValue,
+//     globals: &mut Globals,
+//     context: &mut FullContext,
+// ) -> Option<Result<(), RuntimeError>> {
+//     macro_rules! pop_deep_clone {
+//         () => {{
+//             let val = globals.memory[context.inner().stack.pop().unwrap()].clone();
+//             val.deep_clone(globals)
+//         }};
+//         (Store) => {{
+//             globals.key_deep_clone(context.inner().stack.pop().unwrap())
+//         }};
+//     }
 
-    let param_spans = code.macro_arg_spans.get(&(func, i)).unwrap();
-    let param_list = code.name_sets.get(*id);
-    let mut param_map = AHashMap::new();
-    let mut params = vec![];
-    let mut named_params = vec![];
-    for (name, param_span) in param_list.iter().zip(param_spans) {
-        if name.is_empty() {
-            params.push((pop_deep_clone!(), param_span));
-        } else {
-            if let Some(p) = m.args.iter().position(|MacroArg { name: s, .. }| s == name) {
-                param_map.insert(name.clone(), p);
-            } else {
-                return Some(Err(RuntimeError::UndefinedArgument {
-                    name: name.into(),
-                    macr: base.clone(),
-                    area: code.make_area(*param_span),
-                }));
-            }
-            named_params.push((name.clone(), pop_deep_clone!(), param_span));
-        }
-    }
-    if params.len() > m.args.len() {
-        let call_span = code.get_bytecode_span(func, i);
-        return Some(Err(RuntimeError::TooManyArguments {
-            expected: m.args.len(),
-            provided: params.len(),
-            call_area: code.make_area(call_span),
-            func: base.clone(),
-        }));
-    }
-    let mut arg_fill = m
-        .args
-        .iter()
-        .map(
-            |MacroArg {
-                 pattern, default, ..
-             }| { (pattern.clone(), default.map(|id| globals.deep_clone(id))) },
-        )
-        .collect::<Vec<_>>();
-    params.reverse();
-    named_params.reverse();
-    for (i, (val, param_span)) in params.into_iter().enumerate() {
-        if let Some(pat) = &arg_fill[i].0 {
-            if !value_ops::matches_pat(&val.value, &pat.0) {
-                return Some(Err(RuntimeError::PatternMismatch {
-                    v: val,
-                    pat: pat.clone(),
-                    area: code.make_area(*param_span),
-                }));
-            }
-        }
-        arg_fill[i].1 = Some(val);
-    }
-    for (name, val, param_span) in named_params.into_iter() {
-        let arg_pos = param_map[&name];
-        if let Some(pat) = &arg_fill[arg_pos].0 {
-            if !value_ops::matches_pat(&val.value, &pat.0) {
-                return Some(Err(RuntimeError::PatternMismatch {
-                    v: val,
-                    pat: pat.clone(),
-                    area: code.make_area(*param_span),
-                }));
-            }
-        }
-        arg_fill[arg_pos].1 = Some(val);
-    }
-    for ((_, arg), MacroArg { name, area, .. }) in arg_fill.iter().zip(&m.args) {
-        if arg.is_none() {
-            let call_area = code.get_bytecode_span(func, i);
-            return Some(Err(RuntimeError::ArgumentNotSatisfied {
-                arg_name: name.clone(),
-                call_area: code.make_area(call_area),
-                arg_area: area.clone(),
-            }));
-        }
-    }
-    context.inner().push_vars(
-        &code.bytecode_funcs[m.func_id].scoped_var_ids,
-        code,
-        globals,
-    );
-    context
-        .inner()
-        .push_vars(&code.bytecode_funcs[m.func_id].capture_ids, code, globals);
-    for ((_, arg), id) in arg_fill
-        .into_iter()
-        .zip(&code.bytecode_funcs[m.func_id].arg_ids)
-    {
-        context.inner().set_var(*id, arg.unwrap(), globals);
-    }
-    for (v, id) in m
-        .capture
-        .iter()
-        .zip(&code.bytecode_funcs[m.func_id].capture_ids)
-    {
-        context.inner().replace_var(*id, *v);
-    }
-    globals.call_counter.0 += 1;
-    context.inner().frames.push(Frame {
-        position: (m.func_id, 0),
-        call_id: globals.call_counter,
-        block_stack: vec![],
-    });
-    globals.calls.insert(globals.call_counter);
-    None
-}
+//     let param_spans = code.macro_arg_spans.get(&(func, i)).unwrap();
+//     let param_list = code.name_sets.get(*id);
+//     let mut param_map = AHashMap::new();
+//     let mut params = vec![];
+//     let mut named_params = vec![];
+//     for (name, param_span) in param_list.iter().zip(param_spans) {
+//         if name.is_empty() {
+//             params.push((pop_deep_clone!(), param_span));
+//         } else {
+//             if let Some(p) = m.args.iter().position(|MacroArg { name: s, .. }| s == name) {
+//                 param_map.insert(name.clone(), p);
+//             } else {
+//                 return Some(Err(RuntimeError::UndefinedArgument {
+//                     name: name.into(),
+//                     macr: base.clone(),
+//                     area: code.make_area(*param_span),
+//                 }));
+//             }
+//             named_params.push((name.clone(), pop_deep_clone!(), param_span));
+//         }
+//     }
+//     if params.len() > m.args.len() {
+//         let call_span = code.get_bytecode_span(func, i);
+//         return Some(Err(RuntimeError::TooManyArguments {
+//             expected: m.args.len(),
+//             provided: params.len(),
+//             call_area: code.make_area(call_span),
+//             func: base.clone(),
+//         }));
+//     }
+//     let mut arg_fill = m
+//         .args
+//         .iter()
+//         .map(
+//             |MacroArg {
+//                  pattern, default, ..
+//              }| { (pattern.clone(), default.map(|id| globals.deep_clone(id))) },
+//         )
+//         .collect::<Vec<_>>();
+//     params.reverse();
+//     named_params.reverse();
+//     for (i, (val, param_span)) in params.into_iter().enumerate() {
+//         if let Some(pat) = &arg_fill[i].0 {
+//             if !value_ops::matches_pat(&val.value, &pat.0) {
+//                 return Some(Err(RuntimeError::PatternMismatch {
+//                     v: val,
+//                     pat: pat.clone(),
+//                     area: code.make_area(*param_span),
+//                 }));
+//             }
+//         }
+//         arg_fill[i].1 = Some(val);
+//     }
+//     for (name, val, param_span) in named_params.into_iter() {
+//         let arg_pos = param_map[&name];
+//         if let Some(pat) = &arg_fill[arg_pos].0 {
+//             if !value_ops::matches_pat(&val.value, &pat.0) {
+//                 return Some(Err(RuntimeError::PatternMismatch {
+//                     v: val,
+//                     pat: pat.clone(),
+//                     area: code.make_area(*param_span),
+//                 }));
+//             }
+//         }
+//         arg_fill[arg_pos].1 = Some(val);
+//     }
+//     for ((_, arg), MacroArg { name, area, .. }) in arg_fill.iter().zip(&m.args) {
+//         if arg.is_none() {
+//             let call_area = code.get_bytecode_span(func, i);
+//             return Some(Err(RuntimeError::ArgumentNotSatisfied {
+//                 arg_name: name.clone(),
+//                 call_area: code.make_area(call_area),
+//                 arg_area: area.clone(),
+//             }));
+//         }
+//     }
+//     context.inner().push_vars(
+//         &code.bytecode_funcs[m.func_id].scoped_var_ids,
+//         code,
+//         globals,
+//     );
+//     context
+//         .inner()
+//         .push_vars(&code.bytecode_funcs[m.func_id].capture_ids, code, globals);
+//     for ((_, arg), id) in arg_fill
+//         .into_iter()
+//         .zip(&code.bytecode_funcs[m.func_id].arg_ids)
+//     {
+//         context.inner().set_var(*id, arg.unwrap(), globals);
+//     }
+//     for (v, id) in m
+//         .capture
+//         .iter()
+//         .zip(&code.bytecode_funcs[m.func_id].capture_ids)
+//     {
+//         context.inner().replace_var(*id, *v);
+//     }
+//     globals.call_counter.0 += 1;
+//     context.inner().frames.push(Frame {
+//         position: (m.func_id, 0),
+//         call_id: globals.call_counter,
+//         block_stack: vec![],
+//     });
+//     globals.calls.insert(globals.call_counter);
+//     None
+// }
