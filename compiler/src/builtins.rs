@@ -825,7 +825,7 @@ builtins! {
     }
 
 
-    [Panic] #[desc = "Exit the SPWN program", example = "$.panic() // Exits/panics the SPWN program"] fn panic((a: String) {panic!("{}", a)})
+    [Panic] #[safe = true, desc = "Exit the SPWN program", example = "$.panic() // Exits/panics the SPWN program"] fn panic((a: String) {panic!("{}", a)})
 
     [HTTPRequest] #[safe = false, desc = "Sends an HTTP request", example = ""] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
         #[cfg(not(target_arch = "wasm32"))]
