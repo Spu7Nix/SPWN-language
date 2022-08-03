@@ -825,6 +825,7 @@ builtins! {
     }
 
 
+    [Panic] #[safe = true, desc = "Exit the SPWN program", example = "$.panic() // Exits/panics the SPWN program"] fn panic((a: String) {panic!("{}", a)})
 
     [HTTPRequest] #[safe = false, desc = "Sends an HTTP request", example = ""] fn http_request((method): Str, (url): Str, (headers): Dict, (body): Str) {
         #[cfg(not(target_arch = "wasm32"))]
@@ -970,7 +971,6 @@ builtins! {
     [Max] #[safe = true, desc = "Calculates the max of two numbers", example = "$.assert($.max(1, 2) == 2)"] fn max((a): Number, (b): Number) {Value::Number(a.max(b))}
     [Round] #[safe = true, desc = "Rounds a number", example = "$.assert($.round(1.2) == 1)"] fn round((n): Number) {Value::Number(n.round())}
     [Hypot] #[safe = true, desc = "Calculates the hypothenuse in a right triangle with sides a and b", example = "$.assert($.hypot(3, 4) == 5) // because 3^2 + 4^2 = 5^2"] fn hypot((a): Number, (b): Number) {Value::Number(a.hypot(b))}
-
     [Add] #[safe = true, desc = "Adds a Geometry Dash object or trigger to the target level", example = "
 extract obj_props
 $.add(obj {
