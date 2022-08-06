@@ -81,7 +81,7 @@ pub enum Token {
     #[token("-=")]
     MinusEq,
     #[token("*=")]
-    MultEq,
+    MuLte,
     #[token("/=")]
     DivEq,
     #[token("%=")]
@@ -113,15 +113,15 @@ pub enum Token {
     #[token("==")]
     Eq,
     #[token("!=")]
-    NotEq,
+    Neq,
     #[token(">")]
-    Greater,
+    Gt,
     #[token(">=")]
-    GreaterEq,
+    Gte,
     #[token("<")]
-    Lesser,
+    Lt,
     #[token("<=")]
-    LesserEq,
+    Lte,
 
     #[token("=")]
     Assign,
@@ -180,7 +180,7 @@ impl From<Token> for &str {
             Pow => "^",
             PlusEq => "+=",
             MinusEq => "-=",
-            MultEq => "*=",
+            MuLte => "*=",
             DivEq => "/=",
             ModEq => "%=",
             PowEq => "^=",
@@ -209,11 +209,11 @@ impl From<Token> for &str {
             Split => "split",
             Is => "is",
             Eq => "==",
-            NotEq => "!=",
-            Greater => ">",
-            GreaterEq => ">=",
-            Lesser => "<",
-            LesserEq => "<=",
+            Neq => "!=",
+            Gt => ">",
+            Gte => ">=",
+            Lt => "<",
+            Lte => "<=",
             Colon => ":",
             DoubleColon => "::",
             FatArrow => "=>",

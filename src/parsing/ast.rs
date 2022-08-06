@@ -1,4 +1,4 @@
-use crate::{leveldata::object_data::ObjectMode, parser::lexer::Token};
+use crate::parsing::lexer::Token;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::sources::{CodeSpan, SpwnSource};
@@ -8,27 +8,6 @@ new_key_type! {
     pub struct StmtKey;
 }
 
-pub enum KeyType {
-    Expr(ExprKey),
-    StmtKey(StmtKey),
-}
-
-// just helper for ASTData::area
-pub trait ASTKey {
-    fn to_key(&self) -> KeyType;
-}
-impl ASTKey for ExprKey {
-    fn to_key(&self) -> KeyType {
-        KeyType::Expr(*self)
-    }
-}
-impl ASTKey for StmtKey {
-    fn to_key(&self) -> KeyType {
-        KeyType::StmtKey(*self)
-    }
-}
-
-#[derive(Default)]
 pub struct ASTData {
     pub source: SpwnSource,
 
@@ -46,26 +25,21 @@ pub struct ASTData {
 }
 
 impl ASTData {
-    // pub fn insert<T: ASTNode + 'static>(&mut self, node: T, area: CodeArea) -> ASTKey {
-    //     self.map.insert((Box::new(node), area))
-    // }
-    pub fn get_span<K: ASTKey>(&self, k: K) -> CodeSpan {
-        match k.to_key() {
-            KeyType::Expr(k) => self.exprs[k].1,
-            KeyType::StmtKey(k) => self.stmts[k].1,
+    pub fn new(source: SpwnSource) -> Self {
+        Self {
+            source,
+            exprs: SlotMap::default(),
+            stmts: SlotMap::default(),
+
+            for_loop_iter_spans: SecondaryMap::default(),
+            func_arg_spans: SecondaryMap::default(),
+
+            dictlike_spans: SecondaryMap::default(),
+            objlike_spans: SecondaryMap::default(),
+            impl_spans: SecondaryMap::default(),
+
+            stmt_arrows: SecondaryMap::default(),
         }
-    }
-    pub fn get_expr(&self, k: ExprKey) -> Expression {
-        self.exprs[k].0.clone()
-    }
-    pub fn get_stmt(&self, k: StmtKey) -> Statement {
-        self.stmts[k].0.clone()
-    }
-    pub fn insert_expr(&mut self, expr: Expression, area: CodeSpan) -> ExprKey {
-        self.exprs.insert((expr, area))
-    }
-    pub fn insert_stmt(&mut self, stmt: Statement, area: CodeSpan) -> StmtKey {
-        self.stmts.insert((stmt, area))
     }
 
     pub fn debug(&self, stmts: &Statements) {
@@ -104,6 +78,36 @@ impl ASTData {
         println!("{}", debug_str);
     }
 }
+
+pub trait ASTInsert<T, K> {
+    fn insert(&mut self, v: T, area: CodeSpan) -> K;
+    fn get_full(&mut self, v: K) -> (T, CodeSpan);
+
+    fn get(&mut self, v: K) -> T {
+        self.get_full(v).0
+    }
+    fn span(&mut self, v: K) -> CodeSpan {
+        self.get_full(v).1
+    }
+}
+
+impl ASTInsert<Expression, ExprKey> for ASTData {
+    fn insert(&mut self, v: Expression, area: CodeSpan) -> ExprKey {
+        self.exprs.insert((v, area))
+    }
+    fn get_full(&mut self, v: ExprKey) -> (Expression, CodeSpan) {
+        self.exprs[v].clone()
+    }
+}
+impl ASTInsert<Statement, StmtKey> for ASTData {
+    fn insert(&mut self, v: Statement, area: CodeSpan) -> StmtKey {
+        self.stmts.insert((v, area))
+    }
+    fn get_full(&mut self, v: StmtKey) -> (Statement, CodeSpan) {
+        self.stmts[v].clone()
+    }
+}
+
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Copy)]
 pub enum IdClass {
@@ -115,7 +119,7 @@ pub enum IdClass {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
-    Int(u32),
+    Int(i64),
     Float(f64),
     String(String),
     Bool(bool),
@@ -133,19 +137,19 @@ pub enum Expression {
     Array(Vec<ExprKey>),
     Dict(Vec<(String, Option<ExprKey>)>),
 
-    Obj(ObjectMode, Vec<(ExprKey, ExprKey)>),
+    // Obj(ObjectMode, Vec<(ExprKey, ExprKey)>),
 
     // Index { base: ExprKey, index: ExprKey },
     Empty,
 
     Block(Statements),
 
-    Func {
+    Macro {
         args: Vec<(String, Option<ExprKey>, Option<ExprKey>)>,
         ret_type: Option<ExprKey>,
         code: ExprKey,
     },
-    FuncPattern {
+    MacroPattern {
         args: Vec<ExprKey>,
         ret_type: ExprKey,
     },

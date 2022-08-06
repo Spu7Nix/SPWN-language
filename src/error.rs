@@ -85,7 +85,6 @@ macro_rules! error_maker {
         use $crate::error::*;
         use ariadne::{Report, ReportKind, Label, Source, Fmt};
         #[allow(unused_imports)]
-        use $crate::interpreter::interpreter::Globals;
         use $crate::sources::{SpwnSource, source_name};
 
         $(

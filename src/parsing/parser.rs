@@ -2,13 +2,13 @@ use std::str::Chars;
 
 use logos::{Lexer, Logos};
 
-use super::ast::{ASTData, IdClass};
+use super::ast::{ASTData, ASTInsert, IdClass};
 use super::ast::{ExprKey, Expression, Statement, Statements, StmtKey};
 use super::error::SyntaxError;
 use super::lexer::{Token, Tokens};
-use super::parser_util::{operators, OpType, ParsedDictlike, ParsedObjlike};
+use super::parser_util::{operators, OpType, ParsedDictlike};
 
-use crate::leveldata::object_data::ObjectMode;
+// use crate::leveldata::object_data::ObjectMode;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
 
 type Result<T> = std::result::Result<T, SyntaxError>;
@@ -134,10 +134,10 @@ impl Parser<'_> {
                 _ => self.to_int_radix(content, 10)?,
             }
         } else {
-            content.parse::<u32>().unwrap()
+            content.parse::<i64>().unwrap()
         };
 
-        Ok(ast_data.insert_expr(Expression::Int(int), span))
+        Ok(ast_data.insert(Expression::Int(int), span))
     }
 
     fn parse_id(&mut self, data: &mut ASTData) -> Result<ExprKey> {
@@ -152,7 +152,7 @@ impl Parser<'_> {
             _ => unreachable!(),
         };
         let value = content[0..(content.len() - 1)].parse::<u16>().ok();
-        Ok(data.insert_expr(Expression::Id { class, value }, span))
+        Ok(data.insert(Expression::Id { class, value }, span))
     }
 
     pub fn parse_float(&mut self, ast_data: &mut ASTData) -> Result<ExprKey> {
@@ -161,11 +161,11 @@ impl Parser<'_> {
         let content: &str = self.lexer.slice();
         let float = content.parse::<f64>().unwrap();
 
-        Ok(ast_data.insert_expr(Expression::Float(float), span))
+        Ok(ast_data.insert(Expression::Float(float), span))
     }
 
-    fn to_int_radix(&self, from: &str, radix: u32) -> Result<u32> {
-        u32::from_str_radix(from, radix).map_err(|_| SyntaxError::InvalidLiteral {
+    fn to_int_radix(&self, from: &str, radix: u32) -> Result<i64> {
+        i64::from_str_radix(from, radix).map_err(|_| SyntaxError::InvalidLiteral {
             literal: from.into(),
             area: self.make_area(self.span()),
         })
@@ -199,7 +199,7 @@ impl Parser<'_> {
             }
         };
 
-        Ok(ast_data.insert_expr(Expression::String(out), span))
+        Ok(ast_data.insert(Expression::String(out), span))
     }
 
     fn parse_escapes(&self, chars: &mut Chars) -> Result<String> {
@@ -293,25 +293,25 @@ impl Parser<'_> {
         Ok(ParsedDictlike { items, item_spans })
     }
 
-    pub fn parse_objlike(&mut self, data: &mut ASTData) -> Result<ParsedObjlike> {
-        let mut items = vec![];
-        let mut item_spans = vec![];
+    // pub fn parse_objlike(&mut self, data: &mut ASTData) -> Result<ParsedObjlike> {
+    //     let mut items = vec![];
+    //     let mut item_spans = vec![];
 
-        while self.peek() != Token::RBracket {
-            let key = self.parse_expr(data)?;
-            let span = data.get_span(key);
-            item_spans.push(span);
-            dbg!(self.peek());
-            self.expect_tok(Token::Colon)?;
-            let value = self.parse_expr(data)?;
+    //     while self.peek() != Token::RBracket {
+    //         let key = self.parse_expr(data)?;
+    //         let span = data.span(key);
+    //         item_spans.push(span);
+    //         dbg!(self.peek());
+    //         self.expect_tok(Token::Colon)?;
+    //         let value = self.parse_expr(data)?;
 
-            items.push((key, value));
-            self.peek_expect_tok(Token::RBracket | Token::Comma)?;
-            self.skip_tok(Token::Comma);
-        }
-        self.next();
-        Ok(ParsedObjlike { items, item_spans })
-    }
+    //         items.push((key, value));
+    //         self.peek_expect_tok(Token::RBracket | Token::Comma)?;
+    //         self.skip_tok(Token::Comma);
+    //     }
+    //     self.next();
+    //     Ok(ParsedObjlike { items, item_spans })
+    // }
 
     pub fn parse_unit(&mut self, data: &mut ASTData) -> Result<ExprKey> {
         let peek = self.peek();
@@ -324,17 +324,17 @@ impl Parser<'_> {
             Token::Id => self.parse_id(data),
             Token::True => {
                 self.next();
-                Ok(data.insert_expr(Expression::Bool(true), start))
+                Ok(data.insert(Expression::Bool(true), start))
             }
             Token::False => {
                 self.next();
-                Ok(data.insert_expr(Expression::Bool(false), start))
+                Ok(data.insert(Expression::Bool(false), start))
             }
             Token::Ident => self.parse_ident_or_macro(data),
             Token::TypeIndicator => {
                 self.next();
                 let name = self.slice()[1..].to_string();
-                Ok(data.insert_expr(Expression::Type(name), start))
+                Ok(data.insert(Expression::Type(name), start))
             }
             Token::LParen => self.parse_paren_or_macro(data),
 
@@ -353,21 +353,19 @@ impl Parser<'_> {
                 }
                 self.next();
 
-                Ok(data.insert_expr(Expression::Array(elems), start.extend(self.span())))
+                Ok(data.insert(Expression::Array(elems), start.extend(self.span())))
             }
             Token::LBracket => {
                 self.next();
                 if self.peek() == Token::RBracket {
                     self.next();
-                    return Ok(
-                        data.insert_expr(Expression::Dict(vec![]), start.extend(self.span()))
-                    );
+                    return Ok(data.insert(Expression::Dict(vec![]), start.extend(self.span())));
                 }
 
                 if !(self.peek() == Token::Ident && self.peek_many(2) == Token::Colon) {
                     let code = self.parse_statements(data)?;
                     self.expect_tok(Token::RBracket)?;
-                    Ok(data.insert_expr(Expression::Block(code), start.extend(self.span())))
+                    Ok(data.insert(Expression::Block(code), start.extend(self.span())))
                 } else {
                     let dictlike = self.parse_dictlike(data)?;
                     Ok(data.exprs.insert_with_key(|key| {
@@ -379,7 +377,7 @@ impl Parser<'_> {
 
             Token::QMark => {
                 self.next();
-                Ok(data.insert_expr(Expression::Maybe(None), start))
+                Ok(data.insert(Expression::Maybe(None), start))
             }
 
             Token::Split => {
@@ -387,42 +385,42 @@ impl Parser<'_> {
                 let a = self.parse_expr(data)?;
                 self.expect_tok(Token::Colon)?;
                 let b = self.parse_expr(data)?;
-                Ok(data.insert_expr(Expression::Split(a, b), start))
+                Ok(data.insert(Expression::Split(a, b), start))
             }
 
             Token::TrigFnBracket => {
                 self.next();
                 let code = self.parse_statements(data)?;
                 self.expect_tok(Token::RBracket)?;
-                Ok(data.insert_expr(Expression::TriggerFunc(code), start))
+                Ok(data.insert(Expression::TriggerFunc(code), start))
             }
 
-            Token::Obj | Token::Trigger => {
-                let obj_mode = if peek == Token::Obj {
-                    ObjectMode::Object
-                } else {
-                    ObjectMode::Trigger
-                };
-                self.next();
-                self.expect_tok(Token::LBracket)?;
-                if self.peek() == Token::RBracket {
-                    self.next();
-                    return Ok(data.insert_expr(
-                        Expression::Obj(obj_mode, vec![]),
-                        start.extend(self.span()),
-                    ));
-                }
+            // Token::Obj | Token::Trigger => {
+            //     let obj_mode = if peek == Token::Obj {
+            //         ObjectMode::Object
+            //     } else {
+            //         ObjectMode::Trigger
+            //     };
+            //     self.next();
+            //     self.expect_tok(Token::LBracket)?;
+            //     if self.peek() == Token::RBracket {
+            //         self.next();
+            //         return Ok(data.insert(
+            //             Expression::Obj(obj_mode, vec![]),
+            //             start.extend(self.span()),
+            //         ));
+            //     }
 
-                let objlike = self.parse_objlike(data)?;
+            //     let objlike = self.parse_objlike(data)?;
 
-                Ok(data.exprs.insert_with_key(|key| {
-                    data.objlike_spans.insert(key, objlike.item_spans);
-                    (
-                        Expression::Obj(obj_mode, objlike.items),
-                        start.extend(self.span()),
-                    )
-                }))
-            }
+            //     Ok(data.exprs.insert_with_key(|key| {
+            //         data.objlike_spans.insert(key, objlike.item_spans);
+            //         (
+            //             Expression::Obj(obj_mode, objlike.items),
+            //             start.extend(self.span()),
+            //         )
+            //     }))
+            // }
             unary_op if operators::is_unary(unary_op) => {
                 self.next();
                 let prec = operators::unary_prec(unary_op);
@@ -447,7 +445,7 @@ impl Parser<'_> {
                     self.parse_value(data)?
                 };
 
-                Ok(data.insert_expr(
+                Ok(data.insert(
                     Expression::Unary(unary_op, value),
                     start.extend(self.span()),
                 ))
@@ -471,7 +469,7 @@ impl Parser<'_> {
             )
         {
             self.next();
-            Ok(data.insert_expr(Expression::Empty, start.extend(self.span())))
+            Ok(data.insert(Expression::Empty, start.extend(self.span())))
         } else {
             let mut depth = 1;
             let mut check = self.clone();
@@ -573,8 +571,8 @@ impl Parser<'_> {
                 }
                 let code = self.parse_expr(data)?;
 
-                let key = data.insert_expr(
-                    Expression::Func {
+                let key = data.insert(
+                    Expression::Macro {
                         args,
                         ret_type,
                         code,
@@ -597,8 +595,8 @@ impl Parser<'_> {
                 self.expect_tok(Token::Arrow)?;
                 let ret_type = self.parse_expr(data)?;
 
-                Ok(data.insert_expr(
-                    Expression::FuncPattern { args, ret_type },
+                Ok(data.insert(
+                    Expression::MacroPattern { args, ret_type },
                     start.extend(self.span()),
                 ))
             }
@@ -614,8 +612,8 @@ impl Parser<'_> {
             self.next();
             let code = self.parse_expr(data)?;
 
-            let key = data.insert_expr(
-                Expression::Func {
+            let key = data.insert(
+                Expression::Macro {
                     args: vec![(name, None, None)],
                     ret_type: None,
                     code,
@@ -627,7 +625,7 @@ impl Parser<'_> {
 
             Ok(key)
         } else {
-            Ok(data.insert_expr(Expression::Var(name), start))
+            Ok(data.insert(Expression::Var(name), start))
         }
     }
 
@@ -649,7 +647,7 @@ impl Parser<'_> {
                     self.next();
                     let index = self.parse_expr(data)?;
                     self.expect_tok(Token::RSqBracket)?;
-                    value = data.insert_expr(
+                    value = data.insert(
                         Expression::Index { base: value, index },
                         start.extend(self.span()),
                     )
@@ -659,7 +657,7 @@ impl Parser<'_> {
                     let cond = self.parse_expr(data)?;
                     self.expect_tok(Token::Else)?;
                     let if_false = self.parse_expr(data)?;
-                    value = data.insert_expr(
+                    value = data.insert(
                         Expression::Ternary {
                             cond,
                             if_true: value,
@@ -711,7 +709,7 @@ impl Parser<'_> {
                     }
                     self.next();
 
-                    let key = data.insert_expr(
+                    let key = data.insert(
                         Expression::Call {
                             base: value,
                             params,
@@ -725,8 +723,7 @@ impl Parser<'_> {
                 }
                 Token::QMark => {
                     self.next();
-                    value =
-                        data.insert_expr(Expression::Maybe(Some(value)), start.extend(self.span()))
+                    value = data.insert(Expression::Maybe(Some(value)), start.extend(self.span()))
                 }
                 Token::DoubleColon => {
                     self.next();
@@ -742,7 +739,7 @@ impl Parser<'_> {
                 }
                 Token::ExclMark => {
                     self.next();
-                    value = data.insert_expr(
+                    value = data.insert(
                         Expression::TriggerFuncCall(value),
                         start.extend(self.span()),
                     )
@@ -789,8 +786,8 @@ impl Parser<'_> {
             } else {
                 self.parse_op(data, prec)?
             };
-            let span = data.get_span(left).extend(data.get_span(right));
-            left = data.insert_expr(Expression::Op(left, op, right), span);
+            let span = data.span(left).extend(data.span(right));
+            left = data.insert(Expression::Op(left, op, right), span);
         }
         Ok(left)
     }
@@ -813,7 +810,7 @@ impl Parser<'_> {
             false
         };
 
-        let stmt_key = data.insert_stmt(Statement::Break, start);
+        let stmt_key = data.insert(Statement::Break, start);
         data.stmt_arrows.insert(stmt_key, is_arrow);
 
         let stmt = match self.peek() {

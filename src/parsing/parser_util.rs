@@ -89,12 +89,12 @@ macro_rules! operators {
 
 operators!(
     // RightAssoc  <==  [ Assign ],
-    // RightAssoc  <==  [ PlusEq MinusEq MultEq DivEq ModEq PowEq EuclModEq ],
+    // RightAssoc  <==  [ PlusEq MinusEq MuLte DivEq ModEq PowEq EuclModEq ],
     // LeftAssoc   <==  [ And Or ],
     // LeftAssoc   <==  [ Pipe ],
     LeftAssoc   <==  [ Is ],
     Unary       <==  [ ExclMark ],
-    LeftAssoc   <==  [ Eq NotEq Greater GreaterEq Lesser LesserEq ],
+    LeftAssoc   <==  [ Eq Neq Gt Gte Lt Lte ],
     // LeftAssoc   <==  [ DoubleDot ],
     // Unary       <==  [ DoubleDot ],
     // Unary       <==  [ TripleDot ],
@@ -110,8 +110,7 @@ pub struct ParsedDictlike {
     pub item_spans: Vec<CodeSpan>,
 }
 
-pub struct ParsedObjlike {
-    pub items: Vec<(ExprKey, ExprKey)>,
-    pub item_spans: Vec<CodeSpan>,
-}
-
+// pub struct ParsedObjlike {
+//     pub items: Vec<(ExprKey, ExprKey)>,
+//     pub item_spans: Vec<CodeSpan>,
+// }

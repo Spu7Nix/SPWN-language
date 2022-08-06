@@ -2,18 +2,29 @@ use std::{ops::Range, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-pub type SpwnSource = Option<PathBuf>;
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SpwnSource {
+    File(PathBuf),
+}
+
+impl SpwnSource {
+    pub fn area(&self, span: CodeSpan) -> CodeArea {
+        CodeArea {
+            source: self.clone(),
+            span,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct CodeArea {
-    pub source: Option<PathBuf>,
+    pub source: SpwnSource,
     pub span: CodeSpan,
 }
 
 pub fn source_name(source: &SpwnSource) -> String {
     match source {
-        Some(f) => f.display().to_string(),
-        None => "eval".into(),
+        SpwnSource::File(f) => f.display().to_string(),
     }
 }
 
