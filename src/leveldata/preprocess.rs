@@ -1,6 +1,6 @@
 use ahash::{AHashMap, AHashSet};
 
-use crate::interpreter::value::Id;
+use super::gd_types::Id;
 
 use super::object_data::SPWN_SIGNATURE_GROUP;
 

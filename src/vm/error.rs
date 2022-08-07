@@ -175,5 +175,15 @@ error_maker! {
         //     name: String,
         //     area: CodeArea,
         // },
+
+        #[
+            Message = "Cannot add objects to the level at runtime", Area = area, Note = None,
+            Labels = [
+                area => "Object added here";
+            ]
+        ]
+        AddObjectAtRuntime {
+            area: CodeArea,
+        },
     }
 }

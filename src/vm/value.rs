@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 
-use crate::{compilation::code::VarID, sources::CodeArea};
+use crate::{
+    compilation::code::VarID,
+    leveldata::{gd_types::Id, object_data::GdObj},
+    sources::CodeArea,
+};
 
-use super::interpreter::{Globals, ValueKey};
+use super::interpreter::{Globals, TypeKey, ValueKey};
 
 #[derive(Debug, Clone)]
 pub struct StoredValue {
@@ -34,10 +38,22 @@ pub enum Value {
 
     Macro(Macro),
     Pattern(Pattern),
+
+    TriggerFn { start_group: Id },
+
+    Group(Id),
+    Channel(Id),
+    Block(Id),
+    Item(Id),
+
+    Object(GdObj),
+
+    TypeIndicator(TypeKey),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Argument {
+    pub name: String,
     pub default: Option<ValueKey>,
     pub pattern: Option<ValueKey>,
 }
@@ -63,6 +79,13 @@ impl Value {
             Value::Maybe(_) => ValueType::Maybe,
             Value::Macro(_) => ValueType::Macro,
             Value::Pattern(_) => ValueType::Pattern,
+            Value::TriggerFn { .. } => ValueType::TriggerFn,
+            Value::Channel(_) => ValueType::Channel,
+            Value::Group(_) => ValueType::Group,
+            Value::Item(_) => ValueType::Item,
+            Value::Block(_) => ValueType::Block,
+            Value::Object(_) => ValueType::Object,
+            Value::TypeIndicator(_) => ValueType::TypeIndicator,
         }
     }
     pub fn into_stored(self, area: CodeArea) -> StoredValue {
@@ -73,9 +96,18 @@ impl Value {
     }
     pub fn deep_clone(&self, globals: &mut Globals) -> Value {
         match self {
-            Value::Int(_) | Value::Float(_) | Value::String(_) | Value::Bool(_) | Value::Empty => {
-                self.clone()
-            }
+            Value::Int(_)
+            | Value::Float(_)
+            | Value::String(_)
+            | Value::Bool(_)
+            | Value::Empty
+            | Value::Channel(_)
+            | Value::Group(_)
+            | Value::Item(_)
+            | Value::Block(_)
+            | Value::TypeIndicator(_)
+            | Value::TriggerFn { .. }
+            | Value::Object(_) => self.clone(),
             Value::Pattern(_) => self.clone(),
             // | Value::TypeIndicator(_)
             // | Value::Pattern(_)
@@ -97,6 +129,7 @@ impl Value {
             ),
             Value::Maybe(v) => Value::Maybe(v.map(|v| globals.key_deep_clone(v))),
             Value::Macro(Macro { .. }) => {
+                self.clone()
                 // let args = args
                 //     .iter()
                 //     .map(|m| MacroArg {
@@ -112,8 +145,76 @@ impl Value {
                 //     ret_type: ret_type.clone(),
                 //     capture: capture.clone(),
                 // })
-                todo!()
+                // todo!()
             }
+        }
+    }
+    pub fn to_str(&self, globals: &Globals) -> String {
+        match self {
+            Value::Int(v) => v.to_string(),
+            Value::Float(v) => v.to_string(),
+            Value::String(v) => v.to_string(),
+            Value::Bool(v) => v.to_string(),
+            Value::TypeIndicator(v) => format!("@{}", globals.types[*v].name),
+            Value::Empty => "()".into(),
+            Value::Array(arr) => format!(
+                "[{}]",
+                arr.iter()
+                    .map(|v| globals.memory[*v].value.to_str(globals))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Value::Dict(map) => format!(
+                "{{{}}}",
+                map.iter()
+                    .map(|(k, v)| format!("{}: {}", k, globals.memory[*v].value.to_str(globals)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Value::Maybe(None) => "?".into(),
+            Value::Maybe(Some(v)) => format!("{}?", globals.memory[*v].value.to_str(globals)),
+            // Value::TypeIndicator(typ) => typ.to_str(),
+            Value::Pattern(p) => p.to_str(),
+            Value::Group(id) => format!("{}g", id.to_str()),
+            Value::Channel(id) => format!("{}c", id.to_str()),
+            Value::Item(id) => format!("{}i", id.to_str()),
+            Value::Block(id) => format!("{}b", id.to_str()),
+            Value::TriggerFn { start_group } => format!("!{{...}}:{}", start_group.to_str()),
+            Value::Macro(Macro {
+                args, ret_pattern, ..
+            }) => {
+                format!(
+                    "({}) -> {} {{...}}",
+                    args.iter()
+                        .map(
+                            |Argument {
+                                 name: n,
+                                 pattern: t,
+                                 default: d,
+                                 ..
+                             }| {
+                                format!(
+                                    "{}{}{}",
+                                    n,
+                                    if let Some(t) = t {
+                                        format!(": {}", globals.memory[*t].value.to_str(globals))
+                                    } else {
+                                        "".into()
+                                    },
+                                    if let Some(d) = d {
+                                        format!(" = {}", globals.memory[*d].value.to_str(globals))
+                                    } else {
+                                        "".into()
+                                    },
+                                )
+                            }
+                        )
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    globals.memory[*ret_pattern].value.to_str(globals),
+                )
+            }
+            Value::Object(a) => format!("{:?}", a),
         }
     }
 }
@@ -130,6 +231,13 @@ pub enum ValueType {
     Maybe,
     Macro,
     Pattern,
+    TriggerFn,
+    Channel,
+    Group,
+    Item,
+    Block,
+    Object,
+    TypeIndicator,
 }
 
 impl ValueType {
@@ -147,6 +255,13 @@ impl ValueType {
                 ValueType::Maybe => "maybe",
                 ValueType::Macro => "macro",
                 ValueType::Pattern => "pattern",
+                ValueType::TriggerFn => "trigger_func",
+                ValueType::Channel => "channel",
+                ValueType::Group => "group",
+                ValueType::Item => "item",
+                ValueType::Block => "block",
+                ValueType::Object => "object",
+                ValueType::TypeIndicator => "type_indicator",
             }
         )
     }
@@ -155,6 +270,23 @@ impl ValueType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Any,
+}
+
+impl Pattern {
+    pub fn to_str(&self) -> String {
+        match self {
+            Pattern::Any => "_".into(),
+            // Pattern::Type(t) => t.to_str(),
+            // Pattern::Macro { args, ret } => format!(
+            //     "({}) -> {}",
+            //     args.iter()
+            //         .map(|arg| arg.to_str())
+            //         .collect::<Vec<_>>()
+            //         .join(", "),
+            //     ret.to_str(),
+            // ),
+        }
+    }
 }
 
 pub mod value_ops {

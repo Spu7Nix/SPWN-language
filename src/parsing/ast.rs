@@ -1,4 +1,4 @@
-use crate::parsing::lexer::Token;
+use crate::{leveldata::object_data::ObjectMode, parsing::lexer::Token};
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::sources::{CodeSpan, SpwnSource};
@@ -118,6 +118,12 @@ pub enum IdClass {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum MacroCode {
+    Normal(Statements),
+    Lambda(ExprKey),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Int(i64),
     Float(f64),
@@ -137,17 +143,15 @@ pub enum Expression {
     Array(Vec<ExprKey>),
     Dict(Vec<(String, Option<ExprKey>)>),
 
-    // Obj(ObjectMode, Vec<(ExprKey, ExprKey)>),
+    Obj(ObjectMode, Vec<(ExprKey, ExprKey)>),
 
     // Index { base: ExprKey, index: ExprKey },
     Empty,
 
-    Block(Statements),
-
     Macro {
         args: Vec<(String, Option<ExprKey>, Option<ExprKey>)>,
         ret_type: Option<ExprKey>,
-        code: ExprKey,
+        code: MacroCode,
     },
     MacroPattern {
         args: Vec<ExprKey>,

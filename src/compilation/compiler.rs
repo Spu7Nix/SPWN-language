@@ -1,14 +1,17 @@
 use std::collections::HashMap;
+use std::io::Write;
 
+use ahash::AHashMap;
 use slotmap::{new_key_type, SlotMap};
 
 use crate::{
+    leveldata::object_data::ObjectMode,
     parsing::{
-        ast::{ASTData, ASTInsert, ExprKey, Expression, Statement, StmtKey},
+        ast::{ASTData, ASTInsert, ExprKey, Expression, MacroCode, Statement, StmtKey},
         lexer::Token,
     },
     sources::{CodeSpan, SpwnSource},
-    vm::value::Value,
+    vm::{interpreter::TypeKey, types::Type, value::Value},
 };
 
 use super::{
@@ -24,6 +27,7 @@ pub enum Constant {
     Float(f64),
     Bool(bool),
     String(String),
+    Type(TypeKey),
 }
 
 impl Constant {
@@ -33,6 +37,7 @@ impl Constant {
             Constant::Float(v) => Value::Float(*v),
             Constant::Bool(v) => Value::Bool(*v),
             Constant::String(v) => Value::String(v.clone()),
+            Constant::Type(k) => Value::TypeIndicator(*k),
         }
     }
 }
@@ -51,6 +56,7 @@ pub struct VarData {
 pub struct Scope {
     pub vars: HashMap<String, VarData>,
     pub parent: Option<ScopeKey>,
+    pub children: Vec<ScopeKey>,
 }
 
 pub struct URegister<T> {
@@ -80,14 +86,18 @@ pub struct Compiler {
     pub code: Code,
 
     pub scopes: SlotMap<ScopeKey, Scope>,
+    pub types: SlotMap<TypeKey, Type>,
+    pub type_keys: AHashMap<String, TypeKey>,
 }
 
 impl Compiler {
     pub fn new(ast_data: ASTData, source: SpwnSource) -> Self {
         Self {
             ast_data,
-            code: Code::new(source),
+            code: Code::new(source.clone()),
             scopes: SlotMap::default(),
+            types: SlotMap::default(),
+            type_keys: AHashMap::default(),
         }
     }
 
@@ -151,12 +161,28 @@ impl Compiler {
             }
         }
     }
+    pub fn get_inner_vars(&self, scope: ScopeKey) -> Vec<VarID> {
+        let mut vars = vec![];
+        fn inner(compiler: &Compiler, scope: ScopeKey, vars: &mut Vec<VarID>) {
+            for (_, VarData { id, .. }) in &compiler.scopes[scope].vars {
+                vars.push(*id);
+            }
+            for i in &compiler.scopes[scope].children {
+                inner(compiler, *i, vars);
+            }
+        }
+        inner(self, scope, &mut vars);
+        vars
+    }
 
     pub fn derive_scope(&mut self, scope: ScopeKey) -> ScopeKey {
-        self.scopes.insert(Scope {
+        let child = self.scopes.insert(Scope {
             vars: HashMap::new(),
             parent: Some(scope),
-        })
+            children: vec![],
+        });
+        self.scopes[scope].children.push(child);
+        child
     }
 
     pub fn compile_expr(
@@ -228,7 +254,17 @@ impl Compiler {
                     })
                 }
             },
-            Expression::Type(_) => todo!(),
+            Expression::Type(name) => {
+                if let Some(key) = self.type_keys.get(&name) {
+                    let id = self.code.const_register.insert(Constant::Type(*key));
+                    self.push_instr(Instruction::LoadConst(ConstID(id as u16)), span, func);
+                } else {
+                    return Err(CompilerError::UndefinedType {
+                        name,
+                        area: self.ast_data.source.area(span),
+                    });
+                }
+            }
             Expression::Array(arr) => {
                 for i in &arr {
                     self.compile_expr(*i, scope, func)?;
@@ -268,11 +304,11 @@ impl Compiler {
             Expression::Empty => {
                 self.push_instr(Instruction::PushEmpty, span, func);
             }
-            Expression::Block(stmts) => {
-                let derived = self.derive_scope(scope);
-                self.compile_stmts(stmts, derived, func)?;
-                self.push_instr(Instruction::PushEmpty, span, func);
-            }
+            // Expression::Block(stmts) => {
+            //     let derived = self.derive_scope(scope);
+            //     self.compile_stmts(stmts, derived, func)?;
+            //     self.push_instr(Instruction::PushEmpty, span, func);
+            // }
             Expression::Macro {
                 args,
                 ret_type,
@@ -282,6 +318,7 @@ impl Compiler {
                     instructions: vec![],
                     arg_ids: vec![],
                     capture_ids: self.get_accessible_vars(scope),
+                    inner_ids: vec![],
                 });
                 let func_id = self.code.funcs.len() - 1;
 
@@ -313,8 +350,16 @@ impl Compiler {
                     self.push_instr(Instruction::PushAnyPattern, span, func);
                 }
 
-                self.compile_expr(code, derived, func_id)?;
-                self.push_instr(Instruction::Return, span, func_id);
+                match code {
+                    MacroCode::Normal(stmts) => {
+                        self.compile_stmts(stmts, derived, func_id, false)?;
+                    }
+                    MacroCode::Lambda(expr) => {
+                        self.compile_expr(expr, derived, func_id)?;
+                        self.push_instr(Instruction::Return, span, func_id);
+                    }
+                }
+                self.code.funcs[func_id].inner_ids = self.get_inner_vars(derived);
 
                 self.push_instr(
                     Instruction::BuildMacro(MacroBuildID(info as u16)),
@@ -364,12 +409,32 @@ impl Compiler {
                 self.push_instr(Instruction::WrapMaybe, span, func);
             }
             Expression::TriggerFunc(stmts) => {
+                let enter =
+                    self.push_instr(Instruction::EnterTriggerFunction(InstrNum(0)), span, func);
+
                 let derived = self.derive_scope(scope);
-                self.compile_stmts(stmts, derived, func)?;
-                self.push_instr(Instruction::PushTriggerFn, span, func);
+                self.compile_stmts(stmts, derived, func, false)?;
+
+                let to = self.push_instr(Instruction::YeetContext, span, func);
+                self.get_instr(enter).modify_num((to.idx + 1) as u16);
             }
             Expression::Instance(_, _) => todo!(),
             Expression::Split(_, _) => todo!(),
+            Expression::Obj(mode, vals) => {
+                let l = InstrNum(vals.len() as u16);
+                for (k, v) in vals.into_iter() {
+                    self.compile_expr(k, scope, func)?;
+                    self.compile_expr(v, scope, func)?;
+                }
+                self.push_instr(
+                    match mode {
+                        ObjectMode::Object => Instruction::BuildObject(l),
+                        ObjectMode::Trigger => Instruction::BuildTrigger(l),
+                    },
+                    span,
+                    func,
+                );
+            }
         }
         Ok((start_idx, self.func_len(func)))
     }
@@ -385,6 +450,14 @@ impl Compiler {
         let stmt = self.ast_data.get(stmt_key);
         let span = self.ast_data.span(stmt_key);
 
+        let has_arrow = self.ast_data.stmt_arrows[stmt_key];
+
+        let arrow_jump = if has_arrow {
+            Some(self.push_instr(Instruction::EnterArrowStatement(InstrNum(0)), span, func))
+        } else {
+            None
+        };
+
         match stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, func)?;
@@ -393,7 +466,7 @@ impl Compiler {
             Statement::Let(name, value) => {
                 let var_id = self.new_var(&name, scope, true, span);
                 self.compile_expr(value, scope, func)?;
-                self.push_instr(Instruction::SetVar(var_id), span, func);
+                self.push_instr(Instruction::CreateVar(var_id), span, func);
             }
             Statement::Assign(name, value) => {
                 if let Some(VarData {
@@ -414,7 +487,7 @@ impl Compiler {
                 } else {
                     let var_id = self.new_var(&name, scope, false, span);
                     self.compile_expr(value, scope, func)?;
-                    self.push_instr(Instruction::SetVar(var_id), span, func);
+                    self.push_instr(Instruction::CreateVar(var_id), span, func);
                 }
             }
             Statement::If {
@@ -426,14 +499,14 @@ impl Compiler {
                     self.compile_expr(cond, scope, func)?;
                     let jump = self.push_instr(Instruction::JumpIfFalse(InstrNum(0)), span, func);
                     let derived = self.derive_scope(scope);
-                    self.compile_stmts(stmts, derived, func)?;
+                    self.compile_stmts(stmts, derived, func, false)?;
                     let skip = self.push_instr(Instruction::Jump(InstrNum(0)), span, func);
                     skips.push(skip);
                     self.get_instr(jump).modify_num((skip.idx + 1) as u16);
                 }
                 if let Some(stmts) = else_branch {
                     let derived = self.derive_scope(scope);
-                    self.compile_stmts(stmts, derived, func)?;
+                    self.compile_stmts(stmts, derived, func, false)?;
                 }
                 let skip_to = self.func_len(func);
                 for i in skips {
@@ -450,7 +523,7 @@ impl Compiler {
                 let jump = self.push_instr(Instruction::JumpIfFalse(InstrNum(0)), span, func);
 
                 let derived = self.derive_scope(scope);
-                self.compile_stmts(code, derived, func)?;
+                self.compile_stmts(code, derived, func, false)?;
                 let back =
                     self.push_instr(Instruction::Jump(InstrNum(cond_pos as u16)), span, func);
 
@@ -469,7 +542,7 @@ impl Compiler {
 
                 let var_id = self.new_var(&var, derived, false, span);
                 self.push_instr(Instruction::SetVar(var_id), span, func);
-                self.compile_stmts(code, derived, func)?;
+                self.compile_stmts(code, derived, func, false)?;
                 let back =
                     self.push_instr(Instruction::Jump(InstrNum(iter_pos.idx as u16)), span, func);
 
@@ -485,7 +558,9 @@ impl Compiler {
             }
             Statement::Break => todo!(),
             Statement::Continue => todo!(),
-            Statement::TypeDef(_) => todo!(),
+            Statement::TypeDef(_) => {
+                //already done
+            }
             Statement::Impl(typ, dict) => {
                 let keys = self
                     .code
@@ -517,8 +592,17 @@ impl Compiler {
                 self.compile_expr(v, scope, func)?;
                 self.push_instr(Instruction::Print, span, func);
             }
-            Statement::Add(_) => todo!(),
+            Statement::Add(v) => {
+                self.compile_expr(v, scope, func)?;
+                self.push_instr(Instruction::AddObject, span, func);
+            }
         }
+
+        if let Some(arrow_jump) = arrow_jump {
+            let to = self.push_instr(Instruction::YeetContext, span, func);
+            self.get_instr(arrow_jump).modify_num((to.idx + 1) as u16);
+        }
+
         Ok((start_idx, self.func_len(func)))
     }
 
@@ -527,8 +611,28 @@ impl Compiler {
         stmts: Vec<StmtKey>,
         scope: ScopeKey,
         func: usize,
+        allow_type_def: bool,
     ) -> Result<(usize, usize), CompilerError> {
         let start_idx = self.func_len(func);
+
+        for i in stmts.iter() {
+            if let Statement::TypeDef(name) = self.ast_data.get(*i) {
+                if allow_type_def {
+                    let k = self.types.insert(Type {
+                        name: name.clone(),
+                        members: AHashMap::default(),
+                    });
+                    self.type_keys.insert(name, k);
+                } else {
+                    let span = self.ast_data.span(*i);
+                    return Err(CompilerError::LowerLevelTypeDef {
+                        name,
+                        area: self.code.source.area(span),
+                    });
+                }
+            }
+        }
+
         for i in stmts {
             self.compile_stmt(i, scope, func)?;
         }
@@ -538,13 +642,15 @@ impl Compiler {
         let base_scope = self.scopes.insert(Scope {
             vars: HashMap::new(),
             parent: None,
+            children: vec![],
         });
         self.code.funcs.push(BytecodeFunc {
             instructions: vec![],
             arg_ids: vec![],
             capture_ids: vec![],
+            inner_ids: vec![],
         });
-        self.compile_stmts(stmts, base_scope, 0)?;
+        self.compile_stmts(stmts, base_scope, 0, true)?;
         Ok(())
     }
 }

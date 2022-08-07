@@ -6,8 +6,10 @@ use super::ast::{ASTData, ASTInsert, IdClass};
 use super::ast::{ExprKey, Expression, Statement, Statements, StmtKey};
 use super::error::SyntaxError;
 use super::lexer::{Token, Tokens};
-use super::parser_util::{operators, OpType, ParsedDictlike};
+use super::parser_util::{operators, OpType, ParsedDictlike, ParsedObjlike};
 
+use crate::leveldata::object_data::ObjectMode;
+use crate::parsing::ast::MacroCode;
 // use crate::leveldata::object_data::ObjectMode;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
 
@@ -293,25 +295,25 @@ impl Parser<'_> {
         Ok(ParsedDictlike { items, item_spans })
     }
 
-    // pub fn parse_objlike(&mut self, data: &mut ASTData) -> Result<ParsedObjlike> {
-    //     let mut items = vec![];
-    //     let mut item_spans = vec![];
+    pub fn parse_objlike(&mut self, data: &mut ASTData) -> Result<ParsedObjlike> {
+        let mut items = vec![];
+        let mut item_spans = vec![];
 
-    //     while self.peek() != Token::RBracket {
-    //         let key = self.parse_expr(data)?;
-    //         let span = data.span(key);
-    //         item_spans.push(span);
-    //         dbg!(self.peek());
-    //         self.expect_tok(Token::Colon)?;
-    //         let value = self.parse_expr(data)?;
+        while self.peek() != Token::RBracket {
+            let key = self.parse_expr(data)?;
+            let span = data.span(key);
+            item_spans.push(span);
+            dbg!(self.peek());
+            self.expect_tok(Token::Colon)?;
+            let value = self.parse_expr(data)?;
 
-    //         items.push((key, value));
-    //         self.peek_expect_tok(Token::RBracket | Token::Comma)?;
-    //         self.skip_tok(Token::Comma);
-    //     }
-    //     self.next();
-    //     Ok(ParsedObjlike { items, item_spans })
-    // }
+            items.push((key, value));
+            self.peek_expect_tok(Token::RBracket | Token::Comma)?;
+            self.skip_tok(Token::Comma);
+        }
+        self.next();
+        Ok(ParsedObjlike { items, item_spans })
+    }
 
     pub fn parse_unit(&mut self, data: &mut ASTData) -> Result<ExprKey> {
         let peek = self.peek();
@@ -362,17 +364,17 @@ impl Parser<'_> {
                     return Ok(data.insert(Expression::Dict(vec![]), start.extend(self.span())));
                 }
 
-                if !(self.peek() == Token::Ident && self.peek_many(2) == Token::Colon) {
-                    let code = self.parse_statements(data)?;
-                    self.expect_tok(Token::RBracket)?;
-                    Ok(data.insert(Expression::Block(code), start.extend(self.span())))
-                } else {
-                    let dictlike = self.parse_dictlike(data)?;
-                    Ok(data.exprs.insert_with_key(|key| {
-                        data.dictlike_spans.insert(key, dictlike.item_spans);
-                        (Expression::Dict(dictlike.items), start.extend(self.span()))
-                    }))
-                }
+                // if !(self.peek() == Token::Ident && self.peek_many(2) == Token::Colon) {
+                //     let code = self.parse_statements(data)?;
+                //     self.expect_tok(Token::RBracket)?;
+                //     Ok(data.insert(Expression::Block(code), start.extend(self.span())))
+                // } else {
+                let dictlike = self.parse_dictlike(data)?;
+                Ok(data.exprs.insert_with_key(|key| {
+                    data.dictlike_spans.insert(key, dictlike.item_spans);
+                    (Expression::Dict(dictlike.items), start.extend(self.span()))
+                }))
+                // }
             }
 
             Token::QMark => {
@@ -395,32 +397,31 @@ impl Parser<'_> {
                 Ok(data.insert(Expression::TriggerFunc(code), start))
             }
 
-            // Token::Obj | Token::Trigger => {
-            //     let obj_mode = if peek == Token::Obj {
-            //         ObjectMode::Object
-            //     } else {
-            //         ObjectMode::Trigger
-            //     };
-            //     self.next();
-            //     self.expect_tok(Token::LBracket)?;
-            //     if self.peek() == Token::RBracket {
-            //         self.next();
-            //         return Ok(data.insert(
-            //             Expression::Obj(obj_mode, vec![]),
-            //             start.extend(self.span()),
-            //         ));
-            //     }
+            Token::Obj | Token::Trigger => {
+                let obj_mode = if peek == Token::Obj {
+                    ObjectMode::Object
+                } else {
+                    ObjectMode::Trigger
+                };
+                self.next();
+                self.expect_tok(Token::LBracket)?;
+                if self.peek() == Token::RBracket {
+                    self.next();
+                    return Ok(
+                        data.insert(Expression::Obj(obj_mode, vec![]), start.extend(self.span()))
+                    );
+                }
 
-            //     let objlike = self.parse_objlike(data)?;
+                let objlike = self.parse_objlike(data)?;
 
-            //     Ok(data.exprs.insert_with_key(|key| {
-            //         data.objlike_spans.insert(key, objlike.item_spans);
-            //         (
-            //             Expression::Obj(obj_mode, objlike.items),
-            //             start.extend(self.span()),
-            //         )
-            //     }))
-            // }
+                Ok(data.exprs.insert_with_key(|key| {
+                    data.objlike_spans.insert(key, objlike.item_spans);
+                    (
+                        Expression::Obj(obj_mode, objlike.items),
+                        start.extend(self.span()),
+                    )
+                }))
+            }
             unary_op if operators::is_unary(unary_op) => {
                 self.next();
                 let prec = operators::unary_prec(unary_op);
@@ -502,14 +503,14 @@ impl Parser<'_> {
 
             enum IsMacro {
                 No,
-                Yes { has_arrow: bool },
+                Yes { lambda: bool },
             }
 
             let is_macro = match check.peek() {
                 // `() => {} ` = `IsMacro::Yes { has_arrow: true }`,
-                Token::FatArrow => IsMacro::Yes { has_arrow: true },
+                Token::FatArrow => IsMacro::Yes { lambda: true },
                 //`() {} ` = `IsMacro::Yes { has_arrow: false }`,
-                Token::LBracket => IsMacro::Yes { has_arrow: false },
+                Token::LBracket => IsMacro::Yes { lambda: false },
                 // `(...) ->`
                 Token::Arrow => {
                     // skips the arrow (`->`)
@@ -521,9 +522,9 @@ impl Parser<'_> {
                     // otherwise it's a macro pattern
                     match check.peek() {
                         // `() -> @string => {} ` = `IsMacro::Yes { has_arrow: true }`,
-                        Token::FatArrow => IsMacro::Yes { has_arrow: true },
+                        Token::FatArrow => IsMacro::Yes { lambda: true },
                         //`() -> @string {} ` = `IsMacro::Yes { has_arrow: false }`,
-                        Token::LBracket => IsMacro::Yes { has_arrow: false },
+                        Token::LBracket => IsMacro::Yes { lambda: false },
                         // `() -> @string` = `IsMacro::No` (pattern)
                         _ => IsMacro::No,
                     }
@@ -535,11 +536,11 @@ impl Parser<'_> {
                 }
             };
 
-            if let IsMacro::Yes { has_arrow } = is_macro {
+            if let IsMacro::Yes { lambda } = is_macro {
                 let mut args = vec![];
                 let mut arg_areas = vec![];
                 while self.peek() != Token::RParen {
-                    self.expect_or_tok(Token::Ident, "argument name")?; // what if you want default args (foo = "default")
+                    self.expect_or_tok(Token::Ident, "argument name")?;
                     let arg_name = self.slice().to_string();
                     let arg_span = self.span();
                     let arg_type = if self.peek() == Token::Colon {
@@ -566,19 +567,30 @@ impl Parser<'_> {
                 } else {
                     None
                 };
-                if has_arrow {
+                let key = if lambda {
                     self.expect_tok(Token::FatArrow)?;
-                }
-                let code = self.parse_expr(data)?;
-
-                let key = data.insert(
-                    Expression::Macro {
-                        args,
-                        ret_type,
-                        code,
-                    },
-                    start.extend(self.span()),
-                );
+                    let code = self.parse_expr(data)?;
+                    data.insert(
+                        Expression::Macro {
+                            args,
+                            ret_type,
+                            code: MacroCode::Lambda(code),
+                        },
+                        start.extend(self.span()),
+                    )
+                } else {
+                    self.expect_tok(Token::LBracket)?;
+                    let code = self.parse_statements(data)?;
+                    self.expect_tok(Token::RBracket)?;
+                    data.insert(
+                        Expression::Macro {
+                            args,
+                            ret_type,
+                            code: MacroCode::Normal(code),
+                        },
+                        start.extend(self.span()),
+                    )
+                };
 
                 data.func_arg_spans.insert(key, arg_areas);
 
@@ -616,7 +628,7 @@ impl Parser<'_> {
                 Expression::Macro {
                     args: vec![(name, None, None)],
                     ret_type: None,
-                    code,
+                    code: MacroCode::Lambda(code),
                 },
                 start,
             );

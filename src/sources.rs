@@ -38,7 +38,7 @@ impl CodeArea {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Copy, Default)]
 pub struct CodeSpan {
     pub start: usize,
     pub end: usize,

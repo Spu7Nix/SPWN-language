@@ -16,6 +16,7 @@ error_maker! {
             name: String,
             area: CodeArea,
         },
+
         #[
             Message = "Attempted to modify immutable variable", Area = area, Note = None,
             Labels = [
@@ -26,6 +27,28 @@ error_maker! {
         ModifyImmutable {
             name: String,
             def_area: CodeArea,
+            area: CodeArea,
+        },
+
+        #[
+            Message = "Type definitions can only be defined on the top level of a file", Area = area, Note = None,
+            Labels = [
+                area => "Tried to define type `{}` here": @(format!("@{}", name));
+            ]
+        ]
+        LowerLevelTypeDef {
+            name: String,
+            area: CodeArea,
+        },
+
+        #[
+            Message = "Undefined type", Area = area, Note = None,
+            Labels = [
+                area => "Type `{}` is not defined": @(name);
+            ]
+        ]
+        UndefinedType {
+            name: String,
             area: CodeArea,
         },
     }

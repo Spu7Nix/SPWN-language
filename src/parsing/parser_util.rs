@@ -110,7 +110,7 @@ pub struct ParsedDictlike {
     pub item_spans: Vec<CodeSpan>,
 }
 
-// pub struct ParsedObjlike {
-//     pub items: Vec<(ExprKey, ExprKey)>,
-//     pub item_spans: Vec<CodeSpan>,
-// }
+pub struct ParsedObjlike {
+    pub items: Vec<(ExprKey, ExprKey)>,
+    pub item_spans: Vec<CodeSpan>,
+}

@@ -1,5 +1,6 @@
 mod compilation;
 mod error;
+mod leveldata;
 mod parsing;
 mod sources;
 mod vm;
@@ -40,7 +41,7 @@ fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
     let (ast, stmts) = handle!(parse_stage(&code, &source));
     let compiler = handle!(bytecode_generation(ast, stmts, &source));
 
-    let mut globals = Globals::new();
+    let mut globals = Globals::new(compiler.types);
     let mut contexts = FullContext::single(compiler.code.var_count);
 
     let start = std::time::Instant::now();
@@ -50,6 +51,26 @@ fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
     let end = std::time::Instant::now();
     let duration = end.duration_since(start);
     println!("Duration: {:?}", duration);
+
+    let mut all_objects = globals.objects;
+
+    all_objects.extend(globals.triggers);
+    match leveldata::postprocess::append_objects(all_objects, "") {
+        Ok((new_ls, used_ids)) => {
+            println!("\n{}", ansi_term::Color::Purple.bold().paint("Level:"));
+            for (i, len) in used_ids.iter().enumerate() {
+                if *len > 0 {
+                    println!(
+                        "{} {}",
+                        len,
+                        ["groups", "colors", "block IDs", "item IDs"][i]
+                    );
+                }
+            }
+            println!("Level string:\n{}", new_ls);
+        }
+        Err(e) => eprintln!("{}", ansi_term::Color::Red.paint(e)),
+    };
 }
 
 // fn post_stage(globals: Globals) {

@@ -1,10 +1,8 @@
 use std::{collections::HashMap, fmt};
 
-use crate::interpreter::value::Id;
+use super::gd_types::Id;
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ObjParam {
     Group(Id),
     Color(Id),
@@ -17,13 +15,13 @@ pub enum ObjParam {
     Epsilon,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Copy, Hash)]
+#[derive(Clone, PartialEq, Debug, Copy, Hash)]
 pub enum ObjectMode {
     Object,
     Trigger,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GdObj {
     pub params: HashMap<u16, ObjParam>,
     pub mode: ObjectMode,

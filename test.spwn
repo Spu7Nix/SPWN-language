@@ -1,27 +1,5 @@
 
 
+print @thing1;
 
-
-
-
-
-// let arr = [];
-// let a = 0;
-// while a < 5 {
-//     let i = a;
-//     arr = arr + [() {
-//         print i;
-//     }];
-
-//     a = a + 1;
-// }
-
-// arr[0]();
-
-f = () {
-    return 3;
-};
-
-print f();
-
-
+type @thing1;

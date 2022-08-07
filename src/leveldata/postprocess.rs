@@ -1,14 +1,10 @@
+use super::gd_types::{ArbitraryId, Id, SpecificId};
+use crate::leveldata::{
+    object_data::{serialize_obj, ObjParam},
+    preprocess::get_used_ids,
+};
 use ahash::AHashMap;
 
-use crate::{
-    interpreter::value::Id,
-    leveldata::{
-        object_data::{serialize_obj, ObjParam},
-        preprocess::get_used_ids,
-    },
-};
-pub type ArbitraryId = u16;
-pub type SpecificId = u16;
 use super::object_data::GdObj;
 
 //returns the string to be appended to the old string

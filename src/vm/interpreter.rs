@@ -1,3 +1,4 @@
+use ahash::AHashSet;
 use slotmap::new_key_type;
 use slotmap::SlotMap;
 
@@ -5,8 +6,11 @@ use super::context::FullContext;
 use super::context::SkipMode::*;
 use super::error::RuntimeError;
 use super::instructions;
+use super::types::Type;
 use super::value::StoredValue;
 use crate::compilation::code::*;
+use crate::leveldata::gd_types::ArbitraryId;
+use crate::leveldata::object_data::GdObj;
 use crate::vm::context::ReturnType;
 use crate::vm::instructions::InstrData;
 
@@ -14,16 +18,31 @@ use paste::paste;
 
 new_key_type! {
     pub struct ValueKey;
+    pub struct TypeKey;
 }
 
 pub struct Globals {
     pub memory: SlotMap<ValueKey, StoredValue>,
+
+    pub undefined_captured: AHashSet<VarID>,
+    pub arbitrary_ids: [ArbitraryId; 4],
+
+    pub objects: Vec<GdObj>,
+    pub triggers: Vec<GdObj>,
+    pub types: SlotMap<TypeKey, Type>,
 }
 
 impl Globals {
-    pub fn new() -> Self {
+    pub fn new(types: SlotMap<TypeKey, Type>) -> Self {
         Self {
             memory: SlotMap::default(),
+
+            undefined_captured: AHashSet::new(),
+            arbitrary_ids: [0; 4],
+
+            objects: Vec::new(),
+            triggers: Vec::new(),
+            types,
         }
     }
     pub fn key_deep_clone(&mut self, k: ValueKey) -> ValueKey {
@@ -96,6 +115,7 @@ pub fn run_func(
                 Gte
                 LoadVar(a)
                 SetVar(a)
+                CreateVar(a)
                 BuildArray(a)
                 BuildDict(a)
                 Jump(a)
@@ -115,11 +135,20 @@ pub fn run_func(
                 Call(a)
                 Index
                 Return
+                YeetContext
+                EnterArrowStatement(a)
+                EnterTriggerFunction(a)
+
+                BuildObject(a)
+                BuildTrigger(a)
+                AddObject
             );
 
-            context.inner().pos += 1;
-            if context.inner().pos >= instructions.len() as isize {
-                context.inner().returned = Some(ReturnType::Implicit);
+            for context in context.iter(SkipReturns) {
+                context.inner().pos += 1;
+                if context.inner().pos >= instructions.len() as isize {
+                    context.inner().returned = Some(ReturnType::Implicit);
+                }
             }
         }
 

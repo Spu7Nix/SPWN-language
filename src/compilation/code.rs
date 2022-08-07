@@ -24,7 +24,6 @@ macro_rules! wrappers {
         )*
     };
 }
-
 wrappers! {
     InstrNum(u16)
 
@@ -38,6 +37,7 @@ pub struct BytecodeFunc {
     pub instructions: Vec<(Instruction, CodeSpan)>,
     pub arg_ids: Vec<VarID>,
     pub capture_ids: Vec<VarID>,
+    pub inner_ids: Vec<VarID>,
 }
 
 pub struct Code {
@@ -65,6 +65,7 @@ impl Code {
         }
     }
 
+    #[cfg(debug_assertions)]
     pub fn debug(&self) {
         let mut debug_str = String::new();
         use std::fmt::Write;
@@ -72,9 +73,11 @@ impl Code {
         for (i, f) in self.funcs.iter().enumerate() {
             writeln!(
                 &mut debug_str,
-                "================== Func {} ================== arg_ids: {:?}",
+                "================== Func {} ================== arg_ids: {:?}, capture_ids: {:?}, inner_ids: {:?}",
                 i,
-                f.arg_ids.iter().map(|id| id.0).collect::<Vec<_>>()
+                f.arg_ids.iter().map(|id| id.0).collect::<Vec<_>>(),
+                f.capture_ids.iter().map(|id| id.0).collect::<Vec<_>>(),
+                f.inner_ids.iter().map(|id| id.0).collect::<Vec<_>>(),
             )
             .unwrap();
             for (i, (instr, _)) in f.instructions.iter().enumerate() {
@@ -173,6 +176,7 @@ pub enum Instruction {
 
     LoadVar(VarID),
     SetVar(VarID),
+    CreateVar(VarID),
 
     BuildArray(InstrNum),
     BuildDict(KeysID),
@@ -202,6 +206,15 @@ pub enum Instruction {
     Return,
 
     Index,
+
+    YeetContext,
+    EnterArrowStatement(InstrNum),
+    EnterTriggerFunction(InstrNum),
+
+    /// makes gd object data structure from last n elements on the stack
+    BuildObject(InstrNum),
+    BuildTrigger(InstrNum),
+    AddObject,
 }
 
 impl Instruction {
@@ -210,7 +223,11 @@ impl Instruction {
             Self::BuildArray(num)
             | Self::Jump(num)
             | Self::JumpIfFalse(num)
-            | Self::IterNext(num) => num.0 = n,
+            | Self::EnterArrowStatement(num)
+            | Self::EnterTriggerFunction(num)
+            | Self::IterNext(num)
+            | Self::BuildObject(num)
+            | Self::BuildTrigger(num) => num.0 = n,
             _ => panic!("can't modify number of variant that doesnt hold nubere rf  v 🤓🤓🤓"),
         }
     }

@@ -1,10 +1,20 @@
+use std::collections::HashMap;
+
+use crate::{compilation::code::VarID, leveldata::gd_types::Id};
+
 use super::interpreter::ValueKey;
+
+// variables for each call (kinda like a stack frame thing???)
+#[derive(Debug, Clone)]
+pub struct VarStack {
+    pub vec: Vec<Option<ValueKey>>,
+}
 
 #[derive(Debug, Clone)]
 pub struct Context {
-    // TODO: group id
+    pub group: Id,
     pub stack: Vec<ValueKey>,
-    pub vars: Vec<Option<ValueKey>>,
+    pub vars: Vec<VarStack>,
 
     pub yeeted: bool,
     pub returned: Option<ReturnType>,
@@ -14,8 +24,9 @@ pub struct Context {
 impl Context {
     pub fn new(var_count: usize) -> Self {
         Self {
+            group: Id::Specific(0),
             stack: Vec::new(),
-            vars: vec![None; var_count],
+            vars: vec![VarStack { vec: vec![None] }; var_count],
             yeeted: false,
             returned: None,
             pos: 0,
@@ -29,7 +40,7 @@ pub enum ReturnType {
     Implicit,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum FullContext {
     Single(Context),
     Split(Box<FullContext>, Box<FullContext>),
