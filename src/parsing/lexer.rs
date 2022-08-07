@@ -50,7 +50,7 @@ pub enum Token {
     Continue,
 
     #[token("type")]
-    TypeDef,
+    Type,
     #[token("impl")]
     Impl,
 
@@ -130,6 +130,10 @@ pub enum Token {
     Colon,
     #[token("::")]
     DoubleColon,
+    #[token(".")]
+    Dot,
+    #[token("..")]
+    DotDot,
 
     #[token("=>")]
     FatArrow,
@@ -216,11 +220,13 @@ impl From<Token> for &str {
             Lte => "<=",
             Colon => ":",
             DoubleColon => "::",
+            Dot => ".",
+            DotDot => "..",
             FatArrow => "=>",
             Arrow => "->",
             QMark => "?",
             ExclMark => "!",
-            TypeDef => "type",
+            Type => "type",
             Impl => "impl",
         }
     }
@@ -236,9 +242,9 @@ impl ToString for Token {
 
 // have to use a wrapper struct since it isn't possible to implement on types you dont own (including built-ins)
 #[derive(Clone, Debug)]
-pub struct Tokens(pub Vec<Token>);
+pub struct TokenUnion(pub Vec<Token>);
 
-impl From<Token> for Tokens {
+impl From<Token> for TokenUnion {
     fn from(tok: Token) -> Self {
         Self(vec![tok])
     }
@@ -248,7 +254,7 @@ impl From<Token> for Tokens {
 // single token -> `<token>`
 // 2 tokens -> `<token> or <token>`
 // n tokens `<token>, <token>, ...., or <final token>`
-impl ToString for Tokens {
+impl ToString for TokenUnion {
     fn to_string(&self) -> String {
         if self.0.len() == 1 {
             self.0[0].to_string()
@@ -275,23 +281,23 @@ impl ToString for Tokens {
 // `Token::A | Token::B`
 // this impl alone only allows 2 tokens to be chained together
 impl std::ops::BitOr<Token> for Token {
-    type Output = Tokens;
+    type Output = TokenUnion;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        Tokens(Vec::from([self, rhs]))
+        TokenUnion(Vec::from([self, rhs]))
     }
 }
 
-// `Token::A | Token::B` becomes a `Tokens(Vec[Token::A, Token::B])`
+// `Token::A | Token::B` becomes a `TokenUnion(Vec[Token::A, Token::B])`
 // that means if you chain together 3 tokens (or more) it becomes
-// `Tokens(Vec[Token::A, Token::B]) | Token::C`
+// `TokenUnion(Vec[Token::A, Token::B]) | Token::C`
 // so that has to have its own implementation directly on the struct
-impl std::ops::BitOr<Token> for Tokens {
-    type Output = Tokens;
+impl std::ops::BitOr<Token> for TokenUnion {
+    type Output = TokenUnion;
 
     fn bitor(self, rhs: Token) -> Self::Output {
         let mut out = self.0;
         out.push(rhs);
-        Tokens(out)
+        TokenUnion(out)
     }
 }

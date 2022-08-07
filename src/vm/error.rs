@@ -1,8 +1,9 @@
 use crate::{error_maker, sources::CodeArea};
 
-use super::value::{StoredValue, ValueType};
+use super::value::{StoredValue, ValueType, ValueTypeUnion};
 
 error_maker! {
+    Globals: globals;
     Module: runtime_errors;
     pub enum RuntimeError {
         #[
@@ -18,9 +19,9 @@ error_maker! {
         #[
             Message = "Invalid operands", Area = area, Note = None,
             Labels = [
-                area => "Operator `{}` cannot be used on {} and {}": @(op), @(a.value.typ().to_str()), @(b.value.typ().to_str());
-                a.def_area => "This is of type {}": @(a.value.typ().to_str());
-                b.def_area => "This is of type {}": @(b.value.typ().to_str());
+                area => "Operator `{}` cannot be used on {} and {}": @(op), @(a.value.typ().to_str(globals)), @(b.value.typ().to_str(globals));
+                a.def_area => "This is of type {}": @(a.value.typ().to_str(globals));
+                b.def_area => "This is of type {}": @(b.value.typ().to_str(globals));
             ]
         ]
         InvalidOperands {
@@ -33,8 +34,8 @@ error_maker! {
         #[
             Message = "Invalid unary operand", Area = area, Note = None,
             Labels = [
-                area => "Unary operator `{}` cannot be used on {}": @(op), @(a.value.typ().to_str());
-                a.def_area => "This is of type {}": @(a.value.typ().to_str());
+                area => "Unary operator `{}` cannot be used on {}": @(op), @(a.value.typ().to_str(globals));
+                a.def_area => "This is of type {}": @(a.value.typ().to_str(globals));
             ]
         ]
         InvalidUnaryOperand {
@@ -46,7 +47,7 @@ error_maker! {
         #[
             Message = "Cannot convert type", Area = a.def_area, Note = None,
             Labels = [
-                a.def_area => "{} can't be converted to a {}": @(a.value.typ().to_str()), @(to.to_str());
+                a.def_area => "{} can't be converted to a {}": @(a.value.typ().to_str(globals)), @(to.to_str(globals));
             ]
         ]
         CannotConvert {
@@ -57,7 +58,7 @@ error_maker! {
         // #[
         //     Message = "Not an iterator", Area = a.def_area, Note = None,
         //     Labels = [
-        //         a.def_area => "Cannot iterate over {}": @(a.value.typ().to_str());
+        //         a.def_area => "Cannot iterate over {}": @(a.value.typ().to_str(globals));
         //     ]
         // ]
         // CannotIterate {
@@ -78,8 +79,8 @@ error_maker! {
         #[
             Message = "Invalid call base", Area = area, Note = None,
             Labels = [
-                area => "Cannot call {}": @(base.value.typ().to_str());
-                base.def_area => "Value was defined as {} here": @(base.value.typ().to_str());
+                area => "Cannot call {}": @(base.value.typ().to_str(globals));
+                base.def_area => "Value was defined as {} here": @(base.value.typ().to_str(globals));
             ]
         ]
         CannotCall {
@@ -103,22 +104,22 @@ error_maker! {
         #[
             Message = "Type mismatch", Area = area, Note = None,
             Labels = [
-                area => "Expected {}, found {}": @(expected), @(v.value.typ().to_str());
-                v.def_area => "This is of type {}": @(v.value.typ().to_str());
+                area => "Expected {}, found {}": @(expected.to_string(globals)), @(v.value.typ().to_str(globals));
+                v.def_area => "This is of type {}": @(v.value.typ().to_str(globals));
             ]
         ]
         TypeMismatch {
             v: StoredValue,
-            expected: String,
+            expected: ValueTypeUnion,
             area: CodeArea,
         },
 
         // #[
         //     Message = "Pattern mismatch", Area = area, Note = None,
         //     Labels = [
-        //         area => "This {} is not {}": @(v.value.typ().to_str()), @(pat.0.to_str());
-        //         v.def_area => "This is of type {}": @(v.value.typ().to_str());
-        //         pat.1 => "Pattern defined as {} here": @(pat.0.to_str());
+        //         area => "This {} is not {}": @(v.value.typ().to_str(globals)), @(pat.0.to_str(globals));
+        //         v.def_area => "This is of type {}": @(v.value.typ().to_str(globals));
+        //         pat.1 => "Pattern defined as {} here": @(pat.0.to_str(globals));
         //     ]
         // ]
         // PatternMismatch {
@@ -165,16 +166,16 @@ error_maker! {
         //     area: CodeArea,
         // },
 
-        // #[
-        //     Message = "Use of undefined member!", Area = area, Note = None,
-        //     Labels = [
-        //         area => "`{}` is undefined": @(name);
-        //     ]
-        // ]
-        // UndefinedMember {
-        //     name: String,
-        //     area: CodeArea,
-        // },
+        #[
+            Message = "Use of undefined member!", Area = area, Note = None,
+            Labels = [
+                area => "`{}` is undefined": @(name);
+            ]
+        ]
+        UndefinedMember {
+            name: String,
+            area: CodeArea,
+        },
 
         #[
             Message = "Cannot add objects to the level at runtime", Area = area, Note = None,
@@ -185,5 +186,29 @@ error_maker! {
         AddObjectAtRuntime {
             area: CodeArea,
         },
+
+        #[
+            Message = "Index out of bounds!", Area = area, Note = None,
+            Labels = [
+                area => "The length is {} but the index is {}": @(len), @(idx);
+            ]
+        ]
+        IndexOutOfBounds {
+            area: CodeArea,
+            len: usize,
+            idx: isize,
+        },
+
+        #[
+            Message = "Nonexistent member", Area = area, Note = None,
+            Labels = [
+                area => "The member `{}` does not exist": @(member);
+            ]
+        ]
+        NonexistentMember {
+            area: CodeArea,
+            member: String,
+        },
     }
+
 }

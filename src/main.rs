@@ -26,12 +26,11 @@ fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
     // }
 
     macro_rules! handle {
-        ($a:expr) => {
+        ($a:expr $(=> $arg:expr)?) => {
             match $a {
                 Ok(a) => a,
                 Err(e) => {
-                    use crate::error::RaiseError;
-                    e.raise(&code, source);
+                    e.raise(&code, source $(, $arg)?);
                     return;
                 }
             }
@@ -45,7 +44,7 @@ fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
     let mut contexts = FullContext::single(compiler.code.var_count);
 
     let start = std::time::Instant::now();
-    handle!(run_func(&mut globals, &compiler.code, 0, &mut contexts));
+    handle!(run_func(&mut globals, &compiler.code, 0, &mut contexts) => &globals);
 
     // get end time
     let end = std::time::Instant::now();

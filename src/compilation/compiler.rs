@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::Write;
 
+use crate::vm::value::ValueType;
 use ahash::AHashMap;
 use slotmap::{new_key_type, SlotMap};
 
@@ -11,12 +12,13 @@ use crate::{
         lexer::Token,
     },
     sources::{CodeSpan, SpwnSource},
-    vm::{interpreter::TypeKey, types::Type, value::Value},
+    vm::{interpreter::TypeKey, types::CustomType, value::Value},
 };
 
 use super::{
     code::{
-        BytecodeFunc, Code, ConstID, InstrNum, InstrPos, Instruction, KeysID, MacroBuildID, VarID,
+        BytecodeFunc, Code, ConstID, InstrNum, InstrPos, Instruction, KeysID, MacroBuildID,
+        MemberID, VarID,
     },
     error::CompilerError,
 };
@@ -27,7 +29,7 @@ pub enum Constant {
     Float(f64),
     Bool(bool),
     String(String),
-    Type(TypeKey),
+    Type(ValueType),
 }
 
 impl Constant {
@@ -37,7 +39,7 @@ impl Constant {
             Constant::Float(v) => Value::Float(*v),
             Constant::Bool(v) => Value::Bool(*v),
             Constant::String(v) => Value::String(v.clone()),
-            Constant::Type(k) => Value::TypeIndicator(*k),
+            Constant::Type(k) => Value::Type(*k),
         }
     }
 }
@@ -86,7 +88,7 @@ pub struct Compiler {
     pub code: Code,
 
     pub scopes: SlotMap<ScopeKey, Scope>,
-    pub types: SlotMap<TypeKey, Type>,
+    pub types: SlotMap<TypeKey, CustomType>,
     pub type_keys: AHashMap<String, TypeKey>,
 }
 
@@ -255,15 +257,16 @@ impl Compiler {
                 }
             },
             Expression::Type(name) => {
-                if let Some(key) = self.type_keys.get(&name) {
-                    let id = self.code.const_register.insert(Constant::Type(*key));
-                    self.push_instr(Instruction::LoadConst(ConstID(id as u16)), span, func);
-                } else {
-                    return Err(CompilerError::UndefinedType {
-                        name,
-                        area: self.ast_data.source.area(span),
-                    });
-                }
+                todo!()
+                // if let Some(key) = self.type_keys.get(&name) {
+                //     let id = self.code.const_register.insert(Constant::Type(*key));
+                //     self.push_instr(Instruction::LoadConst(ConstID(id as u16)), span, func);
+                // } else {
+                //     return Err(CompilerError::UndefinedType {
+                //         name,
+                //         area: self.ast_data.source.area(span),
+                //     });
+                // }
             }
             Expression::Array(arr) => {
                 for i in &arr {
@@ -386,6 +389,17 @@ impl Compiler {
                 self.compile_expr(index, scope, func)?;
                 self.push_instr(Instruction::Index, span, func);
             }
+
+            Expression::Member { base, name } => {
+                self.compile_expr(base, scope, func)?;
+                let id = self.code.member_register.insert(name);
+                self.push_instr(Instruction::Member(MemberID(id as u16)), span, func);
+            }
+
+            Expression::TypeOf { base } => {
+                self.compile_expr(base, scope, func)?;
+                self.push_instr(Instruction::TypeOf, span, func);
+            }
             Expression::Call {
                 base,
                 params,
@@ -418,7 +432,35 @@ impl Compiler {
                 let to = self.push_instr(Instruction::YeetContext, span, func);
                 self.get_instr(enter).modify_num((to.idx + 1) as u16);
             }
-            Expression::Instance(_, _) => todo!(),
+            Expression::Instance(t, fields) => {
+                // copied from dict
+                let keys = self
+                    .code
+                    .keys_register
+                    .insert(fields.iter().map(|(s, _)| s.clone()).rev().collect());
+                let key_spans = self.ast_data.dictlike_spans[expr_key].clone();
+                for ((name, v), span) in fields.into_iter().zip(key_spans) {
+                    match v {
+                        Some(e) => {
+                            self.compile_expr(e, scope, func)?;
+                        }
+                        None => match self.get_var(&name, scope) {
+                            Some(data) => {
+                                self.push_instr(Instruction::LoadVar(data.id), span, func);
+                            }
+                            None => {
+                                return Err(CompilerError::NonexistentVariable {
+                                    name,
+                                    area: self.ast_data.source.area(span),
+                                })
+                            }
+                        },
+                    }
+                }
+
+                self.compile_expr(t, scope, func)?;
+                self.push_instr(Instruction::BuildInstance(KeysID(keys as u16)), span, func);
+            }
             Expression::Split(_, _) => todo!(),
             Expression::Obj(mode, vals) => {
                 let l = InstrNum(vals.len() as u16);
@@ -618,7 +660,7 @@ impl Compiler {
         for i in stmts.iter() {
             if let Statement::TypeDef(name) = self.ast_data.get(*i) {
                 if allow_type_def {
-                    let k = self.types.insert(Type {
+                    let k = self.types.insert(CustomType {
                         name: name.clone(),
                         members: AHashMap::default(),
                     });

@@ -23,6 +23,7 @@ lz4-compression = "0.7.0"
 yazi = "0.1.4"
 base64 = "0.13.0"
 mopa = "0.2.2"
+convert_case = "0.5.0"
 
 paste = "1.0.8"
 

@@ -6,7 +6,7 @@ use super::context::FullContext;
 use super::context::SkipMode::*;
 use super::error::RuntimeError;
 use super::instructions;
-use super::types::Type;
+use super::types::CustomType;
 use super::value::StoredValue;
 use crate::compilation::code::*;
 use crate::leveldata::gd_types::ArbitraryId;
@@ -29,11 +29,11 @@ pub struct Globals {
 
     pub objects: Vec<GdObj>,
     pub triggers: Vec<GdObj>,
-    pub types: SlotMap<TypeKey, Type>,
+    pub types: SlotMap<TypeKey, CustomType>,
 }
 
 impl Globals {
-    pub fn new(types: SlotMap<TypeKey, Type>) -> Self {
+    pub fn new(types: SlotMap<TypeKey, CustomType>) -> Self {
         Self {
             memory: SlotMap::default(),
 
@@ -134,6 +134,8 @@ pub fn run_func(
                 BuildMacro(a)
                 Call(a)
                 Index
+                Member(a)
+                TypeOf
                 Return
                 YeetContext
                 EnterArrowStatement(a)
@@ -142,6 +144,8 @@ pub fn run_func(
                 BuildObject(a)
                 BuildTrigger(a)
                 AddObject
+
+                BuildInstance(a)
             );
 
             for context in context.iter(SkipReturns) {

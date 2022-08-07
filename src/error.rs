@@ -53,95 +53,91 @@ impl RainbowColorGenerator {
 
 use crate::SpwnSource;
 
-pub trait RaiseError {
-    fn raise(self, code: &str, source: SpwnSource);
-}
-
 #[macro_export]
 macro_rules! error_maker {
     (
         $(
-            Module: $module_name:ident;
-            pub enum $err_type:ident {
-                $(
-                    #[
-                        Message = $msg:expr, Area = $area:expr, Note = $note:expr,
-                        Labels = [
-                            $(
-                                $l_area:expr => $fmt:literal $(: $( $(@($c_e:expr))? $($e:expr)? ),* )?;
-                            )+
-                        ]
-                    ]
-                    $variant:ident {
+            Globals: $globals:ident;
+        )?
+        Module: $module_name:ident;
+        pub enum $err_type:ident {
+            $(
+                #[
+                    Message = $msg:expr, Area = $area:expr, Note = $note:expr,
+                    Labels = [
                         $(
-                            $field:ident: $typ:ty,
+                            $l_area:expr => $fmt:literal $(: $( $(@($c_e:expr))? $($e:expr)? ),* )?;
                         )+
-                    },
-                )*
-            }
-        )*
+                    ]
+                ]
+                $variant:ident {
+                    $(
+                        $field:ident: $typ:ty,
+                    )+
+                },
+            )*
+        }
 
     ) => {
         use $crate::error::*;
         use ariadne::{Report, ReportKind, Label, Source, Fmt};
         #[allow(unused_imports)]
         use $crate::sources::{SpwnSource, source_name};
+        use crate::Globals;
 
-        $(
-            #[derive(Debug)]
-            pub enum $err_type {
-                $(
-                    $variant {
-                        $(
-                            $field: $typ,
-                        )+
-                    },
-                )*
-            }
+        #[derive(Debug)]
+        pub enum $err_type {
+            $(
+                $variant {
+                    $(
+                        $field: $typ,
+                    )+
+                },
+            )*
+        }
 
-            impl RaiseError for $err_type {
-                fn raise(self, code: &str, source: SpwnSource) {
-                    let mut label_colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 45.0);
-                    let mut item_colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 15.0);
+        impl $err_type {
+            pub fn raise(self, code: &str, source: SpwnSource $(, $globals: &Globals)?) {
+                let mut label_colors = RainbowColorGenerator::new(120.0, ERROR_S, ERROR_V, 45.0);
+                let mut item_colors = RainbowColorGenerator::new(0.0, ERROR_S, ERROR_V, 15.0);
 
 
-                    let (message, area, labels, note): (_, _, _, Option<String>) = match self {
-                        $(
-                            $err_type::$variant { $($field),+ } => {
-                                let err_area = $area.clone();
-                                let labels = vec![
-                                    $(
-                                        ( $l_area, format!($fmt  $( , $(   $($c_e.fg(item_colors.next()))? $($e)?       ,)* )? ) ),
-                                    )+
-                                ];
+                let (message, area, labels, note): (_, _, _, Option<String>) = match self {
+                    $(
+                        $err_type::$variant { $($field),+ } => {
+                            let err_area = $area.clone();
+                            let labels = vec![
+                                $(
+                                    ( $l_area, format!($fmt  $( , $(   $($c_e.fg(item_colors.next()))? $($e)?       ,)* )? ) ),
+                                )+
+                            ];
 
-                                ($msg, err_area, labels, $note)
-                            }
-                        )*
-                    };
+                            ($msg, err_area, labels, $note)
+                        }
+                    )*
+                };
 
-                    let mut report = Report::build(ReportKind::Error, area.name(), area.span.start)
-                        .with_message(message.to_string() + "\n");
+                let mut report = Report::build(ReportKind::Error, area.name(), area.span.start)
+                    .with_message(message.to_string() + "\n");
 
-                    for (c, s) in labels {
-                        report = report.with_label(
-                            Label::new(c.label())
-                                .with_message(s)
-                                .with_color(label_colors.next()),
-                        )
-                    }
-
-                    if let Some(m) = &note {
-                        report = report.with_note(m)
-                    }
-
-                    report
-                        .finish()
-                        .eprint((source_name(&source), Source::from(code)))
-                        .unwrap();
+                for (c, s) in labels {
+                    report = report.with_label(
+                        Label::new(c.label())
+                            .with_message(s)
+                            .with_color(label_colors.next()),
+                    )
                 }
+
+                if let Some(m) = &note {
+                    report = report.with_note(m)
+                }
+
+                report
+                    .finish()
+                    .eprint((source_name(&source), Source::from(code)))
+                    .unwrap();
             }
-        )*
+        }
 
     };
 }

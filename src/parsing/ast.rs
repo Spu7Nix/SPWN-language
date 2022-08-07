@@ -168,6 +168,16 @@ pub enum Expression {
         base: ExprKey,
         index: ExprKey,
     },
+
+    Member {
+        base: ExprKey,
+        name: String,
+    },
+
+    TypeOf {
+        base: ExprKey,
+    },
+
     Call {
         base: ExprKey,
         params: Vec<ExprKey>,

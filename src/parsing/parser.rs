@@ -5,7 +5,7 @@ use logos::{Lexer, Logos};
 use super::ast::{ASTData, ASTInsert, IdClass};
 use super::ast::{ExprKey, Expression, Statement, Statements, StmtKey};
 use super::error::SyntaxError;
-use super::lexer::{Token, Tokens};
+use super::lexer::{Token, TokenUnion};
 use super::parser_util::{operators, OpType, ParsedDictlike, ParsedObjlike};
 
 use crate::leveldata::object_data::ObjectMode;
@@ -70,11 +70,11 @@ impl Parser<'_> {
 
     pub fn peek_expect_or_tok<T, U>(&mut self, tok: T, or: U) -> Result<()>
     where
-        T: Into<Tokens> + ToString,
+        T: Into<TokenUnion> + ToString,
         U: ToString,
     {
         let next = self.peek();
-        let toks: Tokens = tok.into();
+        let toks: TokenUnion = tok.into();
 
         if !toks.0.contains(&next) {
             self.next();
@@ -90,18 +90,18 @@ impl Parser<'_> {
 
     pub fn peek_expect_tok<T>(&mut self, tok: T) -> Result<()>
     where
-        T: Into<Tokens> + ToString + Clone,
+        T: Into<TokenUnion> + ToString + Clone,
     {
         self.peek_expect_or_tok(tok.clone(), tok)
     }
 
     pub fn expect_or_tok<T, U>(&mut self, tok: T, or: U) -> Result<()>
     where
-        T: Into<Tokens> + ToString,
+        T: Into<TokenUnion> + ToString,
         U: ToString,
     {
         let next = self.next();
-        let toks: Tokens = tok.into();
+        let toks: TokenUnion = tok.into();
 
         if !toks.0.contains(&next) {
             return Err(SyntaxError::ExpectedToken {
@@ -115,7 +115,7 @@ impl Parser<'_> {
 
     pub fn expect_tok<T>(&mut self, tok: T) -> Result<()>
     where
-        T: Into<Tokens> + ToString + Clone,
+        T: Into<TokenUnion> + ToString + Clone,
     {
         self.expect_or_tok(tok.clone(), tok)
     }
@@ -653,6 +653,7 @@ impl Parser<'_> {
                 | Token::QMark
                 | Token::DoubleColon
                 | Token::ExclMark
+                | Token::Dot
         ) {
             match self.peek() {
                 Token::LSqBracket => {
@@ -748,6 +749,33 @@ impl Parser<'_> {
                             start.extend(self.span()),
                         )
                     })
+                }
+                Token::Dot => {
+                    self.next();
+                    match self.next() {
+                        Token::Ident => {
+                            let name = self.slice().to_string();
+                            let key = data.insert(
+                                Expression::Member { base: value, name },
+                                start.extend(self.span()),
+                            );
+                            value = key;
+                        }
+                        Token::Type => {
+                            let key = data.insert(
+                                Expression::TypeOf { base: value },
+                                start.extend(self.span()),
+                            );
+                            value = key;
+                        }
+                        _ => {
+                            return Err(SyntaxError::ExpectedToken {
+                                expected: "identifier".to_string(),
+                                found: self.slice().to_string(),
+                                area: self.make_area(self.span()),
+                            });
+                        }
+                    }
                 }
                 Token::ExclMark => {
                     self.next();
@@ -926,7 +954,7 @@ impl Parser<'_> {
                 self.next();
                 Statement::Break
             }
-            Token::TypeDef => {
+            Token::Type => {
                 self.next();
                 self.expect_tok(Token::TypeIndicator)?;
                 let typ_name = self.slice()[1..].to_string();
