@@ -55,6 +55,23 @@ pub struct Code {
     pub funcs: Vec<BytecodeFunc>,
 }
 
+macro_rules! color_replace {
+    ($str:expr, $($reg:expr, $rep:expr,)*) => {
+        $(
+            let re = regex::Regex::new($reg).unwrap();
+            $str = re
+                .replace_all(
+                    &$str,
+                    ansi_term::Color::Yellow
+                        .bold()
+                        .paint($rep)
+                        .to_string(),
+                )
+                .into();
+        )*
+    };
+}
+
 impl Code {
     pub fn new(source: SpwnSource) -> Self {
         Self {
@@ -102,61 +119,15 @@ impl Code {
             }
         }
 
-        let re = regex::Regex::new(r"ConstID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow
-                    .bold()
-                    .paint("const $1")
-                    .to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"VarID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow.bold().paint("var $1").to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"InstrNum\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow.bold().paint("$1").to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"KeysID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow
-                    .bold()
-                    .paint("dict keys $1")
-                    .to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"MacroBuildID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow
-                    .bold()
-                    .paint("macro build $1")
-                    .to_string(),
-            )
-            .into();
-
-        let re = regex::Regex::new(r"MemberID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow
-                    .bold()
-                    .paint("member $1")
-                    .to_string(),
-            )
-            .into();
+        color_replace!(
+            debug_str,
+            r"ConstID\(([^)]*)\)", "const $1",
+            r"VarID\(([^)]*)\)", "var $1",
+            r"InstrNum\(([^)]*)\)", "$1",
+            r"KeysID\(([^)]*)\)", "dict keys $1",
+            r"MacroBuildID\(([^)]*)\)", "macro build $1",
+            r"MemberID\(([^)]*)\)", "member $1",
+        );
 
         println!("{}", debug_str);
     }
