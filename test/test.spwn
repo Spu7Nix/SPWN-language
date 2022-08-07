@@ -1,6 +1,0 @@
-#[no_level]
-
-
-
-$.print([0, 1, 2].reduce($._plus_))
-

@@ -1,0 +1,5 @@
+
+
+print @thing1;
+
+type @thing1;

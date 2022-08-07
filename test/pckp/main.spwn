@@ -1,7 +1,0 @@
-
-complex = import "pckp_libraries/SPWN-complex@1.0.0"
-
-let a = @complex::new(2,4)
-let b = @complex::new(-1,5)
-
-$.print(a * b)

@@ -1,9 +1,0 @@
-[hello]
-text="Hello world"
-number=123
-pi=3.141
-
-[world]
-aa=true
-bb=false
-cc=1970-01-01T01:01:01-01:00
