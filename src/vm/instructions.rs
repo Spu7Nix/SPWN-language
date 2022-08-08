@@ -419,7 +419,7 @@ pub fn run_build_macro(
         }
     }
 
-    push!(Value: Value::Macro(Macro {
+    push!(Value: Value::Macro(Macro::Custom  {
         func_id,
         captured,
         args,
@@ -458,26 +458,31 @@ pub fn run_call(
 
     let v = pop!(Shallow);
     match &v.value {
-        Value::Macro(m) => {
-            let idx = m.func_id;
+        Value::Macro(Macro::Custom {
+            func_id,
+            captured,
+            args,
+            ret_pattern,
+        }) => {
+            let idx = *func_id;
 
             for i in &data.code.funcs[idx].inner_ids {
                 context.inner().vars[i.0 as usize].vec.push(None)
             }
 
             let passed_args = passed_args.0 as usize;
-            if passed_args > m.args.len() {
+            if passed_args > args.len() {
                 return Err(RuntimeError::TooManyArguments {
-                    expected: m.args.len(),
+                    expected: args.len(),
                     provided: passed_args,
                     call_area: area!(),
                     func_area: v.def_area.clone(),
                 });
             }
-            let mut arg_values = vec![None; m.args.len()];
+            let mut arg_values = vec![None; args.len()];
 
             // set defaults
-            for (i, arg) in m.args.iter().enumerate() {
+            for (i, arg) in args.iter().enumerate() {
                 if let Some(default) = arg.default {
                     arg_values[i] = Some(default)
                 }
@@ -486,7 +491,7 @@ pub fn run_call(
             // set positional
             for i in 0..passed_args {
                 let val = pop!(Deep Store);
-                arg_values[m.args.len() - 1 - i] = Some(val);
+                arg_values[args.len() - 1 - i] = Some(val);
             }
 
             // apply
@@ -510,7 +515,7 @@ pub fn run_call(
 
             let stored_pos = context.inner().pos;
 
-            for (id, k) in &m.captured {
+            for (id, k) in captured {
                 *context.inner().vars[id.0 as usize].vec.last_mut().unwrap() = Some(*k);
             }
 
@@ -537,6 +542,12 @@ pub fn run_call(
                     _ => unreachable!(),
                 }
             }
+        }
+        Value::Macro(Macro::Builtin { func_ptr }) => {
+            todo!()
+        }
+        Value::Type(t) => {
+            todo!()
         }
         _ => {
             return Err(RuntimeError::CannotCall {

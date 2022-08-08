@@ -1,3 +1,4 @@
+use super::interpreter::{Globals, ValueKey};
 use super::value::{Value, ValueType};
 
 use super::error::RuntimeError;
@@ -91,7 +92,7 @@ value_to_num! { i16 i32 i64 i128 isize; f32 f64 }
 // generates a load of impl's that impl the trait for differnet length tuples (up to 25)
 // rust still doesnt support variable length generics so this is the only solution
 pub trait FromValueList {
-    fn from_value_list(values: &[Value], area: CodeArea) -> Result<Self, RuntimeError>
+    fn from_value_list(values: &[ValueKey], globals: &mut Globals) -> Result<Self, RuntimeError>
     where
         Self: Sized;
 }
@@ -112,14 +113,16 @@ macro_rules! tuple_value_list {
                 $name,
             )*
         ) {
-            fn from_value_list(values: &[Value], area: CodeArea) -> Result<Self, RuntimeError>
+            fn from_value_list(values: &[ValueKey], globals: &mut Globals) -> Result<Self, RuntimeError>
             where
                 Self: Sized
             {
                 Ok((
-                    $(
-                        $name::from_value(values[$count].clone(), area.clone())?,
-                    )*
+                    $({
+                        let v = values[$count];
+                        let sb = globals.memory[v];
+                        $name::from_value(values[$count], )?,
+                    })*
                 ))
             }
         }

@@ -2,6 +2,11 @@ use std::marker::PhantomData;
 use std::{any::Any, sync::Arc};
 
 use ahash::AHashMap;
+use slotmap::SlotMap;
+
+use crate::sources::CodeArea;
+
+use super::error::RuntimeError;
 
 use super::from_value::FromValueList;
 use super::interpreter::Globals;
@@ -23,17 +28,18 @@ use super::to_value::{ToValue, ToValueResult};
 // default values
 // all methods with areas and globals
 
+// type @group
+
 pub struct CustomType {
     pub name: String,
-    pub members: AHashMap<String, ValueKey>,
-    //internal: Option<&'a mut BuiltinType>,
+    //pub members: AHashMap<String, ValueKey>,
 }
 
-impl CustomType {
-    pub fn get_member(&self, name: String) -> ValueKey {
-        self.members[name]
-    }
-}
+// impl CustomType {
+//     pub fn get_member(&self, name: String) -> ValueKey {
+//         self.members[&name]
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Instance {
@@ -41,71 +47,74 @@ pub struct Instance {
     pub fields: AHashMap<String, ValueKey>,
 }
 
-pub struct BuiltinType;
+type BuiltinPtr = fn(&mut Globals, &[ValueKey]) -> Result<ValueKey, RuntimeError>;
 
-// pub struct RustType<'a, T, R1, R2, A>
-// where
-//     R1: ToValue,
-//     R2: ToValueResult,
-//     A: FromValueList,
-// {
-//     globals: &'a mut Globals,
-//     members: AHashMap<String, Arc<dyn Fn(&T, &mut Globals) -> R1>>,
-//     methods: AHashMap<String, Arc<dyn Fn(A, &mut Globals) -> R2>>,
-// }
-
-// impl RustType {
-//     pub fn new() -> Self {}
-
-//     pub fn get_member() {}
-//     pub fn call_method() {}
-// }
-
-pub struct TypeBuilder<T, R1, R2, A>
-where
-    R1: ToValue,
-    R2: ToValueResult,
-    A: FromValueList,
-{
-    name: &'static str,
-    members: AHashMap<String, Arc<dyn Fn(&T, &mut Globals) -> R1>>,
-    methods: AHashMap<String, Arc<dyn Fn(A, &mut Globals) -> R2>>,
-    phantom: PhantomData<T>,
+pub struct BuiltinFunction {
+    func: BuiltinPtr,
+    is_method: bool, // takes self as first argument if true
+                     // arguments and shit
 }
 
-impl<T, R1, R2, A> TypeBuilder<T, R1, R2, A>
-where
-    R1: ToValue,
-    R2: ToValueResult,
-    A: FromValueList,
-{
-    pub fn named(name: &'static str) -> Self {
+pub struct TypeBuilder {
+    typ: ValueType,
+    members: AHashMap<String, ValueKey>,
+}
+
+impl TypeBuilder {
+    pub fn new(typ: ValueType) -> Self {
         Self {
-            name,
+            typ,
             members: AHashMap::new(),
-            methods: AHashMap::new(),
-            phantom: PhantomData,
         }
     }
 
-    pub fn add_member<F>(&mut self, name: &'static str, f: F)
+    pub fn add_member<V>(mut self, globals: &mut Globals, name: &'static str, v: V) -> Self
     where
-        F: Fn(&T, &mut Globals) -> R1 + 'static,
+        V: ToValue,
     {
-        self.members.insert(name.into(), Arc::new(f));
+        let v = v.to_value().into_stored(CodeArea::unknown());
+        let k = globals.memory.insert(v);
+        self.members.insert(name.into(), k);
+        self
     }
 
-    pub fn add_method<F>(&mut self, name: &'static str, f: F)
-    where
-        F: Fn(A, &mut Globals) -> R2 + 'static,
-    {
-        self.methods.insert(name.into(), Arc::new(f));
+    pub unsafe fn add_method(
+        self,
+        globals: &mut Globals,
+        name: &'static str,
+        f: BuiltinPtr,
+    ) -> Self {
+        let key = globals.builtins.insert(f);
+
+        let v = Value::Macro(Macro::Builtin { func_ptr: key });
+        self.add_member(globals, name, v)
     }
 
-    // pub fn finish_type(&self, globals: &mut Globals) -> CustomType {
-    //     CustomType {
-    //         name: self.name,
-    //         members: AHashMap::new(),
-    //     }
-    // }
+    pub fn finish_type(self, globals: &mut Globals) {
+        globals
+            .type_members
+            .entry(self.typ)
+            .or_default()
+            .extend(self.members);
+    }
+}
+
+#[macro_export]
+macro_rules! method {
+    {
+        $name:ident
+        ($($arg:ident: $pat:expr),*) => $body:expr
+    } => {
+        stringify!($name:ident), BuiltinFunction {
+            func: |globals, args| {
+                let mut args = args;
+                $(
+                    let $arg = args.remove(0).unwrap();
+                    // pattern check
+                )*
+                $body
+            },
+            is_method: true,
+        }
+    };
 }

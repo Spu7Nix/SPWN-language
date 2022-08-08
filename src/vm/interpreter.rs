@@ -1,3 +1,4 @@
+use ahash::AHashMap;
 use ahash::AHashSet;
 use slotmap::new_key_type;
 use slotmap::SlotMap;
@@ -6,8 +7,10 @@ use super::context::FullContext;
 use super::context::SkipMode::*;
 use super::error::RuntimeError;
 use super::instructions;
+use super::types::BuiltinFunction;
 use super::types::CustomType;
 use super::value::StoredValue;
+use super::value::ValueType;
 use crate::compilation::code::*;
 use crate::leveldata::gd_types::ArbitraryId;
 use crate::leveldata::object_data::GdObj;
@@ -19,7 +22,10 @@ use paste::paste;
 new_key_type! {
     pub struct ValueKey;
     pub struct TypeKey;
+    pub struct BuiltinKey;
 }
+
+type BuiltinMap = SlotMap<BuiltinKey, BuiltinFunction>;
 
 pub struct Globals {
     pub memory: SlotMap<ValueKey, StoredValue>,
@@ -30,11 +36,14 @@ pub struct Globals {
     pub objects: Vec<GdObj>,
     pub triggers: Vec<GdObj>,
     pub types: SlotMap<TypeKey, CustomType>,
+    pub type_members: AHashMap<ValueType, AHashMap<String, ValueKey>>,
+
+    pub builtins: BuiltinMap,
 }
 
 impl Globals {
     pub fn new(types: SlotMap<TypeKey, CustomType>) -> Self {
-        Self {
+        let mut g = Self {
             memory: SlotMap::default(),
 
             undefined_captured: AHashSet::new(),
@@ -43,7 +52,13 @@ impl Globals {
             objects: Vec::new(),
             triggers: Vec::new(),
             types,
-        }
+
+            builtins: SlotMap::default(),
+
+            type_members: AHashMap::default(),
+        };
+        g.init_types();
+        g
     }
     pub fn key_deep_clone(&mut self, k: ValueKey) -> ValueKey {
         let val = self.memory[k].clone();

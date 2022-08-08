@@ -9,7 +9,8 @@ use crate::{
 };
 
 use super::{
-    interpreter::{Globals, TypeKey, ValueKey},
+    error::RuntimeError,
+    interpreter::{BuiltinKey, Globals, TypeKey, ValueKey},
     types::Instance,
 };
 
@@ -66,11 +67,17 @@ pub struct Argument {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Macro {
-    pub func_id: usize,
-    pub captured: HashMap<VarID, ValueKey>,
-    pub args: Vec<Argument>,
-    pub ret_pattern: ValueKey,
+pub enum Macro {
+    Custom {
+        func_id: usize,
+        captured: HashMap<VarID, ValueKey>,
+        args: Vec<Argument>,
+        ret_pattern: ValueKey,
+    },
+
+    Builtin {
+        func_ptr: BuiltinKey,
+    },
 }
 
 impl Value {
@@ -121,7 +128,7 @@ impl Value {
                     .collect(),
             }),
             Value::Maybe(v) => Value::Maybe(v.map(|v| globals.key_deep_clone(v))),
-            Value::Macro(Macro { .. }) => {
+            Value::Macro(_) => {
                 self.clone()
                 // let args = args
                 //     .iter()
@@ -173,7 +180,7 @@ impl Value {
             Value::Item(id) => format!("{}i", id.to_str()),
             Value::Block(id) => format!("{}b", id.to_str()),
             Value::TriggerFunction(start_group) => format!("!{{...}}:{}", start_group.to_str()),
-            Value::Macro(Macro {
+            Value::Macro(Macro::Custom {
                 args, ret_pattern, ..
             }) => {
                 format!(
@@ -206,6 +213,9 @@ impl Value {
                         .join(", "),
                     globals.memory[*ret_pattern].value.to_str(globals),
                 )
+            }
+            Value::Macro(Macro::Builtin { .. }) => {
+                format!("$.thing")
             }
             Value::Object(a) => format!("{:?}", a),
             Value::Instance(s) => format!(

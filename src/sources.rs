@@ -36,6 +36,14 @@ impl CodeArea {
     pub fn label(&self) -> (String, Range<usize>) {
         (self.name(), self.span.into())
     }
+
+    pub(crate) fn unknown() -> CodeArea {
+        // fix this lmao idk what im doiung
+        CodeArea {
+            source: SpwnSource::File(PathBuf::from("<unknown>")),
+            span: CodeSpan { start: 0, end: 0 },
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Copy, Default)]
