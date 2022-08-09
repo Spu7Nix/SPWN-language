@@ -247,7 +247,7 @@ impl Parser<'_> {
 
         if !matches!(next, '{') {
             return Err(SyntaxError::ExpectedToken {
-                expected: "{".into(),
+                expected: Token::LBracket.to_string(),
                 found: next.to_string(),
                 area: self.make_area(self.span()),
             });
@@ -261,7 +261,7 @@ impl Parser<'_> {
 
         if !matches!(next, '}') {
             return Err(SyntaxError::ExpectedToken {
-                expected: "}".into(),
+                expected: Token::RBracket.to_string(),
                 found: next.to_string(),
                 area: self.make_area(self.span()),
             });
@@ -740,15 +740,26 @@ impl Parser<'_> {
                 }
                 Token::DoubleColon => {
                     self.next();
-                    self.expect_tok(Token::LBracket)?;
-                    let dictlike = self.parse_dictlike(data)?;
-                    value = data.exprs.insert_with_key(|key| {
-                        data.dictlike_spans.insert(key, dictlike.item_spans);
-                        (
-                            Expression::Instance(value, dictlike.items),
-                            start.extend(self.span()),
-                        )
-                    })
+                    match self.next() {
+                        Token::Ident => value = self.parse_ident_or_macro(data)?,
+                        Token::RBracket => {
+                            let dictlike = self.parse_dictlike(data)?;
+                            value = data.exprs.insert_with_key(|key| {
+                                data.dictlike_spans.insert(key, dictlike.item_spans);
+                                (
+                                    Expression::Instance(value, dictlike.items),
+                                    start.extend(self.span()),
+                                )
+                            })
+                        }
+                        _ => {
+                            return Err(SyntaxError::ExpectedToken {
+                                expected: (Token::RBracket | Token::Ident).to_string(),
+                                found: self.slice().to_string(),
+                                area: self.make_area(self.span()),
+                            });
+                        }
+                    }
                 }
                 Token::Dot => {
                     self.next();
@@ -770,7 +781,7 @@ impl Parser<'_> {
                         }
                         _ => {
                             return Err(SyntaxError::ExpectedToken {
-                                expected: "identifier".to_string(),
+                                expected: Token::Ident.to_string(),
                                 found: self.slice().to_string(),
                                 area: self.make_area(self.span()),
                             });

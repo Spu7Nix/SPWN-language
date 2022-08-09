@@ -26,38 +26,114 @@ impl StoredValue {
             def_area: self.def_area.clone(),
         }
     }
+
+    // pub fn expect_value_type<T>(&self, typ: ValueTypeUnion) -> Result<Value, RuntimeError>
+    // where
+    //     ValueTypeUnion: From<ValueType>,
+    // {
+    //     if !typ.0.contains(&self.value.typ()) {
+    //         Err(RuntimeError::TypeMismatch {
+    //             v: *self,
+    //             expected: typ.into(),
+    //             area: self.def_area,
+    //         })
+    //     } else {
+    //         Ok(self.value)
+    //     }
+    // }
 }
 
-// #[derive(Debug, Clone, PartialEq)]
-// pub enum Value {
-//     Int(i64),
-//     Float(f64),
-//     String(String),
-//     Bool(bool),
+macro_rules! spwn_types {
+    (
+        $(
+            $name:ident $( $value:tt )?,
+        )+
+    ) => {
+        #[derive(Debug, Clone, PartialEq)]
+        pub enum Value {
+            $(
+                $name $( $value )?,
+            )+
+            Instance(Instance),
+        }
 
-//     Array(Vec<ValueKey>),
-//     Dict(AHashMap<String, ValueKey>),
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum ValueType {
+            $(
+                $name,
+            )+
+            Custom(TypeKey),
+        }
+        impl Value {
+            pub fn typ(&self) -> ValueType {
+                match self {
+                    $(
+                        Value::$name(..) => ValueType::$name,
+                    )+
+                    Value::Instance(Instance { typ, .. }) => ValueType::Custom(*typ),
+                }
+            }
+        }
+        use convert_case::{Case, Casing};
 
-//     Empty,
+        impl ValueType {
+            pub fn to_str(self, globals: &Globals) -> String {
+                format!(
+                    "@{}",
+                    match self {
+                        $(
+                            ValueType::$name => stringify!($name).to_case(Case::Snake),
+                        )+
+                        ValueType::Custom(k) => globals.types[k].name.clone(),
+                    }
+                )
+            }
+        }
+        // use super::types::Type;
+        // impl Globals {
+        //     fn populate_type_slotmap(&mut self) {
+        //         $(
+        //             let n = stringify!($name).to_case(Case::Snake);
+        //             self.types.insert(Type {
+        //                 name: n,
+        //                 members: AHashMap::default(),
+        //             });
+        //         )+
+        //     }
+        // }
 
-//     Maybe(Option<ValueKey>),
+    };
+}
 
-//     Macro(Macro),
-//     Pattern(Pattern),
+spwn_types! {
+    Int(i64),
+    Float(f64),
+    String(String),
+    Bool(bool),
 
-//     TriggerFn { start_group: Id },
+    Array(Vec<ValueKey>),
+    Dict(AHashMap<String, ValueKey>),
 
-//     Group(Id),
-//     Channel(Id),
-//     Block(Id),
-//     Item(Id),
+    Empty(),
 
-//     Object(GdObj),
+    Maybe(Option<ValueKey>),
 
-//     TypeIndicator(TypeKey),
+    Macro(Macro),
+    Pattern(Pattern),
 
-//     Instance(Instance),
-// }
+    TriggerFunction(Id),
+
+    Group(Id),
+    Channel(Id),
+    Block(Id),
+    Item(Id),
+
+    Object(GdObj),
+
+    Type(ValueType),
+
+    // Instance(Instance),
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Argument {
@@ -230,120 +306,6 @@ impl Value {
         }
     }
 }
-
-macro_rules! spwn_types {
-    (
-        $(
-            $name:ident $( $value:tt )?,
-        )+
-    ) => {
-        #[derive(Debug, Clone, PartialEq)]
-        pub enum Value {
-            $(
-                $name $( $value )?,
-            )+
-            Instance(Instance),
-        }
-
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        pub enum ValueType {
-            $(
-                $name,
-            )+
-            Custom(TypeKey),
-        }
-        impl Value {
-            pub fn typ(&self) -> ValueType {
-                match self {
-                    $(
-                        Value::$name(..) => ValueType::$name,
-                    )+
-                    Value::Instance(Instance { typ, .. }) => ValueType::Custom(*typ),
-                }
-            }
-        }
-        use convert_case::{Case, Casing};
-
-        impl ValueType {
-            pub fn to_str(self, globals: &Globals) -> String {
-                format!(
-                    "@{}",
-                    match self {
-                        $(
-                            ValueType::$name => stringify!($name).to_case(Case::Snake),
-                        )+
-                        ValueType::Custom(k) => globals.types[k].name.clone(),
-                    }
-                )
-            }
-        }
-        // use super::types::Type;
-        // impl Globals {
-        //     fn populate_type_slotmap(&mut self) {
-        //         $(
-        //             let n = stringify!($name).to_case(Case::Snake);
-        //             self.types.insert(Type {
-        //                 name: n,
-        //                 members: AHashMap::default(),
-        //             });
-        //         )+
-        //     }
-        // }
-
-    };
-}
-
-spwn_types! {
-    Int(i64),
-    Float(f64),
-    String(String),
-    Bool(bool),
-
-    Array(Vec<ValueKey>),
-    Dict(AHashMap<String, ValueKey>),
-
-    Empty(),
-
-    Maybe(Option<ValueKey>),
-
-    Macro(Macro),
-    Pattern(Pattern),
-
-    TriggerFunction(Id),
-
-    Group(Id),
-    Channel(Id),
-    Block(Id),
-    Item(Id),
-
-    Object(GdObj),
-
-    Type(ValueType),
-
-    // Instance(Instance),
-}
-
-// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// pub enum ValueType {
-//     Int,
-//     Float,
-//     String,
-//     Bool,
-//     Array,
-//     Dict,
-//     Empty,
-//     Maybe,
-//     Macro,
-//     Pattern,
-//     TriggerFunction,
-//     Channel,
-//     Group,
-//     Item,
-//     Block,
-//     Object,
-//     Type,
-//     Custom(TypeKey),
-// }
 
 #[derive(Debug)]
 pub struct ValueTypeUnion(pub Vec<ValueType>);

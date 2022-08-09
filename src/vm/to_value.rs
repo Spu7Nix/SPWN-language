@@ -51,7 +51,7 @@ macro_rules! num_to_value {
         )*
     };
 }
-num_to_value! { i8 i16 i32 i64 i128 isize; f32 f64 }
+num_to_value! { i8 i16 i32 i64 i128 isize usize; f32 f64 }
 
 impl ToValue for Value {
     fn to_value(self) -> Value {

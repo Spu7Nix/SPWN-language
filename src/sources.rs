@@ -37,10 +37,9 @@ impl CodeArea {
         (self.name(), self.span.into())
     }
 
-    pub(crate) fn unknown() -> CodeArea {
-        // fix this lmao idk what im doiung
+    pub(crate) fn internal() -> CodeArea {
         CodeArea {
-            source: SpwnSource::File(PathBuf::from("<unknown>")),
+            source: SpwnSource::File(PathBuf::from("<internal>")),
             span: CodeSpan { start: 0, end: 0 },
         }
     }

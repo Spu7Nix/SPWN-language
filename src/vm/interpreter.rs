@@ -3,14 +3,16 @@ use ahash::AHashSet;
 use slotmap::new_key_type;
 use slotmap::SlotMap;
 
+use super::builtin_types;
 use super::context::FullContext;
 use super::context::SkipMode::*;
 use super::error::RuntimeError;
 use super::instructions;
-use super::types::BuiltinFunction;
+use super::types::BuiltinFunctions;
 use super::types::CustomType;
 use super::value::StoredValue;
 use super::value::ValueType;
+
 use crate::compilation::code::*;
 use crate::leveldata::gd_types::ArbitraryId;
 use crate::leveldata::object_data::GdObj;
@@ -25,8 +27,6 @@ new_key_type! {
     pub struct BuiltinKey;
 }
 
-type BuiltinMap = SlotMap<BuiltinKey, BuiltinFunction>;
-
 pub struct Globals {
     pub memory: SlotMap<ValueKey, StoredValue>,
 
@@ -36,9 +36,9 @@ pub struct Globals {
     pub objects: Vec<GdObj>,
     pub triggers: Vec<GdObj>,
     pub types: SlotMap<TypeKey, CustomType>,
+    //pub type_keys: AHashMap<String, TypeKey>,
     pub type_members: AHashMap<ValueType, AHashMap<String, ValueKey>>,
-
-    pub builtins: BuiltinMap,
+    pub builtins: SlotMap<BuiltinKey, BuiltinFunctions>,
 }
 
 impl Globals {
@@ -87,7 +87,6 @@ pub fn run_func(
             $($name:ident $(($arg:ident))?)+
         ) => {
             paste! {
-
                 match $instr {
                     $(
 
@@ -100,6 +99,10 @@ pub fn run_func(
     }
 
     'instruction_loop: loop {
+        if instructions.is_empty() {
+            break;
+        }
+
         let mut finished = true;
         for context in contexts.iter(SkipReturns) {
             finished = false;

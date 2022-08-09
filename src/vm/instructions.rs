@@ -598,6 +598,16 @@ pub fn run_member(
         (Value::String(a), "length") => {
             push!(Value: Value::Int(a.len() as i64).into_stored(area!()))
         }
+        (Value::Type(typ), _) => {
+            let m = globals.type_members[typ]
+                .get(&name)
+                .ok_or(RuntimeError::UndefinedMember {
+                    name,
+                    area: area!(),
+                })?;
+
+            push!(Key: *m);
+        }
         _ => todo!(),
     }
     Ok(())

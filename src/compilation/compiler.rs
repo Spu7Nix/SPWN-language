@@ -257,16 +257,18 @@ impl Compiler {
                 }
             },
             Expression::Type(name) => {
-                todo!()
-                // if let Some(key) = self.type_keys.get(&name) {
-                //     let id = self.code.const_register.insert(Constant::Type(*key));
-                //     self.push_instr(Instruction::LoadConst(ConstID(id as u16)), span, func);
-                // } else {
-                //     return Err(CompilerError::UndefinedType {
-                //         name,
-                //         area: self.ast_data.source.area(span),
-                //     });
-                // }
+                if let Some(key) = self.type_keys.get(&name) {
+                    let id = self
+                        .code
+                        .const_register
+                        .insert(Constant::Type(ValueType::Custom(*key)));
+                    self.push_instr(Instruction::LoadConst(ConstID(id as u16)), span, func);
+                } else {
+                    return Err(CompilerError::UndefinedType {
+                        name,
+                        area: self.ast_data.source.area(span),
+                    });
+                }
             }
             Expression::Array(arr) => {
                 for i in &arr {
@@ -662,7 +664,7 @@ impl Compiler {
                 if allow_type_def {
                     let k = self.types.insert(CustomType {
                         name: name.clone(),
-                        members: AHashMap::default(),
+                        //members: AHashMap::default(),
                     });
                     self.type_keys.insert(name, k);
                 } else {

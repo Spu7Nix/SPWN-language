@@ -8,7 +8,6 @@ use crate::sources::CodeArea;
 
 use super::error::RuntimeError;
 
-use super::from_value::FromValueList;
 use super::interpreter::Globals;
 use super::value::ValueType;
 use super::{
@@ -18,28 +17,10 @@ use super::{
 
 use super::to_value::{ToValue, ToValueResult};
 
-//* Type:
-// all send + sync
-// from struct?
-// constructor
-// fields
-// methods (static + instance separate)?
-// type checking
-// default values
-// all methods with areas and globals
-
-// type @group
-
 pub struct CustomType {
     pub name: String,
     //pub members: AHashMap<String, ValueKey>,
 }
-
-// impl CustomType {
-//     pub fn get_member(&self, name: String) -> ValueKey {
-//         self.members[&name]
-//     }
-// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Instance {
@@ -47,47 +28,77 @@ pub struct Instance {
     pub fields: AHashMap<String, ValueKey>,
 }
 
-type BuiltinPtr = fn(&mut Globals, &[ValueKey]) -> Result<ValueKey, RuntimeError>;
+pub type AttributeFunction<T, R> = fn(&mut Globals, &T) -> R;
+pub type MethodFunction = fn(&mut Globals, &[ValueKey]) -> Result<ValueKey, RuntimeError>;
 
-pub struct BuiltinFunction {
-    func: BuiltinPtr,
-    is_method: bool, // takes self as first argument if true
-                     // arguments and shit
-}
+// pub struct BuiltinFunction {
+//     func: BuiltinPtr,
+//     is_method: bool, // takes self as first argument if true
+//                      // arguments and shit
+// }
 
-pub struct TypeBuilder {
+pub type BuiltinFunctions = Arc<dyn Any>;
+
+pub struct TypeBuilder<T> {
     typ: ValueType,
     members: AHashMap<String, ValueKey>,
+    phantom: PhantomData<T>,
 }
 
-impl TypeBuilder {
+impl<T> TypeBuilder<T>
+where
+    T: 'static,
+{
     pub fn new(typ: ValueType) -> Self {
         Self {
             typ,
             members: AHashMap::new(),
+            phantom: PhantomData,
         }
     }
 
-    pub fn add_member<V>(mut self, globals: &mut Globals, name: &'static str, v: V) -> Self
-    where
-        V: ToValue,
-    {
-        let v = v.to_value().into_stored(CodeArea::unknown());
+    // pub fn add_member<V>(mut self, globals: &mut Globals, name: &'static str, v: V) -> Self
+    // where
+    //     V: ToValue,
+    // {
+    //     let v = v.to_value().into_stored(CodeArea::unknown());
+    //     let k = globals.memory.insert(v);
+    //     self.members.insert(name.into(), k);
+    //     self
+    // }
+
+    fn add(&mut self, globals: &mut Globals, name: &'static str, v: Value) {
+        let v = v.into_stored(CodeArea::internal());
         let k = globals.memory.insert(v);
         self.members.insert(name.into(), k);
+    }
+
+    pub fn add_member(
+        mut self,
+        globals: &mut Globals,
+        name: &'static str,
+        f: AttributeFunction<T, impl ToValueResult + 'static>,
+    ) -> Self {
+        let key = globals.builtins.insert(Arc::new(f));
+        let v = Value::Macro(Macro::Builtin { func_ptr: key });
+
+        self.add(globals, name, v);
+
         self
     }
 
-    pub unsafe fn add_method(
-        self,
+    pub fn add_method(
+        mut self,
         globals: &mut Globals,
         name: &'static str,
-        f: BuiltinPtr,
+        f: MethodFunction,
     ) -> Self {
-        let key = globals.builtins.insert(f);
-
+        let key = globals.builtins.insert(Arc::new(f));
         let v = Value::Macro(Macro::Builtin { func_ptr: key });
-        self.add_member(globals, name, v)
+
+        self.add(globals, name, v);
+
+        self
     }
 
     pub fn finish_type(self, globals: &mut Globals) {
@@ -96,6 +107,13 @@ impl TypeBuilder {
             .entry(self.typ)
             .or_default()
             .extend(self.members);
+
+        // let k = globals.types.insert(CustomType {
+        //     name: self.typ.to_str(globals).into(),
+        //     members: self.members,
+        // });
+
+        // globals.type_keys.insert(self.typ.to_str(globals).into(), k);
     }
 }
 
@@ -103,18 +121,53 @@ impl TypeBuilder {
 macro_rules! method {
     {
         $name:ident
-        ($($arg:ident: $pat:expr),*) => $body:expr
-    } => {
-        stringify!($name:ident), BuiltinFunction {
-            func: |globals, args| {
-                let mut args = args;
-                $(
-                    let $arg = args.remove(0).unwrap();
-                    // pattern check
-                )*
-                $body
-            },
-            is_method: true,
-        }
+        (
+            $(
+                $args:tt
+            )*
+        ) => $body:expr
+    } => {(
+        stringify!($name:ident),
+        |globals, args| {
+            let mut args = args;
+
+            method!($($args)*);
+            // $(
+            //     let $arg = args.remove(0).unwrap();
+            //     // pattern check
+            // )*
+            // $body
+        })
     };
+
+    {
+        this,
+        $(
+            $args:ident
+            $(:
+                $(mut)?
+                $(
+                    $type:ident
+                )|*
+            )?
+        ),*
+    } => {
+        let this = globals.memory[args[0]].expect_value_type(ValueType::Instance);
+
+    };
+
+    {
+        mut this,
+        $(
+            $args:ident
+            $(:
+                $(mut)?
+                $(
+                    $type:ident
+                )|*
+            )?
+        ),*
+    } => {
+
+    }
 }

@@ -145,7 +145,6 @@ pub enum Expression {
 
     Obj(ObjectMode, Vec<(ExprKey, ExprKey)>),
 
-    // Index { base: ExprKey, index: ExprKey },
     Empty,
 
     Macro {
