@@ -1,9 +1,9 @@
 use ahash::AHashMap;
 use ahash::AHashSet;
+use paste::paste;
 use slotmap::new_key_type;
 use slotmap::SlotMap;
 
-use super::builtin_types;
 use super::context::FullContext;
 use super::context::SkipMode::*;
 use super::error::RuntimeError;
@@ -18,8 +18,6 @@ use crate::leveldata::gd_types::ArbitraryId;
 use crate::leveldata::object_data::GdObj;
 use crate::vm::context::ReturnType;
 use crate::vm::instructions::InstrData;
-
-use paste::paste;
 
 new_key_type! {
     pub struct ValueKey;
@@ -60,6 +58,7 @@ impl Globals {
         g.init_types();
         g
     }
+
     pub fn key_deep_clone(&mut self, k: ValueKey) -> ValueKey {
         let val = self.memory[k].clone();
         let val = val.deep_clone(self);

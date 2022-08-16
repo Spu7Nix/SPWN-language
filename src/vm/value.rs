@@ -2,16 +2,15 @@ use std::collections::HashMap;
 
 use ahash::AHashMap;
 
-use crate::{
-    compilation::code::VarID,
-    leveldata::{gd_types::Id, object_data::GdObj},
-    sources::CodeArea,
-};
-
 use super::{
     error::RuntimeError,
     interpreter::{BuiltinKey, Globals, TypeKey, ValueKey},
     types::Instance,
+};
+use crate::{
+    compilation::code::VarID,
+    leveldata::{gd_types::Id, object_data::GdObj},
+    sources::CodeArea,
 };
 
 #[derive(Debug, Clone)]
@@ -163,6 +162,7 @@ impl Value {
             def_area: area,
         }
     }
+
     pub fn deep_clone(&self, globals: &mut Globals) -> Value {
         match self {
             Value::Int(_)
@@ -225,6 +225,7 @@ impl Value {
             }
         }
     }
+
     pub fn to_str(&self, globals: &Globals) -> String {
         match self {
             Value::Int(v) => v.to_string(),
@@ -381,12 +382,11 @@ impl Pattern {
 }
 
 pub mod value_ops {
+    use super::{Pattern, StoredValue, Value, ValueType};
     use crate::{
         sources::CodeArea,
         vm::{error::RuntimeError, interpreter::Globals},
     };
-
-    use super::{Pattern, StoredValue, Value, ValueType};
 
     pub fn equality(a: &Value, b: &Value, globals: &Globals) -> bool {
         match (a, b) {

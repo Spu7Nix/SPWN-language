@@ -128,6 +128,7 @@ fn parse_stage(
     let mut parser = Parser::new(code, source.clone());
     let mut ast_data = ASTData::new(source.clone());
     let stmts = parser.parse(&mut ast_data)?;
+    #[cfg(debug_assertions)]
     ast_data.debug(&stmts);
     Ok((ast_data, stmts))
 }

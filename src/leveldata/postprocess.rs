@@ -1,11 +1,11 @@
+use ahash::AHashMap;
+
 use super::gd_types::{ArbitraryId, Id, SpecificId};
+use super::object_data::GdObj;
 use crate::leveldata::{
     object_data::{serialize_obj, ObjParam},
     preprocess::get_used_ids,
 };
-use ahash::AHashMap;
-
-use super::object_data::GdObj;
 
 //returns the string to be appended to the old string
 pub fn append_objects(

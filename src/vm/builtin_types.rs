@@ -1,10 +1,9 @@
-use crate::method;
-
 use super::{
     interpreter::{Globals, ValueKey},
     types::TypeBuilder,
     value::ValueType,
 };
+use crate::method;
 
 impl Globals {
     pub fn init_types(&mut self) {

@@ -1,10 +1,17 @@
 use std::collections::HashMap;
 use std::io::Write;
 
-use crate::vm::value::ValueType;
 use ahash::AHashMap;
 use slotmap::{new_key_type, SlotMap};
 
+use super::{
+    code::{
+        BytecodeFunc, Code, ConstID, InstrNum, InstrPos, Instruction, KeysID, MacroBuildID,
+        MemberID, VarID,
+    },
+    error::CompilerError,
+};
+use crate::vm::value::ValueType;
 use crate::{
     leveldata::object_data::ObjectMode,
     parsing::{
@@ -13,14 +20,6 @@ use crate::{
     },
     sources::{CodeSpan, SpwnSource},
     vm::{interpreter::TypeKey, types::CustomType, value::Value},
-};
-
-use super::{
-    code::{
-        BytecodeFunc, Code, ConstID, InstrNum, InstrPos, Instruction, KeysID, MacroBuildID,
-        MemberID, VarID,
-    },
-    error::CompilerError,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -111,6 +110,7 @@ impl Compiler {
             idx: instrs.len() - 1,
         }
     }
+
     pub fn get_instr(&mut self, pos: InstrPos) -> &mut Instruction {
         &mut self.code.funcs[pos.func].instructions[pos.idx].0
     }
@@ -131,6 +131,7 @@ impl Compiler {
             }
         }
     }
+
     pub fn new_var(
         &mut self,
         name: &str,
@@ -150,6 +151,7 @@ impl Compiler {
         );
         id
     }
+
     pub fn get_accessible_vars(&self, scope: ScopeKey) -> Vec<VarID> {
         let mut vars = vec![];
         let mut scope = &self.scopes[scope];
@@ -163,6 +165,7 @@ impl Compiler {
             }
         }
     }
+
     pub fn get_inner_vars(&self, scope: ScopeKey) -> Vec<VarID> {
         let mut vars = vec![];
         fn inner(compiler: &Compiler, scope: ScopeKey, vars: &mut Vec<VarID>) {
@@ -435,7 +438,7 @@ impl Compiler {
                 self.get_instr(enter).modify_num((to.idx + 1) as u16);
             }
             Expression::Instance(t, fields) => {
-                // copied from dict
+                //copied from dict
                 let keys = self
                     .code
                     .keys_register
@@ -463,7 +466,7 @@ impl Compiler {
                 self.compile_expr(t, scope, func)?;
                 self.push_instr(Instruction::BuildInstance(KeysID(keys as u16)), span, func);
             }
-            Expression::Split(_, _) => todo!(),
+            Expression::Split(..) => todo!(),
             Expression::Obj(mode, vals) => {
                 let l = InstrNum(vals.len() as u16);
                 for (k, v) in vals.into_iter() {
@@ -682,6 +685,7 @@ impl Compiler {
         }
         Ok((start_idx, self.func_len(func)))
     }
+
     pub fn start_compile(&mut self, stmts: Vec<StmtKey>) -> Result<(), CompilerError> {
         let base_scope = self.scopes.insert(Scope {
             vars: HashMap::new(),

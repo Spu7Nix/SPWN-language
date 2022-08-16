@@ -2,6 +2,10 @@
 
 use std::collections::HashMap;
 
+use super::context::{FullContext, ReturnType};
+use super::error::RuntimeError;
+use super::interpreter::{run_func, Globals};
+use super::value::{value_ops, Value};
 use crate::compilation::code::{Code, ConstID, InstrNum, KeysID, MacroBuildID, MemberID, VarID};
 use crate::leveldata::gd_types::Id;
 use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
@@ -11,11 +15,6 @@ use crate::vm::context::SkipMode;
 use crate::vm::interpreter::ValueKey;
 use crate::vm::types::Instance;
 use crate::vm::value::{Argument, Macro, Pattern, ValueType};
-
-use super::context::{FullContext, ReturnType};
-use super::error::RuntimeError;
-use super::interpreter::{run_func, Globals};
-use super::value::{value_ops, Value};
 
 macro_rules! run_helper {
     ($context:ident, $globals:ident, $data:ident) => {
@@ -47,18 +46,18 @@ macro_rules! run_helper {
 
         #[allow(unused_macros)]
         macro_rules! push {
-            (Value: $v:expr) => {{
+            (Value: $v: expr) => {{
                 let key = $globals.memory.insert($v);
                 $context.inner().stack.push(key);
             }};
-            (Key: $v:expr) => {{
+            (Key: $v: expr) => {{
                 $context.inner().stack.push($v);
             }};
         }
 
         #[allow(unused_macros)]
         macro_rules! store {
-            ($v:expr) => {
+            ($v: expr) => {
                 $globals.memory.insert($v)
             };
         }

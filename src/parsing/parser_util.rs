@@ -1,6 +1,5 @@
-use crate::sources::CodeSpan;
-
 use super::ast::ExprKey;
+use crate::sources::CodeSpan;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum OpType {

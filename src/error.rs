@@ -15,6 +15,7 @@ impl RainbowColorGenerator {
     pub fn new(h: f64, s: f64, v: f64, shift: f64) -> Self {
         Self { h, s, v, shift }
     }
+
     pub fn next(&mut self) -> Color {
         // thanks wikipedia
 

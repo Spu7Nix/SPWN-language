@@ -1,6 +1,5 @@
-use crate::{error_maker, sources::CodeArea};
-
 use super::value::{StoredValue, ValueType, ValueTypeUnion};
+use crate::{error_maker, sources::CodeArea};
 
 error_maker! {
     Globals: globals;

@@ -1,8 +1,8 @@
-use crate::compilation::compiler::URegister;
-use crate::sources::{CodeSpan, SpwnSource};
 use std::ops::Index;
 
 use super::compiler::Constant;
+use crate::compilation::compiler::URegister;
+use crate::sources::{CodeSpan, SpwnSource};
 macro_rules! wrappers {
     ($($n:ident($t:ty))*) => {
         $(

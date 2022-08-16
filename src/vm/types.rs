@@ -2,20 +2,16 @@ use std::marker::PhantomData;
 use std::{any::Any, sync::Arc};
 
 use ahash::AHashMap;
-use slotmap::SlotMap;
-
-use crate::sources::CodeArea;
 
 use super::error::RuntimeError;
-
 use super::interpreter::Globals;
+use super::to_value::ToValueResult;
 use super::value::ValueType;
 use super::{
     interpreter::{TypeKey, ValueKey},
     value::{Macro, Value},
 };
-
-use super::to_value::{ToValue, ToValueResult};
+use crate::sources::CodeArea;
 
 pub struct CustomType {
     pub name: String,

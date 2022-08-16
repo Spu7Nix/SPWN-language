@@ -1,7 +1,6 @@
 use ahash::{AHashMap, AHashSet};
 
 use super::gd_types::Id;
-
 use super::object_data::SPWN_SIGNATURE_GROUP;
 
 pub fn remove_spwn_objects(file_content: &mut String) {
