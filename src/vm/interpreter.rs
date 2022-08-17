@@ -8,7 +8,7 @@ use super::context::FullContext;
 use super::context::SkipMode::*;
 use super::error::RuntimeError;
 use super::instructions;
-use super::types::BuiltinFunctions;
+use super::types::BuiltinFunction;
 use super::types::CustomType;
 use super::value::StoredValue;
 use super::value::ValueType;
@@ -25,6 +25,11 @@ new_key_type! {
     pub struct BuiltinKey;
 }
 
+pub enum TypeMember {
+    Builtin(BuiltinKey),
+    Custom(ValueKey),
+}
+
 pub struct Globals {
     pub memory: SlotMap<ValueKey, StoredValue>,
 
@@ -35,8 +40,8 @@ pub struct Globals {
     pub triggers: Vec<GdObj>,
     pub types: SlotMap<TypeKey, CustomType>,
     //pub type_keys: AHashMap<String, TypeKey>,
-    pub type_members: AHashMap<ValueType, AHashMap<String, ValueKey>>,
-    pub builtins: SlotMap<BuiltinKey, BuiltinFunctions>,
+    pub type_members: AHashMap<ValueType, AHashMap<String, TypeMember>>,
+    pub builtins: SlotMap<BuiltinKey, BuiltinFunction>,
 }
 
 impl Globals {

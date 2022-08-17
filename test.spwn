@@ -1,2 +1,5 @@
-type @a;
-@a::{}::{};
+let a = [];
+a.push(1);
+a.push(2);
+a.push(3);
+print a;

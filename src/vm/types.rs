@@ -4,7 +4,7 @@ use std::{any::Any, sync::Arc};
 use ahash::AHashMap;
 
 use super::error::RuntimeError;
-use super::interpreter::Globals;
+use super::interpreter::{Globals, TypeMember};
 use super::to_value::ToValueResult;
 use super::value::ValueType;
 use super::{
@@ -24,7 +24,7 @@ pub struct Instance {
     pub fields: AHashMap<String, ValueKey>,
 }
 
-pub type AttributeFunction<T, R> = fn(&mut Globals, &T) -> R;
+pub type AttributeFunction = fn(&Globals, ValueKey) -> Value;
 pub type MethodFunction = fn(&mut Globals, &[ValueKey]) -> Result<ValueKey, RuntimeError>;
 
 // pub struct BuiltinFunction {
@@ -33,23 +33,21 @@ pub type MethodFunction = fn(&mut Globals, &[ValueKey]) -> Result<ValueKey, Runt
 //                      // arguments and shit
 // }
 
-pub type BuiltinFunctions = Arc<dyn Any>;
-
-pub struct TypeBuilder<T> {
-    typ: ValueType,
-    members: AHashMap<String, ValueKey>,
-    phantom: PhantomData<T>,
+pub enum BuiltinFunction {
+    Attribute(AttributeFunction),
+    Method(MethodFunction),
 }
 
-impl<T> TypeBuilder<T>
-where
-    T: 'static,
-{
+pub struct TypeBuilder {
+    typ: ValueType,
+    members: AHashMap<String, TypeMember>,
+}
+
+impl TypeBuilder {
     pub fn new(typ: ValueType) -> Self {
         Self {
             typ,
             members: AHashMap::new(),
-            phantom: PhantomData,
         }
     }
 
@@ -63,22 +61,15 @@ where
     //     self
     // }
 
-    fn add(&mut self, globals: &mut Globals, name: &'static str, v: Value) {
-        let v = v.into_stored(CodeArea::internal());
-        let k = globals.memory.insert(v);
-        self.members.insert(name.into(), k);
-    }
-
     pub fn add_member(
         mut self,
         globals: &mut Globals,
         name: &'static str,
-        f: AttributeFunction<T, impl ToValueResult + 'static>,
+        f: AttributeFunction,
     ) -> Self {
-        let key = globals.builtins.insert(Arc::new(f));
-        let v = Value::Macro(Macro::Builtin { func_ptr: key });
+        let key = globals.builtins.insert(BuiltinFunction::Attribute(f));
 
-        self.add(globals, name, v);
+        self.members.insert(name.into(), TypeMember::Builtin(key));
 
         self
     }
@@ -89,10 +80,9 @@ where
         name: &'static str,
         f: MethodFunction,
     ) -> Self {
-        let key = globals.builtins.insert(Arc::new(f));
-        let v = Value::Macro(Macro::Builtin { func_ptr: key });
+        let key = globals.builtins.insert(BuiltinFunction::Method(f));
 
-        self.add(globals, name, v);
+        self.members.insert(name.into(), TypeMember::Builtin(key));
 
         self
     }
@@ -114,56 +104,60 @@ where
 }
 
 #[macro_export]
+macro_rules! attr {
+    (
+        $globals:ident, $this:pat => $body:expr
+    ) => {
+        |$globals: &Globals, this: ValueKey| -> Value {
+            let val = &$globals.memory[this].value;
+            match val {
+                $this => ToValueResult::try_to_value($body).unwrap(),
+                _ => unreachable!(),
+            }
+        }
+    };
+}
+
+/*
+
+attr! {
+    globals, Value::Array(this) => this.len()
+}
+*/
+
+#[macro_export]
+macro_rules! method_arg {
+    ($globals:ident, $args:ident) => {
+        &$globals.memory[*$args.next().unwrap()].value
+    };
+
+    (mut $globals:ident, $args:ident) => {
+        &mut $globals.memory[*$args.next().unwrap()].value
+    };
+
+    (key $globals:ident, $args:ident) => {
+        *$args.next().unwrap()
+    };
+}
+
+#[macro_export]
 macro_rules! method {
     {
-        $name:ident
-        (
-            $(
-                $args:tt
-            )*
-        ) => $body:expr
-    } => {(
-        stringify!($name:ident),
+        $(
+            $(#$mut:ident)? $arg:pat
+        ),*
+        => $body:expr
+    } => {
         |globals, args| {
-            let mut args = args;
+            let mut args = args.iter().rev();
 
-            method!($($args)*);
-            // $(
-            //     let $arg = args.remove(0).unwrap();
-            //     // pattern check
-            // )*
-            // $body
-        })
+            match ($(method_arg!($($mut)? globals, args)),*){
+                ($($arg),*) => Ok({
+                    let a = ToValueResult::try_to_value($body).unwrap();
+                    globals.memory.insert(a.into_stored(CodeArea::internal()))
+                }),
+                _ => return Err(todo!()),
+            }
+        }
     };
-
-    {
-        this,
-        $(
-            $args:ident
-            $(:
-                $(mut)?
-                $(
-                    $type:ident
-                )|*
-            )?
-        ),*
-    } => {
-        let this = globals.memory[args[0]].expect_value_type(ValueType::Instance);
-
-    };
-
-    {
-        mut this,
-        $(
-            $args:ident
-            $(:
-                $(mut)?
-                $(
-                    $type:ident
-                )|*
-            )?
-        ),*
-    } => {
-
-    }
 }

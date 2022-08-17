@@ -12,7 +12,7 @@ use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
 use crate::parsing::ast::IdClass;
 use crate::sources::CodeSpan;
 use crate::vm::context::SkipMode;
-use crate::vm::interpreter::ValueKey;
+use crate::vm::interpreter::{TypeMember, ValueKey};
 use crate::vm::types::Instance;
 use crate::vm::value::{Argument, Macro, Pattern, ValueType};
 
@@ -576,9 +576,9 @@ pub fn run_member(
     id: MemberID,
 ) -> Result<(), RuntimeError> {
     run_helper!(context, globals, data);
-    let base = pop!(Ref);
+    let key = pop!(Key);
     let name = data.code.member_register[id].clone();
-    match (&base.value, name.as_str()) {
+    match (&globals.memory[key].value, name.as_str()) {
         (Value::Dict(fields) | Value::Instance(Instance { fields, .. }), _) => {
             let key = match fields.get(&name) {
                 Some(k) => k,
@@ -591,21 +591,35 @@ pub fn run_member(
             };
             push!(Key: *key);
         }
-        (Value::Array(a), "length") => {
-            push!(Value: Value::Int(a.len() as i64).into_stored(area!()))
-        }
-        (Value::String(a), "length") => {
-            push!(Value: Value::Int(a.len() as i64).into_stored(area!()))
-        }
-        (Value::Type(typ), _) => {
-            let m = globals.type_members[typ]
+        // (Value::Array(a), "length") => {
+        //     push!(Value: Value::Int(a.len() as i64).into_stored(area!()))
+        // }
+        // (Value::String(a), "length") => {
+        //     push!(Value: Value::Int(a.len() as i64).into_stored(area!()))
+        // }
+        (a, _) => {
+            let typ = a.typ();
+            let m = globals.type_members[&typ]
                 .get(&name)
                 .ok_or(RuntimeError::UndefinedMember {
                     name,
                     area: area!(),
                 })?;
 
-            push!(Key: *m);
+            match m {
+                TypeMember::Builtin(b) => {
+                    let builtin = match globals.builtins[*b] {
+                        crate::vm::types::BuiltinFunction::Attribute(f) => {
+                            let v = f(globals, key);
+                            push!(Value: v.into_stored(area!()))
+                        }
+                        crate::vm::types::BuiltinFunction::Method(m) => todo!(),
+                    };
+                }
+                TypeMember::Custom(c) => {
+                    push!(Key: *c);
+                }
+            }
         }
         _ => todo!(),
     }
