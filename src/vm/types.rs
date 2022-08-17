@@ -143,18 +143,19 @@ macro_rules! method_arg {
 #[macro_export]
 macro_rules! method {
     {
+        $globals:ident,
         $(
             $(#$mut:ident)? $arg:pat
         ),*
         => $body:expr
     } => {
-        |globals, args| {
+        |$globals, args| {
             let mut args = args.iter().rev();
 
-            match ($(method_arg!($($mut)? globals, args)),*){
+            match ($(method_arg!($($mut)? $globals, args)),*){
                 ($($arg),*) => Ok({
                     let a = ToValueResult::try_to_value($body).unwrap();
-                    globals.memory.insert(a.into_stored(CodeArea::internal()))
+                    $globals.memory.insert(a.into_stored(CodeArea::internal()))
                 }),
                 _ => return Err(todo!()),
             }

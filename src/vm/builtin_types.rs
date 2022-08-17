@@ -1,7 +1,7 @@
 use super::{
     interpreter::{Globals, ValueKey},
     types::TypeBuilder,
-    value::{Value, ValueType},
+    value::{value_ops, Value, ValueType},
 };
 use crate::sources::CodeArea;
 use crate::vm::to_value::ToValueResult;
@@ -14,7 +14,12 @@ impl Globals {
             .add_method(
                 self,
                 "push",
-                method!(#mut Value::Array(this), #key el => this.push(el)),
+                method!(g, #mut Value::Array(this), #key el => this.push(el)),
+            )
+            .add_method(
+                self,
+                "reverse",
+                method!(g, #mut Value::Array(this) => this.reverse()),
             )
             .finish_type(self);
     }

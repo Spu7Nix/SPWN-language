@@ -151,6 +151,7 @@ pub enum Macro {
     },
 
     Builtin {
+        self_arg: ValueKey,
         func_ptr: BuiltinKey,
     },
 }
@@ -291,8 +292,9 @@ impl Value {
                     globals.memory[*ret_pattern].value.to_str(globals),
                 )
             }
-            Value::Macro(Macro::Builtin { .. }) => {
-                format!("$.thing")
+
+            Value::Macro(Macro::Builtin { self_arg, .. }) => {
+                format!("{}.thing", globals.memory[*self_arg].value.to_str(globals))
             }
             Value::Object(a) => format!("{:?}", a),
             Value::Instance(s) => format!(

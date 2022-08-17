@@ -542,8 +542,24 @@ pub fn run_call(
                 }
             }
         }
-        Value::Macro(Macro::Builtin { func_ptr }) => {
-            todo!()
+
+        Value::Macro(Macro::Builtin { func_ptr, self_arg }) => {
+            let mut args = Vec::new();
+            let passed_args = passed_args.0 as usize;
+            // set positional
+            for i in 0..passed_args {
+                let val = pop!(Deep Store);
+                args.push(val);
+            }
+            // args are intentionally reversed
+            args.push(*self_arg);
+            match globals.builtins[*func_ptr] {
+                crate::vm::types::BuiltinFunction::Method(m) => {
+                    let v = m(globals, &args)?;
+                    push!(Key: v);
+                }
+                _ => unreachable!(),
+            }
         }
         Value::Type(t) => {
             todo!()
@@ -591,12 +607,7 @@ pub fn run_member(
             };
             push!(Key: *key);
         }
-        // (Value::Array(a), "length") => {
-        //     push!(Value: Value::Int(a.len() as i64).into_stored(area!()))
-        // }
-        // (Value::String(a), "length") => {
-        //     push!(Value: Value::Int(a.len() as i64).into_stored(area!()))
-        // }
+
         (a, _) => {
             let typ = a.typ();
             let m = globals.type_members[&typ]
@@ -613,7 +624,13 @@ pub fn run_member(
                             let v = f(globals, key);
                             push!(Value: v.into_stored(area!()))
                         }
-                        crate::vm::types::BuiltinFunction::Method(m) => todo!(),
+                        crate::vm::types::BuiltinFunction::Method(_) => {
+                            let v = Value::Macro(Macro::Builtin {
+                                self_arg: key,
+                                func_ptr: *b,
+                            });
+                            push!(Value: v.into_stored(area!()))
+                        }
                     };
                 }
                 TypeMember::Custom(c) => {
