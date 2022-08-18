@@ -139,7 +139,7 @@ impl Parser<'_> {
                 _ => self.to_int_radix(content, 10)?,
             }
         } else {
-            content.replace('_', "").parse::<i64>().unwrap()
+            self.to_int_radix(content, 10)?
         };
 
         Ok(ast_data.insert(Expression::Int(int), span))
@@ -170,9 +170,11 @@ impl Parser<'_> {
     }
 
     fn to_int_radix(&self, from: &str, radix: u32) -> Result<i64> {
-        i64::from_str_radix(from, radix).map_err(|_| SyntaxError::InvalidLiteral {
-            literal: from.into(),
-            area: self.make_area(self.span()),
+        i64::from_str_radix(&from.replace('_', ""), radix).map_err(|_| {
+            SyntaxError::InvalidLiteral {
+                literal: from.into(),
+                area: self.make_area(self.span()),
+            }
         })
     }
 

@@ -9,6 +9,7 @@ mod test_util;
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::sync::RwLock;
 
     use super::ast::{Expression as Ex, Statement as St, *};
     use super::error::SyntaxError;
@@ -19,21 +20,21 @@ mod tests {
     use crate::sources::SpwnSource;
     use crate::*;
 
-    static mut DATA: Option<ASTData> = None;
+    use lazy_static::lazy_static;
+
+    lazy_static! {
+        static ref SOURCE: SpwnSource = SpwnSource::File(PathBuf::from("<tests>"));
+        static ref DATA: RwLock<ASTData> = RwLock::new(ASTData::new(SOURCE.clone()));
+    }
 
     type Result<T> = std::result::Result<T, SyntaxError>;
 
     fn parse(code: &str) -> Result<Statements> {
-        let source = SpwnSource::File(PathBuf::from("<tests>"));
+        let mut parser = Parser::new(code, SOURCE.clone());
 
-        let mut parser = Parser::new(code, source.clone());
+        let mut data = DATA.write().unwrap();
 
-        let mut data = ASTData::new(source);
-        let stmts = parser.parse(&mut data);
-
-        unsafe { DATA = Some(data) };
-
-        stmts
+        parser.parse(&mut *data)
     }
 
     #[test]
@@ -51,7 +52,10 @@ mod tests {
         expr_eq!(t, expr!(10000000));
 
         let t = parse("1_0_00;")?;
-        expr_eq!(t, expr!(100));
+        expr_eq!(t, expr!(1000));
+
+        let t = parse("0b0101011;")?;
+        expr_eq!(t, expr!(43));
 
         Ok(())
     }
@@ -167,13 +171,16 @@ mod tests {
         let t = parse("10.7 <= 4;")?;
         expr_eq!(t, expr_op!(expr!(10.7), Token::Lte, expr!(4)));
 
+        // let t = parse("1..10;")?;
+        // expr_eq!(t, expr_op!(expr!(1), Token::DotDot, expr!(10)));
+
         // let t = parse("1.0002 %= 2;")?;
         // expr_eq!(t, expr_op!(expr!(1.0002), Token::ModEq, expr!(2)));
 
         let t = parse("-10;")?;
         expr_eq!(t, expr_op!(Token::Minus, expr!(10)));
 
-        todo!("opeq + bin ops + ++ --");
+        todo!("opeq + bin ops + ++ -- ..");
 
         Ok(())
     }
@@ -475,6 +482,78 @@ mod tests {
     fn test_statements() -> Result<()> {
         let t = parse("let a = 10;")?;
         stmt_eq!(t, St::Let(s!("a"), expr_key!(expr!(10))));
+
+        let t = parse("a = true;")?;
+        stmt_eq!(t, St::Assign(s!("a"), expr_key!(expr!(true))));
+
+        let t = parse("if a == b {} else {};")?;
+        stmt_eq!(
+            t,
+            St::If {
+                branches: vec![(
+                    expr_key!(expr_op!(expr_sym!("a"), Token::Eq, expr_sym!("b"))),
+                    vec![]
+                )],
+                else_branch: None
+            }
+        );
+
+        let t = parse("try {} catch e {};")?;
+        stmt_eq!(
+            t,
+            St::TryCatch {
+                try_branch: vec![],
+                catch: vec![],
+                catch_var: s!("e")
+            }
+        );
+
+        let t = parse("while true {};")?;
+        stmt_eq!(
+            t,
+            St::While {
+                cond: expr_key!(expr!(true)),
+                code: vec![]
+            }
+        );
+
+        let t = parse("for e in [1, 2, 3] {};")?;
+        stmt_eq!(
+            t,
+            St::For {
+                var: s!("e"),
+                iterator: expr_key!(expr_arr!(expr!(1), expr!(2), expr!(3))),
+                code: vec![]
+            }
+        );
+
+        let t = parse("return;")?;
+        stmt_eq!(t, St::Return(None));
+
+        let t = parse("return true;")?;
+        stmt_eq!(t, St::Return(Some(expr_key!(expr!(true)))));
+
+        let t = parse("break;")?;
+        stmt_eq!(t, St::Break);
+
+        let t = parse("continue;")?;
+        stmt_eq!(t, St::Continue);
+
+        let t = parse("type @a;")?;
+        stmt_eq!(t, St::TypeDef(s!("a")));
+
+        let t = parse("impl @a { a: 10, b: false };")?;
+        stmt_eq!(
+            t,
+            St::Impl(
+                expr_key!(expr_sym!(@"a")),
+                vec![
+                    (s!("a"), Some(expr_key!(expr!(10)))),
+                    (s!("b"), Some(expr_key!(expr!(false))))
+                ]
+            )
+        );
+
         Ok(())
     }
 }

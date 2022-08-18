@@ -17,15 +17,19 @@ pub trait DeepEq {
 #[macro_export]
 macro_rules! expr_eq {
     ($e:ident, $e2:expr) => {
-        let data = unsafe { DATA.as_ref().unwrap() };
+        let expr = $e2;
+        {
+            let d = DATA.read().expect("error getting read lock (expr_eq)");
+            let data = &*d;
 
-        match data.stmts[$e[0]].0 {
-            Statement::Expr(ekey) => {
-                let e = &data.exprs[ekey].0;
-                assert_eq!(e.deep_eq_expr(&data.exprs, &$e2.0), true);
-            }
-            _ => panic!(),
-        };
+            match data.stmts[$e[0]].0 {
+                Statement::Expr(ekey) => {
+                    let e = &data.exprs[ekey].0;
+                    assert_eq!(e.deep_eq_expr(&data.exprs, &expr.0), true);
+                }
+                _ => panic!(),
+            };
+        }
     };
 }
 
@@ -39,25 +43,42 @@ macro_rules! expr {
 #[macro_export]
 macro_rules! expr_key {
     ($expr:expr) => {{
-        let exprs = &mut unsafe { DATA.as_mut().unwrap() }.exprs;
-        exprs.insert($expr)
+        let expr = $expr;
+
+        let mut d = DATA.write().expect("error getting write lock (expr_key)");
+        let exprs = &mut d.exprs;
+
+        exprs.insert(expr)
     }};
 }
 
 #[macro_export]
 macro_rules! expr_op {
     ($left:expr,$op:expr,$right:expr) => {{
-        let exprs = &mut unsafe { DATA.as_mut().unwrap() }.exprs;
+        let expr1 = $left;
+        let expr2 = $right;
+
+        let mut d = DATA
+            .write()
+            .expect("error getting write lock (expr_op [op])");
+        let exprs = &mut d.exprs;
+
         expr!(Expression::Op(
-            exprs.insert($left),
+            exprs.insert(expr1),
             $op,
-            exprs.insert($right)
+            exprs.insert(expr2)
         ))
     }};
 
     ($op:expr,$right:expr) => {{
-        let exprs = &mut unsafe { DATA.as_mut().unwrap() }.exprs;
-        expr!(Expression::Unary($op, exprs.insert($right)))
+        let expr = $right;
+        {
+            let mut d = DATA
+                .write()
+                .expect("error getting write lock (expr_op [unary])");
+            let exprs = &mut d.exprs;
+            expr!(Expression::Unary($op, exprs.insert(expr)))
+        }
     }};
 }
 
@@ -73,34 +94,43 @@ macro_rules! expr_sym {
 }
 
 #[macro_export]
+
 macro_rules! expr_dict {
     ($($k:literal$(:$v:expr)?),*) => {{
-        let d: Vec<(String, _)> = vec![
-            $(
-                ($k.into(), expr_dict!(@$($v)?))
-            ),*
-        ];
+        let vals = vec![$(
+            ($k.into(), expr_dict!(@$($v)?))
+        ),*];
+
+        let mut d = DATA.write().expect("error getting write lock (expr_dict)");
+        let exprs = &mut d.exprs;
+
+        let mut d = vec![];
+
+        for (k, v) in vals.into_iter() {
+            d.push((k, v.map(|x| exprs.insert(x))));
+        }
 
         expr!(Expression::Dict(d))
     }};
 
-    // { k: v }
-    (@$v:expr) => {{
-        let exprs = &mut unsafe { DATA.as_mut().unwrap() }.exprs;
-        Some(exprs.insert($v))
-    }};
+    (@$e:expr) => {
+        Some($e)
+    };
 
-    // { k }
-    (@) => {
-        None
-    }
+    (@) => { None }
 }
 
 #[macro_export]
 macro_rules! expr_arr {
     ($($e:expr),*) => {{
-        let exprs = &mut unsafe { DATA.as_mut().unwrap() }.exprs;
-        expr!(Expression::Array(vec![$(exprs.insert($e)),*]))
+        let es = vec![$($e),*];
+
+        let mut d = DATA.write().expect("error getting write lock (expr_arr)");
+        let exprs = &mut d.exprs;
+
+        let e_keys = es.into_iter().map(|e| exprs.insert(e)).collect();
+
+        expr!(Expression::Array(e_keys))
     }}
 }
 
@@ -348,15 +378,23 @@ impl From<&str> for Expression {
 #[macro_export]
 macro_rules! stmt_eq {
     ($e:ident, $e2:expr) => {
-        let data = unsafe { DATA.as_ref().unwrap() };
+        let expr = $e2;
+        {
+            let d = DATA.read().expect("error getting read lock");
+            let data = &*d;
 
-        assert_eq!(data.stmts[$e[0]].0.deep_eq_stmt(&data.exprs, &$e2), true)
+            assert_eq!(data.stmts[$e[0]].0.deep_eq_stmt(&data.exprs, &expr), true)
+        }
     };
 }
 
 impl DeepEq for Statement {
     fn deep_eq_stmt(&self, exprs: &ExpressionMap, b: &Statement) -> bool {
         use Statement::*;
+
+        if self == b {
+            return true;
+        }
 
         match (self, b) {
             (Let(n1, e1), Let(n2, e2)) | (Assign(n1, e1), Assign(n2, e2)) => {
@@ -395,6 +433,10 @@ impl DeepEq for Statement {
                     }
                 }
                 false
+            }
+
+            (Impl(t1, m1), Impl(t2, m2)) => {
+                exprs[*t1].0.deep_eq_expr(exprs, &exprs[*t2].0) && deep_eq_expr_dict(m1, m2, exprs)
             }
 
             _ => false,
