@@ -928,3 +928,14 @@ pub fn run_add_object(
     };
     Ok(())
 }
+
+pub fn run_push_builtins(
+    globals: &mut Globals,
+    data: &InstrData,
+    context: &mut FullContext,
+) -> Result<(), RuntimeError> {
+    run_helper!(context, globals, data);
+
+    push!(Value: Value::Builtins().into_stored(area!()));
+    Ok(())
+}

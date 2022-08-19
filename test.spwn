@@ -1,9 +1,1 @@
-let a = [];
-p = a.push;
-p(1);
-p(2);
-p(3);
-p(4);
-print a;
-a.reverse();
-print a;
+$.print("hello");

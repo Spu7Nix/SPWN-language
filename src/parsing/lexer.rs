@@ -54,12 +54,15 @@ pub enum Token {
     #[token("impl")]
     Impl,
 
-    #[token("print")]
-    Print,
-    #[token("split")]
-    Split,
-    #[token("add")]
-    Add,
+    // #[token("print")]
+    // Print,
+    // #[token("split")]
+    // Split,
+    // #[token("add")]
+    // Add,
+
+    #[token("$")]
+    Dollar,
 
     #[token("is")]
     Is,

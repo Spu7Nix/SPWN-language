@@ -131,6 +131,8 @@ spwn_types! {
 
     Type(ValueType),
 
+    Builtins(),
+
     // Instance(Instance),
 }
 
@@ -171,6 +173,7 @@ impl Value {
             | Value::String(_)
             | Value::Bool(_)
             | Value::Empty()
+            | Value::Builtins()
             | Value::Channel(_)
             | Value::Group(_)
             | Value::Item(_)
@@ -235,6 +238,7 @@ impl Value {
             Value::Bool(v) => v.to_string(),
             Value::Type(v) => v.to_str(globals),
             Value::Empty() => "()".into(),
+            Value::Builtins() => "$".into(),
             Value::Array(arr) => format!(
                 "[{}]",
                 arr.iter()

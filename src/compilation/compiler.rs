@@ -482,6 +482,9 @@ impl Compiler {
                     func,
                 );
             }
+            Expression::Builtins => {
+                self.push_instr(Instruction::PushBuiltins, span, func);
+            }
         }
         Ok((start_idx, self.func_len(func)))
     }

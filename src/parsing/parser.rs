@@ -335,6 +335,11 @@ impl Parser<'_> {
             Token::Float => self.parse_float(data),
             Token::String => self.parse_string(data),
             Token::Id => self.parse_id(data),
+
+            Token::Dollar => {
+                self.next();
+                Ok(data.insert(Expression::Builtins, start))
+            }
             Token::True => {
                 self.next();
                 Ok(data.insert(Expression::Bool(true), start))
@@ -393,14 +398,13 @@ impl Parser<'_> {
                 Ok(data.insert(Expression::Maybe(None), start))
             }
 
-            Token::Split => {
-                self.next();
-                let a = self.parse_expr(data)?;
-                self.expect_tok(Token::Colon)?;
-                let b = self.parse_expr(data)?;
-                Ok(data.insert(Expression::Split(a, b), start))
-            }
-
+            // Token::Split => {
+            //     self.next();
+            //     let a = self.parse_expr(data)?;
+            //     self.expect_tok(Token::Colon)?;
+            //     let b = self.parse_expr(data)?;
+            //     Ok(data.insert(Expression::Split(a, b), start))
+            // }
             Token::TrigFnBracket => {
                 self.next();
                 let code = self.parse_statements(data)?;
@@ -690,6 +694,7 @@ impl Parser<'_> {
                         start.extend(self.span()),
                     )
                 }
+
                 Token::LParen => {
                     self.next();
                     let mut params = vec![];
@@ -877,17 +882,17 @@ impl Parser<'_> {
                 let value = self.parse_expr(data)?;
                 Statement::Let(var_name, value)
             }
-            Token::Print => {
-                self.next();
-                let value = self.parse_expr(data)?;
-                Statement::Print(value)
-            }
+            // Token::Print => {
+            //     self.next();
+            //     let value = self.parse_expr(data)?;
+            //     Statement::Print(value)
+            // }
 
-            Token::Add => {
-                self.next();
-                let value = self.parse_expr(data)?;
-                Statement::Add(value)
-            }
+            // Token::Add => {
+            //     self.next();
+            //     let value = self.parse_expr(data)?;
+            //     Statement::Add(value)
+            // }
             Token::If => {
                 self.next();
                 let mut branches = vec![];

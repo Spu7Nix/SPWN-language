@@ -168,6 +168,7 @@ pub fn run_func(
                 AddObject
 
                 BuildInstance(a)
+                PushBuiltins
             );
 
             for context in context.iter(SkipReturns) {

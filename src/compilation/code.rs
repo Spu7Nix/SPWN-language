@@ -234,6 +234,7 @@ pub enum Instruction {
     AddObject,
 
     BuildInstance(KeysID),
+    PushBuiltins,
 }
 
 impl Instruction {

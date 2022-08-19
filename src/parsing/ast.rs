@@ -200,6 +200,7 @@ pub enum Expression {
     Instance(ExprKey, Vec<(String, Option<ExprKey>)>),
 
     Split(ExprKey, ExprKey),
+    Builtins,
 }
 
 #[derive(Debug, Clone, PartialEq)]

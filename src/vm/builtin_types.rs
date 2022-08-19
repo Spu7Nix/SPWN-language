@@ -22,5 +22,13 @@ impl Globals {
                 method!(g, #mut Value::Array(this) => this.reverse()),
             )
             .finish_type(self);
+
+        TypeBuilder::new(ValueType::Builtins)
+            .add_method(
+                self,
+                "print",
+                method!(g, _this, val => println!("{}", val.to_str(g))),
+            )
+            .finish_type(self);
     }
 }
