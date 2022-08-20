@@ -3,6 +3,8 @@ use std::ops::Index;
 use super::compiler::Constant;
 use crate::compilation::compiler::URegister;
 use crate::sources::{CodeSpan, SpwnSource};
+use crate::regex_color_replace;
+
 macro_rules! wrappers {
     ($($n:ident($t:ty))*) => {
         $(
@@ -55,23 +57,6 @@ pub struct Code {
     pub funcs: Vec<BytecodeFunc>,
 }
 
-macro_rules! color_replace {
-    ($str:expr, $($reg:expr, $rep:expr,)*) => {
-        $(
-            let re = regex::Regex::new($reg).unwrap();
-            $str = re
-                .replace_all(
-                    &$str,
-                    ansi_term::Color::Yellow
-                        .bold()
-                        .paint($rep)
-                        .to_string(),
-                )
-                .into();
-        )*
-    };
-}
-
 impl Code {
     pub fn new(source: SpwnSource) -> Self {
         Self {
@@ -119,14 +104,14 @@ impl Code {
             }
         }
 
-        color_replace!(
+        regex_color_replace!(
             debug_str,
-            r"ConstID\(([^)]*)\)", "const $1",
-            r"VarID\(([^)]*)\)", "var $1",
-            r"InstrNum\(([^)]*)\)", "$1",
-            r"KeysID\(([^)]*)\)", "dict keys $1",
-            r"MacroBuildID\(([^)]*)\)", "macro build $1",
-            r"MemberID\(([^)]*)\)", "member $1",
+            r"ConstID\(([^)]*)\)", "const $1", Yellow
+            r"VarID\(([^)]*)\)", "var $1", Yellow
+            r"InstrNum\(([^)]*)\)", "$1", Yellow
+            r"KeysID\(([^)]*)\)", "dict keys $1", Yellow
+            r"MacroBuildID\(([^)]*)\)", "macro build $1", Yellow
+            r"MemberID\(([^)]*)\)", "member $1", Yellow
         );
 
         println!("{}", debug_str);

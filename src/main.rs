@@ -4,6 +4,7 @@ mod leveldata;
 mod parsing;
 mod sources;
 mod vm;
+mod util;
 
 use std::io::{self, Write};
 use std::{fs, path::PathBuf};
