@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! regex_color_replace {
-    ($str:expr, $($reg:expr, $rep:expr, $col:ident)*) => {
+    ($str:expr, $($reg:literal, $rep:literal, $col:ident)*) => {
         $(
             let re = regex::Regex::new($reg).unwrap();
             $str = re
