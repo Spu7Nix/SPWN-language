@@ -55,12 +55,7 @@ pub fn append_objects(
     }
 
     //find new ids for all the arbitrary ones
-    let mut id_maps: [AHashMap<ArbitraryId, SpecificId>; 4] = [
-        AHashMap::default(),
-        AHashMap::default(),
-        AHashMap::default(),
-        AHashMap::default(),
-    ];
+    let mut id_maps: [AHashMap<ArbitraryId, SpecificId>; 4] = Default::default();
 
     const ID_MAX: u16 = 999;
 
