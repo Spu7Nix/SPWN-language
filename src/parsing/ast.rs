@@ -1,17 +1,19 @@
-use crate::{leveldata::object_data::ObjectMode, parsing::lexer::Token};
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::sources::{CodeSpan, SpwnSource};
+use crate::{leveldata::object_data::ObjectMode, parsing::lexer::Token};
 
 new_key_type! {
     pub struct ExprKey;
     pub struct StmtKey;
 }
 
+pub type ExpressionMap = SlotMap<ExprKey, (Expression, CodeSpan)>;
+
 pub struct ASTData {
     pub source: SpwnSource,
 
-    pub exprs: SlotMap<ExprKey, (Expression, CodeSpan)>,
+    pub exprs: ExpressionMap,
     pub stmts: SlotMap<StmtKey, (Statement, CodeSpan)>,
 
     pub for_loop_iter_spans: SecondaryMap<StmtKey, CodeSpan>,
@@ -42,6 +44,7 @@ impl ASTData {
         }
     }
 
+    #[cfg(debug_assertions)]
     pub fn debug(&self, stmts: &Statements) {
         let mut debug_str = String::new();
         use std::fmt::Write;
@@ -95,6 +98,7 @@ impl ASTInsert<Expression, ExprKey> for ASTData {
     fn insert(&mut self, v: Expression, area: CodeSpan) -> ExprKey {
         self.exprs.insert((v, area))
     }
+
     fn get_full(&mut self, v: ExprKey) -> (Expression, CodeSpan) {
         self.exprs[v].clone()
     }
@@ -103,6 +107,7 @@ impl ASTInsert<Statement, StmtKey> for ASTData {
     fn insert(&mut self, v: Statement, area: CodeSpan) -> StmtKey {
         self.stmts.insert((v, area))
     }
+
     fn get_full(&mut self, v: StmtKey) -> (Statement, CodeSpan) {
         self.stmts[v].clone()
     }
@@ -141,14 +146,15 @@ pub enum Expression {
     Type(String),
 
     Array(Vec<ExprKey>),
+    //........key.....value
     Dict(Vec<(String, Option<ExprKey>)>),
-
+    //..mode.............obj key..value
     Obj(ObjectMode, Vec<(ExprKey, ExprKey)>),
 
-    // Index { base: ExprKey, index: ExprKey },
     Empty,
 
     Macro {
+        ///........name....type.............default value
         args: Vec<(String, Option<ExprKey>, Option<ExprKey>)>,
         ret_type: Option<ExprKey>,
         code: MacroCode,
@@ -168,9 +174,20 @@ pub enum Expression {
         base: ExprKey,
         index: ExprKey,
     },
+
+    Member {
+        base: ExprKey,
+        name: String,
+    },
+
+    TypeOf {
+        base: ExprKey,
+    },
+
     Call {
         base: ExprKey,
         params: Vec<ExprKey>,
+        //.................name....value
         named_params: Vec<(String, ExprKey)>,
     },
     TriggerFuncCall(ExprKey),
@@ -179,9 +196,11 @@ pub enum Expression {
 
     TriggerFunc(Statements),
 
+    //.......type name.....key.....value
     Instance(ExprKey, Vec<(String, Option<ExprKey>)>),
 
     Split(ExprKey, ExprKey),
+    Builtins,
 }
 
 #[derive(Debug, Clone, PartialEq)]

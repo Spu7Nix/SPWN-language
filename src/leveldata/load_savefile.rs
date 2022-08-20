@@ -1,5 +1,6 @@
-use libflate::{gzip, zlib};
 use std::io::Read;
+
+use libflate::{gzip, zlib};
 
 fn xor(data: Vec<u8>, key: u8) -> Vec<u8> {
     data.into_iter().map(|b| b ^ key).collect()
@@ -20,7 +21,6 @@ use quick_xml::Reader;
 fn decrypt_savefile(mut sf: Vec<u8>) -> Result<Vec<u8>, String> {
     if cfg!(target_os = "macos") {
         use aes::Aes256;
-
         use block_modes::block_padding::Pkcs7;
         use block_modes::{BlockMode, Ecb};
 
@@ -159,10 +159,11 @@ pub fn get_level_string(ls: Vec<u8>, level_name: Option<&String>) -> Result<Stri
     Ok(String::from_utf8(ls_buf).unwrap())
 }
 
-use quick_xml::Writer;
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
+
+use quick_xml::Writer;
 
 pub fn encrypt_level_string(
     ls: String,
@@ -257,7 +258,6 @@ pub fn encrypt_level_string(
 
     if cfg!(target_os = "macos") {
         use aes::Aes256;
-
         use block_modes::block_padding::Pkcs7;
         use block_modes::{BlockMode, Ecb};
 

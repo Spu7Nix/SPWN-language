@@ -1,8 +1,8 @@
-use crate::compilation::compiler::URegister;
-use crate::sources::{CodeSpan, SpwnSource};
 use std::ops::Index;
 
 use super::compiler::Constant;
+use crate::compilation::compiler::URegister;
+use crate::sources::{CodeSpan, SpwnSource};
 macro_rules! wrappers {
     ($($n:ident($t:ty))*) => {
         $(
@@ -30,6 +30,7 @@ wrappers! {
     VarID(u16)
     ConstID(u16)
     KeysID(u16)
+    MemberID(u16)
     MacroBuildID(u16)
 }
 
@@ -45,6 +46,7 @@ pub struct Code {
 
     pub const_register: URegister<Constant>,
     pub keys_register: URegister<Vec<String>>,
+    pub member_register: URegister<String>,
     #[allow(clippy::type_complexity)]
     pub macro_build_register: URegister<(usize, Vec<(String, bool, bool)>)>,
 
@@ -60,6 +62,7 @@ impl Code {
             const_register: URegister::new(),
             keys_register: URegister::new(),
             macro_build_register: URegister::new(),
+            member_register: URegister::new(),
             var_count: 0,
             funcs: vec![],
         }
@@ -89,6 +92,7 @@ impl Code {
                     ansi_term::Color::Green.bold().paint(match instr {
                         Instruction::LoadConst(c) => format!("{:?}", self.const_register[*c]),
                         Instruction::BuildDict(k) => format!("{:?}", self.keys_register[*k]),
+                        Instruction::Member(k) => format!("{}", self.member_register[*k]),
                         Instruction::BuildMacro(b) =>
                             format!("{:?}", self.macro_build_register[*b]),
                         _ => "".into(),
@@ -139,6 +143,17 @@ impl Code {
                 ansi_term::Color::Yellow
                     .bold()
                     .paint("macro build $1")
+                    .to_string(),
+            )
+            .into();
+
+        let re = regex::Regex::new(r"MemberID\(([^)]*)\)").unwrap();
+        debug_str = re
+            .replace_all(
+                &debug_str,
+                ansi_term::Color::Yellow
+                    .bold()
+                    .paint("member $1")
                     .to_string(),
             )
             .into();
@@ -206,6 +221,8 @@ pub enum Instruction {
     Return,
 
     Index,
+    Member(MemberID),
+    TypeOf,
 
     YeetContext,
     EnterArrowStatement(InstrNum),
@@ -215,6 +232,9 @@ pub enum Instruction {
     BuildObject(InstrNum),
     BuildTrigger(InstrNum),
     AddObject,
+
+    BuildInstance(KeysID),
+    PushBuiltins,
 }
 
 impl Instruction {

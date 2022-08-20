@@ -2,19 +2,19 @@
 
 use std::collections::HashMap;
 
-use crate::compilation::code::{Code, ConstID, InstrNum, KeysID, MacroBuildID, VarID};
+use super::context::{FullContext, ReturnType};
+use super::error::RuntimeError;
+use super::interpreter::{run_func, Globals};
+use super::value::{value_ops, Value};
+use crate::compilation::code::{Code, ConstID, InstrNum, KeysID, MacroBuildID, MemberID, VarID};
 use crate::leveldata::gd_types::Id;
 use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
 use crate::parsing::ast::IdClass;
 use crate::sources::CodeSpan;
 use crate::vm::context::SkipMode;
-use crate::vm::interpreter::ValueKey;
-use crate::vm::value::{Argument, Macro, Pattern};
-
-use super::context::{FullContext, ReturnType};
-use super::error::RuntimeError;
-use super::interpreter::{run_func, Globals};
-use super::value::{value_ops, Value};
+use crate::vm::interpreter::{TypeMember, ValueKey};
+use crate::vm::types::Instance;
+use crate::vm::value::{Argument, Macro, Pattern, ValueType};
 
 macro_rules! run_helper {
     ($context:ident, $globals:ident, $data:ident) => {
@@ -46,18 +46,18 @@ macro_rules! run_helper {
 
         #[allow(unused_macros)]
         macro_rules! push {
-            (Value: $v:expr) => {{
+            (Value: $v: expr) => {{
                 let key = $globals.memory.insert($v);
                 $context.inner().stack.push(key);
             }};
-            (Key: $v:expr) => {{
+            (Key: $v: expr) => {{
                 $context.inner().stack.push($v);
             }};
         }
 
         #[allow(unused_macros)]
         macro_rules! store {
-            ($v:expr) => {
+            ($v: expr) => {
                 $globals.memory.insert($v)
             };
         }
@@ -225,6 +225,36 @@ pub fn run_build_dict(
     Ok(())
 }
 
+pub fn run_build_instance(
+    globals: &mut Globals,
+    data: &InstrData,
+    context: &mut FullContext,
+    keys_id: KeysID,
+) -> Result<(), RuntimeError> {
+    run_helper!(context, globals, data);
+    let typ = pop!(Shallow);
+
+    let tk = match &typ.value {
+        Value::Type(ValueType::Custom(tk)) => *tk,
+        _ => todo!(),
+        // other => {
+        //     return Err(RuntimeError::TypeMismatch {
+        //         area: typ.def_area.clone(),
+        //         v: typ,
+        //         expected: ValueType::Type.into(),
+        //     })
+        // }
+    };
+
+    let key_data = &data.code.keys_register[keys_id];
+    let map = key_data
+        .iter()
+        .map(|s| (s.clone(), pop!(Deep Store)))
+        .collect();
+    push!(Value: Value::Instance(Instance { typ: tk, fields: map }).into_stored(data.code.source.area(data.span)));
+    Ok(())
+}
+
 pub fn run_jump(
     _globals: &mut Globals,
     _data: &InstrData,
@@ -266,7 +296,7 @@ pub fn run_push_empty(
     context: &mut FullContext,
 ) -> Result<(), RuntimeError> {
     run_helper!(context, globals, data);
-    push!(Value: Value::Empty.into_stored(area!()));
+    push!(Value: Value::Empty().into_stored(area!()));
     Ok(())
 }
 
@@ -381,14 +411,14 @@ pub fn run_build_macro(
             }
             var @ None => {
                 globals.undefined_captured.insert(*i);
-                let k = store!(Value::Empty.into_stored(area!()));
+                let k = store!(Value::Empty().into_stored(area!()));
                 *var = Some(k);
                 captured.insert(*i, k);
             }
         }
     }
 
-    push!(Value: Value::Macro(Macro {
+    push!(Value: Value::Macro(Macro::Custom  {
         func_id,
         captured,
         args,
@@ -427,26 +457,31 @@ pub fn run_call(
 
     let v = pop!(Shallow);
     match &v.value {
-        Value::Macro(m) => {
-            let idx = m.func_id;
+        Value::Macro(Macro::Custom {
+            func_id,
+            captured,
+            args,
+            ret_pattern,
+        }) => {
+            let idx = *func_id;
 
             for i in &data.code.funcs[idx].inner_ids {
                 context.inner().vars[i.0 as usize].vec.push(None)
             }
 
             let passed_args = passed_args.0 as usize;
-            if passed_args > m.args.len() {
+            if passed_args > args.len() {
                 return Err(RuntimeError::TooManyArguments {
-                    expected: m.args.len(),
+                    expected: args.len(),
                     provided: passed_args,
                     call_area: area!(),
                     func_area: v.def_area.clone(),
                 });
             }
-            let mut arg_values = vec![None; m.args.len()];
+            let mut arg_values = vec![None; args.len()];
 
             // set defaults
-            for (i, arg) in m.args.iter().enumerate() {
+            for (i, arg) in args.iter().enumerate() {
                 if let Some(default) = arg.default {
                     arg_values[i] = Some(default)
                 }
@@ -455,7 +490,7 @@ pub fn run_call(
             // set positional
             for i in 0..passed_args {
                 let val = pop!(Deep Store);
-                arg_values[m.args.len() - 1 - i] = Some(val);
+                arg_values[args.len() - 1 - i] = Some(val);
             }
 
             // apply
@@ -479,7 +514,7 @@ pub fn run_call(
 
             let stored_pos = context.inner().pos;
 
-            for (id, k) in &m.captured {
+            for (id, k) in captured {
                 *context.inner().vars[id.0 as usize].vec.last_mut().unwrap() = Some(*k);
             }
 
@@ -499,13 +534,35 @@ pub fn run_call(
                         context
                             .inner()
                             .stack
-                            .push(globals.memory.insert(Value::Empty.into_stored(area!())));
+                            .push(globals.memory.insert(Value::Empty().into_stored(area!())));
                         context.inner().returned = None;
                         context.inner().pos = stored_pos;
                     }
                     _ => unreachable!(),
                 }
             }
+        }
+
+        Value::Macro(Macro::Builtin { func_ptr, self_arg }) => {
+            let mut args = Vec::new();
+            let passed_args = passed_args.0 as usize;
+            // set positional
+            for i in 0..passed_args {
+                let val = pop!(Deep Store);
+                args.push(val);
+            }
+            // args are intentionally reversed
+            args.push(*self_arg);
+            match globals.builtins[*func_ptr] {
+                crate::vm::types::BuiltinFunction::Method(m) => {
+                    let v = m(globals, &args)?;
+                    push!(Key: v);
+                }
+                _ => unreachable!(),
+            }
+        }
+        Value::Type(t) => {
+            todo!()
         }
         _ => {
             return Err(RuntimeError::CannotCall {
@@ -528,6 +585,76 @@ pub fn run_return(
     Ok(())
 }
 
+pub fn run_member(
+    globals: &mut Globals,
+    data: &InstrData,
+    context: &mut FullContext,
+    id: MemberID,
+) -> Result<(), RuntimeError> {
+    run_helper!(context, globals, data);
+    let key = pop!(Key);
+    let name = data.code.member_register[id].clone();
+    match (&globals.memory[key].value, name.as_str()) {
+        (Value::Dict(fields) | Value::Instance(Instance { fields, .. }), _) => {
+            let key = match fields.get(&name) {
+                Some(k) => k,
+                None => {
+                    return Err(RuntimeError::UndefinedMember {
+                        name,
+                        area: area!(),
+                    })
+                }
+            };
+            push!(Key: *key);
+        }
+
+        (a, _) => {
+            let typ = a.typ();
+            let m = globals.type_members[&typ]
+                .get(&name)
+                .ok_or(RuntimeError::UndefinedMember {
+                    name,
+                    area: area!(),
+                })?;
+
+            match m {
+                TypeMember::Builtin(b) => {
+                    let builtin = match globals.builtins[*b] {
+                        crate::vm::types::BuiltinFunction::Attribute(f) => {
+                            let v = f(globals, key);
+                            push!(Value: v.into_stored(area!()))
+                        }
+                        crate::vm::types::BuiltinFunction::Method(_) => {
+                            let v = Value::Macro(Macro::Builtin {
+                                self_arg: key,
+                                func_ptr: *b,
+                            });
+                            push!(Value: v.into_stored(area!()))
+                        }
+                    };
+                }
+                TypeMember::Custom(c) => {
+                    push!(Key: *c);
+                }
+            }
+        }
+        _ => todo!(),
+    }
+    Ok(())
+}
+
+pub fn run_type_of(
+    globals: &mut Globals,
+    data: &InstrData,
+    context: &mut FullContext,
+) -> Result<(), RuntimeError> {
+    run_helper!(context, globals, data);
+    let base = pop!(Ref);
+    let typ = base.value.typ();
+    push!(Value: Value::Type(typ).into_stored(area!()));
+    Ok(())
+}
+
 pub fn run_index(
     globals: &mut Globals,
     data: &InstrData,
@@ -537,12 +664,99 @@ pub fn run_index(
 
     let index = pop!(Shallow);
     let base = pop!(Shallow);
-    match base.value {
-        Value::Array(arr) => match index.value {
-            Value::Int(n) => push!(Key: arr[n as usize]),
-            _ => panic!("fuck uu"),
+
+    match &base.value {
+        Value::Array(arr) => match &index.value {
+            Value::Int(n) => {
+                let idx = if *n > 0 {
+                    *n as isize
+                } else {
+                    arr.len() as isize + *n as isize
+                };
+                if idx < 0 || idx >= arr.len() as isize {
+                    return Err(RuntimeError::IndexOutOfBounds {
+                        area: area!(),
+                        len: arr.len(),
+                        idx: *n as isize,
+                    });
+                }
+                push!(Key: arr[idx as usize]);
+            }
+            other => {
+                return Err(RuntimeError::TypeMismatch {
+                    area: index.def_area.clone(),
+                    v: index,
+                    expected: ValueType::Int.into(),
+                })
+            }
         },
-        _ => panic!("fuck u"),
+        Value::String(s) => match &index.value {
+            Value::Int(n) => {
+                let idx = if *n > 0 {
+                    *n as isize
+                } else {
+                    s.len() as isize + *n as isize
+                };
+                if idx < 0 || idx >= s.len() as isize {
+                    return Err(RuntimeError::IndexOutOfBounds {
+                        area: area!(),
+                        len: s.len(),
+                        idx: *n as isize,
+                    });
+                }
+                push!(Value: Value::String(s.chars().nth(idx as usize).unwrap().to_string()).into_stored(area!()));
+            }
+            other => {
+                return Err(RuntimeError::TypeMismatch {
+                    area: index.def_area.clone(),
+                    v: index,
+                    expected: ValueType::Int.into(),
+                })
+            }
+        },
+        Value::Dict(map) => match &index.value {
+            Value::String(k) => match map.get(k) {
+                Some(k) => push!(Key: *k),
+                None => {
+                    return Err(RuntimeError::NonexistentMember {
+                        area: area!(),
+                        member: k.clone(),
+                    })
+                }
+            },
+            other => {
+                return Err(RuntimeError::TypeMismatch {
+                    area: index.def_area.clone(),
+                    v: index,
+                    expected: ValueType::String.into(),
+                })
+            }
+        },
+        Value::Instance(Instance { fields: map, .. }) => match &index.value {
+            Value::String(k) => match map.get(k) {
+                Some(k) => push!(Key: *k),
+                None => {
+                    return Err(RuntimeError::NonexistentMember {
+                        area: area!(),
+                        member: k.clone(),
+                    })
+                }
+            },
+            other => {
+                return Err(RuntimeError::TypeMismatch {
+                    area: index.def_area.clone(),
+                    v: index,
+                    expected: ValueType::String.into(),
+                })
+            }
+        },
+        _ => {
+            return Err(RuntimeError::TypeMismatch {
+                area: base.def_area.clone(),
+                v: base,
+                expected: ValueType::Array | ValueType::String | ValueType::Dict,
+            })
+        }
     }
     Ok(())
 }
@@ -595,10 +809,9 @@ pub fn run_enter_trigger_function(
     // send one context to the end
     outside_context.pos = (end_pos.0 - 1) as isize;
 
-    outside_context.stack.push(store!(Value::TriggerFn {
-        start_group: trig_fn_group,
-    }
-    .into_stored(area!())));
+    outside_context.stack.push(store!(
+        Value::TriggerFunction(trig_fn_group).into_stored(area!())
+    ));
 
     // setup inside context
     inside_context.group = trig_fn_group;
@@ -633,7 +846,7 @@ fn build_object(
             _ => {
                 return Err(RuntimeError::TypeMismatch {
                     v: key.clone(),
-                    expected: "integer".to_string(),
+                    expected: ValueType::Int.into(),
                     area: key.def_area,
                 })
             }
@@ -645,11 +858,16 @@ fn build_object(
             Value::String(s) => ObjParam::Text(s),
             Value::Bool(b) => ObjParam::Bool(b),
             Value::Group(g) => ObjParam::Group(g),
-            Value::TriggerFn { start_group } => ObjParam::Group(start_group),
+            Value::TriggerFunction(start_group) => ObjParam::Group(start_group),
             _ => {
                 return Err(RuntimeError::TypeMismatch {
                     v: val.clone(),
-                    expected: "valid object property value".to_string(),
+                    expected: ValueType::Int
+                        | ValueType::Float
+                        | ValueType::String
+                        | ValueType::Bool
+                        | ValueType::Group
+                        | ValueType::TriggerFunction,
                     area: val.def_area,
                 })
             }
@@ -703,10 +921,21 @@ pub fn run_add_object(
         _ => {
             return Err(RuntimeError::TypeMismatch {
                 v: object.clone(),
-                expected: "obj or trigger".to_string(),
+                expected: ValueType::Object.into(),
                 area: object.def_area,
             })
         }
     };
+    Ok(())
+}
+
+pub fn run_push_builtins(
+    globals: &mut Globals,
+    data: &InstrData,
+    context: &mut FullContext,
+) -> Result<(), RuntimeError> {
+    run_helper!(context, globals, data);
+
+    push!(Value: Value::Builtins().into_stored(area!()));
     Ok(())
 }

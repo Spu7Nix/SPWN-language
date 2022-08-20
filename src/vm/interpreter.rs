@@ -1,4 +1,6 @@
+use ahash::AHashMap;
 use ahash::AHashSet;
+use paste::paste;
 use slotmap::new_key_type;
 use slotmap::SlotMap;
 
@@ -6,19 +8,26 @@ use super::context::FullContext;
 use super::context::SkipMode::*;
 use super::error::RuntimeError;
 use super::instructions;
-use super::types::Type;
+use super::types::BuiltinFunction;
+use super::types::CustomType;
 use super::value::StoredValue;
+use super::value::ValueType;
+
 use crate::compilation::code::*;
 use crate::leveldata::gd_types::ArbitraryId;
 use crate::leveldata::object_data::GdObj;
 use crate::vm::context::ReturnType;
 use crate::vm::instructions::InstrData;
 
-use paste::paste;
-
 new_key_type! {
     pub struct ValueKey;
     pub struct TypeKey;
+    pub struct BuiltinKey;
+}
+
+pub enum TypeMember {
+    Builtin(BuiltinKey),
+    Custom(ValueKey),
 }
 
 pub struct Globals {
@@ -29,12 +38,15 @@ pub struct Globals {
 
     pub objects: Vec<GdObj>,
     pub triggers: Vec<GdObj>,
-    pub types: SlotMap<TypeKey, Type>,
+    pub types: SlotMap<TypeKey, CustomType>,
+    //pub type_keys: AHashMap<String, TypeKey>,
+    pub type_members: AHashMap<ValueType, AHashMap<String, TypeMember>>,
+    pub builtins: SlotMap<BuiltinKey, BuiltinFunction>,
 }
 
 impl Globals {
-    pub fn new(types: SlotMap<TypeKey, Type>) -> Self {
-        Self {
+    pub fn new(types: SlotMap<TypeKey, CustomType>) -> Self {
+        let mut g = Self {
             memory: SlotMap::default(),
 
             undefined_captured: AHashSet::new(),
@@ -43,8 +55,15 @@ impl Globals {
             objects: Vec::new(),
             triggers: Vec::new(),
             types,
-        }
+
+            builtins: SlotMap::default(),
+
+            type_members: AHashMap::default(),
+        };
+        g.init_types();
+        g
     }
+
     pub fn key_deep_clone(&mut self, k: ValueKey) -> ValueKey {
         let val = self.memory[k].clone();
         let val = val.deep_clone(self);
@@ -72,7 +91,6 @@ pub fn run_func(
             $($name:ident $(($arg:ident))?)+
         ) => {
             paste! {
-
                 match $instr {
                     $(
 
@@ -85,6 +103,10 @@ pub fn run_func(
     }
 
     'instruction_loop: loop {
+        if instructions.is_empty() {
+            break;
+        }
+
         let mut finished = true;
         for context in contexts.iter(SkipReturns) {
             finished = false;
@@ -134,6 +156,8 @@ pub fn run_func(
                 BuildMacro(a)
                 Call(a)
                 Index
+                Member(a)
+                TypeOf
                 Return
                 YeetContext
                 EnterArrowStatement(a)
@@ -142,6 +166,9 @@ pub fn run_func(
                 BuildObject(a)
                 BuildTrigger(a)
                 AddObject
+
+                BuildInstance(a)
+                PushBuiltins
             );
 
             for context in context.iter(SkipReturns) {

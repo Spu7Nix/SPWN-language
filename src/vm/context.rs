@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use crate::{compilation::code::VarID, leveldata::gd_types::Id};
-
 use super::interpreter::ValueKey;
+use crate::{compilation::code::VarID, leveldata::gd_types::Id};
 
 // variables for each call (kinda like a stack frame thing???)
 #[derive(Debug, Clone)]
@@ -50,12 +49,14 @@ impl FullContext {
     pub fn single(var_count: usize) -> Self {
         Self::Single(Context::new(var_count))
     }
+
     pub fn inner(&mut self) -> &mut Context {
         match self {
             FullContext::Single(c) => c,
-            FullContext::Split(_, _) => panic!("cant call inner on split hee hee"),
+            FullContext::Split(..) => panic!("cant call inner on split hee hee"),
         }
     }
+
     pub fn iter(&mut self, skip_returns: SkipMode) -> ContextIter {
         ContextIter::new(self, skip_returns)
     }
@@ -118,6 +119,7 @@ impl<'a> ContextIter<'a> {
         iter.add_left_subtree(node);
         iter
     }
+
     fn add_left_subtree(&mut self, mut node: &'a mut FullContext) {
         loop {
             match node {

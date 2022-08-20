@@ -36,6 +36,13 @@ impl CodeArea {
     pub fn label(&self) -> (String, Range<usize>) {
         (self.name(), self.span.into())
     }
+
+    pub(crate) fn internal() -> CodeArea {
+        CodeArea {
+            source: SpwnSource::File(PathBuf::from("<internal>")),
+            span: CodeSpan { start: 0, end: 0 },
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Copy, Default)]

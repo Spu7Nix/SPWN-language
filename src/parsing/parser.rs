@@ -5,12 +5,10 @@ use logos::{Lexer, Logos};
 use super::ast::{ASTData, ASTInsert, IdClass};
 use super::ast::{ExprKey, Expression, Statement, Statements, StmtKey};
 use super::error::SyntaxError;
-use super::lexer::{Token, Tokens};
+use super::lexer::{Token, TokenUnion};
 use super::parser_util::{operators, OpType, ParsedDictlike, ParsedObjlike};
-
 use crate::leveldata::object_data::ObjectMode;
 use crate::parsing::ast::MacroCode;
-// use crate::leveldata::object_data::ObjectMode;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
 
 type Result<T> = std::result::Result<T, SyntaxError>;
@@ -25,15 +23,18 @@ impl Parser<'_> {
     pub fn next(&mut self) -> Token {
         self.lexer.next().unwrap_or(Token::Eof)
     }
+
     pub fn peek(&mut self) -> Token {
         let mut peek = self.lexer.clone();
         peek.next().unwrap_or(Token::Eof)
     }
+
     pub fn peek_span(&mut self) -> CodeSpan {
         let mut peek = self.lexer.clone();
         peek.next();
         peek.span().into()
     }
+
     pub fn peek_many(&mut self, n: usize) -> Token {
         let mut peek = self.lexer.clone();
         let mut last = peek.next();
@@ -48,6 +49,7 @@ impl Parser<'_> {
     pub fn span(&self) -> CodeSpan {
         self.lexer.span().into()
     }
+
     pub fn slice(&self) -> &str {
         self.lexer.slice()
     }
@@ -64,17 +66,18 @@ impl Parser<'_> {
         let lexer = Token::lexer(code);
         Parser { lexer, source }
     }
+
     unsafe fn make_static<'a>(d: &'a str) -> &'static str {
         std::mem::transmute::<&'a str, &'static str>(d)
     }
 
     pub fn peek_expect_or_tok<T, U>(&mut self, tok: T, or: U) -> Result<()>
     where
-        T: Into<Tokens> + ToString,
+        T: Into<TokenUnion> + ToString,
         U: ToString,
     {
         let next = self.peek();
-        let toks: Tokens = tok.into();
+        let toks: TokenUnion = tok.into();
 
         if !toks.0.contains(&next) {
             self.next();
@@ -90,18 +93,18 @@ impl Parser<'_> {
 
     pub fn peek_expect_tok<T>(&mut self, tok: T) -> Result<()>
     where
-        T: Into<Tokens> + ToString + Clone,
+        T: Into<TokenUnion> + ToString + Clone,
     {
         self.peek_expect_or_tok(tok.clone(), tok)
     }
 
     pub fn expect_or_tok<T, U>(&mut self, tok: T, or: U) -> Result<()>
     where
-        T: Into<Tokens> + ToString,
+        T: Into<TokenUnion> + ToString,
         U: ToString,
     {
         let next = self.next();
-        let toks: Tokens = tok.into();
+        let toks: TokenUnion = tok.into();
 
         if !toks.0.contains(&next) {
             return Err(SyntaxError::ExpectedToken {
@@ -115,7 +118,7 @@ impl Parser<'_> {
 
     pub fn expect_tok<T>(&mut self, tok: T) -> Result<()>
     where
-        T: Into<Tokens> + ToString + Clone,
+        T: Into<TokenUnion> + ToString + Clone,
     {
         self.expect_or_tok(tok.clone(), tok)
     }
@@ -136,7 +139,7 @@ impl Parser<'_> {
                 _ => self.to_int_radix(content, 10)?,
             }
         } else {
-            content.parse::<i64>().unwrap()
+            self.to_int_radix(content, 10)?
         };
 
         Ok(ast_data.insert(Expression::Int(int), span))
@@ -161,15 +164,17 @@ impl Parser<'_> {
         self.next();
         let span = self.span();
         let content: &str = self.lexer.slice();
-        let float = content.parse::<f64>().unwrap();
+        let float = content.replace('_', "").parse::<f64>().unwrap();
 
         Ok(ast_data.insert(Expression::Float(float), span))
     }
 
     fn to_int_radix(&self, from: &str, radix: u32) -> Result<i64> {
-        i64::from_str_radix(from, radix).map_err(|_| SyntaxError::InvalidLiteral {
-            literal: from.into(),
-            area: self.make_area(self.span()),
+        i64::from_str_radix(&from.replace('_', ""), radix).map_err(|_| {
+            SyntaxError::InvalidLiteral {
+                literal: from.into(),
+                area: self.make_area(self.span()),
+            }
         })
     }
 
@@ -247,21 +252,27 @@ impl Parser<'_> {
 
         if !matches!(next, '{') {
             return Err(SyntaxError::ExpectedToken {
-                expected: "{".into(),
+                expected: Token::LBracket.to_string(),
                 found: next.to_string(),
                 area: self.make_area(self.span()),
             });
         }
 
+        // `take_while` will always consume the matched chars +1 (in order to check whether it matches)
+        // this means `unwrap_or` would always use the default, so instead clone it to not affect
+        // the actual chars iterator
         let hex = chars
+            .clone()
             .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
             .collect::<String>();
 
-        let next = chars.next().unwrap_or(' ');
+        let mut schars = chars.skip(hex.len());
+
+        let next = schars.next().unwrap_or(' ');
 
         if !matches!(next, '}') {
             return Err(SyntaxError::ExpectedToken {
-                expected: "}".into(),
+                expected: Token::RBracket.to_string(),
                 found: next.to_string(),
                 area: self.make_area(self.span()),
             });
@@ -303,7 +314,7 @@ impl Parser<'_> {
             let key = self.parse_expr(data)?;
             let span = data.span(key);
             item_spans.push(span);
-            dbg!(self.peek());
+
             self.expect_tok(Token::Colon)?;
             let value = self.parse_expr(data)?;
 
@@ -324,6 +335,11 @@ impl Parser<'_> {
             Token::Float => self.parse_float(data),
             Token::String => self.parse_string(data),
             Token::Id => self.parse_id(data),
+
+            Token::Dollar => {
+                self.next();
+                Ok(data.insert(Expression::Builtins, start))
+            }
             Token::True => {
                 self.next();
                 Ok(data.insert(Expression::Bool(true), start))
@@ -382,14 +398,13 @@ impl Parser<'_> {
                 Ok(data.insert(Expression::Maybe(None), start))
             }
 
-            Token::Split => {
-                self.next();
-                let a = self.parse_expr(data)?;
-                self.expect_tok(Token::Colon)?;
-                let b = self.parse_expr(data)?;
-                Ok(data.insert(Expression::Split(a, b), start))
-            }
-
+            // Token::Split => {
+            //     self.next();
+            //     let a = self.parse_expr(data)?;
+            //     self.expect_tok(Token::Colon)?;
+            //     let b = self.parse_expr(data)?;
+            //     Ok(data.insert(Expression::Split(a, b), start))
+            // }
             Token::TrigFnBracket => {
                 self.next();
                 let code = self.parse_statements(data)?;
@@ -653,6 +668,7 @@ impl Parser<'_> {
                 | Token::QMark
                 | Token::DoubleColon
                 | Token::ExclMark
+                | Token::Dot
         ) {
             match self.peek() {
                 Token::LSqBracket => {
@@ -678,6 +694,7 @@ impl Parser<'_> {
                         start.extend(self.span()),
                     )
                 }
+
                 Token::LParen => {
                     self.next();
                     let mut params = vec![];
@@ -715,7 +732,6 @@ impl Parser<'_> {
                             param_areas.push(start.extend(self.span()));
                             named_params.push((name, arg));
                         }
-                        // self.next();
                         self.peek_expect_tok(Token::RParen | Token::Comma)?;
                         self.skip_tok(Token::Comma);
                     }
@@ -739,15 +755,47 @@ impl Parser<'_> {
                 }
                 Token::DoubleColon => {
                     self.next();
-                    self.expect_tok(Token::LBracket)?;
-                    let dictlike = self.parse_dictlike(data)?;
-                    value = data.exprs.insert_with_key(|key| {
-                        data.dictlike_spans.insert(key, dictlike.item_spans);
-                        (
-                            Expression::Instance(value, dictlike.items),
-                            start.extend(self.span()),
-                        )
-                    })
+                    match self.next() {
+                        Token::Ident => value = self.parse_ident_or_macro(data)?,
+                        Token::LBracket => {
+                            let dictlike = self.parse_dictlike(data)?;
+                            value = data.exprs.insert_with_key(|key| {
+                                data.dictlike_spans.insert(key, dictlike.item_spans);
+                                (
+                                    Expression::Instance(value, dictlike.items),
+                                    start.extend(self.span()),
+                                )
+                            })
+                        }
+                        _ => todo!("members + calls"),
+                    }
+                }
+                Token::Dot => {
+                    self.next();
+                    match self.next() {
+                        Token::Ident => {
+                            let name = self.slice().to_string();
+                            let key = data.insert(
+                                Expression::Member { base: value, name },
+                                start.extend(self.span()),
+                            );
+                            value = key;
+                        }
+                        Token::Type => {
+                            let key = data.insert(
+                                Expression::TypeOf { base: value },
+                                start.extend(self.span()),
+                            );
+                            value = key;
+                        }
+                        _ => {
+                            return Err(SyntaxError::ExpectedToken {
+                                expected: Token::Ident.to_string(),
+                                found: self.slice().to_string(),
+                                area: self.make_area(self.span()),
+                            });
+                        }
+                    }
                 }
                 Token::ExclMark => {
                     self.next();
@@ -834,17 +882,17 @@ impl Parser<'_> {
                 let value = self.parse_expr(data)?;
                 Statement::Let(var_name, value)
             }
-            Token::Print => {
-                self.next();
-                let value = self.parse_expr(data)?;
-                Statement::Print(value)
-            }
+            // Token::Print => {
+            //     self.next();
+            //     let value = self.parse_expr(data)?;
+            //     Statement::Print(value)
+            // }
 
-            Token::Add => {
-                self.next();
-                let value = self.parse_expr(data)?;
-                Statement::Add(value)
-            }
+            // Token::Add => {
+            //     self.next();
+            //     let value = self.parse_expr(data)?;
+            //     Statement::Add(value)
+            // }
             Token::If => {
                 self.next();
                 let mut branches = vec![];
@@ -926,7 +974,7 @@ impl Parser<'_> {
                 self.next();
                 Statement::Break
             }
-            Token::TypeDef => {
+            Token::Type => {
                 self.next();
                 self.expect_tok(Token::TypeIndicator)?;
                 let typ_name = self.slice()[1..].to_string();

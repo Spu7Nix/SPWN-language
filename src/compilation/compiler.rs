@@ -4,6 +4,14 @@ use std::io::Write;
 use ahash::AHashMap;
 use slotmap::{new_key_type, SlotMap};
 
+use super::{
+    code::{
+        BytecodeFunc, Code, ConstID, InstrNum, InstrPos, Instruction, KeysID, MacroBuildID,
+        MemberID, VarID,
+    },
+    error::CompilerError,
+};
+use crate::vm::value::ValueType;
 use crate::{
     leveldata::object_data::ObjectMode,
     parsing::{
@@ -11,14 +19,7 @@ use crate::{
         lexer::Token,
     },
     sources::{CodeSpan, SpwnSource},
-    vm::{interpreter::TypeKey, types::Type, value::Value},
-};
-
-use super::{
-    code::{
-        BytecodeFunc, Code, ConstID, InstrNum, InstrPos, Instruction, KeysID, MacroBuildID, VarID,
-    },
-    error::CompilerError,
+    vm::{interpreter::TypeKey, types::CustomType, value::Value},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,7 +28,7 @@ pub enum Constant {
     Float(f64),
     Bool(bool),
     String(String),
-    Type(TypeKey),
+    Type(ValueType),
 }
 
 impl Constant {
@@ -37,7 +38,7 @@ impl Constant {
             Constant::Float(v) => Value::Float(*v),
             Constant::Bool(v) => Value::Bool(*v),
             Constant::String(v) => Value::String(v.clone()),
-            Constant::Type(k) => Value::TypeIndicator(*k),
+            Constant::Type(k) => Value::Type(*k),
         }
     }
 }
@@ -86,7 +87,7 @@ pub struct Compiler {
     pub code: Code,
 
     pub scopes: SlotMap<ScopeKey, Scope>,
-    pub types: SlotMap<TypeKey, Type>,
+    pub types: SlotMap<TypeKey, CustomType>,
     pub type_keys: AHashMap<String, TypeKey>,
 }
 
@@ -109,6 +110,7 @@ impl Compiler {
             idx: instrs.len() - 1,
         }
     }
+
     pub fn get_instr(&mut self, pos: InstrPos) -> &mut Instruction {
         &mut self.code.funcs[pos.func].instructions[pos.idx].0
     }
@@ -129,6 +131,7 @@ impl Compiler {
             }
         }
     }
+
     pub fn new_var(
         &mut self,
         name: &str,
@@ -148,6 +151,7 @@ impl Compiler {
         );
         id
     }
+
     pub fn get_accessible_vars(&self, scope: ScopeKey) -> Vec<VarID> {
         let mut vars = vec![];
         let mut scope = &self.scopes[scope];
@@ -161,6 +165,7 @@ impl Compiler {
             }
         }
     }
+
     pub fn get_inner_vars(&self, scope: ScopeKey) -> Vec<VarID> {
         let mut vars = vec![];
         fn inner(compiler: &Compiler, scope: ScopeKey, vars: &mut Vec<VarID>) {
@@ -256,7 +261,10 @@ impl Compiler {
             },
             Expression::Type(name) => {
                 if let Some(key) = self.type_keys.get(&name) {
-                    let id = self.code.const_register.insert(Constant::Type(*key));
+                    let id = self
+                        .code
+                        .const_register
+                        .insert(Constant::Type(ValueType::Custom(*key)));
                     self.push_instr(Instruction::LoadConst(ConstID(id as u16)), span, func);
                 } else {
                     return Err(CompilerError::UndefinedType {
@@ -386,6 +394,17 @@ impl Compiler {
                 self.compile_expr(index, scope, func)?;
                 self.push_instr(Instruction::Index, span, func);
             }
+
+            Expression::Member { base, name } => {
+                self.compile_expr(base, scope, func)?;
+                let id = self.code.member_register.insert(name);
+                self.push_instr(Instruction::Member(MemberID(id as u16)), span, func);
+            }
+
+            Expression::TypeOf { base } => {
+                self.compile_expr(base, scope, func)?;
+                self.push_instr(Instruction::TypeOf, span, func);
+            }
             Expression::Call {
                 base,
                 params,
@@ -418,8 +437,36 @@ impl Compiler {
                 let to = self.push_instr(Instruction::YeetContext, span, func);
                 self.get_instr(enter).modify_num((to.idx + 1) as u16);
             }
-            Expression::Instance(_, _) => todo!(),
-            Expression::Split(_, _) => todo!(),
+            Expression::Instance(t, fields) => {
+                //copied from dict
+                let keys = self
+                    .code
+                    .keys_register
+                    .insert(fields.iter().map(|(s, _)| s.clone()).rev().collect());
+                let key_spans = self.ast_data.dictlike_spans[expr_key].clone();
+                for ((name, v), span) in fields.into_iter().zip(key_spans) {
+                    match v {
+                        Some(e) => {
+                            self.compile_expr(e, scope, func)?;
+                        }
+                        None => match self.get_var(&name, scope) {
+                            Some(data) => {
+                                self.push_instr(Instruction::LoadVar(data.id), span, func);
+                            }
+                            None => {
+                                return Err(CompilerError::NonexistentVariable {
+                                    name,
+                                    area: self.ast_data.source.area(span),
+                                })
+                            }
+                        },
+                    }
+                }
+
+                self.compile_expr(t, scope, func)?;
+                self.push_instr(Instruction::BuildInstance(KeysID(keys as u16)), span, func);
+            }
+            Expression::Split(..) => todo!(),
             Expression::Obj(mode, vals) => {
                 let l = InstrNum(vals.len() as u16);
                 for (k, v) in vals.into_iter() {
@@ -434,6 +481,9 @@ impl Compiler {
                     span,
                     func,
                 );
+            }
+            Expression::Builtins => {
+                self.push_instr(Instruction::PushBuiltins, span, func);
             }
         }
         Ok((start_idx, self.func_len(func)))
@@ -618,9 +668,9 @@ impl Compiler {
         for i in stmts.iter() {
             if let Statement::TypeDef(name) = self.ast_data.get(*i) {
                 if allow_type_def {
-                    let k = self.types.insert(Type {
+                    let k = self.types.insert(CustomType {
                         name: name.clone(),
-                        members: AHashMap::default(),
+                        //members: AHashMap::default(),
                     });
                     self.type_keys.insert(name, k);
                 } else {
@@ -638,6 +688,7 @@ impl Compiler {
         }
         Ok((start_idx, self.func_len(func)))
     }
+
     pub fn start_compile(&mut self, stmts: Vec<StmtKey>) -> Result<(), CompilerError> {
         let base_scope = self.scopes.insert(Scope {
             vars: HashMap::new(),
