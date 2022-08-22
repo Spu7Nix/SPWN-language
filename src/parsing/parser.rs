@@ -195,7 +195,7 @@ impl Parser<'_> {
         let out = match &*flag {
             "b" => todo!("byte string"),
             "f" => todo!("f-string"),
-            "r" => todo!("raw string"),
+            "r" => chars.collect(),
             "u" => todo!("unindented string"),
             "" => self.parse_escapes(&mut chars)?,
             other => {
@@ -277,7 +277,7 @@ impl Parser<'_> {
             });
         }
 
-        Ok(char::from_u32(self.to_int_radix(&hex, 16)? as u32).unwrap_or('�'))
+        Ok(char::from_u32(self.to_int_radix(&hex, 16)? as u32).unwrap_or('\u{FFFD}'))
     }
 
     pub fn parse_dictlike(&mut self, data: &mut ASTData) -> Result<ParsedDictlike> {

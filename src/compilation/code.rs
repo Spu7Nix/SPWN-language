@@ -3,6 +3,8 @@ use std::ops::Index;
 use super::compiler::Constant;
 use crate::compilation::compiler::URegister;
 use crate::sources::{CodeSpan, SpwnSource};
+use crate::regex_color_replace;
+
 macro_rules! wrappers {
     ($($n:ident($t:ty))*) => {
         $(
@@ -102,61 +104,15 @@ impl Code {
             }
         }
 
-        let re = regex::Regex::new(r"ConstID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow
-                    .bold()
-                    .paint("const $1")
-                    .to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"VarID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow.bold().paint("var $1").to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"InstrNum\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow.bold().paint("$1").to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"KeysID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow
-                    .bold()
-                    .paint("dict keys $1")
-                    .to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"MacroBuildID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow
-                    .bold()
-                    .paint("macro build $1")
-                    .to_string(),
-            )
-            .into();
-
-        let re = regex::Regex::new(r"MemberID\(([^)]*)\)").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow
-                    .bold()
-                    .paint("member $1")
-                    .to_string(),
-            )
-            .into();
+        regex_color_replace!(
+            debug_str,
+            r"ConstID\(([^)]*)\)", "const $1", Yellow
+            r"VarID\(([^)]*)\)", "var $1", Yellow
+            r"InstrNum\(([^)]*)\)", "$1", Yellow
+            r"KeysID\(([^)]*)\)", "dict keys $1", Yellow
+            r"MacroBuildID\(([^)]*)\)", "macro build $1", Yellow
+            r"MemberID\(([^)]*)\)", "member $1", Yellow
+        );
 
         println!("{}", debug_str);
     }

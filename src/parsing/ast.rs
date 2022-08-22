@@ -2,6 +2,7 @@ use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::{leveldata::object_data::ObjectMode, parsing::lexer::Token};
+use crate::regex_color_replace;
 
 new_key_type! {
     pub struct ExprKey;
@@ -63,20 +64,11 @@ impl ASTData {
             writeln!(&mut debug_str, "{:?}", i).unwrap();
         }
 
-        let re = regex::Regex::new(r"(ExprKey\([^)]*\))").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Yellow.bold().paint("$1").to_string(),
-            )
-            .into();
-        let re = regex::Regex::new(r"(StmtKey\([^)]*\))").unwrap();
-        debug_str = re
-            .replace_all(
-                &debug_str,
-                ansi_term::Color::Blue.bold().paint("$1").to_string(),
-            )
-            .into();
+        regex_color_replace!(
+            debug_str,
+            r"(ExprKey\([^)]*\))", "$1", Yellow
+            r"(StmtKey\([^)]*\))", "$1", Blue
+        );
 
         println!("{}", debug_str);
     }

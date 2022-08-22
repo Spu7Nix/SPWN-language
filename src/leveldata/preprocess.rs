@@ -29,12 +29,8 @@ pub fn remove_spwn_objects(file_content: &mut String) {
 }
 
 pub fn get_used_ids(ls: &str) -> [AHashSet<u16>; 4] {
-    let mut out = [
-        AHashSet::<u16>::default(),
-        AHashSet::<u16>::default(),
-        AHashSet::<u16>::default(),
-        AHashSet::<u16>::default(),
-    ];
+    let mut out: [AHashSet<u16>; 4] = Default::default();
+
     let objects = ls.split(';');
     for obj in objects {
         let props: Vec<&str> = obj.split(',').collect();
