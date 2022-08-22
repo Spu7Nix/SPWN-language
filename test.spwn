@@ -1,1 +1,2 @@
-$.print("hello");
+import "hello.spwn";
+$.print("Hello World");

@@ -201,6 +201,13 @@ pub enum Expression {
 
     Split(ExprKey, ExprKey),
     Builtins,
+    Import(ImportType),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ImportType {
+    Module(String),
+    Library(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

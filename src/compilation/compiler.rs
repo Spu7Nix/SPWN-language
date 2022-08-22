@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::fs;
 use std::io::Write;
+use std::{collections::HashMap, path::PathBuf};
 
 use ahash::AHashMap;
 use slotmap::{new_key_type, SlotMap};
@@ -11,7 +12,6 @@ use super::{
     },
     error::CompilerError,
 };
-use crate::vm::value::ValueType;
 use crate::{
     leveldata::object_data::ObjectMode,
     parsing::{
@@ -21,6 +21,7 @@ use crate::{
     sources::{CodeSpan, SpwnSource},
     vm::{interpreter::TypeKey, types::CustomType, value::Value},
 };
+use crate::{parsing::ast::ImportType, vm::value::ValueType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Constant {
@@ -485,6 +486,28 @@ impl Compiler {
             Expression::Builtins => {
                 self.push_instr(Instruction::PushBuiltins, span, func);
             }
+            Expression::Import(ImportType::Module(m)) => {
+                // parse & compile the module
+                // put it into a function??
+                // call the function???
+                // profit?????
+
+                let path = PathBuf::from(m);
+                let content = fs::read_to_string(&path).unwrap();
+
+                // parse content
+                let source = SpwnSource::File(path);
+                let mut parser = crate::parsing::parser::Parser::new(&content, source.clone());
+                let mut ast_data = ASTData::new(source);
+                let statements = match parser.parse(&mut ast_data) {
+                    Ok(a) => a,
+                    Err(e) => todo!(),
+                };
+
+                todo!()
+            }
+
+            Expression::Import(ImportType::Library(_)) => todo!(),
         }
         Ok((start_idx, self.func_len(func)))
     }

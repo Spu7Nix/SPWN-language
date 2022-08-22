@@ -2,7 +2,7 @@ use std::str::Chars;
 
 use logos::{Lexer, Logos};
 
-use super::ast::{ASTData, ASTInsert, IdClass};
+use super::ast::{ASTData, ASTInsert, IdClass, ImportType};
 use super::ast::{ExprKey, Expression, Statement, Statements, StmtKey};
 use super::error::SyntaxError;
 use super::lexer::{Token, TokenUnion};
@@ -178,7 +178,7 @@ impl Parser<'_> {
         })
     }
 
-    pub fn parse_string(&mut self, ast_data: &mut ASTData) -> Result<ExprKey> {
+    pub fn parse_string(&mut self) -> Result<String> {
         self.next();
         let span = self.span();
         let content: &str = self.lexer.slice();
@@ -205,8 +205,7 @@ impl Parser<'_> {
                 });
             }
         };
-
-        Ok(ast_data.insert(Expression::String(out), span))
+        Ok(out)
     }
 
     fn parse_escapes(&self, chars: &mut Chars) -> Result<String> {
@@ -333,7 +332,7 @@ impl Parser<'_> {
         match peek {
             Token::Int => self.parse_int(data),
             Token::Float => self.parse_float(data),
-            Token::String => self.parse_string(data),
+            Token::String => Ok(data.insert(Expression::String(self.parse_string()?), start)),
             Token::Id => self.parse_id(data),
 
             Token::Dollar => {
@@ -354,6 +353,19 @@ impl Parser<'_> {
                 let name = self.slice()[1..].to_string();
                 Ok(data.insert(Expression::Type(name), start))
             }
+
+            Token::Import => {
+                self.next();
+                let expr = match self.peek() {
+                    Token::String => Expression::Import(ImportType::Module(self.parse_string()?)),
+                    Token::Ident => {
+                        Expression::Import(ImportType::Library(self.slice().to_string()))
+                    }
+                    _ => todo!(),
+                };
+                Ok(data.insert(expr, start))
+            }
+
             Token::LParen => self.parse_paren_or_macro(data),
 
             // let value = self.parse_expr(data)?;
