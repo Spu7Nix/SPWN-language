@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::Write;
 use std::{collections::HashMap, path::PathBuf};
 
 use ahash::AHashMap;
@@ -203,7 +202,7 @@ impl Compiler {
         let expr = self.ast_data.get(expr_key);
         let span = self.ast_data.span(expr_key);
 
-        match expr {
+        match expr.t {
             Expression::Int(v) => {
                 let id = self.code.const_register.insert(Constant::Int(v));
                 self.push_instr(Instruction::LoadConst(ConstID(id as u16)), span, func);
@@ -288,20 +287,20 @@ impl Compiler {
                 let keys = self
                     .code
                     .keys_register
-                    .insert(dict.iter().map(|(s, _)| s.clone()).rev().collect());
-                let key_spans = self.ast_data.dictlike_spans[expr_key].clone();
-                for ((name, v), span) in dict.into_iter().zip(key_spans) {
-                    match v {
+                    .insert(dict.iter().map(|s| s.0.clone()).rev().collect());
+
+                for kvs in dict.into_iter() {
+                    match kvs.1 {
                         Some(e) => {
                             self.compile_expr(e, scope, func)?;
                         }
-                        None => match self.get_var(&name, scope) {
+                        None => match self.get_var(&kvs.0, scope) {
                             Some(data) => {
                                 self.push_instr(Instruction::LoadVar(data.id), span, func);
                             }
                             None => {
                                 return Err(CompilerError::NonexistentVariable {
-                                    name,
+                                    name: kvs.0.clone(),
                                     area: self.ast_data.source.area(span),
                                 })
                             }
@@ -313,11 +312,6 @@ impl Compiler {
             Expression::Empty => {
                 self.push_instr(Instruction::PushEmpty, span, func);
             }
-            // Expression::Block(stmts) => {
-            //     let derived = self.derive_scope(scope);
-            //     self.compile_stmts(stmts, derived, func)?;
-            //     self.push_instr(Instruction::PushEmpty, span, func);
-            // }
             Expression::Macro {
                 args,
                 ret_type,
@@ -329,30 +323,34 @@ impl Compiler {
                     capture_ids: self.get_accessible_vars(scope),
                     inner_ids: vec![],
                 });
+
                 let func_id = self.code.funcs.len() - 1;
 
                 let info = self.code.macro_build_register.insert((
                     func_id,
                     args.iter()
-                        .map(|(s, t, d)| (s.clone(), t.is_some(), d.is_some()))
+                        .map(|a| (a.0.clone(), a.1.is_some(), a.2.is_some()))
                         .collect(),
                 ));
 
                 let derived = self.derive_scope(scope);
 
-                let arg_spans = self.ast_data.func_arg_spans[expr_key].clone();
                 let mut arg_ids = vec![];
-                for ((name, t, d), span) in args.into_iter().zip(arg_spans) {
-                    let arg_id = self.new_var(&name, derived, false, span);
+                for arg in args.into_iter() {
+                    let arg_id = self.new_var(&arg.0, derived, false, arg.span);
                     arg_ids.push(arg_id);
-                    if let Some(t) = t {
+
+                    if let Some(t) = arg.1 {
                         self.compile_expr(t, scope, func)?;
                     }
-                    if let Some(d) = d {
+
+                    if let Some(d) = arg.2 {
                         self.compile_expr(d, scope, func)?;
                     }
                 }
+
                 self.code.funcs[func_id].arg_ids = arg_ids;
+
                 if let Some(ret) = ret_type {
                     self.compile_expr(ret, scope, func)?;
                 } else {
@@ -439,40 +437,17 @@ impl Compiler {
                 self.get_instr(enter).modify_num((to.idx + 1) as u16);
             }
             Expression::Instance(t, fields) => {
-                //copied from dict
-                let keys = self
-                    .code
-                    .keys_register
-                    .insert(fields.iter().map(|(s, _)| s.clone()).rev().collect());
-                let key_spans = self.ast_data.dictlike_spans[expr_key].clone();
-                for ((name, v), span) in fields.into_iter().zip(key_spans) {
-                    match v {
-                        Some(e) => {
-                            self.compile_expr(e, scope, func)?;
-                        }
-                        None => match self.get_var(&name, scope) {
-                            Some(data) => {
-                                self.push_instr(Instruction::LoadVar(data.id), span, func);
-                            }
-                            None => {
-                                return Err(CompilerError::NonexistentVariable {
-                                    name,
-                                    area: self.ast_data.source.area(span),
-                                })
-                            }
-                        },
-                    }
-                }
-
+                self.compile_expr(fields, scope, func)?;
                 self.compile_expr(t, scope, func)?;
-                self.push_instr(Instruction::BuildInstance(KeysID(keys as u16)), span, func);
+
+                self.push_instr(Instruction::BuildInstance, span, func);
             }
             Expression::Split(..) => todo!(),
             Expression::Obj(mode, vals) => {
                 let l = InstrNum(vals.len() as u16);
-                for (k, v) in vals.into_iter() {
-                    self.compile_expr(k, scope, func)?;
-                    self.compile_expr(v, scope, func)?;
+                for val in vals.into_iter() {
+                    self.compile_expr(val.0, scope, func)?;
+                    self.compile_expr(val.1, scope, func)?;
                 }
                 self.push_instr(
                     match mode {
@@ -531,7 +506,7 @@ impl Compiler {
             None
         };
 
-        match stmt {
+        match stmt.t {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, func)?;
                 self.push_instr(Instruction::PopTop, span, func);
@@ -635,31 +610,10 @@ impl Compiler {
                 //already done
             }
             Statement::Impl(typ, dict) => {
-                let keys = self
-                    .code
-                    .keys_register
-                    .insert(dict.iter().map(|(s, _)| s.clone()).rev().collect());
-                let key_spans = self.ast_data.impl_spans[stmt_key].clone();
-                for ((name, v), span) in dict.into_iter().zip(key_spans) {
-                    match v {
-                        Some(e) => {
-                            self.compile_expr(e, scope, func)?;
-                        }
-                        None => match self.get_var(&name, scope) {
-                            Some(data) => {
-                                self.push_instr(Instruction::LoadVar(data.id), span, func);
-                            }
-                            None => {
-                                return Err(CompilerError::NonexistentVariable {
-                                    name,
-                                    area: self.ast_data.source.area(span),
-                                })
-                            }
-                        },
-                    }
-                }
+                self.compile_expr(dict, scope, func)?;
                 self.compile_expr(typ, scope, func)?;
-                self.push_instr(Instruction::Impl(KeysID(keys as u16)), span, func);
+
+                self.push_instr(Instruction::Impl, span, func);
             }
             Statement::Print(v) => {
                 self.compile_expr(v, scope, func)?;
@@ -689,7 +643,7 @@ impl Compiler {
         let start_idx = self.func_len(func);
 
         for i in stmts.iter() {
-            if let Statement::TypeDef(name) = self.ast_data.get(*i) {
+            if let Statement::TypeDef(name) = self.ast_data.get(*i).t {
                 if allow_type_def {
                     let k = self.types.insert(CustomType {
                         name: name.clone(),

@@ -213,9 +213,6 @@ impl From<Token> for &str {
             Return => "return",
             Break => "break",
             Continue => "continue",
-            Print => "print",
-            Add => "add",
-            Split => "split",
             Is => "is",
             Eq => "==",
             Neq => "!=",
@@ -233,6 +230,8 @@ impl From<Token> for &str {
             ExclMark => "!",
             Type => "type",
             Impl => "impl",
+            Dollar => "$",
+            Import => "import",
         }
     }
 }

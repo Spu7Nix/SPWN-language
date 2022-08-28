@@ -2,8 +2,8 @@ use std::ops::Index;
 
 use super::compiler::Constant;
 use crate::compilation::compiler::URegister;
-use crate::sources::{CodeSpan, SpwnSource};
 use crate::regex_color_replace;
+use crate::sources::{CodeSpan, SpwnSource};
 
 macro_rules! wrappers {
     ($($n:ident($t:ty))*) => {
@@ -169,7 +169,8 @@ pub enum Instruction {
     ToIter,
     IterNext(InstrNum),
 
-    Impl(KeysID),
+    /// implements members on a type (pops 2 elements from the stack; type and members)
+    Impl,
 
     PushAnyPattern,
     BuildMacro(MacroBuildID),
@@ -189,7 +190,8 @@ pub enum Instruction {
     BuildTrigger(InstrNum),
     AddObject,
 
-    BuildInstance(KeysID),
+    /// creates an instance of a type (pops 2 elements from the stack; type and fields)
+    BuildInstance,
     PushBuiltins,
 }
 

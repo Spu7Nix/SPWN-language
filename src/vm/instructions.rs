@@ -229,10 +229,10 @@ pub fn run_build_instance(
     globals: &mut Globals,
     data: &InstrData,
     context: &mut FullContext,
-    keys_id: KeysID,
 ) -> Result<(), RuntimeError> {
     run_helper!(context, globals, data);
     let typ = pop!(Shallow);
+    let fields = pop!(Shallow);
 
     let tk = match &typ.value {
         Value::Type(ValueType::Custom(tk)) => *tk,
@@ -246,12 +246,12 @@ pub fn run_build_instance(
         // }
     };
 
-    let key_data = &data.code.keys_register[keys_id];
-    let map = key_data
-        .iter()
-        .map(|s| (s.clone(), pop!(Deep Store)))
-        .collect();
-    push!(Value: Value::Instance(Instance { typ: tk, fields: map }).into_stored(data.code.source.area(data.span)));
+    if let Value::Dict(f) = fields.value {
+        push!(Value: Value::Instance(Instance { typ: tk, fields: f }).into_stored(data.code.source.area(data.span)));
+    } else {
+        unreachable!()
+    };
+
     Ok(())
 }
 
@@ -442,7 +442,6 @@ pub fn run_impl(
     globals: &mut Globals,
     data: &InstrData,
     context: &mut FullContext,
-    keys_id: KeysID,
 ) -> Result<(), RuntimeError> {
     todo!()
 }
