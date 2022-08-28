@@ -151,7 +151,7 @@ pub fn run_func(
                 Print
                 ToIter
                 IterNext(a)
-                Impl(a)
+                Impl
                 PushAnyPattern
                 BuildMacro(a)
                 Call(a)
@@ -167,7 +167,7 @@ pub fn run_func(
                 BuildTrigger(a)
                 AddObject
 
-                BuildInstance(a)
+                BuildInstance
                 PushBuiltins
             );
 

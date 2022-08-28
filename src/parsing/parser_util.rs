@@ -103,13 +103,3 @@ operators!(
     RightAssoc  <==  [ Pow ],
     // LeftAssoc   <==  [ As ],
 );
-
-pub struct ParsedDictlike {
-    pub items: Vec<(String, Option<ExprKey>)>,
-    pub item_spans: Vec<CodeSpan>,
-}
-
-pub struct ParsedObjlike {
-    pub items: Vec<(ExprKey, ExprKey)>,
-    pub item_spans: Vec<CodeSpan>,
-}

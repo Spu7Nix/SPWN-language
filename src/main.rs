@@ -3,8 +3,8 @@ mod error;
 mod leveldata;
 mod parsing;
 mod sources;
-mod vm;
 mod util;
+mod vm;
 
 use std::io::{self, Write};
 use std::{fs, path::PathBuf};
@@ -118,6 +118,7 @@ fn bytecode_generation(
 ) -> Result<Compiler, CompilerError> {
     let mut compiler = Compiler::new(ast_data, source.clone());
     compiler.start_compile(stmts)?;
+    #[cfg(debug_assertions)]
     compiler.code.debug();
     Ok(compiler)
 }
