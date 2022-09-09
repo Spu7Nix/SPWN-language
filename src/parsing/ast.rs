@@ -1,28 +1,26 @@
+use std::fmt::{self, Debug, Formatter};
+use std::ops::Deref;
+
+use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
+use super::error::SyntaxError;
+use crate::regex_color_replace;
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::{leveldata::object_data::ObjectMode, parsing::lexer::Token};
-use crate::regex_color_replace;
 
 new_key_type! {
     pub struct ExprKey;
     pub struct StmtKey;
 }
 
-pub type ExpressionMap = SlotMap<ExprKey, (Expression, CodeSpan)>;
+pub type ExpressionMap = SlotMap<ExprKey, Spanned<Expression>>;
 
 pub struct ASTData {
     pub source: SpwnSource,
 
     pub exprs: ExpressionMap,
-    pub stmts: SlotMap<StmtKey, (Statement, CodeSpan)>,
-
-    pub for_loop_iter_spans: SecondaryMap<StmtKey, CodeSpan>,
-    pub func_arg_spans: SecondaryMap<ExprKey, Vec<CodeSpan>>,
-
-    pub dictlike_spans: SecondaryMap<ExprKey, Vec<CodeSpan>>,
-    pub objlike_spans: SecondaryMap<ExprKey, Vec<CodeSpan>>,
-    pub impl_spans: SecondaryMap<StmtKey, Vec<CodeSpan>>,
+    pub stmts: SlotMap<StmtKey, Spanned<Statement>>,
 
     pub stmt_arrows: SecondaryMap<StmtKey, bool>,
 }
@@ -33,14 +31,12 @@ impl ASTData {
             source,
             exprs: SlotMap::default(),
             stmts: SlotMap::default(),
+            // for_loop_iter_spans: SecondaryMap::default(),
+            // func_arg_spans: SecondaryMap::default(),
 
-            for_loop_iter_spans: SecondaryMap::default(),
-            func_arg_spans: SecondaryMap::default(),
-
-            dictlike_spans: SecondaryMap::default(),
-            objlike_spans: SecondaryMap::default(),
-            impl_spans: SecondaryMap::default(),
-
+            // dictlike_spans: SecondaryMap::default(),
+            // objlike_spans: SecondaryMap::default(),
+            // impl_spans: SecondaryMap::default(),
             stmt_arrows: SecondaryMap::default(),
         }
     }
@@ -51,11 +47,11 @@ impl ASTData {
         use std::fmt::Write;
 
         debug_str += "-------- exprs --------\n";
-        for (k, (e, _)) in &self.exprs {
+        for (k, e) in &self.exprs {
             writeln!(&mut debug_str, "{:?}:\t\t{:?}", k, e).unwrap();
         }
         debug_str += "-------- stmts --------\n";
-        for (k, (e, _)) in &self.stmts {
+        for (k, e) in &self.stmts {
             writeln!(&mut debug_str, "{:?}:\t\t{:?}", k, e).unwrap();
         }
         debug_str += "-----------------------\n";
@@ -74,38 +70,34 @@ impl ASTData {
     }
 }
 
-pub trait ASTInsert<T, K> {
+pub trait ASTInsert<T: Debug, K> {
     fn insert(&mut self, v: T, area: CodeSpan) -> K;
-    fn get_full(&mut self, v: K) -> (T, CodeSpan);
+    fn get(&mut self, v: K) -> Spanned<T>;
 
-    fn get(&mut self, v: K) -> T {
-        self.get_full(v).0
-    }
     fn span(&mut self, v: K) -> CodeSpan {
-        self.get_full(v).1
+        self.get(v).span
     }
 }
 
 impl ASTInsert<Expression, ExprKey> for ASTData {
     fn insert(&mut self, v: Expression, area: CodeSpan) -> ExprKey {
-        self.exprs.insert((v, area))
+        self.exprs.insert(v.span(area))
     }
 
-    fn get_full(&mut self, v: ExprKey) -> (Expression, CodeSpan) {
+    fn get(&mut self, v: ExprKey) -> Spanned<Expression> {
         self.exprs[v].clone()
     }
 }
 impl ASTInsert<Statement, StmtKey> for ASTData {
     fn insert(&mut self, v: Statement, area: CodeSpan) -> StmtKey {
-        self.stmts.insert((v, area))
+        self.stmts.insert(v.span(area))
     }
 
-    fn get_full(&mut self, v: StmtKey) -> (Statement, CodeSpan) {
+    fn get(&mut self, v: StmtKey) -> Spanned<Statement> {
         self.stmts[v].clone()
     }
 }
 
-use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Copy)]
 pub enum IdClass {
     Group = 0,
@@ -138,16 +130,16 @@ pub enum Expression {
     Type(String),
 
     Array(Vec<ExprKey>),
-    //........key.....value
-    Dict(Vec<(String, Option<ExprKey>)>),
-    //..mode.............obj key..value
-    Obj(ObjectMode, Vec<(ExprKey, ExprKey)>),
+    //................key.....value
+    Dict(Vec<Spanned<(String, Option<ExprKey>)>>),
+    //..mode.....................obj key..value
+    Obj(ObjectMode, Vec<Spanned<(ExprKey, ExprKey)>>),
 
     Empty,
 
     Macro {
-        ///........name....type.............default value
-        args: Vec<(String, Option<ExprKey>, Option<ExprKey>)>,
+        ///................name....type.............default value
+        args: Vec<Spanned<(String, Option<ExprKey>, Option<ExprKey>)>>,
         ret_type: Option<ExprKey>,
         code: MacroCode,
     },
@@ -172,6 +164,11 @@ pub enum Expression {
         name: String,
     },
 
+    Associated {
+        base: ExprKey,
+        name: String,
+    },
+
     TypeOf {
         base: ExprKey,
     },
@@ -179,8 +176,8 @@ pub enum Expression {
     Call {
         base: ExprKey,
         params: Vec<ExprKey>,
-        //.................name....value
-        named_params: Vec<(String, ExprKey)>,
+        //.........................name....value
+        named_params: Vec<Spanned<(String, ExprKey)>>,
     },
     TriggerFuncCall(ExprKey),
 
@@ -188,8 +185,8 @@ pub enum Expression {
 
     TriggerFunc(Statements),
 
-    //.......type name.....key.....value
-    Instance(ExprKey, Vec<(String, Option<ExprKey>)>),
+    //.......name.....fields
+    Instance(ExprKey, ExprKey),
 
     Split(ExprKey, ExprKey),
     Builtins,
@@ -230,9 +227,92 @@ pub enum Statement {
     Continue,
 
     TypeDef(String),
-    Impl(ExprKey, Vec<(String, Option<ExprKey>)>),
+    Impl(ExprKey, ExprKey),
     Print(ExprKey),
     Add(ExprKey),
+    //Arrow(Statement),
 }
 
 pub type Statements = Vec<StmtKey>;
+
+#[derive(Clone)]
+pub struct Spanned<T: Debug> {
+    pub t: T,
+    pub span: CodeSpan,
+}
+
+impl<T: Debug + PartialEq> PartialEq for Spanned<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.t == other.t
+    }
+}
+
+impl<T: Debug> Debug for Spanned<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.t.fmt(f)
+    }
+}
+
+impl<T: Debug> Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.t
+    }
+}
+
+pub trait ToSpanned<T: Debug> {
+    fn span(self, span: CodeSpan) -> Spanned<T>;
+}
+
+// cant blanket implement as it overrides the `span` method of `Token` so the parser breaks
+// probably would be better with a macro but eh
+impl ToSpanned<Expression> for Expression {
+    fn span(self, span: CodeSpan) -> Spanned<Expression> {
+        Spanned { t: self, span }
+    }
+}
+
+impl ToSpanned<Statement> for Statement {
+    fn span(self, span: CodeSpan) -> Spanned<Statement> {
+        Spanned { t: self, span }
+    }
+}
+
+impl ToSpanned<(String, Option<ExprKey>)> for (String, Option<ExprKey>) {
+    fn span(self, span: CodeSpan) -> Spanned<(String, Option<ExprKey>)> {
+        Spanned { t: self, span }
+    }
+}
+
+impl ToSpanned<(String, ExprKey)> for (String, ExprKey) {
+    fn span(self, span: CodeSpan) -> Spanned<(String, ExprKey)> {
+        Spanned { t: self, span }
+    }
+}
+
+impl ToSpanned<(ExprKey, ExprKey)> for (ExprKey, ExprKey) {
+    fn span(self, span: CodeSpan) -> Spanned<(ExprKey, ExprKey)> {
+        Spanned { t: self, span }
+    }
+}
+
+impl ToSpanned<(String, Option<ExprKey>, Option<ExprKey>)>
+    for (String, Option<ExprKey>, Option<ExprKey>)
+{
+    fn span(self, span: CodeSpan) -> Spanned<(String, Option<ExprKey>, Option<ExprKey>)> {
+        Spanned { t: self, span }
+    }
+}
+
+impl Spanned<Expression> {
+    pub fn insert(self, data: &mut ASTData) -> Result<ExprKey, SyntaxError> {
+        Ok(data.exprs.insert(self))
+    }
+}
+
+impl Spanned<Statement> {
+    pub fn insert(self, data: &mut ASTData) -> Result<StmtKey, SyntaxError> {
+        Ok(data.stmts.insert(self))
+    }
+}

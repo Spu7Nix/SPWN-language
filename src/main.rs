@@ -3,13 +3,13 @@ mod error;
 mod leveldata;
 mod parsing;
 mod sources;
-mod vm;
 mod util;
+mod vm;
 
 use std::io::{self, Write};
 use std::{fs, path::PathBuf};
 
-use compilation::compiler::Compiler;
+use compilation::compiler::{Compiler, CompilerGlobals};
 use compilation::error::CompilerError;
 use parsing::ast::ASTData;
 use parsing::error::SyntaxError;
@@ -42,13 +42,13 @@ fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
     }
 
     let (ast, stmts) = handle!(parse_stage(&code, &source));
-    let compiler = handle!(bytecode_generation(ast, stmts, &source));
+    let (compiler, comp_globals) = handle!(bytecode_generation(ast, stmts, &source));
 
-    let mut globals = Globals::new(compiler.types);
+    let mut globals = Globals::new(compiler.code.types.clone());
     let mut contexts = FullContext::single(compiler.code.var_count);
 
     let start = std::time::Instant::now();
-    handle!(run_func(&mut globals, &compiler.code, 0, &mut contexts) => &globals);
+    handle!(run_func(&mut globals, &compiler.code, 0, &mut contexts, &comp_globals) => &globals);
 
     // get end time
     let end = std::time::Instant::now();
@@ -118,11 +118,13 @@ fn bytecode_generation(
     ast_data: ASTData,
     stmts: Vec<parsing::ast::StmtKey>,
     source: &SpwnSource,
-) -> Result<Compiler, CompilerError> {
+) -> Result<(Compiler, CompilerGlobals), CompilerError> {
     let mut compiler = Compiler::new(ast_data, source.clone());
-    compiler.start_compile(stmts)?;
+    let mut comp_globals = CompilerGlobals::default();
+    compiler.start_compile(stmts, &mut comp_globals)?;
+    #[cfg(debug_assertions)]
     compiler.code.debug();
-    Ok(compiler)
+    Ok((compiler, comp_globals))
 }
 
 fn parse_stage(

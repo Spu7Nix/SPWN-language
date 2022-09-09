@@ -1,6 +1,7 @@
 mod builtin_types;
 pub mod context;
 pub mod error;
+mod from_value;
 pub mod instructions;
 pub mod interpreter;
 mod operators;

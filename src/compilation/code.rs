@@ -1,9 +1,15 @@
 use std::ops::Index;
 
+use ahash::AHashMap;
+use ariadne::Source;
+use slotmap::SlotMap;
+
 use super::compiler::Constant;
 use crate::compilation::compiler::URegister;
-use crate::sources::{CodeSpan, SpwnSource};
 use crate::regex_color_replace;
+use crate::sources::{CodeSpan, SpwnSource};
+use crate::vm::interpreter::TypeKey;
+use crate::vm::types::CustomType;
 
 macro_rules! wrappers {
     ($($n:ident($t:ty))*) => {
@@ -34,6 +40,7 @@ wrappers! {
     KeysID(u16)
     MemberID(u16)
     MacroBuildID(u16)
+    ImportID(u16)
 }
 
 pub struct BytecodeFunc {
@@ -49,12 +56,16 @@ pub struct Code {
     pub const_register: URegister<Constant>,
     pub keys_register: URegister<Vec<String>>,
     pub member_register: URegister<String>,
+    pub import_register: URegister<SpwnSource>,
     #[allow(clippy::type_complexity)]
     pub macro_build_register: URegister<(usize, Vec<(String, bool, bool)>)>,
 
     pub var_count: usize,
 
     pub funcs: Vec<BytecodeFunc>,
+
+    pub types: SlotMap<TypeKey, CustomType>,
+    pub type_keys: AHashMap<String, TypeKey>,
 }
 
 impl Code {
@@ -65,8 +76,14 @@ impl Code {
             keys_register: URegister::new(),
             macro_build_register: URegister::new(),
             member_register: URegister::new(),
+
             var_count: 0,
             funcs: vec![],
+            //modules: AHashMap::default(),
+            import_register: URegister::new(),
+
+            types: SlotMap::default(),
+            type_keys: AHashMap::default(),
         }
     }
 
@@ -169,7 +186,8 @@ pub enum Instruction {
     ToIter,
     IterNext(InstrNum),
 
-    Impl(KeysID),
+    /// implements members on a type (pops 2 elements from the stack; type and members)
+    Impl,
 
     PushAnyPattern,
     BuildMacro(MacroBuildID),
@@ -178,6 +196,7 @@ pub enum Instruction {
 
     Index,
     Member(MemberID),
+    Associated(MemberID),
     TypeOf,
 
     YeetContext,
@@ -189,8 +208,10 @@ pub enum Instruction {
     BuildTrigger(InstrNum),
     AddObject,
 
-    BuildInstance(KeysID),
+    /// creates an instance of a type (pops 2 elements from the stack; type and fields)
+    BuildInstance,
     PushBuiltins,
+    Import(ImportID),
 }
 
 impl Instruction {

@@ -152,7 +152,7 @@ mod tests {
         let t = parse("\"🐠\";")?;
         expr_eq!(t, expr!("🐠"));
 
-        todo!("string flags");
+        //todo!("string flags");
 
         Ok(())
     }
@@ -180,7 +180,7 @@ mod tests {
         let t = parse("-10;")?;
         expr_eq!(t, expr_op!(Token::Minus, expr!(10)));
 
-        todo!("opeq + bin ops + ++ -- ..");
+        //todo!("opeq + bin ops + ++ -- ..");
 
         Ok(())
     }
@@ -250,11 +250,7 @@ mod tests {
             t,
             expr!(Ex::Instance(
                 expr_key!(expr_sym!(@"a")),
-                vec![
-                    (s!("i"), Some(expr_key!(expr!(10)))),
-                    (s!("x"), Some(expr_key!(expr!("20")))),
-                    (s!("a"), None)
-                ]
+                expr_key!(expr_dict!("i": expr!(10), "x": expr!("20"), "a"))
             ))
         );
 
@@ -263,7 +259,7 @@ mod tests {
             t,
             expr!(Ex::Obj(
                 ObjectMode::Object,
-                vec![
+                spanned_vec![
                     (expr_key!(expr_sym!("OBJ_ID")), expr_key!(expr!(2))),
                     (expr_key!(expr_sym!("HVS")), expr_key!(expr!("0a0a0a"))),
                     (expr_key!(expr_sym!("X")), expr_key!(expr!(20.4)))
@@ -276,7 +272,7 @@ mod tests {
             t,
             expr!(Ex::Obj(
                 ObjectMode::Trigger,
-                vec![
+                spanned_vec![
                     (expr_key!(expr_sym!("Y")), expr_key!(expr!(5000))),
                     (
                         expr_key!(expr_sym!("GROUPS")),
@@ -289,7 +285,7 @@ mod tests {
             ))
         );
 
-        todo!("string keys");
+        //todo!("string keys");
 
         Ok(())
     }
@@ -305,13 +301,13 @@ mod tests {
             })
         );
 
-        // let t = parse("a.@x;")?;
-        // expr_eq!(
-        //     t,
-        //     expr!(Ex::TypeOf {
-        //         base: expr_key!(expr_sym!("a")),
-        //     })
-        // );
+        let t = parse("a.type;")?;
+        expr_eq!(
+            t,
+            expr!(Ex::TypeOf {
+                base: expr_key!(expr_sym!("a")),
+            })
+        );
 
         // let t = parse("@a::x;")?;
         // expr_eq!(
@@ -370,14 +366,14 @@ mod tests {
             expr!(Ex::Call {
                 base: expr_key!(expr_sym!("a")),
                 params: vec![expr_key!(expr!(10.04))],
-                named_params: vec![
+                named_params: spanned_vec![
                     (s!("x"), expr_key!(expr!(true))),
                     (s!("something_long"), expr_key!(expr_sym!("test")))
                 ],
             })
         );
 
-        todo!("associated members + slicing + typeof?");
+        //todo!("associated members + index range + typeof?");
 
         Ok(())
     }
@@ -419,7 +415,7 @@ mod tests {
         expr_eq!(
             t,
             expr!(Ex::Macro {
-                args: vec![
+                args: spanned_vec![
                     (s!("a"), None, None),
                     (s!("b"), Some(expr_key!(expr_sym!(@"a"))), None),
                     (
@@ -475,6 +471,8 @@ mod tests {
             })
         );
 
+        //todo!("attributes")
+
         Ok(())
     }
 
@@ -527,6 +525,10 @@ mod tests {
             }
         );
 
+        // let t = parse("for (k, v) in {a: 10, b: 20, c: 30} {};")?;
+        // stmt_eq!(
+        // );
+
         let t = parse("return;")?;
         stmt_eq!(t, St::Return(None));
 
@@ -547,12 +549,11 @@ mod tests {
             t,
             St::Impl(
                 expr_key!(expr_sym!(@"a")),
-                vec![
-                    (s!("a"), Some(expr_key!(expr!(10)))),
-                    (s!("b"), Some(expr_key!(expr!(false))))
-                ]
+                expr_key!(expr_dict!("a": expr!(10), "b": expr!(false)))
             )
         );
+
+        //todo!("for loop var expansion");
 
         Ok(())
     }

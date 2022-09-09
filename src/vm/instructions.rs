@@ -6,7 +6,10 @@ use super::context::{FullContext, ReturnType};
 use super::error::RuntimeError;
 use super::interpreter::{run_func, Globals};
 use super::value::{value_ops, Value};
-use crate::compilation::code::{Code, ConstID, InstrNum, KeysID, MacroBuildID, MemberID, VarID};
+use crate::compilation::code::{
+    Code, ConstID, ImportID, InstrNum, KeysID, MacroBuildID, MemberID, VarID,
+};
+use crate::compilation::compiler::CompilerGlobals;
 use crate::leveldata::gd_types::Id;
 use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
 use crate::parsing::ast::IdClass;
@@ -74,6 +77,7 @@ macro_rules! run_helper {
 // data passedd into an instruction function
 pub struct InstrData<'a> {
     pub code: &'a Code,
+    pub comp_globals: &'a CompilerGlobals,
     pub span: CodeSpan,
 }
 
@@ -229,10 +233,10 @@ pub fn run_build_instance(
     globals: &mut Globals,
     data: &InstrData,
     context: &mut FullContext,
-    keys_id: KeysID,
 ) -> Result<(), RuntimeError> {
     run_helper!(context, globals, data);
     let typ = pop!(Shallow);
+    let fields = pop!(Shallow);
 
     let tk = match &typ.value {
         Value::Type(ValueType::Custom(tk)) => *tk,
@@ -246,12 +250,12 @@ pub fn run_build_instance(
         // }
     };
 
-    let key_data = &data.code.keys_register[keys_id];
-    let map = key_data
-        .iter()
-        .map(|s| (s.clone(), pop!(Deep Store)))
-        .collect();
-    push!(Value: Value::Instance(Instance { typ: tk, fields: map }).into_stored(data.code.source.area(data.span)));
+    if let Value::Dict(f) = fields.value {
+        push!(Value: Value::Instance(Instance { typ: tk, fields: f }).into_stored(data.code.source.area(data.span)));
+    } else {
+        unreachable!()
+    };
+
     Ok(())
 }
 
@@ -442,9 +446,45 @@ pub fn run_impl(
     globals: &mut Globals,
     data: &InstrData,
     context: &mut FullContext,
-    keys_id: KeysID,
 ) -> Result<(), RuntimeError> {
     todo!()
+}
+
+pub fn run_import(
+    globals: &mut Globals,
+    data: &InstrData,
+    context: &mut FullContext,
+    module: ImportID,
+) -> Result<(), RuntimeError> {
+    run_helper!(context, globals, data);
+
+    let source = &data.code.import_register[module];
+    let module = &data.comp_globals.modules[source];
+
+    let stored_pos = context.inner().pos;
+
+    run_func(globals, module, 0, context, data.comp_globals)?;
+
+    for context in context.iter(SkipMode::IncludeReturns) {
+        match context.inner().returned {
+            Some(ReturnType::Explicit(v)) => {
+                context.inner().stack.push(v);
+                context.inner().returned = None;
+                context.inner().pos = stored_pos;
+            }
+            Some(ReturnType::Implicit) => {
+                context
+                    .inner()
+                    .stack
+                    .push(globals.memory.insert(Value::Empty().into_stored(area!())));
+                context.inner().returned = None;
+                context.inner().pos = stored_pos;
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    Ok(())
 }
 
 pub fn run_call(
@@ -518,7 +558,7 @@ pub fn run_call(
                 *context.inner().vars[id.0 as usize].vec.last_mut().unwrap() = Some(*k);
             }
 
-            run_func(globals, data.code, idx, context)?;
+            run_func(globals, data.code, idx, context, data.comp_globals)?;
 
             for context in context.iter(SkipMode::IncludeReturns) {
                 for i in &data.code.funcs[idx].inner_ids {
@@ -551,12 +591,11 @@ pub fn run_call(
                 let val = pop!(Deep Store);
                 args.push(val);
             }
-            // args are intentionally reversed
-            args.push(*self_arg);
+
             match globals.builtins[*func_ptr] {
                 crate::vm::types::BuiltinFunction::Method(m) => {
-                    let v = m(globals, &args)?;
-                    push!(Key: v);
+                    let v = m(globals, context, *self_arg, &args)?;
+                    push!(Value: v.into_stored(area!()));
                 }
                 _ => unreachable!(),
             }
@@ -641,6 +680,18 @@ pub fn run_member(
         _ => todo!(),
     }
     Ok(())
+}
+
+pub fn run_associated(
+    globals: &mut Globals,
+    data: &InstrData,
+    context: &mut FullContext,
+    id: MemberID,
+) -> Result<(), RuntimeError> {
+    run_helper!(context, globals, data);
+    let key = pop!(Key);
+    let name = data.code.member_register[id].clone();
+    todo!();
 }
 
 pub fn run_type_of(
