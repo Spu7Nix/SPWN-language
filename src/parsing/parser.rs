@@ -372,6 +372,7 @@ impl Parser<'_> {
                 let expr = match self.peek() {
                     Token::String => Expression::Import(ImportType::Module(self.parse_string()?)),
                     Token::Ident => {
+                        self.next();
                         Expression::Import(ImportType::Library(self.slice().to_string()))
                     }
                     _ => todo!(),
@@ -739,7 +740,12 @@ impl Parser<'_> {
                 Token::DoubleColon => {
                     self.next();
                     match self.next() {
-                        Token::Ident => value = self.parse_ident_or_macro(data)?,
+                        Token::Ident => {
+                            let name = self.slice().to_string();
+                            value = Expression::Associated { base: value, name }
+                                .span(start.extend(self.span()))
+                                .insert(data)?
+                        }
                         Token::LBracket => {
                             let dictlike = self.parse_dictlike(data)?;
 

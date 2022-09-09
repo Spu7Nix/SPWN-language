@@ -21,12 +21,7 @@ pub struct ASTData {
 
     pub exprs: ExpressionMap,
     pub stmts: SlotMap<StmtKey, Spanned<Statement>>,
-    // pub for_loop_iter_spans: SecondaryMap<StmtKey, CodeSpan>,
-    // pub func_arg_spans: SecondaryMap<ExprKey, Vec<CodeSpan>>,
 
-    // pub dictlike_spans: SecondaryMap<ExprKey, Vec<CodeSpan>>,
-    // pub objlike_spans: SecondaryMap<ExprKey, Vec<CodeSpan>>,
-    // pub impl_spans: SecondaryMap<StmtKey, Vec<CodeSpan>>,
     pub stmt_arrows: SecondaryMap<StmtKey, bool>,
 }
 
@@ -165,6 +160,11 @@ pub enum Expression {
     },
 
     Member {
+        base: ExprKey,
+        name: String,
+    },
+
+    Associated {
         base: ExprKey,
         name: String,
     },

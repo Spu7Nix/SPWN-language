@@ -301,13 +301,13 @@ mod tests {
             })
         );
 
-        // let t = parse("a.@x;")?;
-        // expr_eq!(
-        //     t,
-        //     expr!(Ex::TypeOf {
-        //         base: expr_key!(expr_sym!("a")),
-        //     })
-        // );
+        let t = parse("a.type;")?;
+        expr_eq!(
+            t,
+            expr!(Ex::TypeOf {
+                base: expr_key!(expr_sym!("a")),
+            })
+        );
 
         // let t = parse("@a::x;")?;
         // expr_eq!(
@@ -373,7 +373,7 @@ mod tests {
             })
         );
 
-        //todo!("associated members + slicing + typeof?");
+        //todo!("associated members + index range + typeof?");
 
         Ok(())
     }
@@ -470,6 +470,8 @@ mod tests {
                 if_false: expr_key!(expr_sym!("b"))
             })
         );
+
+        //todo!("attributes")
 
         Ok(())
     }

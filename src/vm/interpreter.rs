@@ -14,6 +14,7 @@ use super::value::StoredValue;
 use super::value::ValueType;
 
 use crate::compilation::code::*;
+use crate::compilation::compiler::CompilerGlobals;
 use crate::leveldata::gd_types::ArbitraryId;
 use crate::leveldata::object_data::GdObj;
 use crate::vm::context::ReturnType;
@@ -76,6 +77,7 @@ pub fn run_func(
     code: &Code,
     fn_index: usize,
     contexts: &mut FullContext,
+    comp_globals: &CompilerGlobals,
 ) -> Result<(), RuntimeError> {
     let instructions = &code.funcs[fn_index].instructions;
 
@@ -114,6 +116,7 @@ pub fn run_func(
             let pos = context.inner().pos;
             let instr = &instructions[pos as usize].0;
             let data = InstrData {
+                comp_globals,
                 code,
                 span: instructions[pos as usize].1,
             };
@@ -157,6 +160,7 @@ pub fn run_func(
                 Call(a)
                 Index
                 Member(a)
+                Associated(a)
                 TypeOf
                 Return
                 YeetContext
@@ -169,6 +173,8 @@ pub fn run_func(
 
                 BuildInstance
                 PushBuiltins
+
+                Import(a)
             );
 
             for context in context.iter(SkipReturns) {
