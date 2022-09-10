@@ -15,7 +15,7 @@ pub struct PckpFile {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PckpMeta {
     pub name: String,
-    pub version: String,
+    pub version: String, // this should ALWAYS point to a valid tag on the remote
     pub folders: Vec<String>,
     pub dependencies: Vec<String> // TODO: add dependencies
 }

@@ -36,6 +36,8 @@ block-modes = "0.8.1"
 
 # for pckp
 serde_yaml = "0.9.11"
+octocrab = "0.16"
+tokio = { version = "1.21.0", features = ["full"] }
 
 [dev-dependencies]
 lazy_static = "1.4.0"

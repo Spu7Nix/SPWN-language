@@ -140,7 +140,8 @@ fn parse_stage(
     Ok((ast_data, stmts))
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     print!("\x1B[2J\x1B[1;1H");
     println!("{}", std::mem::size_of::<Instruction>());
 
