@@ -3,14 +3,24 @@ pub mod add;
 pub mod remove;
 pub mod restore;
 
-pub fn run(args: &mut std::env::Args) {
-    let args = args.collect::<Vec<String>>();
+use clap::ArgMatches;
 
-    match args[2].as_str() {
-        "add" => { add::add(args[3..].to_vec()) },
-        "remove" => { remove::remove(args[3..].to_vec()) },
-        "restore" => { restore::restore() }
-        _ => { panic!("add help command lmao 2"); }
+pub fn run(args: &ArgMatches) {
+    match args.subcommand().unwrap() {
+        ("add", cmd) => {
+            add::add(
+                cmd.get_many::<String>("LIBRARIES").unwrap().collect()
+            );
+        },
+        ("remove", cmd) => {
+            remove::remove(
+                cmd.get_many::<String>("LIBRARIES").unwrap().collect()
+            );
+        },
+        ("restore", cmd) => {
+            restore::restore();
+        },
+        (_,_) => unreachable!(),
     }
 
     return;
