@@ -1,9 +1,12 @@
 use std::{path::PathBuf, fs::File, sync::MutexGuard, io::Write};
 use std::convert::TryInto;
 
+use octocrab::models::repos::Tag;
 use octocrab::{Octocrab, params::repos::Commitish, repos::RepoHandler};
 
 use crate::pckp::util::PckpMeta;
+
+use super::util;
 
 pub struct RemotePackage {
     meta: PckpMeta,
@@ -30,8 +33,40 @@ impl RemotePackage {
         }
     }
 
+    async fn ensure_tag_exist(&self) {
+        let mut gh = Octocrab::builder().build().unwrap();
+        let mut repo = gh
+        .repos(self.owner.clone(), self.repo.clone())
+        .list_tags()
+        .send()
+        .await;
+        
+        let mut page_number: u32 = 1;
+        let mut found = false;
+        while let Ok(page) = repo {
+            repo = gh
+                .repos(self.owner.clone(), self.repo.clone())
+                .list_tags()
+                .page(page_number)
+                .send()
+                .await;
+            
+            for t in page.items {
+                if t.name == self.meta.version {
+                    found = true;
+                    break; // for good measure
+                }
+            }
+        }
+
+        if ! found {
+            util::pckp_error(format!("Tag wasn't found for package {}/{}", self.owner, self.repo).as_str());
+        }
+    }
+
     // this should work
     pub async fn download(&self, target: PathBuf) {
+        self.ensure_tag_exist().await;
         let mut gh = Octocrab::builder().build().unwrap();
         let repo = gh.repos(self.owner.clone(), self.repo.clone());
         let res = repo
