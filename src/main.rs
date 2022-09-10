@@ -5,6 +5,7 @@ mod parsing;
 mod sources;
 mod util;
 mod vm;
+mod pckp;
 
 use std::io::{self, Write};
 use std::{fs, path::PathBuf};
@@ -137,6 +138,12 @@ fn parse_stage(
 }
 
 fn main() {
+    // funy
+    if std::env::args().nth(1).unwrap_or("not pckp".to_string()).as_str() == "pckp" {
+        let mut args = std::env::args();
+        pckp::run(&mut args);
+        return;
+    }
     print!("\x1B[2J\x1B[1;1H");
     println!("{}", std::mem::size_of::<Instruction>());
 

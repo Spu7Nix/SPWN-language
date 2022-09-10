@@ -33,5 +33,8 @@ crc32fast = "1.2.0"
 aes = "0.7.4"
 block-modes = "0.8.1"
 
+# for pckp
+serde_yaml = "0.9.11"
+
 [dev-dependencies]
 lazy_static = "1.4.0"
