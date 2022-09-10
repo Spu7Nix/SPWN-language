@@ -222,13 +222,14 @@ $.assert(arr.index_all(2) == [2,4])
         $.print(arr.shuffle())
     ")]
     (self) -> @array {
-        let clone = self
-        let array = []
-        while clone.length > 0 {
-            item = clone.pop($.random(0..clone.length))
-            array.push(item)
-        }
-        return array
+        let array = self
+        for i in 0..array.length {
+	    rnd_idx = $.floor($.random() * array.length)
+	    temp = array[i]
+	    array[i] = array[rnd_idx]
+	    array[rnd_idx] = temp
+	}
+	return array
     },
 
     unique: #[desc("Returns the array only with items that didn't appear before."), example(u"
