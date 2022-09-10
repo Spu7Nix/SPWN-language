@@ -6,7 +6,7 @@ pub mod package;
 
 use clap::ArgMatches;
 
-pub fn run(args: &ArgMatches) {
+pub async fn run(args: &ArgMatches) {
     match args.subcommand().unwrap() {
         ("add", cmd) => {
             add::add(
