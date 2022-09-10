@@ -182,7 +182,7 @@ async fn main() {
                             .value_parser(value_parser!(String))
                         ),
                     Command::new("restore")
-                        .about("Restores the pckp file"),
+                        .about("Makes sure every dependency is in order"),
                 ])
                 .arg_required_else_help(true),
         ])
@@ -221,7 +221,7 @@ async fn main() {
             run_spwn(input, SpwnSource::File(PathBuf::from("eval")), doctest);
         },
         ("pckp", command) => {
-            pckp::run(command);
+            pckp::run(command).await;
         },
         (_, _) => unreachable!(),
     };
