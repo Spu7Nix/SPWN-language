@@ -20,6 +20,9 @@ use crate::compilation::code::Instruction;
 use crate::vm::context::FullContext;
 use crate::vm::interpreter::{run_func, Globals};
 
+use clap::{arg, Command, ValueHint};
+use ansi_term::Color;
+
 fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
     // if doctest {
     //     parse_doc_comments(code.clone());
@@ -141,16 +144,58 @@ fn main() {
     println!("{}", std::mem::size_of::<Instruction>());
 
     io::stdout().flush().unwrap();
+    
+    let matches = Command::new("SPWN")
+        .about("A programming language that compiles code to Geometry Dash levels")
+        .subcommands([
+            Command::new("build")
+                .visible_alias("b")
+                .about("Runs the input file")
+                .args([
+                    arg!(<SCRIPT> "Path to spwn source file").value_hint(ValueHint::FilePath),
+                    arg!(-d --doc "Doctest stuff"), // not sure about this
+                ]),
+            Command::new("eval")
+                .visible_alias("e")
+                .about("Runs the input given in stdin/the console as SPWN code")
+                .args([
+                    arg!(-d --doc "Doctest stuff"),
+                ])
+        ])
+        .arg_required_else_help(true)
+        .get_matches();
 
-    let file = std::env::args().nth(1).expect("no filename given");
-    let doctest: bool = std::env::args()
-        .nth(2)
-        .unwrap_or_else(|| "false".to_string())
-        .parse()
-        .expect("expected bool for doctest");
-    let buf = PathBuf::from(file);
+    match matches.subcommand().unwrap() {
+        ("build", command) => {
+            let script_path = command.value_of("SCRIPT").unwrap();
+            let buf = PathBuf::from(script_path);
 
-    let code = fs::read_to_string(&buf).unwrap();
-    run_spwn(code, SpwnSource::File(buf), doctest);
-    // println!("{}", std::mem::size_of::<Instruction>());
+            let code = fs::read_to_string(script_path).expect("File not found");
+
+            let doctest = command.contains_id("doc");
+
+            run_spwn(code, SpwnSource::File(buf), doctest);
+        },
+        ("eval", command) => {
+            let end_command = ":build";
+
+            println!(
+                "{} {} {}",
+                Color::Green.bold().paint("Write your code, and then type"),
+                Color::Yellow.bold().paint(end_command),
+                Color::Green.bold().paint("to build it"),
+            );
+
+            let mut input = String::new();
+            while !input.trim_end().ends_with(end_command) {
+                std::io::stdin().read_line(&mut input).unwrap();
+            }
+            input = input.trim().trim_end_matches(end_command).to_string();
+
+            let doctest = command.contains_id("doc");
+
+            run_spwn(input, SpwnSource::File(PathBuf::from("eval")), doctest);
+        },
+        (_, _) => unreachable!(),
+    };
 }
