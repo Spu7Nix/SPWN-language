@@ -1,12 +1,12 @@
 use crate::pckp::util;
 use crate::pckp::restore::restore;
 
-pub fn remove(packages: Vec<String>) {
+pub fn remove(packages: Vec<&String>) {
     let mut pckp_file = util::get_pckp_file();
 
     let mut idx = 0;
     for package in packages {
-        if pckp_file.meta.dependencies.contains(&package) {
+        if pckp_file.meta.dependencies.contains(&package.to_string()) {
             pckp_file.meta.dependencies.remove(idx);
             // compensate for item shift
             if idx != 0 {

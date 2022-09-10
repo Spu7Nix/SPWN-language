@@ -21,7 +21,7 @@ use crate::compilation::code::Instruction;
 use crate::vm::context::FullContext;
 use crate::vm::interpreter::{run_func, Globals};
 
-use clap::{arg, Command, ValueHint};
+use clap::{arg, Command, ValueHint, value_parser};
 use ansi_term::Color;
 
 fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
@@ -141,12 +141,6 @@ fn parse_stage(
 }
 
 fn main() {
-    // funy
-    if std::env::args().nth(1).unwrap_or("not pckp".to_string()).as_str() == "pckp" {
-        let mut args = std::env::args();
-        pckp::run(&mut args);
-        return;
-    }
     print!("\x1B[2J\x1B[1;1H");
     println!("{}", std::mem::size_of::<Instruction>());
 
@@ -167,7 +161,29 @@ fn main() {
                 .about("Runs the input given in stdin/the console as SPWN code")
                 .args([
                     arg!(-d --doc "Doctest stuff"),
+                ]),
+            Command::new("pckp")
+                .visible_alias("p")
+                .about("Libraries manager for spwn")
+                .subcommands([
+                    Command::new("add")
+                        .visible_alias("a")
+                        .about("Adds a library to the pckp file")
+                        .arg(
+                            arg!(<LIBRARIES> ... "Libraries to add")
+                            .value_parser(value_parser!(String))
+                        ),
+                    Command::new("remove")
+                        .visible_alias("r")
+                        .about("Removes a library from the pckp file")
+                        .arg(
+                            arg!(<LIBRARIES> ... "Libraries to remove")
+                            .value_parser(value_parser!(String))
+                        ),
+                    Command::new("restore")
+                        .about("Restores the pckp file"),
                 ])
+                .arg_required_else_help(true),
         ])
         .arg_required_else_help(true)
         .get_matches();
@@ -202,6 +218,9 @@ fn main() {
             let doctest = command.contains_id("doc");
 
             run_spwn(input, SpwnSource::File(PathBuf::from("eval")), doctest);
+        },
+        ("pckp", command) => {
+            pckp::run(command);
         },
         (_, _) => unreachable!(),
     };
