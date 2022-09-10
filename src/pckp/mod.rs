@@ -18,7 +18,7 @@ pub async fn run(args: &ArgMatches) {
                 cmd.get_many::<String>("LIBRARIES").unwrap().collect()
             );
         },
-        ("restore", cmd) => {
+        ("restore", _cmd) => {
             restore::restore();
         },
         (_,_) => unreachable!(),
