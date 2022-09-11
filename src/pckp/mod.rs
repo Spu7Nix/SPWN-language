@@ -3,6 +3,7 @@ pub mod add;
 pub mod remove;
 pub mod restore;
 pub mod package;
+pub mod new;
 
 use clap::ArgMatches;
 
@@ -20,6 +21,11 @@ pub async fn run(args: &ArgMatches) {
         },
         ("restore", cmd) => {
             restore::restore();
+        },
+        ("new", cmd) => {
+            new::new(
+                cmd.get_one::<String>("FOLDER").unwrap().to_string()
+            );
         },
         (_,_) => unreachable!(),
     }

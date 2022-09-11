@@ -183,6 +183,13 @@ async fn main() {
                         ),
                     Command::new("restore")
                         .about("Makes sure every dependency is in order"),
+                    Command::new("new")
+                        .visible_alias("n")
+                        .about("Creates a new SPWN project")
+                        .arg(
+                            arg!(<FOLDER> "target folder")
+                            .value_parser(value_parser!(String))
+                        ),
                 ])
                 .arg_required_else_help(true),
         ])
