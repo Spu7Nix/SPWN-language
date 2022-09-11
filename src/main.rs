@@ -20,6 +20,7 @@ use sources::SpwnSource;
 use crate::compilation::code::Instruction;
 use crate::vm::context::FullContext;
 use crate::vm::interpreter::{run_func, Globals};
+use crate::pckp::pckp_subcommand;
 
 use clap::{arg, Command, ValueHint, value_parser};
 use ansi_term::Color;
@@ -163,35 +164,7 @@ async fn main() {
                 .args([
                     arg!(-d --doc "Doctest stuff"),
                 ]),
-            Command::new("pckp")
-                .visible_alias("p")
-                .about("Libraries manager for spwn")
-                .subcommands([
-                    Command::new("add")
-                        .visible_alias("a")
-                        .about("Adds a library to the pckp file")
-                        .arg(
-                            arg!(<LIBRARIES> ... "Libraries to add")
-                            .value_parser(value_parser!(String))
-                        ),
-                    Command::new("remove")
-                        .visible_alias("r")
-                        .about("Removes a library from the pckp file")
-                        .arg(
-                            arg!(<LIBRARIES> ... "Libraries to remove")
-                            .value_parser(value_parser!(String))
-                        ),
-                    Command::new("restore")
-                        .about("Makes sure every dependency is in order"),
-                    Command::new("new")
-                        .visible_alias("n")
-                        .about("Creates a new SPWN project")
-                        .arg(
-                            arg!(<FOLDER> "target folder")
-                            .value_parser(value_parser!(String))
-                        ),
-                ])
-                .arg_required_else_help(true),
+            pckp_subcommand(),
         ])
         .arg_required_else_help(true)
         .get_matches();
