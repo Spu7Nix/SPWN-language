@@ -11,8 +11,7 @@ pub fn new(target_directory: String) {
     };
     path.push("pckp.yaml");
     let mut pckp_yaml = File::create(&path).unwrap();
-    pckp_yaml.write_all(format!("
-name: {}
+    pckp_yaml.write_all(format!("name: {}
 version: 0.0.1
 folders:
 - src
