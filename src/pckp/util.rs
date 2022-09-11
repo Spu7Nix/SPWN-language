@@ -17,7 +17,8 @@ pub struct PckpMeta {
     pub name: String,
     pub version: String, // this should ALWAYS point to a valid tag on the remote
     pub folders: Vec<String>,
-    pub dependencies: Vec<String> // TODO: add dependencies
+    #[serde(default)]
+    pub dependencies: Vec<String>, // TODO: add dependencies
 }
 
 impl PckpFile {
