@@ -199,7 +199,7 @@ impl Parser<'_> {
             "b" => todo!("byte string"),
             "f" => todo!("f-string"),
             "r" => chars.collect(),
-            "u" => unindent(chars.collect(), true, false),
+            "u" => unindent(self.parse_escapes(&mut chars)?, true, false),
             "" => self.parse_escapes(&mut chars)?,
             other => {
                 return Err(SyntaxError::UnexpectedFlag {
