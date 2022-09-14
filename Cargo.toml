@@ -38,6 +38,7 @@ block-modes = "0.8.1"
 serde_yaml = "0.9.11"
 octocrab = "0.16"
 tokio = { version = "1.21.0", features = ["full"] }
+async-recursion = "1.0.0"
 
 [dev-dependencies]
 lazy_static = "1.4.0"

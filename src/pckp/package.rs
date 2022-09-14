@@ -65,8 +65,9 @@ impl RemotePackage {
     }
 
     // this should work
-    pub async fn download(&self, target: PathBuf) {
+    pub async fn download(&self, reference: &PathBuf) {
         self.ensure_tag_exist().await;
+        let target = reference.clone();
         let mut gh = Octocrab::builder().build().unwrap();
         let repo = gh.repos(self.owner.clone(), self.repo.clone());
         let res = repo
