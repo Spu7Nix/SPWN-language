@@ -66,21 +66,21 @@ impl RemotePackage {
 
     // this should work
     pub async fn download(&self, reference: &PathBuf) {
-        self.ensure_tag_exist().await;
+        // self.ensure_tag_exist().await;
         let target = reference.clone();
-        let mut gh = Octocrab::builder().build().unwrap();
+        let gh = Octocrab::builder().build().unwrap();
         let repo = gh.repos(self.owner.clone(), self.repo.clone());
         let res = repo
-            .download_tarball(Commitish(format!("tags/{}", self.meta.version)))
+            // .download_tarball(Commitish(format!("tags/{}", self.meta.version)))
+            .download_tarball(Commitish(format!("HEAD"))) // TODO: check if tag is present else use HEAD
             .await
             .unwrap()
             .bytes()
             .await
             .unwrap()
-            .into_iter()
-            .collect::<Vec<u8>>();
+            .to_vec();
         
-        let mut f = File::create(target).unwrap();
+        let mut f = File::create(target.join("ball")).unwrap();
         f.write_all(&res).unwrap();
     }
 }

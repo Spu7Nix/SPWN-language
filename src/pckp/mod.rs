@@ -18,10 +18,10 @@ pub async fn run(args: &ArgMatches) {
         ("remove", cmd) => {
             remove::remove(
                 cmd.get_many::<String>("LIBRARIES").unwrap().collect()
-            );
+            ).await;
         },
         ("restore", _cmd) => {
-            restore::restore();
+            restore::restore().await;
         },
         ("new", cmd) => {
             new::new(

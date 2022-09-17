@@ -20,5 +20,5 @@ pub async fn add(packages: Vec<&String>) {
         }
     }
     pckp_file.write_back();
-    restore();
+    restore().await;
 }
