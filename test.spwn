@@ -1,9 +1,6 @@
-sum = (arr) {
-    let s = "";
-    for el in arr {
-        s = s + el;
-    }
-    return s;
+let a = [];
+for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {
+    a = a + [i];
 }
+$.print(a);
 
-$.print(sum("hello" + "world"));

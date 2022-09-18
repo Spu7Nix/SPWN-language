@@ -131,20 +131,7 @@ pub fn run_func(
             instr_funcs! (
                 (context, instr, data, globals)
                 LoadConst(a)
-                Plus
-                Minus
-                Mult
-                Div
-                Modulo
-                Pow
-                Negate
-                Not
-                Eq
-                Neq
-                Lt
-                Lte
-                Gt
-                Gte
+                CallOp(a)
                 LoadVar(a)
                 SetVar(a)
                 CreateVar(a)

@@ -5,6 +5,7 @@ use ariadne::Source;
 use slotmap::SlotMap;
 
 use super::compiler::Constant;
+use super::operators::Operator;
 use crate::compilation::compiler::URegister;
 use crate::regex_color_replace;
 use crate::sources::{CodeSpan, SpwnSource};
@@ -107,7 +108,7 @@ impl<'a> Code<'a> {
             for (i, (instr, _)) in f.instructions.iter().enumerate() {
                 writeln!(
                     &mut debug_str,
-                    "{}\t{:?}    {}",
+                    "{}\t{:?}\t\t{}",
                     i,
                     instr,
                     ansi_term::Color::Green.bold().paint(match instr {
@@ -118,6 +119,7 @@ impl<'a> Code<'a> {
                             format!("{}", self.bltn.iter().find(|(_, b)| b == &k).unwrap().0),
                         Instruction::BuildMacro(b) =>
                             format!("{:?}", self.macro_build_register[*b]),
+                        Instruction::CallOp(op) => format!("{}", op.to_str()),
                         _ => "".into(),
                     })
                 )
@@ -134,6 +136,7 @@ impl<'a> Code<'a> {
             r"MacroBuildID\(([^)]*)\)", "macro build $1", Yellow
             r"MemberID\(([^)]*)\)", "member $1", Yellow
             r"BuiltinKey\(([^)]*)\)", "$1", Yellow
+            //r"CallOp\(([^)]*)\)", "$1", Yellow
         );
 
         println!("{}", debug_str);
@@ -150,22 +153,7 @@ pub struct InstrPos {
 pub enum Instruction {
     LoadConst(ConstID),
 
-    Plus,
-    Minus,
-    Mult,
-    Div,
-    Modulo,
-    Pow,
-
-    Eq,
-    Neq,
-    Gt,
-    Gte,
-    Lt,
-    Lte,
-
-    Negate,
-    Not,
+    CallOp(Operator),
 
     LoadVar(VarID),
     SetVar(VarID),

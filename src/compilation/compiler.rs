@@ -5,6 +5,7 @@ use ahash::AHashMap;
 use slotmap::{new_key_type, SlotMap};
 
 use super::code::ImportID;
+use super::operators::Operator;
 use super::{
     code::{
         BytecodeFunc, Code, ConstID, InstrNum, InstrPos, Instruction, KeysID, MacroBuildID,
@@ -245,28 +246,36 @@ impl<'a> Compiler<'a> {
             Expression::Op(a, op, b) => {
                 self.compile_expr(a, scope, func, globals)?;
                 self.compile_expr(b, scope, func, globals)?;
-                match op {
-                    Token::Plus => self.push_instr(Instruction::Plus, span, func),
-                    Token::Minus => self.push_instr(Instruction::Minus, span, func),
-                    Token::Mult => self.push_instr(Instruction::Mult, span, func),
-                    Token::Div => self.push_instr(Instruction::Div, span, func),
-                    Token::Mod => self.push_instr(Instruction::Modulo, span, func),
-                    Token::Pow => self.push_instr(Instruction::Pow, span, func),
+                self.push_instr(
+                    Instruction::CallOp(match op {
+                        Token::Plus => Operator::Plus,
+                        Token::Minus => Operator::Minus,
+                        Token::Mult => Operator::Mult,
+                        Token::Div => Operator::Div,
+                        Token::Mod => Operator::Modulo,
+                        Token::Pow => Operator::Pow,
 
-                    Token::Eq => self.push_instr(Instruction::Eq, span, func),
-                    Token::Neq => self.push_instr(Instruction::Neq, span, func),
-                    Token::Gt => self.push_instr(Instruction::Gt, span, func),
-                    Token::Gte => self.push_instr(Instruction::Gte, span, func),
-                    Token::Lt => self.push_instr(Instruction::Lt, span, func),
-                    Token::Lte => self.push_instr(Instruction::Lte, span, func),
-                    _ => unreachable!(),
-                };
+                        // Token::Eq => Operator::Eq,
+                        // Token::Neq => Operator::Neq,
+                        // Token::Gt => Operator::Gt,
+                        // Token::Gte => Operator::Gte,
+                        // Token::Lt => Operator::Lt,
+                        // Token::Lte => Operator::Lte,
+                        _ => unreachable!(),
+                    }),
+                    span,
+                    func,
+                );
             }
             Expression::Unary(op, v) => {
                 self.compile_expr(v, scope, func, globals)?;
                 match op {
-                    Token::Minus => self.push_instr(Instruction::Negate, span, func),
-                    Token::ExclMark => self.push_instr(Instruction::Not, span, func),
+                    Token::Minus => {
+                        self.push_instr(Instruction::CallOp(Operator::Negate), span, func)
+                    }
+                    Token::ExclMark => {
+                        self.push_instr(Instruction::CallOp(Operator::Not), span, func)
+                    }
                     _ => unreachable!(),
                 };
             }
@@ -626,20 +635,6 @@ impl<'a> Compiler<'a> {
                 iterator,
                 code,
             } => {
-                // self.compile_expr(iterator, scope, func, globals)?;
-                // self.push_instr(Instruction::ToIter, span, func);
-                // let iter_pos = self.push_instr(Instruction::IterNext(InstrNum(0)), span, func);
-
-                // let derived = self.derive_scope(scope);
-
-                // let var_id = self.new_var(&var, derived, false, span);
-                // self.push_instr(Instruction::SetVar(var_id), span, func);
-                // self.compile_stmts(code, derived, func, false, globals)?;
-                // let back =
-                //     self.push_instr(Instruction::Jump(InstrNum(iter_pos.idx as u16)), span, func);
-
-                // self.get_instr(iter_pos).modify_num((back.idx + 1) as u16);
-
                 // push iterator
                 self.compile_expr(iterator, scope, func, globals)?;
                 // push iter builtin

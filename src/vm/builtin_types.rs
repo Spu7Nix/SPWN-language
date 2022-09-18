@@ -1,7 +1,7 @@
 use super::{
     interpreter::{Globals, ValueKey},
     types::TypeBuilder,
-    value::{value_ops, SpwnIterator, Value, ValueType},
+    value::{SpwnIterator, Value, ValueType},
 };
 
 use crate::sources::CodeArea;

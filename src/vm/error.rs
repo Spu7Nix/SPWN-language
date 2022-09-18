@@ -1,5 +1,5 @@
 use super::value::{StoredValue, ValueType, ValueTypeUnion};
-use crate::{error_maker, sources::CodeArea};
+use crate::{compilation::operators::Operator, error_maker, sources::CodeArea};
 
 error_maker! {
     Globals: globals;
@@ -18,7 +18,7 @@ error_maker! {
         #[
             Message = "Invalid operands", Area = area, Note = None,
             Labels = [
-                area => "Operator `{}` cannot be used on {} and {}": @(op), @(a.value.typ().to_str(globals)), @(b.value.typ().to_str(globals));
+                area => "Operator `{}` cannot be used on {} and {}": @(op.to_str()), @(a.value.typ().to_str(globals)), @(b.value.typ().to_str(globals));
                 a.def_area => "This is of type {}": @(a.value.typ().to_str(globals));
                 b.def_area => "This is of type {}": @(b.value.typ().to_str(globals));
             ]
@@ -26,20 +26,20 @@ error_maker! {
         InvalidOperands {
             a: StoredValue,
             b: StoredValue,
-            op: String,
+            op: Operator,
             area: CodeArea,
         },
 
         #[
             Message = "Invalid unary operand", Area = area, Note = None,
             Labels = [
-                area => "Unary operator `{}` cannot be used on {}": @(op), @(a.value.typ().to_str(globals));
+                area => "Unary operator `{}` cannot be used on {}": @(op.to_str()), @(a.value.typ().to_str(globals));
                 a.def_area => "This is of type {}": @(a.value.typ().to_str(globals));
             ]
         ]
         InvalidUnaryOperand {
             a: StoredValue,
-            op: String,
+            op: Operator,
             area: CodeArea,
         },
 

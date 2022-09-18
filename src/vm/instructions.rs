@@ -5,11 +5,13 @@ use std::collections::HashMap;
 use super::context::{FullContext, ReturnType};
 use super::error::RuntimeError;
 use super::interpreter::{run_func, BuiltinKey, Globals};
-use super::value::{value_ops, Value};
+use super::value::Value;
 use crate::compilation::code::{
     Code, ConstID, ImportID, InstrNum, KeysID, MacroBuildID, MemberID, VarID,
 };
+
 use crate::compilation::compiler::CompilerGlobals;
+
 use crate::leveldata::gd_types::Id;
 use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
 use crate::parsing::ast::IdClass;
@@ -19,6 +21,9 @@ use crate::vm::interpreter::{TypeMember, ValueKey};
 use crate::vm::types::{BuiltinFunction, Instance, MethodFunction};
 use crate::vm::value::{Argument, Macro, Pattern, ValueType};
 
+pub use crate::compilation::operators::run_call_op;
+
+#[macro_export]
 macro_rules! run_helper {
     ($context:ident, $globals:ident, $data:ident) => {
         #[allow(unused_macros)]
@@ -91,32 +96,31 @@ pub fn run_load_const(
     push!(Value: data.code.const_register[id].to_value().into_stored(area!()));
     Ok(())
 }
-use paste::paste;
-macro_rules! op_helper {
-    ($($op_fn:ident),*) => {
-        $(
-            paste! {
-                pub fn [<run_ $op_fn>](
-                    globals: &mut Globals,
-                    data: &InstrData,
-                    context: &mut FullContext,
-                ) -> Result<(), RuntimeError> {
-                    run_helper!(context, globals, data);
-                    let right = pop!(Ref);
-                    let left = pop!(Ref);
+// use paste::paste;
+// macro_rules! op_helper {
+//     ($($op_fn:ident),*) => {
+//         $(
+//             paste! {
+//                 pub fn [<run_ $op_fn>](
+//                     globals: &mut Globals,
+//                     data: &InstrData,
+//                     context: &mut FullContext,
+//                 ) -> Result<(), RuntimeError> {
+//                     run_helper!(context, globals, data);
+//                     let right = pop!(Ref);
+//                     let left = pop!(Ref);
 
+//                     // TODO
+//                     // let result = value_ops::$op_fn(left, right, area!(), globals)?;
+//                     // push!(Value: result);
+//                     Ok(())
+//                 }
+//             }
+//         )*
+//     };
+// }
 
-
-                    let result = value_ops::$op_fn(left, right, area!(), globals)?;
-                    push!(Value: result);
-                    Ok(())
-                }
-            }
-        )*
-    };
-}
-
-op_helper! { plus, minus, mult, div, modulo, pow, eq, neq, gt, gte, lt, lte }
+// op_helper! { plus, minus, mult, div, modulo, pow, eq, neq, gt, gte, lt, lte }
 
 pub fn run_negate(
     globals: &mut Globals,
@@ -124,9 +128,10 @@ pub fn run_negate(
     context: &mut FullContext,
 ) -> Result<(), RuntimeError> {
     run_helper!(context, globals, data);
-    let v = pop!(Ref);
-    let result = value_ops::unary_negate(v, area!())?;
-    push!(Value: result);
+    // TODO
+    // let v = pop!(Ref);
+    // let result = value_ops::unary_negate(v, area!())?;
+    // push!(Value: result);
     Ok(())
 }
 
@@ -136,9 +141,10 @@ pub fn run_not(
     context: &mut FullContext,
 ) -> Result<(), RuntimeError> {
     run_helper!(context, globals, data);
-    let v = pop!(Ref);
-    let result = value_ops::unary_not(v, area!())?;
-    push!(Value: result);
+    // TODO
+    // let v = pop!(Ref);
+    // let result = value_ops::unary_not(v, area!())?;
+    // push!(Value: result);
     Ok(())
 }
 
@@ -274,9 +280,10 @@ pub fn run_jump_if_false(
 ) -> Result<(), RuntimeError> {
     run_helper!(context, globals, data);
     let v = &globals.memory[pop!(Key)];
-    if !value_ops::to_bool(v)? {
-        context.inner().pos = pos.0 as isize - 1;
-    }
+    // TODO
+    // if !value_ops::to_bool(v)? {
+    //     context.inner().pos = pos.0 as isize - 1;
+    // }
     Ok(())
 }
 
