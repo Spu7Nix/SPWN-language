@@ -1,12 +1,30 @@
 use crate::leveldata::object_data::GdObj;
 
-use super::{error::RuntimeError, interpreter::ValueKey, value::Value};
+use super::{error::RuntimeError, interpreter::ValueKey, value::SpwnIterator, value::Value};
 
 pub trait FromValue: Sized {
     fn from_value(val: &Value) -> Result<&Self, RuntimeError>;
 
     fn from_value_mut(_: &mut Value) -> Result<&mut Self, RuntimeError> {
         unimplemented!()
+    }
+}
+
+impl FromValue for SpwnIterator {
+    fn from_value(val: &Value) -> Result<&Self, RuntimeError> {
+        if let Value::Iterator(a) = val {
+            Ok(a)
+        } else {
+            todo!()
+        }
+    }
+
+    fn from_value_mut(val: &mut Value) -> Result<&mut Self, RuntimeError> {
+        if let Value::Iterator(a) = val {
+            Ok(a)
+        } else {
+            todo!("{:?}", val)
+        }
     }
 }
 

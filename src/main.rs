@@ -9,19 +9,21 @@ mod vm;
 use std::io::{self, Write};
 use std::{fs, path::PathBuf};
 
+use ahash::AHashMap;
 use compilation::compiler::{Compiler, CompilerGlobals};
 use compilation::error::CompilerError;
 use parsing::ast::ASTData;
 use parsing::error::SyntaxError;
 use parsing::parser::Parser;
 use sources::SpwnSource;
+use vm::interpreter::BuiltinKey;
 
 use crate::compilation::code::Instruction;
 use crate::vm::context::FullContext;
 use crate::vm::interpreter::{run_func, Globals};
 
-use clap::{arg, Command, ValueHint};
 use ansi_term::Color;
+use clap::{arg, Command, ValueHint};
 
 fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
     // if doctest {
@@ -42,9 +44,17 @@ fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
     }
 
     let (ast, stmts) = handle!(parse_stage(&code, &source));
-    let (compiler, comp_globals) = handle!(bytecode_generation(ast, stmts, &source));
 
-    let mut globals = Globals::new(compiler.code.types.clone());
+    let mut globals = Globals::new();
+
+    let builtin_names = globals.builtins_by_name.clone();
+
+    //dbg!(&builtin_names);
+
+    let (compiler, comp_globals) =
+        handle!(bytecode_generation(ast, stmts, &source, &builtin_names));
+
+    globals.set_types(compiler.code.types.clone());
     let mut contexts = FullContext::single(compiler.code.var_count);
 
     let start = std::time::Instant::now();
@@ -114,12 +124,13 @@ fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
 //     Ok(globals)
 // }
 
-fn bytecode_generation(
+fn bytecode_generation<'a>(
     ast_data: ASTData,
     stmts: Vec<parsing::ast::StmtKey>,
     source: &SpwnSource,
-) -> Result<(Compiler, CompilerGlobals), CompilerError> {
-    let mut compiler = Compiler::new(ast_data, source.clone());
+    builtins_by_name: &'a AHashMap<String, BuiltinKey>,
+) -> Result<(Compiler<'a>, CompilerGlobals<'a>), CompilerError> {
+    let mut compiler = Compiler::new(ast_data, source.clone(), builtins_by_name);
     let mut comp_globals = CompilerGlobals::default();
     compiler.start_compile(stmts, &mut comp_globals)?;
     #[cfg(debug_assertions)]
@@ -144,7 +155,7 @@ fn main() {
     println!("{}", std::mem::size_of::<Instruction>());
 
     io::stdout().flush().unwrap();
-    
+
     let matches = Command::new("SPWN")
         .about("A programming language that compiles code to Geometry Dash levels")
         .subcommands([
@@ -158,9 +169,7 @@ fn main() {
             Command::new("eval")
                 .visible_alias("e")
                 .about("Runs the input given in stdin/the console as SPWN code")
-                .args([
-                    arg!(-d --doc "Doctest stuff"),
-                ])
+                .args([arg!(-d --doc "Doctest stuff")]),
         ])
         .arg_required_else_help(true)
         .get_matches();
@@ -175,7 +184,7 @@ fn main() {
             let doctest = command.contains_id("doc");
 
             run_spwn(code, SpwnSource::File(buf), doctest);
-        },
+        }
         ("eval", command) => {
             let end_command = ":build";
 
@@ -195,7 +204,7 @@ fn main() {
             let doctest = command.contains_id("doc");
 
             run_spwn(input, SpwnSource::File(PathBuf::from("eval")), doctest);
-        },
+        }
         (_, _) => unreachable!(),
     };
 }

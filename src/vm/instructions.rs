@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use super::context::{FullContext, ReturnType};
 use super::error::RuntimeError;
-use super::interpreter::{run_func, Globals};
+use super::interpreter::{run_func, BuiltinKey, Globals};
 use super::value::{value_ops, Value};
 use crate::compilation::code::{
     Code, ConstID, ImportID, InstrNum, KeysID, MacroBuildID, MemberID, VarID,
@@ -13,10 +13,10 @@ use crate::compilation::compiler::CompilerGlobals;
 use crate::leveldata::gd_types::Id;
 use crate::leveldata::object_data::{GdObj, ObjParam, ObjectMode};
 use crate::parsing::ast::IdClass;
-use crate::sources::CodeSpan;
+use crate::sources::{CodeArea, CodeSpan};
 use crate::vm::context::SkipMode;
 use crate::vm::interpreter::{TypeMember, ValueKey};
-use crate::vm::types::Instance;
+use crate::vm::types::{BuiltinFunction, Instance, MethodFunction};
 use crate::vm::value::{Argument, Macro, Pattern, ValueType};
 
 macro_rules! run_helper {
@@ -76,8 +76,8 @@ macro_rules! run_helper {
 
 // data passedd into an instruction function
 pub struct InstrData<'a> {
-    pub code: &'a Code,
-    pub comp_globals: &'a CompilerGlobals,
+    pub code: &'a Code<'a>,
+    pub comp_globals: &'a CompilerGlobals<'a>,
     pub span: CodeSpan,
 }
 
@@ -102,10 +102,13 @@ macro_rules! op_helper {
                     context: &mut FullContext,
                 ) -> Result<(), RuntimeError> {
                     run_helper!(context, globals, data);
-                    let b = pop!(Ref);
-                    let a = pop!(Ref);
-                    let result = value_ops::$op_fn(a, b, area!(), globals)?;
-                    push!(Value: result);
+                    let right = pop!(Ref);
+                    let left = pop!(Ref);
+
+
+
+                    // let result = value_ops::$op_fn(a, b, area!(), globals)?;
+                    push!(Value: Value::Empty().into_stored(area!()));
                     Ok(())
                 }
             }
@@ -240,14 +243,7 @@ pub fn run_build_instance(
 
     let tk = match &typ.value {
         Value::Type(ValueType::Custom(tk)) => *tk,
-        _ => todo!(),
-        // other => {
-        //     return Err(RuntimeError::TypeMismatch {
-        //         area: typ.def_area.clone(),
-        //         v: typ,
-        //         expected: ValueType::Type.into(),
-        //     })
-        // }
+        _ => return Err(RuntimeError::NoConstructor { area: area!() }),
     };
 
     if let Value::Dict(f) = fields.value {
@@ -280,6 +276,24 @@ pub fn run_jump_if_false(
     let v = &globals.memory[pop!(Key)];
     if !value_ops::to_bool(v)? {
         context.inner().pos = pos.0 as isize - 1;
+    }
+    Ok(())
+}
+
+pub fn run_unwrap_or_jump(
+    globals: &mut Globals,
+    _data: &InstrData,
+    context: &mut FullContext,
+    pos: InstrNum,
+) -> Result<(), RuntimeError> {
+    run_helper!(context, globals, data);
+    let v = &globals.memory[pop!(Key)];
+    match v.value {
+        Value::Maybe(None) => {
+            context.inner().pos = pos.0 as isize - 1;
+        }
+        Value::Maybe(Some(v)) => push!(Key: v),
+        _ => unreachable!("unwrapped value that wasnt maybe"),
     }
     Ok(())
 }
@@ -487,6 +501,46 @@ pub fn run_import(
     Ok(())
 }
 
+pub fn run_call_builtin(
+    globals: &mut Globals,
+    data: &InstrData,
+    context: &mut FullContext,
+    builtin: BuiltinKey,
+) -> Result<(), RuntimeError> {
+    run_helper!(context, globals, data);
+    match globals.builtins[builtin] {
+        BuiltinFunction::Method(MethodFunction {
+            func,
+            arg_count,
+            is_static,
+        }) => {
+            let mut args = Vec::new();
+            // set positional
+            for i in 0..arg_count {
+                let val = pop!(Key);
+                args.push(val);
+            }
+            if is_static {
+                args.push(
+                    globals
+                        .memory
+                        .insert(Value::Builtins().into_stored(CodeArea::internal())),
+                ); // "self" value
+            }
+            args.reverse();
+
+            //dbg!(args.len());
+            let v = func(globals, context, &args)?;
+
+            push!(Value: v.into_stored(area!()));
+        }
+
+        _ => todo!(),
+    };
+
+    Ok(())
+}
+
 pub fn run_call(
     globals: &mut Globals,
     data: &InstrData,
@@ -588,13 +642,16 @@ pub fn run_call(
             let passed_args = passed_args.0 as usize;
             // set positional
             for i in 0..passed_args {
-                let val = pop!(Deep Store);
+                let val = pop!(Key);
                 args.push(val);
             }
 
+            args.push(*self_arg);
+            args.reverse();
+
             match globals.builtins[*func_ptr] {
                 crate::vm::types::BuiltinFunction::Method(m) => {
-                    let v = m(globals, context, *self_arg, &args)?;
+                    let v = (m.func)(globals, context, &args)?;
                     push!(Value: v.into_stored(area!()));
                 }
                 _ => unreachable!(),
@@ -660,7 +717,7 @@ pub fn run_member(
                 TypeMember::Builtin(b) => {
                     let builtin = match globals.builtins[*b] {
                         crate::vm::types::BuiltinFunction::Attribute(f) => {
-                            let v = f(globals, key);
+                            let v = f(globals, context, key);
                             push!(Value: v.into_stored(area!()))
                         }
                         crate::vm::types::BuiltinFunction::Method(_) => {

@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
-use ahash::AHashMap;
-
 use super::{
     error::RuntimeError,
     interpreter::{BuiltinKey, Globals, TypeKey, ValueKey},
     types::Instance,
 };
+use ahash::AHashMap;
+use paste::paste;
+
 use crate::{
     compilation::code::VarID,
     leveldata::{gd_types::Id, object_data::GdObj},
@@ -73,19 +74,33 @@ macro_rules! spwn_types {
                 }
             }
         }
-        use convert_case::{Case, Casing};
+
+        // for compiler
+        pub fn get_builtin_valuetype(name: &str) -> Option<ValueType> {
+            paste! {
+                match name {
+                    $(
+                        stringify!([<$name:snake>]) => Some(ValueType::$name),
+                    )+
+                    _ => None,
+                }
+            }
+        }
 
         impl ValueType {
             pub fn to_str(self, globals: &Globals) -> String {
-                format!(
-                    "@{}",
-                    match self {
-                        $(
-                            ValueType::$name => stringify!($name).to_case(Case::Snake),
-                        )+
-                        ValueType::Custom(k) => globals.types[k].name.clone(),
-                    }
-                )
+                paste! {
+                    format!(
+                        "@{}",
+
+                        match self {
+                            $(
+                                ValueType::$name => stringify!([< $name:snake >]),
+                            )+
+                            ValueType::Custom(k) => globals.types[k].name.as_str(),
+                        }
+                    )
+                }
             }
         }
         // use super::types::Type;
@@ -102,6 +117,31 @@ macro_rules! spwn_types {
         // }
 
     };
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SpwnIterator {
+    Array {
+        data: Vec<ValueKey>,
+        pos: usize,
+    },
+    Dict {
+        data: Vec<(String, ValueKey)>,
+        pos: usize,
+    },
+
+    String {
+        data: Vec<char>,
+        pos: usize,
+    },
+
+    // Range {
+    //     start: i64,
+    //     end: i64,
+    //     step: i64,
+    //     pos: usize,
+    // },
+    Custom(ValueKey),
 }
 
 spwn_types! {
@@ -133,9 +173,10 @@ spwn_types! {
 
     Builtins(),
 
-    // Instance(Instance),
+    Iterator(SpwnIterator),
 }
 
+// }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Argument {
     pub name: String,
@@ -227,6 +268,23 @@ impl Value {
                 // })
                 // todo!()
             }
+            Value::Iterator(t) => match t {
+                SpwnIterator::Array { data, pos } => Value::Iterator(SpwnIterator::Array {
+                    data: data.iter().map(|v| globals.key_deep_clone(*v)).collect(),
+                    pos: *pos,
+                }),
+                SpwnIterator::Dict { data, pos } => Value::Iterator(SpwnIterator::Dict {
+                    data: data
+                        .iter()
+                        .map(|(k, v)| (k.clone(), globals.key_deep_clone(*v)))
+                        .collect(),
+                    pos: *pos,
+                }),
+                SpwnIterator::Custom(v) => {
+                    Value::Iterator(SpwnIterator::Custom(globals.key_deep_clone(*v)))
+                }
+                a => Value::Iterator(a.clone()),
+            },
         }
     }
 
@@ -310,6 +368,20 @@ impl Value {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            Value::Iterator(i) => {
+                let val = match i {
+                    SpwnIterator::Array { data, pos: _ } => Value::Array(data.clone()),
+                    SpwnIterator::Dict { data, pos: _ } => {
+                        Value::Dict(data.iter().cloned().collect())
+                    }
+                    SpwnIterator::Custom(v) => globals.memory[*v].value.clone(),
+                    SpwnIterator::String { data, pos } => {
+                        Value::String(data.iter().cloned().collect())
+                    }
+                };
+
+                format!("@iter({})", val.to_str(globals))
+            }
         }
     }
 }

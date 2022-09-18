@@ -40,13 +40,16 @@ pub struct Globals {
     pub objects: Vec<GdObj>,
     pub triggers: Vec<GdObj>,
     pub types: SlotMap<TypeKey, CustomType>,
+
     //pub type_keys: AHashMap<String, TypeKey>,
     pub type_members: AHashMap<ValueType, AHashMap<String, TypeMember>>,
     pub builtins: SlotMap<BuiltinKey, BuiltinFunction>,
+
+    pub builtins_by_name: AHashMap<String, BuiltinKey>,
 }
 
 impl Globals {
-    pub fn new(types: SlotMap<TypeKey, CustomType>) -> Self {
+    pub fn new() -> Self {
         let mut g = Self {
             memory: SlotMap::default(),
 
@@ -55,16 +58,20 @@ impl Globals {
 
             objects: Vec::new(),
             triggers: Vec::new(),
-            types,
+            types: SlotMap::default(),
 
             builtins: SlotMap::default(),
 
             type_members: AHashMap::default(),
+            builtins_by_name: AHashMap::default(),
         };
         g.init_types();
         g
     }
 
+    pub fn set_types(&mut self, types: SlotMap<TypeKey, CustomType>) {
+        self.types = types;
+    }
     pub fn key_deep_clone(&mut self, k: ValueKey) -> ValueKey {
         let val = self.memory[k].clone();
         let val = val.deep_clone(self);
@@ -145,6 +152,7 @@ pub fn run_func(
                 BuildDict(a)
                 Jump(a)
                 JumpIfFalse(a)
+                UnwrapOrJump(a)
                 PopTop
                 PushEmpty
                 WrapMaybe
@@ -158,6 +166,7 @@ pub fn run_func(
                 PushAnyPattern
                 BuildMacro(a)
                 Call(a)
+                CallBuiltin(a)
                 Index
                 Member(a)
                 Associated(a)

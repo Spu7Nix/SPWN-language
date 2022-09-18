@@ -58,6 +58,10 @@ impl CodeSpan {
             end: other.end,
         }
     }
+
+    pub fn internal() -> CodeSpan {
+        CodeSpan { start: 0, end: 0 }
+    }
 }
 
 impl From<Range<usize>> for CodeSpan {

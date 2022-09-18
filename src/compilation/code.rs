@@ -8,7 +8,7 @@ use super::compiler::Constant;
 use crate::compilation::compiler::URegister;
 use crate::regex_color_replace;
 use crate::sources::{CodeSpan, SpwnSource};
-use crate::vm::interpreter::TypeKey;
+use crate::vm::interpreter::{BuiltinKey, TypeKey};
 use crate::vm::types::CustomType;
 
 macro_rules! wrappers {
@@ -50,7 +50,7 @@ pub struct BytecodeFunc {
     pub inner_ids: Vec<VarID>,
 }
 
-pub struct Code {
+pub struct Code<'a> {
     pub source: SpwnSource,
 
     pub const_register: URegister<Constant>,
@@ -66,10 +66,11 @@ pub struct Code {
 
     pub types: SlotMap<TypeKey, CustomType>,
     pub type_keys: AHashMap<String, TypeKey>,
+    pub bltn: &'a AHashMap<String, BuiltinKey>,
 }
 
-impl Code {
-    pub fn new(source: SpwnSource) -> Self {
+impl<'a> Code<'a> {
+    pub fn new(source: SpwnSource, bltn: &'a AHashMap<String, BuiltinKey>) -> Self {
         Self {
             source,
             const_register: URegister::new(),
@@ -84,6 +85,7 @@ impl Code {
 
             types: SlotMap::default(),
             type_keys: AHashMap::default(),
+            bltn,
         }
     }
 
@@ -112,6 +114,8 @@ impl Code {
                         Instruction::LoadConst(c) => format!("{:?}", self.const_register[*c]),
                         Instruction::BuildDict(k) => format!("{:?}", self.keys_register[*k]),
                         Instruction::Member(k) => format!("{}", self.member_register[*k]),
+                        Instruction::CallBuiltin(k) =>
+                            format!("{}", self.bltn.iter().find(|(_, b)| b == &k).unwrap().0),
                         Instruction::BuildMacro(b) =>
                             format!("{:?}", self.macro_build_register[*b]),
                         _ => "".into(),
@@ -129,6 +133,7 @@ impl Code {
             r"KeysID\(([^)]*)\)", "dict keys $1", Yellow
             r"MacroBuildID\(([^)]*)\)", "macro build $1", Yellow
             r"MemberID\(([^)]*)\)", "member $1", Yellow
+            r"BuiltinKey\(([^)]*)\)", "$1", Yellow
         );
 
         println!("{}", debug_str);
@@ -171,6 +176,7 @@ pub enum Instruction {
 
     Jump(InstrNum),
     JumpIfFalse(InstrNum),
+    UnwrapOrJump(InstrNum),
 
     PopTop,
     PushEmpty,
@@ -192,6 +198,7 @@ pub enum Instruction {
     PushAnyPattern,
     BuildMacro(MacroBuildID),
     Call(InstrNum),
+    CallBuiltin(BuiltinKey),
     Return,
 
     Index,
@@ -224,7 +231,8 @@ impl Instruction {
             | Self::EnterTriggerFunction(num)
             | Self::IterNext(num)
             | Self::BuildObject(num)
-            | Self::BuildTrigger(num) => num.0 = n,
+            | Self::BuildTrigger(num)
+            | Self::UnwrapOrJump(num) => num.0 = n,
             _ => panic!("can't modify number of variant that doesnt hold nubere rf  v 🤓🤓🤓"),
         }
     }
