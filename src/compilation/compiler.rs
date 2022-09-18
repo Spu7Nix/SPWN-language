@@ -5,6 +5,7 @@ use ahash::AHashMap;
 use slotmap::{new_key_type, SlotMap};
 
 use super::code::ImportID;
+use super::operators::Operator;
 use super::{
     code::{
         BytecodeFunc, Code, ConstID, InstrNum, InstrPos, Instruction, KeysID, MacroBuildID,
@@ -12,6 +13,8 @@ use super::{
     },
     error::CompilerError,
 };
+use crate::vm::interpreter::BuiltinKey;
+use crate::vm::value::get_builtin_valuetype;
 use crate::{
     leveldata::object_data::ObjectMode,
     parsing::{
@@ -84,22 +87,27 @@ impl<T: PartialEq> URegister<T> {
 }
 
 #[derive(Default)]
-pub struct CompilerGlobals {
-    pub modules: AHashMap<SpwnSource, Code>,
+pub struct CompilerGlobals<'a> {
+    pub modules: AHashMap<SpwnSource, Code<'a>>,
 }
 
-pub struct Compiler {
+pub struct Compiler<'a> {
     pub ast_data: ASTData,
-    pub code: Code,
+    pub code: Code<'a>,
 
     pub scopes: SlotMap<ScopeKey, Scope>,
+    //bltn: &'a AHashMap<String, BuiltinKey>,
 }
 
-impl Compiler {
-    pub fn new(ast_data: ASTData, source: SpwnSource) -> Self {
+impl<'a> Compiler<'a> {
+    pub fn new(
+        ast_data: ASTData,
+        source: SpwnSource,
+        builtins_by_name: &'a AHashMap<String, BuiltinKey>,
+    ) -> Self {
         Self {
             ast_data,
-            code: Code::new(source.clone()),
+            code: Code::new(source.clone(), builtins_by_name),
             scopes: SlotMap::default(),
         }
     }
@@ -197,15 +205,27 @@ impl Compiler {
         expr_key: ExprKey,
         scope: ScopeKey,
         func: usize,
-        globals: &mut CompilerGlobals,
+        globals: &mut CompilerGlobals<'a>,
     ) -> Result<(usize, usize), CompilerError> {
         // the `Ok` contains the idx of the first instruction and the next idx after the last
         let start_idx = self.func_len(func);
 
-        let expr = self.ast_data.get(expr_key);
+        let expr = self.ast_data.get(expr_key).t;
         let span = self.ast_data.span(expr_key);
 
-        match expr.t {
+        self.compile_raw_expr(expr, span, func, scope, globals)?;
+        Ok((start_idx, self.func_len(func)))
+    }
+
+    fn compile_raw_expr(
+        &mut self,
+        expr: Expression,
+        span: CodeSpan,
+        func: usize,
+        scope: ScopeKey,
+        globals: &mut CompilerGlobals<'a>,
+    ) -> Result<(), CompilerError> {
+        Ok(match expr {
             Expression::Int(v) => {
                 let id = self.code.const_register.insert(Constant::Int(v));
                 self.push_instr(Instruction::LoadConst(ConstID(id as u16)), span, func);
@@ -226,28 +246,36 @@ impl Compiler {
             Expression::Op(a, op, b) => {
                 self.compile_expr(a, scope, func, globals)?;
                 self.compile_expr(b, scope, func, globals)?;
-                match op {
-                    Token::Plus => self.push_instr(Instruction::Plus, span, func),
-                    Token::Minus => self.push_instr(Instruction::Minus, span, func),
-                    Token::Mult => self.push_instr(Instruction::Mult, span, func),
-                    Token::Div => self.push_instr(Instruction::Div, span, func),
-                    Token::Mod => self.push_instr(Instruction::Modulo, span, func),
-                    Token::Pow => self.push_instr(Instruction::Pow, span, func),
+                self.push_instr(
+                    Instruction::CallOp(match op {
+                        Token::Plus => Operator::Plus,
+                        Token::Minus => Operator::Minus,
+                        Token::Mult => Operator::Mult,
+                        Token::Div => Operator::Div,
+                        Token::Mod => Operator::Modulo,
+                        Token::Pow => Operator::Pow,
 
-                    Token::Eq => self.push_instr(Instruction::Eq, span, func),
-                    Token::Neq => self.push_instr(Instruction::Neq, span, func),
-                    Token::Gt => self.push_instr(Instruction::Gt, span, func),
-                    Token::Gte => self.push_instr(Instruction::Gte, span, func),
-                    Token::Lt => self.push_instr(Instruction::Lt, span, func),
-                    Token::Lte => self.push_instr(Instruction::Lte, span, func),
-                    _ => unreachable!(),
-                };
+                        // Token::Eq => Operator::Eq,
+                        // Token::Neq => Operator::Neq,
+                        // Token::Gt => Operator::Gt,
+                        // Token::Gte => Operator::Gte,
+                        // Token::Lt => Operator::Lt,
+                        // Token::Lte => Operator::Lte,
+                        _ => unreachable!(),
+                    }),
+                    span,
+                    func,
+                );
             }
             Expression::Unary(op, v) => {
                 self.compile_expr(v, scope, func, globals)?;
                 match op {
-                    Token::Minus => self.push_instr(Instruction::Negate, span, func),
-                    Token::ExclMark => self.push_instr(Instruction::Not, span, func),
+                    Token::Minus => {
+                        self.push_instr(Instruction::CallOp(Operator::Negate), span, func)
+                    }
+                    Token::ExclMark => {
+                        self.push_instr(Instruction::CallOp(Operator::Not), span, func)
+                    }
                     _ => unreachable!(),
                 };
             }
@@ -263,7 +291,10 @@ impl Compiler {
                 }
             },
             Expression::Type(name) => {
-                if let Some(key) = self.code.type_keys.get(&name) {
+                if let Some(v) = get_builtin_valuetype(&name) {
+                    let id = self.code.const_register.insert(Constant::Type(v));
+                    self.push_instr(Instruction::LoadConst(ConstID(id as u16)), span, func);
+                } else if let Some(key) = self.code.type_keys.get(&name) {
                     let id = self
                         .code
                         .const_register
@@ -496,7 +527,7 @@ impl Compiler {
                     };
 
                     // compile content
-                    let mut compiler = Compiler::new(ast_data, source.clone());
+                    let mut compiler = Compiler::new(ast_data, source.clone(), self.code.bltn);
                     compiler.start_compile(statements, globals)?;
 
                     // make a module
@@ -505,8 +536,7 @@ impl Compiler {
 
                 self.push_instr(Instruction::Import(ImportID(id as u16)), span, func);
             }
-        }
-        Ok((start_idx, self.func_len(func)))
+        })
     }
 
     pub fn compile_stmt(
@@ -514,7 +544,7 @@ impl Compiler {
         stmt_key: StmtKey,
         scope: ScopeKey,
         func: usize,
-        globals: &mut CompilerGlobals,
+        globals: &mut CompilerGlobals<'a>,
     ) -> Result<(usize, usize), CompilerError> {
         let start_idx = self.func_len(func);
 
@@ -605,19 +635,54 @@ impl Compiler {
                 iterator,
                 code,
             } => {
+                // push iterator
                 self.compile_expr(iterator, scope, func, globals)?;
-                self.push_instr(Instruction::ToIter, span, func);
-                let iter_pos = self.push_instr(Instruction::IterNext(InstrNum(0)), span, func);
+                // push iter builtin
+                // self.push_instr(Instruction::PushBuiltins, span, func);
+
+                // let iter_id = self.code.member_register.insert("iter".to_string());
+                // self.push_instr(Instruction::Member(MemberID(iter_id as u16)), span, func);
+
+                // self.push_instr(Instruction::Call(InstrNum(1)), span, func);
+                self.push_instr(
+                    Instruction::CallBuiltin(self.code.bltn["@builtins::iter"]),
+                    span,
+                    func,
+                );
+
+                // make variable for iterator
+                let iter_var_id = VarID(self.code.var_count as u16);
+                self.code.var_count += 1;
+
+                self.push_instr(Instruction::CreateVar(iter_var_id), span, func);
+
+                // start loop
+                let cond_pos = self
+                    .push_instr(Instruction::LoadVar(iter_var_id), span, func)
+                    .idx;
+
+                // call iter.next
+                // let next_id = self.code.member_register.insert("next".to_string());
+                // self.push_instr(Instruction::Member(MemberID(next_id as u16)), span, func);
+                // self.push_instr(Instruction::Call(InstrNum(0)), span, func);
+                self.push_instr(
+                    Instruction::CallBuiltin(self.code.bltn["@iterator::next"]),
+                    span,
+                    func,
+                );
 
                 let derived = self.derive_scope(scope);
 
+                let jump = self.push_instr(Instruction::UnwrapOrJump(InstrNum(0)), span, func);
+
                 let var_id = self.new_var(&var, derived, false, span);
-                self.push_instr(Instruction::SetVar(var_id), span, func);
+                self.push_instr(Instruction::CreateVar(var_id), span, func);
+
                 self.compile_stmts(code, derived, func, false, globals)?;
                 let back =
-                    self.push_instr(Instruction::Jump(InstrNum(iter_pos.idx as u16)), span, func);
+                    self.push_instr(Instruction::Jump(InstrNum(cond_pos as u16)), span, func);
 
-                self.get_instr(iter_pos).modify_num((back.idx + 1) as u16);
+                self.get_instr(jump).modify_num((back.idx + 1) as u16);
             }
             Statement::Return(a) => {
                 if let Some(e) = a {
@@ -662,7 +727,7 @@ impl Compiler {
         scope: ScopeKey,
         func: usize,
         allow_type_def: bool,
-        globals: &mut CompilerGlobals,
+        globals: &mut CompilerGlobals<'a>,
     ) -> Result<(usize, usize), CompilerError> {
         let start_idx = self.func_len(func);
 
@@ -693,7 +758,7 @@ impl Compiler {
     pub fn start_compile(
         &mut self,
         stmts: Vec<StmtKey>,
-        globals: &mut CompilerGlobals,
+        globals: &mut CompilerGlobals<'a>,
     ) -> Result<(), CompilerError> {
         let base_scope = self.scopes.insert(Scope {
             vars: HashMap::new(),
