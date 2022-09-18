@@ -1,10 +1,12 @@
 use super::{
     interpreter::{Globals, ValueKey},
     types::TypeBuilder,
-    value::{value_ops, Value, ValueType},
+    value::{SpwnIterator, Value, ValueType},
 };
+
 use crate::sources::CodeArea;
 use crate::vm::to_value::ToValueResult;
+use crate::vm::types::MethodFunction;
 use crate::{attr, method};
 
 use crate::leveldata::object_data::GdObj;
@@ -12,7 +14,11 @@ use crate::leveldata::object_data::GdObj;
 impl Globals {
     pub fn init_types(&mut self) {
         TypeBuilder::new(ValueType::Array)
-            .add_member(self, "length", attr!(g, Value::Array(this) => this.len()))
+            .add_member(
+                self,
+                "length",
+                attr!(g, _c, |this: Vec<ValueKey>| { this.len() }),
+            )
             .add_method(
                 self,
                 "push",
@@ -25,53 +31,55 @@ impl Globals {
                 "reverse",
                 method!(g, c, |mut this: Vec<ValueKey>| { this.reverse() }),
             )
-            // .add_method(self, "sort", method!(g, #mut Value::Array(arr) => {
-            //     // arr.sort_by(compare)
-            //     // merge sort pls copilot
-            //     if arr.len() == 0 {
-            //         return Ok(Value::Array(arr));
-            //     }
-            //     let mut arr = arr.clone();
-            //     let mut stack = Vec::new();
-            //     stack.push((0, arr.len()));
-            //     while let Some((start, end)) = stack.pop() {
-            //         if end - start <= 1 {
-            //             continue;
-            //         }
-            //         let mid = (start + end) / 2;
-            //         stack.push((start, mid));
-            //         stack.push((mid, end));
-            //     }
-            //     while let Some((start, end)) = stack.pop() {
-            //         if end - start <= 1 {
-            //             continue;
-            //         }
-            //         let mid = (start + end) / 2;
-            //         let mut i = start;
-            //         let mut j = mid;
-            //         let mut new_arr = Vec::new();
-            //         while i < mid && j < end {
-            //             let cmp = value_ops::compare(&arr[i], &arr[j]);
-            //             if cmp == Ordering::Less {
-            //                 new_arr.push(arr[i]);
-            //                 i += 1;
-            //             } else {
-            //                 new_arr.push(arr[j]);
-            //                 j += 1;
-            //             }
-            //         }
-            //         while i < mid {
-            //             new_arr.push(arr[i]);
-            //             i += 1;
-            //         }
-            //         while j < end {
-            //             new_arr.push(arr[j]);
-            //             j += 1;
-            //         }
-            //         arr.splice(start..end, new_arr);
-            //     }
-            //     Ok(arr)
-            // })
+            .finish_type(self);
+
+        TypeBuilder::new(ValueType::Iterator)
+            .add_method(
+                self,
+                "next",
+                method!(g, c, |mut this: SpwnIterator| {
+                    let mut output = None;
+
+                    match this {
+                        SpwnIterator::Array { data, pos } => {
+                            let current = data.get(*pos);
+                            if let Some(v) = current {
+                                *pos += 1;
+                                output = Some(*v);
+                            }
+                        }
+                        SpwnIterator::String { data, pos } => {
+                            let current = data.get(*pos);
+                            if let Some(v) = current.cloned() {
+                                *pos += 1;
+                                output = Some(g.memory.insert(
+                                    Value::String(v.to_string()).into_stored(CodeArea::internal()),
+                                ));
+                            }
+                        }
+                        SpwnIterator::Dict { data, pos } => {
+                            let current = data.get(*pos);
+                            if let Some(v) = current.cloned() {
+                                *pos += 1;
+                                let key = v.0;
+                                let string_val = g
+                                    .memory
+                                    .insert(Value::String(key).into_stored(CodeArea::internal()));
+
+                                let arr = g.memory.insert(
+                                    Value::Array(vec![string_val, v.1])
+                                        .into_stored(CodeArea::internal()),
+                                );
+
+                                output = Some(arr)
+                            }
+                        }
+                        _ => todo!(),
+                    };
+
+                    output
+                }),
+            )
             .finish_type(self);
 
         TypeBuilder::new(ValueType::Builtins)
@@ -80,11 +88,28 @@ impl Globals {
                 "print",
                 method!(g, c, |val| { println!("{}", val.to_str(g)) }),
             )
+            .add_method(self, "add", method!(g, c, |obj: GdObj| {}))
             .add_method(
                 self,
-                "add",
-                method!(g, c, |obj: GdObj| {
-                    dbg!(obj);
+                "iter",
+                method!(g, c, |val| {
+                    match val {
+                        Value::Array(arr) => SpwnIterator::Array {
+                            data: arr.clone(),
+                            pos: 0,
+                        },
+
+                        Value::Dict(dict) => SpwnIterator::Dict {
+                            data: dict.iter().map(|(a, b)| (a.clone(), b.clone())).collect(),
+                            pos: 0,
+                        },
+
+                        Value::String(str) => SpwnIterator::String {
+                            data: str.chars().collect(),
+                            pos: 0,
+                        },
+                        _ => panic!("No iter implementation: {:?}", val),
+                    }
                 }),
             )
             .finish_type(self);

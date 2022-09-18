@@ -3,6 +3,86 @@ pub mod error;
 pub mod lexer;
 pub mod parser;
 pub mod parser_util;
+
+use lexer::Token;
+
+impl From<Token> for &str {
+    fn from(tok: Token) -> Self {
+        use Token::*;
+        match tok {
+            Int => "int literal",
+            Float => "float literal",
+            Id => "ID literal",
+            String => "string literal",
+            TypeIndicator => "type indicator",
+            Let => "let",
+            Mut => "mut",
+            Ident => "identifier",
+            Error => "invalid",
+            Eof => "end of file",
+            True => "true",
+            False => "false",
+            Obj => "obj",
+            Trigger => "trigger",
+            Plus => "+",
+            Minus => "-",
+            Mult => "*",
+            Div => "/",
+            Mod => "%",
+            Pow => "^",
+            PlusEq => "+=",
+            MinusEq => "-=",
+            MuLte => "*=",
+            DivEq => "/=",
+            ModEq => "%=",
+            PowEq => "^=",
+            Assign => "=",
+            LParen => "(",
+            RParen => ")",
+
+            LSqBracket => "[",
+            RSqBracket => "]",
+            LBracket => "{",
+            RBracket => "}",
+            TrigFnBracket => "!{",
+            Comma => ",",
+            Eol => ";",
+            If => "if",
+            Else => "else",
+            While => "while",
+            For => "for",
+            In => "in",
+            Try => "try",
+            Catch => "catch",
+            Return => "return",
+            Break => "break",
+            Continue => "continue",
+            Is => "is",
+            Eq => "==",
+            Neq => "!=",
+            Gt => ">",
+            Gte => ">=",
+            Lt => "<",
+            Lte => "<=",
+            Colon => ":",
+            DoubleColon => "::",
+            Dot => ".",
+            DotDot => "..",
+            FatArrow => "=>",
+            Arrow => "->",
+            QMark => "?",
+            ExclMark => "!",
+            Type => "type",
+            Impl => "impl",
+            Dollar => "$",
+            Import => "import",
+            PatAnd => "&",
+            PatOr => "|",
+            And => "&&",
+            Or => "||",
+        }
+    }
+}
 #[cfg(test)]
 mod test_util;
 

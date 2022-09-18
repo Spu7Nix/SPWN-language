@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
-use ahash::AHashMap;
-
 use super::{
     error::RuntimeError,
     interpreter::{BuiltinKey, Globals, TypeKey, ValueKey},
     types::Instance,
 };
+use ahash::AHashMap;
+use paste::paste;
+
 use crate::{
     compilation::code::VarID,
     leveldata::{gd_types::Id, object_data::GdObj},
@@ -73,19 +74,33 @@ macro_rules! spwn_types {
                 }
             }
         }
-        use convert_case::{Case, Casing};
+
+        // for compiler
+        pub fn get_builtin_valuetype(name: &str) -> Option<ValueType> {
+            paste! {
+                match name {
+                    $(
+                        stringify!([<$name:snake>]) => Some(ValueType::$name),
+                    )+
+                    _ => None,
+                }
+            }
+        }
 
         impl ValueType {
             pub fn to_str(self, globals: &Globals) -> String {
-                format!(
-                    "@{}",
-                    match self {
-                        $(
-                            ValueType::$name => stringify!($name).to_case(Case::Snake),
-                        )+
-                        ValueType::Custom(k) => globals.types[k].name.clone(),
-                    }
-                )
+                paste! {
+                    format!(
+                        "@{}",
+
+                        match self {
+                            $(
+                                ValueType::$name => stringify!([< $name:snake >]),
+                            )+
+                            ValueType::Custom(k) => globals.types[k].name.as_str(),
+                        }
+                    )
+                }
             }
         }
         // use super::types::Type;
@@ -102,6 +117,31 @@ macro_rules! spwn_types {
         // }
 
     };
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SpwnIterator {
+    Array {
+        data: Vec<ValueKey>,
+        pos: usize,
+    },
+    Dict {
+        data: Vec<(String, ValueKey)>,
+        pos: usize,
+    },
+
+    String {
+        data: Vec<char>,
+        pos: usize,
+    },
+
+    // Range {
+    //     start: i64,
+    //     end: i64,
+    //     step: i64,
+    //     pos: usize,
+    // },
+    Custom(ValueKey),
 }
 
 spwn_types! {
@@ -133,9 +173,10 @@ spwn_types! {
 
     Builtins(),
 
-    // Instance(Instance),
+    Iterator(SpwnIterator),
 }
 
+// }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Argument {
     pub name: String,
@@ -227,6 +268,23 @@ impl Value {
                 // })
                 // todo!()
             }
+            Value::Iterator(t) => match t {
+                SpwnIterator::Array { data, pos } => Value::Iterator(SpwnIterator::Array {
+                    data: data.iter().map(|v| globals.key_deep_clone(*v)).collect(),
+                    pos: *pos,
+                }),
+                SpwnIterator::Dict { data, pos } => Value::Iterator(SpwnIterator::Dict {
+                    data: data
+                        .iter()
+                        .map(|(k, v)| (k.clone(), globals.key_deep_clone(*v)))
+                        .collect(),
+                    pos: *pos,
+                }),
+                SpwnIterator::Custom(v) => {
+                    Value::Iterator(SpwnIterator::Custom(globals.key_deep_clone(*v)))
+                }
+                a => Value::Iterator(a.clone()),
+            },
         }
     }
 
@@ -310,6 +368,20 @@ impl Value {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            Value::Iterator(i) => {
+                let val = match i {
+                    SpwnIterator::Array { data, pos: _ } => Value::Array(data.clone()),
+                    SpwnIterator::Dict { data, pos: _ } => {
+                        Value::Dict(data.iter().cloned().collect())
+                    }
+                    SpwnIterator::Custom(v) => globals.memory[*v].value.clone(),
+                    SpwnIterator::String { data, pos } => {
+                        Value::String(data.iter().cloned().collect())
+                    }
+                };
+
+                format!("@iter({})", val.to_str(globals))
+            }
         }
     }
 }
@@ -387,421 +459,421 @@ impl Pattern {
     }
 }
 
-pub mod value_ops {
-    use super::{Pattern, StoredValue, Value, ValueType};
-    use crate::{
-        sources::CodeArea,
-        vm::{error::RuntimeError, interpreter::Globals},
-    };
+// pub mod value_ops {
+//     use super::{Pattern, StoredValue, Value, ValueType};
+//     use crate::{
+//         sources::CodeArea,
+//         vm::{error::RuntimeError, interpreter::Globals},
+//     };
 
-    pub fn equality(a: &Value, b: &Value, globals: &Globals) -> bool {
-        match (a, b) {
-            (Value::Int(n1), Value::Float(n2)) => *n1 as f64 == *n2,
-            (Value::Float(n1), Value::Int(n2)) => *n1 == *n2 as f64,
+//     pub fn equality(a: &Value, b: &Value, globals: &Globals) -> bool {
+//         match (a, b) {
+//             (Value::Int(n1), Value::Float(n2)) => *n1 as f64 == *n2,
+//             (Value::Float(n1), Value::Int(n2)) => *n1 == *n2 as f64,
 
-            (Value::Array(arr1), Value::Array(arr2)) => {
-                if arr1.len() != arr2.len() {
-                    false
-                } else {
-                    arr1.iter().zip(arr2).all(|(a, b)| {
-                        equality(
-                            &globals.memory[*a].value,
-                            &globals.memory[*b].value,
-                            globals,
-                        )
-                    })
-                }
-            }
-            (Value::Dict(map1), Value::Dict(map2)) => {
-                if map1.len() != map2.len() {
-                    false
-                } else {
-                    for (k, a) in map1 {
-                        match map2.get(k) {
-                            Some(b) => {
-                                if !equality(
-                                    &globals.memory[*a].value,
-                                    &globals.memory[*b].value,
-                                    globals,
-                                ) {
-                                    return false;
-                                }
-                            }
-                            None => return false,
-                        }
-                    }
-                    true
-                }
-            }
+//             (Value::Array(arr1), Value::Array(arr2)) => {
+//                 if arr1.len() != arr2.len() {
+//                     false
+//                 } else {
+//                     arr1.iter().zip(arr2).all(|(a, b)| {
+//                         equality(
+//                             &globals.memory[*a].value,
+//                             &globals.memory[*b].value,
+//                             globals,
+//                         )
+//                     })
+//                 }
+//             }
+//             (Value::Dict(map1), Value::Dict(map2)) => {
+//                 if map1.len() != map2.len() {
+//                     false
+//                 } else {
+//                     for (k, a) in map1 {
+//                         match map2.get(k) {
+//                             Some(b) => {
+//                                 if !equality(
+//                                     &globals.memory[*a].value,
+//                                     &globals.memory[*b].value,
+//                                     globals,
+//                                 ) {
+//                                     return false;
+//                                 }
+//                             }
+//                             None => return false,
+//                         }
+//                     }
+//                     true
+//                 }
+//             }
 
-            (Value::Maybe(None), Value::Maybe(None)) => true,
-            (Value::Maybe(Some(a)), Value::Maybe(Some(b))) => equality(
-                &globals.memory[*a].value,
-                &globals.memory[*b].value,
-                globals,
-            ),
+//             (Value::Maybe(None), Value::Maybe(None)) => true,
+//             (Value::Maybe(Some(a)), Value::Maybe(Some(b))) => equality(
+//                 &globals.memory[*a].value,
+//                 &globals.memory[*b].value,
+//                 globals,
+//             ),
 
-            _ => a == b,
-        }
-    }
+//             _ => a == b,
+//         }
+//     }
 
-    // pub fn matches_pat(val: &Value, pat: &Pattern) -> bool {
-    //     match (val, pat) {
-    //         (_, Pattern::Any) => true,
-    //         (_, Pattern::Type(t)) => &val.get_type() == t,
-    //         (
-    //             Value::Macro(Macro {
-    //                 func_id,
-    //                 args,
-    //                 capture,
-    //                 ret_type,
-    //             }),
-    //             Pattern::Macro {
-    //                 args: arg_patterns,
-    //                 ret: ret_pattern,
-    //             },
-    //         ) => {
-    //             &ret_type.0 == &**ret_pattern
-    //                 && args
-    //                     .iter()
-    //                     .zip(arg_patterns)
-    //                     .all(|(a, p)| &a.get_pattern() == p)
-    //         }
-    //         (_, _) => false,
-    //     }
-    // }
+//     // pub fn matches_pat(val: &Value, pat: &Pattern) -> bool {
+//     //     match (val, pat) {
+//     //         (_, Pattern::Any) => true,
+//     //         (_, Pattern::Type(t)) => &val.get_type() == t,
+//     //         (
+//     //             Value::Macro(Macro {
+//     //                 func_id,
+//     //                 args,
+//     //                 capture,
+//     //                 ret_type,
+//     //             }),
+//     //             Pattern::Macro {
+//     //                 args: arg_patterns,
+//     //                 ret: ret_pattern,
+//     //             },
+//     //         ) => {
+//     //             &ret_type.0 == &**ret_pattern
+//     //                 && args
+//     //                     .iter()
+//     //                     .zip(arg_patterns)
+//     //                     .all(|(a, p)| &a.get_pattern() == p)
+//     //         }
+//     //         (_, _) => false,
+//     //     }
+//     // }
 
-    pub fn to_bool(a: &StoredValue) -> Result<bool, RuntimeError> {
-        match &a.value {
-            Value::Bool(b) => Ok(*b),
-            _ => Err(RuntimeError::CannotConvert {
-                a: a.clone(),
-                to: ValueType::Bool,
-            }),
-        }
-    }
+//     pub fn to_bool(a: &StoredValue) -> Result<bool, RuntimeError> {
+//         match &a.value {
+//             Value::Bool(b) => Ok(*b),
+//             _ => Err(RuntimeError::CannotConvert {
+//                 a: a.clone(),
+//                 to: ValueType::Bool,
+//             }),
+//         }
+//     }
 
-    pub fn to_pat(a: &StoredValue) -> Result<Pattern, RuntimeError> {
-        match &a.value {
-            Value::Type(typ) => Ok(Pattern::Type(*typ)),
-            Value::Pattern(p) => Ok(p.clone()),
-            _ => Err(RuntimeError::CannotConvert {
-                a: a.clone(),
-                to: ValueType::Pattern,
-            }),
-        }
-    }
+//     pub fn to_pat(a: &StoredValue) -> Result<Pattern, RuntimeError> {
+//         match &a.value {
+//             Value::Type(typ) => Ok(Pattern::Type(*typ)),
+//             Value::Pattern(p) => Ok(p.clone()),
+//             _ => Err(RuntimeError::CannotConvert {
+//                 a: a.clone(),
+//                 to: ValueType::Pattern,
+//             }),
+//         }
+//     }
 
-    // pub fn to_iter(a: &StoredValue, for_area: CodeArea) -> Result<ValueIter, RuntimeError> {
-    //     match &a.value {
-    //         Value::Array(v) => Ok(ValueIter::Array(v.clone(), 0)),
-    //         Value::String(s) => Ok(ValueIter::String(s.clone(), a.def_area.clone(), 0)),
-    //         Value::Dict(map) => Ok(ValueIter::Dict {
-    //             dict_area: a.def_area.clone(),
-    //             for_area,
-    //             idx: 0,
-    //             elems: map.iter().map(|(k, v)| (k.clone(), *v)).collect::<Vec<_>>(),
-    //         }),
-    //         _ => Err(RuntimeError::CannotIterate { a: a.clone() }),
-    //     }
-    // }
+//     // pub fn to_iter(a: &StoredValue, for_area: CodeArea) -> Result<ValueIter, RuntimeError> {
+//     //     match &a.value {
+//     //         Value::Array(v) => Ok(ValueIter::Array(v.clone(), 0)),
+//     //         Value::String(s) => Ok(ValueIter::String(s.clone(), a.def_area.clone(), 0)),
+//     //         Value::Dict(map) => Ok(ValueIter::Dict {
+//     //             dict_area: a.def_area.clone(),
+//     //             for_area,
+//     //             idx: 0,
+//     //             elems: map.iter().map(|(k, v)| (k.clone(), *v)).collect::<Vec<_>>(),
+//     //         }),
+//     //         _ => Err(RuntimeError::CannotIterate { a: a.clone() }),
+//     //     }
+//     // }
 
-    pub fn plus(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 + *n2),
-            (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 + *n2),
-            (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 + *n2 as f64),
-            (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 + *n2),
-            (Value::String(s1), Value::String(s2)) => Value::String(s1.clone() + s2),
+//     pub fn plus(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 + *n2),
+//             (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 + *n2),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 + *n2 as f64),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 + *n2),
+//             (Value::String(s1), Value::String(s2)) => Value::String(s1.clone() + s2),
 
-            (Value::Array(arr1), Value::Array(arr2)) => {
-                Value::Array(arr1.iter().chain(arr2).cloned().collect::<Vec<_>>())
-            }
+//             (Value::Array(arr1), Value::Array(arr2)) => {
+//                 Value::Array(arr1.iter().chain(arr2).cloned().collect::<Vec<_>>())
+//             }
 
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: "+".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn minus(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 - *n2),
-            (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 - *n2),
-            (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 - *n2 as f64),
-            (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 - *n2),
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: "-".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn mult(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 * *n2),
-            (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 * *n2),
-            (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 * *n2 as f64),
-            (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 * *n2),
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: "+".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn minus(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 - *n2),
+//             (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 - *n2),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 - *n2 as f64),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 - *n2),
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: "-".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn mult(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 * *n2),
+//             (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 * *n2),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 * *n2 as f64),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 * *n2),
 
-            (Value::Int(n), Value::String(s)) => {
-                Value::String(s.repeat(if *n < 0 { 0 } else { *n as usize }))
-            }
-            (Value::String(s), Value::Int(n)) => {
-                Value::String(s.repeat(if *n < 0 { 0 } else { *n as usize }))
-            }
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: "*".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn div(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 / *n2),
-            (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 / *n2),
-            (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 / *n2 as f64),
-            (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 / *n2),
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: "/".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn modulo(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 % *n2),
-            (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 % *n2),
-            (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 % *n2 as f64),
-            (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 % *n2),
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: "%".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn pow(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => {
-                Value::Int((*n1 as f64).powf(*n2 as f64).floor() as i64)
-            }
-            (Value::Int(n1), Value::Float(n2)) => Value::Float((*n1 as f64).powf(*n2)),
-            (Value::Float(n1), Value::Int(n2)) => Value::Float((*n1).powf(*n2 as f64)),
-            (Value::Float(n1), Value::Float(n2)) => Value::Float(n1.powf(*n2)),
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: "^".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn eq(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        Ok(Value::Bool(equality(&a.value, &b.value, globals)).into_stored(area))
-    }
-    pub fn neq(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        Ok(Value::Bool(!equality(&a.value, &b.value, globals)).into_stored(area))
-    }
-    pub fn gt(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 > *n2),
-            (Value::Int(n1), Value::Float(n2)) => Value::Bool(*n1 as f64 > *n2),
-            (Value::Float(n1), Value::Int(n2)) => Value::Bool(*n1 > *n2 as f64),
-            (Value::Float(n1), Value::Float(n2)) => Value::Bool(*n1 > *n2),
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: ">".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn gte(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 >= *n2),
-            (Value::Int(n1), Value::Float(n2)) => Value::Bool(*n1 as f64 >= *n2),
-            (Value::Float(n1), Value::Int(n2)) => Value::Bool(*n1 >= *n2 as f64),
-            (Value::Float(n1), Value::Float(n2)) => Value::Bool(*n1 >= *n2),
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: ">=".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn lt(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 < *n2),
-            (Value::Int(n1), Value::Float(n2)) => Value::Bool((*n1 as f64) < *n2),
-            (Value::Float(n1), Value::Int(n2)) => Value::Bool(*n1 < *n2 as f64),
-            (Value::Float(n1), Value::Float(n2)) => Value::Bool(*n1 < *n2),
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: "<".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn lte(
-        a: &StoredValue,
-        b: &StoredValue,
-        area: CodeArea,
-        _globals: &Globals,
-    ) -> Result<StoredValue, RuntimeError> {
-        let value = match (&a.value, &b.value) {
-            (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 <= *n2),
-            (Value::Int(n1), Value::Float(n2)) => Value::Bool(*n1 as f64 <= *n2),
-            (Value::Float(n1), Value::Int(n2)) => Value::Bool(*n1 <= *n2 as f64),
-            (Value::Float(n1), Value::Float(n2)) => Value::Bool(*n1 <= *n2),
-            _ => {
-                return Err(RuntimeError::InvalidOperands {
-                    a: a.clone(),
-                    b: b.clone(),
-                    op: "<=".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
+//             (Value::Int(n), Value::String(s)) => {
+//                 Value::String(s.repeat(if *n < 0 { 0 } else { *n as usize }))
+//             }
+//             (Value::String(s), Value::Int(n)) => {
+//                 Value::String(s.repeat(if *n < 0 { 0 } else { *n as usize }))
+//             }
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: "*".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn div(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 / *n2),
+//             (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 / *n2),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 / *n2 as f64),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 / *n2),
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: "/".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn modulo(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => Value::Int(*n1 % *n2),
+//             (Value::Int(n1), Value::Float(n2)) => Value::Float(*n1 as f64 % *n2),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Float(*n1 % *n2 as f64),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Float(*n1 % *n2),
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: "%".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn pow(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => {
+//                 Value::Int((*n1 as f64).powf(*n2 as f64).floor() as i64)
+//             }
+//             (Value::Int(n1), Value::Float(n2)) => Value::Float((*n1 as f64).powf(*n2)),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Float((*n1).powf(*n2 as f64)),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Float(n1.powf(*n2)),
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: "^".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn eq(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         Ok(Value::Bool(equality(&a.value, &b.value, globals)).into_stored(area))
+//     }
+//     pub fn neq(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         Ok(Value::Bool(!equality(&a.value, &b.value, globals)).into_stored(area))
+//     }
+//     pub fn gt(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 > *n2),
+//             (Value::Int(n1), Value::Float(n2)) => Value::Bool(*n1 as f64 > *n2),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Bool(*n1 > *n2 as f64),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Bool(*n1 > *n2),
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: ">".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn gte(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 >= *n2),
+//             (Value::Int(n1), Value::Float(n2)) => Value::Bool(*n1 as f64 >= *n2),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Bool(*n1 >= *n2 as f64),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Bool(*n1 >= *n2),
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: ">=".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn lt(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 < *n2),
+//             (Value::Int(n1), Value::Float(n2)) => Value::Bool((*n1 as f64) < *n2),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Bool(*n1 < *n2 as f64),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Bool(*n1 < *n2),
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: "<".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn lte(
+//         a: &StoredValue,
+//         b: &StoredValue,
+//         area: CodeArea,
+//         _globals: &Globals,
+//     ) -> Result<StoredValue, RuntimeError> {
+//         let value = match (&a.value, &b.value) {
+//             (Value::Int(n1), Value::Int(n2)) => Value::Bool(*n1 <= *n2),
+//             (Value::Int(n1), Value::Float(n2)) => Value::Bool(*n1 as f64 <= *n2),
+//             (Value::Float(n1), Value::Int(n2)) => Value::Bool(*n1 <= *n2 as f64),
+//             (Value::Float(n1), Value::Float(n2)) => Value::Bool(*n1 <= *n2),
+//             _ => {
+//                 return Err(RuntimeError::InvalidOperands {
+//                     a: a.clone(),
+//                     b: b.clone(),
+//                     op: "<=".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
 
-    pub fn unary_negate(a: &StoredValue, area: CodeArea) -> Result<StoredValue, RuntimeError> {
-        let value = match &a.value {
-            Value::Int(n) => Value::Int(-n),
-            Value::Float(n) => Value::Float(-n),
-            _ => {
-                return Err(RuntimeError::InvalidUnaryOperand {
-                    a: a.clone(),
-                    op: "-".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    pub fn unary_not(a: &StoredValue, area: CodeArea) -> Result<StoredValue, RuntimeError> {
-        let value = match &a.value {
-            Value::Bool(n) => Value::Bool(!n),
-            _ => {
-                return Err(RuntimeError::InvalidUnaryOperand {
-                    a: a.clone(),
-                    op: "-".into(),
-                    area,
-                })
-            }
-        };
-        Ok(value.into_stored(area))
-    }
-    // pub fn is_op(
-    //     a: &StoredValue,
-    //     b: &StoredValue,
-    //     area: CodeArea,
-    //     globals: &Globals,
-    // ) -> Result<StoredValue, RuntimeError> {
-    //     let value = match (&a.value, &b.value) {
-    //         (a, Value::TypeIndicator(typ)) => Value::Bool(&a.get_type() == typ),
-    //         (a, Value::Pattern(pat)) => Value::Bool(matches_pat(a, pat)),
-    //         (_, _) => {
-    //             return Err(RuntimeError::TypeMismatch {
-    //                 v: b.clone(),
-    //                 expected: "@type_indicator or @pattern".into(),
-    //                 area,
-    //             })
-    //         }
-    //     };
-    //     Ok(value.into_stored(area))
-    // }
-}
+//     pub fn unary_negate(a: &StoredValue, area: CodeArea) -> Result<StoredValue, RuntimeError> {
+//         let value = match &a.value {
+//             Value::Int(n) => Value::Int(-n),
+//             Value::Float(n) => Value::Float(-n),
+//             _ => {
+//                 return Err(RuntimeError::InvalidUnaryOperand {
+//                     a: a.clone(),
+//                     op: "-".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     pub fn unary_not(a: &StoredValue, area: CodeArea) -> Result<StoredValue, RuntimeError> {
+//         let value = match &a.value {
+//             Value::Bool(n) => Value::Bool(!n),
+//             _ => {
+//                 return Err(RuntimeError::InvalidUnaryOperand {
+//                     a: a.clone(),
+//                     op: "-".into(),
+//                     area,
+//                 })
+//             }
+//         };
+//         Ok(value.into_stored(area))
+//     }
+//     // pub fn is_op(
+//     //     a: &StoredValue,
+//     //     b: &StoredValue,
+//     //     area: CodeArea,
+//     //     globals: &Globals,
+//     // ) -> Result<StoredValue, RuntimeError> {
+//     //     let value = match (&a.value, &b.value) {
+//     //         (a, Value::TypeIndicator(typ)) => Value::Bool(&a.get_type() == typ),
+//     //         (a, Value::Pattern(pat)) => Value::Bool(matches_pat(a, pat)),
+//     //         (_, _) => {
+//     //             return Err(RuntimeError::TypeMismatch {
+//     //                 v: b.clone(),
+//     //                 expected: "@type_indicator or @pattern".into(),
+//     //                 area,
+//     //             })
+//     //         }
+//     //     };
+//     //     Ok(value.into_stored(area))
+//     // }
+// }
