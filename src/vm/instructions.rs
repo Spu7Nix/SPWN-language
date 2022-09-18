@@ -107,8 +107,8 @@ macro_rules! op_helper {
 
 
 
-                    // let result = value_ops::$op_fn(a, b, area!(), globals)?;
-                    push!(Value: Value::Empty().into_stored(area!()));
+                    let result = value_ops::$op_fn(left, right, area!(), globals)?;
+                    push!(Value: result);
                     Ok(())
                 }
             }
