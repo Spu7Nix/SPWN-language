@@ -1,5 +1,5 @@
 use super::value::{StoredValue, ValueType, ValueTypeUnion};
-use crate::{error_maker, sources::CodeArea};
+use crate::{compilation::operators::Operator, error_maker, sources::CodeArea};
 
 error_maker! {
     Globals: globals;
@@ -8,7 +8,7 @@ error_maker! {
         #[
             Message = "Undefined variable", Area = area, Note = None,
             Labels = [
-                area => "This variable is not defined yet!";
+                area => "This variable is not defined yet";
             ]
         ]
         UndefinedVariable {
@@ -18,7 +18,7 @@ error_maker! {
         #[
             Message = "Invalid operands", Area = area, Note = None,
             Labels = [
-                area => "Operator `{}` cannot be used on {} and {}": @(op), @(a.value.typ().to_str(globals)), @(b.value.typ().to_str(globals));
+                area => "Operator `{}` cannot be used on {} and {}": @(op.to_str()), @(a.value.typ().to_str(globals)), @(b.value.typ().to_str(globals));
                 a.def_area => "This is of type {}": @(a.value.typ().to_str(globals));
                 b.def_area => "This is of type {}": @(b.value.typ().to_str(globals));
             ]
@@ -26,20 +26,20 @@ error_maker! {
         InvalidOperands {
             a: StoredValue,
             b: StoredValue,
-            op: String,
+            op: Operator,
             area: CodeArea,
         },
 
         #[
             Message = "Invalid unary operand", Area = area, Note = None,
             Labels = [
-                area => "Unary operator `{}` cannot be used on {}": @(op), @(a.value.typ().to_str(globals));
+                area => "Unary operator `{}` cannot be used on {}": @(op.to_str()), @(a.value.typ().to_str(globals));
                 a.def_area => "This is of type {}": @(a.value.typ().to_str(globals));
             ]
         ]
         InvalidUnaryOperand {
             a: StoredValue,
-            op: String,
+            op: Operator,
             area: CodeArea,
         },
 
@@ -141,7 +141,7 @@ error_maker! {
         },
 
         #[
-            Message = "Too many arguments!", Area = call_area, Note = None,
+            Message = "Too many arguments", Area = call_area, Note = None,
             Labels = [
                 func_area => "Macro defined to take {} arguments here": @(expected);
                 call_area => "Called with {} arguments": @(provided);
@@ -154,19 +154,18 @@ error_maker! {
             func_area: CodeArea,
         },
 
-        // #[
-        //     Message = "Type has no constructor!", Area = area, Note = None,
-        //     Labels = [
-        //         area => "Tried to call `{}`'s constructor here": @(typ);
-        //     ]
-        // ]
-        // NoConstructor {
-        //     typ: String,
-        //     area: CodeArea,
-        // },
+        #[
+            Message = "Type has no constructor", Area = area, Note = None,
+            Labels = [
+                area => "Tried to call the constructor here";
+            ]
+        ]
+        NoConstructor {
+            area: CodeArea,
+        },
 
         #[
-            Message = "Use of undefined member!", Area = area, Note = None,
+            Message = "Use of undefined member", Area = area, Note = None,
             Labels = [
                 area => "`{}` is undefined": @(name);
             ]
@@ -187,7 +186,7 @@ error_maker! {
         },
 
         #[
-            Message = "Index out of bounds!", Area = area, Note = None,
+            Message = "Index out of bounds", Area = area, Note = None,
             Labels = [
                 area => "The length is {} but the index is {}": @(len), @(idx);
             ]

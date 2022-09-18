@@ -21,9 +21,15 @@ pub struct Instance {
     pub fields: AHashMap<String, ValueKey>,
 }
 
-pub type AttributeFunction = fn(&Globals, ValueKey) -> Value;
-pub type MethodFunction =
-    fn(&mut Globals, &mut FullContext, ValueKey, &[ValueKey]) -> Result<Value, RuntimeError>;
+pub type AttributeFunction = fn(&Globals, &mut FullContext, ValueKey) -> Value;
+
+#[derive(Clone, Copy)]
+pub struct MethodFunction {
+    pub func: fn(&mut Globals, &mut FullContext, &[ValueKey]) -> Result<Value, RuntimeError>,
+    pub arg_count: usize,
+    pub is_static: bool,
+    // arg types, etc
+}
 
 // pub struct BuiltinFunction {
 //     func: BuiltinPtr,
@@ -69,6 +75,10 @@ impl TypeBuilder {
 
         self.members.insert(name.into(), TypeMember::Builtin(key));
 
+        globals
+            .builtins_by_name
+            .insert(format!("{}::{}", self.typ.to_str(globals), name), key);
+
         self
     }
 
@@ -81,6 +91,10 @@ impl TypeBuilder {
         let key = globals.builtins.insert(BuiltinFunction::Method(f));
 
         self.members.insert(name.into(), TypeMember::Builtin(key));
+
+        globals
+            .builtins_by_name
+            .insert(format!("{}::{}", self.typ.to_str(globals), name), key);
 
         self
     }
@@ -101,21 +115,6 @@ impl TypeBuilder {
     }
 }
 
-#[macro_export]
-macro_rules! attr {
-    (
-        $globals:ident, $this:pat => $body:expr
-    ) => {
-        |$globals: &Globals, this: ValueKey| -> Value {
-            let val = &$globals.memory[this].value;
-            match val {
-                $this => ToValueResult::try_to_value($body).unwrap(),
-                _ => unreachable!(),
-            }
-        }
-    };
-}
-
 // this macro is acting as pretty much a match expression but for the tokens
 // each "variant" is a kind of argument (mutable, non mutable, no type, etc)
 #[macro_export]
@@ -124,7 +123,7 @@ macro_rules! method_arg_type {
     // ex: `..., mut el => {}`
     (
         //globals..key.......args......count
-        [$g:ident, $k:ident, $a:ident, $c:ident]
+        [$g:ident, $a:ident, $c:ident]
         mut $arg:ident@
     ) => {
         let $arg = &mut $g.memory[$a[$c]].value;
@@ -134,14 +133,18 @@ macro_rules! method_arg_type {
     // ex: `..., mut el: A => {}`
     // ex: `..., mut el: A | B | C => {}`
     (
-        [$g:ident, $k:ident, $a:ident, $c:ident]
-        mut $arg:ident@$($argty:ty)|*
-    ) => {};
+        [$g:ident, $a:ident, $c:ident]
+        mut $arg:ident@$($argty:ident)|*
+    ) => {
+        let v = &mut $g.memory[$a[$c]].value;
+
+        $crate::method_arg_type!(@mut@ $arg v $($argty,)*);
+    };
 
     // non mutable, no type specified
     // ex: `..., el => {}`
     (
-        [$g:ident, $k:ident, $a:ident, $c:ident]
+        [$g:ident, $a:ident, $c:ident]
         $arg:ident@
     ) => {
         let $arg = &$g.memory[$a[$c]].value;
@@ -151,24 +154,49 @@ macro_rules! method_arg_type {
     // ex: `..., el: A => {}`
     // ex: `..., el: A | B | C => {}`
     (
-        [$g:ident, $k:ident, $a:ident, $c:ident]
-        $arg:ident@$($argty:ty)|*
+        [$g:ident, $a:ident, $c:ident]
+        $arg:ident@$($argty:ident)|*
     ) => {
-        // TODO: multiple types
-        // TODO: fix references
-        $(
-            let $arg: &$argty = $crate::vm::from_value::FromValue::from_value(&$g.memory[$a[$c]].value)?;
-        )*
+        let v = &$g.memory[$a[$c]].value;
+
+        $crate::method_arg_type!(@@$arg v $($argty,)*);
     };
 
     // "reference" (ValueKey)
     // ex: `..., ref el => {}`
     (
         //.............................count
-        [$g:ident, $k:ident, $a:ident, $c:ident]
+        [$g:ident, $a:ident, $c:ident]
         ref $arg:ident@
     ) => {
         let $arg = $a[$c];
+    };
+
+    //////////////////////////////////////////////////////
+
+    // multiple types type checking
+    (@$($mut:ident)?@ $arg:ident $v:ident $t1:ident, $($trest:ident),+,) => {
+        if !(match $v {
+            $crate::vm::value::Value::$t1(..) => true,
+            $(
+                $crate::vm::value::Value::$trest(..) => true,
+            )*
+            _ => false,
+        }) {
+            // TODO: error
+        }
+
+        let $arg = &$($mut)?*$v;
+    };
+
+    // single type type checking
+    (@@ $arg:ident $v:ident $type1:ty,) => {
+        let $arg: &$type1 = $crate::vm::from_value::FromValue::from_value($v)?;
+    };
+
+    // single mut type type checking
+    (@mut@ $arg:ident $v:ident $type1:ty,) => {
+        let $arg: &mut $type1 = $crate::vm::from_value::FromValue::from_value_mut($v)?;
     };
 }
 
@@ -179,38 +207,42 @@ macro_rules! method_args {
     // |mut this: X| { }
     //  ^
     {
-        //globals..key.......args
-        [$g:ident, $c:ident, $k:ident, $a:ident]
+        //globals...context...key.......args
+        [$g:ident, $c:ident, $a:ident]
         $globals:ident, $context:ident, |mut $this:ident: $typ:ty| $body:block
     } => {{
         let $globals = $g;
         let $context = $c;
 
-        let $this: &mut $typ = $crate::vm::from_value::FromValue::from_value_mut(&mut $globals.memory[$k].value)?;
+        let slf = $a.get(0).unwrap();//.map_err(|_| ) // TODO: error (missing self)
+
+        let $this: &mut $typ = $crate::vm::from_value::FromValue::from_value_mut(&mut $globals.memory[*slf].value)?;
         $body
     }};
 
     // this: X => { }
     {
-        [$g:ident, $c:ident, $k:ident, $a:ident]
-        $globals:ident, |$this:ident: $typ:ty| $body:block
+        [$g:ident, $c:ident, $a:ident]
+        $globals:ident, $context:ident, |$this:ident: $typ:ty| $body:block
     } => {{
         let $globals = $g;
         let $context = $c;
 
-        let $this: $typ = $crate::vm::from_value::FromValue::from_value($a[0])?;
+        let slf = $a.get(0).unwrap();//.map_err(|_| ) // TODO: error (missing self)
+
+        let $this: &$typ = $crate::vm::from_value::FromValue::from_value(&$globals.memory[*slf].value)?;
         $body
     }};
 
     // |mut this: X, mut y: Y, z: Z| { }
     //  ^
     {
-        [$g:ident, $c:ident, $k:ident, $a:ident]
+        [$g:ident, $c:ident, $a:ident]
         $globals:ident, $context:ident, |mut $this:ident: $typ:ty,
             $(
                 $($arg:ident)+
                 $(
-                    : $( $argty:ty )|*
+                    : $( $argty:ident )|*
                 )?
             ),+
         | $body:block
@@ -220,7 +252,9 @@ macro_rules! method_args {
             let $globals = $g;
             let $context = $c;
 
-            let $this: &mut $typ = $crate::vm::from_value::FromValue::from_value_mut(&mut $globals.memory[$k].value)?;
+            let slf = $a.get(0).unwrap();//.map_err(|_| ) // TODO: error (missing self)
+
+            let $this: &mut $typ = $crate::vm::from_value::FromValue::from_value_mut(&mut $globals.memory[*slf].value)?;
 
             let mut count = 0;
             $(
@@ -230,15 +264,10 @@ macro_rules! method_args {
             )+
 
             if count < $a.len() {
-                //return Err($crate::vm::error::RuntimeError::)
+                // TODO: error
             }
             if count > $a.len() {
-                // return Err($crate::vm::error::RuntimeError::TooManyArguments {
-                //     expected: $a.len(),
-                //     provided: count,
-                //     call_area: ,
-                //     func_area: $crate::sources::CodeArea::internal(),
-                // })
+                // TODO: error
             }
 
             // reset count so now we can increment again to get arg index
@@ -246,7 +275,7 @@ macro_rules! method_args {
 
             $(
                 $crate::method_arg_type!(
-                    [$globals, $k, $a, count]
+                    [$globals, $a, count]
                     $($arg)+ @ $($($argty)|*)?
                 );
                 count += 1;
@@ -258,12 +287,13 @@ macro_rules! method_args {
 
     // |this: X, mut y: Y, z: Z| { }
     {
-        [$g:ident, $c:ident, $k:ident, $a:ident]
-        $globals:ident, $context:ident, |$this:ident: $typ:ty,
+        [$g:ident, $c:ident, $a:ident]
+        $globals:ident, $context:ident,
+        |$this:ident: $typ:ty,
             $(
                 $($arg:ident)+
                 $(
-                    : $( $argty:ty )|*
+                    : $( $argty:ident )|*
                 )?
             ),+
         | $body:block
@@ -273,7 +303,9 @@ macro_rules! method_args {
             let $globals = $g;
             let $context = $c;
 
-            let $this: $typ = $crate::vm::from_value::FromValue::from_value($globals.memory[$k].value)?;
+            let slf = $a.get(0).unwrap();//.map_err(|_| ) // TODO: error (missing self)
+
+            let $this: $typ = $crate::vm::from_value::FromValue::from_value($globals.memory[*slf].value)?;
 
             let mut count = 0;
             $(
@@ -283,10 +315,10 @@ macro_rules! method_args {
             )+
 
             if count < $a.len() {
-                return Err(todo!())
+                // TODO: error
             }
             if count > $a.len() {
-                return Err(todo!())
+                // TODO: error
             }
 
             // reset count so now we can increment again to get arg index
@@ -294,7 +326,7 @@ macro_rules! method_args {
 
             $(
                 $crate::method_arg_type!(
-                    [$globals, $k, $a, count]
+                    [$globals, $a, count]
                     $($arg)+ @ $($($argty)|*)?
                 );
                 count += 1;
@@ -306,12 +338,12 @@ macro_rules! method_args {
 
     // |mut y: Y, z: Z| { }
     {
-        [$g:ident, $c:ident, $k:ident, $a:ident]
+        [$g:ident, $c:ident, $a:ident]
         $globals:ident, $context:ident,
         |$(
             $($arg:ident)+
             $(
-                : $( $argty:ty )|*
+                : $( $argty:ident )|*
             )?
         ),+| $body:block
     } => {
@@ -320,7 +352,8 @@ macro_rules! method_args {
             let $globals = $g;
             let $context = $c;
 
-            let mut count = 0;
+            // skip first argument ("self" argument, but since this is a static method it doesnt actually point to anything useful)
+            let mut count = 1;
             $(
                 // useless stringify to get the token to repeat so count increases
                 stringify!($($arg)*,);
@@ -328,18 +361,18 @@ macro_rules! method_args {
             )+
 
             if count < $a.len() {
-                return Err(todo!())
+                // TODO: error
             }
             if count > $a.len() {
-                return Err(todo!())
+                // TODO: error
             }
 
-            // reset count so now we can increment again to get arg index
-            count = 0;
+            // skip first argument ("self" argument, but since this is a static method it doesnt actually point to anything useful)
+            count = 1;
 
             $(
                 $crate::method_arg_type!(
-                    [$globals, $k, $a, count]
+                    [$globals, $a, count]
                     $($arg)+ @ $($($argty)|*)?
                 );
                 count += 1;
@@ -351,13 +384,129 @@ macro_rules! method_args {
 }
 
 #[macro_export]
+macro_rules! count_args {
+    {
+        $globals:ident, $context:ident, |
+            $(
+                $($arg:ident)+
+                $(
+                    : $( $argty:ty )|*
+                )?
+            ),+
+        | $body:block
+    } => {
+        {let mut count = 0;
+        $(
+            stringify!($($arg)+,);
+            count += 1;
+        )+
+        count}
+    }
+
+}
+
+#[macro_export]
+macro_rules! is_static {
+
+    {
+        $globals:ident, $context:ident, |mut $this:ident: $typ:ty| $body:block
+    } => {false};
+
+    {
+        $globals:ident, $context:ident, |$this:ident: $typ:ty| $body:block
+    } => {false};
+
+    {
+        $globals:ident, $context:ident,
+        |$this:ident: $typ:ty,
+            $(
+                $($arg:ident)+
+                $(
+                    : $( $argty:ident )|*
+                )?
+            ),+
+        | $body:block
+    } => { false };
+
+    {
+        $globals:ident, $context:ident, |mut $this:ident: $typ:ty,
+            $(
+                $($arg:ident)+
+                $(
+                    : $( $argty:ident )|*
+                )?
+            ),+
+        | $body:block
+    } => { false };
+
+    {
+        $globals:ident, $context:ident,
+        |$(
+            $($arg:ident)+
+            $(
+                : $( $argty:ident )|*
+            )?
+        ),+| $body:block
+    } => { true }
+
+}
+
+#[macro_export]
 macro_rules! method {
     // capture all tokens as "base" macro, just to generate closure
     ($($all:tt)+) => {
-        |globals, context, _key, _args| {
-            $crate::vm::to_value::ToValueResult::try_to_value(
-                $crate::method_args!(
-                    [globals, context, _key, _args]
+        MethodFunction {
+            func: |globals, context, args| {
+                $crate::vm::to_value::ToValueResult::try_to_value(
+                    $crate::method_args!(
+                        [globals, context, args]
+                        $($all)+
+                    )
+                )
+            },
+            arg_count: $crate::count_args!($($all)+),
+            is_static: $crate::is_static!($($all)+),
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! attr_args {
+    // |mut this: X| { }
+    //  ^
+    {
+        //globals...context...key.......args
+        [$g:ident, $c:ident, $k:ident]
+        $globals:ident, $context:ident, |mut $this:ident: $typ:ty| $body:block
+    } => {{
+        let $globals = $g;
+        let $context = $c;
+
+        let $this: &mut $typ = $crate::vm::from_value::FromValue::from_value_mut(&mut $globals.memory[$k].value).unwrap(); // shouldnt be possible to error here
+        $body
+    }};
+
+    // this: X => { }
+    {
+        [$g:ident, $c:ident, $k:ident]
+        $globals:ident, $context:ident, |$this:ident: $typ:ty| $body:block
+    } => {{
+        let $globals = $g;
+        let $context = $c;
+
+        let $this: &$typ = $crate::vm::from_value::FromValue::from_value(&$globals.memory[$k].value).unwrap();
+        $body
+    }};
+}
+
+#[macro_export]
+macro_rules! attr {
+    // capture all tokens as "base" macro, just to generate closure
+    ($($all:tt)+) => {
+        |globals, context, key| {
+            $crate::vm::to_value::ToValue::to_value(
+                $crate::attr_args!(
+                    [globals, context, key]
                     $($all)+
                 )
             )

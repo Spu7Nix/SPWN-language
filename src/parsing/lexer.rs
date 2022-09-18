@@ -1,11 +1,14 @@
 use logos::Logos;
 
+// a &= b
+// a = a + b
+// a
+
 #[derive(Logos, Debug, PartialEq, Eq, Clone, Copy)]
-#[logos(subpattern digits = r#"(\d)([\d_]+)?"#)]
 pub enum Token {
-    #[regex(r#"(0[b])?(?&digits)"#, priority = 2)]
+    #[regex(r#"(0[b])?((\d)([\d_]+)?)"#, priority = 2)]
     Int,
-    #[regex(r#"(?&digits)(\.[\d_]+)?"#)]
+    #[regex(r#"((\d)([\d_]+)?)(\.[\d_]+)?"#)]
     Float,
     #[regex(r"([0-9]+|\?)[gbci]")]
     Id,
@@ -57,12 +60,6 @@ pub enum Token {
     #[token("import")]
     Import,
 
-    // #[token("print")]
-    // Print,
-    // #[token("split")]
-    // Split,
-    // #[token("add")]
-    // Add,
     #[token("$")]
     Dollar,
 
@@ -93,6 +90,16 @@ pub enum Token {
     ModEq,
     #[token("^=")]
     PowEq,
+
+    #[token("&")]
+    PatAnd,
+    #[token("|")]
+    PatOr,
+
+    #[token("&&")]
+    And,
+    #[token("||")]
+    Or,
 
     #[token(";")]
     Eol,
@@ -161,79 +168,6 @@ pub enum Token {
     Error,
 
     Eof,
-}
-
-impl From<Token> for &str {
-    fn from(tok: Token) -> Self {
-        use Token::*;
-        match tok {
-            Int => "int literal",
-            Float => "float literal",
-            Id => "ID literal",
-            String => "string literal",
-            TypeIndicator => "type indicator",
-            Let => "let",
-            Mut => "mut",
-            Ident => "identifier",
-            Error => "invalid",
-            Eof => "end of file",
-            True => "true",
-            False => "false",
-            Obj => "obj",
-            Trigger => "trigger",
-            Plus => "+",
-            Minus => "-",
-            Mult => "*",
-            Div => "/",
-            Mod => "%",
-            Pow => "^",
-            PlusEq => "+=",
-            MinusEq => "-=",
-            MuLte => "*=",
-            DivEq => "/=",
-            ModEq => "%=",
-            PowEq => "^=",
-            Assign => "=",
-            LParen => "(",
-            RParen => ")",
-            LSqBracket => "[",
-            RSqBracket => "]",
-            LBracket => "{",
-            RBracket => "}",
-            TrigFnBracket => "!{",
-            Comma => ",",
-            Eol => ";",
-            If => "if",
-            Else => "else",
-            While => "while",
-            For => "for",
-            In => "in",
-            Try => "try",
-            Catch => "catch",
-            Return => "return",
-            Break => "break",
-            Continue => "continue",
-            Is => "is",
-            Eq => "==",
-            Neq => "!=",
-            Gt => ">",
-            Gte => ">=",
-            Lt => "<",
-            Lte => "<=",
-            Colon => ":",
-            DoubleColon => "::",
-            Dot => ".",
-            DotDot => "..",
-            FatArrow => "=>",
-            Arrow => "->",
-            QMark => "?",
-            ExclMark => "!",
-            Type => "type",
-            Impl => "impl",
-            Dollar => "$",
-            Import => "import",
-        }
-    }
 }
 
 // converts tokens to a string

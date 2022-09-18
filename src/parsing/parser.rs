@@ -287,8 +287,26 @@ impl Parser<'_> {
         let mut items = vec![];
 
         while self.peek() != Token::RBracket {
-            self.expect_or_tok(Token::Ident, "key")?;
-            let key = self.slice().to_string();
+            let peek = self.peek();
+
+            let key = match peek {
+                Token::String => {
+                    self.next();
+                    self.parse_string()?
+                }
+                Token::Ident => {
+                    self.next();
+                    self.slice().to_string()
+                }
+                _ => {
+                    return Err(SyntaxError::ExpectedToken {
+                        expected: "key".into(),
+                        found: peek.to_string(),
+                        area: self.make_area(self.span()),
+                    })
+                }
+            };
+
             let key_span = self.span();
 
             let elem = if self.peek() == Token::Colon {

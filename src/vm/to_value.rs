@@ -1,5 +1,6 @@
 use super::error::RuntimeError;
-use super::value::Value;
+use super::interpreter::ValueKey;
+use super::value::{SpwnIterator, Value};
 
 pub trait ToValue {
     fn to_value(self) -> Value;
@@ -18,6 +19,18 @@ impl<R: ToValue> ToValueResult for R {
 impl ToValue for String {
     fn to_value(self) -> Value {
         Value::String(self)
+    }
+}
+
+impl ToValue for Option<ValueKey> {
+    fn to_value(self) -> Value {
+        Value::Maybe(self)
+    }
+}
+
+impl ToValue for SpwnIterator {
+    fn to_value(self) -> Value {
+        Value::Iterator(self)
     }
 }
 
