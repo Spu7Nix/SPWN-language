@@ -58,7 +58,7 @@ impl PckpFile {
 
 pub fn github_to_string(owner: &str, repo: &str, version: Option<&str>) -> String {
     // owner/repo@version
-    format!("{}/{}", owner, repo) + &version.map(|s| format!("@{}",s)).unwrap_or(Default::default())
+    format!("{}/{}", owner, repo) + &version.map(|s| format!("@{}",s)).unwrap_or_default()
 }
 
 impl PckpDependency {

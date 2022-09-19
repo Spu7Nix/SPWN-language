@@ -30,8 +30,6 @@ pub async fn run(args: &ArgMatches) {
         },
         (_,_) => unreachable!(),
     }
-
-    return;
 }
 
 #[inline]

@@ -15,10 +15,10 @@ pub async fn restore() {
 // this might be fixed by the `create_dir(path).unwrap()`
 #[async_recursion]
 async fn calculate_dependencies(root_pkg: String) -> PckpLockFile {
-    let owner = root_pkg.split("/").collect::<Vec<_>>()[0];
-    let repo = root_pkg.split("/").collect::<Vec<_>>()[1];
+    let owner = root_pkg.split('/').collect::<Vec<_>>()[0];
+    let repo = root_pkg.split('/').collect::<Vec<_>>()[1];
     let version = Option::None; // TODO: fix add version to this
-    let root = RemotePackage::from_github_repo(owner.into(), repo.into()).await;
+    let root = RemotePackage::from_github_repo(owner.into(), repo.into(), None).await; // TODO: version
     let mut pkgs = PckpLockFile { dependencies: Vec::new() };
     
     let cwd = std::env::current_dir().unwrap();
@@ -46,7 +46,7 @@ async fn calculate_dependencies(root_pkg: String) -> PckpLockFile {
                     repo,
                     version,
                 } => {
-                    let pack = RemotePackage::from_github_repo(owner.clone(), repo.clone()).await;
+                    let pack = RemotePackage::from_github_repo(owner.clone(), repo.clone(), version.clone()).await;
                     pack.download(&root_pkg_folder).await;
                     pkgs.dependencies.push(PckpDependency::GitHub {
                         owner,

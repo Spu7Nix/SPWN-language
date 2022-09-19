@@ -21,12 +21,12 @@ pub async fn add(packages: Vec<&String>) {
         let github_repo = &package.split(&['/','@'][..]).collect::<Vec<&str>>()[..];
         match github_repo {
             [ owner, repo ] => {
-                package::RemotePackage::from_github_repo(owner.to_string(), repo.to_string()).await;
+                package::RemotePackage::from_github_repo(owner.to_string(), repo.to_string(), None).await;
                 push_dependency();
                 continue;
             },
-            [ owner, repo, version] => {
-                package::RemotePackage::from_github_repo(owner.to_string(), repo.to_string()).await;
+            [ owner, repo, version ] => {
+                package::RemotePackage::from_github_repo(owner.to_string(), repo.to_string(), Some(version.to_string())).await;
                 push_dependency();
                 continue;
             },

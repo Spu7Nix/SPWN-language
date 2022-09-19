@@ -12,7 +12,7 @@ pub fn new(target_directory: PathBuf) {
     path.push(&target_directory);
     match create_dir(&path) {
         Ok(_) => {},
-        Err(e) => { util::pckp_error(format!("Failed to create folder: {}", e.to_string()).as_str()) }
+        Err(e) => { util::pckp_error(format!("Failed to create folder: {}", e).as_str()) }
     };
     path.push("pckp.yaml");
     let mut pckp_yaml = File::create(&path).unwrap();

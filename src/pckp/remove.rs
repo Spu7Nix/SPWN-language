@@ -7,7 +7,7 @@ pub async fn remove(packages: Vec<&String>) {
     pckp_file.meta.dependencies = pckp_file.meta.dependencies
         .iter()
         .filter(|dep| !packages.contains(dep))
-        .map(|s| s.clone())
+        .cloned()
         .collect();
 
     pckp_file.write_back();

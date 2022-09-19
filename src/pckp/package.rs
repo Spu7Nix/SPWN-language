@@ -1,4 +1,4 @@
-use std::{path::PathBuf, fs::File, sync::MutexGuard, io::Write};
+use std::{path::Path, fs::File, sync::MutexGuard, io::Write};
 use std::convert::TryInto;
 
 use octocrab::models::repos::Tag;
@@ -12,10 +12,19 @@ pub struct RemotePackage {
     meta: PckpMeta,
     owner: String,
     repo: String,
+    version: Option<String>,
 }
 
 impl RemotePackage {
-    pub async fn from_github_repo(owner: String, repo: String) -> Self {
+    pub fn get_commitish(&self) -> Commitish {
+        if self.version.is_some() {
+            Commitish(format!("tags/{}", self.meta.version))
+        } else {
+            Commitish("HEAD".to_string())
+        }
+    }
+
+    pub async fn from_github_repo(owner: String, repo: String, version: Option<String>) -> Self {
         let mut gh = Octocrab::builder().build().unwrap();
         let pckp_yaml = &gh
             .repos(&owner, &repo)
@@ -27,9 +36,10 @@ impl RemotePackage {
             .unwrap();
         
         Self {
-            meta: serde_yaml::from_str(&pckp_yaml).unwrap(),
+            meta: serde_yaml::from_str(pckp_yaml).unwrap(),
             owner: owner.clone(),
-            repo: repo.clone()
+            repo: repo.clone(),
+            version,
         }
     }
 
@@ -65,14 +75,12 @@ impl RemotePackage {
     }
 
     // this should work
-    pub async fn download(&self, reference: &PathBuf) {
+    pub async fn download(&self, reference: &Path) {
         // self.ensure_tag_exist().await;
-        let target = reference.clone();
         let gh = Octocrab::builder().build().unwrap();
         let repo = gh.repos(self.owner.clone(), self.repo.clone());
         let res = repo
-            // .download_tarball(Commitish(format!("tags/{}", self.meta.version)))
-            .download_tarball(Commitish(format!("HEAD"))) // TODO: check if tag is present else use HEAD
+            .download_tarball(self.get_commitish()) // TODO: check if tag is present else use HEAD
             .await
             .unwrap()
             .bytes()
@@ -80,7 +88,7 @@ impl RemotePackage {
             .unwrap()
             .to_vec();
         
-        let mut f = File::create(target.join("ball")).unwrap();
+        let mut f = File::create(reference.join("ball")).unwrap();
         f.write_all(&res).unwrap();
     }
 }
