@@ -59,7 +59,7 @@ fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
 
     let start = std::time::Instant::now();
     handle!(run_func(&mut globals, &compiler.code, 0, &mut contexts, &comp_globals) => &globals);
-
+    //dbg!(&globals.memory.iter().collect::<Vec<_>>());
     // get end time
     let end = std::time::Instant::now();
     let duration = end.duration_since(start);

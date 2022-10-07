@@ -271,7 +271,7 @@ macro_rules! method_args {
             }
 
             // reset count so now we can increment again to get arg index
-            count = 0;
+            count = 1;
 
             $(
                 $crate::method_arg_type!(
@@ -322,7 +322,7 @@ macro_rules! method_args {
             }
 
             // reset count so now we can increment again to get arg index
-            count = 0;
+            count = 1;
 
             $(
                 $crate::method_arg_type!(
