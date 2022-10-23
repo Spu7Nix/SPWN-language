@@ -99,6 +99,12 @@ pacman -U spwn-0.0.8-x86_64-linux_arch.pkg.tar.zst
 yay -S spwn-bin
 ```
 
+- Or you can build SPWN from source from the AUR (replace yay with your helper of choice):
+
+```cmd
+yay -S spwn
+```
+
 #### Android
 
 ##### Requirements
