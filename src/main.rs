@@ -5,6 +5,7 @@ mod parsing;
 mod sources;
 mod util;
 mod vm;
+mod pckp;
 
 use std::io::{self, Write};
 use std::{fs, path::PathBuf};
@@ -21,9 +22,10 @@ use vm::interpreter::BuiltinKey;
 use crate::compilation::code::Instruction;
 use crate::vm::context::FullContext;
 use crate::vm::interpreter::{run_func, Globals};
+use crate::pckp::pckp_subcommand;
 
+use clap::{arg, Command, ValueHint, value_parser};
 use ansi_term::Color;
-use clap::{arg, Command, ValueHint};
 
 fn run_spwn(code: String, source: SpwnSource, _doctest: bool) {
     // if doctest {
@@ -150,7 +152,8 @@ fn parse_stage(
     Ok((ast_data, stmts))
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     print!("\x1B[2J\x1B[1;1H");
     println!("{}", std::mem::size_of::<Instruction>());
 
@@ -169,7 +172,10 @@ fn main() {
             Command::new("eval")
                 .visible_alias("e")
                 .about("Runs the input given in stdin/the console as SPWN code")
-                .args([arg!(-d --doc "Doctest stuff")]),
+                .args([
+                    arg!(-d --doc "Doctest stuff"),
+                ]),
+            pckp_subcommand(),
         ])
         .arg_required_else_help(true)
         .get_matches();
@@ -204,7 +210,10 @@ fn main() {
             let doctest = command.contains_id("doc");
 
             run_spwn(input, SpwnSource::File(PathBuf::from("eval")), doctest);
-        }
+        },
+        ("pckp", command) => {
+            pckp::run(command).await;
+        },
         (_, _) => unreachable!(),
-    };
+    }
 }

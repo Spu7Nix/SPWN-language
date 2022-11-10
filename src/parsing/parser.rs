@@ -10,6 +10,7 @@ use super::parser_util::{operators, OpType};
 use crate::leveldata::object_data::ObjectMode;
 use crate::parsing::ast::MacroCode;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
+use crate::util::string::unindent;
 
 type Result<T> = std::result::Result<T, SyntaxError>;
 
@@ -198,7 +199,7 @@ impl Parser<'_> {
             "b" => todo!("byte string"),
             "f" => todo!("f-string"),
             "r" => chars.collect(),
-            "u" => todo!("unindented string"),
+            "u" => unindent(self.parse_escapes(&mut chars)?, true, false),
             "" => self.parse_escapes(&mut chars)?,
             other => {
                 return Err(SyntaxError::UnexpectedFlag {
