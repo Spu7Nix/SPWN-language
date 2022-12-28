@@ -329,6 +329,8 @@ pub enum Token {
     #[error]
     #[regex(r"[ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*", logos::skip)]
     Error,
+
+    
 }
 
 impl Token {
@@ -363,7 +365,6 @@ impl Token {
         }
     }
 }
-
 pub struct ParseNotes {
     pub tag: ast::Attribute,
     pub file: SpwnSource,
@@ -935,7 +936,6 @@ pub fn parse_statement(
             /*
                 You might be asking yourself here,
                 "why are we parsing it as a variable and not a type?"
-
                 Well the answer to that is simply that the developer thought
                 that some people might not like the typing system and would
                 want to use a variable instead.
