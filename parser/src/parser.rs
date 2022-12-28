@@ -304,6 +304,24 @@ pub enum Token {
     #[token("sync")]
     Sync,
 
+    #[token(">>")]
+    RightShift,
+
+    #[token("<<")]
+    LeftShift,
+
+    #[token("~")]
+    BitNot,
+
+    #[token("~?")]
+    BitXor,
+
+    #[token(">>=")]
+    RightShiftAssign,
+
+    #[token("<<=")]
+    LeftShiftAssign,
+
     //STATEMENT SEPARATOR
     #[regex(r"[\n\r;]+")]
     StatementSeparator,
@@ -320,7 +338,8 @@ impl Token {
             Or | And | Equal | NotEqual | MoreOrEqual | LessOrEqual | MoreThan | LessThan
             | Star | Modulo | Power | Plus | Minus | Slash | Exclamation | Assign | Add
             | Subtract | Multiply | Divide | IntDividedBy | IntDivide | As | In | Either
-            | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is => {
+            | Ampersand | DoubleStar | Exponate | Modulate | Increment | Decrement | Swap | Is 
+            | RightShift | LeftShift | BitNot | BitXor | LeftShiftAssign | RightShiftAssign => {
                 "operator"
             }
             Symbol => "identifier",
@@ -1043,7 +1062,7 @@ macro_rules! op_precedence {
 op_precedence! { // make sure the highest precedence is at the top
     12, Left => As,
     11, Left => Both,
-    10, Left => Either,
+    10, Left => Either LeftShift RightShift BitXor,
     9, Right => Power,
     8, Left => Modulo Star Slash IntDividedBy,
     7, Left => Plus Minus,
@@ -1053,7 +1072,7 @@ op_precedence! { // make sure the highest precedence is at the top
     3, Left => Is NotEqual In Equal,
     2, Left => And,
     1, Left => Or,
-    0, Right => Assign Add Subtract Multiply Divide IntDivide Exponate Modulate Swap,
+    0, Right => Assign Add Subtract Multiply Divide IntDivide Exponate Modulate Swap LeftShiftAssign RightShiftAssign,
 }
 
 fn fix_precedence(mut expr: ast::Expression) -> ast::Expression {
@@ -1449,6 +1468,11 @@ fn parse_operator(token: &Token) -> Option<ast::Operator> {
         Token::In => Some(ast::Operator::In),
         Token::As => Some(ast::Operator::As),
         Token::Is => Some(ast::Operator::Is),
+        Token::RightShift => Some(ast::Operator::RightShift),
+        Token::LeftShift => Some(ast::Operator::LeftShift),
+        Token::BitXor => Some(ast::Operator::BitXor),
+        Token::LeftShiftAssign => Some(ast::Operator::LeftShiftAssign),
+        Token::RightShiftAssign => Some(ast::Operator::RightShiftAssign),
         _ => None,
     }
 }
@@ -2352,6 +2376,12 @@ fn parse_variable(
 
     let operator = match first_token {
         // does it start with an op? (e.g -3, let i)
+
+        Some(Token::BitNot) => {
+            first_token = tokens.next(false);
+            Some(ast::UnaryOperator::BitNot)
+        }
+
         Some(Token::Minus) => {
             first_token = tokens.next(false);
             Some(ast::UnaryOperator::Minus)
