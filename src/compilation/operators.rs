@@ -119,6 +119,24 @@ ops! {
     Pow(^)[2] {
         (a: Int, b: Int) -> Int => a.pow(*b as u32),
     }
+    RightShift(>>)[2] {
+        (a: Int, b: Int) -> Int => a >> b,
+        (a: Float, b: Int) -> Float => a >> *b as f64,
+        (a: Int, b: Float) -> Float => *a as f64 >> b,
+        (a: Float, b: Float) -> Float => a >> b,
+    }
+    ZeroFillRightShift(>>>)[2] {
+        (a: Int, b: Int) -> Int => a >>> b,
+        (a: Float, b: Int) -> Float => a >>> *b as f64,
+        (a: Int, b: Float) -> Float => *a as f64 >>> b,
+        (a: Float, b: Float) -> Float => a >>> b,
+    }
+    LeftShift(<<)[2] {
+        (a: Int, b: Int) -> Int => a << b,
+        (a: Float, b: Int) -> Float => a << *b as f64,
+        (a: Int, b: Float) -> Float => *a as f64 << b,
+        (a: Float, b: Float) -> Float => a << b,
+    }
     // Eq(==)[2] {
     //     (a, b) -> Bool => a == b,
 
