@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "SPWN-Language"
+name = "spwn"
 version = "0.1.0"
