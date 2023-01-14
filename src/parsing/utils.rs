@@ -6,7 +6,7 @@ macro_rules! operators {
     ) => {
         pub mod operators {
 
-            use $crate::parsing::lexer::Token;
+            use crate::Token;
 
             #[derive(Debug, Copy, Clone, PartialEq, Eq)]
             pub enum OpType {
@@ -52,15 +52,10 @@ macro_rules! operators {
     };
 }
 
-// 1 + 2 + 3 <=> (1 + 2) + 3
-// 1 ^ 2 ^ 3 <=> 1 ^ (2 ^ 3)
-
-// 3 is @number
-
 operators! {
-    // low
+    // lowest precedence
     Right => [Assign];
-    Right => [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq];
+    Right => [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];
     Left => [DotDot];
     Left => [In];
     Left => [Is];
@@ -69,10 +64,11 @@ operators! {
     Unary => [BinNot];
     Unary => [ExclMark];
     Left => [Eq, Neq, Gt, Gte, Lt, Lte];
+    Left => [ShiftLeft, ShiftRight];
     Left => [Plus, Minus];
     Unary => [Minus];
     Left => [Mult, Div, Mod];
     Right => [Pow];
     Left => [As];
-    // high
+    // highest precedence
 }

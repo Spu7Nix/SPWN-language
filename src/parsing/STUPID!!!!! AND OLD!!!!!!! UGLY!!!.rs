@@ -111,47 +111,47 @@ impl Parser<'_> {
     //     Expression::Float(float).span(span)
     // }
 
-    // pub fn parse_dictlike(&mut self) -> ParseParseResult<ExprNode> {
-    //     let mut items = vec![];
+    pub fn parse_dictlike(&mut self) -> ParseParseResult<ExprNode> {
+        let mut items = vec![];
 
-    //     while self.peek() != Token::RBracket {
-    //         let peek = self.peek();
+        while self.peek() != Token::RBracket {
+            let peek = self.peek();
 
-    //         let key = match peek {
-    //             Token::String => {
-    //                 self.next();
-    //                 self.parse_string()?
-    //             }
-    //             Token::Ident => {
-    //                 self.next();
-    //                 self.slice().to_string()
-    //             }
-    //             _ => {
-    //                 return Err(SyntaxError::ExpectedToken {
-    //                     expected: "key".into(),
-    //                     found: peek.to_string(),
-    //                     area: self.make_area(self.span()),
-    //                 })
-    //             }
-    //         };
+            let key = match peek {
+                Token::String => {
+                    self.next();
+                    self.parse_string()?
+                }
+                Token::Ident => {
+                    self.next();
+                    self.slice().to_string()
+                }
+                _ => {
+                    return Err(SyntaxError::ExpectedToken {
+                        expected: "key".into(),
+                        found: peek.to_string(),
+                        area: self.make_area(self.span()),
+                    })
+                }
+            };
 
-    //         let key_span = self.span();
+            let key_span = self.span();
 
-    //         let elem = if self.peek() == Token::Colon {
-    //             self.next();
-    //             Some(self.parse_expr()?)
-    //         } else {
-    //             None
-    //         };
+            let elem = if self.peek() == Token::Colon {
+                self.next();
+                Some(self.parse_expr()?)
+            } else {
+                None
+            };
 
-    //         items.push((key, elem).span(key_span));
-    //         self.peek_expect_tok(Token::RBracket | Token::Comma)?;
-    //         self.skip_tok(Token::Comma);
-    //     }
-    //     self.next();
+            items.push((key, elem).span(key_span));
+            self.peek_expect_tok(Token::RBracket | Token::Comma)?;
+            self.skip_tok(Token::Comma);
+        }
+        self.next();
 
-    //     Expression::Dict(items).span(self.span())
-    // }
+        Expression::Dict(items).span(self.span())
+    }
 
     // pub fn parse_objlike(&mut self) -> ParseResult<ExprNode> {
     //     let obj_mode = if self.peek() == Token::Obj {

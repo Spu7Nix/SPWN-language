@@ -2,10 +2,11 @@
 
 use std::{io::Write, path::PathBuf};
 
-use crate::{lexing::tokens::Token, sources::SpwnSource};
+use crate::{lexing::tokens::Token, parsing::parser::Parser, sources::SpwnSource};
 
 mod error;
 mod lexing;
+mod parsing;
 mod sources;
 
 fn main() {
@@ -17,22 +18,12 @@ fn main() {
     let src = SpwnSource::File(path);
     let code = src.read().unwrap();
 
-    let mut lexer = Token::lex(&code);
-    while let Some(t) = lexer.next() {
-        if t == Token::Error {
-            println!("sex!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    let mut parser = Parser::new(&code, src);
+
+    match parser.parse() {
+        Ok(stmts) => {
+            println!("{:#?}", stmts)
         }
-        println!("{:?} {} {:?}", t, lexer.slice(), lexer.span())
+        Err(err) => err.to_report().display(),
     }
-
-    // let mut parser = Parser::new(&code, src);
-
-    // match parser.parse() {
-    //     Ok(stmts) => {
-    //         println!("{:#?}", stmts)
-    //     }
-    //     Err(err) => {
-    //         println!("{:?}", err)
-    //     }
-    // }
 }

@@ -2,7 +2,7 @@
 macro_rules! lexer {
     (
         $(
-            $tok:ident: $(regex($regex:literal))? $(text($text:literal))?,
+            $tok:ident $(: $(regex($regex:literal))? $(text($text:literal))?)?,
         )*
 
         @skip: $skip_regex:literal;
@@ -26,20 +26,21 @@ macro_rules! lexer {
                 static ref SKIP_REGEX: Regex = Regex::new($skip_regex).unwrap();
 
                 $(
-                    $(
+                    $($(
                         static ref [<REGEX_ $tok:upper>]: Regex = Regex::new($regex).unwrap();
-                    )?
+                    )?)?
                 )*
             }
 
             $(
-                $(
+                $($(
                     const [<TEXT_ $tok:upper>]: &str = $text;
                     const [<TEXT_LEN_ $tok:upper>]: usize = $text.len();
-                )?
+                )?)?
             )*
         }
 
+        #[derive(Clone)]
         pub struct Lexer<'a> {
             code: &'a str,
             last_span: Range<usize>,
@@ -57,14 +58,14 @@ macro_rules! lexer {
 
                 paste! {
                     $(
-                        $(
+                        $($(
                             stringify!($regex);
                             will_match[Token::$tok as usize] = [<REGEX_ $tok:upper>].is_match(code);
                         )?
                         $(
                             stringify!($text);
                             will_match[Token::$tok as usize] = code.find([<TEXT_ $tok:upper>]).is_some();
-                        )?
+                        )?)?
                     )*
                 }
 
@@ -94,7 +95,11 @@ macro_rules! lexer {
                 self.last_slice = &self.code[0..n];
                 self.code = &self.code[n..];
 
-                self.total_advance += n as usize
+                self.total_advance += n
+            }
+
+            pub fn next_or_eof(&mut self) -> Token {
+                self.next().unwrap_or(Token::Eof)
             }
         }
 
@@ -104,6 +109,8 @@ macro_rules! lexer {
             fn next(&mut self) -> Option<Self::Item> {
 
                 if self.code == "" {
+                    self.last_span = (self.last_span.end)..(self.last_span.end + 1);
+                    self.last_slice = "";
                     return None
                 }
 
@@ -116,11 +123,14 @@ macro_rules! lexer {
                     }
                 }
 
-                let lookahead = &self.code[0..self.code.len().min(1000)];
+                const LOOKAHEAD: usize = 1000;
+
+                let lookahead_len = self.code.len().min(LOOKAHEAD);
+                let lookahead = &self.code[0..lookahead_len];
 
                 paste! {
                     $(
-                        $(
+                        $($(
                             stringify!($regex);
 
                             if self.cache[Token::$tok as usize] <= self.total_advance && self.will_match[Token::$tok as usize] {
@@ -157,12 +167,15 @@ macro_rules! lexer {
                                             self.cache[Token::$tok as usize] = n + self.total_advance
                                         }
                                         None => {
-                                            self.cache[Token::$tok as usize] = &self.code.len() + self.total_advance
+                                            // if Token::$tok == Token::Minus {
+                                            //     println!("                                             fartsex");
+                                            // }
+                                            self.cache[Token::$tok as usize] = lookahead_len + self.total_advance
                                         }
                                     }
                                 }
                             }
-                        )?
+                        )?)?
 
                     )*
                 }
@@ -173,6 +186,7 @@ macro_rules! lexer {
                         Some(tok)
                     }
                     None => {
+                        println!("ball {} {}", self.total_advance, self.cache[Token::Minus as usize]);
                         self.advance(1);
                         Some(Token::Error)
                     }

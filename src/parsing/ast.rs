@@ -1,6 +1,4 @@
-use crate::sources::CodeSpan;
-
-use super::lexer::Token;
+use crate::{lexing::tokens::Token, sources::CodeSpan};
 
 #[derive(Debug, Clone)]
 pub enum ImportType {
@@ -16,11 +14,31 @@ pub enum IDClass {
     Item = 3,
 }
 
-#[derive(Debug, Clone)]
-pub struct ExprNode {
-    pub expr: Box<Expression>,
-    pub span: CodeSpan,
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum FileAttribute {
+    CacheOutput,
+    NoStd,
+    ConsoleOutput,
+    NoLevel,
+    NoBytecodeCache,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum Attribute {
+    NoOptimise,
+}
+
+#[derive(Debug, Clone)]
+pub enum MacroCode {
+    Normal(Statements),
+    Lambda(ExprNode),
+}
+
+pub type ExprNode = Spanned<Expression>;
+pub type StmtNode = Spanned<Statement>;
+
+pub type DictItems = Vec<(Spanned<String>, Option<ExprNode>)>;
+
 #[derive(Debug, Clone)]
 pub enum Expression {
     Int(i64),
@@ -33,24 +51,41 @@ pub enum Expression {
     Op(ExprNode, Token, ExprNode),
     Unary(Token, ExprNode),
 
+    Var(String),
+    Type(String),
+
     Array(Vec<ExprNode>),
+    Dict(DictItems),
+
     Maybe(Option<ExprNode>),
 
-    Var(String),
+    Index {
+        base: ExprNode,
+        index: ExprNode,
+    },
+    Member {
+        base: ExprNode,
+        name: String,
+    },
+    Associated {
+        base: ExprNode,
+        name: String,
+    },
 
-    Index { base: ExprNode, index: ExprNode },
+    Macro {
+        args: Vec<(Spanned<String>, Option<ExprNode>, Option<ExprNode>)>,
+        ret_type: Option<ExprNode>,
+        code: MacroCode,
+    },
 
-    TriggerFunc(Statements),
+    TriggerFunc {
+        code: Statements,
+    },
 
-    Type(String),
+    Builtins,
+    Empty,
 }
 
-#[derive(Debug, Clone)]
-pub struct StmtNode {
-    pub stmt: Box<Statement>,
-    //pub has_arrow: bool,
-    pub span: CodeSpan,
-}
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expr(ExprNode),
@@ -67,27 +102,17 @@ pub enum Statement {
     Arrow(Box<Statement>),
 }
 
-impl Expression {
-    pub fn into_node(self, span: CodeSpan) -> ExprNode {
-        ExprNode {
-            span,
-            expr: Box::new(self),
-        }
-    }
-}
-impl Statement {
-    pub fn into_node(self, span: CodeSpan) -> StmtNode {
-        StmtNode {
-            span,
-            stmt: Box::new(self),
-            //has_arrow,
-        }
-    }
-}
-
 pub type Statements = Vec<StmtNode>;
 
-impl ExprNode {
+#[derive(Clone, Debug)]
+pub struct Spanned<T> {
+    pub value: Box<T>,
+    pub span: CodeSpan,
+}
+impl<T> Spanned<T> {
+    pub fn split(self) -> (T, CodeSpan) {
+        (*self.value, self.span)
+    }
     pub fn extended(self, other: CodeSpan) -> Self {
         Self {
             span: self.span.extend(other),
@@ -95,11 +120,21 @@ impl ExprNode {
         }
     }
 }
-impl StmtNode {
-    pub fn extended(self, other: CodeSpan) -> Self {
-        Self {
-            span: self.span.extend(other),
-            ..self
+
+pub trait Spannable {
+    fn spanned(self, span: CodeSpan) -> Spanned<Self>
+    where
+        Self: Sized;
+}
+
+impl<T> Spannable for T {
+    fn spanned(self, span: CodeSpan) -> Spanned<Self>
+    where
+        Self: Sized,
+    {
+        Spanned {
+            value: Box::new(self),
+            span,
         }
     }
 }

@@ -1,19 +1,24 @@
 use std::str::Chars;
 
-use logos::{Lexer, Logos};
+use base64::Engine;
+use unindent::Unindent;
 
-use crate::sources::{CodeArea, CodeSpan, SpwnSource};
+use crate::{
+    lexing::tokens::{Lexer, Token},
+    sources::{CodeArea, CodeSpan, SpwnSource},
+};
 
 use super::{
-    ast::{ExprNode, Expression, IDClass, Statement, Statements, StmtNode},
+    ast::{
+        DictItems, ExprNode, Expression, IDClass, MacroCode, Spannable, Spanned, Statement,
+        Statements, StmtNode,
+    },
     error::SyntaxError,
-    lexer::Token,
     utils::operators::{self, unary_prec},
 };
 
-#[derive(Clone)]
 pub struct Parser<'a> {
-    lexer: Lexer<'a, Token>,
+    lexer: Lexer<'a>,
     src: SpwnSource,
 }
 
@@ -21,14 +26,14 @@ type ParseResult<T> = Result<T, SyntaxError>;
 
 impl<'a> Parser<'a> {
     pub fn new(code: &'a str, src: SpwnSource) -> Self {
-        let lexer = Token::lexer(code);
+        let lexer = Token::lex(code);
         Parser { lexer, src }
     }
 }
 
 impl Parser<'_> {
     pub fn next(&mut self) -> Token {
-        self.lexer.next().unwrap_or(Token::Eof)
+        self.lexer.next_or_eof()
     }
     pub fn span(&self) -> CodeSpan {
         self.lexer.span().into()
@@ -43,7 +48,7 @@ impl Parser<'_> {
     }
     pub fn peek(&self) -> Token {
         let mut peek = self.lexer.clone();
-        peek.next().unwrap_or(Token::Eof)
+        peek.next_or_eof()
     }
     pub fn next_is(&self, tok: Token) -> bool {
         self.peek() == tok
@@ -51,7 +56,7 @@ impl Parser<'_> {
     pub fn next_are(&self, toks: &[Token]) -> bool {
         let mut peek = self.lexer.clone();
         for tok in toks {
-            if peek.next().unwrap_or(Token::Eof) != *tok {
+            if peek.next_or_eof() != *tok {
                 return false;
             }
         }
@@ -89,8 +94,6 @@ impl Parser<'_> {
     }
 
     pub fn parse_int(&self, s: &str) -> i64 {
-        println!("cock {}", s);
-
         if s.len() > 2 {
             match &s[0..2] {
                 "0x" => {
@@ -111,17 +114,7 @@ impl Parser<'_> {
         s.parse::<i64>().unwrap()
     }
 
-    // fn to_int_radix(&self, from: &str, radix: u32) -> Result<i64> {
-    //     i64::from_str_radix(&from.replace('_', ""), radix).map_err(|_| {
-    //         SyntaxError::InvalidLiteral {
-    //             literal: from.into(),
-    //             area: self.make_area(self.span()),
-    //         }
-    //     })
-    // }
-
     fn parse_id(&self, s: &str) -> (IDClass, Option<u16>) {
-        println!("shitfuck {}", s);
         let class = match &s[(s.len() - 1)..(s.len())] {
             "g" => IDClass::Group,
             "c" => IDClass::Color,
@@ -134,107 +127,174 @@ impl Parser<'_> {
         (class, value)
     }
 
-    pub fn parse_string(&self, s: &str) -> String {
-        // let span = self.span();
-        // let content: &str = self.lexer.slice();
-        // let mut chars = content.chars();
+    pub fn parse_string(&self, s: &str, span: CodeSpan) -> ParseResult<String> {
+        let mut chars = s.chars();
 
-        // // Remove trailing "
-        // chars.next_back();
+        // Remove trailing "
+        chars.next_back();
 
-        // let flag = chars
-        //     .by_ref()
-        //     .take_while(|c| !matches!(c, '"' | '\''))
-        //     .collect::<String>();
+        let flags = chars
+            .by_ref()
+            .take_while(|c| !matches!(c, '"' | '\''))
+            .collect::<String>();
+        let mut out: String = chars.collect();
 
-        // let out = match &*flag {
-        //     "b" => todo!("byte string"),
-        //     "u" => todo!("unindented string"),
-        //     "" => self.parse_escapes(&mut chars)?,
-        //     other => {
-        //         return Err(SyntaxError::UnexpectedFlag {
-        //             flag: other.to_string(),
-        //             area: self.make_area(self.span()),
-        //         });
-        //     }
-        // };
-        // Ok(out)
+        if flags.is_empty() {
+            return self.parse_escapes(&mut out.chars());
+        }
 
-        // string flags shit here eventually amognsu
-        s.into()
+        let mut flags = flags.split('_').collect::<Vec<_>>();
+        let last = flags.pop().unwrap();
+
+        if matches!(last, "r" | "r#" | "r##") {
+            out = out[0..(out.len() - last.len() + 1)].into();
+        }
+
+        for flag in flags {
+            match flag {
+                "b" => todo!("byte string"),
+                "u" => out = out.unindent(),
+                "b64" => {
+                    out = base64::engine::general_purpose::STANDARD.encode(out);
+                }
+                other => {
+                    return Err(SyntaxError::UnexpectedFlag {
+                        flag: other.to_string(),
+                        area: self.make_area(span),
+                    });
+                }
+            }
+        }
+
+        Ok(out)
     }
 
-    // fn parse_escapes(&self, chars: &mut Chars) -> ParseResult<String> {
-    //     let mut out = String::new();
+    fn parse_escapes(&self, chars: &mut Chars) -> ParseResult<String> {
+        let mut out = String::new();
 
-    //     loop {
-    //         match chars.next() {
-    //             Some('\\') => out.push(match chars.next() {
-    //                 Some('n') => '\n',
-    //                 Some('r') => '\r',
-    //                 Some('t') => '\t',
-    //                 Some('"') => '"',
-    //                 Some('\'') => '\'',
-    //                 Some('\\') => '\\',
-    //                 Some('u') => self.parse_unicode(chars)?,
-    //                 Some(c) => {
-    //                     return Err(SyntaxError::InvalidEscape {
-    //                         character: c,
-    //                         area: self.make_area(self.span()),
-    //                     })
-    //                 }
-    //                 None => {
-    //                     return Err(SyntaxError::InvalidEscape {
-    //                         character: ' ',
-    //                         area: self.make_area(self.span()),
-    //                     })
-    //                 }
-    //             }),
-    //             Some(c) => {
-    //                 if c != '\'' && c != '"' {
-    //                     out.push(c)
-    //                 }
-    //             }
-    //             None => break,
-    //         }
-    //     }
+        loop {
+            match chars.next() {
+                Some('\\') => out.push(match chars.next() {
+                    Some('n') => '\n',
+                    Some('r') => '\r',
+                    Some('t') => '\t',
+                    Some('"') => '"',
+                    Some('\'') => '\'',
+                    Some('\\') => '\\',
+                    Some('u') => self.parse_unicode(chars)?,
+                    Some(c) => {
+                        return Err(SyntaxError::InvalidEscape {
+                            character: c,
+                            area: self.make_area(self.span()),
+                        })
+                    }
+                    None => {
+                        return Err(SyntaxError::InvalidEscape {
+                            character: ' ',
+                            area: self.make_area(self.span()),
+                        })
+                    }
+                }),
+                Some(c) => {
+                    if c != '\'' && c != '"' {
+                        out.push(c)
+                    }
+                }
+                None => break,
+            }
+        }
 
-    //     Ok(out)
-    // }
+        Ok(out)
+    }
 
-    // fn parse_unicode(&self, chars: &mut Chars) -> ParseResult<char> {
-    //     let next = chars.next().unwrap_or(' ');
+    fn parse_unicode(&self, chars: &mut Chars) -> ParseResult<char> {
+        let next = chars.next().unwrap_or(' ');
 
-    //     if !matches!(next, '{') {
-    //         return Err(SyntaxError::UnxpectedCharacter {
-    //             expected: Token::LBracket,
-    //             found: next.to_string(),
-    //             area: self.make_area(self.span()),
-    //         });
-    //     }
+        if !matches!(next, '{') {
+            return Err(SyntaxError::UnxpectedCharacter {
+                expected: Token::LBracket,
+                found: next.to_string(),
+                area: self.make_area(self.span()),
+            });
+        }
 
-    //     // `take_while` will always consume the matched chars +1 (in order to check whether it matches)
-    //     // this means `unwrap_or` would always use the default, so instead clone it to not affect
-    //     // the actual chars iterator
-    //     let hex = chars
-    //         .clone()
-    //         .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
-    //         .collect::<String>();
+        // `take_while` will always consume the matched chars +1 (in order to check whether it matches)
+        // this means `unwrap_or` would always use the default, so instead clone it to not affect
+        // the actual chars iterator
+        let hex = chars
+            .clone()
+            .take_while(|c| matches!(*c, '0'..='9' | 'a'..='f' | 'A'..='F'))
+            .collect::<String>();
 
-    //     let mut schars = chars.skip(hex.len());
+        let mut schars = chars.skip(hex.len());
 
-    //     let next = schars.next().unwrap_or(' ');
+        let next = schars.next();
 
-    //     if !matches!(next, '}') {
-    //         return Err(SyntaxError::UnxpectedCharacter {
-    //             expected: Token::RBracket,
-    //             found: next.to_string(),
-    //             area: self.make_area(self.span()),
-    //         });
-    //     }
+        match next {
+            Some('}') => (),
+            Some(t) => {
+                return Err(SyntaxError::UnxpectedCharacter {
+                    expected: Token::RBracket,
+                    found: t.to_string(),
+                    area: self.make_area(self.span()),
+                })
+            }
+            None => {
+                return Err(SyntaxError::UnxpectedCharacter {
+                    expected: Token::RBracket,
+                    found: "end of string".into(),
+                    area: self.make_area(self.span()),
+                })
+            }
+        }
 
-    //     Ok(char::from_u32(self.to_int_radix(&hex, 16)? as u32).unwrap_or('\u{FFFD}'))
-    // }
+        Ok(char::from_u32(u32::from_str_radix(&hex, 16).map_err(|_| {
+            SyntaxError::InvalidUnicode {
+                sequence: hex,
+                area: self.make_area(self.span()),
+            }
+        })?)
+        .unwrap_or('\u{FFFD}'))
+    }
+
+    pub fn parse_dictlike(&mut self) -> ParseResult<DictItems> {
+        let mut items = vec![];
+
+        while !self.next_is(Token::RBracket) {
+            let key = match self.next() {
+                Token::Int => self.parse_int(self.slice()).to_string(),
+                Token::String => self.parse_string(self.slice(), self.span())?,
+                Token::Ident => self.slice().to_string(),
+                other => {
+                    return Err(SyntaxError::UnexpectedToken {
+                        expected: "key".into(),
+                        found: other,
+                        area: self.make_area(self.span()),
+                    })
+                }
+            };
+
+            let key_span = self.span();
+
+            let elem = if self.next_is(Token::Colon) {
+                self.next();
+                Some(self.parse_expr()?)
+            } else {
+                None
+            };
+
+            items.push((key.spanned(key_span), elem));
+
+            if !self.skip_tok(Token::Comma) {
+                break;
+            }
+        }
+        self.expect_tok(Token::RBracket)?;
+
+        Ok(items)
+    }
+
+    // pub fn parse_attribute(&mut self) -> ParseResult<>
 
     pub fn parse_unit(&mut self) -> ParseResult<ExprNode> {
         let peek = self.peek();
@@ -244,46 +304,152 @@ impl Parser<'_> {
         Ok(match peek {
             Token::Int => {
                 self.next();
-                Expression::Int(self.parse_int(self.slice())).into_node(start)
+                Expression::Int(self.parse_int(self.slice())).spanned(start)
             }
             Token::Float => {
                 self.next();
                 Expression::Float(self.slice().replace('_', "").parse::<f64>().unwrap())
-                    .into_node(start)
+                    .spanned(start)
             }
             Token::String => {
                 self.next();
-                Expression::String(self.parse_string(self.slice())).into_node(start)
+                Expression::String(self.parse_string(self.slice(), self.span())?).spanned(start)
+            }
+            Token::RawString => {
+                self.next();
+                Expression::String(self.parse_string(self.slice(), self.span())?).spanned(start)
             }
             Token::Id => {
                 self.next();
 
                 let (id_class, value) = self.parse_id(self.slice());
-                Expression::Id(id_class, value).into_node(start)
+                Expression::Id(id_class, value).spanned(start)
+            }
+            Token::Dollar => {
+                self.next();
+
+                Expression::Builtins.spanned(start)
             }
             Token::True => {
                 self.next();
-                Expression::Bool(true).into_node(start)
+                Expression::Bool(true).spanned(start)
             }
             Token::False => {
                 self.next();
-                Expression::Bool(false).into_node(start)
+                Expression::Bool(false).spanned(start)
             }
             Token::Ident => {
                 self.next();
-                Expression::Var(self.slice().into()).into_node(start)
+                let var_name = self.slice().to_string();
+
+                if self.next_is(Token::FatArrow) {
+                    self.next();
+                    let code = MacroCode::Lambda(self.parse_expr()?);
+
+                    return Ok(Expression::Macro {
+                        args: vec![(var_name.spanned(start), None, None)],
+                        code,
+                        ret_type: None,
+                    }
+                    .spanned(start.extend(self.span())));
+                }
+
+                Expression::Var(var_name).spanned(start)
             }
             Token::TypeIndicator => {
                 self.next();
                 let name = self.slice()[1..].to_string();
-                Expression::Type(name).into_node(start)
+                Expression::Type(name).spanned(start)
             }
-
+            // Token::Attribute => {
+            //     self.next();
+            // }
             Token::LParen => {
                 self.next();
-                let value = self.parse_expr()?;
-                self.expect_tok(Token::RParen)?;
-                value.extended(self.span())
+
+                let mut peek = self.lexer.clone();
+                let mut indent = 1;
+
+                let after_close = loop {
+                    match peek.next_or_eof() {
+                        Token::LParen => indent += 1,
+                        Token::Eof => {
+                            return Err(SyntaxError::UnmatchedToken {
+                                not_found: Token::RParen,
+                                for_char: Token::LParen,
+                                area: self.make_area(start),
+                            })
+                        }
+                        Token::RParen => {
+                            indent -= 1;
+                            if indent == 0 {
+                                break peek.next_or_eof();
+                            }
+                        }
+                        _ => (),
+                    }
+                };
+
+                if matches!(
+                    after_close,
+                    Token::FatArrow | Token::Arrow | Token::LBracket
+                ) {
+                    let mut args = vec![];
+
+                    while self.peek() != Token::RParen {
+                        self.expect_tok_named(Token::Ident, "argument name")?;
+                        let arg_name = self.slice().to_string().spanned(self.span());
+
+                        let typ = if self.next_is(Token::Colon) {
+                            self.next();
+                            Some(self.parse_expr()?)
+                        } else {
+                            None
+                        };
+                        let default = if self.next_is(Token::Assign) {
+                            self.next();
+                            Some(self.parse_expr()?)
+                        } else {
+                            None
+                        };
+
+                        args.push((arg_name, typ, default));
+                        if !self.skip_tok(Token::Comma) {
+                            break;
+                        }
+                    }
+                    self.expect_tok(Token::RParen)?;
+
+                    let ret_type = if self.next_is(Token::Arrow) {
+                        self.next();
+                        Some(self.parse_expr()?)
+                    } else {
+                        None
+                    };
+
+                    let code = if self.next_is(Token::FatArrow) {
+                        self.next();
+                        MacroCode::Lambda(self.parse_expr()?)
+                    } else {
+                        println!("fuckfart");
+                        MacroCode::Normal(self.parse_block()?)
+                    };
+
+                    Expression::Macro {
+                        args,
+                        code,
+                        ret_type,
+                    }
+                    .spanned(start.extend(self.span()))
+                } else {
+                    if self.next_is(Token::RParen) {
+                        self.next();
+                        return Ok(Expression::Empty.spanned(start.extend(self.span())));
+                    }
+                    let inner = self.parse_expr()?;
+                    self.expect_tok(Token::RParen)?;
+                    inner.extended(self.span())
+                }
             }
             Token::LSqBracket => {
                 self.next();
@@ -297,25 +463,24 @@ impl Parser<'_> {
                 }
                 self.expect_tok(Token::RSqBracket)?;
 
-                Expression::Array(elems).into_node(start.extend(self.span()))
+                Expression::Array(elems).spanned(start.extend(self.span()))
             }
             Token::LBracket => {
                 self.next();
 
-                todo!()
-                // self.parse_dictlike()
+                Expression::Dict(self.parse_dictlike()?).spanned(start.extend(self.span()))
             }
 
             Token::QMark => {
                 self.next();
-                Expression::Maybe(None).into_node(start)
+                Expression::Maybe(None).spanned(start)
             }
 
             Token::TrigFnBracket => {
                 self.next();
                 let code = self.parse_statements()?;
                 self.expect_tok(Token::RBracket)?;
-                Expression::TriggerFunc(code).into_node(start)
+                Expression::TriggerFunc { code }.spanned(start)
             }
             unary_op
                 if {
@@ -330,7 +495,7 @@ impl Parser<'_> {
                     Some(next_prec) => self.parse_op(next_prec)?,
                     None => self.parse_value()?,
                 };
-                Expression::Unary(unary_op, val).into_node(start.extend(self.span()))
+                Expression::Unary(unary_op, val).spanned(start.extend(self.span()))
             }
 
             other => {
@@ -347,14 +512,33 @@ impl Parser<'_> {
         let mut value = self.parse_unit()?;
         #[allow(clippy::while_let_loop)]
         loop {
+            let new_span = value.span.extend(self.peek_span());
             match self.peek() {
                 Token::LSqBracket => {
                     self.next();
                     let index = self.parse_expr()?;
                     self.expect_tok(Token::RSqBracket)?;
 
-                    let new_span = value.span.extend(self.span());
-                    value = Expression::Index { base: value, index }.into_node(new_span);
+                    value = Expression::Index { base: value, index }.spanned(new_span);
+                }
+                Token::Dot => {
+                    self.next();
+                    self.expect_tok_named(Token::Ident, "member name")?;
+                    let name = self.slice().to_string();
+
+                    value = Expression::Member { base: value, name }.spanned(new_span);
+                }
+                Token::DoubleColon => {
+                    self.next();
+                    self.expect_tok_named(Token::Ident, "associated member name")?;
+                    let name = self.slice().to_string();
+
+                    value = Expression::Associated { base: value, name }.spanned(new_span);
+                }
+                Token::QMark => {
+                    self.next();
+
+                    value = Expression::Maybe(Some(value)).spanned(new_span);
                 }
                 _ => break,
             }
@@ -384,7 +568,7 @@ impl Parser<'_> {
                 self.parse_op(prec)?
             };
             let new_span = left.span.extend(right.span);
-            left = Expression::Op(left, op, right).into_node(new_span)
+            left = Expression::Op(left, op, right).spanned(new_span)
         }
         Ok(left)
     }
@@ -483,7 +667,7 @@ impl Parser<'_> {
         } else {
             stmt
         }
-        .into_node(start.extend(self.span()));
+        .spanned(start.extend(self.span()));
 
         Ok(stmt)
     }
