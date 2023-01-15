@@ -18,11 +18,12 @@ fn main() {
     let src = SpwnSource::File(path);
     let code = src.read().unwrap();
 
-    let mut parser = Parser::new(&code, src);
+    let mut parser = Parser::new(code.trim_end(), src);
 
     match parser.parse() {
-        Ok(stmts) => {
-            println!("{:#?}", stmts)
+        Ok(ast) => {
+            println!("attrs: {:#?}", ast.file_attributes);
+            println!("{:#?}", ast.statements)
         }
         Err(err) => err.to_report().display(),
     }

@@ -1,3 +1,6 @@
+#[no_std]
+
+// #[deprecated(since = "1.0.0", note = "45345345")] !{}
 
 
-let a = fuck => 5;
+

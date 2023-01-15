@@ -185,5 +185,32 @@ error_maker! {
             sequence: String,
             area: CodeArea,
         },
+
+        /////////
+        #[
+            Message: "Error parsing attributes", Note: Some(help.to_string());
+            Labels: [
+                area => "Unknown attribute `{}`": attr;
+            ]
+        ]
+        UnknownAttribute {
+            attr: String,
+            area: CodeArea,
+
+            help: String,
+        },
+
+        /////////
+        #[
+            Message: "Error parsing attributes", Note: Some(help.to_string());
+            Labels: [
+                area => "Unexpected attribute";
+            ]
+        ]
+        UnexpectedAttribute {
+            area: CodeArea,
+
+            help: String,
+        },
     }
 }

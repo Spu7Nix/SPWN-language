@@ -5,6 +5,18 @@ use colored::Colorize;
 
 use crate::sources::{CodeArea, SpwnSource};
 
+pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
+    let text = match text {
+        Some(t) => t.to_string(),
+        None => url.to_string(),
+    };
+
+    format!("\x1B]8;;{}\x1B\\{}\x1B]8;;\x1B\\", url.to_string(), text)
+        .blue()
+        .underline()
+        .to_string()
+}
+
 #[derive(Debug)]
 pub struct ErrorReport {
     pub title: String,
@@ -73,7 +85,7 @@ macro_rules! error_maker {
                                 )?
                                 v
                             },
-                            note: $note,
+                            note: $note.map(|s: String| s.to_string()),
                         },
                     )*
                 }
@@ -135,7 +147,7 @@ impl ErrorReport {
         for (area, msg) in &self.labels {
             source_vec.push(area.src.clone());
             report = report.with_label(
-                Label::new((area.src.name(), area.span.into()))
+                Label::new((area.src.hyperlink(), area.span.into()))
                     .with_message(msg)
                     .with_color(colors.next()),
             );
@@ -152,7 +164,7 @@ impl ErrorReport {
             .eprint(sources(
                 source_vec
                     .iter()
-                    .map(|src| (src.name(), src.read().unwrap())),
+                    .map(|src| (src.hyperlink(), src.read().unwrap())),
             ))
             .unwrap();
     }

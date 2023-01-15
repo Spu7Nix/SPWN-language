@@ -1,3 +1,4 @@
+use crate::error::hyperlink;
 use std::{fs, ops::Range, path::PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -20,6 +21,16 @@ impl SpwnSource {
     pub fn read(&self) -> Option<String> {
         match self {
             SpwnSource::File(p) => fs::read_to_string(p).ok(),
+        }
+    }
+    pub fn path(&self) -> String {
+        match self {
+            SpwnSource::File(f) => fs::canonicalize(f).unwrap().to_str().unwrap().into(),
+        }
+    }
+    pub fn hyperlink(&self) -> String {
+        match self {
+            SpwnSource::File(f) => hyperlink(self.path(), Some(self.name())),
         }
     }
 }

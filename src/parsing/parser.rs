@@ -1,34 +1,50 @@
-use std::str::Chars;
+use std::str::{Chars, FromStr};
 
 use base64::Engine;
+use strum::VariantNames;
 use unindent::Unindent;
 
 use crate::{
+    error::hyperlink,
     lexing::tokens::{Lexer, Token},
     sources::{CodeArea, CodeSpan, SpwnSource},
 };
 
 use super::{
     ast::{
-        DictItems, ExprNode, Expression, IDClass, MacroCode, Spannable, Spanned, Statement,
-        Statements, StmtNode,
+        Ast, DictItems, ExprAttribute, ExprNode, Expression, IDClass, MacroCode, ScriptAttribute,
+        Spannable, Statement, Statements, StmtNode,
     },
     error::SyntaxError,
     utils::operators::{self, unary_prec},
 };
 
+#[derive(Clone)]
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     src: SpwnSource,
 }
 
-type ParseResult<T> = Result<T, SyntaxError>;
+pub type ParseResult<T> = Result<T, SyntaxError>;
 
 impl<'a> Parser<'a> {
     pub fn new(code: &'a str, src: SpwnSource) -> Self {
         let lexer = Token::lex(code);
         Parser { lexer, src }
     }
+}
+
+#[macro_export]
+macro_rules! list_helper {
+    ($self:ident, $closing_tok:ident $code:block) => {
+        while !$self.next_is(Token::$closing_tok) {
+            $code;
+            if !$self.skip_tok(Token::Comma) {
+                break;
+            }
+        }
+        $self.expect_tok(Token::$closing_tok)?;
+    };
 }
 
 impl Parser<'_> {
@@ -53,15 +69,15 @@ impl Parser<'_> {
     pub fn next_is(&self, tok: Token) -> bool {
         self.peek() == tok
     }
-    pub fn next_are(&self, toks: &[Token]) -> bool {
-        let mut peek = self.lexer.clone();
-        for tok in toks {
-            if peek.next_or_eof() != *tok {
-                return false;
-            }
-        }
-        true
-    }
+    // pub fn next_are(&self, toks: &[Token]) -> bool {
+    //     let mut peek = self.lexer.clone();
+    //     for tok in toks {
+    //         if peek.next_or_eof() != *tok {
+    //             return false;
+    //         }
+    //     }
+    //     true
+    // }
 
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
         CodeArea {
@@ -260,7 +276,7 @@ impl Parser<'_> {
     pub fn parse_dictlike(&mut self) -> ParseResult<DictItems> {
         let mut items = vec![];
 
-        while !self.next_is(Token::RBracket) {
+        list_helper!(self, RBracket {
             let key = match self.next() {
                 Token::Int => self.parse_int(self.slice()).to_string(),
                 Token::String => self.parse_string(self.slice(), self.span())?,
@@ -284,24 +300,87 @@ impl Parser<'_> {
             };
 
             items.push((key.spanned(key_span), elem));
-
-            if !self.skip_tok(Token::Comma) {
-                break;
-            }
-        }
-        self.expect_tok(Token::RBracket)?;
+        });
 
         Ok(items)
     }
 
-    // pub fn parse_attribute(&mut self) -> ParseResult<>
+    pub fn parse_attributes<T>(&mut self) -> ParseResult<Vec<T>>
+    where
+        T: std::str::FromStr + strum::VariantNames + strum::EnumProperty,
+    {
+        let mut attrs = vec![];
+        self.expect_tok(Token::LSqBracket)?;
+
+        list_helper!(self, RSqBracket {
+            self.expect_tok(Token::Ident)?;
+
+            let attr_name = self.slice();
+
+            let attr = T::from_str(attr_name).map_err(|_| SyntaxError::UnknownAttribute {
+                attr: attr_name.into(),
+                area: self.make_area(self.span()),
+
+                help: format!(
+                    "The valid attributes are: {}",
+                    T::VARIANTS
+                        .iter()
+                        .map(|v| hyperlink(
+                            "https://spu7nix.net/spwn/#/attributes?id=attributes",
+                            Some(v)
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            })?;
+
+            let num_args = attr
+                .get_str("args")
+                .map_or_else(|| 0, |a| a.parse().unwrap());
+
+            if num_args > 0 {
+                self.expect_tok(Token::LParen)?;
+
+
+                list_helper!(self, RParen {
+                    // for arg in 0..num_args {
+                    //     let arg_name = attr.get_str(&format!("arg{}", arg)).unwrap();
+
+                            // if stringify!(the_field) == arg_name {
+
+                            // } else {
+
+                            // }
+
+                    //     attr[arg_name] = asdfjgisjfg
+                    // }
+                });
+            }
+
+
+            attrs.push(attr);
+        });
+
+        Ok(attrs)
+    }
 
     pub fn parse_unit(&mut self) -> ParseResult<ExprNode> {
+        let attr_start = self.peek_span();
+
+        let attrs = if self.next_is(Token::Hashtag) {
+            self.next();
+
+            self.parse_attributes::<ExprAttribute>()?
+        } else {
+            vec![]
+        };
+
         let peek = self.peek();
         let start = self.peek_span();
 
         let unary;
-        Ok(match peek {
+
+        let mut expr = match peek {
             Token::Int => {
                 self.next();
                 Expression::Int(self.parse_int(self.slice())).spanned(start)
@@ -342,14 +421,23 @@ impl Parser<'_> {
                 self.next();
                 let var_name = self.slice().to_string();
 
-                if self.next_is(Token::FatArrow) {
-                    self.next();
+                if matches!(self.peek(), Token::FatArrow | Token::Arrow) {
+                    let ret_type = if self.next_is(Token::Arrow) {
+                        self.next();
+                        let r = Some(self.parse_expr()?);
+                        self.expect_tok(Token::FatArrow)?;
+                        r
+                    } else {
+                        self.next();
+                        None
+                    };
+
                     let code = MacroCode::Lambda(self.parse_expr()?);
 
                     return Ok(Expression::Macro {
                         args: vec![(var_name.spanned(start), None, None)],
                         code,
-                        ret_type: None,
+                        ret_type,
                     }
                     .spanned(start.extend(self.span())));
                 }
@@ -361,17 +449,14 @@ impl Parser<'_> {
                 let name = self.slice()[1..].to_string();
                 Expression::Type(name).spanned(start)
             }
-            // Token::Attribute => {
-            //     self.next();
-            // }
             Token::LParen => {
                 self.next();
 
-                let mut peek = self.lexer.clone();
+                let mut check = self.clone();
                 let mut indent = 1;
 
                 let after_close = loop {
-                    match peek.next_or_eof() {
+                    match check.next() {
                         Token::LParen => indent += 1,
                         Token::Eof => {
                             return Err(SyntaxError::UnmatchedToken {
@@ -383,20 +468,35 @@ impl Parser<'_> {
                         Token::RParen => {
                             indent -= 1;
                             if indent == 0 {
-                                break peek.next_or_eof();
+                                break check.next();
                             }
                         }
                         _ => (),
                     }
                 };
 
-                if matches!(
-                    after_close,
-                    Token::FatArrow | Token::Arrow | Token::LBracket
-                ) {
+                let is_macro = match after_close {
+                    Token::FatArrow | Token::LBracket => true,
+                    Token::Arrow => {
+                        check.parse_expr()?;
+
+                        matches!(check.peek(), Token::FatArrow | Token::LBracket)
+                    }
+                    _ => {
+                        if self.next_is(Token::RParen) {
+                            self.next();
+                            return Ok(Expression::Empty.spanned(start.extend(self.span())));
+                        }
+                        let inner = self.parse_expr()?;
+                        self.expect_tok(Token::RParen)?;
+                        return Ok(inner.extended(self.span()));
+                    }
+                };
+
+                if is_macro {
                     let mut args = vec![];
 
-                    while self.peek() != Token::RParen {
+                    list_helper!(self, RParen {
                         self.expect_tok_named(Token::Ident, "argument name")?;
                         let arg_name = self.slice().to_string().spanned(self.span());
 
@@ -414,11 +514,7 @@ impl Parser<'_> {
                         };
 
                         args.push((arg_name, typ, default));
-                        if !self.skip_tok(Token::Comma) {
-                            break;
-                        }
-                    }
-                    self.expect_tok(Token::RParen)?;
+                    });
 
                     let ret_type = if self.next_is(Token::Arrow) {
                         self.next();
@@ -442,26 +538,27 @@ impl Parser<'_> {
                     }
                     .spanned(start.extend(self.span()))
                 } else {
-                    if self.next_is(Token::RParen) {
-                        self.next();
-                        return Ok(Expression::Empty.spanned(start.extend(self.span())));
-                    }
-                    let inner = self.parse_expr()?;
-                    self.expect_tok(Token::RParen)?;
-                    inner.extended(self.span())
+                    let mut args = vec![];
+
+                    list_helper!(self, RParen {
+                        args.push(self.parse_expr()?);
+                    });
+
+                    self.expect_tok(Token::Arrow)?;
+
+                    let ret_type = self.parse_expr()?;
+
+                    Expression::MacroPattern { args, ret_type }.spanned(start.extend(self.span()))
                 }
             }
             Token::LSqBracket => {
                 self.next();
 
                 let mut elems = vec![];
-                while !self.next_is(Token::RSqBracket) {
+
+                list_helper!(self, RSqBracket {
                     elems.push(self.parse_expr()?);
-                    if !self.skip_tok(Token::Comma) {
-                        break;
-                    }
-                }
-                self.expect_tok(Token::RSqBracket)?;
+                });
 
                 Expression::Array(elems).spanned(start.extend(self.span()))
             }
@@ -470,17 +567,28 @@ impl Parser<'_> {
 
                 Expression::Dict(self.parse_dictlike()?).spanned(start.extend(self.span()))
             }
+            // Token::Hashtag => {
+            //     self.next();
 
+            //     self.parse_attributes::<Attribute>()?;
+            // }
             Token::QMark => {
                 self.next();
+
                 Expression::Maybe(None).spanned(start)
             }
 
             Token::TrigFnBracket => {
                 self.next();
+
                 let code = self.parse_statements()?;
                 self.expect_tok(Token::RBracket)?;
-                Expression::TriggerFunc { code }.spanned(start)
+
+                Expression::TriggerFunc {
+                    code,
+                    attributes: vec![],
+                }
+                .spanned(start)
             }
             unary_op
                 if {
@@ -495,6 +603,7 @@ impl Parser<'_> {
                     Some(next_prec) => self.parse_op(next_prec)?,
                     None => self.parse_value()?,
                 };
+
                 Expression::Unary(unary_op, val).spanned(start.extend(self.span()))
             }
 
@@ -503,9 +612,26 @@ impl Parser<'_> {
                     expected: "expression".into(),
                     found: other,
                     area: self.make_area(start),
-                })
+                });
             }
-        })
+        };
+
+        if !attrs.is_empty() {
+            match &mut *expr.value {
+                Expression::TriggerFunc { attributes, .. } => {
+                    *attributes = attrs;
+                }
+                _ => {
+                    return Err(SyntaxError::UnexpectedAttribute {
+                        area: self.make_area(attr_start.extend(self.span())),
+                        help: "The valid expression attribute locations are trigger functions"
+                            .into(),
+                    })
+                }
+            };
+        }
+
+        Ok(expr)
     }
 
     pub fn parse_value(&mut self) -> ParseResult<ExprNode> {
@@ -540,6 +666,25 @@ impl Parser<'_> {
 
                     value = Expression::Maybe(Some(value)).spanned(new_span);
                 }
+                Token::ExclMark => {
+                    self.next();
+
+                    value = Expression::TriggerFuncCall(value).spanned(new_span);
+                }
+                Token::If => {
+                    self.next();
+                    let cond = self.parse_expr()?;
+                    self.expect_tok(Token::Else)?;
+                    let if_false = self.parse_expr()?;
+
+                    value = Expression::Ternary {
+                        cond,
+                        if_true: value,
+                        if_false,
+                    }
+                    .spanned(new_span);
+                }
+                // Token::C
                 _ => break,
             }
         }
@@ -635,32 +780,46 @@ impl Parser<'_> {
 
                 Statement::While { cond, code }
             }
-            // Token::Return => {
-            //     self.next();
-            //     if matches!(self.peek(), Token::Eol | Token::RBracket) {
-            //         Statement::Return(None)
-            //     } else {
-            //         let val = self.parse_expr()?;
+            Token::For => {
+                self.next();
+                self.expect_tok_named(Token::Ident, "variable name")?;
+                let var = self.slice().to_string();
+                self.expect_tok(Token::In)?;
+                let iterator = self.parse_expr()?;
 
-            //         Statement::Return(Some(val))
-            //     }
-            // }
-            // Token::Continue => {
-            //     self.next();
+                let code = self.parse_block()?;
 
-            //     Statement::Continue
-            // }
-            // Token::Break => {
-            //     self.next();
+                Statement::For {
+                    var,
+                    iterator,
+                    code,
+                }
+            }
+            Token::Return => {
+                self.next();
+                if matches!(self.peek(), Token::Eol | Token::RBracket | Token::Eof) {
+                    Statement::Return(None)
+                } else {
+                    let val = self.parse_expr()?;
 
-            //     Statement::Break
-            // }
+                    Statement::Return(Some(val))
+                }
+            }
+            Token::Continue => {
+                self.next();
+
+                Statement::Continue
+            }
+            Token::Break => {
+                self.next();
+
+                Statement::Break
+            }
             _ => Statement::Expr(self.parse_expr()?),
         };
         if self.slice() != "}" {
             self.expect_tok(Token::Eol)?;
         }
-        // self.skip_tok(Token::Eol);
 
         let stmt = if is_arrow {
             Statement::Arrow(Box::new(stmt))
@@ -674,16 +833,30 @@ impl Parser<'_> {
 
     pub fn parse_statements(&mut self) -> ParseResult<Statements> {
         let mut statements = vec![];
+
         while !matches!(self.peek(), Token::Eof | Token::RBracket) {
             let stmt = self.parse_statement()?;
             statements.push(stmt);
         }
+
         Ok(statements)
     }
 
-    pub fn parse(&mut self) -> ParseResult<Statements> {
-        let stmts = self.parse_statements()?;
+    pub fn parse(&mut self) -> ParseResult<Ast> {
+        let file_attributes = if self.next_is(Token::Hashtag) {
+            self.next();
+
+            self.parse_attributes::<ScriptAttribute>()?
+        } else {
+            vec![]
+        };
+
+        let statements = self.parse_statements()?;
         self.expect_tok(Token::Eof)?;
-        Ok(stmts)
+
+        Ok(Ast {
+            statements,
+            file_attributes,
+        })
     }
 }

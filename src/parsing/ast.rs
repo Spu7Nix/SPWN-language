@@ -1,3 +1,5 @@
+use strum::{EnumProperty, EnumString, EnumVariantNames};
+
 use crate::{lexing::tokens::Token, sources::CodeSpan};
 
 #[derive(Debug, Clone)]
@@ -14,8 +16,58 @@ pub enum IDClass {
     Item = 3,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
-pub enum FileAttribute {
+// #[derive(Debug, Clone, PartialEq, Eq, Copy)]
+// struct AttributeArgs<const LEN: usize, K, V>
+// where
+//     K: Default + PartialEq,
+//     V: Default + PartialEq,
+// {
+//     args: [(K, V); LEN],
+// }
+
+// impl<const LEN: usize, K, V> Default for AttributeArgs<LEN, K, V>
+// where
+//     K: Default + PartialEq,
+//     V: Default + PartialEq,
+// {
+//     fn default() -> Self {
+//         Self {
+//             args: [(K::default(), V::default()); LEN],
+//         }
+//     }
+// }
+
+// impl<const LEN: usize, K, V> std::ops::Index<K> for AttributeArgs<LEN, K, V>
+// where
+//     K: Default + PartialEq,
+//     V: Default + PartialEq,
+// {
+//     type Output = Option<V>;
+
+//     fn index(&self, index: K) -> &Self::Output {
+//         if let Some(a) = self.args.iter().find(|a| a.0 == index) {
+//             return &Some(a.1);
+//         }
+//         &None
+//     }
+// }
+
+// impl<const LEN: usize, K, V> std::ops::IndexMut<K> for AttributeArgs<LEN, K, V>
+// where
+//     K: Default + PartialEq,
+//     V: Default + PartialEq,
+// {
+//     fn index_mut(&mut self, index: K) -> &mut Self::Output {
+//         if let Some(a) = self.args.iter().find(|a| a.0 == index) {
+//             return &mut Some(a.1);
+//         }
+//         &mut None
+//     }
+// }
+
+#[derive(Debug, Clone, PartialEq, Eq, Copy, EnumString, EnumVariantNames, EnumProperty)]
+#[strum(serialize_all = "snake_case")]
+pub enum ScriptAttribute {
     CacheOutput,
     NoStd,
     ConsoleOutput,
@@ -23,9 +75,15 @@ pub enum FileAttribute {
     NoBytecodeCache,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
-pub enum Attribute {
-    NoOptimise,
+#[derive(Debug, Clone, PartialEq, Eq, EnumString, EnumVariantNames, EnumProperty)]
+#[strum(serialize_all = "snake_case")]
+pub enum ExprAttribute {
+    NoOptimize,
+
+    #[strum(props(args = "2", arg0 = "since", arg1 = "note"))]
+    Deprecated {
+        //args: AttributeArgs<2, String, String>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -77,9 +135,22 @@ pub enum Expression {
         ret_type: Option<ExprNode>,
         code: MacroCode,
     },
+    MacroPattern {
+        args: Vec<ExprNode>,
+        ret_type: ExprNode,
+    },
 
     TriggerFunc {
+        attributes: Vec<ExprAttribute>,
         code: Statements,
+    },
+
+    TriggerFuncCall(ExprNode),
+
+    Ternary {
+        cond: ExprNode,
+        if_true: ExprNode,
+        if_false: ExprNode,
     },
 
     Builtins,
@@ -98,11 +169,25 @@ pub enum Statement {
         cond: ExprNode,
         code: Statements,
     },
+    For {
+        var: String,
+        iterator: ExprNode,
+        code: Statements,
+    },
 
     Arrow(Box<Statement>),
+
+    Return(Option<ExprNode>),
+    Break,
+    Continue,
 }
 
 pub type Statements = Vec<StmtNode>;
+
+pub struct Ast {
+    pub statements: Vec<StmtNode>,
+    pub file_attributes: Vec<ScriptAttribute>,
+}
 
 #[derive(Clone, Debug)]
 pub struct Spanned<T> {
