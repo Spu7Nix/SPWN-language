@@ -127,18 +127,6 @@ error_maker! {
 
         /////////
         #[
-            Message: "Error parsing literal", Note: None;
-            Labels: [
-                area => "Expected valid literal, found `{}`": literal;
-            ]
-        ]
-        InvalidLiteral {
-            literal: String,
-            area: CodeArea,
-        },
-
-        /////////
-        #[
             Message: "Unexpected character", Note: None;
             Labels: [
                 area => "Expected `{}`, found `{}`": expected.to_str(), found;
@@ -188,13 +176,26 @@ error_maker! {
 
         /////////
         #[
-            Message: "Error parsing attributes", Note: Some(help.to_string());
+            Message: "Unknown attribute", Note: Some(format!("The valid attributes are: {}", valid.join(", ")));
             Labels: [
-                area => "Unknown attribute `{}`": attr;
+                area => "Attribute `{}` does not exist": attribute;
             ]
         ]
         UnknownAttribute {
-            attr: String,
+            attribute: String,
+            area: CodeArea,
+
+            valid: Vec<String>,
+        },
+
+        /////////
+        #[
+            Message: "Mismatched attribute", Note: Some(help.to_string());
+            Labels: [
+                area => "Attributes cannot be added to this expression";
+            ]
+        ]
+        MismatchedAttribute {
             area: CodeArea,
 
             help: String,
@@ -202,15 +203,41 @@ error_maker! {
 
         /////////
         #[
-            Message: "Error parsing attributes", Note: Some(help.to_string());
+            Message: "Invalid attribute field", Note: Some(format!("Valid fields for attribute `{}` are {}", attribute, fields.join(", ")));
             Labels: [
                 area => "Unexpected attribute";
             ]
         ]
-        UnexpectedAttribute {
+        InvalidAttributeField {
             area: CodeArea,
+            attribute: String,
+            fields: Vec<String>,
+        },
 
-            help: String,
+        /////////
+        #[
+            Message: "Duplicate attribute field", Note: None;
+            Labels: [
+                first_used => "Field `{}` first used here": field;
+                used_again => "Used again here";
+            ]
+        ]
+        DuplicateAttributeField {
+            used_again: CodeArea,
+            field: String,
+            first_used: CodeArea,
+        },
+
+        /////////
+        #[
+            Message: "Invalid attribute value", Note: None;
+            Labels: [
+                area => "{}": message;
+            ]
+        ]
+        InvalidAttributeValue {
+            area: CodeArea,
+            message: String,
         },
     }
 }

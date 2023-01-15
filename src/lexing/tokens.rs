@@ -4,8 +4,7 @@ lexer! {
     Int: regex(r#"0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[\d_]+"#),
     Float: regex(r#"[\d_]+(\.[\d_]+)?"#),
 
-    String: regex(r#"([a-zA-Z]\w*)?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')"#),
-    RawString: regex(r###"([a-zA-Z]\w*_)?(r".*?"|r#".*?"#|r##".*?"##|r'.*?'|r#'.*?'#|r##'.*?'##)"###),
+    String: regex(r###"([a-zA-Z]\w*)?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')|([a-zA-Z]\w*_)?(r".*?"|r#".*?"#|r##".*?"##|r'.*?'|r#'.*?'#|r##'.*?'##)"###),
 
     Id: regex(r"([0-9]+|\?)[gbci]"),
     TypeIndicator: regex(r"@[a-zA-Z_]\w*"),
@@ -119,7 +118,6 @@ impl Token {
             Self::Float => "float literal",
             Self::Id => "ID literal",
             Self::String => "string literal",
-            Self::RawString => "raw string literal",
             Self::TypeIndicator => "type indicator",
             Self::Let => "let",
             Self::Ident => "identifier",

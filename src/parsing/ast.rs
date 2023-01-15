@@ -2,6 +2,8 @@ use strum::{EnumProperty, EnumString, EnumVariantNames};
 
 use crate::{lexing::tokens::Token, sources::CodeSpan};
 
+use super::attributes::{ExprAttribute, ScriptAttribute};
+
 #[derive(Debug, Clone)]
 pub enum ImportType {
     Module(String),
@@ -65,26 +67,26 @@ pub enum IDClass {
 //     }
 // }
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy, EnumString, EnumVariantNames, EnumProperty)]
-#[strum(serialize_all = "snake_case")]
-pub enum ScriptAttribute {
-    CacheOutput,
-    NoStd,
-    ConsoleOutput,
-    NoLevel,
-    NoBytecodeCache,
-}
+// #[derive(Debug, Clone, PartialEq, Eq, Copy, EnumString, EnumVariantNames, EnumProperty)]
+// #[strum(serialize_all = "snake_case")]
+// pub enum ScriptAttribute {
+//     CacheOutput,
+//     NoStd,
+//     ConsoleOutput,
+//     NoLevel,
+//     NoBytecodeCache,
+// }
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumString, EnumVariantNames, EnumProperty)]
-#[strum(serialize_all = "snake_case")]
-pub enum ExprAttribute {
-    NoOptimize,
+// #[derive(Debug, Clone, PartialEq, Eq, EnumString, EnumVariantNames, EnumProperty)]
+// #[strum(serialize_all = "snake_case")]
+// pub enum ExprAttribute {
+//     NoOptimize,
 
-    #[strum(props(args = "2", arg0 = "since", arg1 = "note"))]
-    Deprecated {
-        //args: AttributeArgs<2, String, String>,
-    },
-}
+//     #[strum(props(args = "2", arg0 = "since", arg1 = "note"))]
+//     Deprecated {
+//         //args: AttributeArgs<2, String, String>,
+//     },
+// }
 
 #[derive(Debug, Clone)]
 pub enum MacroCode {

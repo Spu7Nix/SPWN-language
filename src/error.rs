@@ -14,6 +14,7 @@ pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
     format!("\x1B]8;;{}\x1B\\{}\x1B]8;;\x1B\\", url.to_string(), text)
         .blue()
         .underline()
+        .bold()
         .to_string()
 }
 

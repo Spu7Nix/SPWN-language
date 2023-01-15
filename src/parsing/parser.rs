@@ -12,9 +12,10 @@ use crate::{
 
 use super::{
     ast::{
-        Ast, DictItems, ExprAttribute, ExprNode, Expression, IDClass, MacroCode, ScriptAttribute,
-        Spannable, Statement, Statements, StmtNode,
+        Ast, DictItems, ExprNode, Expression, IDClass, MacroCode, Spannable, Statement, Statements,
+        StmtNode,
     },
+    attributes::{AttributeEnum, ExprAttribute, ScriptAttribute},
     error::SyntaxError,
     utils::operators::{self, unary_prec},
 };
@@ -108,6 +109,17 @@ impl Parser<'_> {
     pub fn expect_tok(&mut self, expect: Token) -> Result<(), SyntaxError> {
         self.expect_tok_named(expect, expect.to_str())
     }
+    pub fn expect_toks_named(&mut self, expect: &[Token], name: &str) -> ParseResult<()> {
+        let next = self.next();
+        if !expect.contains(&next) {
+            return Err(SyntaxError::UnexpectedToken {
+                found: next,
+                expected: name.to_string(),
+                area: self.make_area(self.span()),
+            });
+        }
+        Ok(())
+    }
 
     pub fn parse_int(&self, s: &str) -> i64 {
         if s.len() > 2 {
@@ -164,6 +176,8 @@ impl Parser<'_> {
 
         if matches!(last, "r" | "r#" | "r##") {
             out = out[0..(out.len() - last.len() + 1)].into();
+        } else {
+            flags.push(last);
         }
 
         for flag in flags {
@@ -305,58 +319,13 @@ impl Parser<'_> {
         Ok(items)
     }
 
-    pub fn parse_attributes<T>(&mut self) -> ParseResult<Vec<T>>
-    where
-        T: std::str::FromStr + strum::VariantNames + strum::EnumProperty,
-    {
+    pub fn parse_attributes<T: AttributeEnum>(&mut self) -> ParseResult<Vec<T>> {
         let mut attrs = vec![];
         self.expect_tok(Token::LSqBracket)?;
 
         list_helper!(self, RSqBracket {
-            self.expect_tok(Token::Ident)?;
 
-            let attr_name = self.slice();
-
-            let attr = T::from_str(attr_name).map_err(|_| SyntaxError::UnknownAttribute {
-                attr: attr_name.into(),
-                area: self.make_area(self.span()),
-
-                help: format!(
-                    "The valid attributes are: {}",
-                    T::VARIANTS
-                        .iter()
-                        .map(|v| hyperlink(
-                            "https://spu7nix.net/spwn/#/attributes?id=attributes",
-                            Some(v)
-                        ))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ),
-            })?;
-
-            let num_args = attr
-                .get_str("args")
-                .map_or_else(|| 0, |a| a.parse().unwrap());
-
-            if num_args > 0 {
-                self.expect_tok(Token::LParen)?;
-
-
-                list_helper!(self, RParen {
-                    // for arg in 0..num_args {
-                    //     let arg_name = attr.get_str(&format!("arg{}", arg)).unwrap();
-
-                            // if stringify!(the_field) == arg_name {
-
-                            // } else {
-
-                            // }
-
-                    //     attr[arg_name] = asdfjgisjfg
-                    // }
-                });
-            }
-
+            let attr = T::attribute_parse(self)?;
 
             attrs.push(attr);
         });
@@ -391,10 +360,6 @@ impl Parser<'_> {
                     .spanned(start)
             }
             Token::String => {
-                self.next();
-                Expression::String(self.parse_string(self.slice(), self.span())?).spanned(start)
-            }
-            Token::RawString => {
                 self.next();
                 Expression::String(self.parse_string(self.slice(), self.span())?).spanned(start)
             }
@@ -622,11 +587,11 @@ impl Parser<'_> {
                     *attributes = attrs;
                 }
                 _ => {
-                    return Err(SyntaxError::UnexpectedAttribute {
+                    return Err(SyntaxError::MismatchedAttribute {
                         area: self.make_area(attr_start.extend(self.span())),
                         help: "The valid expression attribute locations are trigger functions"
                             .into(),
-                    })
+                    });
                 }
             };
         }
