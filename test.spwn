@@ -1,6 +1,6 @@
+#[no_std]
 
 
 
 
-
-#[cock_tuple("5.2.8", b64"the fart lol")]
+#[deprecated(a = "£111")] !{}

@@ -4,6 +4,8 @@ use crate::{lexing::tokens::Token, sources::CodeSpan};
 
 use super::attributes::{ExprAttribute, ScriptAttribute};
 
+///use super::attributes::{ExprAttribute, ScriptAttribute};
+
 #[derive(Debug, Clone)]
 pub enum ImportType {
     Module(String),
@@ -18,84 +20,23 @@ pub enum IDClass {
     Item = 3,
 }
 
-// #[derive(Debug, Clone, PartialEq, Eq, Copy)]
-// struct AttributeArgs<const LEN: usize, K, V>
-// where
-//     K: Default + PartialEq,
-//     V: Default + PartialEq,
-// {
-//     args: [(K, V); LEN],
-// }
-
-// impl<const LEN: usize, K, V> Default for AttributeArgs<LEN, K, V>
-// where
-//     K: Default + PartialEq,
-//     V: Default + PartialEq,
-// {
-//     fn default() -> Self {
-//         Self {
-//             args: [(K::default(), V::default()); LEN],
-//         }
-//     }
-// }
-
-// impl<const LEN: usize, K, V> std::ops::Index<K> for AttributeArgs<LEN, K, V>
-// where
-//     K: Default + PartialEq,
-//     V: Default + PartialEq,
-// {
-//     type Output = Option<V>;
-
-//     fn index(&self, index: K) -> &Self::Output {
-//         if let Some(a) = self.args.iter().find(|a| a.0 == index) {
-//             return &Some(a.1);
-//         }
-//         &None
-//     }
-// }
-
-// impl<const LEN: usize, K, V> std::ops::IndexMut<K> for AttributeArgs<LEN, K, V>
-// where
-//     K: Default + PartialEq,
-//     V: Default + PartialEq,
-// {
-//     fn index_mut(&mut self, index: K) -> &mut Self::Output {
-//         if let Some(a) = self.args.iter().find(|a| a.0 == index) {
-//             return &mut Some(a.1);
-//         }
-//         &mut None
-//     }
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq, Copy, EnumString, EnumVariantNames, EnumProperty)]
-// #[strum(serialize_all = "snake_case")]
-// pub enum ScriptAttribute {
-//     CacheOutput,
-//     NoStd,
-//     ConsoleOutput,
-//     NoLevel,
-//     NoBytecodeCache,
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq, EnumString, EnumVariantNames, EnumProperty)]
-// #[strum(serialize_all = "snake_case")]
-// pub enum ExprAttribute {
-//     NoOptimize,
-
-//     #[strum(props(args = "2", arg0 = "since", arg1 = "note"))]
-//     Deprecated {
-//         //args: AttributeArgs<2, String, String>,
-//     },
-// }
-
 #[derive(Debug, Clone)]
 pub enum MacroCode {
     Normal(Statements),
     Lambda(ExprNode),
 }
 
-pub type ExprNode = Spanned<Expression>;
-pub type StmtNode = Spanned<Statement>;
+#[derive(Debug, Clone)]
+pub struct ExprNode {
+    pub expr: Box<Expression>,
+    pub attributes: Vec<ExprAttribute>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StmtNode {
+    pub stmt: Box<Statement>,
+    pub attributes: Vec<StmtNode>,
+}
 
 pub type DictItems = Vec<(Spanned<String>, Option<ExprNode>)>;
 
@@ -186,6 +127,23 @@ pub enum Statement {
 
 pub type Statements = Vec<StmtNode>;
 
+impl Expression {
+    pub fn into_node(self, attributes: Vec<ExprAttribute>) -> ExprNode {
+        ExprNode {
+            expr: Box::new(self),
+            attributes,
+        }
+    }
+}
+impl Statement {
+    pub fn into_node(self, attributes: Vec<StmtNode>) -> StmtNode {
+        StmtNode {
+            stmt: Box::new(self),
+            attributes,
+        }
+    }
+}
+
 pub struct Ast {
     pub statements: Vec<StmtNode>,
     pub file_attributes: Vec<ScriptAttribute>,
@@ -193,18 +151,21 @@ pub struct Ast {
 
 #[derive(Clone, Debug)]
 pub struct Spanned<T> {
-    pub value: Box<T>,
+    pub value: T,
     pub span: CodeSpan,
 }
 impl<T> Spanned<T> {
     pub fn split(self) -> (T, CodeSpan) {
-        (*self.value, self.span)
+        (self.value, self.span)
     }
     pub fn extended(self, other: CodeSpan) -> Self {
         Self {
             span: self.span.extend(other),
             ..self
         }
+    }
+    pub fn apply_fn<U, F: FnOnce(T) -> U>(self, f: F) -> Spanned<U> {
+        f(self.value).spanned(self.span)
     }
 }
 
@@ -219,9 +180,6 @@ impl<T> Spannable for T {
     where
         Self: Sized,
     {
-        Spanned {
-            value: Box::new(self),
-            span,
-        }
+        Spanned { value: self, span }
     }
 }

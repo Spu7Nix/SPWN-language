@@ -1,6 +1,13 @@
-use std::str::{Chars, FromStr};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    str::{Chars, FromStr},
+    sync::Arc,
+};
 
 use base64::Engine;
+use lasso::Rodeo;
+use string_interner::StringInterner;
 use strum::VariantNames;
 use unindent::Unindent;
 
@@ -12,10 +19,11 @@ use crate::{
 
 use super::{
     ast::{
-        Ast, DictItems, ExprNode, Expression, IDClass, MacroCode, Spannable, Statement, Statements,
-        StmtNode,
+        Ast, DictItems, ExprNode, Expression, IDClass, MacroCode, Spannable, Spanned, Statement,
+        Statements, StmtNode,
     },
-    attributes::{AttributeEnum, ExprAttribute, ScriptAttribute},
+    attributes::{ExprAttribute, ScriptAttribute},
+    // attributes::{AttributeEnum, ExprAttribute, ScriptAttribute},
     error::SyntaxError,
     utils::operators::{self, unary_prec},
 };
@@ -24,14 +32,19 @@ use super::{
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     src: SpwnSource,
+    interner: Rc<RefCell<Rodeo>>,
 }
 
 pub type ParseResult<T> = Result<T, SyntaxError>;
 
 impl<'a> Parser<'a> {
-    pub fn new(code: &'a str, src: SpwnSource) -> Self {
+    pub fn new(code: &'a str, src: SpwnSource, interner: Rodeo) -> Self {
         let lexer = Token::lex(code);
-        Parser { lexer, src }
+        Parser {
+            lexer,
+            src,
+            interner: Rc::new(RefCell::new(interner)),
+        }
     }
 }
 
@@ -319,27 +332,93 @@ impl Parser<'_> {
         Ok(items)
     }
 
-    pub fn parse_attributes<T: AttributeEnum>(&mut self) -> ParseResult<Vec<T>> {
+    // pub fn parse_attributes<T>(&mut self) -> ParseResult<Vec<T>>
+    // where
+    //     T: AttributeArguments,
+    // {
+    //     let mut attrs = vec![];
+    //     self.expect_tok(Token::LSqBracket)?;
+
+    //     list_helper!(self, RSqBracket {
+    //         self.expect_tok(Token::Ident)?;
+
+    //         let attr_name = self.slice();
+
+    //         let mut attr = T::from_str(attr_name).map_err(|_| SyntaxError::UnknownAttribute {
+    //             attr: attr_name.into(),
+    //             area: self.make_area(self.span()),
+
+    //             help: format!(
+    //                 "The valid attributes are: {}",
+    //                 T::VARIANTS
+    //                     .iter()
+    //                     .map(|v| hyperlink(
+    //                         "https://spu7nix.net/spwn/#/attributes?id=attributes",
+    //                         Some(v)
+    //                     ))
+    //                     .collect::<Vec<_>>()
+    //                     .join(", ")
+    //             ),
+    //         })?;
+
+    //         let num_args = attr
+    //             .get_str("args")
+    //             .map_or_else(|| 0, |a| a.parse().unwrap());
+
+    //         let expect_kw = attr.get_str("type").unwrap_or("").eq("kw");
+
+    //         let mut args = vec![];
+
+    //         if num_args > 0 {
+    //             self.expect_tok(Token::LParen)?;
+
+    //             list_helper!(self, RParen {
+    //                 if expect_kw {
+    //                     self.expect_tok(Token::Ident)?;
+    //                     let arg_name = self.slice().to_string();
+
+    //                     self.expect_tok(Token::Assign)?;
+
+    //                     self.expect_tok(Token::String)?;
+    //                     let arg_value = self.parse_string(self.slice(), self.span())?;
+
+    //                     args.push((arg_name, arg_value))
+    //                 } else {
+    //                     self.expect_tok(Token::String)?;
+
+    //                     let arg_value = self.parse_string(self.slice(), self.span())?;
+
+    //                     args.push((args.len().to_string(), arg_value));
+    //                 }
+    //             });
+    //         }
+
+    //         for (name, val) in args {
+    //             attr.set_argument(&name, val).ok_or(SyntaxError::UnknownAttributeArgument { area: self.make_area(self.span()), arg: name })?;
+    //         }
+
+    //         attrs.push(attr);
+    //     });
+
+    //     Ok(attrs)
+    // }
+
+    pub fn parse_attributes<T>(&mut self) -> ParseResult<Vec<T>> {
         let mut attrs = vec![];
         self.expect_tok(Token::LSqBracket)?;
 
-        list_helper!(self, RSqBracket {
-
-            let attr = T::attribute_parse(self)?;
-
-            attrs.push(attr);
-        });
+        list_helper!(self, RSqBracket {});
 
         Ok(attrs)
     }
 
-    pub fn parse_unit(&mut self) -> ParseResult<ExprNode> {
+    pub fn parse_unit(&mut self) -> ParseResult<Spanned<ExprNode>> {
         let attr_start = self.peek_span();
 
         let attrs = if self.next_is(Token::Hashtag) {
             self.next();
 
-            self.parse_attributes::<ExprAttribute>()?
+            self.parse_attributes()?
         } else {
             vec![]
         };
@@ -581,6 +660,9 @@ impl Parser<'_> {
             }
         };
 
+        // attrs.assign_or_err(expr)?;\
+        // expr.
+        // V
         if !attrs.is_empty() {
             match &mut *expr.value {
                 Expression::TriggerFunc { attributes, .. } => {
@@ -599,8 +681,9 @@ impl Parser<'_> {
         Ok(expr)
     }
 
-    pub fn parse_value(&mut self) -> ParseResult<ExprNode> {
+    pub fn parse_value(&mut self) -> ParseResult<Spanned<ExprNode>> {
         let mut value = self.parse_unit()?;
+
         #[allow(clippy::while_let_loop)]
         loop {
             let new_span = value.span.extend(self.peek_span());
@@ -656,11 +739,11 @@ impl Parser<'_> {
         Ok(value)
     }
 
-    pub fn parse_expr(&mut self) -> ParseResult<ExprNode> {
+    pub fn parse_expr(&mut self) -> ParseResult<Spanned<ExprNode>> {
         self.parse_op(0)
     }
 
-    pub fn parse_op(&mut self, prec: usize) -> ParseResult<ExprNode> {
+    pub fn parse_op(&mut self, prec: usize) -> ParseResult<Spanned<ExprNode>> {
         let next_prec = operators::next_infix(prec);
 
         let mut left = match next_prec {
@@ -811,7 +894,7 @@ impl Parser<'_> {
         let file_attributes = if self.next_is(Token::Hashtag) {
             self.next();
 
-            self.parse_attributes::<ScriptAttribute>()?
+            self.parse_attributes()?
         } else {
             vec![]
         };
