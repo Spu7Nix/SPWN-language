@@ -5,6 +5,7 @@ mod error;
 mod lexing;
 mod parsing;
 mod sources;
+mod pckp;
 
 use std::{io::Write, path::PathBuf};
 
