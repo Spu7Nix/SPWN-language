@@ -123,10 +123,12 @@ macro_rules! lexer {
                     }
                 }
 
+
                 const LOOKAHEAD: usize = 1000;
 
                 let lookahead_len = self.code.len().min(LOOKAHEAD);
                 let lookahead = &self.code[0..lookahead_len];
+
 
                 paste! {
                     $(
@@ -167,9 +169,6 @@ macro_rules! lexer {
                                             self.cache[Token::$tok as usize] = n + self.total_advance
                                         }
                                         None => {
-                                            // if Token::$tok == Token::Minus {
-                                            //     println!("                                             fartsex");
-                                            // }
                                             self.cache[Token::$tok as usize] = lookahead_len + self.total_advance
                                         }
                                     }
@@ -186,7 +185,6 @@ macro_rules! lexer {
                         Some(tok)
                     }
                     None => {
-                        println!("ball {} {}", self.total_advance, self.cache[Token::Minus as usize]);
                         self.advance(1);
                         Some(Token::Error)
                     }

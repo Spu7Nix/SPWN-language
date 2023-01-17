@@ -1,9 +1,9 @@
-use std::{collections::HashMap, io::Write};
+use std::io::Write;
 
-use ariadne::sources;
+use ariadne::{sources, Label, Report, ReportKind};
 use colored::Colorize;
 
-use crate::sources::{CodeArea, SpwnSource};
+use crate::sources::CodeArea;
 
 pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
     let text = match text {
@@ -41,7 +41,7 @@ macro_rules! error_maker {
                     Message: $msg:expr, Note: $note:expr;
                     Labels: [
                         $(
-                            $l_area:expr => $fmt:literal $(: $($e:expr),+)?;
+                            $l_area:expr => $fmt:literal $(: $( $($e:expr)? $(=>($e_no_col:expr))? ),+)?;
                         )+
                         $(-> $spread:expr)?
                     ]
@@ -65,9 +65,12 @@ macro_rules! error_maker {
             )*
         }
         use $crate::error::ErrorReport;
+
         impl $enum {
             pub fn to_report(&self $(, $extra_arg: $extra_type)* ) -> ErrorReport {
                 use colored::Colorize;
+                use $crate::error::RainbowColorGenerator;
+                let mut info_colors = RainbowColorGenerator::new(166.0, 0.5, 0.95, 35.0);
                 match self {
                     $(
                         $enum::$err_name { $($field,)* } => ErrorReport {
@@ -76,7 +79,18 @@ macro_rules! error_maker {
                             labels: {
                                 let v = vec![
                                     $(
-                                        ($l_area.clone(), format!($fmt $(, $($e.to_string().truecolor(255, 234, 128).bold()),*)?)),
+                                        ($l_area.clone(), format!($fmt $(, $(
+
+                                            $(
+                                                {
+                                                    let col = info_colors.next();
+                                                    $e.to_string().truecolor(col.0, col.1, col.2).bold()
+                                                }
+                                            )?
+
+                                            $($e_no_col.to_string())?
+
+                                        ),* )?)),
                                     )*
                                 ];
                                 $(
@@ -100,15 +114,18 @@ pub struct RainbowColorGenerator {
     h: f64,
     s: f64,
     v: f64,
+    hue_shift: f64,
 }
 
 impl RainbowColorGenerator {
-    pub fn new(h: f64, s: f64, v: f64) -> Self {
-        Self { h, s, v }
+    pub fn new(h: f64, s: f64, v: f64, hue_shift: f64) -> Self {
+        Self { h, s, v, hue_shift }
     }
-    pub fn next(&mut self) -> ariadne::Color {
+    pub fn next(&mut self) -> (u8, u8, u8) {
         let c = self.v * self.s;
         let h0 = self.h / 60.0;
+
+        // "gfdgdf".bold().hidden()
 
         let x = c * (1.0 - (h0.rem_euclid(2.0) - 1.0).abs());
 
@@ -129,17 +146,15 @@ impl RainbowColorGenerator {
         let m = self.v - c;
         let (r, g, b) = (r + m, g + m, b + m);
 
-        self.h = (self.h + 45.0).rem_euclid(360.0);
+        self.h = (self.h + self.hue_shift).rem_euclid(360.0);
 
-        ariadne::Color::RGB((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+        ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
     }
 }
 
 impl ErrorReport {
     pub fn display(&self) {
-        use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
-
-        let mut colors = RainbowColorGenerator::new(345.0, 0.73, 1.0);
+        let mut label_colors = RainbowColorGenerator::new(308.0, 0.5, 0.95, 35.0);
 
         let mut report = Report::build(ReportKind::Error, "", 0).with_message(&self.message);
 
@@ -147,10 +162,13 @@ impl ErrorReport {
 
         for (area, msg) in &self.labels {
             source_vec.push(area.src.clone());
+
+            let col = label_colors.next();
+
             report = report.with_label(
                 Label::new((area.src.hyperlink(), area.span.into()))
                     .with_message(msg)
-                    .with_color(colors.next()),
+                    .with_color(ariadne::Color::RGB(col.0, col.1, col.2)),
             );
         }
         println!("\n");

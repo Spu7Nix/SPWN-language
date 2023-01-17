@@ -7,7 +7,8 @@ use crate::parsing::{
 use ahash::AHashMap;
 use paste::paste;
 
-use super::ast::{Expression, Spanned, Statement};
+use super::ast::{Expression, Spanned};
+use crate::SpwnSource;
 
 pub trait ParseAttribute {
     fn parse(parser: &mut Parser<'_>) -> ParseResult<Self>
@@ -15,63 +16,59 @@ pub trait ParseAttribute {
         Self: Sized;
 }
 
-pub trait IsValidOn<T> {
-    fn assign_if_valid(&self, node: Spanned<T>) -> ParseResult<Self>
-    where
-        Self: Sized;
+pub trait IsValidOn<T: Into<&'static str>> {
+    fn is_valid_on(&self, node: &Spanned<T>, src: SpwnSource) -> ParseResult<()>;
+}
+
+macro_rules! parse_string {
+    ($parser:ident) => {
+        $parser.parse_string($parser.slice(), $parser.span())?
+    };
 }
 
 macro_rules! attributes {
     (
-        $(
-            $( #[check_validity($check:ident)] )?
-            //$(#[$meta:meta])*
-            pub enum $enum:ident {
+        $( #[check_validity($check:ident)] )?
+        pub enum $enum:ident {
+            $(
+                $(#[valid_on($($item:ident),+ $(,)*)])?
+                $variant:ident
                 $(
-                    $(#[valid_on($($items:path),* $(,)*)])?
-                    $variant:ident
-                    $(
-                        (
-                            $typ1:ty
-                            $(,$typ:ty)*
-                        )
-                    )?
-                    $(
-                        {
-                            $field1:ident: $f_typ1:ty, $($field:ident: $f_typ:ty,)*
-                        }
-                    )?,
-                )+
-            }
-        )+
+                    (
+                        $typ1:ty
+                        $(,$typ:ty)*
+                    )
+                )?
+                $(
+                    {
+                        $field1:ident: $f_typ1:ty, $($field:ident: $f_typ:ty,)*
+                    }
+                )?,
+            )*
+        }
     ) => {
-        $(
-            macro_rules! parse_string {
-                ($parser:ident) => {
-                    $parser.parse_string($parser.slice(), $parser.span())?
-                };
-            }
 
-            #[derive(Debug, Clone)]
-            pub enum $enum {
-                $(
-                    $variant $( ( $typ1 $(,$typ)*) )? $( { $field1: $f_typ1, $($field: $f_typ,)* } )?,
-                )+
-            }
 
-            impl ParseAttribute for $enum {
-                #[allow(redundant_semicolons)]
-                fn parse(parser: &mut Parser) -> ParseResult<$enum> {
-                    parser.expect_tok(Token::Ident)?;
+        #[derive(Debug, Clone)]
+        pub enum $enum {
+            $(
+                $variant $( ( $typ1 $(,$typ)*) )? $( { $field1: $f_typ1, $($field: $f_typ,)* } )?,
+            )*
+        }
 
-                    let attr_name = parser.slice().to_string();
-                    let attr_name_span = parser.span();
+        impl ParseAttribute for $enum {
+            #[allow(redundant_semicolons)]
+            fn parse(parser: &mut Parser) -> ParseResult<$enum> {
+                parser.expect_tok(Token::Ident)?;
 
-                    let attr = loop {
-                        $(
-                            if paste!(attr_name == stringify!([< $variant:snake >])) {
-                                // let has_fields = {false $(; stringify!($($typ)*); true)? $(; stringify!($($field)*); true)?};
+                let attr_name = parser.slice().to_string();
+                let attr_name_span = parser.span();
 
+                #[allow(unused_variables)]
+                let attr = loop {
+                    $(
+                        paste!(
+                            if attr_name == stringify!([< $variant:snake >]) {
                                 $(
                                     let field_names = vec![stringify!($field1) $(,stringify!($field))*];
                                     parser.expect_tok(Token::LParen)?;
@@ -81,7 +78,14 @@ macro_rules! attributes {
                                     for (i, _) in field_names.iter().enumerate() {
 
                                         if i != 0 {
-                                            parser.expect_tok(Token::Comma)?;
+                                            parser.expect_tok(Token::Comma).map_err(|_| {
+                                                SyntaxError::InvalidAttributeArgCount {
+                                                    attribute: stringify!([< $variant:snake >]).into(),
+                                                    expected: field_names.len(),
+
+                                                    area: parser.make_area(attr_name_span)
+                                                }
+                                            })?;
                                         }
                                         parser.expect_tok(Token::Ident)?;
 
@@ -111,10 +115,18 @@ macro_rules! attributes {
                                     }
 
                                     parser.skip_tok(Token::Comma);
-                                    parser.expect_tok(Token::RParen)?;
+                                    parser.expect_tok(Token::RParen).map_err(|_| {
+                                        SyntaxError::InvalidAttributeArgCount {
+                                            attribute: stringify!([< $variant:snake >]).into(),
+                                            expected: field_names.len(),
+
+                                            area: parser.make_area(attr_name_span)
+                                        }
+                                    })?;
                                 )?
 
-                                paste!(
+                                $( let tuple_arg_amount = [stringify!($typ1), $(stringify!($typ)),*].len(); )?
+
                                     let r = $enum::$variant
                                         $(
                                             (
@@ -128,9 +140,18 @@ macro_rules! attributes {
                                                 }
                                                 $(
                                                     ,{
+
                                                         stringify!($typ);
 
-                                                        parser.expect_tok(Token::Comma)?;
+                                                        parser.expect_tok(Token::Comma).map_err(|_| {
+                                                            SyntaxError::InvalidAttributeArgCount {
+                                                                attribute: stringify!([< $variant:snake >]).into(),
+                                                                expected: tuple_arg_amount,
+
+                                                                area: parser.make_area(attr_name_span)
+                                                            }
+                                                        })?;
+
                                                         parser.expect_tok(Token::String)?;
 
                                                         parse_string!(parser)
@@ -139,7 +160,14 @@ macro_rules! attributes {
                                             );
 
                                             parser.skip_tok(Token::Comma);
-                                            parser.expect_tok(Token::RParen)?;
+                                            parser.expect_tok(Token::RParen).map_err(|_| {
+                                                SyntaxError::InvalidAttributeArgCount {
+                                                    attribute: stringify!([< $variant:snake >]).into(),
+                                                    expected: tuple_arg_amount,
+
+                                                    area: parser.make_area(attr_name_span)
+                                                }
+                                            })?;
                                         )?
                                         $(
                                             {
@@ -150,75 +178,116 @@ macro_rules! attributes {
                                             };
                                         )?
                                     ;
-                                );
-
                                 break r;
                             }
+                        );
+                    )*
+
+                    return Err(SyntaxError::UnknownAttribute {
+                        area: parser.make_area(attr_name_span),
+                        attribute: attr_name,
+                        valid: paste!(vec![$(hyperlink(
+                            "https://spu7nix.net/spwn/#/attributes?id=attributes",
+                            Some(stringify!([<$variant:snake>]))
+                        )),*])
+                    })
+                };
+
+                #[allow(unreachable_code)]
+                Ok(attr)
+            }
+        }
+
+
+        attributes!(
+            @impl !$($check)?; $enum;
+            $(
+                $variant: $($($item),+)?;
+            )*
+        );
+
+    };
+
+    (@impl !; $($rest:tt)*) => {};
+
+    (
+        @impl !$check:ident; $enum:ident;
+        $(
+            $variant:ident: $($item:ident),+;
+        )*
+    ) => {
+        impl IsValidOn<$check> for Vec<Spanned<$enum>> {
+            fn is_valid_on(&self, node: &Spanned<$check>, src: SpwnSource) -> ParseResult<()> {
+                if !self.is_empty() {
+                    let mut map: AHashMap<&str, Vec<String>> = AHashMap::new();
+
+                    paste!(
+                        $(
+                            $(
+                                map.entry(
+                                    stringify!($item)
+                                )
+                                .and_modify( |v| v.push(
+                                    stringify!([<$variant:snake>])
+                                        .to_string()
+                                ))
+                                .or_insert(vec![
+                                    stringify!([<$variant:snake>]).to_string()
+                                ]);
+                            )+
                         )+
 
-                        return Err(SyntaxError::UnknownAttribute {
-                            area: parser.make_area(attr_name_span),
-                            attribute: attr_name,
-                            valid: paste!(vec![$(hyperlink(
-                                "https://spu7nix.net/spwn/#/attributes?id=attributes",
-                                Some(stringify!([<$variant:snake>]))
-                            )),+])
-                        })
-                    };
 
-                    Ok(attr)
-                }
-            }
-
-            $(
-                impl IsValidOn<$check> for Vec<$enum> {
-                    fn assign_if_valid(&self, node: Spanned<$check>) -> ParseResult<Self> {
-                        if !self.is_empty() {
-
+                        for attr in self {
+                            match attr.value {
+                                $(
+                                    $enum::$variant{..} => match &node.value {
+                                        $(
+                                            $check::$item {..} => (),
+                                        )+
+                                        other => return Err(SyntaxError::MismatchedAttribute {
+                                            area: src.area(attr.span),
+                                            expr_area: src.area(node.span),
+                                            attr: stringify!([< $variant:snake >]).into(),
+                                            valid: map.remove(Into::<&'static str>::into(other)),
+                                        }),
+                                    },
+                                )+
+                            }
                         }
-                        todo!()
-                    }
+                    );
                 }
-            )?
-        )+
+
+                Ok(())
+            }
+        }
     };
+}
+attributes! {
+    pub enum StmtAttribute {}
 }
 
 attributes! {
-
-    pub enum ScriptAttribute {
-        Fart,
-        CockTuple(String, String),
-        TheStruct {
-            fart: String,
-            dog: String,
-        },
-    }
-
     #[check_validity(Expression)]
     pub enum ExprAttribute {
-        #[valid_on(TriggerFunction)]
-        Cocker(String),
-        #[valid_on(TriggerFunction)]
-        Bitch,
+        #[valid_on(TriggerFunc, Int)]
+        NoOptimize,
+
+        #[valid_on(TriggerFunc)]
+        Poo(String, String),
+
+        #[valid_on(TriggerFunc)]
+        Cock {
+            dog: String,
+            cat: String,
+        },
     }
 }
 
-// pub type Attributes<T> = Vec<T>;
-
 // attributes! {
-//     #[derive(Debug, Clone)]
-//     pub enum ExprAttribute {
-//         //#[valid_on(Expression::TriggerFunc)]
-//         #[serde]
-//         NoOptimize,
-//     }
-// }
-
-// attributes! {
-//     #[derive(Debug, Clone)]
+//     #[check_validity(Statement)]
 //     pub enum DocAttribute {
-//         //#[valid_on(Expression::TriggerFunc, Expression::Method, Expression::Type)]
+//         #[valid_on(Expression::TriggerFunc, Expression::Method, Expression::Type)]
 //         Doc(String),
 
 //         //#[valid_on(Expression::TriggerFunc, Expression::Method, Expression::Type)]
@@ -226,22 +295,12 @@ attributes! {
 //     }
 // }
 
-// attributes! {
-//     #[derive(Debug, Clone)]
-//     pub enum ScriptAttribute {
-//         //#[valid_on()]
-//         CacheOutput,
-
-//         //#[valid_on()]
-//         NoStd,
-
-//         //#[valid_on()]
-//         ConsoleOutput,
-
-//         //#[valid_on()]
-//         NoLevel,
-
-//         //#[valid_on()]
-//         NoBytecodeCache,
-//     }
-// }
+attributes! {
+    pub enum ScriptAttribute {
+        CacheOutput,
+        NoStd,
+        ConsoleOutput,
+        NoLevel,
+        NoBytecodeCache,
+    }
+}

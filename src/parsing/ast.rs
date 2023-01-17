@@ -1,15 +1,13 @@
-use strum::{EnumProperty, EnumString, EnumVariantNames};
+use lasso::Spur;
 
 use crate::{lexing::tokens::Token, sources::CodeSpan};
 
-use super::attributes::{ExprAttribute, ScriptAttribute};
-
-///use super::attributes::{ExprAttribute, ScriptAttribute};
+use super::attributes::{ExprAttribute, ScriptAttribute, StmtAttribute};
 
 #[derive(Debug, Clone)]
 pub enum ImportType {
-    Module(String),
-    Library(String),
+    Module(Spur),
+    Library(Spur),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
@@ -30,21 +28,23 @@ pub enum MacroCode {
 pub struct ExprNode {
     pub expr: Box<Expression>,
     pub attributes: Vec<ExprAttribute>,
+    pub span: CodeSpan,
 }
 
 #[derive(Debug, Clone)]
 pub struct StmtNode {
     pub stmt: Box<Statement>,
-    pub attributes: Vec<StmtNode>,
+    pub attributes: Vec<StmtAttribute>,
+    pub span: CodeSpan,
 }
 
 pub type DictItems = Vec<(Spanned<String>, Option<ExprNode>)>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, strum::IntoStaticStr)]
 pub enum Expression {
     Int(i64),
     Float(f64),
-    String(String),
+    String(Spur),
     Bool(bool),
 
     Id(IDClass, Option<u16>),
@@ -52,8 +52,8 @@ pub enum Expression {
     Op(ExprNode, Token, ExprNode),
     Unary(Token, ExprNode),
 
-    Var(String),
-    Type(String),
+    Var(Spur),
+    Type(Spur),
 
     Array(Vec<ExprNode>),
     Dict(DictItems),
@@ -66,15 +66,21 @@ pub enum Expression {
     },
     Member {
         base: ExprNode,
-        name: String,
+        name: Spur,
     },
     Associated {
         base: ExprNode,
-        name: String,
+        name: Spur,
+    },
+
+    Call {
+        base: ExprNode,
+        params: Vec<ExprNode>,
+        named_params: Vec<(Spur, ExprNode)>,
     },
 
     Macro {
-        args: Vec<(Spanned<String>, Option<ExprNode>, Option<ExprNode>)>,
+        args: Vec<(Spanned<Spur>, Option<ExprNode>, Option<ExprNode>)>,
         ret_type: Option<ExprNode>,
         code: MacroCode,
     },
@@ -96,14 +102,18 @@ pub enum Expression {
         if_false: ExprNode,
     },
 
+    Typeof(ExprNode),
+
     Builtins,
     Empty,
+
+    Import(ImportType),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, strum::IntoStaticStr)]
 pub enum Statement {
     Expr(ExprNode),
-    Let(String, ExprNode),
+    Let(Spur, ExprNode),
     If {
         branches: Vec<(ExprNode, Statements)>,
         else_branch: Option<Statements>,
@@ -113,9 +123,14 @@ pub enum Statement {
         code: Statements,
     },
     For {
-        var: String,
+        var: Spur,
         iterator: ExprNode,
         code: Statements,
+    },
+    TryCatch {
+        try_code: Statements,
+        error_var: Option<Spur>,
+        catch_code: Statements,
     },
 
     Arrow(Box<Statement>),
@@ -123,27 +138,54 @@ pub enum Statement {
     Return(Option<ExprNode>),
     Break,
     Continue,
+
+    TypeDef(Spur),
+    Extract(ExprNode),
+
+    Impl {
+        typ: Spur,
+        items: DictItems,
+    },
 }
 
 pub type Statements = Vec<StmtNode>;
 
 impl Expression {
-    pub fn into_node(self, attributes: Vec<ExprAttribute>) -> ExprNode {
+    pub fn into_node(self, attributes: Vec<ExprAttribute>, span: CodeSpan) -> ExprNode {
         ExprNode {
             expr: Box::new(self),
             attributes,
+            span,
         }
     }
 }
 impl Statement {
-    pub fn into_node(self, attributes: Vec<StmtNode>) -> StmtNode {
+    pub fn into_node(self, attributes: Vec<StmtAttribute>, span: CodeSpan) -> StmtNode {
         StmtNode {
             stmt: Box::new(self),
             attributes,
+            span,
         }
     }
 }
 
+impl ExprNode {
+    pub fn extended(self, other: CodeSpan) -> Self {
+        Self {
+            span: self.span.extend(other),
+            ..self
+        }
+    }
+}
+impl StmtNode {
+    pub fn extended(self, other: CodeSpan) -> Self {
+        Self {
+            span: self.span.extend(other),
+            ..self
+        }
+    }
+}
+#[derive(Debug)]
 pub struct Ast {
     pub statements: Vec<StmtNode>,
     pub file_attributes: Vec<ScriptAttribute>,

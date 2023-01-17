@@ -190,15 +190,35 @@ error_maker! {
 
         /////////
         #[
-            Message: "Mismatched attribute", Note: Some(help.to_string());
+            Message: "Positional argument after keyword argument", Note: None;
             Labels: [
-                area => "Attributes cannot be added to this expression";
+                area => "This positional argument was provided after keyword arguments";
+                keyword_area => "First keyword argument provided here";
+            ]
+        ]
+        PositionalArgAfterKeyword {
+            area: CodeArea,
+            keyword_area: CodeArea,
+        },
+
+        /////////
+        #[
+            Message: "Mismatched attribute", Note: None;
+            Labels: [
+                area => "Attribute `{}` cannot be added to this expression": attr;
+
+                expr_area => "{}": =>(match valid {
+                    Some(v) => format!("The valid attributes for this expression are: {}", v.join(", ")),
+                    None => "This expression doesn't support any attributes".into(),
+                });
             ]
         ]
         MismatchedAttribute {
             area: CodeArea,
+            expr_area: CodeArea,
+            attr: String,
 
-            help: String,
+            valid: Option<Vec<String>>,
         },
 
         /////////
@@ -230,14 +250,17 @@ error_maker! {
 
         /////////
         #[
-            Message: "Invalid attribute value", Note: None;
+            Message: "Invalid numnber of arguments", Note: None;
             Labels: [
-                area => "{}": message;
+                area => "Attribute `{}` expected {} arguments": attribute, expected;
             ]
         ]
-        InvalidAttributeValue {
+        InvalidAttributeArgCount {
+            attribute: String,
+            expected: usize,
+
             area: CodeArea,
-            message: String,
         },
+
     }
 }

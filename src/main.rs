@@ -1,21 +1,23 @@
 #![deny(unused_must_use)]
-
-use std::{io::Write, path::PathBuf};
-
-use crate::{lexing::tokens::Token, parsing::parser::Parser, sources::SpwnSource};
-use lasso::Rodeo;
-use string_interner::StringInterner;
+#![allow(clippy::result_large_err)] // shut the fuck up clippy Lmao
 
 mod error;
 mod lexing;
 mod parsing;
 mod sources;
 
+use std::{io::Write, path::PathBuf};
+
+use crate::{lexing::tokens::Token, parsing::parser::Parser, sources::SpwnSource};
+use lasso::Rodeo;
+
+use ahash::RandomState;
+
 fn main() {
     print!("\x1B[2J\x1B[1;1H");
     std::io::stdout().flush().unwrap();
 
-    let interner = Rodeo::new(); //Rodeo::default();
+    let interner: Rodeo<lasso::Spur, RandomState> = Rodeo::with_hasher(RandomState::new());
 
     let path = PathBuf::from("test.spwn");
 
@@ -26,8 +28,7 @@ fn main() {
 
     match parser.parse() {
         Ok(ast) => {
-            // println!("attrs: {:#?}", ast.file_attributes);
-            println!("{:#?}", ast.statements)
+            println!("{:#?}", ast)
         }
         Err(err) => err.to_report().display(),
     }

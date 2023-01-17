@@ -1,6 +1,9 @@
-#[no_std]
+impl @cock {
+    aaa: (self, bob: @fuck) {
+        print(self, bob.dick);
+    },
+};
 
 
 
 
-#[deprecated(a = "£111")] !{}
