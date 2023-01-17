@@ -95,6 +95,18 @@ pub enum Opcode {
         right: Register,
         dest: Register,
     },
+    Not {
+        src: Register,
+        dest: Register,
+    },
+    ShifLeft {
+        src: Register,
+        dest: Register,
+    },
+    ShiftRight {
+        src: Register,
+        dest: Register,
+    },
 
     Jump {
         to: JumpPos,

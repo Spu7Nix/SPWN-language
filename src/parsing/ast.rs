@@ -108,12 +108,17 @@ pub enum Expression {
     Empty,
 
     Import(ImportType),
+
+    Instance {
+        base: ExprNode,
+        items: DictItems,
+    },
 }
 
 #[derive(Debug, Clone, strum::IntoStaticStr)]
 pub enum Statement {
     Expr(ExprNode),
-    Let(Spur, ExprNode),
+    Let(ExprNode, ExprNode),
     If {
         branches: Vec<(ExprNode, Statements)>,
         else_branch: Option<Statements>,
@@ -123,7 +128,7 @@ pub enum Statement {
         code: Statements,
     },
     For {
-        var: Spur,
+        iter: ExprNode,
         iterator: ExprNode,
         code: Statements,
     },

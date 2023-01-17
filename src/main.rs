@@ -1,10 +1,12 @@
 #![deny(unused_must_use)]
 #![allow(clippy::result_large_err)] // shut the fuck up clippy Lmao
 
+mod compiling;
 mod error;
 mod lexing;
 mod parsing;
 mod sources;
+mod vm;
 
 use std::{io::Write, path::PathBuf};
 
@@ -28,7 +30,8 @@ fn main() {
 
     match parser.parse() {
         Ok(ast) => {
-            println!("{:#?}", ast)
+            // println!("{:#?}", ast)
+            println!("cock")
         }
         Err(err) => err.to_report().display(),
     }

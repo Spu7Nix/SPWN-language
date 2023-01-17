@@ -495,7 +495,6 @@ impl Parser<'_> {
                             self.next();
                             MacroCode::Lambda(self.parse_expr()?)
                         } else {
-                            // println!("fuckfart");
                             MacroCode::Normal(self.parse_block()?)
                         };
 
@@ -541,7 +540,6 @@ impl Parser<'_> {
 
                     Expression::Maybe(None).spanned(start.extend(self.span()))
                 }
-
                 Token::TrigFnBracket => {
                     self.next();
 
@@ -642,10 +640,21 @@ impl Parser<'_> {
                 }
                 Token::DoubleColon => {
                     self.next();
-                    self.expect_tok_named(Token::Ident, "associated member name")?;
-                    let name = self.slice_interned();
-
-                    Expression::Associated { base: value, name }
+                    match self.next() {
+                        Token::Ident => {
+                            let name = self.slice_interned();
+                            Expression::Associated { base: value, name }
+                        }
+                        Token::LBracket => {
+                            let items = self.parse_dictlike()?;
+                            Expression::Instance { base: value, items }
+                        }
+                        other => return Err(SyntaxError::UnexpectedToken {
+                            expected: "associated member name or instance fields".into(),
+                            found: other,
+                            area: self.make_area(self.span()),
+                        })
+                    }
                 }
                 Token::QMark => {
                     self.next();
@@ -772,12 +781,11 @@ impl Parser<'_> {
         let stmt = match self.peek() {
             Token::Let => {
                 self.next();
-                self.expect_tok_named(Token::Ident, "variable name")?;
-                let var_name = self.slice_interned();
+                let var = self.parse_unit()?;
                 self.expect_tok(Token::Assign)?;
                 let value = self.parse_expr()?;
 
-                Statement::Let(var_name, value)
+                Statement::Let(var, value)
             }
             Token::If => {
                 self.next();
@@ -815,15 +823,14 @@ impl Parser<'_> {
             }
             Token::For => {
                 self.next();
-                self.expect_tok_named(Token::Ident, "variable name")?;
-                let var = self.slice_interned();
+                let iter = self.parse_unit()?;
                 self.expect_tok(Token::In)?;
                 let iterator = self.parse_expr()?;
 
                 let code = self.parse_block()?;
 
                 Statement::For {
-                    var,
+                    iter,
                     iterator,
                     code,
                 }

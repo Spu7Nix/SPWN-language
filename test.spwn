@@ -1,9 +1,32 @@
-impl @cock {
-    aaa: (self, bob: @fuck) {
-        print(self, bob.dick);
-    },
+
+// match gkdfg {
+//     @int => ...,
+//     >4 => ...,
+//     let [a, b] => ...,
+//     ==5 => ...
+// }
+
+/*
+
+[a, b] = [10, 11]
+{} = ...
+
+a = 10
+b = 11
+
+
+let [] = ...
+let {} = ...
+
+for [] in {}
+for {} in {}
+
+*/
+
+
+for [a, b] in cock {
+    
 };
-
-
-
-
+for [a, b] in cock {
+    
+};

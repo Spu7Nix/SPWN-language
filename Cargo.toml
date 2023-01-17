@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-slotmap = "1.0.6"
 ariadne = "0.1.5"
 colored = "2.0.0"
 ahash = "0.8.2"
@@ -19,3 +18,4 @@ unindent = "0.1.11"
 base64 = "0.21.0"
 lasso = "0.6.0"
 strum = { version = "0.24.1", features = ["derive"] }
+slotmap = "1.0.6"
