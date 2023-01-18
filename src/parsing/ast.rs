@@ -2,7 +2,10 @@ use lasso::Spur;
 
 use crate::{lexing::tokens::Token, sources::CodeSpan};
 
-use super::attributes::{ExprAttribute, ScriptAttribute, StmtAttribute};
+use super::{
+    attributes::{ExprAttribute, ScriptAttribute, StmtAttribute},
+    utils::operators::{BinOp, UnaryOp},
+};
 
 #[derive(Debug, Clone)]
 pub enum ImportType {
@@ -49,8 +52,8 @@ pub enum Expression {
 
     Id(IDClass, Option<u16>),
 
-    Op(ExprNode, Token, ExprNode),
-    Unary(Token, ExprNode),
+    Op(ExprNode, BinOp, ExprNode),
+    Unary(UnaryOp, ExprNode),
 
     Var(Spur),
     Type(Spur),

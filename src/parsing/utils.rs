@@ -1,8 +1,12 @@
 macro_rules! operators {
+
     (
         $(
-            $assoc:ident => [$($tok:ident),*];
-        )*
+            $( Left => [$($l_tok:ident),+] )?
+            $( Right => [$($r_tok:ident),+] )?
+            $( Unary => [$($u_tok:ident),+] )?
+            ;
+        )+
     ) => {
         pub mod operators {
 
@@ -15,7 +19,47 @@ macro_rules! operators {
                 Unary,
             }
 
-            const OP_LIST: &[(OpType, &[Token])] = &[$((OpType::$assoc, &[$(Token::$tok),*])),*];
+            #[derive(Debug, Clone, Copy)]
+            pub enum BinOp {
+                $(
+                    $($($l_tok,)+)?
+                    $($($r_tok,)+)?
+                )+
+            }
+            #[derive(Debug, Clone, Copy)]
+            pub enum UnaryOp {
+                $(
+                    $($($u_tok,)+)?
+                )+
+            }
+
+            impl Token {
+                pub fn to_bin_op(self) -> BinOp {
+                    match self {
+                        $(
+                            $($(Token::$l_tok => BinOp::$l_tok,)+)?
+                            $($(Token::$r_tok => BinOp::$r_tok,)+)?
+                        )+
+                        _ => unreachable!(),
+                    }
+                }
+                pub fn to_unary_op(self) -> UnaryOp {
+                    match self {
+                        $(
+                            $($(Token::$u_tok => UnaryOp::$u_tok,)+)?
+                        )+
+                        _ => unreachable!(),
+                    }
+                }
+            }
+
+            const OP_LIST: &[(OpType, &[Token])] = &[
+                $(
+                    $( (OpType::Left, &[$(Token::$l_tok),*]) )?
+                    $( (OpType::Right, &[$(Token::$r_tok),*]) )?
+                    $( (OpType::Unary, &[$(Token::$u_tok),*]) )?
+                ),*
+            ];
             pub const OP_COUNT: usize = OP_LIST.len();
 
             pub fn next_infix(prec: usize) -> Option<usize> {

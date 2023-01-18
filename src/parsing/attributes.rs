@@ -20,6 +20,7 @@ pub trait IsValidOn<T: Into<&'static str>> {
     fn is_valid_on(&self, node: &Spanned<T>, src: SpwnSource) -> ParseResult<()>;
 }
 
+#[allow(unused_macros)]
 macro_rules! parse_string {
     ($parser:ident) => {
         $parser.parse_string($parser.slice(), $parser.span())?
@@ -272,15 +273,6 @@ attributes! {
     pub enum ExprAttribute {
         #[valid_on(TriggerFunc, Int)]
         NoOptimize,
-
-        #[valid_on(TriggerFunc)]
-        Poo(String, String),
-
-        #[valid_on(TriggerFunc)]
-        Cock {
-            dog: String,
-            cat: String,
-        },
     }
 }
 

@@ -20,11 +20,13 @@ use super::{
     utils::operators::{self, unary_prec},
 };
 
+pub type Interner = Rodeo<Spur, RandomState>;
+
 #[derive(Clone)]
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     src: SpwnSource,
-    interner: Rc<RefCell<Rodeo<Spur, RandomState>>>,
+    pub interner: Rc<RefCell<Interner>>,
 }
 
 pub type ParseResult<T> = Result<T, SyntaxError>;
@@ -588,7 +590,7 @@ impl Parser<'_> {
                         None => self.parse_value()?,
                     };
 
-                    Expression::Unary(unary_op, val).spanned(start.extend(self.span()))
+                    Expression::Unary(unary_op.to_unary_op(), val).spanned(start.extend(self.span()))
                 }
 
                 other => {
@@ -755,7 +757,7 @@ impl Parser<'_> {
                 self.parse_op(prec)?
             };
             let new_span = left.span.extend(right.span);
-            left = Expression::Op(left, op, right).into_node(vec![], new_span)
+            left = Expression::Op(left, op.to_bin_op(), right).into_node(vec![], new_span)
         }
         Ok(left)
     }

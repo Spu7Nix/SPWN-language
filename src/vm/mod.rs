@@ -1,3 +1,2 @@
-pub mod bytecode;
 mod interpreter;
-mod opcodes;
+pub mod opcodes;

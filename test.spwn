@@ -24,9 +24,5 @@ for {} in {}
 */
 
 
-for [a, b] in cock {
-    
-};
-for [a, b] in cock {
-    
-};
+[];
+

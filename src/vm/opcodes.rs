@@ -2,17 +2,26 @@ use serde::{
     de::{Error, Visitor},
     Deserialize, Serialize,
 };
+use strum::EnumString;
 
 pub type Register = u8;
 pub type ConstID = u16;
 pub type JumpPos = u16;
 pub type AllocSize = u16;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, EnumString)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum Opcode {
     LoadConst {
         dest: Register,
         id: ConstID,
+    },
+    Copy {
+        from: Register,
+        to: Register,
+    },
+    Print {
+        reg: Register,
     },
     // LoadBuiltin {},
 
@@ -51,9 +60,92 @@ pub enum Opcode {
         right: Register,
         dest: Register,
     },
+    Mod {
+        left: Register,
+        right: Register,
+        dest: Register,
+    },
     Pow {
         left: Register,
         right: Register,
+        dest: Register,
+    },
+    ShiftLeft {
+        left: Register,
+        right: Register,
+        dest: Register,
+    },
+    ShiftRight {
+        left: Register,
+        right: Register,
+        dest: Register,
+    },
+    BinOr {
+        left: Register,
+        right: Register,
+        dest: Register,
+    },
+    BinAnd {
+        left: Register,
+        right: Register,
+        dest: Register,
+    },
+
+    AddEq {
+        left: Register,
+        right: Register,
+    },
+    SubEq {
+        left: Register,
+        right: Register,
+    },
+    MultEq {
+        left: Register,
+        right: Register,
+    },
+    DivEq {
+        left: Register,
+        right: Register,
+    },
+    ModEq {
+        left: Register,
+        right: Register,
+    },
+    PowEq {
+        left: Register,
+        right: Register,
+    },
+    ShiftLeftEq {
+        left: Register,
+        right: Register,
+    },
+    ShiftRightEq {
+        left: Register,
+        right: Register,
+    },
+    BinAndEq {
+        left: Register,
+        right: Register,
+    },
+    BinOrEq {
+        left: Register,
+        right: Register,
+    },
+    BinNotEq {
+        left: Register,
+        right: Register,
+    },
+
+    Not {
+        src: Register,
+        dest: Register,
+    },
+    Negate {
+        src: Register,
+        dest: Register,
+    },
+    BinNot {
+        src: Register,
         dest: Register,
     },
 
@@ -69,19 +161,44 @@ pub enum Opcode {
     },
 
     Gt {
-        src: Register,
+        left: Register,
+        right: Register,
         dest: Register,
     },
     Lt {
-        src: Register,
+        left: Register,
+        right: Register,
         dest: Register,
     },
     Gte {
-        src: Register,
+        left: Register,
+        right: Register,
         dest: Register,
     },
     Lte {
-        src: Register,
+        left: Register,
+        right: Register,
+        dest: Register,
+    },
+
+    Range {
+        left: Register,
+        right: Register,
+        dest: Register,
+    },
+    In {
+        left: Register,
+        right: Register,
+        dest: Register,
+    },
+    As {
+        left: Register,
+        right: Register,
+        dest: Register,
+    },
+    Is {
+        left: Register,
+        right: Register,
         dest: Register,
     },
 
@@ -93,18 +210,6 @@ pub enum Opcode {
     Or {
         left: Register,
         right: Register,
-        dest: Register,
-    },
-    Not {
-        src: Register,
-        dest: Register,
-    },
-    ShifLeft {
-        src: Register,
-        dest: Register,
-    },
-    ShiftRight {
-        src: Register,
         dest: Register,
     },
 
