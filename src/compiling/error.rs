@@ -1,8 +1,8 @@
 use std::string::ToString;
 
-use crate::error::hyperlink;
 use crate::error_maker;
 use crate::sources::CodeArea;
+use crate::util::hyperlink;
 
 error_maker! {
     Title: "Compile Error"

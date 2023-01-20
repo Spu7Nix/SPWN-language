@@ -1,3 +1,4 @@
+use delve::EnumToStr;
 use lasso::Spur;
 
 use crate::{gd::ids::IDClass, lexing::tokens::Token, sources::CodeSpan};
@@ -35,7 +36,7 @@ pub struct StmtNode {
 
 pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>)>;
 
-#[derive(Debug, Clone, strum::IntoStaticStr)]
+#[derive(Debug, Clone, EnumToStr)]
 pub enum Expression {
     Int(i64),
     Float(f64),
@@ -110,7 +111,7 @@ pub enum Expression {
     },
 }
 
-#[derive(Debug, Clone, strum::IntoStaticStr)]
+#[derive(Debug, Clone, EnumToStr)]
 pub enum Statement {
     Expr(ExprNode),
     Let(ExprNode, ExprNode),

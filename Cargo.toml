@@ -17,6 +17,5 @@ paste = "1.0.11"
 unindent = "0.1.11"
 base64 = "0.21.0"
 lasso = "0.6.0"
-strum = { version = "0.24.1", features = ["derive"] }
 slotmap = "1.0.6"
-delve = { version = "0.2.0", features = ["derive"] }
+delve = { version = "0.3.0", features = ["derive"] }

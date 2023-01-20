@@ -7,3 +7,14 @@ pub enum IDClass {
     Block = 2,
     Item = 3,
 }
+
+impl IDClass {
+    pub fn letter(&self) -> &str {
+        match self {
+            IDClass::Group => "g",
+            IDClass::Color => "c",
+            IDClass::Block => "b",
+            IDClass::Item => "i",
+        }
+    }
+}

@@ -1,4 +1,4 @@
-use crate::error::hyperlink;
+use crate::util::hyperlink;
 use std::{fs, ops::Range, path::PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

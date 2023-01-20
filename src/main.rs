@@ -7,6 +7,7 @@ mod gd;
 mod lexing;
 mod parsing;
 mod sources;
+mod util;
 mod vm;
 
 use std::rc::Rc;
@@ -20,37 +21,11 @@ use crate::{
     sources::SpwnSource,
     vm::opcodes::Opcode,
 };
+use colored::Colorize;
 use compiling::bytecode::BytecodeBuilder;
 use lasso::Rodeo;
 
 use ahash::RandomState;
-
-// fn ball() {
-//     let mut b = BytecodeBuilder::new();
-
-//     b.new_func(|b| {
-//         b.load_none(0);
-//         b.load_none(1);
-
-//         b.block(|b| {
-//             b.load_none(2);
-//             Ok(())
-//         })
-//         .unwrap();
-//         b.load_none(3);
-//         b.block(|b| {
-//             b.load_none(2);
-//             Ok(())
-//         })
-//         .unwrap();
-//         b.load_none(3);
-
-//         Ok(())
-//     })
-//     .unwrap();
-
-//     b.build();
-// }
 
 fn main() {
     print!("\x1B[2J\x1B[1;1H");

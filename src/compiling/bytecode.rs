@@ -2,26 +2,47 @@ use std::hash::Hash;
 
 use ahash::AHashMap;
 use colored::Colorize;
-use delve::{FieldNames, ModifyField};
+use delve::{FieldNames, VariantNames};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 
 use crate::{
+    error::RainbowColorGenerator,
     gd::ids::IDClass,
     vm::opcodes::{Opcode, Register},
 };
 
-use super::error::CompilerError;
-
 use super::compiler::CompileResult;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum Constant {
     Int(i64),
     Float(f64),
     String(String),
     Bool(bool),
     Id(IDClass, Option<u16>),
+}
+
+impl std::fmt::Debug for Constant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Constant::Int(v) => write!(f, "{}", v.to_string()),
+            Constant::Float(v) => write!(f, "{}", v.to_string()),
+            Constant::Bool(v) => write!(f, "{}", v.to_string()),
+            Constant::String(v) => write!(f, "\"{}\"", v),
+            Constant::Id(class, n) => write!(
+                f,
+                "{}{}",
+                if let Some(n) = n {
+                    n.to_string()
+                } else {
+                    "".into()
+                },
+                class.letter()
+            ),
+        }
+    }
 }
 
 #[allow(clippy::derive_hash_xor_eq)]
@@ -206,9 +227,9 @@ impl BytecodeBuilder {
             }
 
             get_block_pos(&f.code, &mut length, &mut block_positions);
-            for (path, (start, end)) in &block_positions {
-                println!("{:?} -> [{}, {})", path, start, end)
-            }
+            // for (path, (start, end)) in &block_positions {
+            //     println!("{:?} -> [{}, {})", path, start, end)
+            // }
 
             let mut opcodes = vec![];
 
@@ -618,7 +639,7 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn load_builtins(&mut self, to: Register) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::LoadBuiltins { to }))
+            .push(ProtoOpcode::Raw(Opcode::LoadBuiltins { dest: to }))
     }
 
     pub fn ret(&mut self, src: Register) {
@@ -646,13 +667,102 @@ pub struct Bytecode {
 
 impl std::fmt::Display for Bytecode {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "Constants: {:?}\n", self.consts)?;
+        let longest_opcode: usize = Opcode::VARIANT_NAMES
+            .iter()
+            .map(|s| s.len())
+            .max()
+            .unwrap_or(2);
+
+        writeln!(f, "{}: {:?}\n", "Constants".red(), self.consts)?;
+
+        let mut colors = RainbowColorGenerator::new(150.0, 0.4, 0.9, 60.0);
+
+        let mut lines = vec![];
+        let mut formatted_opcodes = vec![];
+        let mut formatted_field_names = vec![];
+        let mut longest_formatted = 0;
+        let mut longest_field_name = 0;
+
+        let col_reg = Regex::new(r"(R\d+)").unwrap();
+
+        let ansi_regex = Regex::new(r#"(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]"#).unwrap();
+        let clear_ansi = |s: &str| ansi_regex.replace_all(s, "").to_string();
 
         for (i, func) in self.functions.iter().enumerate() {
-            writeln!(f, "======== Function {} ========", i)?;
+            writeln!(
+                f,
+                "{}",
+                format!("======== Function {} ========", i).yellow()
+            )?;
+
             for (i, opcode) in func.opcodes.iter().enumerate() {
-                writeln!(f, "{}\t{:?}", i.to_string().bright_blue(), opcode)?;
+                lines.push(format!(
+                    "{}  {:>pad$}",
+                    i.to_string().blue().bold(),
+                    <&Opcode as Into<&'static str>>::into(&opcode),
+                    pad = (longest_opcode - (i.to_string().len() - 1))
+                ));
+
+                let formatted = match opcode {
+                    Opcode::LoadConst { dest, id } => {
+                        format!(
+                            "{} -> R{dest}",
+                            format!("{:?}", &self.consts[*id as usize])
+                                .bright_purple()
+                                .bold()
+                        )
+                    }
+                    _ => {
+                        format!("{}", opcode)
+                    }
+                };
+
+                let formatted = col_reg
+                    .replace_all(&formatted, "$1".red().bold().to_string())
+                    .to_string();
+                let f_len = clear_ansi(&formatted).len();
+
+                if f_len > longest_formatted {
+                    longest_formatted = f_len;
+                }
+                formatted_opcodes.push(formatted);
+
+                let field_names = opcode.field_names().unwrap_or(&[]).join(", ");
+
+                if field_names.len() > longest_field_name {
+                    longest_field_name = field_names.len();
+                }
+                formatted_field_names.push(field_names);
             }
+
+            for (i, line) in lines.iter_mut().enumerate() {
+                let c = colors.next();
+
+                let fmto = &formatted_opcodes[i];
+                let fmto_len = clear_ansi(&fmto).len();
+
+                let fmtv = &formatted_field_names[i];
+
+                let bytes = bincode::serialize(&func.opcodes[i]).unwrap();
+
+                line.push_str(&format!(
+                    "  {} {:pad$}｜ {}{:pad2$}  ｜  {}",
+                    fmto.bright_white(),
+                    "",
+                    fmtv.bright_yellow(),
+                    "",
+                    bytes
+                        .iter()
+                        .map(|n| format!("{:0>2X}", n))
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                        .truecolor(c.0, c.1, c.2),
+                    pad = longest_formatted - fmto_len,
+                    pad2 = longest_field_name - fmtv.len(),
+                ));
+            }
+
+            writeln!(f, "{}", lines.join("\n"))?
         }
 
         Ok(())
