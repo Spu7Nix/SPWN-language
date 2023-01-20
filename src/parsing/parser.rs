@@ -7,12 +7,12 @@ use unindent::Unindent;
 
 use crate::{
     lexing::tokens::{Lexer, Token},
-    sources::{CodeArea, CodeSpan, SpwnSource},
+    sources::{CodeArea, CodeSpan, SpwnSource}, gd::ids::IDClass,
 };
 
 use super::{
     ast::{
-        Ast, DictItems, ExprNode, Expression, IDClass, MacroCode, Spannable, Spanned, Statement,
+        Ast, DictItems, ExprNode, Expression, MacroCode, Spannable, Spanned, Statement,
         Statements, StmtNode, ImportType,
     },
     attributes::{ExprAttribute, IsValidOn, ParseAttribute, ScriptAttribute},
@@ -25,7 +25,7 @@ pub type Interner = Rodeo<Spur, RandomState>;
 #[derive(Clone)]
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
-    src: SpwnSource,
+    pub src: SpwnSource,
     pub interner: Rc<RefCell<Interner>>,
 }
 
@@ -307,6 +307,7 @@ impl Parser<'_> {
                     })
                 }
             };
+            let key = self.intern_string(key);
 
             let key_span = self.span();
 
@@ -333,6 +334,24 @@ impl Parser<'_> {
         });
 
         Ok(attrs)
+    }
+
+    pub fn parse_import(&mut self) -> ParseResult<ImportType> {
+        Ok(match self.peek() {
+            Token::String => {
+                self.next();
+                ImportType::Module(self.intern_string(self.parse_string(self.slice(), self.span())?))
+            }
+            Token::Ident => {
+                self.next();
+                ImportType::Library(self.slice_interned())
+            }
+            other => return Err(SyntaxError::UnexpectedToken {
+                expected: "string literal or identifier".into(),
+                found: other,
+                area: self.make_area(self.peek_span()),
+            }),
+        })
     }
 
     pub fn parse_unit(&mut self) -> ParseResult<ExprNode> {
@@ -557,21 +576,7 @@ impl Parser<'_> {
                 Token::Import => {
                     self.next();
 
-                    let import_type = match self.peek() {
-                        Token::String => {
-                            self.next();
-                            ImportType::Module(self.intern_string(self.parse_string(self.slice(), self.span())?))
-                        }
-                        Token::Ident => {
-                            self.next();
-                            ImportType::Library(self.slice_interned())
-                        }
-                        other => return Err(SyntaxError::UnexpectedToken {
-                            expected: "string literal or identifier".into(),
-                            found: other,
-                            area: self.make_area(self.peek_span()),
-                        }),
-                    };
+                    let import_type = self.parse_import()?;
                     
                     Expression::Import (import_type)
                         .spanned(start.extend(self.span()))
@@ -780,6 +785,8 @@ impl Parser<'_> {
             false
         };
 
+        let inner_start = self.peek_span();
+
         let stmt = match self.peek() {
             Token::Let => {
                 self.next();
@@ -883,11 +890,6 @@ impl Parser<'_> {
                 let name = self.slice()[1..].to_string();
                 Statement::TypeDef(self.intern_string(name))
             }
-            Token::Extract => {
-                self.next();
-                let value = self.parse_expr()?;
-                Statement::Extract(value)
-            }
             Token::Impl => {
                 self.next();
                 self.expect_tok(Token::TypeIndicator)?;
@@ -899,13 +901,22 @@ impl Parser<'_> {
 
                 Statement::Impl{typ, items}
             }
+            Token::Extract => {
+                self.next();
+                self.expect_tok(Token::Import)?;
+
+                let import_type = self.parse_import()?;
+
+                Statement::ExtractImport(import_type)
+            }
             _ => Statement::Expr(self.parse_expr()?),
         };
+        let inner_span = inner_start.extend(self.span());
 
         self.expect_tok(Token::Eol)?;
 
         let stmt = if is_arrow {
-            Statement::Arrow(Box::new(stmt))
+            Statement::Arrow(Box::new(stmt.into_node(vec![], inner_span)))
         } else {
             stmt
         }

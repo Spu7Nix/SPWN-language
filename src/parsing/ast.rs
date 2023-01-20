@@ -1,6 +1,6 @@
 use lasso::Spur;
 
-use crate::{lexing::tokens::Token, sources::CodeSpan};
+use crate::{gd::ids::IDClass, lexing::tokens::Token, sources::CodeSpan};
 
 use super::{
     attributes::{ExprAttribute, ScriptAttribute, StmtAttribute},
@@ -11,14 +11,6 @@ use super::{
 pub enum ImportType {
     Module(Spur),
     Library(Spur),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
-pub enum IDClass {
-    Group = 0,
-    Color = 1,
-    Block = 2,
-    Item = 3,
 }
 
 #[derive(Debug, Clone)]
@@ -41,7 +33,7 @@ pub struct StmtNode {
     pub span: CodeSpan,
 }
 
-pub type DictItems = Vec<(Spanned<String>, Option<ExprNode>)>;
+pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>)>;
 
 #[derive(Debug, Clone, strum::IntoStaticStr)]
 pub enum Expression {
@@ -141,14 +133,15 @@ pub enum Statement {
         catch_code: Statements,
     },
 
-    Arrow(Box<Statement>),
+    Arrow(Box<StmtNode>),
 
     Return(Option<ExprNode>),
     Break,
     Continue,
 
     TypeDef(Spur),
-    Extract(ExprNode),
+
+    ExtractImport(ImportType),
 
     Impl {
         typ: Spur,

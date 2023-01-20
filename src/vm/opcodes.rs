@@ -2,15 +2,17 @@ use serde::{
     de::{Error, Visitor},
     Deserialize, Serialize,
 };
-use strum::EnumString;
+
+use delve::{EnumDisplay, EnumFields, EnumModify, EnumToStr};
 
 pub type Register = u8;
 pub type ConstID = u16;
 pub type JumpPos = u16;
 pub type AllocSize = u16;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, EnumString)]
-#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, EnumDisplay, EnumToStr, EnumFields, EnumModify)]
+#[delve(rename_all = "SCREAMING_SNAKE_CASE")]
+#[delve(resolve(ConstID, u16), resolve(JumpPos, u16), resolve(AllocSize, u16))]
 pub enum Opcode {
     LoadConst {
         dest: Register,
@@ -26,6 +28,7 @@ pub enum Opcode {
     // LoadBuiltin {},
 
     // Call {},
+    //#[delve(display = |size: &AllocSize, dest: &Register| format!("[...; {}] -> R{}", size, dest))]
     AllocArray {
         size: AllocSize,
         dest: Register,
@@ -35,16 +38,23 @@ pub enum Opcode {
         dest: Register,
     },
 
-    Push {
+    PushArrayElem {
         elem: Register,
         dest: Register,
     },
+    PushDictElem {
+        elem: Register,
+        key: Register,
+        dest: Register,
+    },
 
+    #[delve(display = "+")]
     Add {
         left: Register,
         right: Register,
         dest: Register,
     },
+    #[delve(display = "-")]
     Sub {
         left: Register,
         right: Register,
@@ -225,9 +235,41 @@ pub enum Opcode {
         src: Register,
     },
 
+    WrapMaybe {
+        src: Register,
+        dest: Register,
+    },
+    LoadNone {
+        dest: Register,
+    },
+
+    LoadEmpty {
+        dest: Register,
+    },
+
+    Index {
+        from: Register,
+        dest: Register,
+        index: Register,
+    },
+    Member {
+        from: Register,
+        dest: Register,
+        member: Register,
+    },
+    Associated {
+        from: Register,
+        dest: Register,
+        name: Register,
+    },
+
     YeetContext,
     EnterArrowStatement {
         skip_to: JumpPos,
+    },
+
+    LoadBuiltins {
+        to: Register,
     },
 }
 

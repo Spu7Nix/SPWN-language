@@ -3,6 +3,7 @@
 
 mod compiling;
 mod error;
+mod gd;
 mod lexing;
 mod parsing;
 mod sources;
@@ -11,16 +12,45 @@ mod vm;
 use std::rc::Rc;
 use std::{io::Write, path::PathBuf};
 
+use crate::compiling::compiler::Compiler;
 use crate::{
-    compiling::{bytecode::Constant, compiler::Compiler},
+    compiling::bytecode::Constant,
     lexing::tokens::Token,
     parsing::parser::{Interner, Parser},
     sources::SpwnSource,
     vm::opcodes::Opcode,
 };
+use compiling::bytecode::BytecodeBuilder;
 use lasso::Rodeo;
 
 use ahash::RandomState;
+
+// fn ball() {
+//     let mut b = BytecodeBuilder::new();
+
+//     b.new_func(|b| {
+//         b.load_none(0);
+//         b.load_none(1);
+
+//         b.block(|b| {
+//             b.load_none(2);
+//             Ok(())
+//         })
+//         .unwrap();
+//         b.load_none(3);
+//         b.block(|b| {
+//             b.load_none(2);
+//             Ok(())
+//         })
+//         .unwrap();
+//         b.load_none(3);
+
+//         Ok(())
+//     })
+//     .unwrap();
+
+//     b.build();
+// }
 
 fn main() {
     print!("\x1B[2J\x1B[1;1H");
@@ -40,15 +70,19 @@ fn main() {
             let interner = Rc::try_unwrap(parser.interner)
                 .expect("multiple references still held (how??????????????????)")
                 .into_inner();
-            let compiler = Compiler::new(interner);
+            let mut compiler = Compiler::new(interner, parser.src);
 
-            let bytecode = compiler.compile(ast.statements);
-            println!("{}", bytecode);
+            match compiler.compile(ast.statements) {
+                Ok(bytecode) => {
+                    println!("{}", bytecode);
 
-            let bytes = bincode::serialize(&bytecode).unwrap();
-            println!("{:?}", bytes);
+                    let bytes = bincode::serialize(&bytecode).unwrap();
+                    println!("{:?}", bytes);
 
-            std::fs::write("cock.spwnc", &bytes).unwrap();
+                    std::fs::write("cock.spwnc", &bytes).unwrap();
+                }
+                Err(err) => err.to_report().display(),
+            }
         }
         Err(err) => err.to_report().display(),
     }

@@ -271,8 +271,11 @@ attributes! {
 attributes! {
     #[check_validity(Expression)]
     pub enum ExprAttribute {
-        #[valid_on(TriggerFunc, Int)]
+        #[valid_on(TriggerFunc)]
         NoOptimize,
+
+        #[valid_on(TriggerFunc, Macro)]
+        DebugBytecode,
     }
 }
 
@@ -294,5 +297,6 @@ attributes! {
         ConsoleOutput,
         NoLevel,
         NoBytecodeCache,
+        DebugBytecode,
     }
 }
