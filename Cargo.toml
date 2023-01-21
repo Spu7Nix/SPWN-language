@@ -19,7 +19,7 @@ base64 = "0.21.0"
 lasso = "0.6.0"
 slotmap = "1.0.6"
 delve = { version = "0.3.0", features = ["derive"] }
-
+md5 = "0.7.0"
 
 quick-xml = "0.20.0"
 libflate = "1.1.0"

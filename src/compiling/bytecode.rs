@@ -2,7 +2,7 @@ use std::{fmt::Display, hash::Hash};
 
 use ahash::AHashMap;
 use colored::Colorize;
-use delve::{FieldNames, VariantNames};
+use delve::VariantNames;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
@@ -12,6 +12,7 @@ use crate::{
     gd::ids::IDClass,
     parsing::ast::{Spannable, Spanned},
     sources::{CodeSpan, SpwnSource},
+    util::Digest,
     vm::opcodes::{Opcode, Register, UnoptOpcode, UnoptRegister},
 };
 
@@ -306,6 +307,7 @@ impl BytecodeBuilder {
         }
 
         Bytecode {
+            source_hash: None,
             consts,
             functions,
             opcode_span_map,
@@ -425,145 +427,335 @@ impl<'a> FuncBuilder<'a> {
         Ok(())
     }
 
-    pub fn load_int(&mut self, value: i64, reg: UnoptRegister) {
+    pub fn load_int(&mut self, value: i64, reg: UnoptRegister, span: CodeSpan) {
         let k = self.code_builder.constants.insert(Constant::Int(value));
-        self.push_opcode(ProtoOpcode::LoadConst(reg, k))
+        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
-    pub fn load_float(&mut self, value: f64, reg: UnoptRegister) {
+    pub fn load_float(&mut self, value: f64, reg: UnoptRegister, span: CodeSpan) {
         let k = self.code_builder.constants.insert(Constant::Float(value));
-        self.push_opcode(ProtoOpcode::LoadConst(reg, k))
+        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
     pub fn load_string(&mut self, value: String, reg: UnoptRegister, span: CodeSpan) {
         let k = self.code_builder.constants.insert(Constant::String(value));
         self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
-    pub fn load_bool(&mut self, value: bool, reg: UnoptRegister) {
+    pub fn load_bool(&mut self, value: bool, reg: UnoptRegister, span: CodeSpan) {
         let k = self.code_builder.constants.insert(Constant::Bool(value));
-        self.push_opcode(ProtoOpcode::LoadConst(reg, k))
+        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
-    pub fn load_id(&mut self, value: Option<u16>, class: IDClass, reg: UnoptRegister) {
+    pub fn load_id(
+        &mut self,
+        value: Option<u16>,
+        class: IDClass,
+        reg: UnoptRegister,
+        span: CodeSpan,
+    ) {
         let k = self
             .code_builder
             .constants
             .insert(Constant::Id(class, value));
-        self.push_opcode(ProtoOpcode::LoadConst(reg, k))
+        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
 
-    pub fn add(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Add { left, right, dest }))
+    pub fn add(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Add { left, right, dest }),
+            span,
+        )
     }
-    pub fn sub(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Sub { left, right, dest }))
+    pub fn sub(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Sub { left, right, dest }),
+            span,
+        )
     }
-    pub fn mult(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Mult { left, right, dest }))
+    pub fn mult(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Mult { left, right, dest }),
+            span,
+        )
     }
-    pub fn div(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Div { left, right, dest }))
+    pub fn div(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Div { left, right, dest }),
+            span,
+        )
     }
-    pub fn modulo(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Mod { left, right, dest }))
+    pub fn modulo(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Mod { left, right, dest }),
+            span,
+        )
     }
-    pub fn pow(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Pow { left, right, dest }))
+    pub fn pow(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Pow { left, right, dest }),
+            span,
+        )
     }
-    pub fn shl(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::ShiftLeft {
-            left,
-            right,
-            dest,
-        }))
+    pub fn shl(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::ShiftLeft { left, right, dest }),
+            span,
+        )
     }
-    pub fn shr(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::ShiftRight {
-            left,
-            right,
-            dest,
-        }))
+    pub fn shr(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::ShiftRight { left, right, dest }),
+            span,
+        )
     }
-    pub fn eq(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Eq { left, right, dest }))
+    pub fn eq(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Eq { left, right, dest }),
+            span,
+        )
     }
-    pub fn neq(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Neq { left, right, dest }))
+    pub fn neq(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Neq { left, right, dest }),
+            span,
+        )
     }
-    pub fn gt(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Gt { left, right, dest }))
+    pub fn gt(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Gt { left, right, dest }),
+            span,
+        )
     }
-    pub fn gte(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Gte { left, right, dest }))
+    pub fn gte(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Gte { left, right, dest }),
+            span,
+        )
     }
-    pub fn lt(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Lt { left, right, dest }))
+    pub fn lt(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Lt { left, right, dest }),
+            span,
+        )
     }
-    pub fn lte(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Lte { left, right, dest }))
+    pub fn lte(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Lte { left, right, dest }),
+            span,
+        )
     }
-    pub fn range(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Range { left, right, dest }))
+    pub fn range(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Range { left, right, dest }),
+            span,
+        )
     }
-    pub fn in_op(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::In { left, right, dest }))
+    pub fn in_op(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::In { left, right, dest }),
+            span,
+        )
     }
-    pub fn as_op(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }))
+    pub fn as_op(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }),
+            span,
+        )
     }
-    pub fn is_op(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }))
+    pub fn is_op(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }),
+            span,
+        )
     }
-    pub fn bin_or(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::BinOr { left, right, dest }))
+    pub fn bin_or(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::BinOr { left, right, dest }),
+            span,
+        )
     }
-    pub fn bin_and(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::BinAnd { left, right, dest }))
+    pub fn bin_and(
+        &mut self,
+        left: UnoptRegister,
+        right: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::BinAnd { left, right, dest }),
+            span,
+        )
     }
 
-    pub fn add_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::AddEq { left, right }))
+    pub fn add_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::AddEq { left, right }), span)
     }
-    pub fn sub_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SubEq { left, right }))
+    pub fn sub_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::SubEq { left, right }), span)
     }
-    pub fn mult_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::MultEq { left, right }))
+    pub fn mult_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::MultEq { left, right }), span)
     }
-    pub fn div_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::DivEq { left, right }))
+    pub fn div_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::DivEq { left, right }), span)
     }
-    pub fn modulo_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::ModEq { left, right }))
+    pub fn modulo_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::ModEq { left, right }), span)
     }
-    pub fn pow_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PowEq { left, right }))
+    pub fn pow_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PowEq { left, right }), span)
     }
-    pub fn shl_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::ShiftLeftEq { left, right }))
+    pub fn shl_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::ShiftLeftEq { left, right }),
+            span,
+        )
     }
-    pub fn shr_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::ShiftRightEq { left, right }))
+    pub fn shr_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::ShiftRightEq { left, right }),
+            span,
+        )
     }
-    pub fn bin_and_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::BinAndEq { left, right }))
+    pub fn bin_and_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::BinAndEq { left, right }),
+            span,
+        )
     }
-    pub fn bin_or_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::BinOrEq { left, right }))
+    pub fn bin_or_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinOrEq { left, right }), span)
     }
-    pub fn bin_not_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::BinNotEq { left, right }))
+    pub fn bin_not_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::BinNotEq { left, right }),
+            span,
+        )
     }
 
-    pub fn unary_not(&mut self, src: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Not { src, dest }))
+    pub fn unary_not(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Not { src, dest }), span)
     }
-    pub fn unary_negate(&mut self, src: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Negate { src, dest }))
+    pub fn unary_negate(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Negate { src, dest }), span)
     }
-    pub fn unary_bin_not(&mut self, src: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::BinNot { src, dest }))
+    pub fn unary_bin_not(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinNot { src, dest }), span)
     }
 
-    pub fn copy(&mut self, from: UnoptRegister, to: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Copy { from, to }))
+    pub fn copy(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Copy { from, to }), span)
     }
 
     pub fn print(&mut self, reg: UnoptRegister) {
@@ -594,18 +786,15 @@ impl<'a> FuncBuilder<'a> {
         let path = self.block_path.clone();
         self.push_opcode(ProtoOpcode::JumpIfFalse(reg, JumpTo::End(path)))
     }
-    pub fn sex(&self) {
-        println!("func: {:?}, path: {:?}", self.func, self.block_path);
-    }
 
-    pub fn load_none(&mut self, reg: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::LoadNone { dest: reg }))
+    pub fn load_none(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadNone { dest: reg }), span)
     }
-    pub fn wrap_maybe(&mut self, src: UnoptRegister, dest: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::WrapMaybe { src, dest }))
+    pub fn wrap_maybe(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::WrapMaybe { src, dest }), span)
     }
-    pub fn load_empty(&mut self, reg: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }))
+    pub fn load_empty(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }), span)
     }
 
     pub fn index(&mut self, from: UnoptRegister, dest: UnoptRegister, index: UnoptRegister) {
@@ -630,8 +819,11 @@ impl<'a> FuncBuilder<'a> {
         }))
     }
 
-    pub fn load_builtins(&mut self, to: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::LoadBuiltins { dest: to }))
+    pub fn load_builtins(&mut self, to: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::LoadBuiltins { dest: to }),
+            span,
+        )
     }
 
     pub fn ret(&mut self, src: UnoptRegister) {
@@ -648,26 +840,21 @@ impl<'a> FuncBuilder<'a> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(bound = "R: Serialize, for<'de2> R: Deserialize<'de2>")]
+#[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
 pub struct Function<R>
 where
-    R: Display + Copy + Serialize,
-    for<'de2> R: Deserialize<'de2>,
-    Opcode<R>: Serialize,
-    for<'de3> Opcode<R>: Deserialize<'de3>,
+    R: Display + Copy,
 {
     pub opcodes: Vec<Opcode<R>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(bound = "R: Serialize, for<'de2> R: Deserialize<'de2>")]
+#[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
 pub struct Bytecode<R>
 where
-    R: Display + Copy + Serialize,
-    for<'de2> R: Deserialize<'de2>,
-    Opcode<R>: Serialize,
-    for<'de3> Opcode<R>: Deserialize<'de3>,
+    R: Display + Copy,
 {
+    pub source_hash: Option<Digest>,
     pub consts: Vec<Constant>,
 
     pub functions: Vec<Function<R>>,
@@ -676,10 +863,8 @@ where
 
 impl<R> Bytecode<R>
 where
-    R: Display + Copy + Serialize,
-    for<'de2> R: Deserialize<'de2>,
+    R: Display + Copy,
     Opcode<R>: Serialize,
-    for<'de3> Opcode<R>: Deserialize<'de3>,
 {
     pub fn debug_str(&self, src: &SpwnSource) {
         let code = src.read().unwrap();
@@ -690,11 +875,12 @@ where
             .max()
             .unwrap_or(2);
 
-        println!("{}: {:?}\n", "Constants".bright_red().bold(), self.consts);
+        println!("{}: {:?}\n", "Constants".bright_cyan().bold(), self.consts);
 
         let mut colors = RainbowColorGenerator::new(150.0, 0.4, 0.9, 60.0);
 
         let col_reg = Regex::new(r"(R\d+)").unwrap();
+        let arrow_reg = Regex::new(r"([+\-*/<>]+)").unwrap();
 
         let ansi_regex = Regex::new(r#"(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]"#).unwrap();
         let clear_ansi = |s: &str| ansi_regex.replace_all(s, "").to_string();
@@ -722,7 +908,7 @@ where
                         format!(
                             "{} -> R{dest}",
                             format!("{:?}", &self.consts[*id as usize])
-                                .bright_magenta()
+                                .bright_cyan()
                                 .bold()
                         )
                     }
@@ -764,11 +950,17 @@ where
                 let fmto_len = clear_ansi(fmto).len();
 
                 let ostr = &formatted_spans[i];
+                let ostr = if ostr != "" {
+                    ostr.to_string()
+                } else {
+                    format!("{}{}", " ".repeat((longest_span - 1) / 2), "-".red().bold())
+                };
+                let o_len = clear_ansi(&ostr).len();
 
                 let bytes = bincode::serialize(&func.opcodes[i]).unwrap();
 
                 line.push_str(&format!(
-                    "  {} {:pad$} {line}  {:pad2$} {} {line}  {} ",
+                    "  {} {:pad$} {line}  {}{:pad2$}  {line}  {} ",
                     fmto.bright_white(),
                     "",
                     ostr,
@@ -780,7 +972,7 @@ where
                         .join(" ")
                         .truecolor(c.0, c.1, c.2),
                     pad = longest_formatted - fmto_len,
-                    pad2 = longest_span - ostr.len(),
+                    pad2 = longest_span - o_len,
                     line = "│".bright_yellow(),
                 ));
             }
@@ -816,129 +1008,3 @@ where
         }
     }
 }
-
-// impl<R> std::fmt::Display for Bytecode<R>
-// where
-//     R: Display + Copy + Serialize,
-//     for<'de2> R: Deserialize<'de2>,
-//     Opcode<R>: Serialize,
-//     for<'de3> Opcode<R>: Deserialize<'de3>,
-// {
-//     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-//         let longest_opcode: usize = Opcode::<Register>::VARIANT_NAMES
-//             .iter()
-//             .map(|s| s.len())
-//             .max()
-//             .unwrap_or(2);
-
-//         writeln!(
-//             f,
-//             "{}: {:?}\n",
-//             "Constants".bright_red().bold(),
-//             self.consts
-//         )?;
-
-//         let mut colors = RainbowColorGenerator::new(150.0, 0.4, 0.9, 60.0);
-
-//         let mut lines = vec![];
-//         let mut formatted_opcodes = vec![];
-//         let mut longest_formatted = 0;
-
-//         let col_reg = Regex::new(r"(R\d+)").unwrap();
-
-//         let ansi_regex = Regex::new(r#"(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]"#).unwrap();
-//         let clear_ansi = |s: &str| ansi_regex.replace_all(s, "").to_string();
-
-//         for (i, func) in self.functions.iter().enumerate() {
-//             let max_num_width = func.opcodes.len().to_string().len();
-
-//             for (i, opcode) in func.opcodes.iter().enumerate() {
-//                 lines.push(format!(
-//                     "{:<pad$}  {:>pad2$}",
-//                     i.to_string().bright_blue().bold(),
-//                     <&Opcode<R> as Into<&'static str>>::into(opcode),
-//                     pad = max_num_width,
-//                     pad2 = longest_opcode
-//                 ));
-
-//                 let formatted = match opcode {
-//                     Opcode::LoadConst { dest, id } => {
-//                         format!(
-//                             "{} -> R{dest}",
-//                             format!("{:?}", &self.consts[*id as usize])
-//                                 .bright_magenta()
-//                                 .bold()
-//                         )
-//                     }
-//                     _ => {
-//                         format!("{}", opcode)
-//                     }
-//                 };
-
-//                 let formatted = col_reg
-//                     .replace_all(&formatted, "$1".bright_red().bold().to_string())
-//                     .to_string();
-//                 let f_len = clear_ansi(&formatted).len();
-
-//                 if f_len > longest_formatted {
-//                     longest_formatted = f_len;
-//                 }
-//                 formatted_opcodes.push(formatted);
-//             }
-
-//             for (i, line) in lines.iter_mut().enumerate() {
-//                 let c = colors.next();
-
-//                 let fmto = &formatted_opcodes[i];
-//                 let fmto_len = clear_ansi(fmto).len();
-
-//                 let bytes = bincode::serialize(&func.opcodes[i]).unwrap();
-
-//                 line.push_str(&format!(
-//                     "  {} {:pad$} {line}  {} ",
-//                     fmto.bright_white(),
-//                     "",
-//                     bytes
-//                         .iter()
-//                         .map(|n| format!("{:0>2X}", n))
-//                         .collect::<Vec<String>>()
-//                         .join(" ")
-//                         .truecolor(c.0, c.1, c.2),
-//                     pad = longest_formatted - fmto_len,
-//                     line = "│".bright_yellow(),
-//                 ));
-//             }
-
-//             writeln!(
-//                 f,
-//                 "{}",
-//                 format!(
-//                     "╭────┤ Function {} ├{}┬{}╮",
-//                     i,
-//                     "─".repeat(longest_formatted + max_num_width + 10),
-//                     // bytecode will never be more than 15 characters (2 spaces padding on either side, 2 hex chars + 1 space * 4)
-//                     "─".repeat(15),
-//                 )
-//                 .bright_yellow()
-//             )?;
-
-//             for line in &lines {
-//                 writeln!(f, "{0} {1} {0}", "│".bright_yellow(), line)?
-//             }
-
-//             writeln!(
-//                 f,
-//                 "{}",
-//                 format!(
-//                     "╰──────────────────{}┴{}╯",
-//                     "─".repeat(longest_formatted + max_num_width + 10),
-//                     // bytecode will never be more than 15 characters (2 spaces padding on either side, 2 hex chars + 1 space * 4)
-//                     "─".repeat(15),
-//                 )
-//                 .bright_yellow()
-//             )?;
-//         }
-
-//         Ok(())
-//     }
-// }

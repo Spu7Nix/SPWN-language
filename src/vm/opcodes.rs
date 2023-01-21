@@ -1,4 +1,4 @@
-use std::{fmt::Display, marker::PhantomData};
+use std::fmt::Display;
 
 use serde::{
     de::{Error, Visitor},
@@ -7,14 +7,14 @@ use serde::{
 
 use delve::{EnumDisplay, EnumFields, EnumToStr, EnumVariantNames};
 
-struct OpcodeVisitor<R>(PhantomData<R>);
+struct OpcodeVisitor;
 
 impl Serialize for Opcode<Register> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        // Safety:
+        // SAFETY:
         // opcodes will always be u32 or less
         serializer.serialize_u32(unsafe { std::mem::transmute::<_, u32>(*self) })
     }
@@ -25,11 +25,11 @@ impl<'de> Deserialize<'de> for Opcode<Register> {
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_u32(OpcodeVisitor::<Register>(PhantomData))
+        deserializer.deserialize_u32(OpcodeVisitor)
     }
 }
 
-impl<'de> Visitor<'de> for OpcodeVisitor<Register> {
+impl<'de> Visitor<'de> for OpcodeVisitor {
     type Value = Opcode<Register>;
 
     fn expecting(&self, _: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -40,27 +40,9 @@ impl<'de> Visitor<'de> for OpcodeVisitor<Register> {
     where
         E: Error,
     {
-        // Safety:
+        // SAFETY:
         // who is manually writing bytecode
         Ok(unsafe { std::mem::transmute::<_, Opcode<Register>>(value) })
-    }
-}
-
-impl Serialize for Opcode<usize> {
-    fn serialize<S>(&self, _: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        panic!("do not serialize Opcode<usize>")
-    }
-}
-
-impl<'de> Deserialize<'de> for Opcode<usize> {
-    fn deserialize<D>(_: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        panic!("do not deserialize Opcode<usize>")
     }
 }
 

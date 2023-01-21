@@ -1,4 +1,4 @@
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, fs::File, path::PathBuf, rc::Rc};
 
 use ahash::AHashMap;
 use lasso::{Rodeo, Spur};
@@ -57,10 +57,10 @@ pub struct Compiler<'a> {
 }
 
 macro_rules! bop {
-    ($left:ident $f:ident $right:ident ($scope:ident, $builder:ident, $out_reg:ident, $self:ident)) => {{
+    ($left:ident $f:ident $right:ident ($scope:ident, $builder:ident, $out_reg:ident, $self:ident, $span:expr)) => {{
         let a = $self.compile_expr(&$left, $scope, $builder)?;
         let b = $self.compile_expr(&$right, $scope, $builder)?;
-        $builder.$f(a, b, $out_reg)
+        $builder.$f(a, b, $out_reg, $span)
     }};
 }
 
@@ -155,11 +155,12 @@ impl<'a> Compiler<'a> {
             })
             .collect();
 
-        // Ok(Bytecode { consts, functions })
+        let hash = md5::compute(self.src.read().unwrap());
 
         self.map.map.insert(
             self.src.clone(),
             Bytecode {
+                source_hash: Some(hash.into()),
                 consts: unopt_code.consts,
                 functions,
                 opcode_span_map: unopt_code.opcode_span_map,
@@ -174,25 +175,32 @@ impl<'a> Compiler<'a> {
     pub fn compile_import(
         &mut self,
         typ: ImportType,
-        scope: ScopeKey,
+        _: ScopeKey,
         span: CodeSpan,
     ) -> CompileResult<()> {
-        let (src, name) = match typ {
-            ImportType::Module(s) => (
-                SpwnSource::File(PathBuf::from(self.resolve(&s))),
-                self.resolve(&s),
-            ),
-            ImportType::Library(name) => (
-                SpwnSource::File(PathBuf::from(format!(
-                    "libraries/{}/lib.spwn",
-                    self.resolve(&name)
-                ))),
-                self.resolve(&name),
-            ),
+        let base_dir = match &self.src {
+            SpwnSource::File(path) => path.parent().unwrap(),
         };
-        let is_module = matches!(typ, ImportType::Module(_));
 
-        // let bytecode
+        let (path, name) = match typ {
+            ImportType::Module(s) => {
+                let name = PathBuf::from(self.resolve(&s));
+                (
+                    base_dir.join(name.clone()),
+                    name.file_stem().unwrap().to_str().unwrap().to_string(),
+                )
+            }
+            ImportType::Library(name) => {
+                let name = PathBuf::from(format!("libraries/{}/lib.spwn", self.resolve(&name)));
+                (
+                    base_dir.join(name.clone()),
+                    name.file_stem().unwrap().to_str().unwrap().to_string(),
+                )
+            }
+        };
+        let src = SpwnSource::File(path.clone());
+
+        let is_module = matches!(typ, ImportType::Module(_));
 
         let code = match src.read() {
             Some(s) => s,
@@ -205,14 +213,49 @@ impl<'a> Compiler<'a> {
             }
         };
 
-        let mut parser = Parser::new(code.trim_end(), src, Rc::clone(&self.interner));
+        let hash = md5::compute(&code);
+
+        let import_base = path.parent().unwrap();
+
+        let spwnc = import_base.join(format!(".spwnc/{}.spwnc", name));
+
+        'cache: {
+            if spwnc.is_file() {
+                let source = std::fs::read(&spwnc).unwrap();
+
+                let bytecode: Bytecode<u8> = match bincode::deserialize(&source) {
+                    Ok(b) => b,
+                    Err(_) => {
+                        break 'cache;
+                    }
+                };
+
+                if bytecode.source_hash.unwrap() == hash.into() {
+                    self.map.map.insert(src, bytecode);
+
+                    return Ok(());
+                }
+            } // aaa obamu :))))))
+        }
+
+        let mut parser = Parser::new(code.trim_end(), src.clone(), Rc::clone(&self.interner));
 
         match parser.parse() {
             Ok(ast) => {
                 let mut compiler = Compiler::new(Rc::clone(&self.interner), parser.src, self.map);
 
                 match compiler.compile(ast.statements) {
-                    Ok(bytecode) => {}
+                    Ok(_) => {
+                        let bytecode = &self.map.map[&src];
+
+                        let bytes = bincode::serialize(&bytecode).unwrap();
+
+                        let _ = std::fs::create_dir(import_base.join(".spwnc"));
+                        std::fs::write(import_base.join(format!(".spwnc/{}.spwnc", name)), bytes)
+                            .unwrap();
+
+                        println!("written {}.spwnc", name);
+                    }
                     Err(err) => return Err(err),
                 }
             }
@@ -264,7 +307,7 @@ impl<'a> Compiler<'a> {
                     );
                     let expr_reg = self.compile_expr(expr, scope, builder)?;
 
-                    builder.copy(expr_reg, var_reg);
+                    builder.copy(expr_reg, var_reg, stmt.span);
                 }
                 _ => todo!("haha 😂😂😂😂"),
             },
@@ -382,7 +425,7 @@ impl<'a> Compiler<'a> {
                             let out_reg = builder.next_reg();
                             match value {
                                 None => {
-                                    builder.load_empty(out_reg);
+                                    builder.load_empty(out_reg, stmt.span);
                                     builder.ret(out_reg)
                                 }
                                 Some(expr) => {
@@ -415,127 +458,131 @@ impl<'a> Compiler<'a> {
         let out_reg = builder.next_reg();
 
         match &*expr.expr {
-            Expression::Int(v) => builder.load_int(*v, out_reg),
-            Expression::Float(v) => builder.load_float(*v, out_reg),
-            Expression::Bool(v) => builder.load_bool(*v, out_reg),
+            Expression::Int(v) => builder.load_int(*v, out_reg, expr.span),
+            Expression::Float(v) => builder.load_float(*v, out_reg, expr.span),
+            Expression::Bool(v) => builder.load_bool(*v, out_reg, expr.span),
             Expression::String(v) => builder.load_string(self.resolve(v), out_reg, expr.span),
-            Expression::Id(class, value) => builder.load_id(*value, *class, out_reg),
+            Expression::Id(class, value) => builder.load_id(*value, *class, out_reg, expr.span),
             Expression::Op(left, op, right) => match op {
-                BinOp::Plus => bop!(left add right (scope, builder, out_reg, self)),
-                BinOp::Minus => bop!(left sub right (scope, builder, out_reg, self)),
-                BinOp::Mult => bop!(left mult right (scope, builder, out_reg, self)),
-                BinOp::Div => bop!(left div right (scope, builder, out_reg, self)),
-                BinOp::Mod => bop!(left modulo right (scope, builder, out_reg, self)),
-                BinOp::Pow => bop!(left pow right (scope, builder, out_reg, self)),
-                BinOp::ShiftLeft => bop!(left shl right (scope, builder, out_reg, self)),
-                BinOp::ShiftRight => bop!(left shr right (scope, builder, out_reg, self)),
-                BinOp::BinAnd => bop!(left bin_and right (scope, builder, out_reg, self)),
-                BinOp::BinOr => bop!(left bin_or right (scope, builder, out_reg, self)),
+                BinOp::Plus => bop!(left add right (scope, builder, out_reg, self, expr.span)),
+                BinOp::Minus => bop!(left sub right (scope, builder, out_reg, self, expr.span)),
+                BinOp::Mult => bop!(left mult right (scope, builder, out_reg, self, expr.span)),
+                BinOp::Div => bop!(left div right (scope, builder, out_reg, self, expr.span)),
+                BinOp::Mod => bop!(left modulo right (scope, builder, out_reg, self, expr.span)),
+                BinOp::Pow => bop!(left pow right (scope, builder, out_reg, self, expr.span)),
+                BinOp::ShiftLeft => bop!(left shl right (scope, builder, out_reg, self, expr.span)),
+                BinOp::ShiftRight => {
+                    bop!(left shr right (scope, builder, out_reg, self, expr.span))
+                }
+                BinOp::BinAnd => {
+                    bop!(left bin_and right (scope, builder, out_reg, self, expr.span))
+                }
+                BinOp::BinOr => bop!(left bin_or right (scope, builder, out_reg, self, expr.span)),
                 // specky can do the rest :)))
                 BinOp::PlusEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.add_eq(a, b)
+                    builder.add_eq(a, b, expr.span)
                 }
                 BinOp::MinusEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.sub_eq(a, b)
+                    builder.sub_eq(a, b, expr.span)
                 }
                 BinOp::MultEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.mult_eq(a, b)
+                    builder.mult_eq(a, b, expr.span)
                 }
                 BinOp::DivEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.div_eq(a, b)
+                    builder.div_eq(a, b, expr.span)
                 }
                 BinOp::ModEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.modulo_eq(a, b)
+                    builder.modulo_eq(a, b, expr.span)
                 }
                 BinOp::PowEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.pow_eq(a, b)
+                    builder.pow_eq(a, b, expr.span)
                 }
                 BinOp::ShiftLeftEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.shl_eq(a, b)
+                    builder.shl_eq(a, b, expr.span)
                 }
                 BinOp::ShiftRightEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.shr_eq(a, b)
+                    builder.shr_eq(a, b, expr.span)
                 }
                 BinOp::BinAndEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.bin_and_eq(a, b)
+                    builder.bin_and_eq(a, b, expr.span)
                 }
                 BinOp::BinOrEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.bin_or_eq(a, b)
+                    builder.bin_or_eq(a, b, expr.span)
                 }
                 BinOp::BinNotEq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.bin_not_eq(a, b)
+                    builder.bin_not_eq(a, b, expr.span)
                 }
                 BinOp::Eq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.eq(a, b, out_reg)
+                    builder.eq(a, b, out_reg, expr.span)
                 }
                 BinOp::Neq => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.neq(a, b, out_reg)
+                    builder.neq(a, b, out_reg, expr.span)
                 }
                 BinOp::Gt => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.gt(a, b, out_reg)
+                    builder.gt(a, b, out_reg, expr.span)
                 }
                 BinOp::Gte => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.gte(a, b, out_reg)
+                    builder.gte(a, b, out_reg, expr.span)
                 }
                 BinOp::Lt => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.lt(a, b, out_reg)
+                    builder.lt(a, b, out_reg, expr.span)
                 }
                 BinOp::Lte => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.lte(a, b, out_reg)
+                    builder.lte(a, b, out_reg, expr.span)
                 }
                 BinOp::DotDot => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.range(a, b, out_reg)
+                    builder.range(a, b, out_reg, expr.span)
                 }
                 BinOp::In => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.in_op(a, b, out_reg)
+                    builder.in_op(a, b, out_reg, expr.span)
                 }
                 BinOp::As => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.as_op(a, b, out_reg)
+                    builder.as_op(a, b, out_reg, expr.span)
                 }
                 BinOp::Is => {
                     let a = self.compile_expr(left, scope, builder)?;
                     let b = self.compile_expr(right, scope, builder)?;
-                    builder.is_op(a, b, out_reg)
+                    builder.is_op(a, b, out_reg, expr.span)
                 }
 
                 BinOp::Assign => match *left.expr {
@@ -544,7 +591,7 @@ impl<'a> Compiler<'a> {
                             if var.mutable {
                                 self.redef_var(s, expr.span, scope);
                                 let expr_reg = self.compile_expr(right, scope, builder)?;
-                                builder.copy(expr_reg, var.reg);
+                                builder.copy(expr_reg, var.reg, expr.span);
                             } else {
                                 return Err(CompilerError::ImmutableAssign {
                                     area: self.make_area(expr.span),
@@ -566,7 +613,7 @@ impl<'a> Compiler<'a> {
                             );
                             let expr_reg = self.compile_expr(right, scope, builder)?;
 
-                            builder.copy(expr_reg, var_reg);
+                            builder.copy(expr_reg, var_reg, expr.span);
                         }
                     },
                     _ => todo!("haha 😂😂😂😂"),
@@ -575,9 +622,9 @@ impl<'a> Compiler<'a> {
             Expression::Unary(op, value) => {
                 let v = self.compile_expr(value, scope, builder)?;
                 match op {
-                    UnaryOp::BinNot => builder.unary_bin_not(v, out_reg),
-                    UnaryOp::ExclMark => builder.unary_not(v, out_reg),
-                    UnaryOp::Minus => builder.unary_negate(v, out_reg),
+                    UnaryOp::BinNot => builder.unary_bin_not(v, out_reg, expr.span),
+                    UnaryOp::ExclMark => builder.unary_not(v, out_reg, expr.span),
+                    UnaryOp::Minus => builder.unary_negate(v, out_reg, expr.span),
                 }
             }
             Expression::Var(name) => match self.get_var(*name, scope) {
@@ -622,9 +669,9 @@ impl<'a> Compiler<'a> {
             Expression::Maybe(e) => match e {
                 Some(e) => {
                     let value = self.compile_expr(e, scope, builder)?;
-                    builder.wrap_maybe(value, out_reg)
+                    builder.wrap_maybe(value, out_reg, expr.span)
                 }
-                None => builder.load_none(out_reg),
+                None => builder.load_none(out_reg, expr.span),
             },
             Expression::Index { base, index } => {
                 let base_reg = self.compile_expr(base, scope, builder)?;
@@ -664,24 +711,24 @@ impl<'a> Compiler<'a> {
                     outer_b.block(|b| {
                         b.exit_if_false(cond_reg);
                         let reg = self.compile_expr(if_true, scope, b)?;
-                        b.copy(reg, out_reg);
+                        b.copy(reg, out_reg, expr.span);
 
                         b.exit_other_block(outer_path);
                         Ok(())
                     })?;
 
                     let reg = self.compile_expr(if_false, scope, outer_b)?;
-                    outer_b.copy(reg, out_reg);
+                    outer_b.copy(reg, out_reg, expr.span);
 
                     Ok(())
                 })?;
             }
             Expression::Typeof(_) => todo!(),
             Expression::Builtins => {
-                builder.load_builtins(out_reg);
+                builder.load_builtins(out_reg, expr.span);
             }
             Expression::Empty => {
-                builder.load_empty(out_reg);
+                builder.load_empty(out_reg, expr.span);
             }
             Expression::Import(t) => {
                 self.compile_import(*t, scope, expr.span)?;
