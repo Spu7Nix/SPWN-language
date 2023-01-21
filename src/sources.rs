@@ -1,4 +1,6 @@
-use crate::util::hyperlink;
+use ahash::AHashMap;
+
+use crate::{compiling::bytecode::Bytecode, util::hyperlink};
 use std::{fs, ops::Range, path::PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -30,7 +32,7 @@ impl SpwnSource {
     }
     pub fn hyperlink(&self) -> String {
         match self {
-            SpwnSource::File(f) => hyperlink(self.path(), Some(self.name())),
+            SpwnSource::File(_) => hyperlink(self.path(), Some(self.name())),
         }
     }
 }
@@ -88,4 +90,9 @@ impl From<CodeSpan> for Range<usize> {
     fn from(s: CodeSpan) -> Self {
         s.start..s.end
     }
+}
+
+#[derive(Default)]
+pub struct BytecodeMap {
+    pub map: AHashMap<SpwnSource, Bytecode>,
 }

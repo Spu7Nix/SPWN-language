@@ -25,15 +25,17 @@ for {} in {}
 
 // let foo = [10, 20, 30];
 
-1 + 2;
+// -> if 1 {
+//     let a = [1, 2, 3];
+//     -> a[0] == a[1];
+// };
+// extract import "funny.spwn";
 
--> if true {
-    5;
-};
--> if true {
-    5;
-};
 
-a = {
-    foo: 2,
-};
+
+
+let a = 10832;
+
+let b = a;
+
+b += 10;

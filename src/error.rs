@@ -1,7 +1,6 @@
 use std::io::Write;
 
 use ariadne::{sources, Label, Report, ReportKind};
-use colored::Colorize;
 
 use crate::sources::CodeArea;
 
@@ -57,14 +56,17 @@ macro_rules! error_maker {
             pub fn to_report(&self $(, $extra_arg: $extra_type)* ) -> ErrorReport {
                 use colored::Colorize;
                 use $crate::error::RainbowColorGenerator;
+
                 let mut info_colors = RainbowColorGenerator::new(166.0, 0.5, 0.95, 35.0);
+
                 match self {
                     $(
                         $enum::$err_name { $($field,)* } => ErrorReport {
                             title: $title.to_string(),
                             message: ($msg).to_string(),
                             labels: {
-                                let v = vec![
+                                #[allow(unused_mut)]
+                                let mut v = vec![
                                     $(
                                         ($l_area.clone(), format!($fmt $(, $(
 

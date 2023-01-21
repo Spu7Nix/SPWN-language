@@ -13,23 +13,18 @@ mod vm;
 use std::rc::Rc;
 use std::{io::Write, path::PathBuf};
 
-use crate::compiling::compiler::Compiler;
-use crate::{
-    compiling::bytecode::Constant,
-    lexing::tokens::Token,
-    parsing::parser::{Interner, Parser},
-    sources::SpwnSource,
-    vm::opcodes::Opcode,
-};
-use colored::Colorize;
-use compiling::bytecode::BytecodeBuilder;
 use lasso::Rodeo;
 
-use ahash::RandomState;
+use crate::compiling::compiler::Compiler;
+use crate::sources::BytecodeMap;
+use crate::util::{Interner, RandomState};
+use crate::{lexing::tokens::Token, parsing::parser::Parser, sources::SpwnSource};
 
 fn main() {
     print!("\x1B[2J\x1B[1;1H");
     std::io::stdout().flush().unwrap();
+
+    let mut bytecode_map = BytecodeMap::default();
 
     let interner: Interner = Rodeo::with_hasher(RandomState::new());
 
@@ -45,16 +40,23 @@ fn main() {
             let interner = Rc::try_unwrap(parser.interner)
                 .expect("multiple references still held (how??????????????????)")
                 .into_inner();
-            let mut compiler = Compiler::new(interner, parser.src);
+
+            let mut compiler = Compiler::new(interner, parser.src, &mut bytecode_map);
 
             match compiler.compile(ast.statements) {
-                Ok(bytecode) => {
-                    println!("{}", bytecode);
+                Ok(_) => {
+                    for (src, bytecode) in &compiler.map.map {
+                        println!(
+                            "GOG: {:?}\n──────────────────────────────────────────────────────",
+                            src
+                        );
+                        println!("{}", bytecode);
 
-                    let bytes = bincode::serialize(&bytecode).unwrap();
-                    println!("{:?}", bytes);
+                        // let bytes = bincode::serialize(&bytecode).unwrap();
+                        // println!("{:?}", bytes);
 
-                    std::fs::write("cock.spwnc", &bytes).unwrap();
+                        // std::fs::write("cock.spwnc", bytes).unwrap();
+                    }
                 }
                 Err(err) => err.to_report().display(),
             }

@@ -1,19 +1,21 @@
+use std::{path::PathBuf, rc::Rc};
+
 use ahash::AHashMap;
-use lasso::Spur;
+use lasso::{Rodeo, Spur};
 use slotmap::{new_key_type, SlotMap};
 
 use crate::{
     parsing::{
-        ast::{ExprNode, Expression, ImportType, Statement, StmtNode},
-        parser::Interner,
+        ast::{ExprNode, Expression, ImportType, Spanned, Statement, StmtNode},
+        parser::Parser,
         utils::operators::{BinOp, UnaryOp},
     },
-    sources::{CodeArea, CodeSpan, SpwnSource},
-    vm::opcodes::Register,
+    sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource},
+    util::{Interner, RandomState},
 };
 
 use super::{
-    bytecode::{Bytecode, BytecodeBuilder, FuncBuilder},
+    bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function},
     error::CompilerError,
 };
 
@@ -27,7 +29,7 @@ new_key_type! {
 pub struct Variable {
     mutable: bool,
     def_span: CodeSpan,
-    reg: Register,
+    reg: usize,
 }
 
 #[derive(Clone)]
@@ -44,26 +46,32 @@ pub struct Scope {
     // captures: Vec<Spur>,
 }
 
-pub struct Compiler {
+pub struct Compiler<'a> {
     interner: Interner,
     scopes: SlotMap<ScopeKey, Scope>,
-    src: SpwnSource,
+    pub src: SpwnSource,
+
+    pub map: &'a mut BytecodeMap,
+
+    global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
 }
 
 macro_rules! bop {
     ($left:ident $f:ident $right:ident ($scope:ident, $builder:ident, $out_reg:ident, $self:ident)) => {{
-        let a = $self.compile_expr($left, $scope, $builder)?;
-        let b = $self.compile_expr($right, $scope, $builder)?;
+        let a = $self.compile_expr(&$left, $scope, $builder)?;
+        let b = $self.compile_expr(&$right, $scope, $builder)?;
         $builder.$f(a, b, $out_reg)
     }};
 }
 
-impl Compiler {
-    pub fn new(interner: Interner, src: SpwnSource) -> Self {
+impl<'a> Compiler<'a> {
+    pub fn new(interner: Interner, src: SpwnSource, map: &'a mut BytecodeMap) -> Self {
         Self {
             interner,
             scopes: SlotMap::default(),
             src,
+            map,
+            global_return: None,
         }
     }
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
@@ -117,7 +125,7 @@ impl Compiler {
         }
     }
 
-    pub fn compile(&mut self, stmts: Vec<StmtNode>) -> CompileResult<Bytecode> {
+    pub fn compile(&mut self, stmts: Vec<StmtNode>) -> CompileResult<()> {
         let mut builder = BytecodeBuilder::new();
 
         // func 0 ("global")
@@ -128,19 +136,96 @@ impl Compiler {
                 typ: Some(ScopeType::Global),
             });
 
-            self.compile_stmts(stmts, base_scope, f)
+            self.compile_stmts(&stmts, base_scope, f)
         })?;
+        let (consts, unopt_funcs) = builder.build();
 
-        Ok(builder.build())
+        let functions = unopt_funcs
+            .into_iter()
+            .map(|v| {
+                let opcodes = v
+                    .into_iter()
+                    .map(|opcode| opcode.try_into().expect("404, sex not found , yo're missing the sex... Where is it? You find it? You do finding its now? Where art it hbe it has gone? Forgotten by societty , , sex walked across acres of empty land....   Almost as if ...,, he did... whereever he may be.... He will stay it will remain..... It told me this it would be like this it will. Be like this it will...."))
+                    .collect();
+                Function { opcodes }
+            })
+            .collect();
+
+        // Ok(Bytecode { consts, functions })
+
+        self.map
+            .map
+            .insert(self.src.clone(), Bytecode { consts, functions });
+
+        Ok(())
+
+        // Ok(builder.build())
     }
 
-    pub fn compile_import(&mut self, typ: ImportType, scope: ScopeKey) -> CompileResult<()> {
+    pub fn compile_import(
+        &mut self,
+        typ: ImportType,
+        scope: ScopeKey,
+        span: CodeSpan,
+    ) -> CompileResult<()> {
+        let (src, name) = match typ {
+            ImportType::Module(s) => (
+                SpwnSource::File(PathBuf::from(self.interner.resolve(&s))),
+                self.interner.resolve(&s),
+            ),
+            ImportType::Library(name) => (
+                SpwnSource::File(PathBuf::from(format!(
+                    "libraries/{}/lib.spwn",
+                    self.interner.resolve(&name)
+                ))),
+                self.interner.resolve(&name),
+            ),
+        };
+        let is_module = matches!(typ, ImportType::Module(_));
+
+        // let bytecode
+
+        let code = match src.read() {
+            Some(s) => s,
+            None => {
+                return Err(CompilerError::NonexistentImport {
+                    is_module,
+                    name: name.into(),
+                    area: self.make_area(span),
+                })
+            }
+        };
+
+        let interner: Interner = Rodeo::with_hasher(RandomState::new());
+        let mut parser = Parser::new(code.trim_end(), src, interner);
+
+        match parser.parse() {
+            Ok(ast) => {
+                let interner = Rc::try_unwrap(parser.interner)
+                    .expect("multiple references still held (how??????????????????)")
+                    .into_inner();
+                let mut compiler = Compiler::new(interner, parser.src, self.map);
+
+                match compiler.compile(ast.statements) {
+                    Ok(bytecode) => {}
+                    Err(err) => return Err(err),
+                }
+            }
+            Err(err) => {
+                return Err(CompilerError::ImportSyntaxError {
+                    is_module,
+                    err,
+                    area: self.make_area(span),
+                })
+            }
+        }
+
         Ok(())
     }
 
     pub fn compile_stmts(
         &mut self,
-        stmts: Vec<StmtNode>,
+        stmts: &Vec<StmtNode>,
         scope: ScopeKey,
         builder: &mut FuncBuilder,
     ) -> CompileResult<()> {
@@ -152,11 +237,11 @@ impl Compiler {
 
     pub fn compile_stmt(
         &mut self,
-        stmt: StmtNode,
+        stmt: &StmtNode,
         scope: ScopeKey,
         builder: &mut FuncBuilder,
     ) -> CompileResult<()> {
-        match *stmt.stmt {
+        match &*stmt.stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder)?;
             }
@@ -252,7 +337,7 @@ impl Compiler {
             Statement::Arrow(statement) => {
                 builder.block(|b| {
                     b.enter_arrow();
-                    self.compile_stmt(*statement, scope, b)?;
+                    self.compile_stmt(statement, scope, b)?;
                     b.yeet_context();
                     Ok(())
                 })?;
@@ -262,7 +347,17 @@ impl Compiler {
                     match value {
                         Some(node) => match &*node.expr {
                             Expression::Dict(items) => {
-                                todo!()
+                                if let Some((_, prev_span)) = self.global_return {
+                                    return Err(CompilerError::DuplicateModuleReturn {
+                                        area: self.make_area(stmt.span),
+                                        prev_area: self.make_area(prev_span),
+                                    });
+                                }
+
+                                let ret_reg = self.compile_expr(node, scope, builder)?;
+                                self.global_return =
+                                    Some((items.iter().map(|i| i.0).collect(), stmt.span));
+                                builder.export(ret_reg);
                             }
                             _ => {
                                 return Err(CompilerError::InvalidModuleReturn {
@@ -308,20 +403,20 @@ impl Compiler {
 
     pub fn compile_expr(
         &mut self,
-        expr: ExprNode,
+        expr: &ExprNode,
         scope: ScopeKey,
         builder: &mut FuncBuilder,
-    ) -> CompileResult<Register> {
+    ) -> CompileResult<usize> {
         let out_reg = builder.next_reg();
 
-        match *expr.expr {
-            Expression::Int(v) => builder.load_int(v, out_reg),
-            Expression::Float(v) => builder.load_float(v, out_reg),
-            Expression::Bool(v) => builder.load_bool(v, out_reg),
+        match &*expr.expr {
+            Expression::Int(v) => builder.load_int(*v, out_reg),
+            Expression::Float(v) => builder.load_float(*v, out_reg),
+            Expression::Bool(v) => builder.load_bool(*v, out_reg),
             Expression::String(v) => {
-                builder.load_string(self.interner.resolve(&v).to_string(), out_reg)
+                builder.load_string(self.interner.resolve(v).to_string(), out_reg)
             }
-            Expression::Id(class, value) => builder.load_id(value, class, out_reg),
+            Expression::Id(class, value) => builder.load_id(*value, *class, out_reg),
             Expression::Op(left, op, right) => match op {
                 BinOp::Plus => bop!(left add right (scope, builder, out_reg, self)),
                 BinOp::Minus => bop!(left sub right (scope, builder, out_reg, self)),
@@ -482,18 +577,18 @@ impl Compiler {
                     UnaryOp::Minus => builder.unary_negate(v, out_reg),
                 }
             }
-            Expression::Var(name) => match self.get_var(name, scope) {
+            Expression::Var(name) => match self.get_var(*name, scope) {
                 Some(data) => return Ok(data.reg),
                 None => {
                     return Err(CompilerError::NonexistentVariable {
                         area: self.make_area(expr.span),
-                        var: self.interner.resolve(&name).into(),
+                        var: self.interner.resolve(name).into(),
                     })
                 }
             },
             Expression::Type(_) => todo!(),
             Expression::Array(items) => {
-                builder.new_array(items.len(), out_reg, |builder, elems| {
+                builder.new_array(items.len() as u16, out_reg, |builder, elems| {
                     for item in items {
                         elems.push(self.compile_expr(item, scope, builder)?);
                     }
@@ -501,7 +596,7 @@ impl Compiler {
                 })?;
             }
             Expression::Dict(items) => {
-                builder.new_dict(items.len(), out_reg, |builder, elems| {
+                builder.new_dict(items.len() as u16, out_reg, |builder, elems| {
                     for (key, item) in items {
                         let value_reg = match item {
                             Some(e) => self.compile_expr(e, scope, builder)?,
@@ -585,7 +680,9 @@ impl Compiler {
             Expression::Empty => {
                 builder.load_empty(out_reg);
             }
-            Expression::Import(_) => todo!(),
+            Expression::Import(t) => {
+                self.compile_import(*t, scope, expr.span)?;
+            }
             Expression::Instance { base, items } => todo!(),
         }
 

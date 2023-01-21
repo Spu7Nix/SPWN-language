@@ -8,7 +8,7 @@ use super::{
     utils::operators::{BinOp, UnaryOp},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ImportType {
     Module(Spur),
     Library(Spur),
@@ -198,6 +198,7 @@ pub struct Spanned<T> {
     pub value: T,
     pub span: CodeSpan,
 }
+
 impl<T> Spanned<T> {
     pub fn split(self) -> (T, CodeSpan) {
         (self.value, self.span)
@@ -212,6 +213,8 @@ impl<T> Spanned<T> {
         f(self.value).spanned(self.span)
     }
 }
+
+impl<T: Copy> Copy for Spanned<T> {}
 
 pub trait Spannable {
     fn spanned(self, span: CodeSpan) -> Spanned<Self>

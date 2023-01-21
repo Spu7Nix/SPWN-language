@@ -1,6 +1,7 @@
 use std::string::ToString;
 
 use crate::error_maker;
+use crate::parsing::error::SyntaxError;
 use crate::sources::CodeArea;
 use crate::util::hyperlink;
 
@@ -76,6 +77,46 @@ error_maker! {
         ]
         InvalidModuleReturn {
             area: CodeArea,
+        },
+
+        /////
+        #[
+            Message: "Import could not be resolved", Note: None;
+            Labels: [
+                area => "{} `{}` could not be found": => (if *is_module { "Module" } else { "Library" }), name;
+            ]
+        ]
+        NonexistentImport {
+            is_module: bool,
+            name: String,
+            area: CodeArea,
+        },
+
+        /////
+        #[
+            Message: "Syntax error in import", Note: None;
+            Labels: [
+                area => "Syntax error occured while importing this {}": => (if *is_module { "module" } else { "library" });
+                -> err.to_report().labels
+            ]
+        ]
+        ImportSyntaxError {
+            is_module: bool,
+            err: SyntaxError,
+            area: CodeArea,
+        },
+
+        /////
+        #[
+            Message: "Duplicate module return", Note: None;
+            Labels: [
+                area => "Invalid second module return found here";
+                prev_area => "Previous module return used here";
+            ]
+        ]
+        DuplicateModuleReturn {
+            area: CodeArea,
+            prev_area: CodeArea,
         },
     }
 }

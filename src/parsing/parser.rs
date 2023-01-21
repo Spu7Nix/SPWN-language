@@ -1,13 +1,12 @@
 use std::{cell::RefCell, rc::Rc, str::Chars};
 
-use ahash::RandomState;
 use base64::Engine;
-use lasso::{Rodeo, Spur};
+use lasso::{Spur};
 use unindent::Unindent;
 
 use crate::{
     lexing::tokens::{Lexer, Token},
-    sources::{CodeArea, CodeSpan, SpwnSource}, gd::ids::IDClass,
+    sources::{CodeArea, CodeSpan, SpwnSource}, gd::ids::IDClass, util::Interner,
 };
 
 use super::{
@@ -20,8 +19,6 @@ use super::{
     utils::operators::{self, unary_prec},
 };
 
-pub type Interner = Rodeo<Spur, RandomState>;
-
 #[derive(Clone)]
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
@@ -32,7 +29,7 @@ pub struct Parser<'a> {
 pub type ParseResult<T> = Result<T, SyntaxError>;
 
 impl<'a> Parser<'a> {
-    pub fn new(code: &'a str, src: SpwnSource, interner: Rodeo<Spur, RandomState>) -> Self {
+    pub fn new(code: &'a str, src: SpwnSource, interner: Interner) -> Self {
         let lexer = Token::lex(code);
         Parser {
             lexer,

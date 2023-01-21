@@ -10,7 +10,7 @@ use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 use crate::{
     error::RainbowColorGenerator,
     gd::ids::IDClass,
-    vm::opcodes::{Opcode, Register},
+    vm::opcodes::{Opcode, Register, UnoptOpcode, UnoptRegister},
 };
 
 use super::compiler::CompileResult;
@@ -27,9 +27,9 @@ pub enum Constant {
 impl std::fmt::Debug for Constant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Constant::Int(v) => write!(f, "{}", v.to_string()),
-            Constant::Float(v) => write!(f, "{}", v.to_string()),
-            Constant::Bool(v) => write!(f, "{}", v.to_string()),
+            Constant::Int(v) => write!(f, "{}", v),
+            Constant::Float(v) => write!(f, "{}", v),
+            Constant::Bool(v) => write!(f, "{}", v),
             Constant::String(v) => write!(f, "\"{}\"", v),
             Constant::Id(class, n) => write!(
                 f,
@@ -95,11 +95,11 @@ enum JumpTo {
 }
 #[derive(Debug, Clone)]
 enum ProtoOpcode {
-    Raw(Opcode),
+    Raw(UnoptOpcode),
 
     Jump(JumpTo),
-    JumpIfFalse(Register, JumpTo),
-    LoadConst(Register, ConstKey),
+    JumpIfFalse(UnoptRegister, JumpTo),
+    LoadConst(UnoptRegister, ConstKey),
 
     EnterArrowStatement(JumpTo),
 }
@@ -152,7 +152,7 @@ pub struct FuncBuilder<'a> {
     func: usize,
     pub block_path: Vec<usize>,
 
-    used_regs: u8,
+    used_regs: usize,
 }
 
 impl BytecodeBuilder {
@@ -185,7 +185,7 @@ impl BytecodeBuilder {
         f(&mut func_builder)
     }
 
-    pub fn build(self) -> Bytecode {
+    pub fn build(self) -> (Vec<Constant>, Vec<Vec<UnoptOpcode>>) {
         let mut const_index_map = SecondaryMap::default();
 
         let consts = self
@@ -235,7 +235,7 @@ impl BytecodeBuilder {
 
             fn build_block(
                 b: &Block,
-                opcodes: &mut Vec<Opcode>,
+                opcodes: &mut Vec<UnoptOpcode>,
                 positions: &PositionMap<'_>,
                 const_index_map: &SecondaryMap<ConstKey, usize>,
             ) {
@@ -252,19 +252,19 @@ impl BytecodeBuilder {
                             for opcode in v {
                                 opcodes.push(match opcode {
                                     ProtoOpcode::Raw(o) => *o,
-                                    ProtoOpcode::Jump(to) => Opcode::Jump {
+                                    ProtoOpcode::Jump(to) => UnoptOpcode::Jump {
                                         to: get_jump_pos(to) as u16,
                                     },
-                                    ProtoOpcode::JumpIfFalse(r, to) => Opcode::JumpIfFalse {
+                                    ProtoOpcode::JumpIfFalse(r, to) => UnoptOpcode::JumpIfFalse {
                                         src: *r,
                                         to: get_jump_pos(to) as u16,
                                     },
-                                    ProtoOpcode::LoadConst(r, k) => Opcode::LoadConst {
+                                    ProtoOpcode::LoadConst(r, k) => UnoptOpcode::LoadConst {
                                         dest: *r,
                                         id: const_index_map[*k] as u16,
                                     },
                                     ProtoOpcode::EnterArrowStatement(to) => {
-                                        Opcode::EnterArrowStatement {
+                                        UnoptOpcode::EnterArrowStatement {
                                             skip_to: get_jump_pos(to) as u16,
                                         }
                                     }
@@ -280,10 +280,10 @@ impl BytecodeBuilder {
 
             build_block(&f.code, &mut opcodes, &block_positions, &const_index_map);
 
-            functions.push(Function { opcodes })
+            functions.push(opcodes)
         }
 
-        Bytecode { consts, functions }
+        (consts, functions)
     }
 }
 
@@ -303,12 +303,13 @@ impl<'a> FuncBuilder<'a> {
             .assume_code()
     }
 
-    pub fn next_reg(&mut self) -> Register {
+    pub fn next_reg(&mut self) -> UnoptRegister {
         let old = self.used_regs;
         self.used_regs = self
             .used_regs
             .checked_add(1)
             .expect("sil;ly goober used too mnay regusters!!!! i🙌!");
+
         old
     }
 
@@ -345,13 +346,13 @@ impl<'a> FuncBuilder<'a> {
         Ok(())
     }
 
-    pub fn new_array<F>(&mut self, len: usize, dest: Register, f: F) -> CompileResult<()>
+    pub fn new_array<F>(&mut self, len: u16, dest: UnoptRegister, f: F) -> CompileResult<()>
     where
-        F: FnOnce(&mut FuncBuilder, &mut Vec<Register>) -> CompileResult<()>,
+        F: FnOnce(&mut FuncBuilder, &mut Vec<UnoptRegister>) -> CompileResult<()>,
     {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::AllocArray {
-                size: len as u16,
+            .push(ProtoOpcode::Raw(UnoptOpcode::AllocArray {
+                size: len,
                 dest,
             }));
 
@@ -360,21 +361,21 @@ impl<'a> FuncBuilder<'a> {
 
         for i in items {
             self.current_code()
-                .push(ProtoOpcode::Raw(Opcode::PushArrayElem { elem: i, dest }))
+                .push(ProtoOpcode::Raw(UnoptOpcode::PushArrayElem {
+                    elem: i,
+                    dest,
+                }))
         }
 
         Ok(())
     }
 
-    pub fn new_dict<F>(&mut self, len: usize, dest: Register, f: F) -> CompileResult<()>
+    pub fn new_dict<F>(&mut self, len: u16, dest: UnoptRegister, f: F) -> CompileResult<()>
     where
-        F: FnOnce(&mut FuncBuilder, &mut Vec<(String, Register)>) -> CompileResult<()>,
+        F: FnOnce(&mut FuncBuilder, &mut Vec<(String, UnoptRegister)>) -> CompileResult<()>,
     {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::AllocDict {
-                size: len as u16,
-                dest,
-            }));
+            .push(ProtoOpcode::Raw(UnoptOpcode::AllocDict { size: len, dest }));
 
         let mut items = vec![];
         f(self, &mut items)?;
@@ -384,7 +385,7 @@ impl<'a> FuncBuilder<'a> {
             self.load_string(k, key_reg);
 
             self.current_code()
-                .push(ProtoOpcode::Raw(Opcode::PushDictElem {
+                .push(ProtoOpcode::Raw(UnoptOpcode::PushDictElem {
                     elem: r,
                     key: key_reg,
                     dest,
@@ -394,23 +395,23 @@ impl<'a> FuncBuilder<'a> {
         Ok(())
     }
 
-    pub fn load_int(&mut self, value: i64, reg: Register) {
+    pub fn load_int(&mut self, value: i64, reg: UnoptRegister) {
         let k = self.code_builder.constants.insert(Constant::Int(value));
         self.current_code().push(ProtoOpcode::LoadConst(reg, k))
     }
-    pub fn load_float(&mut self, value: f64, reg: Register) {
+    pub fn load_float(&mut self, value: f64, reg: UnoptRegister) {
         let k = self.code_builder.constants.insert(Constant::Float(value));
         self.current_code().push(ProtoOpcode::LoadConst(reg, k))
     }
-    pub fn load_string(&mut self, value: String, reg: Register) {
+    pub fn load_string(&mut self, value: String, reg: UnoptRegister) {
         let k = self.code_builder.constants.insert(Constant::String(value));
         self.current_code().push(ProtoOpcode::LoadConst(reg, k))
     }
-    pub fn load_bool(&mut self, value: bool, reg: Register) {
+    pub fn load_bool(&mut self, value: bool, reg: UnoptRegister) {
         let k = self.code_builder.constants.insert(Constant::Bool(value));
         self.current_code().push(ProtoOpcode::LoadConst(reg, k))
     }
-    pub fn load_id(&mut self, value: Option<u16>, class: IDClass, reg: Register) {
+    pub fn load_id(&mut self, value: Option<u16>, class: IDClass, reg: UnoptRegister) {
         let k = self
             .code_builder
             .constants
@@ -418,153 +419,161 @@ impl<'a> FuncBuilder<'a> {
         self.current_code().push(ProtoOpcode::LoadConst(reg, k))
     }
 
-    pub fn add(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn add(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Add { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Add { left, right, dest }))
     }
-    pub fn sub(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn sub(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Sub { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Sub { left, right, dest }))
     }
-    pub fn mult(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn mult(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Mult { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Mult { left, right, dest }))
     }
-    pub fn div(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn div(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Div { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Div { left, right, dest }))
     }
-    pub fn modulo(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn modulo(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Mod { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Mod { left, right, dest }))
     }
-    pub fn pow(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn pow(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Pow { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Pow { left, right, dest }))
     }
-    pub fn shl(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn shl(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::ShiftLeft { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::ShiftLeft {
+                left,
+                right,
+                dest,
+            }))
     }
-    pub fn shr(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn shr(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::ShiftRight { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::ShiftRight {
+                left,
+                right,
+                dest,
+            }))
     }
-    pub fn eq(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn eq(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Eq { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Eq { left, right, dest }))
     }
-    pub fn neq(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn neq(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Neq { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Neq { left, right, dest }))
     }
-    pub fn gt(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn gt(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Gt { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Gt { left, right, dest }))
     }
-    pub fn gte(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn gte(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Gte { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Gte { left, right, dest }))
     }
-    pub fn lt(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn lt(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Lt { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Lt { left, right, dest }))
     }
-    pub fn lte(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn lte(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Lte { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Lte { left, right, dest }))
     }
-    pub fn range(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn range(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Range { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Range { left, right, dest }))
     }
-    pub fn in_op(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn in_op(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::In { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::In { left, right, dest }))
     }
-    pub fn as_op(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn as_op(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::As { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }))
     }
-    pub fn is_op(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn is_op(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::As { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }))
     }
-    pub fn bin_or(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn bin_or(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::BinOr { left, right, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::BinOr { left, right, dest }))
     }
-    pub fn bin_and(&mut self, left: Register, right: Register, dest: Register) {
+    pub fn bin_and(&mut self, left: UnoptRegister, right: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::BinAnd { left, right, dest }))
-    }
-
-    pub fn add_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::AddEq { left, right }))
-    }
-    pub fn sub_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::SubEq { left, right }))
-    }
-    pub fn mult_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::MultEq { left, right }))
-    }
-    pub fn div_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::DivEq { left, right }))
-    }
-    pub fn modulo_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::ModEq { left, right }))
-    }
-    pub fn pow_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::PowEq { left, right }))
-    }
-    pub fn shl_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::ShiftLeftEq { left, right }))
-    }
-    pub fn shr_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::ShiftRightEq { left, right }))
-    }
-    pub fn bin_and_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::BinAndEq { left, right }))
-    }
-    pub fn bin_or_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::BinOrEq { left, right }))
-    }
-    pub fn bin_not_eq(&mut self, left: Register, right: Register) {
-        self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::BinNotEq { left, right }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::BinAnd { left, right, dest }))
     }
 
-    pub fn unary_not(&mut self, src: Register, dest: Register) {
+    pub fn add_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Not { src, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::AddEq { left, right }))
     }
-    pub fn unary_negate(&mut self, src: Register, dest: Register) {
+    pub fn sub_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Negate { src, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::SubEq { left, right }))
     }
-    pub fn unary_bin_not(&mut self, src: Register, dest: Register) {
+    pub fn mult_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::BinNot { src, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::MultEq { left, right }))
+    }
+    pub fn div_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::DivEq { left, right }))
+    }
+    pub fn modulo_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::ModEq { left, right }))
+    }
+    pub fn pow_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::PowEq { left, right }))
+    }
+    pub fn shl_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::ShiftLeftEq { left, right }))
+    }
+    pub fn shr_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::ShiftRightEq { left, right }))
+    }
+    pub fn bin_and_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::BinAndEq { left, right }))
+    }
+    pub fn bin_or_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::BinOrEq { left, right }))
+    }
+    pub fn bin_not_eq(&mut self, left: UnoptRegister, right: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::BinNotEq { left, right }))
     }
 
-    pub fn copy(&mut self, from: Register, to: Register) {
+    pub fn unary_not(&mut self, src: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Copy { from, to }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Not { src, dest }))
+    }
+    pub fn unary_negate(&mut self, src: UnoptRegister, dest: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::Negate { src, dest }))
+    }
+    pub fn unary_bin_not(&mut self, src: UnoptRegister, dest: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::BinNot { src, dest }))
     }
 
-    pub fn print(&mut self, reg: Register) {
+    pub fn copy(&mut self, from: UnoptRegister, to: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Print { reg }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Copy { from, to }))
+    }
+
+    pub fn print(&mut self, reg: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::Print { reg }))
     }
 
     pub fn repeat_block(&mut self) {
@@ -578,7 +587,7 @@ impl<'a> FuncBuilder<'a> {
         self.current_code()
             .push(ProtoOpcode::Jump(JumpTo::End(path)))
     }
-    pub fn exit_other_block(&mut self, path: Vec<usize>) {
+    pub fn exit_other_block(&mut self, path: Vec<UnoptRegister>) {
         self.current_code()
             .push(ProtoOpcode::Jump(JumpTo::End(path)))
     }
@@ -587,11 +596,11 @@ impl<'a> FuncBuilder<'a> {
         self.current_code()
             .push(ProtoOpcode::EnterArrowStatement(JumpTo::End(path)))
     }
-    // pub fn exit_block_absolute(&mut self, to: usize) {
+    // pub fn exit_block_absolute(&mut self, to: UnoptRegister) {
     //     self.current_code().push(ProtoOpcode::Jump(to))
     // }
 
-    pub fn exit_if_false(&mut self, reg: Register) {
+    pub fn exit_if_false(&mut self, reg: UnoptRegister) {
         let path = self.block_path.clone();
         self.current_code()
             .push(ProtoOpcode::JumpIfFalse(reg, JumpTo::End(path)))
@@ -600,88 +609,97 @@ impl<'a> FuncBuilder<'a> {
         println!("func: {:?}, path: {:?}", self.func, self.block_path);
     }
 
-    pub fn load_none(&mut self, reg: Register) {
+    pub fn load_none(&mut self, reg: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::LoadNone { dest: reg }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::LoadNone { dest: reg }))
     }
-    pub fn wrap_maybe(&mut self, src: Register, dest: Register) {
+    pub fn wrap_maybe(&mut self, src: UnoptRegister, dest: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::WrapMaybe { src, dest }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::WrapMaybe { src, dest }))
     }
-    pub fn load_empty(&mut self, reg: Register) {
+    pub fn load_empty(&mut self, reg: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::LoadEmpty { dest: reg }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }))
     }
 
-    pub fn index(&mut self, from: Register, dest: Register, index: Register) {
+    pub fn index(&mut self, from: UnoptRegister, dest: UnoptRegister, index: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Index { from, dest, index }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Index { from, dest, index }))
     }
-    pub fn member(&mut self, from: Register, dest: Register, member: String) {
+    pub fn member(&mut self, from: UnoptRegister, dest: UnoptRegister, member: String) {
         let next_reg = self.next_reg();
         self.load_string(member, next_reg);
-        self.current_code().push(ProtoOpcode::Raw(Opcode::Member {
-            from,
-            dest,
-            member: next_reg,
-        }))
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::Member {
+                from,
+                dest,
+                member: next_reg,
+            }))
     }
-    pub fn associated(&mut self, from: Register, dest: Register, associated: String) {
+    pub fn associated(&mut self, from: UnoptRegister, dest: UnoptRegister, associated: String) {
         let next_reg = self.next_reg();
         self.load_string(associated, next_reg);
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Associated {
+            .push(ProtoOpcode::Raw(UnoptOpcode::Associated {
                 from,
                 dest,
                 name: next_reg,
             }))
     }
 
-    pub fn load_builtins(&mut self, to: Register) {
+    pub fn load_builtins(&mut self, to: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::LoadBuiltins { dest: to }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::LoadBuiltins { dest: to }))
     }
 
-    pub fn ret(&mut self, src: Register) {
+    pub fn ret(&mut self, src: UnoptRegister) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::Ret { src }))
+            .push(ProtoOpcode::Raw(UnoptOpcode::Ret { src }))
+    }
+
+    pub fn export(&mut self, src: UnoptRegister) {
+        self.current_code()
+            .push(ProtoOpcode::Raw(UnoptOpcode::Export { src }))
     }
 
     pub fn yeet_context(&mut self) {
         self.current_code()
-            .push(ProtoOpcode::Raw(Opcode::YeetContext))
+            .push(ProtoOpcode::Raw(UnoptOpcode::YeetContext))
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Function {
-    opcodes: Vec<Opcode>,
+    pub opcodes: Vec<Opcode>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Bytecode {
-    consts: Vec<Constant>,
+    pub consts: Vec<Constant>,
 
-    functions: Vec<Function>,
+    pub functions: Vec<Function>,
 }
 
 impl std::fmt::Display for Bytecode {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let longest_opcode: usize = Opcode::VARIANT_NAMES
+        let longest_opcode: usize = Opcode::<Register>::VARIANT_NAMES
             .iter()
             .map(|s| s.len())
             .max()
             .unwrap_or(2);
 
-        writeln!(f, "{}: {:?}\n", "Constants".red(), self.consts)?;
+        writeln!(
+            f,
+            "{}: {:?}\n",
+            "Constants".bright_red().bold(),
+            self.consts
+        )?;
 
         let mut colors = RainbowColorGenerator::new(150.0, 0.4, 0.9, 60.0);
 
         let mut lines = vec![];
         let mut formatted_opcodes = vec![];
-        let mut formatted_field_names = vec![];
         let mut longest_formatted = 0;
-        let mut longest_field_name = 0;
 
         let col_reg = Regex::new(r"(R\d+)").unwrap();
 
@@ -689,18 +707,15 @@ impl std::fmt::Display for Bytecode {
         let clear_ansi = |s: &str| ansi_regex.replace_all(s, "").to_string();
 
         for (i, func) in self.functions.iter().enumerate() {
-            writeln!(
-                f,
-                "{}",
-                format!("======== Function {} ========", i).yellow()
-            )?;
+            let max_num_width = func.opcodes.len().to_string().len();
 
             for (i, opcode) in func.opcodes.iter().enumerate() {
                 lines.push(format!(
-                    "{}  {:>pad$}",
-                    i.to_string().blue().bold(),
-                    <&Opcode as Into<&'static str>>::into(&opcode),
-                    pad = (longest_opcode - (i.to_string().len() - 1))
+                    "{:<pad$}  {:>pad2$}",
+                    i.to_string().bright_blue().bold(),
+                    <&Opcode as Into<&'static str>>::into(opcode),
+                    pad = max_num_width,
+                    pad2 = longest_opcode
                 ));
 
                 let formatted = match opcode {
@@ -708,7 +723,7 @@ impl std::fmt::Display for Bytecode {
                         format!(
                             "{} -> R{dest}",
                             format!("{:?}", &self.consts[*id as usize])
-                                .bright_purple()
+                                .bright_magenta()
                                 .bold()
                         )
                     }
@@ -718,7 +733,7 @@ impl std::fmt::Display for Bytecode {
                 };
 
                 let formatted = col_reg
-                    .replace_all(&formatted, "$1".red().bold().to_string())
+                    .replace_all(&formatted, "$1".bright_red().bold().to_string())
                     .to_string();
                 let f_len = clear_ansi(&formatted).len();
 
@@ -726,30 +741,19 @@ impl std::fmt::Display for Bytecode {
                     longest_formatted = f_len;
                 }
                 formatted_opcodes.push(formatted);
-
-                let field_names = opcode.field_names().unwrap_or(&[]).join(", ");
-
-                if field_names.len() > longest_field_name {
-                    longest_field_name = field_names.len();
-                }
-                formatted_field_names.push(field_names);
             }
 
             for (i, line) in lines.iter_mut().enumerate() {
                 let c = colors.next();
 
                 let fmto = &formatted_opcodes[i];
-                let fmto_len = clear_ansi(&fmto).len();
-
-                let fmtv = &formatted_field_names[i];
+                let fmto_len = clear_ansi(fmto).len();
 
                 let bytes = bincode::serialize(&func.opcodes[i]).unwrap();
 
                 line.push_str(&format!(
-                    "  {} {:pad$}｜ {}{:pad2$}  ｜  {}",
+                    "  {} {:pad$} {line}  {} ",
                     fmto.bright_white(),
-                    "",
-                    fmtv.bright_yellow(),
                     "",
                     bytes
                         .iter()
@@ -758,11 +762,38 @@ impl std::fmt::Display for Bytecode {
                         .join(" ")
                         .truecolor(c.0, c.1, c.2),
                     pad = longest_formatted - fmto_len,
-                    pad2 = longest_field_name - fmtv.len(),
+                    line = "│".bright_yellow(),
                 ));
             }
 
-            writeln!(f, "{}", lines.join("\n"))?
+            writeln!(
+                f,
+                "{}",
+                format!(
+                    "╭────┤ Function {} ├{}┬{}╮",
+                    i,
+                    "─".repeat(longest_formatted + max_num_width + 10),
+                    // bytecode will never be more than 15 characters (2 spaces padding on either side, 2 hex chars + 1 space * 4)
+                    "─".repeat(15),
+                )
+                .bright_yellow()
+            )?;
+
+            for line in &lines {
+                writeln!(f, "{0} {1} {0}", "│".bright_yellow(), line)?
+            }
+
+            writeln!(
+                f,
+                "{}",
+                format!(
+                    "╰──────────────────{}┴{}╯",
+                    "─".repeat(longest_formatted + max_num_width + 10),
+                    // bytecode will never be more than 15 characters (2 spaces padding on either side, 2 hex chars + 1 space * 4)
+                    "─".repeat(15),
+                )
+                .bright_yellow()
+            )?;
         }
 
         Ok(())

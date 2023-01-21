@@ -1,330 +1,11 @@
+use std::fmt::Display;
+
 use serde::{
     de::{Error, Visitor},
     Deserialize, Serialize,
 };
 
 use delve::{EnumDisplay, EnumFields, EnumToStr, EnumVariantNames};
-
-pub type Register = u8;
-pub type ConstID = u16;
-pub type JumpPos = u16;
-pub type AllocSize = u16;
-
-#[derive(
-    Clone, Copy, PartialEq, Eq, Debug, EnumDisplay, EnumToStr, EnumFields, EnumVariantNames,
-)]
-#[delve(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum Opcode {
-    LoadConst {
-        dest: Register,
-        id: ConstID,
-    },
-
-    #[delve(display = |f: &Register, t: &Register| format!("R{f} -> R{t}"))]
-    Copy {
-        from: Register,
-        to: Register,
-    },
-    #[delve(display = |reg: &Register| format!("print R{reg}"))]
-    Print {
-        reg: Register,
-    },
-    // LoadBuiltin {},
-
-    // Call {},
-    #[delve(display = |s: &AllocSize, d: &Register| format!("[...; {s}] -> R{d}"))]
-    AllocArray {
-        size: AllocSize,
-        dest: Register,
-    },
-    #[delve(display = |s: &AllocSize, d: &Register| format!("{{...; {s}}} -> R{d}"))]
-    AllocDict {
-        size: AllocSize,
-        dest: Register,
-    },
-
-    #[delve(display = |e: &Register, d: &Register| format!("R{d}.push R{e}"))]
-    PushArrayElem {
-        elem: Register,
-        dest: Register,
-    },
-    #[delve(display = |e: &Register, k: &Register, d: &Register| format!("R{d}.insert R{k}: R{d}"))]
-    PushDictElem {
-        elem: Register,
-        key: Register,
-        dest: Register,
-    },
-
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} + R{b} -> R{x}"))]
-    Add {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} - R{b} -> R{x}"))]
-    Sub {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} * R{b} -> R{x}"))]
-    Mult {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} / R{b} -> R{x}"))]
-    Div {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} % R{b} -> R{x}"))]
-    Mod {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} ^ R{b} -> R{x}"))]
-    Pow {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} << R{b} -> R{x}"))]
-    ShiftLeft {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} >> R{b} -> R{x}"))]
-    ShiftRight {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} | R{b} -> R{x}"))]
-    BinOr {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} & R{b} -> R{x}"))]
-    BinAnd {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} += R{b}"))]
-    AddEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} -= R{b}"))]
-    SubEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} *= R{b}"))]
-    MultEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} /= R{b}"))]
-    DivEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} %= R{b}"))]
-    ModEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} ^= R{b}"))]
-    PowEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} <<= R{b}"))]
-    ShiftLeftEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} >>= R{b}"))]
-    ShiftRightEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} &= R{b}"))]
-    BinAndEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} |= R{b}"))]
-    BinOrEq {
-        left: Register,
-        right: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register| format!("R{a} ~= R{b}"))]
-    BinNotEq {
-        left: Register,
-        right: Register,
-    },
-
-    #[delve(display = |s: &Register, d: &Register| format!("!R{s} -> R{d}"))]
-    Not {
-        src: Register,
-        dest: Register,
-    },
-    #[delve(display = |s: &Register, d: &Register| format!("-R{s} -> R{d}"))]
-    Negate {
-        src: Register,
-        dest: Register,
-    },
-    #[delve(display = |s: &Register, d: &Register| format!("~R{s} -> R{d}"))]
-    BinNot {
-        src: Register,
-        dest: Register,
-    },
-
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} == R{b} -> R{x}"))]
-    Eq {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} != R{b} -> R{x}"))]
-    Neq {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} > R{b} -> R{x}"))]
-    Gt {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} < R{b} -> R{x}"))]
-    Lt {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} >= R{b} -> R{x}"))]
-    Gte {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} <= R{b} -> R{x}"))]
-    Lte {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a}..R{b} -> R{x}"))]
-    Range {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} in R{b} -> R{x}"))]
-    In {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} as R{b} -> R{x}"))]
-    As {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} is R{b} -> R{x}"))]
-    Is {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} && R{b} -> R{x}"))]
-    And {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-    #[delve(display = |a: &Register, b: &Register, x: &Register| format!("R{a} || R{b} -> R{x}"))]
-    Or {
-        left: Register,
-        right: Register,
-        dest: Register,
-    },
-
-    #[delve(display = |to: &JumpPos| format!("to {to}"))]
-    Jump {
-        to: JumpPos,
-    },
-    #[delve(display = |s: &Register, to: &JumpPos| format!("if !R{s}, to {to}"))]
-    JumpIfFalse {
-        src: Register,
-        to: JumpPos,
-    },
-
-    #[delve(display = |s: &Register| format!("return R{s}"))]
-    Ret {
-        src: Register,
-    },
-
-    #[delve(display = |s: &Register, d: &Register| format!("R{s}? -> R{d}"))]
-    WrapMaybe {
-        src: Register,
-        dest: Register,
-    },
-    #[delve(display = |d: &Register| format!("? -> R{d}"))]
-    LoadNone {
-        dest: Register,
-    },
-
-    #[delve(display = |d: &Register| format!("() -> R{d}"))]
-    LoadEmpty {
-        dest: Register,
-    },
-
-    #[delve(display = |f: &Register, d: &Register, i: &Register| format!("R{f}[R{i}] -> R{d}"))]
-    Index {
-        from: Register,
-        dest: Register,
-        index: Register,
-    },
-    #[delve(display = |f: &Register, d: &Register, i: &Register| format!("R{f}.R{i} -> R{d}"))]
-    Member {
-        from: Register,
-        dest: Register,
-        member: Register,
-    },
-    #[delve(display = |f: &Register, d: &Register, i: &Register| format!("R{f}::R{i} -> R{d}"))]
-    Associated {
-        from: Register,
-        dest: Register,
-        name: Register,
-    },
-
-    #[delve(display = || format!("yeet"))]
-    YeetContext,
-    #[delve(display = |to: &JumpPos| format!("-> to {to}"))]
-    EnterArrowStatement {
-        skip_to: JumpPos,
-    },
-
-    #[delve(display = |d: &Register| format!("$ -> R{d}"))]
-    LoadBuiltins {
-        dest: Register,
-    },
-}
 
 impl Serialize for Opcode {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -363,4 +44,233 @@ impl<'de> Visitor<'de> for OpcodeVisitor {
         // who is manually writing bytecode
         Ok(unsafe { std::mem::transmute::<_, Opcode>(value) })
     }
+}
+
+pub type Register = u8;
+pub type UnoptRegister = usize;
+
+pub type ConstID = u16;
+pub type JumpPos = u16;
+pub type AllocSize = u16;
+
+macro_rules! opcodes {
+    (
+        <$g:ident = $d:ident> where ($($g_info:tt)*);
+
+        $(
+            $(#[$meta:meta])*
+            $variant:ident $({
+                $(
+                    $($field:ident: $typ:ty)?
+                    $(=> $reg_field:ident)?
+                ),+
+            })?,
+        )+
+    ) => {
+        #[derive(
+            Clone,
+            Copy,
+            PartialEq,
+            Eq,
+            Debug,
+            EnumDisplay,
+            EnumToStr,
+            EnumFields,
+            EnumVariantNames
+        )]
+        #[delve(rename_all = "SCREAMING_SNAKE_CASE")]
+        pub enum Opcode<$g = $d> where $($g_info)* {
+            $(
+                $(#[$meta])*
+                $variant $({
+                    $(
+                        $($field: $typ,)?
+                        $($reg_field: $g,)?
+                    )+
+                })?,
+            )+
+        }
+
+        pub type UnoptOpcode = Opcode<UnoptRegister>;
+
+        impl TryFrom<UnoptOpcode> for Opcode {
+            type Error = ();
+
+            fn try_from(value: UnoptOpcode) -> Result<Self, Self::Error> {
+                match value {
+                    $(
+                        UnoptOpcode::$variant $({
+                            $(
+                                $($reg_field,)?
+                                $($field,)?
+                            )+
+                            ..
+                        })? => Ok(
+                            Opcode::$variant
+                            $(
+                                {
+                                    $(
+                                        $($reg_field: $reg_field.try_into().map_err(|_| ())?,)?
+                                        $($field,)?
+                                    )+
+                                }
+                            )?
+                        ),
+                    )+
+                }
+            }
+        }
+    };
+}
+
+opcodes! {
+    <R = Register> where (R: Display + Copy);
+
+    LoadConst {
+        => dest,
+        id: ConstID,
+    },
+
+    #[delve(display = |f: &R, t: &R| format!("R{f} -> R{t}"))]
+    Copy { => from, => to },
+    #[delve(display = |reg: &R| format!("print R{reg}"))]
+    Print { => reg },
+    // LoadBuiltin {},
+
+    // Call {},
+    #[delve(display = |s: &AllocSize, d: &R| format!("[...; {s}] -> R{d}"))]
+    AllocArray {
+        size: AllocSize,
+        => dest,
+    },
+    #[delve(display = |s: &AllocSize, d: &R| format!("{{...; {s}}} -> R{d}"))]
+    AllocDict {
+        size: AllocSize,
+        => dest,
+    },
+
+    #[delve(display = |e: &R, d: &R| format!("push R{d} into R{e}"))]
+    PushArrayElem { => elem, => dest },
+    #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d}"))]
+    PushDictElem { => elem, => key, => dest },
+
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} + R{b} -> R{x}"))]
+    Add { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} - R{b} -> R{x}"))]
+    Sub { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} * R{b} -> R{x}"))]
+    Mult { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} / R{b} -> R{x}"))]
+    Div { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} % R{b} -> R{x}"))]
+    Mod { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} ^ R{b} -> R{x}"))]
+    Pow { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} << R{b} -> R{x}"))]
+    ShiftLeft { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} >> R{b} -> R{x}"))]
+    ShiftRight { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} | R{b} -> R{x}"))]
+    BinOr { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} & R{b} -> R{x}"))]
+    BinAnd { => left, => right, => dest },
+
+    #[delve(display = |a: &R, b: &R| format!("R{a} += R{b}"))]
+    AddEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} -= R{b}"))]
+    SubEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} *= R{b}"))]
+    MultEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} /= R{b}"))]
+    DivEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} %= R{b}"))]
+    ModEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} ^= R{b}"))]
+    PowEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} <<= R{b}"))]
+    ShiftLeftEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} >>= R{b}"))]
+    ShiftRightEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} &= R{b}"))]
+    BinAndEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} |= R{b}"))]
+    BinOrEq { => left, => right },
+    #[delve(display = |a: &R, b: &R| format!("R{a} ~= R{b}"))]
+    BinNotEq { => left, => right },
+
+    #[delve(display = |s: &R, d: &R| format!("!R{s} -> R{d}"))]
+    Not { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!("-R{s} -> R{d}"))]
+    Negate { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!("~R{s} -> R{d}"))]
+    BinNot { => src, => dest },
+
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} == R{b} -> R{x}"))]
+    Eq { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} != R{b} -> R{x}"))]
+    Neq { => left, => right, => dest },
+
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} > R{b} -> R{x}"))]
+    Gt { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} < R{b} -> R{x}"))]
+    Lt { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} >= R{b} -> R{x}"))]
+    Gte { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} <= R{b} -> R{x}"))]
+    Lte { => left, => right, => dest },
+
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a}..R{b} -> R{x}"))]
+    Range { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} in R{b} -> R{x}"))]
+    In { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} as R{b} -> R{x}"))]
+    As { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} is R{b} -> R{x}"))]
+    Is { => left, => right, => dest },
+
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} && R{b} -> R{x}"))]
+    And { => left, => right, => dest },
+    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} || R{b} -> R{x}"))]
+    Or { => left, => right, => dest },
+
+    #[delve(display = |to: &JumpPos| format!("to {to}"))]
+    Jump {
+        to: JumpPos,
+    },
+    #[delve(display = |s: &R, to: &JumpPos| format!("if not R{s}, to {to}"))]
+    JumpIfFalse {
+        => src,
+        to: JumpPos,
+    },
+
+    #[delve(display = |s: &R| format!("return R{s}"))]
+    Ret { => src },
+
+    #[delve(display = |s: &R, d: &R| format!("R{s}? -> R{d}"))]
+    WrapMaybe { => src, => dest },
+    #[delve(display = |d: &R| format!("? -> R{d}"))]
+    LoadNone { => dest },
+
+    #[delve(display = |d: &R| format!("() -> R{d}"))]
+    LoadEmpty { => dest },
+
+    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}[R{i}] -> R{d}"))]
+    Index { => from, => dest, => index },
+    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.R{i} -> R{d}"))]
+    Member { => from, => dest, => member },
+    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} -> R{d}"))]
+    Associated { => from, => dest, => name },
+
+    #[delve(display = || "yeet".to_string())]
+    YeetContext,
+    #[delve(display = |to: &JumpPos| format!("skip to {to}"))]
+    EnterArrowStatement {
+        skip_to: JumpPos,
+    },
+
+    #[delve(display = |d: &R| format!("$ -> R{d}"))]
+    LoadBuiltins { => dest },
+
+    #[delve(display = |s: &R| format!("export R{s}"))]
+    Export { => src },
 }

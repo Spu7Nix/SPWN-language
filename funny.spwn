@@ -1,0 +1,5 @@
+
+
+let b = 5;
+b * 10 - 2;
+-> while true {};

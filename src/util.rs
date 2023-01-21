@@ -1,3 +1,6 @@
+pub type RandomState = ahash::RandomState;
+pub type Interner = lasso::Rodeo<lasso::Spur, RandomState>;
+
 use colored::Colorize;
 
 pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
