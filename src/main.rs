@@ -10,6 +10,7 @@ mod sources;
 mod util;
 mod vm;
 
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::{io::Write, path::PathBuf};
 
@@ -18,30 +19,29 @@ use lasso::Rodeo;
 use crate::compiling::compiler::Compiler;
 use crate::sources::BytecodeMap;
 use crate::util::{Interner, RandomState};
+use crate::vm::interpreter::ValueKey;
 use crate::{lexing::tokens::Token, parsing::parser::Parser, sources::SpwnSource};
 
 fn main() {
     print!("\x1B[2J\x1B[1;1H");
     std::io::stdout().flush().unwrap();
 
+    println!("{} bytes", std::mem::size_of::<SpwnSource>());
+
     let mut bytecode_map = BytecodeMap::default();
 
-    let interner: Interner = Rodeo::with_hasher(RandomState::new());
+    let interner = Rc::new(RefCell::new(Rodeo::with_hasher(RandomState::new())));
 
     let path = PathBuf::from("test.spwn");
 
     let src = SpwnSource::File(path);
     let code = src.read().unwrap();
 
-    let mut parser = Parser::new(code.trim_end(), src, interner);
+    let mut parser = Parser::new(code.trim_end(), src, Rc::clone(&interner));
 
     match parser.parse() {
         Ok(ast) => {
-            let interner = Rc::try_unwrap(parser.interner)
-                .expect("multiple references still held (how??????????????????)")
-                .into_inner();
-
-            let mut compiler = Compiler::new(interner, parser.src, &mut bytecode_map);
+            let mut compiler = Compiler::new(Rc::clone(&interner), parser.src, &mut bytecode_map);
 
             match compiler.compile(ast.statements) {
                 Ok(_) => {
@@ -50,7 +50,8 @@ fn main() {
                             "GOG: {:?}\n──────────────────────────────────────────────────────",
                             src
                         );
-                        println!("{}", bytecode);
+                        bytecode.debug_str(src);
+                        // println!("{}", bytecode);
 
                         // let bytes = bincode::serialize(&bytecode).unwrap();
                         // println!("{:?}", bytes);

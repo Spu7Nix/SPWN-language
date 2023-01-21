@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, marker::PhantomData};
 
 use serde::{
     de::{Error, Visitor},
@@ -7,7 +7,9 @@ use serde::{
 
 use delve::{EnumDisplay, EnumFields, EnumToStr, EnumVariantNames};
 
-impl Serialize for Opcode {
+struct OpcodeVisitor<R>(PhantomData<R>);
+
+impl Serialize for Opcode<Register> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -18,19 +20,17 @@ impl Serialize for Opcode {
     }
 }
 
-impl<'de> Deserialize<'de> for Opcode {
+impl<'de> Deserialize<'de> for Opcode<Register> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_u32(OpcodeVisitor)
+        deserializer.deserialize_u32(OpcodeVisitor::<Register>(PhantomData))
     }
 }
 
-struct OpcodeVisitor;
-
-impl<'de> Visitor<'de> for OpcodeVisitor {
-    type Value = Opcode;
+impl<'de> Visitor<'de> for OpcodeVisitor<Register> {
+    type Value = Opcode<Register>;
 
     fn expecting(&self, _: &mut std::fmt::Formatter) -> std::fmt::Result {
         panic!("idk")
@@ -42,7 +42,25 @@ impl<'de> Visitor<'de> for OpcodeVisitor {
     {
         // Safety:
         // who is manually writing bytecode
-        Ok(unsafe { std::mem::transmute::<_, Opcode>(value) })
+        Ok(unsafe { std::mem::transmute::<_, Opcode<Register>>(value) })
+    }
+}
+
+impl Serialize for Opcode<usize> {
+    fn serialize<S>(&self, _: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        panic!("do not serialize Opcode<usize>")
+    }
+}
+
+impl<'de> Deserialize<'de> for Opcode<usize> {
+    fn deserialize<D>(_: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        panic!("do not deserialize Opcode<usize>")
     }
 }
 
@@ -55,7 +73,7 @@ pub type AllocSize = u16;
 
 macro_rules! opcodes {
     (
-        <$g:ident = $d:ident> where ($($g_info:tt)*);
+        <$g:ident> where ($($g_info:tt)*);
 
         $(
             $(#[$meta:meta])*
@@ -79,7 +97,7 @@ macro_rules! opcodes {
             EnumVariantNames
         )]
         #[delve(rename_all = "SCREAMING_SNAKE_CASE")]
-        pub enum Opcode<$g = $d> where $($g_info)* {
+        pub enum Opcode<$g> where $($g_info)* {
             $(
                 $(#[$meta])*
                 $variant $({
@@ -93,7 +111,7 @@ macro_rules! opcodes {
 
         pub type UnoptOpcode = Opcode<UnoptRegister>;
 
-        impl TryFrom<UnoptOpcode> for Opcode {
+        impl TryFrom<UnoptOpcode> for Opcode<Register> {
             type Error = ();
 
             fn try_from(value: UnoptOpcode) -> Result<Self, Self::Error> {
@@ -124,7 +142,7 @@ macro_rules! opcodes {
 }
 
 opcodes! {
-    <R = Register> where (R: Display + Copy);
+    <R> where (R: Display + Copy );
 
     LoadConst {
         => dest,
@@ -149,7 +167,7 @@ opcodes! {
         => dest,
     },
 
-    #[delve(display = |e: &R, d: &R| format!("push R{d} into R{e}"))]
+    #[delve(display = |e: &R, d: &R| format!("push R{e} into R{d}"))]
     PushArrayElem { => elem, => dest },
     #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d}"))]
     PushDictElem { => elem, => key, => dest },

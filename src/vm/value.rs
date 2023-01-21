@@ -1,6 +1,12 @@
-use crate::{compiling::bytecode::Constant, gd::ids::*};
+use crate::{compiling::bytecode::Constant, gd::ids::*, sources::CodeArea};
 
 use super::interpreter::ValueKey;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StoredValue {
+    value: Value,
+    def_area: CodeArea,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

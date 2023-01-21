@@ -1,1 +1,1 @@
-// pub fn add()
+// pub fn add(a: &Value, b: &Value) {}

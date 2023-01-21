@@ -23,18 +23,18 @@ use super::{
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     pub src: SpwnSource,
-    pub interner: Rc<RefCell<Interner>>,
+    interner: Rc<RefCell<Interner>>,
 }
 
 pub type ParseResult<T> = Result<T, SyntaxError>;
 
 impl<'a> Parser<'a> {
-    pub fn new(code: &'a str, src: SpwnSource, interner: Interner) -> Self {
+    pub fn new(code: &'a str, src: SpwnSource, interner: Rc<RefCell<Interner>>) -> Self {
         let lexer = Token::lex(code);
         Parser {
             lexer,
             src,
-            interner: Rc::new(RefCell::new(interner)),
+            interner,
         }
     }
 }
@@ -748,6 +748,7 @@ impl Parser<'_> {
             Some(next_prec) => self.parse_op(next_prec)?,
             None => self.parse_value()?,
         };
+
         while operators::is_infix_prec(self.peek(), prec) {
             let op = self.next();
             let right = if operators::prec_type(prec) == operators::OpType::Left {
@@ -761,6 +762,7 @@ impl Parser<'_> {
             let new_span = left.span.extend(right.span);
             left = Expression::Op(left, op.to_bin_op(), right).into_node(vec![], new_span)
         }
+        
         Ok(left)
     }
 

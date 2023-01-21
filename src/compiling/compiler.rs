@@ -1,4 +1,4 @@
-use std::{path::PathBuf, rc::Rc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use ahash::AHashMap;
 use lasso::{Rodeo, Spur};
@@ -47,7 +47,7 @@ pub struct Scope {
 }
 
 pub struct Compiler<'a> {
-    interner: Interner,
+    interner: Rc<RefCell<Interner>>,
     scopes: SlotMap<ScopeKey, Scope>,
     pub src: SpwnSource,
 
@@ -65,7 +65,7 @@ macro_rules! bop {
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(interner: Interner, src: SpwnSource, map: &'a mut BytecodeMap) -> Self {
+    pub fn new(interner: Rc<RefCell<Interner>>, src: SpwnSource, map: &'a mut BytecodeMap) -> Self {
         Self {
             interner,
             scopes: SlotMap::default(),
@@ -79,6 +79,10 @@ impl<'a> Compiler<'a> {
             span,
             src: self.src.clone(),
         }
+    }
+
+    pub fn resolve(&self, spur: &Spur) -> String {
+        self.interner.borrow().resolve(spur).to_string()
     }
 
     pub fn get_var(&self, var: Spur, scope: ScopeKey) -> Option<Variable> {
@@ -138,12 +142,12 @@ impl<'a> Compiler<'a> {
 
             self.compile_stmts(&stmts, base_scope, f)
         })?;
-        let (consts, unopt_funcs) = builder.build();
+        let unopt_code = builder.build();
 
-        let functions = unopt_funcs
+        let functions = unopt_code.functions
             .into_iter()
             .map(|v| {
-                let opcodes = v
+                let opcodes = v.opcodes
                     .into_iter()
                     .map(|opcode| opcode.try_into().expect("404, sex not found , yo're missing the sex... Where is it? You find it? You do finding its now? Where art it hbe it has gone? Forgotten by societty , , sex walked across acres of empty land....   Almost as if ...,, he did... whereever he may be.... He will stay it will remain..... It told me this it would be like this it will. Be like this it will...."))
                     .collect();
@@ -153,9 +157,14 @@ impl<'a> Compiler<'a> {
 
         // Ok(Bytecode { consts, functions })
 
-        self.map
-            .map
-            .insert(self.src.clone(), Bytecode { consts, functions });
+        self.map.map.insert(
+            self.src.clone(),
+            Bytecode {
+                consts: unopt_code.consts,
+                functions,
+                opcode_span_map: unopt_code.opcode_span_map,
+            },
+        );
 
         Ok(())
 
@@ -170,15 +179,15 @@ impl<'a> Compiler<'a> {
     ) -> CompileResult<()> {
         let (src, name) = match typ {
             ImportType::Module(s) => (
-                SpwnSource::File(PathBuf::from(self.interner.resolve(&s))),
-                self.interner.resolve(&s),
+                SpwnSource::File(PathBuf::from(self.resolve(&s))),
+                self.resolve(&s),
             ),
             ImportType::Library(name) => (
                 SpwnSource::File(PathBuf::from(format!(
                     "libraries/{}/lib.spwn",
-                    self.interner.resolve(&name)
+                    self.resolve(&name)
                 ))),
-                self.interner.resolve(&name),
+                self.resolve(&name),
             ),
         };
         let is_module = matches!(typ, ImportType::Module(_));
@@ -190,21 +199,17 @@ impl<'a> Compiler<'a> {
             None => {
                 return Err(CompilerError::NonexistentImport {
                     is_module,
-                    name: name.into(),
+                    name,
                     area: self.make_area(span),
                 })
             }
         };
 
-        let interner: Interner = Rodeo::with_hasher(RandomState::new());
-        let mut parser = Parser::new(code.trim_end(), src, interner);
+        let mut parser = Parser::new(code.trim_end(), src, Rc::clone(&self.interner));
 
         match parser.parse() {
             Ok(ast) => {
-                let interner = Rc::try_unwrap(parser.interner)
-                    .expect("multiple references still held (how??????????????????)")
-                    .into_inner();
-                let mut compiler = Compiler::new(interner, parser.src, self.map);
+                let mut compiler = Compiler::new(Rc::clone(&self.interner), parser.src, self.map);
 
                 match compiler.compile(ast.statements) {
                     Ok(bytecode) => {}
@@ -413,9 +418,7 @@ impl<'a> Compiler<'a> {
             Expression::Int(v) => builder.load_int(*v, out_reg),
             Expression::Float(v) => builder.load_float(*v, out_reg),
             Expression::Bool(v) => builder.load_bool(*v, out_reg),
-            Expression::String(v) => {
-                builder.load_string(self.interner.resolve(v).to_string(), out_reg)
-            }
+            Expression::String(v) => builder.load_string(self.resolve(v), out_reg, expr.span),
             Expression::Id(class, value) => builder.load_id(*value, *class, out_reg),
             Expression::Op(left, op, right) => match op {
                 BinOp::Plus => bop!(left add right (scope, builder, out_reg, self)),
@@ -546,7 +549,7 @@ impl<'a> Compiler<'a> {
                                 return Err(CompilerError::ImmutableAssign {
                                     area: self.make_area(expr.span),
                                     def_area: self.make_area(var.def_span),
-                                    var: self.interner.resolve(&s).into(),
+                                    var: self.resolve(&s).into(),
                                 });
                             }
                         }
@@ -582,7 +585,7 @@ impl<'a> Compiler<'a> {
                 None => {
                     return Err(CompilerError::NonexistentVariable {
                         area: self.make_area(expr.span),
-                        var: self.interner.resolve(name).into(),
+                        var: self.resolve(name).into(),
                     })
                 }
             },
@@ -605,13 +608,13 @@ impl<'a> Compiler<'a> {
                                 None => {
                                     return Err(CompilerError::NonexistentVariable {
                                         area: self.make_area(expr.span),
-                                        var: self.interner.resolve(&key.value).into(),
+                                        var: self.resolve(&key.value).into(),
                                     })
                                 }
                             },
                         };
 
-                        elems.push((self.interner.resolve(&key.value).into(), value_reg));
+                        elems.push((self.resolve(&key.value).into(), value_reg));
                     }
                     Ok(())
                 })?;
@@ -630,11 +633,11 @@ impl<'a> Compiler<'a> {
             }
             Expression::Member { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder)?;
-                builder.member(base_reg, out_reg, self.interner.resolve(&name).into())
+                builder.member(base_reg, out_reg, self.resolve(&name).into())
             }
             Expression::Associated { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder)?;
-                builder.associated(base_reg, out_reg, self.interner.resolve(&name).into())
+                builder.associated(base_reg, out_reg, self.resolve(&name).into())
             }
             Expression::Call {
                 base,

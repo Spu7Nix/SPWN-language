@@ -2,7 +2,10 @@ use slotmap::{new_key_type, SlotMap};
 
 use crate::compiling::bytecode::Bytecode;
 
-use super::{opcodes::Opcode, value::Value};
+use super::{
+    opcodes::{Opcode, Register},
+    value::Value,
+};
 
 new_key_type! {
     pub struct ValueKey;
@@ -13,7 +16,7 @@ struct Vm<'a> {
 
     memory: SlotMap<ValueKey, Value>,
 
-    program: &'a Bytecode,
+    program: &'a Bytecode<Register>,
     // sp: usize,
     // pc: usize,
 }

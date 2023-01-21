@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 ariadne = "0.1.5"
 colored = "2.0.0"
-ahash = "0.8.2"
+ahash = {version = "0.8.2", features = ["serde"]}
 bincode = "1.3.3"
 serde = { version = "1.0.152", features = ["derive"] }
 regex = "1.7.1"

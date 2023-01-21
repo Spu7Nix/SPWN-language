@@ -34,8 +34,12 @@ for {} in {}
 
 
 
-let a = 10832;
+let a = [1, 2, 3];
 
-let b = a;
-
-b += 10;
+-> if a[0] < 5 {
+    -> a[2] += "fg
+    sdgaffffffff
+fg";
+} else {
+    ?;
+};

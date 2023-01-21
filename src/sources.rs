@@ -1,7 +1,9 @@
-use ahash::AHashMap;
-
-use crate::{compiling::bytecode::Bytecode, util::hyperlink};
 use std::{fs, ops::Range, path::PathBuf};
+
+use ahash::AHashMap;
+use serde::{Deserialize, Serialize};
+
+use crate::{compiling::bytecode::Bytecode, util::hyperlink, vm::opcodes::Register};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SpwnSource {
@@ -59,7 +61,7 @@ impl CodeArea {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Default, Serialize, Deserialize)]
 pub struct CodeSpan {
     pub start: usize,
     pub end: usize,
@@ -75,6 +77,9 @@ impl CodeSpan {
 
     pub fn internal() -> CodeSpan {
         CodeSpan { start: 0, end: 0 }
+    }
+    pub fn invalid() -> CodeSpan {
+        CodeSpan { start: 1, end: 0 }
     }
 }
 
@@ -94,5 +99,5 @@ impl From<CodeSpan> for Range<usize> {
 
 #[derive(Default)]
 pub struct BytecodeMap {
-    pub map: AHashMap<SpwnSource, Bytecode>,
+    pub map: AHashMap<SpwnSource, Bytecode<Register>>,
 }
