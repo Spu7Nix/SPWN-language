@@ -3,7 +3,7 @@ use lasso::Spur;
 
 use crate::{compiling::bytecode::Constant, gd::ids::*, sources::CodeArea, util::Interner};
 
-use super::interpreter::ValueKey;
+use super::interpreter::{ValueKey, Vm};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -103,6 +103,53 @@ impl Value {
             Constant::String(v) => Value::String(v.clone()),
             Constant::Bool(v) => Value::Bool(*v),
             Constant::Id(c, v) => todo!(),
+        }
+    }
+
+    pub fn display(&self, vm: &Vm) -> String {
+        match self {
+            Value::Int(n) => n.to_string(),
+            Value::Float(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            Value::String(s) => format!("\"{}\"", s),
+            Value::Array(arr) => {
+                let mut s = String::new();
+                s.push('[');
+                for (i, el) in arr.iter().enumerate() {
+                    if i != 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(&vm.memory[*el].value.display(vm));
+                }
+                s.push(']');
+                s
+            }
+            Value::Dict(d) => {
+                let mut s = String::new();
+                s.push('{');
+                for (i, (k, v)) in d.iter().enumerate() {
+                    if i != 0 {
+                        s.push_str(", ");
+                    }
+                    s.push_str(&vm.interner.borrow().resolve(k));
+                    s.push_str(": ");
+                    s.push_str(&vm.memory[*v].value.display(vm));
+                }
+                s.push('}');
+                s
+            }
+            Value::Group(id) => id.fmt("g"),
+            Value::Color(id) => id.fmt("c"),
+            Value::Block(id) => id.fmt("b"),
+            Value::Item(id) => id.fmt("i"),
+            Value::Builtins => "$".to_string(),
+            Value::Range(n1, n2, s) => {
+                if *s == 1 {
+                    format!("{}..{}", n1, n2)
+                } else {
+                    format!("{}..{}..{}", n1, s, n2)
+                }
+            }
         }
     }
 }

@@ -126,11 +126,11 @@ operators! {
     // lowest precedence
     Right => [Assign];
     Right => [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];
-    Left => [DotDot];
+    Left => [Range];
     Left => [In];
     Left => [Is];
-    Left => [BinOr];
-    Left => [BinAnd];
+    Left => [BinOr, Or];
+    Left => [BinAnd, And];
     Unary => [BinNot];
     Unary => [ExclMark];
     Left => [Eq, Neq, Gt, Gte, Lt, Lte];

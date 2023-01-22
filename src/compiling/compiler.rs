@@ -505,7 +505,7 @@ impl<'a> Compiler<'a> {
                 BinOp::Lte => {
                     bin_op!(left lte right)
                 }
-                BinOp::DotDot => {
+                BinOp::Range => {
                     bin_op!(left range right)
                 }
                 BinOp::In => {
@@ -607,6 +607,8 @@ impl<'a> Compiler<'a> {
                     },
                     _ => todo!("haha 😂😂😂😂"),
                 },
+                BinOp::Or => todo!(),
+                BinOp::And => todo!(),
             },
             Expression::Unary(op, value) => {
                 let v = self.compile_expr(value, scope, builder)?;

@@ -96,7 +96,7 @@ lexer! {
     Colon: text(":"),
     DoubleColon: text("::"),
     Dot: text("."),
-    DotDot: text(".."),
+    Range: text(".."),
 
     FatArrow: text("=>"),
     Arrow: text("->"),
@@ -175,7 +175,7 @@ impl Token {
             Self::Colon => ":",
             Self::DoubleColon => "::",
             Self::Dot => ".",
-            Self::DotDot => "..",
+            Self::Range => "..",
             Self::FatArrow => "=>",
             Self::Arrow => "->",
             Self::QMark => "?",

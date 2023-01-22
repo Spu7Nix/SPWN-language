@@ -39,6 +39,13 @@ impl Id {
 
         Id::Arbitrary(*counter)
     }
+
+    pub fn fmt(&self, suffix: &'static str) -> String {
+        match self {
+            Id::Specific(n) => format!("{}{}", n, suffix),
+            Id::Arbitrary(n) => format!("{}?{}", n, suffix),
+        }
+    }
 }
 
 // impl std::fmt::Debug for Id {

@@ -25,11 +25,11 @@ new_key_type! {
 pub struct Vm<'a> {
     registers: [ValueKey; 256],
 
-    memory: SlotMap<ValueKey, StoredValue>,
+    pub memory: SlotMap<ValueKey, StoredValue>,
 
     program: &'a Bytecode<Register>,
 
-    interner: Rc<RefCell<Interner>>,
+    pub interner: Rc<RefCell<Interner>>,
 }
 
 impl<'a> Vm<'a> {
@@ -110,7 +110,7 @@ impl<'a> Vm<'a> {
                     self.registers[*to as usize] = self.deep_clone_reg(*from)
                 }
                 Opcode::Print { reg } => {
-                    println!("{:?}", self.get_reg(*reg).value)
+                    println!("{}", self.get_reg(*reg).value.display(self))
                 }
                 Opcode::AllocArray { size, dest } => self.set_reg(
                     *dest,
@@ -151,55 +151,23 @@ impl<'a> Vm<'a> {
                     }
                 }
                 Opcode::Add { left, right, dest } => {
-                    let span = self.get_span(func, ip);
-                    let value =
-                        value_ops::add(self.get_reg(*left), self.get_reg(*right), span, self)?;
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value,
-                            area: self.make_area(span),
-                        },
-                    )
+                    self.bop(value_ops::add, func, ip, left, right, dest)?
                 }
                 Opcode::Sub { left, right, dest } => {
-                    let span = self.get_span(func, ip);
-                    let value =
-                        value_ops::sub(self.get_reg(*left), self.get_reg(*right), span, self)?;
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value,
-                            area: self.make_area(span),
-                        },
-                    )
+                    self.bop(value_ops::sub, func, ip, left, right, dest)?
                 }
                 Opcode::Mult { left, right, dest } => {
-                    let span = self.get_span(func, ip);
-                    let value =
-                        value_ops::mult(self.get_reg(*left), self.get_reg(*right), span, self)?;
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value,
-                            area: self.make_area(span),
-                        },
-                    )
+                    self.bop(value_ops::mult, func, ip, left, right, dest)?
                 }
                 Opcode::Div { left, right, dest } => {
-                    let span = self.get_span(func, ip);
-                    let value =
-                        value_ops::div(self.get_reg(*left), self.get_reg(*right), span, self)?;
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value,
-                            area: self.make_area(span),
-                        },
-                    )
+                    self.bop(value_ops::div, func, ip, left, right, dest)?
                 }
-                Opcode::Mod { left, right, dest } => todo!(),
-                Opcode::Pow { left, right, dest } => todo!(),
+                Opcode::Mod { left, right, dest } => {
+                    self.bop(value_ops::modulo, func, ip, left, right, dest)?
+                }
+                Opcode::Pow { left, right, dest } => {
+                    self.bop(value_ops::pow, func, ip, left, right, dest)?
+                }
                 Opcode::ShiftLeft { left, right, dest } => todo!(),
                 Opcode::ShiftRight { left, right, dest } => todo!(),
                 Opcode::BinOr { left, right, dest } => todo!(),
@@ -215,25 +183,64 @@ impl<'a> Vm<'a> {
                 Opcode::BinAndEq { left, right } => todo!(),
                 Opcode::BinOrEq { left, right } => todo!(),
                 Opcode::BinNotEq { left, right } => todo!(),
-                Opcode::Not { src, dest } => todo!(),
-                Opcode::Negate { src, dest } => todo!(),
+                Opcode::Not { src, dest } => {
+                    let span = self.get_span(func, ip);
+                    let value = value_ops::not(self.get_reg(*src), span, self)?;
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value,
+                            area: self.make_area(span),
+                        },
+                    )
+                }
+                Opcode::Negate { src, dest } => {
+                    let span = self.get_span(func, ip);
+                    let value = value_ops::negate(self.get_reg(*src), span, self)?;
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value,
+                            area: self.make_area(span),
+                        },
+                    )
+                }
                 Opcode::BinNot { src, dest } => todo!(),
+
                 Opcode::Eq { left, right, dest } => todo!(),
                 Opcode::Neq { left, right, dest } => todo!(),
-                Opcode::Gt { left, right, dest } => todo!(),
-                Opcode::Lt { left, right, dest } => todo!(),
-                Opcode::Gte { left, right, dest } => todo!(),
-                Opcode::Lte { left, right, dest } => todo!(),
-                Opcode::Range { left, right, dest } => todo!(),
+                Opcode::Gt { left, right, dest } => {
+                    self.bop(value_ops::gt, func, ip, left, right, dest)?
+                }
+                Opcode::Lt { left, right, dest } => {
+                    self.bop(value_ops::lt, func, ip, left, right, dest)?
+                }
+                Opcode::Gte { left, right, dest } => {
+                    self.bop(value_ops::gte, func, ip, left, right, dest)?
+                }
+                Opcode::Lte { left, right, dest } => {
+                    self.bop(value_ops::lte, func, ip, left, right, dest)?
+                }
+                Opcode::Range { left, right, dest } => {
+                    self.bop(value_ops::range, func, ip, left, right, dest)?
+                }
                 Opcode::In { left, right, dest } => todo!(),
                 Opcode::As { left, right, dest } => todo!(),
                 Opcode::Is { left, right, dest } => todo!(),
-                Opcode::And { left, right, dest } => todo!(),
-                Opcode::Or { left, right, dest } => todo!(),
+                Opcode::And { left, right, dest } => {
+                    self.bop(value_ops::and, func, ip, left, right, dest)?
+                }
+                Opcode::Or { left, right, dest } => {
+                    self.bop(value_ops::or, func, ip, left, right, dest)?
+                }
                 Opcode::Jump { to } => {
                     ip = *to as usize;
                 }
-                Opcode::JumpIfFalse { src, to } => todo!(),
+                Opcode::JumpIfFalse { src, to } => {
+                    if self.get_reg(*src).value == Value::Bool(false) {
+                        ip = *to as usize;
+                    }
+                }
                 Opcode::Ret { src } => todo!(),
                 Opcode::WrapMaybe { src, dest } => todo!(),
                 Opcode::LoadNone { dest } => todo!(),
@@ -243,7 +250,16 @@ impl<'a> Vm<'a> {
                 Opcode::Associated { from, dest, name } => todo!(),
                 Opcode::YeetContext => todo!(),
                 Opcode::EnterArrowStatement { skip_to } => todo!(),
-                Opcode::LoadBuiltins { dest } => todo!(),
+                Opcode::LoadBuiltins { dest } => {
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Builtins,
+                            area: self.make_area(span),
+                        },
+                    )
+                }
                 Opcode::Export { src } => todo!(),
             }
 
@@ -251,5 +267,29 @@ impl<'a> Vm<'a> {
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn bop<F>(
+        &mut self,
+        op: F,
+        func: usize,
+        ip: usize,
+        left: &u8,
+        right: &u8,
+        dest: &u8,
+    ) -> Result<(), RuntimeError>
+    where
+        F: Fn(&StoredValue, &StoredValue, CodeSpan, &Vm) -> RuntimeResult<Value>,
+    {
+        let span = self.get_span(func, ip);
+        let value = op(self.get_reg(*left), self.get_reg(*right), span, self)?;
+        Ok(self.set_reg(
+            *dest,
+            StoredValue {
+                value,
+                area: self.make_area(span),
+            },
+        ))
     }
 }
