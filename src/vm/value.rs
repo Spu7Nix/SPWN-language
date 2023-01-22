@@ -65,32 +65,24 @@ impl Value {
             Value::Float(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
             Value::String(s) => format!("\"{}\"", s),
-            Value::Array(arr) => {
-                let mut s = String::new();
-                s.push('[');
-                for (i, el) in arr.iter().enumerate() {
-                    if i != 0 {
-                        s.push_str(", ");
-                    }
-                    s.push_str(&vm.memory[*el].value.runtime_display(vm));
-                }
-                s.push(']');
-                s
-            }
-            Value::Dict(d) => {
-                let mut s = String::new();
-                s.push('{');
-                for (i, (k, v)) in d.iter().enumerate() {
-                    if i != 0 {
-                        s.push_str(", ");
-                    }
-                    s.push_str(&vm.interner.borrow().resolve(k));
-                    s.push_str(": ");
-                    s.push_str(&vm.memory[*v].value.runtime_display(vm));
-                }
-                s.push('}');
-                s
-            }
+            Value::Array(arr) => format!(
+                "[{}]",
+                arr.iter()
+                    .map(|k| vm.memory[*k].value.runtime_display(vm))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Value::Dict(d) => format!(
+                "{{{}}}",
+                d.iter()
+                    .map(|(s, k)| format!(
+                        "{}: {}",
+                        vm.interner.borrow().resolve(s),
+                        vm.memory[*k].value.runtime_display(vm)
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
             Value::Group(id) => id.fmt("g"),
             Value::Color(id) => id.fmt("c"),
             Value::Block(id) => id.fmt("b"),

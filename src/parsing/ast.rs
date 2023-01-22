@@ -62,11 +62,11 @@ pub enum Expression {
     },
     Member {
         base: ExprNode,
-        name: Spur,
+        name: Spanned<Spur>,
     },
     Associated {
         base: ExprNode,
-        name: Spur,
+        name: Spanned<Spur>,
     },
 
     Call {

@@ -1,17 +1,30 @@
 use crate::{
-    parsing::utils::operators::BinOp,
+    parsing::utils::operators::{BinOp, UnaryOp},
     sources::{CodeArea, CodeSpan},
 };
 
 use super::{
     error::RuntimeError,
     interpreter::{RuntimeResult, Vm},
-    value::{StoredValue, Value},
+    value::{StoredValue, Value, ValueType},
 };
 
 // pub fn call_op(a: &StoredValue, b: &StoredValue, op: BinOp, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
 
 // }
+
+pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<bool> {
+    Ok(match &v.value {
+        Value::Bool(b) => *b,
+        _ => {
+            return Err(RuntimeError::TypeMismatch {
+                v: (v.value.get_type(), v.area.clone()),
+                expected: ValueType::Bool,
+                area: vm.make_area(span),
+            })
+        }
+    })
+}
 
 pub fn add(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -121,31 +134,29 @@ pub fn pow(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runtime
     })
 }
 
-pub fn not(src: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
-    Ok(match &src.value {
+pub fn not(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+    Ok(match &v.value {
         Value::Bool(b) => Value::Bool(!b),
         _ => {
-            unimplemented!()
-            // return Err(RuntimeError::InvalidOperand {
-            //     a: (src.value.get_type(), src.area.clone()),
-            //     op: UnOp::Not,
-            //     area: arg.make_area(span),
-            // })
+            return Err(RuntimeError::InvalidUnaryOperand {
+                v: (v.value.get_type(), v.area.clone()),
+                op: UnaryOp::ExclMark,
+                area: vm.make_area(span),
+            })
         }
     })
 }
 
-pub fn negate(src: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
-    Ok(match &src.value {
+pub fn negate(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+    Ok(match &v.value {
         Value::Int(n) => Value::Int(-n),
         Value::Float(n) => Value::Float(-n),
         _ => {
-            unimplemented!()
-            // return Err(RuntimeError::InvalidOperand {
-            //     a: (src.value.get_type(), src.area.clone()),
-            //     op: UnOp::Negate,
-            //     area: arg.make_area(span),
-            // })
+            return Err(RuntimeError::InvalidUnaryOperand {
+                v: (v.value.get_type(), v.area.clone()),
+                op: UnaryOp::Minus,
+                area: vm.make_area(span),
+            })
         }
     })
 }

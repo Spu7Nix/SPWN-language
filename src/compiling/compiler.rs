@@ -6,7 +6,7 @@ use slotmap::{new_key_type, SlotMap};
 
 use crate::{
     parsing::{
-        ast::{ExprNode, Expression, ImportType, Spanned, Statement, StmtNode},
+        ast::{ExprNode, Expression, ImportType, Spannable, Spanned, Statement, StmtNode},
         attributes::ScriptAttribute,
         parser::Parser,
         utils::operators::{BinOp, UnaryOp},
@@ -331,7 +331,7 @@ impl<'a> Compiler<'a> {
                         self.derive_scope(scope, Some(ScopeType::Loop(b.block_path.clone())));
 
                     let cond_reg = self.compile_expr(cond, scope, b)?;
-                    b.exit_if_false(cond_reg);
+                    b.exit_if_false(cond_reg, cond.span);
 
                     self.compile_stmts(code, inner_scope, b)?;
 
@@ -351,7 +351,7 @@ impl<'a> Compiler<'a> {
                         // let fuck = outer_b.test();
                         outer_b.block(|b| {
                             let cond_reg = self.compile_expr(cond, scope, b)?;
-                            b.exit_if_false(cond_reg);
+                            b.exit_if_false(cond_reg, cond.span);
                             self.compile_stmts(code, inner_scope, b)?;
 
                             b.exit_other_block(outer_path);
@@ -674,13 +674,13 @@ impl<'a> Compiler<'a> {
                                     None => {
                                         return Err(CompilerError::NonexistentVariable {
                                             area: self.make_area(expr.span),
-                                            var: self.resolve(&key.value).into(),
+                                            var: self.resolve(&key.value),
                                         })
                                     }
                                 },
                             };
 
-                            elems.push((self.resolve(&key.value).into(), value_reg));
+                            elems.push((self.resolve(&key.value).spanned(key.span), value_reg));
                         }
                         Ok(())
                     },
@@ -697,15 +697,25 @@ impl<'a> Compiler<'a> {
             Expression::Index { base, index } => {
                 let base_reg = self.compile_expr(base, scope, builder)?;
                 let index_reg = self.compile_expr(index, scope, builder)?;
-                builder.index(base_reg, out_reg, index_reg)
+                builder.index(base_reg, out_reg, index_reg, expr.span)
             }
             Expression::Member { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder)?;
-                builder.member(base_reg, out_reg, self.resolve(&name))
+                builder.member(
+                    base_reg,
+                    out_reg,
+                    self.resolve(&name.value).spanned(name.span),
+                    expr.span,
+                )
             }
             Expression::Associated { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder)?;
-                builder.associated(base_reg, out_reg, self.resolve(&name))
+                builder.associated(
+                    base_reg,
+                    out_reg,
+                    self.resolve(&name.value).spanned(name.span),
+                    expr.span,
+                )
             }
             Expression::Call {
                 base,
@@ -730,7 +740,7 @@ impl<'a> Compiler<'a> {
                     let outer_path = outer_b.block_path.clone();
 
                     outer_b.block(|b| {
-                        b.exit_if_false(cond_reg);
+                        b.exit_if_false(cond_reg, cond.span);
                         let reg = self.compile_expr(if_true, scope, b)?;
                         b.copy(reg, out_reg, expr.span);
 

@@ -234,11 +234,15 @@ impl<'a> Vm<'a> {
                     self.bop(value_ops::or, func, ip, left, right, dest)?
                 }
                 Opcode::Jump { to } => {
-                    ip = *to as usize - 1;
+                    ip = *to as usize;
+                    continue;
                 }
                 Opcode::JumpIfFalse { src, to } => {
-                    if self.get_reg(*src).value == Value::Bool(false) {
-                        ip = *to as usize - 1;
+                    let span = self.get_span(func, ip);
+                    // println!("{:?}", self.get_reg(*src).value);
+                    if !value_ops::to_bool(self.get_reg(*src), span, self)? {
+                        ip = *to as usize;
+                        continue;
                     }
                 }
                 Opcode::Ret { src } => todo!(),
@@ -284,12 +288,13 @@ impl<'a> Vm<'a> {
     {
         let span = self.get_span(func, ip);
         let value = op(self.get_reg(*left), self.get_reg(*right), span, self)?;
-        Ok(self.set_reg(
+        self.set_reg(
             *dest,
             StoredValue {
                 value,
                 area: self.make_area(span),
             },
-        ))
+        );
+        Ok(())
     }
 }

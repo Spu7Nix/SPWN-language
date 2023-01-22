@@ -70,7 +70,12 @@ impl Parser<'_> {
     }
     pub fn peek_span(&self) -> CodeSpan {
         let mut peek = self.lexer.clone();
-        peek.next();
+        while peek.next_or_eof() == Token::Newline {}
+        peek.span().into()
+    }
+    pub fn peek_span_or_newline(&self) -> CodeSpan {
+        let mut peek = self.lexer.clone();
+        peek.next_or_eof();
         peek.span().into()
     }
     pub fn slice(&self) -> &str {
@@ -656,7 +661,7 @@ impl Parser<'_> {
                     match self.next() {
                         Token::Ident => {
                             let name = self.slice_interned();
-                            Expression::Member { base: value, name }
+                            Expression::Member { base: value, name: name.spanned(self.span()) }
                         }
                         Token::Type => Expression::Typeof(value),
                         other => {
@@ -673,7 +678,7 @@ impl Parser<'_> {
                     match self.next() {
                         Token::Ident => {
                             let name = self.slice_interned();
-                            Expression::Associated { base: value, name }
+                            Expression::Associated { base: value, name: name.spanned(self.span()) }
                         }
                         Token::LBracket => {
                             let items = self.parse_dictlike()?;
@@ -952,7 +957,7 @@ impl Parser<'_> {
         let inner_span = inner_start.extend(self.span());
         
         
-        if !matches!(self.peek(), Token::LBracket) && !matches!(self.next_or_newline(), Token::Eol | Token::Newline | Token::Eof) {
+        if !matches!(self.peek(), Token::LBracket) && !matches!(self.peek_or_newline(), Token::Eol | Token::Newline | Token::Eof) {
             return Err(SyntaxError::UnexpectedToken {
                 found: self.next(),
                 expected: "statement separator (';' or newline)".to_string(),

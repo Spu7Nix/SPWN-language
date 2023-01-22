@@ -442,7 +442,10 @@ impl<'a> FuncBuilder<'a> {
         span: CodeSpan,
     ) -> CompileResult<()>
     where
-        F: FnOnce(&mut FuncBuilder, &mut Vec<(String, UnoptRegister)>) -> CompileResult<()>,
+        F: FnOnce(
+            &mut FuncBuilder,
+            &mut Vec<(Spanned<String>, UnoptRegister)>,
+        ) -> CompileResult<()>,
     {
         self.push_opcode_spanned(
             ProtoOpcode::Raw(UnoptOpcode::AllocDict { size: len, dest }),
@@ -454,7 +457,7 @@ impl<'a> FuncBuilder<'a> {
 
         for (k, r) in items {
             let key_reg = self.next_reg();
-            self.load_string(k, key_reg, CodeSpan::invalid());
+            self.load_string(k.value, key_reg, k.span);
 
             self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushDictElem {
                 elem: r,
@@ -821,9 +824,9 @@ impl<'a> FuncBuilder<'a> {
     //     self.current_code().push(ProtoOpcode::Jump(to))
     // }
 
-    pub fn exit_if_false(&mut self, reg: UnoptRegister) {
+    pub fn exit_if_false(&mut self, reg: UnoptRegister, span: CodeSpan) {
         let path = self.block_path.clone();
-        self.push_opcode(ProtoOpcode::JumpIfFalse(reg, JumpTo::End(path)))
+        self.push_opcode_spanned(ProtoOpcode::JumpIfFalse(reg, JumpTo::End(path)), span)
     }
 
     pub fn load_none(&mut self, reg: UnoptRegister, span: CodeSpan) {
@@ -836,26 +839,53 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }), span)
     }
 
-    pub fn index(&mut self, from: UnoptRegister, dest: UnoptRegister, index: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Index { from, dest, index }))
+    pub fn index(
+        &mut self,
+        from: UnoptRegister,
+        dest: UnoptRegister,
+        index: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Index { from, dest, index }),
+            span,
+        )
     }
-    pub fn member(&mut self, from: UnoptRegister, dest: UnoptRegister, member: String) {
+    pub fn member(
+        &mut self,
+        from: UnoptRegister,
+        dest: UnoptRegister,
+        member: Spanned<String>,
+        span: CodeSpan,
+    ) {
         let next_reg = self.next_reg();
-        self.load_string(member, next_reg, CodeSpan::invalid());
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Member {
-            from,
-            dest,
-            member: next_reg,
-        }))
+        self.load_string(member.value, next_reg, member.span);
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Member {
+                from,
+                dest,
+                member: next_reg,
+            }),
+            span,
+        )
     }
-    pub fn associated(&mut self, from: UnoptRegister, dest: UnoptRegister, associated: String) {
+    pub fn associated(
+        &mut self,
+        from: UnoptRegister,
+        dest: UnoptRegister,
+        associated: Spanned<String>,
+        span: CodeSpan,
+    ) {
         let next_reg = self.next_reg();
-        self.load_string(associated, next_reg, CodeSpan::invalid());
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Associated {
-            from,
-            dest,
-            name: next_reg,
-        }))
+        self.load_string(associated.value, next_reg, associated.span);
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Associated {
+                from,
+                dest,
+                name: next_reg,
+            }),
+            span,
+        )
     }
 
     pub fn load_builtins(&mut self, to: UnoptRegister, span: CodeSpan) {
@@ -938,14 +968,13 @@ where
                     .to_string();
                 let f_len = clear_ansi(&formatted).len();
 
-                let opcode_str = format!(
-                    "{:?}",
-                    match self.opcode_span_map.get(&(func_i, opcode_i)) {
-                        Some(span) => &code[span.start..span.end],
-                        None => "",
+                let opcode_str = match self.opcode_span_map.get(&(func_i, opcode_i)) {
+                    Some(span) => {
+                        let s = format!("{:?}", &code[span.start..span.end]);
+                        format!("({}..{}), {}", span.start, span.end, &s[1..s.len() - 1])
                     }
-                );
-                let opcode_str = opcode_str[1..opcode_str.len() - 1].to_string();
+                    None => "".into(),
+                };
                 let o_len = opcode_str.len();
 
                 if f_len > longest_formatted {
@@ -966,7 +995,7 @@ where
                 let fmto_len = clear_ansi(fmto).len();
 
                 let ostr = &formatted_spans[i];
-                let ostr = if ostr != "" {
+                let ostr = if !ostr.is_empty() {
                     ostr.to_string()
                 } else {
                     format!("{}{}", " ".repeat((longest_span - 1) / 2), "-".red().bold())

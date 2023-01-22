@@ -1,8 +1,10 @@
+let a = 0
+let b = 1
 
-let a = 1
-while a < 50 {
-    a = a + 1
-    //print a
+while a < 1000 {
+    c = a + b
+    print c
+    a = b
+    b = c
 }
 
-print "this no longer errors !!!!!!!!!!!!!!!"
