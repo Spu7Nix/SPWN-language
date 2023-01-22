@@ -18,6 +18,30 @@ use crate::{
 
 use super::compiler::CompileResult;
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
+pub struct Function<R>
+where
+    R: Display + Copy,
+{
+    pub opcodes: Vec<Opcode<R>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
+pub struct Bytecode<R>
+where
+    R: Display + Copy,
+{
+    pub src: SpwnSource,
+    pub source_hash: Digest,
+
+    pub consts: Vec<Constant>,
+
+    pub functions: Vec<Function<R>>,
+    pub opcode_span_map: AHashMap<(usize, usize), CodeSpan>,
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum Constant {
     Int(i64),
@@ -852,30 +876,6 @@ impl<'a> FuncBuilder<'a> {
     pub fn yeet_context(&mut self) {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::YeetContext))
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
-pub struct Function<R>
-where
-    R: Display + Copy,
-{
-    pub opcodes: Vec<Opcode<R>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
-pub struct Bytecode<R>
-where
-    R: Display + Copy,
-{
-    pub src: SpwnSource,
-    pub source_hash: Digest,
-
-    pub consts: Vec<Constant>,
-
-    pub functions: Vec<Function<R>>,
-    pub opcode_span_map: AHashMap<(usize, usize), CodeSpan>,
 }
 
 impl<R> Bytecode<R>

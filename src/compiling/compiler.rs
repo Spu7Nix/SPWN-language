@@ -7,6 +7,7 @@ use slotmap::{new_key_type, SlotMap};
 use crate::{
     parsing::{
         ast::{ExprNode, Expression, ImportType, Spanned, Statement, StmtNode},
+        attributes::ScriptAttribute,
         parser::Parser,
         utils::operators::{BinOp, UnaryOp},
     },
@@ -55,16 +56,24 @@ pub struct Compiler<'a> {
     pub map: &'a mut BytecodeMap,
 
     global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
+
+    file_attrs: &'a Vec<ScriptAttribute>,
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(interner: Rc<RefCell<Interner>>, src: SpwnSource, map: &'a mut BytecodeMap) -> Self {
+    pub fn new(
+        interner: Rc<RefCell<Interner>>,
+        src: SpwnSource,
+        map: &'a mut BytecodeMap,
+        file_attrs: &'a Vec<ScriptAttribute>,
+    ) -> Self {
         Self {
             interner,
             scopes: SlotMap::default(),
             src,
             map,
             global_return: None,
+            file_attrs,
         }
     }
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
@@ -230,24 +239,35 @@ impl<'a> Compiler<'a> {
 
                     return Ok(());
                 }
-            } // aaa obamu :))))))
+            }
         }
 
         let mut parser = Parser::new(code.trim_end(), src, Rc::clone(&self.interner));
 
         match parser.parse() {
             Ok(ast) => {
-                let mut compiler = Compiler::new(Rc::clone(&self.interner), parser.src, self.map);
+                let mut compiler = Compiler::new(
+                    Rc::clone(&self.interner),
+                    parser.src,
+                    self.map,
+                    &ast.file_attributes,
+                );
 
                 match compiler.compile(ast.statements) {
                     Ok(bytecode) => {
                         let bytes = bincode::serialize(&bytecode).unwrap();
 
-                        let _ = std::fs::create_dir(import_base.join(".spwnc"));
-                        std::fs::write(import_base.join(format!(".spwnc/{}.spwnc", name)), bytes)
+                        // dont write bytecode if caching is disabled
+                        if !self.file_attrs.contains(&ScriptAttribute::NoBytecodeCache) {
+                            let _ = std::fs::create_dir(import_base.join(".spwnc"));
+                            std::fs::write(
+                                import_base.join(format!(".spwnc/{}.spwnc", name)),
+                                bytes,
+                            )
                             .unwrap();
+                        }
 
-                        println!("written {}.spwnc", name);
+                        //println!("written {}.spwnc", name);
                     }
                     Err(err) => return Err(err),
                 }

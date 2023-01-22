@@ -39,7 +39,12 @@ fn main() {
 
     match parser.parse() {
         Ok(ast) => {
-            let mut compiler = Compiler::new(Rc::clone(&interner), parser.src, &mut bytecode_map);
+            let mut compiler = Compiler::new(
+                Rc::clone(&interner),
+                parser.src,
+                &mut bytecode_map,
+                &ast.file_attributes,
+            );
 
             match compiler.compile(ast.statements) {
                 Ok(bytecode) => {

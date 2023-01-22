@@ -17,6 +17,7 @@ pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
         .to_string()
 }
 
+// gotta do this skrunkly stuff cause md5::Digest does not implement serde
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Digest(pub [u8; 16]);
 
@@ -62,7 +63,7 @@ impl<'de> Visitor<'de> for DigestVisitor {
         }
 
         // SAFETY:
-        // this is safe cause we check the length above
+        // this is safe since we check the length above (cant be more than 16)
         Ok(Digest(unsafe {
             *std::mem::transmute::<_, &[u8; 16]>(v.as_ptr())
         }))
