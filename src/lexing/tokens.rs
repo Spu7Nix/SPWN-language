@@ -108,12 +108,15 @@ lexer! {
 
     Ident: regex(r"[a-zA-Z_][a-zA-Z_0-9]*"),
 
+    Newline: regex(r"(\n|(\r\n))+"),
+
     Eof,
 
-    @skip: r#"[ \t\f\n\r]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*"#;
+    @skip: r#"[ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*"#;
     @error: Error;
 }
 
+// generate this in macro???
 impl Token {
     pub fn to_str(self) -> &'static str {
         match self {
@@ -197,6 +200,7 @@ impl Token {
             Self::Hashtag => "#",
             Self::Extract => "extract",
             Self::Print => "print",
+            Self::Newline => "linebreak",
         }
     }
 }

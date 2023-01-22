@@ -55,6 +55,14 @@ macro_rules! list_helper {
 
 impl Parser<'_> {
     pub fn next(&mut self) -> Token {
+        let out = self.lexer.next_or_eof();
+        if out == Token::Newline {
+            self.next()
+        } else {
+            out
+        }
+    }
+    pub fn next_or_newline(&mut self) -> Token {
         self.lexer.next_or_eof()
     }
     pub fn span(&self) -> CodeSpan {
@@ -73,7 +81,16 @@ impl Parser<'_> {
     }
     pub fn peek(&self) -> Token {
         let mut peek = self.lexer.clone();
-        peek.next_or_eof()
+        let mut out = peek.next_or_eof();
+        while out == Token::Newline {
+            // should theoretically never be more than one, but having a loop just in case doesn't hurt
+            out = peek.next_or_eof();
+        }
+        out
+    }
+    pub fn peek_or_newline(&self) -> Token {
+        let mut peek = self.lexer.clone();
+        peek.next_or_eof()  
     }
     pub fn next_is(&self, tok: Token) -> bool {
         self.peek() == tok
@@ -529,7 +546,16 @@ impl Parser<'_> {
                             args.push(self.parse_expr()?);
                         });
 
-                        self.expect_tok(Token::Arrow)?;
+                        
+                        let next = self.next_or_newline(); 
+                        if next != Token::Arrow {
+                            return Err(SyntaxError::UnexpectedToken {
+                                found: next,
+                                expected: Token::Arrow.to_str().to_string(),
+                                area: self.make_area(self.span()),
+                            });
+                        }
+                                
 
                         let ret_type = self.parse_expr()?;
 
@@ -671,10 +697,16 @@ impl Parser<'_> {
                     Expression::TriggerFuncCall(value)
                 }
                 Token::If => {
+                    // if there is a newline, treat as separate statement
+                    if self.peek_or_newline() == Token::Newline {
+                        break;
+                    }
                     self.next();
                     let cond = self.parse_expr()?;
                     self.expect_tok(Token::Else)?;
                     let if_false = self.parse_expr()?;
+
+                    // also we not parsing `if is` ternarise?????
 
                     Expression::Ternary {
                         cond,
@@ -865,7 +897,7 @@ impl Parser<'_> {
             }
             Token::Return => {
                 self.next();
-                if matches!(self.peek(), Token::Eol | Token::RBracket | Token::Eof) {
+                if matches!(self.peek_or_newline(), Token::Eol | Token::RBracket | Token::Eof | Token::Newline) {
                     Statement::Return(None)
                 } else {
                     let val = self.parse_expr()?;
@@ -918,9 +950,16 @@ impl Parser<'_> {
             _ => Statement::Expr(self.parse_expr()?),
         };
         let inner_span = inner_start.extend(self.span());
-
-        self.expect_tok(Token::Eol)?;
-
+        
+        
+        if !matches!(self.peek(), Token::LBracket) && !matches!(self.next_or_newline(), Token::Eol | Token::Newline | Token::Eof) {
+            return Err(SyntaxError::UnexpectedToken {
+                found: self.next(),
+                expected: "statement separator (';' or newline)".to_string(),
+                area: self.make_area(self.span()),
+            });
+        }
+            
         let stmt = if is_arrow {
             Statement::Arrow(Box::new(stmt.into_node(vec![], inner_span)))
         } else {
