@@ -70,6 +70,7 @@ macro_rules! opcodes {
         #[derive(
             Clone,
             Copy,
+            Default,
             PartialEq,
             Eq,
             Debug,
@@ -261,6 +262,7 @@ opcodes! {
     #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} -> R{d}"))]
     Associated { => from, => dest, => name },
 
+    #[default]
     #[delve(display = || "yeet".to_string())]
     YeetContext,
     #[delve(display = |to: &JumpPos| format!("skip to {to}"))]

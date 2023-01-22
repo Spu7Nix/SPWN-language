@@ -18,7 +18,7 @@ use crate::{
 
 use super::{
     bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function},
-    error::CompilerError,
+    error::CompilerError, optimize::optimize_function,
 };
 
 pub type CompileResult<T> = Result<T, CompilerError>;
@@ -151,8 +151,13 @@ impl<'a> Compiler<'a> {
             .functions
             .into_iter()
             .map(|v| {
-                let opcodes = v
-                    .opcodes
+                let v = if true { // TODO: change this to a debug flag
+                    optimize_function(&v)
+                } else {
+                    v
+                };
+
+                let opcodes = v.opcodes
                     .into_iter()
                     .map(|opcode| opcode.try_into().expect("usize too big for u8"))
                     .collect();

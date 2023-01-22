@@ -18,7 +18,7 @@ use crate::{
 
 use super::compiler::CompileResult;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
 pub struct Function<R>
 where
