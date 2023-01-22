@@ -16,8 +16,8 @@ error_maker! {
             Message: "Invalid operands", Note: None;
             Labels: [
                 area => "Invalid operands for `{}` operator": op.to_str();
-                a.1 => "This is of type `{}`": a.0.type_name();
-                b.1 => "This is of type `{}`": b.0.type_name();
+                a.1 => "This is of type `{}`": a.0;
+                b.1 => "This is of type `{}`": b.0;
             ]
         ]
         InvalidOperands {

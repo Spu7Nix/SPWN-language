@@ -20,9 +20,12 @@ use crate::compiling::compiler::Compiler;
 use crate::sources::BytecodeMap;
 use crate::util::RandomState;
 use crate::vm::interpreter::Vm;
+use crate::vm::opcodes::{Opcode, Register};
 use crate::{lexing::tokens::Token, parsing::parser::Parser, sources::SpwnSource};
 
 fn main() {
+    assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
+
     print!("\x1B[2J\x1B[1;1H");
     std::io::stdout().flush().unwrap();
 
@@ -41,7 +44,7 @@ fn main() {
         Ok(ast) => {
             let mut compiler = Compiler::new(
                 Rc::clone(&interner),
-                parser.src,
+                parser.src.clone(),
                 &mut bytecode_map,
                 &ast.file_attributes,
             );
@@ -52,26 +55,26 @@ fn main() {
                     //     .expect("multiple interner references still held")
                     //     .into_inner();
 
+                    // for (src, bytecode) in compiler.map.map {
+                    //     println!(
+                    //         "GOG: {:?}\n──────────────────────────────────────────────────────",
+                    //         src
+                    //     );
+                    bytecode.debug_str(&parser.src);
+                    // println!("{}", bytecode);
+
+                    // let bytes = bincode::serialize(&bytecode).unwrap();
+                    // println!("{:?}", bytes);
+
+                    // std::fs::write("cock.spwnc", bytes).unwrap();
+                    //}
+
                     let mut vm = Vm::new(bytecode, Rc::clone(&interner));
 
                     match vm.run_func(0) {
                         Ok(_) => {}
                         Err(err) => err.to_report().display(),
                     };
-
-                    // for (src, bytecode) in &compiler.map.map {
-                    //     println!(
-                    //         "GOG: {:?}\n──────────────────────────────────────────────────────",
-                    //         src
-                    //     );
-                    //     bytecode.debug_str(src);
-                    //     // println!("{}", bytecode);
-
-                    //     // let bytes = bincode::serialize(&bytecode).unwrap();
-                    //     // println!("{:?}", bytes);
-
-                    //     // std::fs::write("cock.spwnc", bytes).unwrap();
-                    // }
                 }
                 Err(err) => err.to_report().display(),
             }

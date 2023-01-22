@@ -2,7 +2,7 @@
 let a = 1
 while a < 50 {
     a = a + 1
-    print a
+    //print a
 }
 
-print "this errors for some reason"
+print "this no longer errors !!!!!!!!!!!!!!!"

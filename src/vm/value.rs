@@ -1,7 +1,10 @@
+use std::fmt::write;
+
 use ahash::AHashMap;
 use lasso::Spur;
+use strum::EnumDiscriminants;
 
-use crate::{compiling::bytecode::Constant, gd::ids::*, sources::CodeArea, util::Interner};
+use crate::{compiling::bytecode::Constant, gd::ids::*, sources::CodeArea};
 
 use super::interpreter::{ValueKey, Vm};
 
@@ -11,91 +14,41 @@ pub struct StoredValue {
     pub area: CodeArea,
 }
 
-macro_rules! value_types {
-    (
-        $(
-            #[type_name($s:literal)]
-            $name:ident
-            $( ($($t:ty),+) )?
-            $( {$($field:ident: $field_t:ty,)+} )?,
-        )+
-    ) => {
-        #[derive(Debug, Clone, PartialEq)]
-        pub enum Value {
-            $(
-                $name $( ($($t),+) )? $( {$($field: $field_t,)+} )?,
-            )+
-        }
-
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        pub enum ValueType {
-            $(
-                $name,
-            )+
-        }
-
-        impl Value {
-            pub fn get_type(&self) -> ValueType {
-                match self {
-                    $(
-                        Value::$name {..} => ValueType::$name,
-                    )+
-                }
-            }
-        }
-
-        impl ValueType {
-            pub fn type_name(&self) -> &str {
-                match self {
-                    $(
-                        ValueType::$name => $s,
-                    )+
-                }
-            }
-        }
-    };
-}
-
-value_types! {
-    #[type_name("@int")]
+#[derive(EnumDiscriminants, Debug, Clone, PartialEq)]
+// `EnumDiscriminants` generates a new enum that is just the variant names without any data
+// anything in `strum_discriminants` is applied to the `ValueType` enum
+#[strum_discriminants(name(ValueType))]
+#[strum_discriminants(derive(delve::EnumToStr))]
+#[strum_discriminants(delve(rename_all = "lowercase"))]
+pub enum Value {
     Int(i64),
-    #[type_name("@float")]
     Float(f64),
-    #[type_name("@bool")]
     Bool(bool),
-    #[type_name("@string")]
     String(String),
 
-    #[type_name("@array")]
     Array(Vec<ValueKey>),
-    #[type_name("@dict")]
     Dict(AHashMap<Spur, ValueKey>),
 
-    #[type_name("@group")]
     Group(Id),
-    #[type_name("@color")]
     Color(Id),
-    #[type_name("@block")]
     Block(Id),
-    #[type_name("@item")]
     Item(Id),
 
-    // TriggerFunc(TriggerFunction),
-    // Dict(AHashMap<LocalIntern<String>, StoredValue>),
-    // Macro(Macro),
-
-    // Array(Vec<StoredValue>),
-    // Obj(Vec<(u16, ObjParam)>, ast::ObjectMode),
-    #[type_name("@builtins")]
     Builtins,
-    // // BuiltinFunction(Builtin),
-    // TypeIndicator(TypeId),
-    #[type_name("@range")]
     Range(i64, i64, usize), //start, end, step
-                            // Pattern(Pattern),
+}
+
+impl std::fmt::Display for ValueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "@{}", <&ValueType as Into<&'static str>>::into(self))
+    }
 }
 
 impl Value {
+    pub fn get_type(&self) -> ValueType {
+        self.into()
+    }
+
     pub fn from_const(c: &Constant) -> Self {
         match c {
             Constant::Int(v) => Value::Int(*v),
@@ -106,7 +59,7 @@ impl Value {
         }
     }
 
-    pub fn display(&self, vm: &Vm) -> String {
+    pub fn runtime_display(&self, vm: &Vm) -> String {
         match self {
             Value::Int(n) => n.to_string(),
             Value::Float(n) => n.to_string(),
@@ -119,7 +72,7 @@ impl Value {
                     if i != 0 {
                         s.push_str(", ");
                     }
-                    s.push_str(&vm.memory[*el].value.display(vm));
+                    s.push_str(&vm.memory[*el].value.runtime_display(vm));
                 }
                 s.push(']');
                 s
@@ -133,7 +86,7 @@ impl Value {
                     }
                     s.push_str(&vm.interner.borrow().resolve(k));
                     s.push_str(": ");
-                    s.push_str(&vm.memory[*v].value.display(vm));
+                    s.push_str(&vm.memory[*v].value.runtime_display(vm));
                 }
                 s.push('}');
                 s

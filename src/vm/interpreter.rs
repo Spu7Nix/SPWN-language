@@ -110,7 +110,7 @@ impl<'a> Vm<'a> {
                     self.registers[*to as usize] = self.deep_clone_reg(*from)
                 }
                 Opcode::Print { reg } => {
-                    println!("{}", self.get_reg(*reg).value.display(self))
+                    println!("{}", self.get_reg(*reg).value.runtime_display(self))
                 }
                 Opcode::AllocArray { size, dest } => self.set_reg(
                     *dest,
@@ -234,11 +234,11 @@ impl<'a> Vm<'a> {
                     self.bop(value_ops::or, func, ip, left, right, dest)?
                 }
                 Opcode::Jump { to } => {
-                    ip = *to as usize;
+                    ip = *to as usize - 1;
                 }
                 Opcode::JumpIfFalse { src, to } => {
                     if self.get_reg(*src).value == Value::Bool(false) {
-                        ip = *to as usize;
+                        ip = *to as usize - 1;
                     }
                 }
                 Opcode::Ret { src } => todo!(),

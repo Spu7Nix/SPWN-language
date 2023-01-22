@@ -147,18 +147,18 @@ impl<'a> Compiler<'a> {
 
         let unopt_code = builder.build(&self.src);
 
-        let functions = unopt_code.functions
+        let functions = unopt_code
+            .functions
             .into_iter()
             .map(|v| {
-                let opcodes = v.opcodes
+                let opcodes = v
+                    .opcodes
                     .into_iter()
-                    .map(|opcode| opcode.try_into().expect("404, sex not found , yo're missing the sex... Where is it? You find it? You do finding its now? Where art it hbe it has gone? Forgotten by societty , , sex walked across acres of empty land....   Almost as if ...,, he did... whereever he may be.... He will stay it will remain..... It told me this it would be like this it will. Be like this it will...."))
+                    .map(|opcode| opcode.try_into().expect("usize too big for u8"))
                     .collect();
                 Function { opcodes }
             })
             .collect();
-
-        let hash = md5::compute(self.src.read().unwrap());
 
         self.map.map.insert(
             self.src.clone(),
