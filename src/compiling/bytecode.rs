@@ -189,7 +189,7 @@ impl BytecodeBuilder {
         f(&mut func_builder)
     }
 
-    pub fn build(self) -> Bytecode<UnoptRegister> {
+    pub fn build(self, src: &SpwnSource) -> Bytecode<UnoptRegister> {
         let mut const_index_map = SecondaryMap::default();
 
         let consts = self
@@ -232,9 +232,6 @@ impl BytecodeBuilder {
             }
 
             get_block_pos(&f.code, &mut length, &mut block_positions);
-            // for (path, (start, end)) in &block_positions {
-            //     println!("{:?} -> [{}, {})", path, start, end)
-            // }
 
             let mut opcodes = vec![];
 
@@ -306,8 +303,11 @@ impl BytecodeBuilder {
             functions.push(Function { opcodes })
         }
 
+        let hash = md5::compute(src.read().unwrap());
+
         Bytecode {
-            source_hash: None,
+            src: src.clone(),
+            source_hash: hash.into(),
             consts,
             functions,
             opcode_span_map,
@@ -382,14 +382,20 @@ impl<'a> FuncBuilder<'a> {
         Ok(())
     }
 
-    pub fn new_array<F>(&mut self, len: u16, dest: UnoptRegister, f: F) -> CompileResult<()>
+    pub fn new_array<F>(
+        &mut self,
+        len: u16,
+        dest: UnoptRegister,
+        f: F,
+        span: CodeSpan,
+    ) -> CompileResult<()>
     where
         F: FnOnce(&mut FuncBuilder, &mut Vec<UnoptRegister>) -> CompileResult<()>,
     {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::AllocArray {
-            size: len,
-            dest,
-        }));
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::AllocArray { size: len, dest }),
+            span,
+        );
 
         let mut items = vec![];
         f(self, &mut items)?;
@@ -404,11 +410,20 @@ impl<'a> FuncBuilder<'a> {
         Ok(())
     }
 
-    pub fn new_dict<F>(&mut self, len: u16, dest: UnoptRegister, f: F) -> CompileResult<()>
+    pub fn new_dict<F>(
+        &mut self,
+        len: u16,
+        dest: UnoptRegister,
+        f: F,
+        span: CodeSpan,
+    ) -> CompileResult<()>
     where
         F: FnOnce(&mut FuncBuilder, &mut Vec<(String, UnoptRegister)>) -> CompileResult<()>,
     {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::AllocDict { size: len, dest }));
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::AllocDict { size: len, dest }),
+            span,
+        );
 
         let mut items = vec![];
         f(self, &mut items)?;
@@ -854,7 +869,9 @@ pub struct Bytecode<R>
 where
     R: Display + Copy,
 {
-    pub source_hash: Option<Digest>,
+    pub src: SpwnSource,
+    pub source_hash: Digest,
+
     pub consts: Vec<Constant>,
 
     pub functions: Vec<Function<R>>,
@@ -880,7 +897,6 @@ where
         let mut colors = RainbowColorGenerator::new(150.0, 0.4, 0.9, 60.0);
 
         let col_reg = Regex::new(r"(R\d+)").unwrap();
-        let arrow_reg = Regex::new(r"([+\-*/<>]+)").unwrap();
 
         let ansi_regex = Regex::new(r#"(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]"#).unwrap();
         let clear_ansi = |s: &str| ansi_regex.replace_all(s, "").to_string();

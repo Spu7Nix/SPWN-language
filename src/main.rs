@@ -18,15 +18,13 @@ use lasso::Rodeo;
 
 use crate::compiling::compiler::Compiler;
 use crate::sources::BytecodeMap;
-use crate::util::{Interner, RandomState};
-use crate::vm::interpreter::ValueKey;
+use crate::util::RandomState;
+use crate::vm::interpreter::Vm;
 use crate::{lexing::tokens::Token, parsing::parser::Parser, sources::SpwnSource};
 
 fn main() {
     print!("\x1B[2J\x1B[1;1H");
     std::io::stdout().flush().unwrap();
-
-    println!("{} bytes", std::mem::size_of::<SpwnSource>());
 
     let mut bytecode_map = BytecodeMap::default();
 
@@ -44,20 +42,31 @@ fn main() {
             let mut compiler = Compiler::new(Rc::clone(&interner), parser.src, &mut bytecode_map);
 
             match compiler.compile(ast.statements) {
-                Ok(_) => {
-                    for (src, bytecode) in &compiler.map.map {
-                        println!(
-                            "GOG: {:?}\n──────────────────────────────────────────────────────",
-                            src
-                        );
-                        bytecode.debug_str(src);
-                        // println!("{}", bytecode);
+                Ok(bytecode) => {
+                    // let interner = Rc::try_unwrap(interner)
+                    //     .expect("multiple interner references still held")
+                    //     .into_inner();
 
-                        // let bytes = bincode::serialize(&bytecode).unwrap();
-                        // println!("{:?}", bytes);
+                    let mut vm = Vm::new(bytecode, Rc::clone(&interner));
 
-                        // std::fs::write("cock.spwnc", bytes).unwrap();
-                    }
+                    match vm.run_func(0) {
+                        Ok(_) => {}
+                        Err(err) => err.to_report().display(),
+                    };
+
+                    // for (src, bytecode) in &compiler.map.map {
+                    //     println!(
+                    //         "GOG: {:?}\n──────────────────────────────────────────────────────",
+                    //         src
+                    //     );
+                    //     bytecode.debug_str(src);
+                    //     // println!("{}", bytecode);
+
+                    //     // let bytes = bincode::serialize(&bytecode).unwrap();
+                    //     // println!("{:?}", bytes);
+
+                    //     // std::fs::write("cock.spwnc", bytes).unwrap();
+                    // }
                 }
                 Err(err) => err.to_report().display(),
             }

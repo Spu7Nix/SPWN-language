@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{compiling::bytecode::Bytecode, util::hyperlink, vm::opcodes::Register};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpwnSource {
     File(PathBuf),
 }

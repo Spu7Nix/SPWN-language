@@ -33,6 +33,32 @@ macro_rules! operators {
                 )+
             }
 
+            impl BinOp {
+                pub fn to_str(self) -> &'static str {
+                    match self {
+                        $(
+                            $($(
+                                BinOp::$l_tok => Token::$l_tok.to_str(),
+                            )+)?
+                            $($(
+                                BinOp::$r_tok => Token::$r_tok.to_str(),
+                            )+)?
+                        )+
+                    }
+                }
+            }
+            impl UnaryOp {
+                pub fn to_str(self) -> &'static str {
+                    match self {
+                        $(
+                            $($(
+                                UnaryOp::$u_tok => Token::$u_tok.to_str(),
+                            )+)?
+                        )+
+                    }
+                }
+            }
+
             impl Token {
                 pub fn to_bin_op(self) -> BinOp {
                     match self {

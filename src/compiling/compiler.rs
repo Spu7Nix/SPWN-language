@@ -1,7 +1,7 @@
-use std::{cell::RefCell, fs::File, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use ahash::AHashMap;
-use lasso::{Rodeo, Spur};
+use lasso::Spur;
 use slotmap::{new_key_type, SlotMap};
 
 use crate::{
@@ -11,7 +11,8 @@ use crate::{
         utils::operators::{BinOp, UnaryOp},
     },
     sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource},
-    util::{Interner, RandomState},
+    util::Interner,
+    vm::opcodes::Register,
 };
 
 use super::{
@@ -54,14 +55,6 @@ pub struct Compiler<'a> {
     pub map: &'a mut BytecodeMap,
 
     global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
-}
-
-macro_rules! bop {
-    ($left:ident $f:ident $right:ident ($scope:ident, $builder:ident, $out_reg:ident, $self:ident, $span:expr)) => {{
-        let a = $self.compile_expr(&$left, $scope, $builder)?;
-        let b = $self.compile_expr(&$right, $scope, $builder)?;
-        $builder.$f(a, b, $out_reg, $span)
-    }};
 }
 
 impl<'a> Compiler<'a> {
@@ -129,7 +122,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile(&mut self, stmts: Vec<StmtNode>) -> CompileResult<()> {
+    pub fn compile(&mut self, stmts: Vec<StmtNode>) -> CompileResult<&Bytecode<Register>> {
         let mut builder = BytecodeBuilder::new();
 
         // func 0 ("global")
@@ -142,7 +135,8 @@ impl<'a> Compiler<'a> {
 
             self.compile_stmts(&stmts, base_scope, f)
         })?;
-        let unopt_code = builder.build();
+
+        let unopt_code = builder.build(&self.src);
 
         let functions = unopt_code.functions
             .into_iter()
@@ -160,14 +154,15 @@ impl<'a> Compiler<'a> {
         self.map.map.insert(
             self.src.clone(),
             Bytecode {
-                source_hash: Some(hash.into()),
+                src: unopt_code.src,
+                source_hash: unopt_code.source_hash,
                 consts: unopt_code.consts,
                 functions,
                 opcode_span_map: unopt_code.opcode_span_map,
             },
         );
 
-        Ok(())
+        Ok(&self.map.map[&self.src])
 
         // Ok(builder.build())
     }
@@ -230,7 +225,7 @@ impl<'a> Compiler<'a> {
                     }
                 };
 
-                if bytecode.source_hash.unwrap() == hash.into() {
+                if bytecode.source_hash == hash.into() {
                     self.map.map.insert(src, bytecode);
 
                     return Ok(());
@@ -238,16 +233,14 @@ impl<'a> Compiler<'a> {
             } // aaa obamu :))))))
         }
 
-        let mut parser = Parser::new(code.trim_end(), src.clone(), Rc::clone(&self.interner));
+        let mut parser = Parser::new(code.trim_end(), src, Rc::clone(&self.interner));
 
         match parser.parse() {
             Ok(ast) => {
                 let mut compiler = Compiler::new(Rc::clone(&self.interner), parser.src, self.map);
 
                 match compiler.compile(ast.statements) {
-                    Ok(_) => {
-                        let bytecode = &self.map.map[&src];
-
+                    Ok(bytecode) => {
                         let bytes = bincode::serialize(&bytecode).unwrap();
 
                         let _ = std::fs::create_dir(import_base.join(".spwnc"));
@@ -445,6 +438,10 @@ impl<'a> Compiler<'a> {
             Statement::TypeDef(_) => todo!(),
             Statement::Impl { typ, items } => todo!(),
             Statement::ExtractImport(_) => todo!(),
+            Statement::Print(v) => {
+                let v_reg = self.compile_expr(v, scope, builder)?;
+                builder.print(v_reg);
+            }
         }
         Ok(())
     }
@@ -457,6 +454,14 @@ impl<'a> Compiler<'a> {
     ) -> CompileResult<usize> {
         let out_reg = builder.next_reg();
 
+        macro_rules! bin_op {
+            ($left:ident $fn:ident $right:ident) => {{
+                let a = self.compile_expr(&$left, scope, builder)?;
+                let b = self.compile_expr(&$right, scope, builder)?;
+                builder.$fn(a, b, out_reg, expr.span)
+            }};
+        }
+
         match &*expr.expr {
             Expression::Int(v) => builder.load_int(*v, out_reg, expr.span),
             Expression::Float(v) => builder.load_float(*v, out_reg, expr.span),
@@ -464,20 +469,54 @@ impl<'a> Compiler<'a> {
             Expression::String(v) => builder.load_string(self.resolve(v), out_reg, expr.span),
             Expression::Id(class, value) => builder.load_id(*value, *class, out_reg, expr.span),
             Expression::Op(left, op, right) => match op {
-                BinOp::Plus => bop!(left add right (scope, builder, out_reg, self, expr.span)),
-                BinOp::Minus => bop!(left sub right (scope, builder, out_reg, self, expr.span)),
-                BinOp::Mult => bop!(left mult right (scope, builder, out_reg, self, expr.span)),
-                BinOp::Div => bop!(left div right (scope, builder, out_reg, self, expr.span)),
-                BinOp::Mod => bop!(left modulo right (scope, builder, out_reg, self, expr.span)),
-                BinOp::Pow => bop!(left pow right (scope, builder, out_reg, self, expr.span)),
-                BinOp::ShiftLeft => bop!(left shl right (scope, builder, out_reg, self, expr.span)),
+                BinOp::Plus => bin_op!(left add right),
+                BinOp::Minus => bin_op!(left sub right),
+                BinOp::Mult => bin_op!(left mult right),
+                BinOp::Div => bin_op!(left div right),
+                BinOp::Mod => bin_op!(left modulo right),
+                BinOp::Pow => bin_op!(left pow right),
+                BinOp::ShiftLeft => {
+                    bin_op!(left shl right)
+                }
                 BinOp::ShiftRight => {
-                    bop!(left shr right (scope, builder, out_reg, self, expr.span))
+                    bin_op!(left shr right)
                 }
                 BinOp::BinAnd => {
-                    bop!(left bin_and right (scope, builder, out_reg, self, expr.span))
+                    bin_op!(left bin_and right)
                 }
-                BinOp::BinOr => bop!(left bin_or right (scope, builder, out_reg, self, expr.span)),
+                BinOp::BinOr => {
+                    bin_op!(left bin_or right)
+                }
+                BinOp::Eq => {
+                    bin_op!(left eq right)
+                }
+                BinOp::Neq => {
+                    bin_op!(left neq right)
+                }
+                BinOp::Gt => {
+                    bin_op!(left gt right)
+                }
+                BinOp::Gte => {
+                    bin_op!(left gte right)
+                }
+                BinOp::Lt => {
+                    bin_op!(left lt right)
+                }
+                BinOp::Lte => {
+                    bin_op!(left lte right)
+                }
+                BinOp::DotDot => {
+                    bin_op!(left range right)
+                }
+                BinOp::In => {
+                    bin_op!(left in_op right)
+                }
+                BinOp::As => {
+                    bin_op!(left as_op right)
+                }
+                BinOp::Is => {
+                    bin_op!(left is_op right)
+                }
                 // specky can do the rest :)))
                 BinOp::PlusEq => {
                     let a = self.compile_expr(left, scope, builder)?;
@@ -534,56 +573,6 @@ impl<'a> Compiler<'a> {
                     let b = self.compile_expr(right, scope, builder)?;
                     builder.bin_not_eq(a, b, expr.span)
                 }
-                BinOp::Eq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.eq(a, b, out_reg, expr.span)
-                }
-                BinOp::Neq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.neq(a, b, out_reg, expr.span)
-                }
-                BinOp::Gt => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.gt(a, b, out_reg, expr.span)
-                }
-                BinOp::Gte => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.gte(a, b, out_reg, expr.span)
-                }
-                BinOp::Lt => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.lt(a, b, out_reg, expr.span)
-                }
-                BinOp::Lte => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.lte(a, b, out_reg, expr.span)
-                }
-                BinOp::DotDot => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.range(a, b, out_reg, expr.span)
-                }
-                BinOp::In => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.in_op(a, b, out_reg, expr.span)
-                }
-                BinOp::As => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.as_op(a, b, out_reg, expr.span)
-                }
-                BinOp::Is => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.is_op(a, b, out_reg, expr.span)
-                }
 
                 BinOp::Assign => match *left.expr {
                     Expression::Var(s) => match self.get_var(s, scope) {
@@ -596,7 +585,7 @@ impl<'a> Compiler<'a> {
                                 return Err(CompilerError::ImmutableAssign {
                                     area: self.make_area(expr.span),
                                     def_area: self.make_area(var.def_span),
-                                    var: self.resolve(&s).into(),
+                                    var: self.resolve(&s),
                                 });
                             }
                         }
@@ -632,39 +621,49 @@ impl<'a> Compiler<'a> {
                 None => {
                     return Err(CompilerError::NonexistentVariable {
                         area: self.make_area(expr.span),
-                        var: self.resolve(name).into(),
+                        var: self.resolve(name),
                     })
                 }
             },
             Expression::Type(_) => todo!(),
             Expression::Array(items) => {
-                builder.new_array(items.len() as u16, out_reg, |builder, elems| {
-                    for item in items {
-                        elems.push(self.compile_expr(item, scope, builder)?);
-                    }
-                    Ok(())
-                })?;
+                builder.new_array(
+                    items.len() as u16,
+                    out_reg,
+                    |builder, elems| {
+                        for item in items {
+                            elems.push(self.compile_expr(item, scope, builder)?);
+                        }
+                        Ok(())
+                    },
+                    expr.span,
+                )?;
             }
             Expression::Dict(items) => {
-                builder.new_dict(items.len() as u16, out_reg, |builder, elems| {
-                    for (key, item) in items {
-                        let value_reg = match item {
-                            Some(e) => self.compile_expr(e, scope, builder)?,
-                            None => match self.get_var(key.value, scope) {
-                                Some(data) => data.reg,
-                                None => {
-                                    return Err(CompilerError::NonexistentVariable {
-                                        area: self.make_area(expr.span),
-                                        var: self.resolve(&key.value).into(),
-                                    })
-                                }
-                            },
-                        };
+                builder.new_dict(
+                    items.len() as u16,
+                    out_reg,
+                    |builder, elems| {
+                        for (key, item) in items {
+                            let value_reg = match item {
+                                Some(e) => self.compile_expr(e, scope, builder)?,
+                                None => match self.get_var(key.value, scope) {
+                                    Some(data) => data.reg,
+                                    None => {
+                                        return Err(CompilerError::NonexistentVariable {
+                                            area: self.make_area(expr.span),
+                                            var: self.resolve(&key.value).into(),
+                                        })
+                                    }
+                                },
+                            };
 
-                        elems.push((self.resolve(&key.value).into(), value_reg));
-                    }
-                    Ok(())
-                })?;
+                            elems.push((self.resolve(&key.value).into(), value_reg));
+                        }
+                        Ok(())
+                    },
+                    expr.span,
+                )?;
             }
             Expression::Maybe(e) => match e {
                 Some(e) => {
@@ -680,11 +679,11 @@ impl<'a> Compiler<'a> {
             }
             Expression::Member { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder)?;
-                builder.member(base_reg, out_reg, self.resolve(&name).into())
+                builder.member(base_reg, out_reg, self.resolve(&name))
             }
             Expression::Associated { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder)?;
-                builder.associated(base_reg, out_reg, self.resolve(&name).into())
+                builder.associated(base_reg, out_reg, self.resolve(&name))
             }
             Expression::Call {
                 base,
