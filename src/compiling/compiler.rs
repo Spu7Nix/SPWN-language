@@ -600,6 +600,7 @@ impl<'a> Compiler<'a> {
                             if var.mutable {
                                 self.redef_var(s, expr.span, scope);
                                 let expr_reg = self.compile_expr(right, scope, builder)?;
+
                                 builder.copy(expr_reg, var.reg, expr.span);
                             } else {
                                 return Err(CompilerError::ImmutableAssign {
@@ -610,19 +611,18 @@ impl<'a> Compiler<'a> {
                             }
                         }
                         None => {
-                            let var_reg = builder.next_reg();
                             self.new_var(
                                 s,
                                 Variable {
                                     mutable: false,
                                     def_span: expr.span,
-                                    reg: var_reg,
+                                    reg: out_reg,
                                 },
                                 scope,
                             );
                             let expr_reg = self.compile_expr(right, scope, builder)?;
 
-                            builder.copy(expr_reg, var_reg, expr.span);
+                            builder.copy(expr_reg, out_reg, expr.span);
                         }
                     },
                     _ => todo!("haha 😂😂😂😂"),

@@ -14,9 +14,6 @@ impl Serialize for Opcode<Register> {
     where
         S: serde::Serializer,
     {
-        let x = unsafe { std::mem::transmute::<Opcode<Register>, u32>(*self) };
-
-        println!("{:?}, {}", self, x);
         // SAFETY:
         // opcodes will always be u32 or less
         serializer.serialize_u32(unsafe { std::mem::transmute::<_, u32>(*self) })

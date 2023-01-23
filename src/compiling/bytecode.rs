@@ -365,6 +365,7 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn next_reg(&mut self) -> UnoptRegister {
         let old = self.used_regs;
+
         self.used_regs = self
             .used_regs
             .checked_add(1)
