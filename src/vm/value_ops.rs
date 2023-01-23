@@ -1,6 +1,6 @@
 use crate::{
     parsing::utils::operators::{BinOp, UnaryOp},
-    sources::{CodeArea, CodeSpan},
+    sources::CodeSpan,
 };
 
 use super::{
@@ -8,10 +8,6 @@ use super::{
     interpreter::{RuntimeResult, Vm},
     value::{StoredValue, Value, ValueType},
 };
-
-// pub fn call_op(a: &StoredValue, b: &StoredValue, op: BinOp, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
-
-// }
 
 pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<bool> {
     Ok(match &v.value {
@@ -24,6 +20,44 @@ pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<bool> 
             })
         }
     })
+}
+
+pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
+    match (a, b) {
+        (Value::Array(v1), Value::Array(v2)) => {
+            if v1.len() != v2.len() {
+                false
+            } else {
+                v1.iter()
+                    .zip(v2)
+                    .all(|(k1, k2)| equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm))
+            }
+        }
+        (Value::Dict(v1), Value::Dict(v2)) => {
+            if v1.len() != v2.len() {
+                false
+            } else {
+                for (k, k1) in v1 {
+                    match v2.get(k) {
+                        Some(k2) => {
+                            if !equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm) {
+                                return false;
+                            }
+                        }
+                        None => return false,
+                    }
+                }
+                true
+                // v1.iter()
+                //     .zip(v2)
+                //     .all(|(k1, k2)| equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm))
+            }
+        }
+        (Value::Maybe(Some(k1)), Value::Maybe(Some(k2))) => {
+            equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm)
+        }
+        _ => a == b,
+    }
 }
 
 pub fn add(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {

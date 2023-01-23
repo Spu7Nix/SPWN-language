@@ -207,8 +207,34 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::BinNot { src, dest } => todo!(),
 
-                Opcode::Eq { left, right, dest } => todo!(),
-                Opcode::Neq { left, right, dest } => todo!(),
+                Opcode::Eq { left, right, dest } => {
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Bool(value_ops::equality(
+                                &self.get_reg(*left).value,
+                                &self.get_reg(*right).value,
+                                self,
+                            )),
+                            area: self.make_area(span),
+                        },
+                    );
+                }
+                Opcode::Neq { left, right, dest } => {
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Bool(!value_ops::equality(
+                                &self.get_reg(*left).value,
+                                &self.get_reg(*right).value,
+                                self,
+                            )),
+                            area: self.make_area(span),
+                        },
+                    );
+                }
                 Opcode::Gt { left, right, dest } => {
                     self.bop(value_ops::gt, func, ip, left, right, dest)?
                 }
@@ -239,16 +265,43 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::JumpIfFalse { src, to } => {
                     let span = self.get_span(func, ip);
-                    // println!("{:?}", self.get_reg(*src).value);
                     if !value_ops::to_bool(self.get_reg(*src), span, self)? {
                         ip = *to as usize;
                         continue;
                     }
                 }
                 Opcode::Ret { src } => todo!(),
-                Opcode::WrapMaybe { src, dest } => todo!(),
-                Opcode::LoadNone { dest } => todo!(),
-                Opcode::LoadEmpty { dest } => todo!(),
+                Opcode::WrapMaybe { src, dest } => {
+                    let v = self.deep_clone_reg(*src);
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Maybe(Some(v)),
+                            area: self.make_area(span),
+                        },
+                    )
+                }
+                Opcode::LoadNone { dest } => {
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Maybe(None),
+                            area: self.make_area(span),
+                        },
+                    )
+                }
+                Opcode::LoadEmpty { dest } => {
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Empty,
+                            area: self.make_area(span),
+                        },
+                    )
+                }
                 Opcode::Index { from, dest, index } => todo!(),
                 Opcode::Member { from, dest, member } => todo!(),
                 Opcode::Associated { from, dest, name } => todo!(),
@@ -288,6 +341,7 @@ impl<'a> Vm<'a> {
     {
         let span = self.get_span(func, ip);
         let value = op(self.get_reg(*left), self.get_reg(*right), span, self)?;
+
         self.set_reg(
             *dest,
             StoredValue {
