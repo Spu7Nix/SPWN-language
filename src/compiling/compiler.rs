@@ -151,7 +151,7 @@ impl<'a> Compiler<'a> {
             .functions
             .into_iter()
             .map(|v| {
-                let v = if true { // TODO: change this to a debug flag
+                let v = if true { // TODO: change this to a debug flag or #[no_bytecode_optimization] attribute
                     optimize_function(&v)
                 } else {
                     v
