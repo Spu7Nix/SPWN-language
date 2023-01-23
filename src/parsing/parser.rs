@@ -964,6 +964,7 @@ impl Parser<'_> {
                 area: self.make_area(self.span()),
             });
         }
+        self.skip_tok(Token::Eol);
             
         let stmt = if is_arrow {
             Statement::Arrow(Box::new(stmt.into_node(vec![], inner_span)))

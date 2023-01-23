@@ -36,6 +36,9 @@ pub enum Value {
 
     Builtins,
     Range(i64, i64, usize), //start, end, step
+
+    Maybe(Option<ValueKey>),
+    Empty,
 }
 
 impl std::fmt::Display for ValueType {
@@ -95,6 +98,11 @@ impl Value {
                     format!("{}..{}..{}", n1, s, n2)
                 }
             }
+            Value::Maybe(o) => match o {
+                Some(k) => format!("({})?", vm.memory[*k].value.runtime_display(vm)),
+                None => "?".into(),
+            },
+            Value::Empty => "()".into(),
         }
     }
 }
