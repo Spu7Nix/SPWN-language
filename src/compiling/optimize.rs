@@ -1,4 +1,5 @@
-use petgraph::Graph;
+use ahash::{HashMap, HashMapExt};
+use petgraph::{Graph, graph::NodeIndex};
 
 use crate::vm::opcodes::Opcode;
 use super::bytecode::Function;
@@ -13,52 +14,79 @@ pub fn optimize_function(func: &Function<usize>) -> Function<usize> {
 fn remove_unused(func: &Function<usize>) -> Function<usize> {
     type GraphNode = (usize, Opcode<usize>);
 
-    let mut write_graph = Graph::<GraphNode, GraphNode>::new();
-    let mut read_graph = Graph::<GraphNode, GraphNode>::new();
-    let mut jump_graph = Graph::<GraphNode, GraphNode>::new();
-    let mut constant_graph = Graph::<GraphNode, u16>::new();
+    let size = func.opcodes.len();
+
+    let mut write_graph = Graph::<GraphNode, ()>::new();
+    let mut read_graph = Graph::<GraphNode, ()>::new();
+    let mut jump_graph = Graph::<GraphNode, ()>::new();
+    let mut constant_graph = Graph::<GraphNode, ()>::new();
+
+    // vectors would be enough
+    let mut write_nodes = Vec::with_capacity(size);
+    let mut read_nodes = Vec::with_capacity(size);
+    let mut jump_nodes = Vec::with_capacity(size);
+    let mut constant_nodes = Vec::with_capacity(size);
+
+    // CREATE NODES
+    for (i, op) in func.opcodes.iter().copied().enumerate() {
+        let write_node = write_graph.add_node((i, op));
+        write_nodes.push(write_node);
+
+        let read_node = read_graph.add_node((i, op));
+        read_nodes.push(read_node);
+
+        let jump_node = jump_graph.add_node((i, op));
+        jump_nodes.push(jump_node);
+
+        let constant_node = constant_graph.add_node((i, op));
+        constant_nodes.push(constant_node);
+    }
+
+    macro_rules! unused {
+        ($( $variant:ident $tree:tt )*) => {
+            {
+                for (i, op) in func.opcodes.iter().copied().enumerate() {
+                    match op {
+                        $(
+                            unused!(@ $variant $tree) => unused!(= $variant $tree),
+                        )*
+                        _ => todo!("{:?}", op),
+                    };
+                }
+            }
+        };
+    
+        (@ $variant:ident { $($name:ident($typ:ident) $(,)?)* }) => {
+            Opcode::$variant { $($name,)* }
+        };
+
+        (= $variant:ident { $($name:ident($typ:ident) $(,)?)* }) => {
+            {
+                $(
+                    unused!(# $name($typ));
+                )*
+            }
+        };
+
+        (# $name:ident(read)) => {
+            drop($name);
+        };
+        (# $name:ident(write)) => {
+            drop($name);
+        };
+        (# $name:ident(jump)) => {
+            drop($name);
+        };
+        (# $name:ident(constant)) => {
+            drop($name);
+        };
+    }
 
     for (i, op) in func.opcodes.iter().copied().enumerate() {
         let write_node = write_graph.add_node((i, op));
         let read_node = read_graph.add_node((i, op));
         let jump_node = jump_graph.add_node((i, op));
         let constant_node = constant_graph.add_node((i, op));
-
-        macro_rules! unused {
-            ($( $variant:ident $tree:tt )*) => {
-                match op {
-                    $(
-                        unused!(@ $variant $tree) => unused!(= $variant $tree),
-                    )*
-                    _ => todo!("{:?}", op),
-                };
-            };
-        
-            (@ $variant:ident { $($name:ident($typ:ident) $(,)?)* }) => {
-                Opcode::$variant { $($name,)* }
-            };
-
-            (= $variant:ident { $($name:ident($typ:ident) $(,)?)* }) => {
-                {
-                    $(
-                        unused!(# $name($typ));
-                    )*
-                }
-            };
-
-            (# $name:ident(read)) => {
-                drop($name);
-            };
-            (# $name:ident(write)) => {
-                drop($name);
-            };
-            (# $name:ident(jump)) => {
-                drop($name);
-            };
-            (# $name:ident(constant)) => {
-                drop($name);
-            };
-        }
 
         unused!(
             LoadBuiltins { dest(write) }
@@ -68,8 +96,6 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
 
             Add { left(read), right(read), dest(write) }
             Sub { left(read), right(read), dest(write) }
-
-            // Assign {}
 
             Lt { left(read), right(read), dest(write) }
             Lte { left(read), right(read), dest(write) }
@@ -82,10 +108,6 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
             JumpIfFalse { src(read), to(jump) }
             Jump { to(jump) }
         );
-
-        // graph.extend_with_edges(&[
-        //     ((i, op), (registers, addresses))
-        // ]);
     }
 
     func.clone()
