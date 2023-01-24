@@ -110,6 +110,7 @@ impl RainbowColorGenerator {
     pub fn new(h: f64, s: f64, v: f64, hue_shift: f64) -> Self {
         Self { h, s, v, hue_shift }
     }
+
     pub fn next(&mut self) -> (u8, u8, u8) {
         let c = self.v * self.s;
         let h0 = self.h / 60.0;

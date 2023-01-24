@@ -12,18 +12,20 @@ mod util;
 mod vm;
 
 use std::cell::RefCell;
+use std::io::Write;
+use std::path::PathBuf;
 use std::rc::Rc;
-use std::{io::Write, path::PathBuf};
 
 use lasso::Rodeo;
 
 use crate::cli::FileSettings;
 use crate::compiling::compiler::Compiler;
-use crate::sources::BytecodeMap;
+use crate::lexing::tokens::Token;
+use crate::parsing::parser::Parser;
+use crate::sources::{BytecodeMap, SpwnSource};
 use crate::util::RandomState;
 use crate::vm::interpreter::Vm;
 use crate::vm::opcodes::{Opcode, Register};
-use crate::{lexing::tokens::Token, parsing::parser::Parser, sources::SpwnSource};
 
 fn main() {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
@@ -61,6 +63,8 @@ fn main() {
                     }
 
                     let mut vm = Vm::new(bytecode, Rc::clone(&interner));
+
+                    vm.push_func_regs(0);
 
                     match vm.run_func(0) {
                         Ok(_) => {}

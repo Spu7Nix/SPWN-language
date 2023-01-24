@@ -1,12 +1,11 @@
 use delve::EnumToStr;
 use lasso::Spur;
 
-use crate::{gd::ids::IDClass, lexing::tokens::Token, sources::CodeSpan};
-
-use super::{
-    attributes::{ExprAttribute, ScriptAttribute, StmtAttribute},
-    utils::operators::{AssignOp, BinOp, UnaryOp},
-};
+use super::attributes::{ExprAttribute, ScriptAttribute, StmtAttribute};
+use super::utils::operators::{AssignOp, BinOp, UnaryOp};
+use crate::gd::ids::IDClass;
+use crate::lexing::tokens::Token;
+use crate::sources::CodeSpan;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ImportType {
@@ -72,7 +71,7 @@ pub enum Expression {
     Call {
         base: ExprNode,
         params: Vec<ExprNode>,
-        named_params: Vec<(Spur, ExprNode)>,
+        named_params: Vec<(Spanned<Spur>, ExprNode)>,
     },
 
     Macro {
@@ -207,12 +206,14 @@ impl<T> Spanned<T> {
     pub fn split(self) -> (T, CodeSpan) {
         (self.value, self.span)
     }
+
     pub fn extended(self, other: CodeSpan) -> Self {
         Self {
             span: self.span.extend(other),
             ..self
         }
     }
+
     pub fn apply_fn<U, F: FnOnce(T) -> U>(self, f: F) -> Spanned<U> {
         f(self.value).spanned(self.span)
     }

@@ -1,28 +1,23 @@
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 use ahash::AHashMap;
 use lasso::Spur;
 use slotmap::{new_key_type, SlotMap};
 
-use crate::{
-    cli::FileSettings,
-    parsing::{
-        ast::{
-            ExprNode, Expression, ImportType, MacroCode, Spannable, Spanned, Statement, StmtNode,
-        },
-        attributes::ScriptAttribute,
-        parser::Parser,
-        utils::operators::{AssignOp, BinOp, UnaryOp},
-    },
-    sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource},
-    util::Interner,
-    vm::opcodes::Register,
+use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
+use super::error::CompilerError;
+use crate::cli::FileSettings;
+use crate::parsing::ast::{
+    ExprNode, Expression, ImportType, MacroCode, Spannable, Spanned, Statement, StmtNode,
 };
-
-use super::{
-    bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function},
-    error::CompilerError,
-};
+use crate::parsing::attributes::ScriptAttribute;
+use crate::parsing::parser::Parser;
+use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
+use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
+use crate::util::Interner;
+use crate::vm::opcodes::Register;
 
 pub type CompileResult<T> = Result<T, CompilerError>;
 
@@ -78,6 +73,7 @@ impl<'a> Compiler<'a> {
             file_attrs,
         }
     }
+
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
         CodeArea {
             span,
@@ -99,6 +95,7 @@ impl<'a> Compiler<'a> {
             },
         }
     }
+
     pub fn redef_var(&mut self, var: Spur, span: CodeSpan, scope: ScopeKey) {
         let scope = &mut self.scopes[scope];
         match scope.variables.get_mut(&var) {
@@ -110,6 +107,7 @@ impl<'a> Compiler<'a> {
             }
         }
     }
+
     pub fn new_var(&mut self, var: Spur, data: Variable, scope: ScopeKey) {
         self.scopes[scope].variables.insert(var, data);
     }
@@ -553,19 +551,17 @@ impl<'a> Compiler<'a> {
                     }
                 } else {
                     match self.find_scope_type(scope) {
-                        Some(ScopeType::MacroBody) => {
-                            let out_reg = builder.next_reg();
-                            match value {
-                                None => {
-                                    builder.load_empty(out_reg, stmt.span);
-                                    builder.ret(out_reg)
-                                }
-                                Some(expr) => {
-                                    self.compile_expr(expr, scope, builder)?;
-                                    builder.ret(out_reg)
-                                }
+                        Some(ScopeType::MacroBody) => match value {
+                            None => {
+                                let out_reg = builder.next_reg();
+                                builder.load_empty(out_reg, stmt.span);
+                                builder.ret(out_reg)
                             }
-                        }
+                            Some(expr) => {
+                                let ret_reg = self.compile_expr(expr, scope, builder)?;
+                                builder.ret(ret_reg)
+                            }
+                        },
                         _ => {
                             return Err(CompilerError::ReturnOutsideMacro {
                                 area: self.make_area(stmt.span),
@@ -755,7 +751,7 @@ impl<'a> Compiler<'a> {
                     |f| {
                         let mut variables = AHashMap::new();
 
-                        for (name, _, _) in args {
+                        for (name, ..) in args {
                             variables.insert(
                                 name.value,
                                 Variable {
@@ -767,7 +763,7 @@ impl<'a> Compiler<'a> {
                         }
 
                         let base_scope = self.scopes.insert(Scope {
-                            parent: None,
+                            parent: Some(scope),
                             variables,
                             typ: Some(ScopeType::MacroBody),
                         });
@@ -816,12 +812,51 @@ impl<'a> Compiler<'a> {
                 params,
                 named_params,
             } => {
-                /*
+                let base_reg = self.compile_expr(base, scope, builder)?;
+                let args_reg = builder.next_reg();
+                builder.new_array(
+                    2,
+                    args_reg,
+                    |builder, elems| {
+                        let params_reg = builder.next_reg();
+                        builder.new_array(
+                            params.len() as u16,
+                            params_reg,
+                            |builder, elems| {
+                                for i in params {
+                                    elems.push(self.compile_expr(i, scope, builder)?);
+                                }
+                                Ok(())
+                            },
+                            expr.span,
+                        )?;
 
-                    // icopy ...
-                    // icopy ...
-                    // icopy ...
-                */
+                        let named_params_reg = builder.next_reg();
+                        builder.new_dict(
+                            named_params.len() as u16,
+                            named_params_reg,
+                            |builder, elems| {
+                                for (name, param) in named_params {
+                                    let value_reg = self.compile_expr(param, scope, builder)?;
+
+                                    elems.push((
+                                        self.resolve(&name.value).spanned(name.span),
+                                        value_reg,
+                                    ));
+                                }
+                                Ok(())
+                            },
+                            expr.span,
+                        )?;
+
+                        elems.push(params_reg);
+                        elems.push(named_params_reg);
+
+                        Ok(())
+                    },
+                    expr.span,
+                )?;
+                builder.call(base_reg, out_reg, args_reg, expr.span);
             }
             Expression::MacroPattern { args, ret_type } => todo!(),
             Expression::TriggerFunc { attributes, code } => todo!(),

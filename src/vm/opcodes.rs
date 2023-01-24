@@ -1,11 +1,8 @@
 use std::fmt::Display;
 
-use serde::{
-    de::{Error, Visitor},
-    Deserialize, Serialize,
-};
-
 use delve::{EnumDisplay, EnumFields, EnumToStr, EnumVariantNames};
+use serde::de::{Error, Visitor};
+use serde::{Deserialize, Serialize};
 
 struct OpcodeVisitor;
 
@@ -71,7 +68,6 @@ macro_rules! opcodes {
         #[derive(
             Clone,
             Copy,
-            Default,
             PartialEq,
             Eq,
             Debug,
@@ -139,12 +135,8 @@ opcodes! {
     Print { => reg },
     // LoadBuiltin {},
 
-    #[delve(display = |f: &R, t: &R| format!("R{f} -> R{t}"))]
-    InterdimensionalCopy { => from, => to },
-
-    Call {
-        funtion: FunctionID,
-    },
+    #[delve(display = |b: &R, a: &R, d: &R| format!("R{b}(args R{a}) -> R{d}"))]
+    Call { => base, => args, => dest },
 
     #[delve(display = |s: &AllocSize, d: &R| format!("[...; {s}] -> R{d}"))]
     AllocArray {
@@ -281,7 +273,6 @@ opcodes! {
     #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} -> R{d}"))]
     Associated { => from, => dest, => name },
 
-    #[default]
     #[delve(display = || "yeet".to_string())]
     YeetContext,
     #[delve(display = |to: &JumpPos| format!("skip to {to}"))]

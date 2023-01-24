@@ -1,9 +1,13 @@
-use std::{fs, ops::Range, path::PathBuf};
+use std::fs;
+use std::ops::Range;
+use std::path::PathBuf;
 
 use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::{compiling::bytecode::Bytecode, util::hyperlink, vm::opcodes::Register};
+use crate::compiling::bytecode::Bytecode;
+use crate::util::hyperlink;
+use crate::vm::opcodes::Register;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpwnSource {
@@ -17,21 +21,25 @@ impl SpwnSource {
             span,
         }
     }
+
     pub fn name(&self) -> String {
         match self {
             SpwnSource::File(f) => f.display().to_string(),
         }
     }
+
     pub fn read(&self) -> Option<String> {
         match self {
             SpwnSource::File(p) => fs::read_to_string(p).ok(),
         }
     }
+
     pub fn path(&self) -> String {
         match self {
             SpwnSource::File(f) => fs::canonicalize(f).unwrap().to_str().unwrap().into(),
         }
     }
+
     pub fn hyperlink(&self) -> String {
         match self {
             SpwnSource::File(_) => hyperlink(self.path(), Some(self.name())),
@@ -78,6 +86,7 @@ impl CodeSpan {
     pub fn internal() -> CodeSpan {
         CodeSpan { start: 0, end: 0 }
     }
+
     pub fn invalid() -> CodeSpan {
         CodeSpan { start: 1, end: 0 }
     }

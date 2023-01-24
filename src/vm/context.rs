@@ -1,5 +1,4 @@
-use std::cmp::Ordering;
-use std::cmp::PartialOrd;
+use std::cmp::{Ordering, PartialOrd};
 
 use crate::gd::ids::Id;
 

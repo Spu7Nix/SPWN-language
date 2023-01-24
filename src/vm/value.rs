@@ -4,12 +4,11 @@ use ahash::AHashMap;
 use lasso::Spur;
 use strum::EnumDiscriminants;
 
-use crate::{compiling::bytecode::Constant, gd::ids::*, sources::CodeArea};
-
-use super::{
-    interpreter::{ValueKey, Vm},
-    opcodes::FunctionID,
-};
+use super::interpreter::{ValueKey, Vm};
+use super::opcodes::FunctionID;
+use crate::compiling::bytecode::Constant;
+use crate::gd::ids::*;
+use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {

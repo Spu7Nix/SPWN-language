@@ -1,15 +1,12 @@
 use ahash::AHashMap;
 use paste::paste;
 
+use super::ast::{Expression, Spanned};
 use crate::lexing::tokens::Token;
-use crate::parsing::{
-    error::SyntaxError,
-    parser::{ParseResult, Parser},
-};
+use crate::parsing::error::SyntaxError;
+use crate::parsing::parser::{ParseResult, Parser};
 use crate::util::hyperlink;
 use crate::SpwnSource;
-
-use super::ast::{Expression, Spanned};
 
 pub trait ParseAttribute {
     fn parse(parser: &mut Parser<'_>) -> ParseResult<Self>

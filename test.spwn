@@ -1,22 +1,12 @@
 #[debug_bytecode]
 
+let cock = 1
 
-// import "test2.spwn";
-// if 3 > 4 {
-//   print("3 is greater than 4")
-// } else {
-//   print("3 is not greater than 4")
-// }
-
-
-cock = (a: 69, b: 1337 = 420) {
-    let a = 5;
-    print a + b
+shit = (n) {
+    print n;
+    print cock;
 }
 
-print cock;
-
-
-// funny(a, b)
+shit(69);
 
 

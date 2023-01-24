@@ -1,13 +1,8 @@
-use crate::{
-    parsing::utils::operators::{BinOp, UnaryOp},
-    sources::CodeSpan,
-};
-
-use super::{
-    error::RuntimeError,
-    interpreter::{RuntimeResult, Vm},
-    value::{StoredValue, Value, ValueType},
-};
+use super::error::RuntimeError;
+use super::interpreter::{RuntimeResult, Vm};
+use super::value::{StoredValue, Value, ValueType};
+use crate::parsing::utils::operators::{BinOp, UnaryOp};
+use crate::sources::CodeSpan;
 
 pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<bool> {
     Ok(match &v.value {
@@ -307,6 +302,78 @@ pub fn range(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runti
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Range,
+                area: vm.make_area(span),
+            })
+        }
+    })
+}
+
+pub fn bin_and(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+    Ok(match (&a.value, &b.value) {
+        (Value::Int(a), Value::Int(b)) => Value::Int(*a & *b),
+        (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a & *b),
+
+        _ => {
+            return Err(RuntimeError::InvalidOperands {
+                a: (a.value.get_type(), a.area.clone()),
+                b: (b.value.get_type(), b.area.clone()),
+                op: BinOp::BinAnd,
+                area: vm.make_area(span),
+            })
+        }
+    })
+}
+
+pub fn bin_or(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+    Ok(match (&a.value, &b.value) {
+        (Value::Int(a), Value::Int(b)) => Value::Int(*a | *b),
+        (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a | *b),
+
+        _ => {
+            return Err(RuntimeError::InvalidOperands {
+                a: (a.value.get_type(), a.area.clone()),
+                b: (b.value.get_type(), b.area.clone()),
+                op: BinOp::BinOr,
+                area: vm.make_area(span),
+            })
+        }
+    })
+}
+
+pub fn shift_left(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+) -> RuntimeResult<Value> {
+    Ok(match (&a.value, &b.value) {
+        (Value::Int(a), Value::Int(b)) => Value::Int(*a << *b),
+
+        _ => {
+            return Err(RuntimeError::InvalidOperands {
+                a: (a.value.get_type(), a.area.clone()),
+                b: (b.value.get_type(), b.area.clone()),
+                op: BinOp::BinOr,
+                area: vm.make_area(span),
+            })
+        }
+    })
+}
+
+pub fn shift_right(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+) -> RuntimeResult<Value> {
+    Ok(match (&a.value, &b.value) {
+        (Value::Int(a), Value::Int(b)) => Value::Int(*a >> *b),
+
+        _ => {
+            return Err(RuntimeError::InvalidOperands {
+                a: (a.value.get_type(), a.area.clone()),
+                b: (b.value.get_type(), b.area.clone()),
+                op: BinOp::BinOr,
                 area: vm.make_area(span),
             })
         }

@@ -1,11 +1,9 @@
 use std::string::ToString;
 
+use super::value::ValueType;
 use crate::error_maker;
-use crate::lexing::tokens::Token;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;
-
-use super::value::ValueType;
 
 error_maker! {
     Title: "Runtime Error"
@@ -53,6 +51,49 @@ error_maker! {
             v: (ValueType, CodeArea),
             area: CodeArea,
             expected: ValueType,
+        },
+
+        /////////
+        #[
+            Message: "Too many arguments", Note: None;
+            Labels: [
+                call_area => "Received {} arguments, expected {}": call_arg_amount, macro_arg_amount;
+                macro_def_area => "Macro defined to take {} arguments here": macro_arg_amount;
+            ]
+        ]
+        TooManyArguments {
+            call_area: CodeArea,
+            macro_def_area: CodeArea,
+            macro_arg_amount: usize,
+            call_arg_amount: usize,
+        },
+
+        /////////
+        #[
+            Message: "Nonexistent argument", Note: None;
+            Labels: [
+                call_area => "Argument `{}` does not exist": arg_name;
+                macro_def_area => "Macro defined here";
+            ]
+        ]
+        NonexistentArgument {
+            call_area: CodeArea,
+            macro_def_area: CodeArea,
+            arg_name: String,
+        },
+
+        /////////
+        #[
+            Message: "Argument not satisfied", Note: None;
+            Labels: [
+                call_area => "Argument `{}` not satisfied": arg_name;
+                macro_def_area => "Macro defined here";
+            ]
+        ]
+        ArgumentNotSatisfied {
+            call_area: CodeArea,
+            macro_def_area: CodeArea,
+            arg_name: String,
         },
     }
 }
