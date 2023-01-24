@@ -1,3 +1,6 @@
+// CURRENT PROBLEM:
+// - reading variables in a sub-macro isn't possible if optimized
+
 use ahash::{HashMap, HashMapExt};
 
 use crate::vm::opcodes::Opcode;
@@ -22,42 +25,6 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
     let mut write = [false; 1024]; // I guess 1024 are enough atm
     let mut read = [false; 1024]; // we may change these to hashmaps or something, idk
 
-    for op in &func.opcodes {
-        match *op {
-            Opcode::LoadBuiltins { dest } => write[dest] = true,
-            Opcode::LoadConst { dest, id: _ } => write[dest] = true,
-            Opcode::LoadEmpty { dest } => write[dest] = true,
-            Opcode::LoadNone { dest } => write[dest] = true,
-            Opcode::Add { left, right, dest } => {
-                read[left] = true;
-                read[right] = true;
-                write[dest] = true;
-            }
-            Opcode::Sub { left, right, dest } => {
-                read[left] = true;
-                read[right] = true;
-                write[dest] = true;
-            }
-            Opcode::Copy { from, to } => {
-                read[from] = true;
-                write[to] = true;
-            }
-            Opcode::Print { reg } => {
-                read[reg] = true;
-            }
-            Opcode::JumpIfFalse { src, to: _ } => read[src] = true,
-            Opcode::Jump { to: _ } => {}
-            Opcode::Lt { left, right, dest } => {
-                read[left] = true;
-                read[right] = true;
-                write[dest] = true; 
-            }
-            _ => {
-                println!("OPTIMIZATION: UNIMPLEMENTED OPERATOR [{:?}]", op);
-            },
-        }
-    }
-
     let mut registers: HashMap<usize, usize> = HashMap::new();
     let mut next_register = 0;
     let mut get_reg = |reg| {
@@ -71,49 +38,177 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
             actual_reg
         }
     };
-    let is_used = |reg| {
-        match (read[reg], write[reg]) {
-            (true, true) => true,
-            (true, false) => false, // unreachable!(),
-            (false, true) => false,
-            (false, false) => false,
-        }
-    };
-    
-    let opcodes = func.opcodes.iter().copied().map(|op| match op {
-        Opcode::LoadBuiltins { dest } =>
-            is_used(dest).then(|| Opcode::LoadBuiltins { dest: get_reg(dest) }),
-        Opcode::LoadConst { dest, id } =>
-            is_used(dest).then(|| Opcode::LoadConst { dest: get_reg(dest), id }),
-        Opcode::LoadEmpty { dest } =>
-            is_used(dest).then(|| Opcode::LoadEmpty { dest: get_reg(dest) }),
-        Opcode::LoadNone { dest } => 
-            is_used(dest).then(|| Opcode::LoadNone { dest: get_reg(dest) }),
-        Opcode::Add { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Add { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Sub { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Sub { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Lt { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Lt { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Lte { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Lte { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Gt { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Gt { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Gte { left, right, dest } =>
-            is_used(dest).then(|| Opcode::Gte { left: get_reg(left), right: get_reg(right), dest: get_reg(dest) }),
-        Opcode::Copy { from, to } =>
-            is_used(to).then(|| Opcode::Copy { from: get_reg(from), to: get_reg(to) }),
-        Opcode::Print { reg } => Some(Opcode::Print { reg: get_reg(reg) }),
-        Opcode::JumpIfFalse { src, to } => Some(Opcode::JumpIfFalse { src: get_reg(src), to }),
-        Opcode::Jump { to } => Some(Opcode::Jump { to }),
-        _ => {
-            println!("OPTIMIZATION: UNIMPLEMENTED OPERATOR [{:?}]", op);
-            Some(op)
-        },
-    })
-    .collect::<Vec<_>>();
 
-    let mut output = Function { opcodes: vec![] };
+    macro_rules! opcode {
+        ($( $bytecode:ident { $( $var:ident($typ:ident) )* } )*) => {
+            {
+                for op in &func.opcodes {
+                    opcode!(
+                        READ/WRITE
+                        op
+                        $(
+                            $bytecode { $( $var($typ) )* }
+                        )*
+                    );
+                }
+
+                let is_used = |reg| {
+                    match (read[reg], write[reg]) {
+                        (true, true) => true,
+                        (true, false) => false, // unreachable!(),
+                        (false, true) => false,
+                        (false, false) => false,
+                    }
+                };
+
+                func.opcodes
+                    .iter()
+                    .copied()
+                    .map(|op|
+                        opcode!(
+                            UNUSED
+                            op
+                            is_used
+                            $(
+                                $bytecode { $( $var($typ) )* }
+                            )*
+                        )
+                    )
+                    .collect()
+            }
+        };
+
+        (READ/WRITE $op:ident $( $bytecode:ident { $( $var:ident($typ:ident) )* } )*) => {
+            match *$op {
+                $(
+                    #[allow(unused_variables)]
+                    Opcode::$bytecode { $( $var, )* } => {
+                        $(
+                            opcode!(#READ/WRITE $var $typ);
+                        )*
+                    },
+                )*
+                _ => opcode!(UNIMPLEMENTED $op),
+            }
+        };
+        (#READ/WRITE $var:ident read) => { read[$var] = true; };
+        (#READ/WRITE $var:ident write) => { write[$var] = true; };
+        (#READ/WRITE $var:ident $_:ident) => {};
+
+        (UNUSED $op:ident $is_used:ident $( $bytecode:ident { $( $var:ident($typ:ident) )* } )*) => {
+            match $op {
+                $(
+                    Opcode::$bytecode { $( $var, )* } => [$(opcode!(#IS_USED $is_used $var($typ)),)*].iter().all(|v| *v == true).then(|| Opcode::$bytecode {
+                        $(
+                            $var: opcode!(#UNUSED $var($typ)),
+                        )*
+                    }),
+                )*
+                _ => {
+                    opcode!(UNIMPLEMENTED $op);
+                    Some($op)
+                },
+            }
+        };
+        (#UNUSED $var:ident(read)) => { get_reg($var) };
+        (#UNUSED $var:ident(write)) => { get_reg($var) };
+        (#UNUSED $var:ident($_:ident)) => { $var };
+
+        (#IS_USED $is_used:ident $var:ident(write)) => { $is_used($var) };
+        (#IS_USED $is_used:ident $var:ident($_:ident)) => { true };
+
+        (UNIMPLEMENTED $op:ident) => {
+            println!("OPTIMIZATION: UNIMPLEMENTED OPERATOR [{:?}]", $op)
+        };
+    }
+
+    let opcodes: Vec<Option<Opcode<usize>>> = opcode!(
+        LoadConst { id(constant) dest(write) }
+
+        Copy { from(read) to(write) }
+        Print { reg(read) }
+
+        Call { base(ignore) args(ignore) dest(write) }
+
+        AllocArray { size(ignore) dest(write) }
+        AllocDict { size(ignore) dest(write) }
+
+        PushArrayElem { elem(read) dest(write) }
+        PushDictElem { elem(read) key(ignore) dest(write) }
+
+        CreateMacro { id(ignore) dest(write)  }
+        PushMacroArg { name(read) dest(write) }
+        SetMacroArgDefault { src(read) dest(write) }
+        SetMacroArgPattern { src(read) dest(write) }
+
+        Add { left(read) right(read) dest(write) }
+        Sub { left(read) right(read) dest(write) }
+        Mult { left(read) right(read) dest(write) }
+        Div { left(read) right(read) dest(write) }
+        Mod { left(read) right(read) dest(write) }
+        Pow { left(read) right(read) dest(write) }
+        ShiftLeft { left(read) right(read) dest(write) }
+        ShiftRight { left(read) right(read) dest(write) }
+        BinOr { left(read) right(read) dest(write) }
+        BinAnd { left(read) right(read) dest(write) }
+
+        // TODO: this requires an operator to be both read and write, which isn't implemented yet
+        // AddEq { left(read) right(read) dest(write) }
+        // SubEq { left(read) right(read) dest(write) }
+        // MultEq { left(read) right(read) dest(write) }
+        // DivEq { left(read) right(read) dest(write) }
+        // ModEq { left(read) right(read) dest(write) }
+        // PowEq { left(read) right(read) dest(write) }
+        // ShiftLeftEq { left(read) right(read) dest(write) }
+        // ShiftRightEq { left(read) right(read) dest(write) }
+        // BinOrEq { left(read) right(read) dest(write) }
+        // BinAndEq { left(read) right(read) dest(write) }
+
+        Not { src(read) dest(write) }
+        Negate { src(read) dest(write) }
+        BinNot { src(read) dest(write) }
+
+        Eq { left(read) right(read) dest(write) }
+        Neq { left(read) right(read) dest(write) }
+
+        Gt { left(read) right(read) dest(write) }
+        Lt { left(read) right(read) dest(write) }
+        Gte { left(read) right(read) dest(write) }
+        Lte { left(read) right(read) dest(write) }
+
+        Range { left(read) right(read) dest(write) }
+        In { left(read) right(read) dest(write) }
+        As { left(read) right(read) dest(write) }
+        Is { left(read) right(read) dest(write) }
+
+        And { left(read) right(read) dest(write) }
+        Or { left(read) right(read) dest(write) }
+
+        Jump { to(jump) }
+        JumpIfFalse { src(read) to(jump) }
+
+        Ret { src(read) }
+
+        WrapMaybe { src(read) dest(write) }
+        LoadNone { dest(write) }
+        LoadEmpty { dest(write) }
+
+        Index { from(read) dest(write) index(read) }
+        Member { from(read) dest(write) member(read) }
+        Associated { from(read) dest(write) name(read) }
+
+        // empty enum?
+        // YeetContext
+        EnterArrowStatement { skip_to(jump) }
+
+        LoadBuiltins { dest(write) }
+        
+        Export { src(read) }
+    );
+
+    let mut output = func.clone();
+    output.opcodes.clear();
+    output.regs_used = read.clone().iter().filter(|v| **v).count();
 
     // fix jumps
     for (_i, op) in opcodes.iter().enumerate().filter_map(|(i, v)| v.map(|v| (i, v))) {

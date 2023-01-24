@@ -8,6 +8,7 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
 use super::error::CompilerError;
+use super::optimize::optimize_function;
 use crate::cli::FileSettings;
 use crate::parsing::ast::{
     ExprNode, Expression, ImportType, MacroCode, Spannable, Spanned, Statement, StmtNode,
@@ -164,10 +165,9 @@ impl<'a> Compiler<'a> {
             .functions
             .into_iter()
             .map(|f| {
-                // let v = if true { // TODO: change this to a debug flag or #[no_bytecode_optimization] attribute
-                //     optimize_function(&v)
-                // } else {
-                //     v
+                // let f = match self.file_attrs.no_optimize_bytecode {
+                //     false => optimize_function(&f),
+                //     true => f,
                 // };
 
                 let opcodes = f
