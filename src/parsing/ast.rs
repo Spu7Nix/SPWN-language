@@ -5,7 +5,7 @@ use crate::{gd::ids::IDClass, lexing::tokens::Token, sources::CodeSpan};
 
 use super::{
     attributes::{ExprAttribute, ScriptAttribute, StmtAttribute},
-    utils::operators::{BinOp, UnaryOp},
+    utils::operators::{AssignOp, BinOp, UnaryOp},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -115,6 +115,8 @@ pub enum Expression {
 pub enum Statement {
     Expr(ExprNode),
     Let(ExprNode, ExprNode),
+    AssignOp(ExprNode, AssignOp, ExprNode),
+
     If {
         branches: Vec<(ExprNode, Statements)>,
         else_branch: Option<Statements>,

@@ -13,7 +13,7 @@ use crate::{
     parsing::ast::{Spannable, Spanned},
     sources::{CodeSpan, SpwnSource},
     util::Digest,
-    vm::opcodes::{Opcode, Register, UnoptOpcode, UnoptRegister},
+    vm::opcodes::{FunctionID, Opcode, Register, UnoptOpcode, UnoptRegister},
 };
 
 use super::compiler::CompileResult;
@@ -25,6 +25,11 @@ where
     R: Display + Copy,
 {
     pub opcodes: Vec<Opcode<R>>,
+    // always 0 for unoptimised bytecode
+    // populated only after optimisation
+    pub regs_used: usize,
+
+    pub arg_amount: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,6 +45,8 @@ where
 
     pub functions: Vec<Function<R>>,
     pub opcode_span_map: AHashMap<(usize, usize), CodeSpan>,
+
+    pub export_names: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -163,6 +170,8 @@ impl BlockContent {
 
 struct ProtoFunc {
     code: Block,
+    used_regs: usize,
+    arg_amount: usize,
 }
 
 new_key_type! {
@@ -179,8 +188,6 @@ pub struct FuncBuilder<'a> {
 
     func: usize,
     pub block_path: Vec<usize>,
-
-    used_regs: usize,
 }
 
 impl BytecodeBuilder {
@@ -191,7 +198,7 @@ impl BytecodeBuilder {
         }
     }
 
-    pub fn new_func<F>(&mut self, f: F) -> CompileResult<()>
+    pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
     where
         F: FnOnce(&mut FuncBuilder) -> CompileResult<()>,
     {
@@ -200,20 +207,24 @@ impl BytecodeBuilder {
                 path: vec![],
                 content: vec![BlockContent::Code(vec![])],
             },
+            used_regs: 0,
+            arg_amount,
         };
+        let func_id = self.funcs.len();
         self.funcs.push(new_func);
 
         let mut func_builder = FuncBuilder {
             func: self.funcs.len() - 1,
             code_builder: self,
             block_path: vec![],
-            used_regs: 0,
         };
 
-        f(&mut func_builder)
+        f(&mut func_builder)?;
+
+        Ok(func_id as FunctionID)
     }
 
-    pub fn build(self, src: &SpwnSource) -> Bytecode<UnoptRegister> {
+    pub fn build(self, src: &SpwnSource, global_returns: Vec<String>) -> Bytecode<UnoptRegister> {
         let mut const_index_map = SecondaryMap::default();
 
         let consts = self
@@ -324,7 +335,11 @@ impl BytecodeBuilder {
                 &const_index_map,
             );
 
-            functions.push(Function { opcodes })
+            functions.push(Function {
+                opcodes,
+                regs_used: f.used_regs,
+                arg_amount: f.arg_amount,
+            })
         }
 
         let hash = md5::compute(src.read().unwrap());
@@ -335,6 +350,7 @@ impl BytecodeBuilder {
             consts,
             functions,
             opcode_span_map,
+            export_names: global_returns, //todo
         }
     }
 }
@@ -364,10 +380,11 @@ impl<'a> FuncBuilder<'a> {
     }
 
     pub fn next_reg(&mut self) -> UnoptRegister {
-        let old = self.used_regs;
+        let used_regs = &mut self.code_builder.funcs[self.func].used_regs;
 
-        self.used_regs = self
-            .used_regs
+        let old = *used_regs;
+
+        *used_regs = used_regs
             .checked_add(1)
             .expect("sil;ly goober used too mnay regusters!!!! i🙌!");
 
@@ -393,18 +410,23 @@ impl<'a> FuncBuilder<'a> {
                 code_builder: self.code_builder,
                 func: self.func,
                 block_path: new_path,
-                used_regs: self.used_regs,
             }
         };
 
         f(&mut func_builder)?;
 
-        self.used_regs = func_builder.used_regs;
         self.current_block()
             .content
             .push(BlockContent::Code(vec![]));
 
         Ok(())
+    }
+
+    pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
+    where
+        F: FnOnce(&mut FuncBuilder) -> CompileResult<()>,
+    {
+        self.code_builder.new_func(f, arg_amount)
     }
 
     pub fn new_array<F>(
@@ -466,6 +488,59 @@ impl<'a> FuncBuilder<'a> {
                 dest,
             }))
         }
+
+        Ok(())
+    }
+
+    pub fn new_macro<F>(
+        &mut self,
+        id: FunctionID,
+        dest: UnoptRegister,
+        f: F,
+        span: CodeSpan,
+    ) -> CompileResult<()>
+    where
+        F: FnOnce(
+            &mut FuncBuilder,
+            &mut Vec<(
+                Spanned<String>,
+                Option<UnoptRegister>,
+                Option<UnoptRegister>,
+            )>,
+        ) -> CompileResult<()>,
+    {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::CreateMacro { id, dest }),
+            span,
+        );
+
+        let mut items = vec![];
+        f(self, &mut items)?;
+
+        for (n, pat, def) in items {
+            let name_reg = self.next_reg();
+            self.load_string(n.value, name_reg, n.span);
+
+            self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushMacroArg {
+                name: name_reg,
+                dest,
+            }));
+
+            if let Some(p) = pat {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
+                    src: p,
+                    dest,
+                }));
+            }
+            if let Some(d) = def {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgDefault {
+                    src: d,
+                    dest,
+                }));
+            }
+        }
+
+        // https://youtu.be/bJdK0mSRAOg
 
         Ok(())
     }
@@ -923,6 +998,12 @@ where
             .max()
             .unwrap_or(2);
 
+        println!(
+            "{0} {1} {0}",
+            "======".bright_yellow().bold(),
+            self.src.name().bright_yellow().bold()
+        );
+
         println!("{}: {:?}\n", "Constants".bright_cyan().bold(), self.consts);
 
         let mut colors = RainbowColorGenerator::new(150.0, 0.4, 0.9, 60.0);
@@ -971,12 +1052,26 @@ where
 
                 let opcode_str = match self.opcode_span_map.get(&(func_i, opcode_i)) {
                     Some(span) => {
-                        let s = format!("{:?}", &code[span.start..span.end]);
-                        format!("({}..{}), {}", span.start, span.end, &s[1..s.len() - 1])
+                        let mut s = format!("{:?}", &code[span.start..span.end]);
+                        s = s[1..s.len() - 1].into();
+                        let last_char = &s[s.len() - 1..s.len()];
+
+                        if s.len() > 15 {
+                            s = format!(
+                                "{} ... {}",
+                                &s[..15].bright_cyan().underline(),
+                                last_char.bright_cyan().underline()
+                            );
+                        } else {
+                            s = s.bright_cyan().underline().to_string();
+                        }
+
+                        format!("({}..{}) {}", span.start, span.end, s)
                     }
                     None => "".into(),
                 };
-                let o_len = opcode_str.len();
+
+                let o_len = clear_ansi(&opcode_str).len();
 
                 if f_len > longest_formatted {
                     longest_formatted = f_len;
@@ -1026,12 +1121,13 @@ where
             println!(
                 "{}",
                 format!(
-                    "╭────┤ Function {} ├{}┬{}┬{}╮",
+                    "╭────┤ Function {} ├{}┬{}┬{}╮ registers used: {}",
                     func_i,
                     "─".repeat(longest_formatted + max_num_width + 10),
                     "─".repeat(longest_span + 4),
                     // bytecode will never be more than 15 characters (2 spaces padding on either side, 2 hex chars + 1 space * 4)
                     "─".repeat(15),
+                    func.regs_used,
                 )
                 .bright_yellow()
             );

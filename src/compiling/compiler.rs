@@ -5,11 +5,14 @@ use lasso::Spur;
 use slotmap::{new_key_type, SlotMap};
 
 use crate::{
+    cli::FileSettings,
     parsing::{
-        ast::{ExprNode, Expression, ImportType, Spannable, Spanned, Statement, StmtNode},
+        ast::{
+            ExprNode, Expression, ImportType, MacroCode, Spannable, Spanned, Statement, StmtNode,
+        },
         attributes::ScriptAttribute,
         parser::Parser,
-        utils::operators::{BinOp, UnaryOp},
+        utils::operators::{AssignOp, BinOp, UnaryOp},
     },
     sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource},
     util::Interner,
@@ -18,7 +21,7 @@ use crate::{
 
 use super::{
     bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function},
-    error::CompilerError, optimize::optimize_function,
+    error::CompilerError,
 };
 
 pub type CompileResult<T> = Result<T, CompilerError>;
@@ -45,7 +48,6 @@ pub struct Scope {
     parent: Option<ScopeKey>,
     variables: AHashMap<Spur, Variable>,
     typ: Option<ScopeType>,
-    // captures: Vec<Spur>,
 }
 
 pub struct Compiler<'a> {
@@ -57,7 +59,7 @@ pub struct Compiler<'a> {
 
     global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
 
-    file_attrs: &'a Vec<ScriptAttribute>,
+    file_attrs: &'a FileSettings,
 }
 
 impl<'a> Compiler<'a> {
@@ -65,7 +67,7 @@ impl<'a> Compiler<'a> {
         interner: Rc<RefCell<Interner>>,
         src: SpwnSource,
         map: &'a mut BytecodeMap,
-        file_attrs: &'a Vec<ScriptAttribute>,
+        file_attrs: &'a FileSettings,
     ) -> Self {
         Self {
             interner,
@@ -135,33 +137,51 @@ impl<'a> Compiler<'a> {
         let mut builder = BytecodeBuilder::new();
 
         // func 0 ("global")
-        builder.new_func(|f| {
-            let base_scope = self.scopes.insert(Scope {
-                parent: None,
-                variables: AHashMap::new(),
-                typ: Some(ScopeType::Global),
-            });
+        builder.new_func(
+            |f| {
+                let base_scope = self.scopes.insert(Scope {
+                    parent: None,
+                    variables: AHashMap::new(),
+                    typ: Some(ScopeType::Global),
+                });
 
-            self.compile_stmts(&stmts, base_scope, f)
-        })?;
+                self.compile_stmts(&stmts, base_scope, f)
+            },
+            0,
+        )?;
 
-        let unopt_code = builder.build(&self.src);
+        let unopt_code = builder.build(
+            &self.src,
+            match &self.global_return {
+                Some(v) => {
+                    v.0.iter()
+                        .map(|s| self.interner.borrow().resolve(&s.value).into())
+                        .collect()
+                }
+                None => vec![],
+            },
+        );
 
         let functions = unopt_code
             .functions
             .into_iter()
-            .map(|v| {
-                let v = if true { // TODO: change this to a debug flag or #[no_bytecode_optimization] attribute
-                    optimize_function(&v)
-                } else {
-                    v
-                };
+            .map(|f| {
+                // let v = if true { // TODO: change this to a debug flag or #[no_bytecode_optimization] attribute
+                //     optimize_function(&v)
+                // } else {
+                //     v
+                // };
 
-                let opcodes = v.opcodes
+                let opcodes = f
+                    .opcodes
                     .into_iter()
                     .map(|opcode| opcode.try_into().expect("usize too big for u8"))
                     .collect();
-                Function { opcodes }
+                Function {
+                    opcodes,
+                    regs_used: f.regs_used,
+                    arg_amount: f.arg_amount,
+                }
             })
             .collect();
 
@@ -173,6 +193,7 @@ impl<'a> Compiler<'a> {
                 consts: unopt_code.consts,
                 functions,
                 opcode_span_map: unopt_code.opcode_span_map,
+                export_names: unopt_code.export_names,
             },
         );
 
@@ -251,11 +272,14 @@ impl<'a> Compiler<'a> {
 
         match parser.parse() {
             Ok(ast) => {
+                let mut file_settings = FileSettings::default();
+                file_settings.apply_attributes(&ast.file_attributes);
+
                 let mut compiler = Compiler::new(
                     Rc::clone(&self.interner),
                     parser.src,
                     self.map,
-                    &ast.file_attributes,
+                    &file_settings,
                 );
 
                 match compiler.compile(ast.statements) {
@@ -263,7 +287,7 @@ impl<'a> Compiler<'a> {
                         let bytes = bincode::serialize(&bytecode).unwrap();
 
                         // dont write bytecode if caching is disabled
-                        if !self.file_attrs.contains(&ScriptAttribute::NoBytecodeCache) {
+                        if !self.file_attrs.no_bytecode_cache {
                             let _ = std::fs::create_dir(import_base.join(".spwnc"));
                             std::fs::write(
                                 import_base.join(format!(".spwnc/{}.spwnc", name)),
@@ -271,8 +295,6 @@ impl<'a> Compiler<'a> {
                             )
                             .unwrap();
                         }
-
-                        //println!("written {}.spwnc", name);
                     }
                     Err(err) => return Err(err),
                 }
@@ -328,6 +350,98 @@ impl<'a> Compiler<'a> {
                     builder.copy(expr_reg, var_reg, stmt.span);
                 }
                 _ => todo!("haha 😂😂😂😂"),
+            },
+            Statement::AssignOp(left, op, right) => match op {
+                AssignOp::Assign => match *left.expr {
+                    Expression::Var(s) => match self.get_var(s, scope) {
+                        Some(var) => {
+                            if var.mutable {
+                                self.redef_var(s, stmt.span, scope);
+                                let expr_reg = self.compile_expr(right, scope, builder)?;
+
+                                builder.copy(expr_reg, var.reg, stmt.span);
+                            } else {
+                                return Err(CompilerError::ImmutableAssign {
+                                    area: self.make_area(stmt.span),
+                                    def_area: self.make_area(var.def_span),
+                                    var: self.resolve(&s),
+                                });
+                            }
+                        }
+                        None => {
+                            let var_reg = builder.next_reg();
+
+                            self.new_var(
+                                s,
+                                Variable {
+                                    mutable: false,
+                                    def_span: stmt.span,
+                                    reg: var_reg,
+                                },
+                                scope,
+                            );
+                            let expr_reg = self.compile_expr(right, scope, builder)?;
+
+                            builder.copy(expr_reg, var_reg, stmt.span);
+                        }
+                    },
+                    _ => todo!("haha 😂😂😂😂"),
+                },
+                AssignOp::PlusEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.add_eq(a, b, stmt.span)
+                }
+                AssignOp::MinusEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.sub_eq(a, b, stmt.span)
+                }
+                AssignOp::MultEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.mult_eq(a, b, stmt.span)
+                }
+                AssignOp::DivEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.div_eq(a, b, stmt.span)
+                }
+                AssignOp::ModEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.modulo_eq(a, b, stmt.span)
+                }
+                AssignOp::PowEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.pow_eq(a, b, stmt.span)
+                }
+                AssignOp::ShiftLeftEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.shl_eq(a, b, stmt.span)
+                }
+                AssignOp::ShiftRightEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.shr_eq(a, b, stmt.span)
+                }
+                AssignOp::BinAndEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.bin_and_eq(a, b, stmt.span)
+                }
+                AssignOp::BinOrEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.bin_or_eq(a, b, stmt.span)
+                }
+                AssignOp::BinNotEq => {
+                    let a = self.compile_expr(left, scope, builder)?;
+                    let b = self.compile_expr(right, scope, builder)?;
+                    builder.bin_not_eq(a, b, stmt.span)
+                }
             },
 
             Statement::While { cond, code } => {
@@ -542,96 +656,6 @@ impl<'a> Compiler<'a> {
                 BinOp::Is => {
                     bin_op!(left is_op right)
                 }
-                // specky can do the rest :)))
-                BinOp::PlusEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.add_eq(a, b, expr.span)
-                }
-                BinOp::MinusEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.sub_eq(a, b, expr.span)
-                }
-                BinOp::MultEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.mult_eq(a, b, expr.span)
-                }
-                BinOp::DivEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.div_eq(a, b, expr.span)
-                }
-                BinOp::ModEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.modulo_eq(a, b, expr.span)
-                }
-                BinOp::PowEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.pow_eq(a, b, expr.span)
-                }
-                BinOp::ShiftLeftEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.shl_eq(a, b, expr.span)
-                }
-                BinOp::ShiftRightEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.shr_eq(a, b, expr.span)
-                }
-                BinOp::BinAndEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.bin_and_eq(a, b, expr.span)
-                }
-                BinOp::BinOrEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.bin_or_eq(a, b, expr.span)
-                }
-                BinOp::BinNotEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
-                    builder.bin_not_eq(a, b, expr.span)
-                }
-
-                BinOp::Assign => match *left.expr {
-                    Expression::Var(s) => match self.get_var(s, scope) {
-                        Some(var) => {
-                            if var.mutable {
-                                self.redef_var(s, expr.span, scope);
-                                let expr_reg = self.compile_expr(right, scope, builder)?;
-
-                                builder.copy(expr_reg, var.reg, expr.span);
-                            } else {
-                                return Err(CompilerError::ImmutableAssign {
-                                    area: self.make_area(expr.span),
-                                    def_area: self.make_area(var.def_span),
-                                    var: self.resolve(&s),
-                                });
-                            }
-                        }
-                        None => {
-                            self.new_var(
-                                s,
-                                Variable {
-                                    mutable: false,
-                                    def_span: expr.span,
-                                    reg: out_reg,
-                                },
-                                scope,
-                            );
-                            let expr_reg = self.compile_expr(right, scope, builder)?;
-
-                            builder.copy(expr_reg, out_reg, expr.span);
-                        }
-                    },
-                    _ => todo!("haha 😂😂😂😂"),
-                },
                 BinOp::Or => todo!(),
                 BinOp::And => todo!(),
             },
@@ -678,7 +702,7 @@ impl<'a> Compiler<'a> {
                                     Some(data) => data.reg,
                                     None => {
                                         return Err(CompilerError::NonexistentVariable {
-                                            area: self.make_area(expr.span),
+                                            area: self.make_area(key.span),
                                             var: self.resolve(&key.value),
                                         })
                                     }
@@ -722,16 +746,83 @@ impl<'a> Compiler<'a> {
                     expr.span,
                 )
             }
-            Expression::Call {
-                base,
-                params,
-                named_params,
-            } => todo!(),
             Expression::Macro {
                 args,
                 ret_type,
                 code,
-            } => todo!(),
+            } => {
+                let func_id = builder.new_func(
+                    |f| {
+                        let mut variables = AHashMap::new();
+
+                        for (name, _, _) in args {
+                            variables.insert(
+                                name.value,
+                                Variable {
+                                    mutable: false,
+                                    def_span: name.span,
+                                    reg: f.next_reg(),
+                                },
+                            );
+                        }
+
+                        let base_scope = self.scopes.insert(Scope {
+                            parent: None,
+                            variables,
+                            typ: Some(ScopeType::MacroBody),
+                        });
+
+                        match code {
+                            MacroCode::Normal(stmts) => self.compile_stmts(stmts, base_scope, f)?,
+                            MacroCode::Lambda(expr) => {
+                                let ret_reg = self.compile_expr(expr, base_scope, f)?;
+                                f.ret(ret_reg);
+                            }
+                        }
+
+                        Ok(())
+                    },
+                    args.len(),
+                )?;
+
+                builder.new_macro(
+                    func_id,
+                    out_reg,
+                    |builder, elems| {
+                        for (name, pat, def) in args {
+                            let n = self.resolve(&name.value).spanned(name.span);
+
+                            let p = if let Some(p) = pat {
+                                Some(self.compile_expr(p, scope, builder)?)
+                            } else {
+                                None
+                            };
+                            let d = if let Some(d) = def {
+                                Some(self.compile_expr(d, scope, builder)?)
+                            } else {
+                                None
+                            };
+
+                            elems.push((n, p, d))
+                        }
+
+                        Ok(())
+                    },
+                    expr.span,
+                )?;
+            }
+            Expression::Call {
+                base,
+                params,
+                named_params,
+            } => {
+                /*
+
+                    // icopy ...
+                    // icopy ...
+                    // icopy ...
+                */
+            }
             Expression::MacroPattern { args, ret_type } => todo!(),
             Expression::TriggerFunc { attributes, code } => todo!(),
             Expression::TriggerFuncCall(_) => todo!(),

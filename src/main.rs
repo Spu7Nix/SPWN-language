@@ -1,6 +1,7 @@
 #![deny(unused_must_use)]
 #![allow(clippy::result_large_err)] // shut the fuck up clippy Lmao
 
+mod cli;
 mod compiling;
 mod error;
 mod gd;
@@ -16,6 +17,7 @@ use std::{io::Write, path::PathBuf};
 
 use lasso::Rodeo;
 
+use crate::cli::FileSettings;
 use crate::compiling::compiler::Compiler;
 use crate::sources::BytecodeMap;
 use crate::util::RandomState;
@@ -42,32 +44,21 @@ fn main() {
 
     match parser.parse() {
         Ok(ast) => {
+            let mut file_settings = FileSettings::default();
+            file_settings.apply_attributes(&ast.file_attributes);
+
             let mut compiler = Compiler::new(
                 Rc::clone(&interner),
                 parser.src.clone(),
                 &mut bytecode_map,
-                &ast.file_attributes,
+                &file_settings,
             );
 
             match compiler.compile(ast.statements) {
                 Ok(bytecode) => {
-                    // let interner = Rc::try_unwrap(interner)
-                    //     .expect("multiple interner references still held")
-                    //     .into_inner();
-
-                    // for (src, bytecode) in compiler.map.map {
-                    //     println!(
-                    //         "GOG: {:?}\n──────────────────────────────────────────────────────",
-                    //         src
-                    //     );
-                    bytecode.debug_str(&parser.src);
-                    // println!("{}", bytecode);
-
-                    // let bytes = bincode::serialize(&bytecode).unwrap();
-                    // println!("{:?}", bytes);
-
-                    // std::fs::write("cock.spwnc", bytes).unwrap();
-                    //}
+                    if file_settings.debug_bytecode {
+                        bytecode.debug_str(&parser.src);
+                    }
 
                     let mut vm = Vm::new(bytecode, Rc::clone(&interner));
 

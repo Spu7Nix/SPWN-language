@@ -16,7 +16,7 @@ use super::{
     },
     attributes::{ExprAttribute, IsValidOn, ParseAttribute, ScriptAttribute},
     error::SyntaxError,
-    utils::operators::{self, unary_prec},
+    utils::operators::{self, unary_prec, is_assign_op},
 };
 
 #[derive(Clone)]
@@ -952,10 +952,20 @@ impl Parser<'_> {
 
                 Statement::Print(value)
             }
-            _ => Statement::Expr(self.parse_expr()?),
+            _ => {
+                let left = self.parse_expr()?;
+                let peek = self.peek();
+                if is_assign_op(peek) {
+                    self.next();
+                    let right = self.parse_expr()?;
+                    Statement::AssignOp(left, peek.to_assign_op(), right)
+                } else {
+                    Statement::Expr(left)
+                }
+            },
         };
-        let inner_span = inner_start.extend(self.span());
         
+        let inner_span = inner_start.extend(self.span());
         
         if !matches!(self.peek(), Token::LBracket) && !matches!(self.peek_or_newline(), Token::Eol | Token::Newline | Token::Eof) {
             return Err(SyntaxError::UnexpectedToken {

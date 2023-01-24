@@ -1,10 +1,22 @@
-let a = 0
-let b = 1
+#[debug_bytecode]
 
-while a < 1000 {
-    c = a + b
-    "";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";"";
-    print c
-    a = b
-    b = c
+
+// import "test2.spwn";
+// if 3 > 4 {
+//   print("3 is greater than 4")
+// } else {
+//   print("3 is not greater than 4")
+// }
+
+
+cock = (a: 69, b: 1337 = 420) {
+    let a = 5;
+    print a + b
 }
+
+print cock;
+
+
+// funny(a, b)
+
+

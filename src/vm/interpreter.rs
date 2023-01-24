@@ -1,6 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use ahash::AHashMap;
+use lasso::Spur;
 use slotmap::{new_key_type, SlotMap};
 
 use crate::{
@@ -12,7 +13,7 @@ use crate::{
 use super::{
     error::RuntimeError,
     opcodes::{Opcode, Register},
-    value::{StoredValue, Value},
+    value::{ArgData, StoredValue, Value},
     value_ops,
 };
 
@@ -23,23 +24,30 @@ new_key_type! {
 }
 
 pub struct Vm<'a> {
-    registers: [ValueKey; 256],
+    // 256 registers per function
+    registers: Vec<Vec<ValueKey>>,
 
     pub memory: SlotMap<ValueKey, StoredValue>,
 
     program: &'a Bytecode<Register>,
 
     pub interner: Rc<RefCell<Interner>>,
+
+    pub id_counters: [usize; 4],
 }
 
 impl<'a> Vm<'a> {
     pub fn new(program: &'a Bytecode<Register>, interner: Rc<RefCell<Interner>>) -> Vm {
         Self {
             memory: SlotMap::default(),
-            registers: [ValueKey::default(); 256],
+            registers: vec![],
             interner,
             program,
+            id_counters: [0; 4],
         }
+    }
+    pub fn resolve(&self, spur: &Spur) -> String {
+        self.interner.borrow().resolve(spur).to_string()
     }
 
     pub fn deep_clone_value(&mut self, k: ValueKey) -> ValueKey {
@@ -57,18 +65,18 @@ impl<'a> Vm<'a> {
         })
     }
     pub fn deep_clone_reg(&mut self, reg: Register) -> ValueKey {
-        self.deep_clone_value(self.registers[reg as usize])
+        self.deep_clone_value(self.registers.last().unwrap()[reg as usize])
     }
 
     pub fn get_reg(&self, reg: Register) -> &StoredValue {
-        &self.memory[self.registers[reg as usize]]
+        &self.memory[self.registers.last().unwrap()[reg as usize]]
     }
     pub fn get_reg_mut(&mut self, reg: Register) -> &mut StoredValue {
-        &mut self.memory[self.registers[reg as usize]]
+        &mut self.memory[self.registers.last().unwrap()[reg as usize]]
     }
 
     pub fn set_reg(&mut self, reg: Register, v: StoredValue) {
-        self.registers[reg as usize] = self.memory.insert(v)
+        self.registers.last_mut().unwrap()[reg as usize] = self.memory.insert(v)
     }
 
     pub fn make_area(&self, span: CodeSpan) -> CodeArea {
@@ -86,13 +94,16 @@ impl<'a> Vm<'a> {
 
     pub fn run_func(&mut self, func: usize) -> RuntimeResult<()> {
         let opcodes = &self.program.functions[func].opcodes;
+        let regs_used = self.program.functions[func].regs_used;
+
+        self.registers.push(vec![ValueKey::default(); regs_used]);
 
         let mut ip = 0_usize;
 
         while ip < opcodes.len() {
             match &opcodes[ip] {
                 Opcode::LoadConst { dest, id } => {
-                    let value = Value::from_const(&self.program.consts[*id as usize]);
+                    let value = Value::from_const(&self.program.consts[*id as usize], self);
 
                     self.set_reg(
                         *dest,
@@ -101,13 +112,14 @@ impl<'a> Vm<'a> {
                             area: self.get_area(func, ip),
                         },
                     )
-                    // self.registers[*dest as usize] = self.memory.insert(Value::from_const(
-                    //     &self.program.consts[*id as usize],
-                    //     &mut self.interner,
-                    // ))
                 }
                 Opcode::Copy { from, to } => {
-                    self.registers[*to as usize] = self.deep_clone_reg(*from)
+                    self.registers.last_mut().unwrap()[*to as usize] =
+                        self.deep_clone_reg(*from)
+                }
+                Opcode::InterdimensionalCopy { from, to } => {
+                    self.registers.last_mut().unwrap()[*to as usize] = 
+                        self.deep_clone_value(self.registers[self.registers.len() - 2][*from as usize])
                 }
                 Opcode::Print { reg } => {
                     println!("{}", self.get_reg(*reg).value.runtime_display(self))
@@ -318,6 +330,71 @@ impl<'a> Vm<'a> {
                     )
                 }
                 Opcode::Export { src } => todo!(),
+                Opcode::Call { funtion } => todo!(),
+                Opcode::CreateMacro { id, dest } => self.set_reg(
+                    *dest,
+                    StoredValue {
+                        value: Value::Macro {
+                            func_id: *id,
+                            args: vec![],
+                        },
+                        area: self.get_area(func, ip),
+                    },
+                ),
+                Opcode::PushMacroArg { name, dest } => {
+                    
+                    let name = match &self.get_reg(*name).value {
+                        Value::String(s) => s.clone(),
+                        _ => unreachable!(),
+                    };
+
+                    let name = self.interner.borrow_mut().get_or_intern(name);
+                    
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Macro { args, .. } => args.push(ArgData {
+                            name,
+                            default: None,
+                            pattern: None,
+                        }),
+                        _ => unreachable!(),
+                    }
+                },
+                Opcode::SetMacroArgDefault { src, dest } => {
+                    let set = self.deep_clone_reg(*src);
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Macro { args, .. } => args.last_mut().unwrap().default = Some(set),
+                        _ => unreachable!(),
+                    }
+                }
+                Opcode::SetMacroArgPattern { src, dest } => {
+                    let set = self.deep_clone_reg(*src);
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Macro { args, .. } => args.last_mut().unwrap().pattern = Some(set),
+                        _ => unreachable!(),
+                    }
+                }
+                // Opcode::AllocArray { size, dest } => self.set_reg(
+                //     *dest,
+                //     StoredValue {
+                //         value: Value::Array(Vec::with_capacity(*size as usize)),
+                //         area: self.get_area(func, ip),
+                //     },
+                // ),
+                // Opcode::AllocDict { size, dest } => self.set_reg(
+                //     *dest,
+                //     StoredValue {
+                //         value: Value::Dict(AHashMap::with_capacity(*size as usize)),
+                //         area: self.get_area(func, ip),
+                //     },
+                // ),
+                // Opcode::PushArrayElem { elem, dest } => {
+                //     let push = self.deep_clone_reg(*elem);
+                //     match &mut self.get_reg_mut(*dest).value {
+                //         Value::Array(v) => v.push(push),
+                //         _ => unreachable!(),
+                //     }
+                // }
+                // Opcode::Call {} => todo!(),
             }
 
             ip += 1;
@@ -350,5 +427,10 @@ impl<'a> Vm<'a> {
             },
         );
         Ok(())
+    }
+
+    pub fn next_id(&mut self, c: crate::gd::ids::IDClass) -> u16 {
+        self.id_counters[c as usize] += 1;
+        self.id_counters[c as usize] as u16
     }
 }

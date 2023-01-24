@@ -21,6 +21,7 @@ slotmap = "1.0.6"
 delve = { version = "0.3.0", features = ["derive"] }
 md5 = "0.7.0"
 strum = { version = "0.24", features = ["derive"] }
+clap = { version = "4.1.2", features = ["derive"] }
 
 quick-xml = "0.20.0"
 libflate = "1.1.0"

@@ -6,12 +6,22 @@ use strum::EnumDiscriminants;
 
 use crate::{compiling::bytecode::Constant, gd::ids::*, sources::CodeArea};
 
-use super::interpreter::{ValueKey, Vm};
+use super::{
+    interpreter::{ValueKey, Vm},
+    opcodes::FunctionID,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
     pub value: Value,
     pub area: CodeArea,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub struct ArgData {
+    pub name: Spur,
+    pub default: Option<ValueKey>,
+    pub pattern: Option<ValueKey>,
 }
 
 #[derive(EnumDiscriminants, Debug, Clone, PartialEq)]
@@ -39,6 +49,10 @@ pub enum Value {
 
     Maybe(Option<ValueKey>),
     Empty,
+    Macro {
+        func_id: FunctionID,
+        args: Vec<ArgData>,
+    },
 }
 
 impl std::fmt::Display for ValueType {
@@ -52,13 +66,26 @@ impl Value {
         self.into()
     }
 
-    pub fn from_const(c: &Constant) -> Self {
+    pub fn from_const(c: &Constant, vm: &mut Vm) -> Self {
         match c {
             Constant::Int(v) => Value::Int(*v),
             Constant::Float(v) => Value::Float(*v),
             Constant::String(v) => Value::String(v.clone()),
             Constant::Bool(v) => Value::Bool(*v),
-            Constant::Id(c, v) => todo!(),
+            Constant::Id(c, v) => {
+                let id = if let Some(n) = v {
+                    Id::Specific(*n)
+                } else {
+                    Id::Arbitrary(vm.next_id(*c))
+                };
+
+                match c {
+                    IDClass::Group => Value::Group(id),
+                    IDClass::Color => Value::Color(id),
+                    IDClass::Block => Value::Block(id),
+                    IDClass::Item => Value::Item(id),
+                }
+            }
         }
     }
 
@@ -103,6 +130,13 @@ impl Value {
                 None => "?".into(),
             },
             Value::Empty => "()".into(),
+            Value::Macro { args, .. } => format!(
+                "({}) {{...}}",
+                args.iter()
+                    .map(|d| vm.resolve(&d.name))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 }

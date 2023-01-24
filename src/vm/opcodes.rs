@@ -52,6 +52,7 @@ pub type UnoptRegister = usize;
 pub type ConstID = u16;
 pub type JumpPos = u16;
 pub type AllocSize = u16;
+pub type FunctionID = u16;
 
 macro_rules! opcodes {
     (
@@ -138,7 +139,13 @@ opcodes! {
     Print { => reg },
     // LoadBuiltin {},
 
-    // Call {},
+    #[delve(display = |f: &R, t: &R| format!("R{f} -> R{t}"))]
+    InterdimensionalCopy { => from, => to },
+
+    Call {
+        funtion: FunctionID,
+    },
+
     #[delve(display = |s: &AllocSize, d: &R| format!("[...; {s}] -> R{d}"))]
     AllocArray {
         size: AllocSize,
@@ -154,6 +161,18 @@ opcodes! {
     PushArrayElem { => elem, => dest },
     #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d}"))]
     PushDictElem { => elem, => key, => dest },
+
+    #[delve(display = |i: &FunctionID, d: &R| format!("{i}: (...) {{...}} -> R{d}"))]
+    CreateMacro {
+        id: FunctionID,
+        => dest,
+    },
+    #[delve(display = |n: &R, d: &R| format!("insert arg R{n} into R{d}"))]
+    PushMacroArg { => name, => dest },
+    #[delve(display = |s: &R, d: &R| format!("set default to R{s} for R{d}"))]
+    SetMacroArgDefault { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!("set pattern to R{s} for R{d}"))]
+    SetMacroArgPattern { => src, => dest },
 
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} + R{b} -> R{x}"))]
     Add { => left, => right, => dest },

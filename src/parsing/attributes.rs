@@ -1,9 +1,7 @@
 use ahash::AHashMap;
-use delve::VariantNames;
 use paste::paste;
 
 use crate::lexing::tokens::Token;
-use crate::parsing::ast::Statement;
 use crate::parsing::{
     error::SyntaxError,
     parser::{ParseResult, Parser},
@@ -302,5 +300,7 @@ attributes! {
         NoLevel,
         NoBytecodeCache,
         DebugBytecode,
+        NoOptimize,
+        NoOptimizeBytecode,
     }
 }

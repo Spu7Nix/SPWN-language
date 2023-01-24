@@ -1,6 +1,7 @@
 macro_rules! operators {
 
     (
+        Assign: [$($a_tok:ident),+];
         $(
             $( Left => [$($l_tok:ident),+] )?
             $( Right => [$($r_tok:ident),+] )?
@@ -11,6 +12,23 @@ macro_rules! operators {
         pub mod operators {
 
             use crate::Token;
+
+
+            #[derive(Debug, Clone, Copy)]
+            pub enum AssignOp {
+                $(
+                    $a_tok,
+                )+
+            }
+            pub fn is_assign_op(op: Token) -> bool {
+                match op {
+                    $(
+                        Token::$a_tok => true,
+                    )+
+                    _ => false,
+                }
+            }
+
 
             #[derive(Debug, Copy, Clone, PartialEq, Eq)]
             pub enum OpType {
@@ -77,6 +95,14 @@ macro_rules! operators {
                         _ => unreachable!(),
                     }
                 }
+                pub fn to_assign_op(self) -> AssignOp {
+                    match self {
+                        $(
+                            Token::$a_tok => AssignOp::$a_tok,
+                        )+
+                        _ => unreachable!(),
+                    }
+                }
             }
 
             const OP_LIST: &[(OpType, &[Token])] = &[
@@ -123,9 +149,10 @@ macro_rules! operators {
 }
 
 operators! {
+    Assign: [Assign, PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];
     // lowest precedence
-    Right => [Assign];
-    Right => [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];
+    // Right => [Assign];
+    // Right => [PlusEq, MinusEq, MultEq, DivEq, PowEq, ModEq, BinAndEq, BinOrEq, BinNotEq, ShiftLeftEq, ShiftRightEq];
     Left => [Range];
     Left => [In];
     Left => [Is];
