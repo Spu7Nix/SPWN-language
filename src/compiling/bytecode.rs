@@ -1,4 +1,4 @@
-use std::fmt::{format, Debug, Display};
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
 use ahash::AHashMap;
@@ -11,10 +11,10 @@ use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 use super::compiler::CompileResult;
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
-use crate::parsing::ast::{Spannable, Spanned};
+use crate::parsing::ast::{ImportType, Spannable, Spanned};
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
-use crate::vm::opcodes::{FunctionID, Opcode, Register, UnoptOpcode, UnoptRegister};
+use crate::vm::opcodes::{FunctionID, ImportID, Opcode, Register, UnoptOpcode, UnoptRegister};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
@@ -40,7 +40,6 @@ where
     R: Display + Debug + Copy,
     for<'de3> Vec<(R, R)>: Serialize + Deserialize<'de3>,
 {
-    pub src: SpwnSource,
     pub source_hash: Digest,
 
     pub consts: Vec<Constant>,
@@ -49,6 +48,7 @@ where
     pub opcode_span_map: AHashMap<(usize, usize), CodeSpan>,
 
     pub export_names: Vec<String>,
+    pub import_paths: Vec<Spanned<ImportType>>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -186,6 +186,8 @@ pub struct BytecodeBuilder {
     constants: UniqueRegister<ConstKey, Constant>,
 
     funcs: Vec<ProtoFunc>,
+
+    import_paths: Vec<Spanned<ImportType>>,
 }
 
 pub struct FuncBuilder<'a> {
@@ -200,6 +202,7 @@ impl BytecodeBuilder {
         Self {
             constants: UniqueRegister::new(),
             funcs: vec![],
+            import_paths: vec![],
         }
     }
 
@@ -353,12 +356,12 @@ impl BytecodeBuilder {
         let hash = md5::compute(src.read().unwrap());
 
         Bytecode {
-            src: src.clone(),
             source_hash: hash.into(),
             consts,
             functions,
             opcode_span_map,
             export_names: global_returns, //todo
+            import_paths: self.import_paths,
         }
     }
 }
@@ -1050,12 +1053,11 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
-    pub fn import(&mut self, dest: UnoptRegister, src: Spanned<String>, span: CodeSpan) {
-        let next_reg = self.next_reg();
-        self.load_string(src.value, next_reg, src.span);
+    pub fn import(&mut self, dest: UnoptRegister, src: Spanned<ImportType>, span: CodeSpan) {
+        self.code_builder.import_paths.push(src);
         self.push_opcode_spanned(
             ProtoOpcode::Raw(UnoptOpcode::Import {
-                src: next_reg,
+                src: (self.code_builder.import_paths.len() - 1) as ImportID,
                 dest,
             }),
             span,
@@ -1076,10 +1078,18 @@ impl Bytecode<Register> {
         println!(
             "{0} {1} {0}",
             "======".bright_yellow().bold(),
-            self.src.name().bright_yellow().bold()
+            src.name().bright_yellow().bold()
         );
 
-        println!("{}: {:?}\n", "Constants".bright_cyan().bold(), self.consts);
+        println!("{}: {:?}", "Constants".bright_cyan().bold(), self.consts);
+        println!(
+            "{}: {:?}\n",
+            "Import paths".bright_cyan().bold(),
+            self.import_paths
+                .iter()
+                .map(|p| &p.value)
+                .collect::<Vec<_>>()
+        );
 
         let mut colors = RainbowColorGenerator::new(150.0, 0.4, 0.9, 60.0);
 

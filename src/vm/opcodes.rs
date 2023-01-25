@@ -50,6 +50,7 @@ pub type ConstID = u16;
 pub type JumpPos = u16;
 pub type AllocSize = u16;
 pub type FunctionID = u16;
+pub type ImportID = u16;
 
 macro_rules! opcodes {
     (
@@ -285,6 +286,6 @@ opcodes! {
 
     #[delve(display = |s: &R| format!("export R{s}"))]
     Export { => src },
-    #[delve(display = |s: &R, d: &R| format!("import R{s} -> R{d}"))]
-    Import { => src, => dest },
+    #[delve(display = |s: &ImportID, d: &R| format!("import id {s} -> R{d}"))]
+    Import { src: ImportID => dest },
 }

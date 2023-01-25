@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::path::PathBuf;
 use std::rc::Rc;
 
 use ahash::AHashMap;
@@ -52,6 +51,8 @@ pub struct Compiler<'a> {
     global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
 
     file_attrs: &'a FileSettings,
+
+    pub map: &'a mut BytecodeMap,
 }
 
 impl<'a> Compiler<'a> {
@@ -59,6 +60,7 @@ impl<'a> Compiler<'a> {
         interner: Rc<RefCell<Interner>>,
         src: SpwnSource,
         file_attrs: &'a FileSettings,
+        map: &'a mut BytecodeMap,
     ) -> Self {
         Self {
             interner,
@@ -66,17 +68,18 @@ impl<'a> Compiler<'a> {
             src,
             global_return: None,
             file_attrs,
+            map,
         }
     }
 
-    pub fn make_area(&self, span: CodeSpan) -> CodeArea {
+    fn make_area(&self, span: CodeSpan) -> CodeArea {
         CodeArea {
             span,
             src: self.src.clone(),
         }
     }
 
-    pub fn resolve(&self, spur: &Spur) -> String {
+    fn resolve(&self, spur: &Spur) -> String {
         self.interner.borrow().resolve(spur).to_string()
     }
 
@@ -141,7 +144,7 @@ impl<'a> Compiler<'a> {
         vars
     }
 
-    pub fn compile(&mut self, stmts: Vec<StmtNode>) -> CompileResult<Bytecode<Register>> {
+    pub fn compile(&mut self, stmts: Vec<StmtNode>) -> CompileResult<&Bytecode<Register>> {
         let mut builder = BytecodeBuilder::new();
 
         // func 0 ("global")
@@ -200,56 +203,33 @@ impl<'a> Compiler<'a> {
             })
             .collect();
 
-        Ok(Bytecode {
-            src: unopt_code.src,
-            source_hash: unopt_code.source_hash,
-            consts: unopt_code.consts,
-            functions,
-            opcode_span_map: unopt_code.opcode_span_map,
-            export_names: unopt_code.export_names,
-        })
+        self.map.map.insert(
+            self.src.clone(),
+            Bytecode {
+                import_paths: unopt_code.import_paths,
+                source_hash: unopt_code.source_hash,
+                consts: unopt_code.consts,
+                functions,
+                opcode_span_map: unopt_code.opcode_span_map,
+                export_names: unopt_code.export_names,
+            },
+        );
 
-        // Ok(builder.build())
+        Ok(&self.map.map[&self.src])
     }
 
-    pub fn compile_import(
-        &mut self,
-        typ: ImportType,
-        scope: ScopeKey,
-        span: CodeSpan,
-    ) -> CompileResult<Bytecode<Register>> {
+    pub fn compile_import(&mut self, typ: &ImportType, span: CodeSpan) -> CompileResult<()> {
         let base_dir = match &self.src {
             SpwnSource::File(path) => path.parent().unwrap(),
         };
 
-        let (path, name) = match typ {
-            ImportType::Module(s) => {
-                let name = PathBuf::from(self.resolve(&s));
-                (
-                    base_dir.join(name.clone()),
-                    name.file_stem().unwrap().to_str().unwrap().to_string(),
-                )
-            }
-            ImportType::Library(name) => {
-                let name = PathBuf::from(format!("libraries/{}/lib.spwn", self.resolve(&name)));
-                (
-                    base_dir.join(name.clone()),
-                    name.parent()
-                        .unwrap()
-                        .file_name()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string(),
-                )
-            }
-        };
+        let (name, rel_path) = typ.to_path_name();
+        let import_path = base_dir.join(rel_path);
 
-        let src = SpwnSource::File(path.clone());
-
+        let import_src = SpwnSource::File(import_path.clone());
         let is_module = matches!(typ, ImportType::Module(_));
 
-        let code = match src.read() {
+        let code = match import_src.read() {
             Some(s) => s,
             None => {
                 return Err(CompilerError::NonexistentImport {
@@ -259,66 +239,72 @@ impl<'a> Compiler<'a> {
                 })
             }
         };
+        let import_base = import_path.parent().unwrap();
 
         let hash = md5::compute(&code);
 
-        let import_base = path.parent().unwrap();
-        let spwnc = import_base.join(format!(".spwnc/{name}.spwnc"));
+        let spwnc_path = import_base.join(format!(".spwnc/{name}.spwnc"));
 
-        let bytecode = 'bytecode: {
-            'from_cache: {
-                if spwnc.is_file() {
-                    let source = std::fs::read(&spwnc).unwrap();
+        'from_cache: {
+            if spwnc_path.is_file() {
+                let source = std::fs::read(&spwnc_path).unwrap();
 
-                    let bytecode: Bytecode<Register> = match bincode::deserialize(&source) {
-                        Ok(b) => b,
-                        Err(_) => {
-                            break 'from_cache;
-                        }
-                    };
-
-                    if bytecode.source_hash == hash.into() {
-                        break 'bytecode bytecode;
+                let bytecode: Bytecode<Register> = match bincode::deserialize(&source) {
+                    Ok(b) => b,
+                    Err(_) => {
+                        break 'from_cache;
                     }
+                };
+
+                if bytecode.source_hash == hash.into() {
+                    for import in &bytecode.import_paths {
+                        self.compile_import(&import.value, import.span)?;
+                    }
+
+                    self.map.map.insert(import_src.clone(), bytecode);
+                    return Ok(());
+                    // break 'bytecode &self.map.map[&import_src];
                 }
             }
+        }
 
-            let mut parser = Parser::new(code.trim_end(), src, Rc::clone(&self.interner));
+        let mut parser = Parser::new(code.trim_end(), import_src, Rc::clone(&self.interner));
 
-            match parser.parse() {
-                Ok(ast) => {
-                    let mut file_settings = FileSettings::default();
-                    file_settings.apply_attributes(&ast.file_attributes);
+        match parser.parse() {
+            Ok(ast) => {
+                let mut file_settings = FileSettings::default();
+                file_settings.apply_attributes(&ast.file_attributes);
 
-                    let mut compiler =
-                        Compiler::new(Rc::clone(&self.interner), parser.src, &file_settings);
+                let mut compiler = Compiler::new(
+                    Rc::clone(&self.interner),
+                    parser.src,
+                    &file_settings,
+                    self.map,
+                );
 
-                    match compiler.compile(ast.statements) {
-                        Ok(bytecode) => {
-                            let bytes = bincode::serialize(&bytecode).unwrap();
+                match compiler.compile(ast.statements) {
+                    Ok(bytecode) => {
+                        let bytes = bincode::serialize(&bytecode).unwrap();
 
-                            // dont write bytecode if caching is disabled
-                            if !self.file_attrs.no_bytecode_cache {
-                                let _ = std::fs::create_dir(import_base.join(".spwnc"));
-                                std::fs::write(&spwnc, bytes).unwrap();
-                            }
-
-                            break 'bytecode bytecode;
+                        // dont write bytecode if caching is disabled
+                        if !self.file_attrs.no_bytecode_cache {
+                            let _ = std::fs::create_dir(import_base.join(".spwnc"));
+                            std::fs::write(&spwnc_path, bytes).unwrap();
                         }
-                        Err(err) => return Err(err),
                     }
+                    Err(err) => return Err(err),
                 }
-                Err(err) => {
-                    return Err(CompilerError::ImportSyntaxError {
-                        is_module,
-                        err,
-                        area: self.make_area(span),
-                    })
-                }
+            }
+            Err(err) => {
+                return Err(CompilerError::ImportSyntaxError {
+                    is_module,
+                    err,
+                    area: self.make_area(span),
+                })
             }
         };
 
-        Ok(bytecode)
+        Ok(())
     }
 
     pub fn compile_stmts(
@@ -913,16 +899,8 @@ impl<'a> Compiler<'a> {
                 builder.load_empty(out_reg, expr.span);
             }
             Expression::Import(t) => {
-                let bytecode = self.compile_import(*t, scope, expr.span)?;
-                builder.import(
-                    out_reg,
-                    match t {
-                        ImportType::Module(m) => self.resolve(m),
-                        ImportType::Library(l) => format!("libraries/{}/lib.spwn", self.resolve(l)),
-                    }
-                    .spanned(expr.span),
-                    expr.span,
-                )
+                self.compile_import(t, expr.span)?;
+                builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
             }
             Expression::Instance { base, items } => todo!(),
         }

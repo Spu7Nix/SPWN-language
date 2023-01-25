@@ -369,13 +369,11 @@ impl Parser<'_> {
         Ok(match self.peek() {
             Token::String => {
                 self.next();
-                ImportType::Module(
-                    self.intern_string(self.parse_string(self.slice(), self.span())?),
-                )
+                ImportType::Module(self.parse_string(self.slice(), self.span())?)
             }
             Token::Ident => {
                 self.next();
-                ImportType::Library(self.slice_interned())
+                ImportType::Library(self.slice().into())
             }
             other => {
                 return Err(SyntaxError::UnexpectedToken {

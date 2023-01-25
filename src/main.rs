@@ -23,7 +23,7 @@ use crate::cli::FileSettings;
 use crate::compiling::compiler::Compiler;
 use crate::lexing::tokens::Token;
 use crate::parsing::parser::Parser;
-use crate::sources::SpwnSource;
+use crate::sources::{BytecodeMap, SpwnSource};
 use crate::util::RandomState;
 use crate::vm::context::FullContext;
 use crate::vm::interpreter::{FuncCoord, Vm};
@@ -44,34 +44,48 @@ fn main() {
 
     let mut parser = Parser::new(code.trim_end(), src, Rc::clone(&interner));
 
+    let mut map = BytecodeMap::default();
+
     match parser.parse() {
         Ok(ast) => {
             let mut file_settings = FileSettings::default();
             file_settings.apply_attributes(&ast.file_attributes);
 
-            let mut compiler =
-                Compiler::new(Rc::clone(&interner), parser.src.clone(), &file_settings);
+            let mut compiler = Compiler::new(
+                Rc::clone(&interner),
+                parser.src.clone(),
+                &file_settings,
+                &mut map,
+            );
 
             match compiler.compile(ast.statements) {
-                Ok(bytecode) => {
-                    if file_settings.debug_bytecode {
-                        bytecode.debug_str(&parser.src);
-                    }
-
-                    let mut vm = Vm::new(interner);
-
-                    let key = vm.programs.insert(&bytecode);
-                    let start = FuncCoord::new(0, key);
-
-                    vm.push_call_stack(start, 0, false);
-
-                    match vm.run_program() {
-                        Ok(_) => {}
-                        Err(err) => err.to_report().display(),
-                    };
+                Ok(_) => (),
+                Err(err) => {
+                    err.to_report().display();
+                    return;
                 }
-                Err(err) => err.to_report().display(),
             }
+
+            if file_settings.debug_bytecode {
+                for (k, b) in &map.map {
+                    b.debug_str(k)
+                }
+                // bytecode.debug_str(&parser.src);
+            }
+
+            let bytecode = &map.map[&parser.src];
+
+            let mut vm = Vm::new(interner);
+
+            let key = vm.programs.insert(bytecode);
+            let start = FuncCoord::new(0, key);
+
+            // vm.push_call_stack(start, 0, false);
+
+            // match vm.run_program() {
+            //     Ok(_) => {}
+            //     Err(err) => err.to_report().display(),
+            // };
         }
         Err(err) => err.to_report().display(),
     }

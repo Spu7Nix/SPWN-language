@@ -38,6 +38,7 @@ pub struct Vm<'a> {
     pub memory: SlotMap<ValueKey, StoredValue>,
 
     pub programs: SlotMap<BytecodeKey, &'a Bytecode<Register>>,
+    // pub imports: AHashMap<SpwnSource, BytecodeKey>,
 
     pub interner: Rc<RefCell<Interner>>,
 
@@ -118,10 +119,11 @@ impl<'a> Vm<'a> {
     // }
 
     pub fn make_area(&self, span: CodeSpan, code: BytecodeKey) -> CodeArea {
-        CodeArea {
-            span,
-            src: self.programs[code].src.clone(),
-        }
+        todo!()
+        // CodeArea {
+        //     span,
+        //     src: self.programs[code].src.clone(),
+        // }
     }
 
     pub fn get_span(&self, func: FuncCoord, i: usize) -> CodeSpan {
@@ -139,16 +141,21 @@ impl<'a> Vm<'a> {
         increment_last: bool,
     ) {
         let regs_used = self.programs[func.code].functions[func.func].regs_used;
+
         let mut regs = Vec::with_capacity(regs_used);
+
         for _ in 0..regs_used {
             regs.push(self.memory.insert(StoredValue {
                 value: Value::Empty,
                 area: self.make_area(CodeSpan::invalid(), func.code),
             }))
         }
+
         let call_key = self.contexts.have_not_returned.insert(());
+
         let mut current = self.contexts.current_mut();
         current.registers.push(regs);
+
         if increment_last {
             current.pos_stack.last_mut().unwrap().ip += 1;
         }
@@ -617,7 +624,7 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     }
                 }
-                _ => todo!(),
+                Opcode::Import { src, dest } => todo!(),
             }
 
             // increment ip
