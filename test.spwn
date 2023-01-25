@@ -1,7 +1,8 @@
 #[debug_bytecode]
 
-import "test2.spwn"
+f = () {
+    -> return 1
+    return 2
+}
 
-
-
-
+print [f(), f()]

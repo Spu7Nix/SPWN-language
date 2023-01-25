@@ -80,12 +80,12 @@ fn main() {
             let key = vm.programs.insert(bytecode);
             let start = FuncCoord::new(0, key);
 
-            // vm.push_call_stack(start, 0, false);
+            vm.push_call_stack(start, 0, false);
 
-            // match vm.run_program() {
-            //     Ok(_) => {}
-            //     Err(err) => err.to_report().display(),
-            // };
+            match vm.run_program() {
+                Ok(_) => {}
+                Err(err) => err.to_report().display(),
+            };
         }
         Err(err) => err.to_report().display(),
     }

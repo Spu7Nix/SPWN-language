@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use colored::Colorize;
 use lasso::Spur;
 use slotmap::{new_key_type, SlotMap};
 
@@ -39,7 +40,6 @@ pub struct Vm<'a> {
 
     pub programs: SlotMap<BytecodeKey, &'a Bytecode<Register>>,
     // pub imports: AHashMap<SpwnSource, BytecodeKey>,
-
     pub interner: Rc<RefCell<Interner>>,
 
     pub id_counters: [usize; 4],
@@ -106,6 +106,7 @@ impl<'a> Vm<'a> {
         &mut self.memory[self.contexts.current_mut().registers.last().unwrap()[reg as usize]]
     }
 
+    // please only use for "mutating" something, otherwise context fuckery
     pub fn set_reg(&mut self, reg: Register, v: StoredValue) {
         self.memory[self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize]] = v
     }
@@ -119,11 +120,13 @@ impl<'a> Vm<'a> {
     // }
 
     pub fn make_area(&self, span: CodeSpan, code: BytecodeKey) -> CodeArea {
-        todo!()
+        //todo!()
         // CodeArea {
         //     span,
         //     src: self.programs[code].src.clone(),
         // }
+
+        CodeArea::internal()
     }
 
     pub fn get_span(&self, func: FuncCoord, i: usize) -> CodeSpan {
@@ -177,26 +180,27 @@ impl<'a> Vm<'a> {
             return;
         }
 
-        let item = {
+        let ret_val = if let Some(ret_val) = ret_val {
+            ret_val
+        } else {
+            StoredValue {
+                value: Value::Empty,
+                area: CodeArea::internal(), // probably gonna have to store the areas in the stack
+            }
+        };
+
+        let call_key = {
             let mut current = self.contexts.current_mut();
             current.recursion_depth -= 1;
             current.registers.pop();
-            current.pos_stack.pop().unwrap()
+            let item = current.pos_stack.pop().unwrap();
+
+            self.memory[current.registers.last_mut().unwrap()[item.return_dest as usize]] = ret_val;
+
+            item.call_key
         };
 
-        self.contexts.have_not_returned.remove(item.call_key);
-
-        if let Some(ret_val) = ret_val {
-            self.set_reg(item.return_dest, ret_val);
-        } else {
-            self.set_reg(
-                item.return_dest,
-                StoredValue {
-                    value: Value::Empty,
-                    area: self.make_area(CodeSpan::internal(), item.func.code), // probably gonna have to store the areas in the stack
-                },
-            );
-        }
+        self.contexts.have_not_returned.remove(call_key);
     }
 
     pub fn run_program(&mut self) -> RuntimeResult<()> {
@@ -218,6 +222,11 @@ impl<'a> Vm<'a> {
                 continue;
             }
             let opcode = &opcodes[ip];
+
+            // println!(
+            //     "{} - {opcode}",
+            //     <&Opcode<Register> as Into<&'static str>>::into(opcode).green()
+            // );
 
             match opcode {
                 Opcode::LoadConst { dest, id } => {
@@ -462,7 +471,7 @@ impl<'a> Vm<'a> {
                     continue;
                 }
                 Opcode::EnterArrowStatement { skip_to } => {
-                    self.contexts.split_current();
+                    self.split_current_context();
                     self.contexts.jump_current(*skip_to as usize);
                 }
                 Opcode::LoadBuiltins { dest } => {

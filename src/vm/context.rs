@@ -36,17 +36,14 @@ impl PartialOrd for Context {
 
 impl Ord for Context {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.pos_stack
-            .len()
-            .cmp(&other.pos_stack.len())
-            .then(
-                self.pos_stack
-                    .last()
-                    .unwrap()
-                    .ip
-                    .cmp(&other.pos_stack.last().unwrap().ip),
-            )
-            .reverse()
+        self.recursion_depth.cmp(&other.recursion_depth).then(
+            self.pos_stack
+                .last()
+                .unwrap()
+                .ip
+                .cmp(&other.pos_stack.last().unwrap().ip)
+                .reverse(),
+        )
     }
 }
 
@@ -115,10 +112,19 @@ impl FullContext {
     pub fn yeet_current(&mut self) {
         self.contexts.pop();
     }
+}
 
-    pub fn split_current(&mut self) {
-        let current = self.current();
-        let new = current.clone();
-        self.contexts.push(new);
+impl<'a> super::interpreter::Vm<'a> {
+    pub fn split_current_context(&mut self) {
+        let current = self.contexts.current();
+        let mut new = current.clone();
+
+        // lord forgive me for what i am about to do
+        for regs in &mut new.registers {
+            for reg in regs {
+                *reg = self.deep_clone_key_insert(*reg);
+            }
+        }
+        self.contexts.contexts.push(new);
     }
 }
