@@ -1,16 +1,46 @@
+use std::path::PathBuf;
+
 use delve::EnumToStr;
 use lasso::Spur;
+use serde::{Deserialize, Serialize};
 
 use super::attributes::{ExprAttribute, ScriptAttribute, StmtAttribute};
 use super::utils::operators::{AssignOp, BinOp, UnaryOp};
 use crate::gd::ids::IDClass;
-use crate::lexing::tokens::Token;
 use crate::sources::CodeSpan;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ImportType {
-    Module(Spur),
-    Library(Spur),
+    Module(String),
+    Library(String),
+}
+
+impl ImportType {
+    pub fn to_path_name(&self) -> (String, PathBuf) {
+        match self {
+            ImportType::Module(s) => {
+                let rel_path = PathBuf::from(s);
+                (
+                    rel_path.file_stem().unwrap().to_str().unwrap().to_string(),
+                    rel_path,
+                )
+            }
+            ImportType::Library(name) => {
+                let rel_path = PathBuf::from(format!("libraries/{name}/lib.spwn"));
+                (
+                    rel_path
+                        .parent()
+                        .unwrap()
+                        .file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                    rel_path,
+                )
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -196,7 +226,7 @@ pub struct Ast {
     pub file_attributes: Vec<ScriptAttribute>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Spanned<T> {
     pub value: T,
     pub span: CodeSpan,

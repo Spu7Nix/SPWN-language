@@ -4,7 +4,7 @@ use ahash::AHashMap;
 use lasso::Spur;
 use strum::EnumDiscriminants;
 
-use super::interpreter::{ValueKey, Vm};
+use super::interpreter::{FuncCoord, ValueKey, Vm};
 use super::opcodes::FunctionID;
 use crate::compiling::bytecode::Constant;
 use crate::gd::ids::*;
@@ -49,8 +49,9 @@ pub enum Value {
     Maybe(Option<ValueKey>),
     Empty,
     Macro {
-        func_id: FunctionID,
+        func: FuncCoord,
         args: Vec<ArgData>,
+        captured: Vec<ValueKey>,
     },
 }
 
@@ -93,7 +94,7 @@ impl Value {
             Value::Int(n) => n.to_string(),
             Value::Float(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::String(s) => format!("\"{}\"", s),
+            Value::String(s) => format!("\"{s}\""),
             Value::Array(arr) => format!(
                 "[{}]",
                 arr.iter()
@@ -119,9 +120,9 @@ impl Value {
             Value::Builtins => "$".to_string(),
             Value::Range(n1, n2, s) => {
                 if *s == 1 {
-                    format!("{}..{}", n1, n2)
+                    format!("{n1}..{n2}")
                 } else {
-                    format!("{}..{}..{}", n1, s, n2)
+                    format!("{n1}..{s}..{n2}")
                 }
             }
             Value::Maybe(o) => match o {

@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::path::PathBuf;
 use std::rc::Rc;
 
 use ahash::AHashMap;
@@ -13,7 +12,6 @@ use crate::cli::FileSettings;
 use crate::parsing::ast::{
     ExprNode, Expression, ImportType, MacroCode, Spannable, Spanned, Statement, StmtNode,
 };
-use crate::parsing::attributes::ScriptAttribute;
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
@@ -51,38 +49,38 @@ pub struct Compiler<'a> {
     scopes: SlotMap<ScopeKey, Scope>,
     pub src: SpwnSource,
 
-    pub map: &'a mut BytecodeMap,
-
     global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
 
     file_attrs: &'a FileSettings,
+
+    pub map: &'a mut BytecodeMap,
 }
 
 impl<'a> Compiler<'a> {
     pub fn new(
         interner: Rc<RefCell<Interner>>,
         src: SpwnSource,
-        map: &'a mut BytecodeMap,
         file_attrs: &'a FileSettings,
+        map: &'a mut BytecodeMap,
     ) -> Self {
         Self {
             interner,
             scopes: SlotMap::default(),
             src,
-            map,
             global_return: None,
             file_attrs,
+            map,
         }
     }
 
-    pub fn make_area(&self, span: CodeSpan) -> CodeArea {
+    fn make_area(&self, span: CodeSpan) -> CodeArea {
         CodeArea {
             span,
             src: self.src.clone(),
         }
     }
 
-    pub fn resolve(&self, spur: &Spur) -> String {
+    fn resolve(&self, spur: &Spur) -> String {
         self.interner.borrow().resolve(spur).to_string()
     }
 
@@ -132,6 +130,21 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    pub fn get_accessible_vars(&self, scope: ScopeKey) -> Vec<(Spur, Variable)> {
+        let mut vars = vec![];
+        fn inner(compiler: &Compiler, scope: ScopeKey, vars: &mut Vec<(Spur, Variable)>) {
+            let scope = &compiler.scopes[scope];
+            for (name, data) in &scope.variables {
+                vars.push((*name, *data))
+            }
+            if let Some(p) = scope.parent {
+                inner(compiler, p, vars)
+            }
+        }
+        inner(self, scope, &mut vars);
+        vars
+    }
+
     pub fn compile(&mut self, stmts: Vec<StmtNode>) -> CompileResult<&Bytecode<Register>> {
         let mut builder = BytecodeBuilder::new();
 
@@ -144,7 +157,9 @@ impl<'a> Compiler<'a> {
                     typ: Some(ScopeType::Global),
                 });
 
-                self.compile_stmts(&stmts, base_scope, f)
+                self.compile_stmts(&stmts, base_scope, f)?;
+
+                Ok(vec![])
             },
             0,
         )?;
@@ -179,6 +194,11 @@ impl<'a> Compiler<'a> {
                     opcodes,
                     regs_used: f.regs_used,
                     arg_amount: f.arg_amount,
+                    capture_regs: f
+                        .capture_regs
+                        .iter()
+                        .map(|(from, to)| (*from as Register, *to as Register))
+                        .collect(),
                 }
             })
             .collect();
@@ -186,7 +206,7 @@ impl<'a> Compiler<'a> {
         self.map.map.insert(
             self.src.clone(),
             Bytecode {
-                src: unopt_code.src,
+                import_paths: unopt_code.import_paths,
                 source_hash: unopt_code.source_hash,
                 consts: unopt_code.consts,
                 functions,
@@ -196,41 +216,20 @@ impl<'a> Compiler<'a> {
         );
 
         Ok(&self.map.map[&self.src])
-
-        // Ok(builder.build())
     }
 
-    pub fn compile_import(
-        &mut self,
-        typ: ImportType,
-        _: ScopeKey,
-        span: CodeSpan,
-    ) -> CompileResult<()> {
+    pub fn compile_import(&mut self, typ: &ImportType, span: CodeSpan) -> CompileResult<()> {
         let base_dir = match &self.src {
             SpwnSource::File(path) => path.parent().unwrap(),
         };
 
-        let (path, name) = match typ {
-            ImportType::Module(s) => {
-                let name = PathBuf::from(self.resolve(&s));
-                (
-                    base_dir.join(name.clone()),
-                    name.file_stem().unwrap().to_str().unwrap().to_string(),
-                )
-            }
-            ImportType::Library(name) => {
-                let name = PathBuf::from(format!("libraries/{}/lib.spwn", self.resolve(&name)));
-                (
-                    base_dir.join(name.clone()),
-                    name.file_stem().unwrap().to_str().unwrap().to_string(),
-                )
-            }
-        };
-        let src = SpwnSource::File(path.clone());
+        let (name, rel_path) = typ.to_path_name();
+        let import_path = base_dir.join(rel_path);
 
+        let import_src = SpwnSource::File(import_path.clone());
         let is_module = matches!(typ, ImportType::Module(_));
 
-        let code = match src.read() {
+        let code = match import_src.read() {
             Some(s) => s,
             None => {
                 return Err(CompilerError::NonexistentImport {
@@ -240,33 +239,36 @@ impl<'a> Compiler<'a> {
                 })
             }
         };
+        let import_base = import_path.parent().unwrap();
 
         let hash = md5::compute(&code);
 
-        let import_base = path.parent().unwrap();
+        let spwnc_path = import_base.join(format!(".spwnc/{name}.spwnc"));
 
-        let spwnc = import_base.join(format!(".spwnc/{}.spwnc", name));
+        'from_cache: {
+            if spwnc_path.is_file() {
+                let source = std::fs::read(&spwnc_path).unwrap();
 
-        'cache: {
-            if spwnc.is_file() {
-                let source = std::fs::read(&spwnc).unwrap();
-
-                let bytecode: Bytecode<u8> = match bincode::deserialize(&source) {
+                let bytecode: Bytecode<Register> = match bincode::deserialize(&source) {
                     Ok(b) => b,
                     Err(_) => {
-                        break 'cache;
+                        break 'from_cache;
                     }
                 };
 
                 if bytecode.source_hash == hash.into() {
-                    self.map.map.insert(src, bytecode);
+                    for import in &bytecode.import_paths {
+                        self.compile_import(&import.value, import.span)?;
+                    }
 
+                    self.map.map.insert(import_src.clone(), bytecode);
                     return Ok(());
+                    // break 'bytecode &self.map.map[&import_src];
                 }
             }
         }
 
-        let mut parser = Parser::new(code.trim_end(), src, Rc::clone(&self.interner));
+        let mut parser = Parser::new(code.trim_end(), import_src, Rc::clone(&self.interner));
 
         match parser.parse() {
             Ok(ast) => {
@@ -276,8 +278,8 @@ impl<'a> Compiler<'a> {
                 let mut compiler = Compiler::new(
                     Rc::clone(&self.interner),
                     parser.src,
-                    self.map,
                     &file_settings,
+                    self.map,
                 );
 
                 match compiler.compile(ast.statements) {
@@ -287,11 +289,7 @@ impl<'a> Compiler<'a> {
                         // dont write bytecode if caching is disabled
                         if !self.file_attrs.no_bytecode_cache {
                             let _ = std::fs::create_dir(import_base.join(".spwnc"));
-                            std::fs::write(
-                                import_base.join(format!(".spwnc/{}.spwnc", name)),
-                                bytes,
-                            )
-                            .unwrap();
+                            std::fs::write(&spwnc_path, bytes).unwrap();
                         }
                     }
                     Err(err) => return Err(err),
@@ -304,7 +302,7 @@ impl<'a> Compiler<'a> {
                     area: self.make_area(span),
                 })
             }
-        }
+        };
 
         Ok(())
     }
@@ -495,7 +493,7 @@ impl<'a> Compiler<'a> {
                 }
             },
             Statement::Continue => match self.find_scope_type(scope) {
-                Some(ScopeType::Loop(path)) => builder.exit_other_block(path.clone()),
+                Some(ScopeType::Loop(path)) => builder.repeat_other_block(path.clone()),
                 _ => {
                     return Err(CompilerError::ContinueOutsideLoop {
                         area: self.make_area(stmt.span),
@@ -761,9 +759,17 @@ impl<'a> Compiler<'a> {
                                 },
                             );
                         }
+                        let to_capture = self.get_accessible_vars(scope);
+                        let mut capture_regs = vec![];
+
+                        for (name, data) in to_capture {
+                            let reg = f.next_reg();
+                            capture_regs.push((data.reg, reg));
+                            variables.insert(name, Variable { reg, ..data });
+                        }
 
                         let base_scope = self.scopes.insert(Scope {
-                            parent: Some(scope),
+                            parent: None,
                             variables,
                             typ: Some(ScopeType::MacroBody),
                         });
@@ -776,7 +782,7 @@ impl<'a> Compiler<'a> {
                             }
                         }
 
-                        Ok(())
+                        Ok(capture_regs)
                     },
                     args.len(),
                 )?;
@@ -893,7 +899,8 @@ impl<'a> Compiler<'a> {
                 builder.load_empty(out_reg, expr.span);
             }
             Expression::Import(t) => {
-                self.compile_import(*t, scope, expr.span)?;
+                self.compile_import(t, expr.span)?;
+                builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
             }
             Expression::Instance { base, items } => todo!(),
         }

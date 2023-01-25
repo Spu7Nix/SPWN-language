@@ -1,31 +1,31 @@
 use super::error::RuntimeError;
-use super::interpreter::{RuntimeResult, Vm};
+use super::interpreter::{BytecodeKey, RuntimeResult, Vm};
 use super::value::{StoredValue, Value, ValueType};
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeSpan;
 
-pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<bool> {
+pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm, code: BytecodeKey) -> RuntimeResult<bool> {
     Ok(match &v.value {
         Value::Bool(b) => *b,
         _ => {
             return Err(RuntimeError::TypeMismatch {
                 v: (v.value.get_type(), v.area.clone()),
                 expected: ValueType::Bool,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
+pub fn equality(a: &Value, b: &Value, vm: &Vm, code: BytecodeKey) -> bool {
     match (a, b) {
         (Value::Array(v1), Value::Array(v2)) => {
             if v1.len() != v2.len() {
                 false
             } else {
-                v1.iter()
-                    .zip(v2)
-                    .all(|(k1, k2)| equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm))
+                v1.iter().zip(v2).all(|(k1, k2)| {
+                    equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm, code)
+                })
             }
         }
         (Value::Dict(v1), Value::Dict(v2)) => {
@@ -35,7 +35,7 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
                 for (k, k1) in v1 {
                     match v2.get(k) {
                         Some(k2) => {
-                            if !equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm) {
+                            if !equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm, code) {
                                 return false;
                             }
                         }
@@ -43,19 +43,22 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
                     }
                 }
                 true
-                // v1.iter()
-                //     .zip(v2)
-                //     .all(|(k1, k2)| equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm))
             }
         }
         (Value::Maybe(Some(k1)), Value::Maybe(Some(k2))) => {
-            equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm)
+            equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm, code)
         }
         _ => a == b,
     }
 }
 
-pub fn add(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn add(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(*a + *b),
         (Value::Float(a), Value::Float(b)) => Value::Float(*a + *b),
@@ -68,13 +71,19 @@ pub fn add(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runtime
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Plus,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn sub(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn sub(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(*a - *b),
         (Value::Float(a), Value::Float(b)) => Value::Float(*a - *b),
@@ -85,13 +94,19 @@ pub fn sub(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runtime
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Minus,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn mult(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn mult(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(*a * *b),
         (Value::Float(a), Value::Float(b)) => Value::Float(*a * *b),
@@ -107,12 +122,18 @@ pub fn mult(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runtim
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Mult,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
-pub fn div(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn div(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(*a / *b),
         (Value::Float(a), Value::Float(b)) => Value::Float(*a / *b),
@@ -123,13 +144,19 @@ pub fn div(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runtime
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Div,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn modulo(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn modulo(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(*a % *b),
         (Value::Float(a), Value::Float(b)) => Value::Float(*a % *b),
@@ -140,13 +167,19 @@ pub fn modulo(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runt
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Mod,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn pow(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn pow(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(a.pow(*b as u32)),
         (Value::Float(a), Value::Float(b)) => Value::Float(a.powf(*b)),
@@ -157,26 +190,36 @@ pub fn pow(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runtime
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Pow,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn not(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn unary_not(
+    v: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match &v.value {
         Value::Bool(b) => Value::Bool(!b),
         _ => {
             return Err(RuntimeError::InvalidUnaryOperand {
                 v: (v.value.get_type(), v.area.clone()),
                 op: UnaryOp::ExclMark,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn negate(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn unary_negate(
+    v: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match &v.value {
         Value::Int(n) => Value::Int(-n),
         Value::Float(n) => Value::Float(-n),
@@ -184,13 +227,19 @@ pub fn negate(v: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> 
             return Err(RuntimeError::InvalidUnaryOperand {
                 v: (v.value.get_type(), v.area.clone()),
                 op: UnaryOp::Minus,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn gt(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn gt(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Bool(a > b),
         (Value::Float(a), Value::Float(b)) => Value::Bool(a > b),
@@ -202,13 +251,19 @@ pub fn gt(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeR
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Gt,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn lt(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn lt(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Bool(a < b),
         (Value::Float(a), Value::Float(b)) => Value::Bool(a < b),
@@ -220,13 +275,19 @@ pub fn lt(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeR
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Lt,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn gte(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn gte(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Bool(a >= b),
         (Value::Float(a), Value::Float(b)) => Value::Bool(a >= b),
@@ -238,13 +299,19 @@ pub fn gte(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runtime
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Gte,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn lte(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn lte(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Bool(a <= b),
         (Value::Float(a), Value::Float(b)) => Value::Bool(a <= b),
@@ -256,13 +323,19 @@ pub fn lte(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runtime
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Lte,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn and(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn and(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a && *b),
         _ => {
@@ -270,13 +343,19 @@ pub fn and(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runtime
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::And,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn or(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn or(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a || *b),
         _ => {
@@ -284,31 +363,44 @@ pub fn or(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeR
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Or,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn range(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn range(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Range(*a, *b, 1),
-        (Value::Int(a), Value::Float(b)) => Value::Range(*a, *b as i64, 1),
-        (Value::Float(a), Value::Int(b)) => Value::Range(*a as i64, *b, 1),
-        (Value::Float(a), Value::Float(b)) => Value::Range(*a as i64, *b as i64, 1),
+        // (Value::Int(a), Value::Float(b)) => Value::Range(*a, *b as i64, 1),
+        // (Value::Float(a), Value::Int(b)) => Value::Range(*a as i64, *b, 1),
+        // (Value::Float(a), Value::Float(b)) => Value::Range(*a as i64, *b as i64, 1),
 
+        // should only allow integer ranges, rounding floats is kinda stinky
         _ => {
             return Err(RuntimeError::InvalidOperands {
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Range,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn bin_and(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn bin_and(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(*a & *b),
         (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a & *b),
@@ -318,13 +410,19 @@ pub fn bin_and(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Run
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinAnd,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
 }
 
-pub fn bin_or(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> RuntimeResult<Value> {
+pub fn bin_or(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(*a | *b),
         (Value::Bool(a), Value::Bool(b)) => Value::Bool(*a | *b),
@@ -334,7 +432,7 @@ pub fn bin_or(a: &StoredValue, b: &StoredValue, span: CodeSpan, vm: &Vm) -> Runt
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
@@ -345,6 +443,7 @@ pub fn shift_left(
     b: &StoredValue,
     span: CodeSpan,
     vm: &Vm,
+    code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(*a << *b),
@@ -354,7 +453,7 @@ pub fn shift_left(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
@@ -365,6 +464,7 @@ pub fn shift_right(
     b: &StoredValue,
     span: CodeSpan,
     vm: &Vm,
+    code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Int(*a >> *b),
@@ -374,7 +474,7 @@ pub fn shift_right(
                 a: (a.value.get_type(), a.area.clone()),
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
-                area: vm.make_area(span),
+                area: vm.make_area(span, code),
             })
         }
     })
