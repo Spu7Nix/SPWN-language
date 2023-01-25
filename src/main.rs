@@ -58,21 +58,14 @@ fn main() {
                         bytecode.debug_str(&parser.src);
                     }
 
-                    let mut programs = SlotMap::default();
-                    let key = programs.insert(&bytecode);
+                    let mut vm = Vm::new(interner);
+
+                    let key = vm.programs.insert(&bytecode);
                     let start = FuncCoord::new(0, key);
 
-                    let mut vm = Vm {
-                        memory: SlotMap::default(),
-                        interner,
-                        programs,
-                        id_counters: [0; 4],
-                        contexts: FullContext::new(start),
-                    };
+                    vm.push_call_stack(start, 0, false);
 
-                    vm.push_func_regs(start);
-
-                    match vm.run_func(start) {
+                    match vm.run_program() {
                         Ok(_) => {}
                         Err(err) => err.to_report().display(),
                     };

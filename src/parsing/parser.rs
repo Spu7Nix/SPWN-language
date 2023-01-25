@@ -442,7 +442,7 @@ impl Parser<'_> {
                     self.next();
                     let var_name = self.slice_interned();
 
-                    if matches!(self.peek(), Token::FatArrow | Token::Arrow) {
+                    if matches!(self.peek_or_newline(), Token::FatArrow | Token::Arrow) {
                         let ret_type = if self.next_is(Token::Arrow) {
                             self.next();
                             let r = Some(self.parse_expr()?);
@@ -740,6 +740,10 @@ impl Parser<'_> {
                     }
                 }
                 Token::Arrow => {
+                    if self.peek_or_newline() == Token::Newline {
+                        break;
+                    }
+
                     self.next();
 
                     let ret_type = self.parse_expr()?;

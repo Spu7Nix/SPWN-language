@@ -1,16 +1,25 @@
-use std::cmp::{Ordering, PartialOrd, Reverse};
+use std::cmp::{Ordering, PartialOrd};
+use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
 
 use super::interpreter::{FuncCoord, ValueKey};
+use super::opcodes::Register;
 use crate::gd::ids::Id;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CallStackItem {
+    pub func: FuncCoord,
+    pub ip: usize,
+    pub return_dest: Register,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
     pub group: Id,
-    pub pos: usize,
     pub recursion_depth: usize,
-    pub func: FuncCoord,
     pub memory: usize,
+
+    pub pos_stack: Vec<CallStackItem>,
 
     pub registers: Vec<Vec<ValueKey>>,
 }
@@ -18,38 +27,41 @@ pub struct Context {
 // sort by pos, then by recursion depth
 impl PartialOrd for Context {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.pos.cmp(&other.pos) {
-            Ordering::Equal => self.recursion_depth.partial_cmp(&other.recursion_depth),
-            x => Some(x),
-        }
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Context {
     fn cmp(&self, other: &Self) -> Ordering {
-        Reverse(self.pos)
-            .cmp(&Reverse(other.pos))
-            .then(Reverse(self.recursion_depth).cmp(&Reverse(other.recursion_depth)))
+        self.pos_stack
+            .len()
+            .cmp(&other.pos_stack.len())
+            .then(
+                self.pos_stack
+                    .last()
+                    .unwrap()
+                    .ip
+                    .cmp(&other.pos_stack.last().unwrap().ip),
+            )
+            .reverse()
     }
 }
 
 /// all the contexts!!!pub
+#[derive(Debug)]
 pub struct FullContext {
-    // literally gonna use a binary heap!!! even though theres gonna be like max 4 of them!!
-    // max my dick!
     contexts: BinaryHeap<Context>,
 }
 
 impl FullContext {
-    pub fn new(func: FuncCoord) -> Self {
+    pub fn new() -> Self {
         let mut contexts = BinaryHeap::new();
         contexts.push(Context {
             group: Id::Specific(0),
-            pos: 0,
             recursion_depth: 0,
-            func,
             memory: 0,
-            registers: Vec::new(),
+            registers: vec![],
+            pos_stack: vec![],
         });
         Self { contexts }
     }
@@ -58,12 +70,44 @@ impl FullContext {
         self.contexts.peek().unwrap()
     }
 
-    pub fn increment_current(&mut self) {
-        let mut current = self.contexts.peek_mut().unwrap();
-        current.pos += 1;
+    pub fn increment_current(&mut self, func_len: usize) {
+        {
+            let mut current = self.current_mut();
+            let ip = &mut current.pos_stack.last_mut().unwrap().ip;
+            *ip += 1;
+
+            if *ip >= func_len {
+                current.pos_stack.pop();
+            }
+        }
+        if self.current().pos_stack.is_empty() {
+            self.contexts.pop();
+        }
     }
 
-    pub fn current_mut(&mut self) -> std::collections::binary_heap::PeekMut<Context> {
+    pub fn jump_current(&mut self, pos: usize) {
+        self.current_mut().pos_stack.last_mut().unwrap().ip = pos
+    }
+
+    pub fn current_mut(&mut self) -> PeekMut<Context> {
         self.contexts.peek_mut().unwrap()
+    }
+
+    pub fn ip(&self) -> usize {
+        self.current().pos_stack.last().unwrap().ip
+    }
+
+    pub fn valid(&self) -> bool {
+        !self.contexts.is_empty()
+    }
+
+    pub fn yeet_current(&mut self) {
+        self.contexts.pop();
+    }
+
+    pub fn split_current(&mut self) {
+        let current = self.current();
+        let new = current.clone();
+        self.contexts.push(new);
     }
 }

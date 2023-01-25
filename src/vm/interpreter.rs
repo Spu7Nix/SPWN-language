@@ -5,7 +5,7 @@ use ahash::AHashMap;
 use lasso::Spur;
 use slotmap::{new_key_type, SlotMap};
 
-use super::context::FullContext;
+use super::context::{CallStackItem, FullContext};
 use super::error::RuntimeError;
 use super::opcodes::{Opcode, Register};
 use super::value::{ArgData, StoredValue, Value, ValueType};
@@ -47,13 +47,13 @@ pub struct Vm<'a> {
 }
 
 impl<'a> Vm<'a> {
-    pub fn new(interner: Rc<RefCell<Interner>>, start: FuncCoord) -> Vm<'a> {
+    pub fn new(interner: Rc<RefCell<Interner>>) -> Vm<'a> {
         Self {
             memory: SlotMap::default(),
             interner,
             programs: SlotMap::default(),
             id_counters: [0; 4],
-            contexts: FullContext::new(start),
+            contexts: FullContext::new(),
         }
     }
 
@@ -132,29 +132,75 @@ impl<'a> Vm<'a> {
         self.make_area(self.get_span(func, i), func.code)
     }
 
-    pub fn push_func_regs(&mut self, func: FuncCoord) {
+    pub fn push_call_stack(
+        &mut self,
+        func: FuncCoord,
+        return_dest: Register,
+        increment_last: bool,
+    ) {
         let regs_used = self.programs[func.code].functions[func.func].regs_used;
-        let mut regs = vec![];
+        let mut regs = Vec::with_capacity(regs_used);
         for _ in 0..regs_used {
             regs.push(self.memory.insert(StoredValue {
                 value: Value::Empty,
                 area: self.make_area(CodeSpan::invalid(), func.code),
             }))
         }
-        self.contexts.current_mut().registers.push(regs);
+        {
+            let mut current = self.contexts.current_mut();
+            current.registers.push(regs);
+            if increment_last {
+                current.pos_stack.last_mut().unwrap().ip += 1;
+            }
+            current.pos_stack.push(CallStackItem {
+                func,
+                ip: 0,
+                return_dest,
+            });
+            current.recursion_depth += 1;
+        }
+        //dbg!(&self.contexts);
     }
 
-    pub fn pop_func_regs(&mut self) {
-        self.contexts.current_mut().registers.pop();
+    pub fn return_and_pop_current(&mut self, ret_val: Option<StoredValue>) {
+        if self.contexts.current().pos_stack.len() == 1 {
+            self.contexts.yeet_current();
+            return;
+        }
+
+        let item = {
+            let mut current = self.contexts.current_mut();
+            current.recursion_depth -= 1;
+            current.registers.pop();
+            current.pos_stack.pop().unwrap()
+        };
+
+        if let Some(ret_val) = ret_val {
+            self.set_reg(item.return_dest, ret_val);
+        } else {
+            self.set_reg(
+                item.return_dest,
+                StoredValue {
+                    value: Value::Empty,
+                    area: self.make_area(CodeSpan::internal(), item.func.code), // probably gonna have to store the areas in the stack
+                },
+            );
+        }
     }
 
-    pub fn run_func(&mut self, func: FuncCoord) -> RuntimeResult<Option<StoredValue>> {
-        let opcodes = &self.programs[func.code].functions[func.func].opcodes;
+    pub fn run_program(&mut self) -> RuntimeResult<()> {
+        //self.push_call_stack(start, 0);
+        while self.contexts.valid() {
+            let &CallStackItem { func, ip, .. } = self.contexts.current().pos_stack.last().unwrap();
+            let opcodes = &self.programs[func.code].functions[func.func].opcodes;
 
-        let mut ip = 0_usize;
+            if ip >= opcodes.len() {
+                self.return_and_pop_current(None);
+                continue;
+            }
+            let opcode = &opcodes[ip];
 
-        while ip < opcodes.len() {
-            match &opcodes[ip] {
+            match opcode {
                 Opcode::LoadConst { dest, id } => {
                     let value =
                         Value::from_const(&self.programs[func.code].consts[*id as usize], self);
@@ -331,17 +377,21 @@ impl<'a> Vm<'a> {
                     self.bin_op(value_ops::or, func, ip, left, right, dest)?
                 }
                 Opcode::Jump { to } => {
-                    ip = *to as usize;
+                    self.contexts.jump_current(*to as usize);
                     continue;
                 }
                 Opcode::JumpIfFalse { src, to } => {
                     let span = self.get_span(func, ip);
                     if !value_ops::to_bool(self.get_reg(*src), span, self, func.code)? {
-                        ip = *to as usize;
+                        self.contexts.jump_current(*to as usize);
                         continue;
                     }
                 }
-                Opcode::Ret { src } => return Ok(Some(self.deep_clone_reg(*src))),
+                Opcode::Ret { src } => {
+                    let ret_val = self.deep_clone_reg(*src);
+                    self.return_and_pop_current(Some(ret_val));
+                    continue;
+                }
                 Opcode::WrapMaybe { src, dest } => {
                     let v = self.deep_clone_reg_insert(*src);
                     let span = self.get_span(func, ip);
@@ -388,8 +438,14 @@ impl<'a> Vm<'a> {
                     dest: _,
                     name: _,
                 } => todo!(),
-                Opcode::YeetContext => todo!(),
-                Opcode::EnterArrowStatement { skip_to: _ } => todo!(),
+                Opcode::YeetContext => {
+                    self.contexts.yeet_current();
+                    continue;
+                }
+                Opcode::EnterArrowStatement { skip_to } => {
+                    self.contexts.split_current();
+                    self.contexts.jump_current(*skip_to as usize);
+                }
                 Opcode::LoadBuiltins { dest } => {
                     let span = self.get_span(func, ip);
                     self.set_reg(
@@ -457,7 +513,7 @@ impl<'a> Vm<'a> {
                                 _ => unreachable!(),
                             }
                             let base_area = base.area.clone();
-                            self.push_func_regs(func);
+                            self.push_call_stack(func, *dest, true);
 
                             for (i, data) in arg_data.iter().enumerate() {
                                 let v = match param_map[&data.name] {
@@ -483,16 +539,14 @@ impl<'a> Vm<'a> {
                                 self.change_reg_key(*to, *k)
                             }
 
-                            let ret_val = match self.run_func(func)? {
-                                Some(v) => v,
-                                None => StoredValue {
-                                    value: Value::Empty,
-                                    area: base_area,
-                                },
-                            };
-                            self.pop_func_regs();
-
-                            self.set_reg(*dest, ret_val);
+                            // let ret_val = match self.run_program(func)? {
+                            //     Some(v) => v,
+                            //     None => StoredValue {
+                            //         value: Value::Empty,
+                            //         area: base_area,
+                            //     },
+                            // };
+                            continue;
                         }
                         _ => {
                             return Err(RuntimeError::TypeMismatch {
@@ -554,11 +608,16 @@ impl<'a> Vm<'a> {
                 _ => todo!(),
             }
 
-            ip += 1;
+            // increment ip
+            // TODO: implicit return shit
+            {
+                let mut current = self.contexts.current_mut();
+                let ip = &mut current.pos_stack.last_mut().unwrap().ip;
+                *ip += 1;
+            };
         }
 
-        // none is the same as empty (`()`)
-        Ok(None)
+        Ok(())
     }
 
     #[inline]

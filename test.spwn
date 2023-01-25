@@ -1,14 +1,23 @@
-// #[debug_bytecode]
+#[debug_bytecode]
 
 // foo = import "foo.spwn"
 
-#[debug_bytecode]
 
-() {
-    print 1
-    print 2
-    print 3
-} ()
+a = () {
+    -> return 1
+    -> return 2
+    return 3
+}
+
+b = a()
+
+if b == 1 {
+    print "a is 1"
+} else if b == 2 {
+    print "a is 2"
+} else {
+    print "a is 3"
+}
 
 
 
