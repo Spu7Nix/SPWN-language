@@ -146,19 +146,21 @@ impl<'a> Vm<'a> {
                 area: self.make_area(CodeSpan::invalid(), func.code),
             }))
         }
-        {
-            let mut current = self.contexts.current_mut();
-            current.registers.push(regs);
-            if increment_last {
-                current.pos_stack.last_mut().unwrap().ip += 1;
-            }
-            current.pos_stack.push(CallStackItem {
-                func,
-                ip: 0,
-                return_dest,
-            });
-            current.recursion_depth += 1;
+        let call_key = self.contexts.have_not_returned.insert(());
+        let mut current = self.contexts.current_mut();
+        current.registers.push(regs);
+        if increment_last {
+            current.pos_stack.last_mut().unwrap().ip += 1;
         }
+
+        current.pos_stack.push(CallStackItem {
+            func,
+            ip: 0,
+            return_dest,
+            call_key,
+        });
+        current.recursion_depth += 1;
+
         //dbg!(&self.contexts);
     }
 
@@ -174,6 +176,8 @@ impl<'a> Vm<'a> {
             current.registers.pop();
             current.pos_stack.pop().unwrap()
         };
+
+        self.contexts.have_not_returned.remove(item.call_key);
 
         if let Some(ret_val) = ret_val {
             self.set_reg(item.return_dest, ret_val);
@@ -191,11 +195,19 @@ impl<'a> Vm<'a> {
     pub fn run_program(&mut self) -> RuntimeResult<()> {
         //self.push_call_stack(start, 0);
         while self.contexts.valid() {
-            let &CallStackItem { func, ip, .. } = self.contexts.current().pos_stack.last().unwrap();
+            let &CallStackItem {
+                func, ip, call_key, ..
+            } = self.contexts.current().pos_stack.last().unwrap();
             let opcodes = &self.programs[func.code].functions[func.func].opcodes;
 
             if ip >= opcodes.len() {
-                self.return_and_pop_current(None);
+                if self.contexts.have_not_returned.contains_key(call_key) {
+                    // implicit return
+                    self.return_and_pop_current(None);
+                } else {
+                    // implicit yeet
+                    self.contexts.yeet_current();
+                }
                 continue;
             }
             let opcode = &opcodes[ip];

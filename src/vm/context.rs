@@ -2,6 +2,8 @@ use std::cmp::{Ordering, PartialOrd};
 use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
 
+use slotmap::{new_key_type, SlotMap};
+
 use super::interpreter::{FuncCoord, ValueKey};
 use super::opcodes::Register;
 use crate::gd::ids::Id;
@@ -11,6 +13,7 @@ pub struct CallStackItem {
     pub func: FuncCoord,
     pub ip: usize,
     pub return_dest: Register,
+    pub call_key: CallKey,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,10 +50,15 @@ impl Ord for Context {
     }
 }
 
+new_key_type! {
+    pub struct CallKey;
+}
+
 /// all the contexts!!!pub
 #[derive(Debug)]
 pub struct FullContext {
     contexts: BinaryHeap<Context>,
+    pub have_not_returned: SlotMap<CallKey, ()>,
 }
 
 impl FullContext {
@@ -63,7 +71,10 @@ impl FullContext {
             registers: vec![],
             pos_stack: vec![],
         });
-        Self { contexts }
+        Self {
+            contexts,
+            have_not_returned: SlotMap::default(),
+        }
     }
 
     pub fn current(&self) -> &Context {
