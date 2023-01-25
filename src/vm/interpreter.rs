@@ -5,6 +5,7 @@ use ahash::AHashMap;
 use lasso::Spur;
 use slotmap::{new_key_type, SlotMap};
 
+use super::context::FullContext;
 use super::error::RuntimeError;
 use super::opcodes::{Opcode, Register};
 use super::value::{ArgData, StoredValue, Value, ValueType};
@@ -26,27 +27,33 @@ pub struct FuncCoord {
     code: BytecodeKey,
 }
 
+impl FuncCoord {
+    pub fn new(func: usize, code: BytecodeKey) -> Self {
+        Self { func, code }
+    }
+}
+
 pub struct Vm<'a> {
     // 256 registers per function
-    registers: Vec<Vec<ValueKey>>,
-
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    programs: SlotMap<BytecodeKey, &'a Bytecode<Register>>,
+    pub programs: SlotMap<BytecodeKey, &'a Bytecode<Register>>,
 
     pub interner: Rc<RefCell<Interner>>,
 
     pub id_counters: [usize; 4],
+
+    pub contexts: FullContext,
 }
 
 impl<'a> Vm<'a> {
-    pub fn new(interner: Rc<RefCell<Interner>>) -> Vm<'a> {
+    pub fn new(interner: Rc<RefCell<Interner>>, start: FuncCoord) -> Vm<'a> {
         Self {
             memory: SlotMap::default(),
-            registers: vec![],
             interner,
             programs: SlotMap::default(),
             id_counters: [0; 4],
+            contexts: FullContext::new(start),
         }
     }
 
@@ -78,7 +85,7 @@ impl<'a> Vm<'a> {
     }
 
     pub fn deep_clone_reg(&mut self, reg: Register) -> StoredValue {
-        self.deep_clone_key(self.registers.last().unwrap()[reg as usize])
+        self.deep_clone_key(self.contexts.current().registers.last().unwrap()[reg as usize])
     }
 
     pub fn deep_clone_reg_insert(&mut self, reg: Register) -> ValueKey {
@@ -87,27 +94,27 @@ impl<'a> Vm<'a> {
     }
 
     pub fn get_reg(&self, reg: Register) -> &StoredValue {
-        &self.memory[self.registers.last().unwrap()[reg as usize]]
+        &self.memory[self.contexts.current().registers.last().unwrap()[reg as usize]]
     }
 
     pub fn get_reg_key(&self, reg: Register) -> ValueKey {
-        self.registers.last().unwrap()[reg as usize]
+        self.contexts.current().registers.last().unwrap()[reg as usize]
     }
 
     pub fn get_reg_mut(&mut self, reg: Register) -> &mut StoredValue {
-        &mut self.memory[self.registers.last().unwrap()[reg as usize]]
+        &mut self.memory[self.contexts.current_mut().registers.last().unwrap()[reg as usize]]
     }
 
     pub fn set_reg(&mut self, reg: Register, v: StoredValue) {
-        self.memory[self.registers.last_mut().unwrap()[reg as usize]] = v
+        self.memory[self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize]] = v
     }
 
     pub fn change_reg_key(&mut self, reg: Register, k: ValueKey) {
-        self.registers.last_mut().unwrap()[reg as usize] = k
+        self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize] = k
     }
 
     // pub fn set_reg_key(&mut self, reg: Register, k: ValueKey) {
-    //     self.registers.last_mut().unwrap()[reg as usize] = k
+    //     self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize] = k
     // }
 
     pub fn make_area(&self, span: CodeSpan, code: BytecodeKey) -> CodeArea {
@@ -134,11 +141,11 @@ impl<'a> Vm<'a> {
                 area: self.make_area(CodeSpan::invalid(), func.code),
             }))
         }
-        self.registers.push(regs);
+        self.contexts.current_mut().registers.push(regs);
     }
 
     pub fn pop_func_regs(&mut self) {
-        self.registers.pop();
+        self.contexts.current_mut().registers.pop();
     }
 
     pub fn run_func(&mut self, func: FuncCoord) -> RuntimeResult<Option<StoredValue>> {
@@ -237,17 +244,17 @@ impl<'a> Vm<'a> {
                     self.bin_op(value_ops::bin_and, func, ip, left, right, dest)?
                 }
 
-                Opcode::AddEq { left, right } => todo!(),
-                Opcode::SubEq { left, right } => todo!(),
-                Opcode::MultEq { left, right } => todo!(),
-                Opcode::DivEq { left, right } => todo!(),
-                Opcode::ModEq { left, right } => todo!(),
-                Opcode::PowEq { left, right } => todo!(),
-                Opcode::ShiftLeftEq { left, right } => todo!(),
-                Opcode::ShiftRightEq { left, right } => todo!(),
-                Opcode::BinAndEq { left, right } => todo!(),
-                Opcode::BinOrEq { left, right } => todo!(),
-                Opcode::BinNotEq { left, right } => todo!(),
+                Opcode::AddEq { left: _, right: _ } => todo!(),
+                Opcode::SubEq { left: _, right: _ } => todo!(),
+                Opcode::MultEq { left: _, right: _ } => todo!(),
+                Opcode::DivEq { left: _, right: _ } => todo!(),
+                Opcode::ModEq { left: _, right: _ } => todo!(),
+                Opcode::PowEq { left: _, right: _ } => todo!(),
+                Opcode::ShiftLeftEq { left: _, right: _ } => todo!(),
+                Opcode::ShiftRightEq { left: _, right: _ } => todo!(),
+                Opcode::BinAndEq { left: _, right: _ } => todo!(),
+                Opcode::BinOrEq { left: _, right: _ } => todo!(),
+                Opcode::BinNotEq { left: _, right: _ } => todo!(),
                 Opcode::Not { src, dest } => {
                     self.unary_op(value_ops::unary_not, func, ip, src, dest)?
                 }
@@ -255,7 +262,7 @@ impl<'a> Vm<'a> {
                     self.unary_op(value_ops::unary_negate, func, ip, src, dest)?
                 }
 
-                Opcode::BinNot { src, dest } => todo!(),
+                Opcode::BinNot { src: _, dest: _ } => todo!(),
 
                 Opcode::Eq { left, right, dest } => {
                     let span = self.get_span(func, ip);
@@ -302,9 +309,21 @@ impl<'a> Vm<'a> {
                 Opcode::Range { left, right, dest } => {
                     self.bin_op(value_ops::range, func, ip, left, right, dest)?
                 }
-                Opcode::In { left, right, dest } => todo!(),
-                Opcode::As { left, right, dest } => todo!(),
-                Opcode::Is { left, right, dest } => todo!(),
+                Opcode::In {
+                    left: _,
+                    right: _,
+                    dest: _,
+                } => todo!(),
+                Opcode::As {
+                    left: _,
+                    right: _,
+                    dest: _,
+                } => todo!(),
+                Opcode::Is {
+                    left: _,
+                    right: _,
+                    dest: _,
+                } => todo!(),
                 Opcode::And { left, right, dest } => {
                     self.bin_op(value_ops::and, func, ip, left, right, dest)?
                 }
@@ -354,11 +373,23 @@ impl<'a> Vm<'a> {
                         },
                     )
                 }
-                Opcode::Index { from, dest, index } => todo!(),
-                Opcode::Member { from, dest, member } => todo!(),
-                Opcode::Associated { from, dest, name } => todo!(),
+                Opcode::Index {
+                    from: _,
+                    dest: _,
+                    index: _,
+                } => todo!(),
+                Opcode::Member {
+                    from: _,
+                    dest: _,
+                    member: _,
+                } => todo!(),
+                Opcode::Associated {
+                    from: _,
+                    dest: _,
+                    name: _,
+                } => todo!(),
                 Opcode::YeetContext => todo!(),
-                Opcode::EnterArrowStatement { skip_to } => todo!(),
+                Opcode::EnterArrowStatement { skip_to: _ } => todo!(),
                 Opcode::LoadBuiltins { dest } => {
                     let span = self.get_span(func, ip);
                     self.set_reg(
@@ -369,7 +400,7 @@ impl<'a> Vm<'a> {
                         },
                     )
                 }
-                Opcode::Export { src } => todo!(),
+                Opcode::Export { src: _ } => todo!(),
                 Opcode::Call { args, base, dest } => {
                     let base = self.get_reg(*base);
                     let span = self.get_span(func, ip);

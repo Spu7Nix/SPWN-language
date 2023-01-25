@@ -1,15 +1,18 @@
 use std::cmp::{Ordering, PartialOrd, Reverse};
 use std::collections::BinaryHeap;
 
-use super::interpreter::FuncCoord;
+use super::interpreter::{FuncCoord, ValueKey};
 use crate::gd::ids::Id;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
     pub group: Id,
     pub pos: usize,
     pub recursion_depth: usize,
     pub func: FuncCoord,
+    pub memory: usize,
+
+    pub registers: Vec<Vec<ValueKey>>,
 }
 // yore sot sitnky 😍😍😍😍😍😍😍😂😂😂😂😻😻😻😻😻❤️❤️❤️❤️❤️❤️😭💷💷💷💷💵💵🚘🚘🚘😉😉😉
 // sort by pos, then by recursion depth
@@ -30,20 +33,37 @@ impl Ord for Context {
     }
 }
 
-/// all the contexts!!!
-struct FullContext {
+/// all the contexts!!!pub
+pub struct FullContext {
     // literally gonna use a binary heap!!! even though theres gonna be like max 4 of them!!
     // max my dick!
     contexts: BinaryHeap<Context>,
 }
 
 impl FullContext {
-    fn current(&self) -> &Context {
+    pub fn new(func: FuncCoord) -> Self {
+        let mut contexts = BinaryHeap::new();
+        contexts.push(Context {
+            group: Id::Specific(0),
+            pos: 0,
+            recursion_depth: 0,
+            func,
+            memory: 0,
+            registers: Vec::new(),
+        });
+        Self { contexts }
+    }
+
+    pub fn current(&self) -> &Context {
         self.contexts.peek().unwrap()
     }
 
-    fn increment_current(&mut self) {
+    pub fn increment_current(&mut self) {
         let mut current = self.contexts.peek_mut().unwrap();
         current.pos += 1;
+    }
+
+    pub fn current_mut(&mut self) -> std::collections::binary_heap::PeekMut<Context> {
+        self.contexts.peek_mut().unwrap()
     }
 }

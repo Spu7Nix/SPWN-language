@@ -2,22 +2,14 @@
 
 // foo = import "foo.spwn"
 
-// foo.some_fun()
-
-
-
-// let a = 0
-
-// cock = () {
-//     a = a + 1
-// }
-
-// return {
-//     cock
-// }
 #[debug_bytecode]
 
-import guga
+() {
+    print 1
+    print 2
+    print 3
+} ()
+
 
 
 

@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use lasso::Rodeo;
+use slotmap::SlotMap;
 
 use crate::cli::FileSettings;
 use crate::compiling::compiler::Compiler;
@@ -24,6 +25,8 @@ use crate::lexing::tokens::Token;
 use crate::parsing::parser::Parser;
 use crate::sources::SpwnSource;
 use crate::util::RandomState;
+use crate::vm::context::FullContext;
+use crate::vm::interpreter::{FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
 
 fn main() {
@@ -55,14 +58,24 @@ fn main() {
                         bytecode.debug_str(&parser.src);
                     }
 
-                    // let mut vm = Vm::new(bytecode, Rc::clone(&interner));
+                    let mut programs = SlotMap::default();
+                    let key = programs.insert(&bytecode);
+                    let start = FuncCoord::new(0, key);
 
-                    // vm.push_func_regs(0);
+                    let mut vm = Vm {
+                        memory: SlotMap::default(),
+                        interner,
+                        programs,
+                        id_counters: [0; 4],
+                        contexts: FullContext::new(start),
+                    };
 
-                    // match vm.run_func(0) {
-                    //     Ok(_) => {}
-                    //     Err(err) => err.to_report().display(),
-                    // };
+                    vm.push_func_regs(start);
+
+                    match vm.run_func(start) {
+                        Ok(_) => {}
+                        Err(err) => err.to_report().display(),
+                    };
                 }
                 Err(err) => err.to_report().display(),
             }
