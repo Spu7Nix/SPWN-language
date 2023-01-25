@@ -7,7 +7,7 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
 use super::error::CompilerError;
-use super::optimize::optimize_function;
+// use super::optimize::optimize_function;
 use crate::cli::FileSettings;
 use crate::parsing::ast::{
     ExprNode, Expression, ImportType, MacroCode, Spannable, Spanned, Statement, StmtNode,

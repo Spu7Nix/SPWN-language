@@ -39,6 +39,10 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
         }
     };
 
+    for (input, output) in &func.capture_regs {
+        write[*output] = true;
+    }
+
     macro_rules! opcode {
         ($( $bytecode:ident { $( $var:ident($typ:ident) )* } )*) => {
             {
@@ -55,7 +59,7 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
                 let is_used = |reg| {
                     match (read[reg], write[reg]) {
                         (true, true) => true,
-                        (true, false) => false, // unreachable!(),
+                        (true, false) => true, // this could be false
                         (false, true) => false,
                         (false, false) => false,
                     }
@@ -93,7 +97,9 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
         };
         (#READ/WRITE $var:ident read) => { read[$var] = true; };
         (#READ/WRITE $var:ident write) => { write[$var] = true; };
-        (#READ/WRITE $var:ident $_:ident) => {};
+        (#READ/WRITE $var:ident constant) => {};
+        (#READ/WRITE $var:ident jump) => {};
+        (#READ/WRITE $var:ident ignore) => {};
 
         (UNUSED $op:ident $is_used:ident $( $bytecode:ident { $( $var:ident($typ:ident) )* } )*) => {
             match $op {
@@ -112,7 +118,9 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
         };
         (#UNUSED $var:ident(read)) => { get_reg($var) };
         (#UNUSED $var:ident(write)) => { get_reg($var) };
-        (#UNUSED $var:ident($_:ident)) => { $var };
+        (#UNUSED $var:ident(constant)) => { $var };
+        (#UNUSED $var:ident(jump)) => { $var };
+        (#UNUSED $var:ident(ignore)) => { $var };
 
         (#IS_USED $is_used:ident $var:ident(write)) => { $is_used($var) };
         (#IS_USED $is_used:ident $var:ident($_:ident)) => { true };
@@ -153,16 +161,17 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
         BinAnd { left(read) right(read) dest(write) }
 
         // TODO: this requires an operator to be both read and write, which isn't implemented yet
-        // AddEq { left(read) right(read) dest(write) }
-        // SubEq { left(read) right(read) dest(write) }
-        // MultEq { left(read) right(read) dest(write) }
-        // DivEq { left(read) right(read) dest(write) }
-        // ModEq { left(read) right(read) dest(write) }
-        // PowEq { left(read) right(read) dest(write) }
-        // ShiftLeftEq { left(read) right(read) dest(write) }
-        // ShiftRightEq { left(read) right(read) dest(write) }
-        // BinOrEq { left(read) right(read) dest(write) }
-        // BinAndEq { left(read) right(read) dest(write) }
+        AddEq { left(write) right(read) }
+        SubEq { left(write) right(read) }
+        MultEq { left(write) right(read) }
+        DivEq { left(write) right(read) }
+        ModEq { left(write) right(read) }
+        PowEq { left(write) right(read) }
+        ShiftLeftEq { left(write) right(read) }
+        ShiftRightEq { left(write) right(read) }
+        BinOrEq { left(write) right(read) }
+        BinAndEq { left(write) right(read) }
+        BinNotEq { left(write) right(read) }
 
         Not { src(read) dest(write) }
         Negate { src(read) dest(write) }
@@ -204,11 +213,16 @@ fn remove_unused(func: &Function<usize>) -> Function<usize> {
         LoadBuiltins { dest(write) }
         
         Export { src(read) }
+        Import { src(ignore) dest(write) }
     );
 
+    
     let mut output = func.clone();
     output.opcodes.clear();
     output.regs_used = read.clone().iter().filter(|v| **v).count();
+
+    // fix captures
+    output.capture_regs = output.capture_regs.iter().map(|(input, output)| (get_reg(*input), *output)).collect();
 
     // fix jumps
     for (_i, op) in opcodes.iter().enumerate().filter_map(|(i, v)| v.map(|v| (i, v))) {
