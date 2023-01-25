@@ -1,12 +1,24 @@
+// #[debug_bytecode]
+
+// foo = import "foo.spwn"
+
+// foo.some_fun()
+
+
+
+// let a = 0
+
+// cock = () {
+//     a = a + 1
+// }
+
+// return {
+//     cock
+// }
 #[debug_bytecode]
 
-let cock = 1
+import guga
 
-shit = (n) {
-    print n;
-    print cock;
-}
 
-shit(69);
 
 

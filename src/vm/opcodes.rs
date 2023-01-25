@@ -285,4 +285,6 @@ opcodes! {
 
     #[delve(display = |s: &R| format!("export R{s}"))]
     Export { => src },
+    #[delve(display = |s: &R, d: &R| format!("import R{s} -> R{d}"))]
+    Import { => src, => dest },
 }

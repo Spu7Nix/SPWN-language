@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{format, Debug, Display};
 use std::hash::Hash;
 
 use ahash::AHashMap;
@@ -20,7 +20,8 @@ use crate::vm::opcodes::{FunctionID, Opcode, Register, UnoptOpcode, UnoptRegiste
 #[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
 pub struct Function<R>
 where
-    R: Display + Copy,
+    R: Display + Debug + Copy,
+    for<'de3> Vec<(R, R)>: Serialize + Deserialize<'de3>,
 {
     pub opcodes: Vec<Opcode<R>>,
     // always 0 for unoptimised bytecode
@@ -28,13 +29,16 @@ where
     pub regs_used: usize,
 
     pub arg_amount: usize,
+
+    pub capture_regs: Vec<(R, R)>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
 pub struct Bytecode<R>
 where
-    R: Display + Copy,
+    R: Display + Debug + Copy,
+    for<'de3> Vec<(R, R)>: Serialize + Deserialize<'de3>,
 {
     pub src: SpwnSource,
     pub source_hash: Digest,
@@ -59,10 +63,10 @@ pub enum Constant {
 impl std::fmt::Debug for Constant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Constant::Int(v) => write!(f, "{}", v),
-            Constant::Float(v) => write!(f, "{}", v),
-            Constant::Bool(v) => write!(f, "{}", v),
-            Constant::String(v) => write!(f, "{:?}", v),
+            Constant::Int(v) => write!(f, "{v}"),
+            Constant::Float(v) => write!(f, "{v}"),
+            Constant::Bool(v) => write!(f, "{v}"),
+            Constant::String(v) => write!(f, "{v:?}"),
             Constant::Id(class, n) => write!(
                 f,
                 "{}{}",
@@ -77,7 +81,7 @@ impl std::fmt::Debug for Constant {
     }
 }
 
-#[allow(clippy::derive_hash_xor_eq)]
+#[allow(clippy::derived_hash_with_manual_eq)]
 impl Hash for Constant {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         std::mem::discriminant(self).hash(state);
@@ -172,6 +176,7 @@ struct ProtoFunc {
     code: Block,
     used_regs: usize,
     arg_amount: usize,
+    capture_regs: Vec<(UnoptRegister, UnoptRegister)>,
 }
 
 new_key_type! {
@@ -200,7 +205,7 @@ impl BytecodeBuilder {
 
     pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
     where
-        F: FnOnce(&mut FuncBuilder) -> CompileResult<()>,
+        F: FnOnce(&mut FuncBuilder) -> CompileResult<Vec<(UnoptRegister, UnoptRegister)>>,
     {
         let new_func = ProtoFunc {
             code: Block {
@@ -209,6 +214,7 @@ impl BytecodeBuilder {
             },
             used_regs: 0,
             arg_amount,
+            capture_regs: vec![],
         };
         let func_id = self.funcs.len();
         self.funcs.push(new_func);
@@ -219,7 +225,8 @@ impl BytecodeBuilder {
             block_path: vec![],
         };
 
-        f(&mut func_builder)?;
+        let capture_regs = f(&mut func_builder)?;
+        self.funcs[func_id].capture_regs = capture_regs;
 
         Ok(func_id as FunctionID)
     }
@@ -339,6 +346,7 @@ impl BytecodeBuilder {
                 opcodes,
                 regs_used: f.used_regs,
                 arg_amount: f.arg_amount,
+                capture_regs: f.capture_regs.clone(),
             })
         }
 
@@ -426,7 +434,7 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
     where
-        F: FnOnce(&mut FuncBuilder) -> CompileResult<()>,
+        F: FnOnce(&mut FuncBuilder) -> CompileResult<Vec<(UnoptRegister, UnoptRegister)>>,
     {
         self.code_builder.new_func(f, arg_amount)
     }
@@ -920,13 +928,17 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode(ProtoOpcode::Jump(JumpTo::Start(path)))
     }
 
-    pub fn exit_block(&mut self) {
-        let path = self.block_path.clone();
-        self.push_opcode(ProtoOpcode::Jump(JumpTo::End(path)))
-    }
+    // pub fn exit_block(&mut self) {
+    //     let path = self.block_path.clone();
+    //     self.push_opcode(ProtoOpcode::Jump(JumpTo::End(path)))
+    // }
 
     pub fn exit_other_block(&mut self, path: Vec<UnoptRegister>) {
         self.push_opcode(ProtoOpcode::Jump(JumpTo::End(path)))
+    }
+
+    pub fn repeat_other_block(&mut self, path: Vec<UnoptRegister>) {
+        self.push_opcode(ProtoOpcode::Jump(JumpTo::Start(path)))
     }
 
     pub fn enter_arrow(&mut self) {
@@ -1037,13 +1049,21 @@ impl<'a> FuncBuilder<'a> {
             span,
         )
     }
+
+    pub fn import(&mut self, dest: UnoptRegister, src: Spanned<String>, span: CodeSpan) {
+        let next_reg = self.next_reg();
+        self.load_string(src.value, next_reg, src.span);
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::Import {
+                src: next_reg,
+                dest,
+            }),
+            span,
+        )
+    }
 }
 
-impl<R> Bytecode<R>
-where
-    R: Display + Copy,
-    Opcode<R>: Serialize,
-{
+impl Bytecode<Register> {
     pub fn debug_str(&self, src: &SpwnSource) {
         let code = src.read().unwrap();
 
@@ -1081,7 +1101,7 @@ where
                 lines.push(format!(
                     "{:<pad$}  {:>pad2$}",
                     opcode_i.to_string().bright_blue().bold(),
-                    <&Opcode<R> as Into<&'static str>>::into(opcode),
+                    <&Opcode<Register> as Into<&'static str>>::into(opcode),
                     pad = max_num_width,
                     pad2 = longest_opcode
                 ));
@@ -1096,7 +1116,7 @@ where
                         )
                     }
                     _ => {
-                        format!("{}", opcode)
+                        format!("{opcode}")
                     }
                 };
 
@@ -1176,13 +1196,12 @@ where
             println!(
                 "{}",
                 format!(
-                    "╭────┤ Function {} ├{}┬{}┬{}╮ registers used: {}",
+                    "╭────┤ Function {} ├{}┬{}┬{}╮",
                     func_i,
                     "─".repeat(longest_formatted + max_num_width + 10),
                     "─".repeat(longest_span + 4),
                     // bytecode will never be more than 15 characters (2 spaces padding on either side, 2 hex chars + 1 space * 4)
                     "─".repeat(15),
-                    func.regs_used,
                 )
                 .bright_yellow()
             );
@@ -1194,13 +1213,32 @@ where
             println!(
                 "{}",
                 format!(
-                    "╰──────────────────{}┴{}┴{}╯",
+                    "├──────────────────{}┴{}┴{}╯",
                     "─".repeat(longest_formatted + max_num_width + 10),
                     "─".repeat(longest_span + 4),
                     // bytecode will never be more than 15 characters (2 spaces padding on either side, 2 hex chars + 1 space * 4)
                     "─".repeat(15),
                 )
                 .bright_yellow()
+            );
+
+            println!(
+                "{}\n{}\n{}",
+                format!("│ registers used: {}", func.regs_used).bright_yellow(),
+                format!(
+                    "│ capture regs: {}",
+                    func.capture_regs
+                        .iter()
+                        .map(|(from, to)| format!(
+                            "{} -> {}",
+                            format!("R{from}").bright_red().bold(),
+                            format!("R{to}").bright_red().bold(),
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+                .bright_yellow(),
+                "╰───────────────────────────────────╼".bright_yellow()
             );
         }
     }

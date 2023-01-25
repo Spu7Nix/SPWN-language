@@ -17,7 +17,13 @@ use crate::util::Interner;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 new_key_type! {
-    pub struct ValueKey;
+    pub struct ValueKey; pub struct BytecodeKey;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FuncCoord {
+    func: usize,
+    code: BytecodeKey,
 }
 
 pub struct Vm<'a> {
@@ -26,7 +32,7 @@ pub struct Vm<'a> {
 
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    program: &'a Bytecode<Register>,
+    programs: SlotMap<BytecodeKey, &'a Bytecode<Register>>,
 
     pub interner: Rc<RefCell<Interner>>,
 
@@ -34,12 +40,12 @@ pub struct Vm<'a> {
 }
 
 impl<'a> Vm<'a> {
-    pub fn new(program: &'a Bytecode<Register>, interner: Rc<RefCell<Interner>>) -> Vm {
+    pub fn new(interner: Rc<RefCell<Interner>>) -> Vm<'a> {
         Self {
             memory: SlotMap::default(),
             registers: vec![],
             interner,
-            program,
+            programs: SlotMap::default(),
             id_counters: [0; 4],
         }
     }
@@ -48,23 +54,36 @@ impl<'a> Vm<'a> {
         self.interner.borrow().resolve(spur).to_string()
     }
 
-    pub fn deep_clone_value(&mut self, k: ValueKey) -> ValueKey {
+    pub fn deep_clone_key(&mut self, k: ValueKey) -> StoredValue {
         let v = self.memory[k].clone();
 
         let value = match v.value {
-            Value::Array(arr) => {
-                Value::Array(arr.into_iter().map(|v| self.deep_clone_value(v)).collect())
-            }
+            Value::Array(arr) => Value::Array(
+                arr.into_iter()
+                    .map(|v| self.deep_clone_key_insert(v))
+                    .collect(),
+            ),
             v => v,
         };
-        self.memory.insert(StoredValue {
+
+        StoredValue {
             value,
             area: v.area.clone(),
-        })
+        }
     }
 
-    pub fn deep_clone_reg(&mut self, reg: Register) -> ValueKey {
-        self.deep_clone_value(self.registers.last().unwrap()[reg as usize])
+    pub fn deep_clone_key_insert(&mut self, k: ValueKey) -> ValueKey {
+        let v = self.deep_clone_key(k);
+        self.memory.insert(v)
+    }
+
+    pub fn deep_clone_reg(&mut self, reg: Register) -> StoredValue {
+        self.deep_clone_key(self.registers.last().unwrap()[reg as usize])
+    }
+
+    pub fn deep_clone_reg_insert(&mut self, reg: Register) -> ValueKey {
+        let v = self.deep_clone_reg(reg);
+        self.memory.insert(v)
     }
 
     pub fn get_reg(&self, reg: Register) -> &StoredValue {
@@ -80,49 +99,58 @@ impl<'a> Vm<'a> {
     }
 
     pub fn set_reg(&mut self, reg: Register, v: StoredValue) {
-        self.registers.last_mut().unwrap()[reg as usize] = self.memory.insert(v)
+        self.memory[self.registers.last_mut().unwrap()[reg as usize]] = v
     }
 
-    pub fn set_reg_key(&mut self, reg: Register, k: ValueKey) {
+    pub fn change_reg_key(&mut self, reg: Register, k: ValueKey) {
         self.registers.last_mut().unwrap()[reg as usize] = k
     }
 
-    pub fn make_area(&self, span: CodeSpan) -> CodeArea {
+    // pub fn set_reg_key(&mut self, reg: Register, k: ValueKey) {
+    //     self.registers.last_mut().unwrap()[reg as usize] = k
+    // }
+
+    pub fn make_area(&self, span: CodeSpan, code: BytecodeKey) -> CodeArea {
         CodeArea {
             span,
-            src: self.program.src.clone(),
+            src: self.programs[code].src.clone(),
         }
     }
 
-    pub fn get_span(&self, func: usize, i: usize) -> CodeSpan {
-        self.program.opcode_span_map[&(func, i)]
+    pub fn get_span(&self, func: FuncCoord, i: usize) -> CodeSpan {
+        self.programs[func.code].opcode_span_map[&(func.func, i)]
     }
 
-    pub fn get_area(&self, func: usize, i: usize) -> CodeArea {
-        self.make_area(self.get_span(func, i))
+    pub fn get_area(&self, func: FuncCoord, i: usize) -> CodeArea {
+        self.make_area(self.get_span(func, i), func.code)
     }
 
-    pub fn push_func_regs(&mut self, func: usize) {
-        let regs_used = self.program.functions[func].regs_used;
-        self.registers.push(vec![ValueKey::default(); regs_used]);
+    pub fn push_func_regs(&mut self, func: FuncCoord) {
+        let regs_used = self.programs[func.code].functions[func.func].regs_used;
+        let mut regs = vec![];
+        for _ in 0..regs_used {
+            regs.push(self.memory.insert(StoredValue {
+                value: Value::Empty,
+                area: self.make_area(CodeSpan::invalid(), func.code),
+            }))
+        }
+        self.registers.push(regs);
     }
 
     pub fn pop_func_regs(&mut self) {
         self.registers.pop();
     }
 
-    pub fn run_func(&mut self, func: usize) -> RuntimeResult<Option<ValueKey>> {
-        let opcodes = &self.program.functions[func].opcodes;
-        // let regs_used = self.program.functions[func].regs_used;
-
-        // self.registers.push(vec![ValueKey::default(); regs_used]);
+    pub fn run_func(&mut self, func: FuncCoord) -> RuntimeResult<Option<StoredValue>> {
+        let opcodes = &self.programs[func.code].functions[func.func].opcodes;
 
         let mut ip = 0_usize;
 
         while ip < opcodes.len() {
             match &opcodes[ip] {
                 Opcode::LoadConst { dest, id } => {
-                    let value = Value::from_const(&self.program.consts[*id as usize], self);
+                    let value =
+                        Value::from_const(&self.programs[func.code].consts[*id as usize], self);
 
                     self.set_reg(
                         *dest,
@@ -133,7 +161,8 @@ impl<'a> Vm<'a> {
                     )
                 }
                 Opcode::Copy { from, to } => {
-                    self.registers.last_mut().unwrap()[*to as usize] = self.deep_clone_reg(*from)
+                    let v = self.deep_clone_reg(*from);
+                    self.set_reg(*to, v)
                 }
                 Opcode::Print { reg } => {
                     println!("{}", self.get_reg(*reg).value.runtime_display(self))
@@ -154,14 +183,14 @@ impl<'a> Vm<'a> {
                     },
                 ),
                 Opcode::PushArrayElem { elem, dest } => {
-                    let push = self.deep_clone_reg(*elem);
+                    let push = self.deep_clone_reg_insert(*elem);
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Array(v) => v.push(push),
                         _ => unreachable!(),
                     }
                 }
                 Opcode::PushDictElem { elem, key, dest } => {
-                    let push = self.deep_clone_reg(*elem);
+                    let push = self.deep_clone_reg_insert(*elem);
 
                     let key = match &self.get_reg(*key).value {
                         Value::String(s) => s.clone(),
@@ -178,34 +207,34 @@ impl<'a> Vm<'a> {
                     }
                 }
                 Opcode::Add { left, right, dest } => {
-                    self.bop(value_ops::add, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::add, func, ip, left, right, dest)?
                 }
                 Opcode::Sub { left, right, dest } => {
-                    self.bop(value_ops::sub, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::sub, func, ip, left, right, dest)?
                 }
                 Opcode::Mult { left, right, dest } => {
-                    self.bop(value_ops::mult, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::mult, func, ip, left, right, dest)?
                 }
                 Opcode::Div { left, right, dest } => {
-                    self.bop(value_ops::div, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::div, func, ip, left, right, dest)?
                 }
                 Opcode::Mod { left, right, dest } => {
-                    self.bop(value_ops::modulo, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::modulo, func, ip, left, right, dest)?
                 }
                 Opcode::Pow { left, right, dest } => {
-                    self.bop(value_ops::pow, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::pow, func, ip, left, right, dest)?
                 }
                 Opcode::ShiftLeft { left, right, dest } => {
-                    self.bop(value_ops::shift_left, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::shift_left, func, ip, left, right, dest)?
                 }
                 Opcode::ShiftRight { left, right, dest } => {
-                    self.bop(value_ops::shift_right, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::shift_right, func, ip, left, right, dest)?
                 }
                 Opcode::BinOr { left, right, dest } => {
-                    self.bop(value_ops::bin_or, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::bin_or, func, ip, left, right, dest)?
                 }
                 Opcode::BinAnd { left, right, dest } => {
-                    self.bop(value_ops::bin_and, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::bin_and, func, ip, left, right, dest)?
                 }
 
                 Opcode::AddEq { left, right } => todo!(),
@@ -220,26 +249,10 @@ impl<'a> Vm<'a> {
                 Opcode::BinOrEq { left, right } => todo!(),
                 Opcode::BinNotEq { left, right } => todo!(),
                 Opcode::Not { src, dest } => {
-                    let span = self.get_span(func, ip);
-                    let value = value_ops::not(self.get_reg(*src), span, self)?;
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value,
-                            area: self.make_area(span),
-                        },
-                    )
+                    self.unary_op(value_ops::unary_not, func, ip, src, dest)?
                 }
                 Opcode::Negate { src, dest } => {
-                    let span = self.get_span(func, ip);
-                    let value = value_ops::negate(self.get_reg(*src), span, self)?;
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value,
-                            area: self.make_area(span),
-                        },
-                    )
+                    self.unary_op(value_ops::unary_negate, func, ip, src, dest)?
                 }
 
                 Opcode::BinNot { src, dest } => todo!(),
@@ -253,8 +266,9 @@ impl<'a> Vm<'a> {
                                 &self.get_reg(*left).value,
                                 &self.get_reg(*right).value,
                                 self,
+                                func.code,
                             )),
-                            area: self.make_area(span),
+                            area: self.make_area(span, func.code),
                         },
                     );
                 }
@@ -267,34 +281,35 @@ impl<'a> Vm<'a> {
                                 &self.get_reg(*left).value,
                                 &self.get_reg(*right).value,
                                 self,
+                                func.code,
                             )),
-                            area: self.make_area(span),
+                            area: self.make_area(span, func.code),
                         },
                     );
                 }
                 Opcode::Gt { left, right, dest } => {
-                    self.bop(value_ops::gt, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::gt, func, ip, left, right, dest)?
                 }
                 Opcode::Lt { left, right, dest } => {
-                    self.bop(value_ops::lt, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::lt, func, ip, left, right, dest)?
                 }
                 Opcode::Gte { left, right, dest } => {
-                    self.bop(value_ops::gte, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::gte, func, ip, left, right, dest)?
                 }
                 Opcode::Lte { left, right, dest } => {
-                    self.bop(value_ops::lte, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::lte, func, ip, left, right, dest)?
                 }
                 Opcode::Range { left, right, dest } => {
-                    self.bop(value_ops::range, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::range, func, ip, left, right, dest)?
                 }
                 Opcode::In { left, right, dest } => todo!(),
                 Opcode::As { left, right, dest } => todo!(),
                 Opcode::Is { left, right, dest } => todo!(),
                 Opcode::And { left, right, dest } => {
-                    self.bop(value_ops::and, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::and, func, ip, left, right, dest)?
                 }
                 Opcode::Or { left, right, dest } => {
-                    self.bop(value_ops::or, func, ip, left, right, dest)?
+                    self.bin_op(value_ops::or, func, ip, left, right, dest)?
                 }
                 Opcode::Jump { to } => {
                     ip = *to as usize;
@@ -302,20 +317,20 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::JumpIfFalse { src, to } => {
                     let span = self.get_span(func, ip);
-                    if !value_ops::to_bool(self.get_reg(*src), span, self)? {
+                    if !value_ops::to_bool(self.get_reg(*src), span, self, func.code)? {
                         ip = *to as usize;
                         continue;
                     }
                 }
-                Opcode::Ret { src } => return Ok(Some(self.get_reg_key(*src))),
+                Opcode::Ret { src } => return Ok(Some(self.deep_clone_reg(*src))),
                 Opcode::WrapMaybe { src, dest } => {
-                    let v = self.deep_clone_reg(*src);
+                    let v = self.deep_clone_reg_insert(*src);
                     let span = self.get_span(func, ip);
                     self.set_reg(
                         *dest,
                         StoredValue {
                             value: Value::Maybe(Some(v)),
-                            area: self.make_area(span),
+                            area: self.make_area(span, func.code),
                         },
                     )
                 }
@@ -325,7 +340,7 @@ impl<'a> Vm<'a> {
                         *dest,
                         StoredValue {
                             value: Value::Maybe(None),
-                            area: self.make_area(span),
+                            area: self.make_area(span, func.code),
                         },
                     )
                 }
@@ -335,7 +350,7 @@ impl<'a> Vm<'a> {
                         *dest,
                         StoredValue {
                             value: Value::Empty,
-                            area: self.make_area(span),
+                            area: self.make_area(span, func.code),
                         },
                     )
                 }
@@ -350,7 +365,7 @@ impl<'a> Vm<'a> {
                         *dest,
                         StoredValue {
                             value: Value::Builtins,
-                            area: self.make_area(span),
+                            area: self.make_area(span, func.code),
                         },
                     )
                 }
@@ -360,8 +375,9 @@ impl<'a> Vm<'a> {
                     let span = self.get_span(func, ip);
                     match base.value.clone() {
                         Value::Macro {
-                            func_id,
+                            func,
                             args: arg_data,
+                            captured,
                         } => {
                             let mut param_map = AHashMap::new();
 
@@ -375,7 +391,7 @@ impl<'a> Vm<'a> {
                                         Value::Array(v) => {
                                             if v.len() > arg_data.len() {
                                                 return Err(RuntimeError::TooManyArguments {
-                                                    call_area: self.make_area(span),
+                                                    call_area: self.make_area(span, func.code),
                                                     macro_def_area: base.area.clone(),
                                                     macro_arg_amount: arg_data.len(),
                                                     call_arg_amount: v.len(),
@@ -395,7 +411,8 @@ impl<'a> Vm<'a> {
                                                 } else {
                                                     return Err(
                                                         RuntimeError::NonexistentArgument {
-                                                            call_area: self.make_area(span),
+                                                            call_area: self
+                                                                .make_area(span, func.code),
                                                             macro_def_area: base.area.clone(),
                                                             arg_name: self.resolve(name),
                                                         },
@@ -409,46 +426,48 @@ impl<'a> Vm<'a> {
                                 _ => unreachable!(),
                             }
                             let base_area = base.area.clone();
-                            self.push_func_regs(func_id as usize);
+                            self.push_func_regs(func);
 
                             for (i, data) in arg_data.iter().enumerate() {
-                                let k = match param_map[&data.name] {
-                                    Some(k) => self.deep_clone_value(k),
+                                let v = match param_map[&data.name] {
+                                    Some(k) => self.deep_clone_key(k),
                                     None => match data.default {
-                                        Some(k) => self.deep_clone_value(k),
+                                        Some(k) => self.deep_clone_key(k),
                                         None => {
                                             return Err(RuntimeError::ArgumentNotSatisfied {
-                                                call_area: self.make_area(span),
+                                                call_area: self.make_area(span, func.code),
                                                 macro_def_area: base_area,
                                                 arg_name: self.resolve(&data.name),
                                             })
                                         }
                                     },
                                 };
-                                println!(
-                                    "cocki {} {}",
-                                    self.registers.len(),
-                                    self.memory[k].value.runtime_display(self)
-                                );
-                                self.set_reg_key(i as Register, k)
+                                self.set_reg(i as Register, v)
                             }
-                            let ret_key = match self.run_func(func_id as usize)? {
-                                Some(k) => k,
-                                None => self.memory.insert(StoredValue {
+
+                            for (k, (_, to)) in captured
+                                .iter()
+                                .zip(&self.programs[func.code].functions[func.func].capture_regs)
+                            {
+                                self.change_reg_key(*to, *k)
+                            }
+
+                            let ret_val = match self.run_func(func)? {
+                                Some(v) => v,
+                                None => StoredValue {
                                     value: Value::Empty,
                                     area: base_area,
-                                }),
+                                },
                             };
-                            let ret_key = self.deep_clone_value(ret_key);
                             self.pop_func_regs();
 
-                            self.set_reg_key(*dest, ret_key);
+                            self.set_reg(*dest, ret_val);
                         }
                         _ => {
                             return Err(RuntimeError::TypeMismatch {
                                 v: (base.value.get_type(), base.area.clone()),
                                 expected: ValueType::Macro,
-                                area: self.make_area(span),
+                                area: self.make_area(span, func.code),
                             })
                         }
                     }
@@ -457,8 +476,16 @@ impl<'a> Vm<'a> {
                     *dest,
                     StoredValue {
                         value: Value::Macro {
-                            func_id: *id,
+                            func: FuncCoord {
+                                func: *id as usize,
+                                code: func.code,
+                            },
                             args: vec![],
+                            captured: self.programs[func.code].functions[*id as usize]
+                                .capture_regs
+                                .iter()
+                                .map(|(from, _)| self.get_reg_key(*from))
+                                .collect(),
                         },
                         area: self.get_area(func, ip),
                     },
@@ -480,19 +507,20 @@ impl<'a> Vm<'a> {
                     }
                 }
                 Opcode::SetMacroArgDefault { src, dest } => {
-                    let set = self.deep_clone_reg(*src);
+                    let set = self.deep_clone_reg_insert(*src);
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Macro { args, .. } => args.last_mut().unwrap().default = Some(set),
                         _ => unreachable!(),
                     }
                 }
                 Opcode::SetMacroArgPattern { src, dest } => {
-                    let set = self.deep_clone_reg(*src);
+                    let set = self.deep_clone_reg_insert(*src);
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Macro { args, .. } => args.last_mut().unwrap().pattern = Some(set),
                         _ => unreachable!(),
                     }
                 }
+                _ => todo!(),
             }
 
             ip += 1;
@@ -503,26 +531,57 @@ impl<'a> Vm<'a> {
     }
 
     #[inline]
-    fn bop<F>(
+    fn bin_op<F>(
         &mut self,
         op: F,
-        func: usize,
+        func: FuncCoord,
         ip: usize,
         left: &u8,
         right: &u8,
         dest: &u8,
     ) -> Result<(), RuntimeError>
     where
-        F: Fn(&StoredValue, &StoredValue, CodeSpan, &Vm) -> RuntimeResult<Value>,
+        F: Fn(&StoredValue, &StoredValue, CodeSpan, &Vm, BytecodeKey) -> RuntimeResult<Value>,
     {
         let span = self.get_span(func, ip);
-        let value = op(self.get_reg(*left), self.get_reg(*right), span, self)?;
+        let value = op(
+            self.get_reg(*left),
+            self.get_reg(*right),
+            span,
+            self,
+            func.code,
+        )?;
 
         self.set_reg(
             *dest,
             StoredValue {
                 value,
-                area: self.make_area(span),
+                area: self.make_area(span, func.code),
+            },
+        );
+        Ok(())
+    }
+
+    #[inline]
+    fn unary_op<F>(
+        &mut self,
+        op: F,
+        func: FuncCoord,
+        ip: usize,
+        value: &u8,
+        dest: &u8,
+    ) -> Result<(), RuntimeError>
+    where
+        F: Fn(&StoredValue, CodeSpan, &Vm, BytecodeKey) -> RuntimeResult<Value>,
+    {
+        let span = self.get_span(func, ip);
+        let value = op(self.get_reg(*value), span, self, func.code)?;
+
+        self.set_reg(
+            *dest,
+            StoredValue {
+                value,
+                area: self.make_area(span, func.code),
             },
         );
         Ok(())
