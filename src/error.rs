@@ -3,6 +3,7 @@ use std::io::Write;
 use ariadne::{sources, Label, Report, ReportKind};
 
 use crate::sources::CodeArea;
+use crate::vm::context::CallStackItem;
 
 #[derive(Debug)]
 pub struct ErrorReport {
@@ -36,6 +37,8 @@ macro_rules! error_maker {
                     $(
                         $field:ident: $typ:ty,
                     )*
+
+                    $([$call_stack:ident])?
                 },
             )*
         }
@@ -47,6 +50,7 @@ macro_rules! error_maker {
                     $(
                         $field: $typ,
                     )*
+                    $($call_stack: Vec<CallStackItem>)?
                 },
             )*
         }
@@ -61,7 +65,7 @@ macro_rules! error_maker {
 
                 match self {
                     $(
-                        $enum::$err_name { $($field,)* } => ErrorReport {
+                        $enum::$err_name { $($field,)* $($call_stack)? } => ErrorReport {
                             title: $title.to_string(),
                             message: ($msg).to_string(),
                             labels: {
@@ -85,6 +89,12 @@ macro_rules! error_maker {
                                 $(
                                     for i in $spread {
                                         v.push(i)
+                                    }
+                                )?
+
+                                $(
+                                    for area in $call_stack.iter().filter_map(|i| i.call_area.clone()) {
+                                        v.push((area, "Error comes from this macro call".to_string()));
                                     }
                                 )?
                                 v

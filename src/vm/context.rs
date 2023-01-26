@@ -2,11 +2,12 @@ use std::cmp::{Ordering, PartialOrd};
 use std::collections::binary_heap::PeekMut;
 use std::collections::BinaryHeap;
 
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use super::interpreter::{FuncCoord, ValueKey};
 use super::opcodes::Register;
 use crate::gd::ids::Id;
+use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallStackItem {
@@ -14,6 +15,7 @@ pub struct CallStackItem {
     pub ip: usize,
     pub return_dest: Register,
     pub call_key: CallKey,
+    pub call_area: Option<CodeArea>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -120,9 +122,21 @@ impl<'a> super::interpreter::Vm<'a> {
         let mut new = current.clone();
 
         // lord forgive me for what i am about to do
+
+        let mut clone_map = SecondaryMap::default();
+
         for regs in &mut new.registers {
             for reg in regs {
-                *reg = self.deep_clone_key_insert(*reg);
+                let k = match clone_map.get(*reg) {
+                    Some(k) => *k,
+                    None => {
+                        let k = self.deep_clone_key_insert(*reg);
+                        clone_map.insert(*reg, k);
+                        k
+                    }
+                };
+
+                *reg = k;
             }
         }
         self.contexts.contexts.push(new);

@@ -73,14 +73,12 @@ fn main() {
                 // bytecode.debug_str(&parser.src);
             }
 
-            let bytecode = &map.map[&parser.src];
+            let mut vm = Vm::new(&map, interner);
 
-            let mut vm = Vm::new(interner);
-
-            let key = vm.programs.insert(bytecode);
+            let key = vm.src_map[&parser.src];
             let start = FuncCoord::new(0, key);
 
-            vm.push_call_stack(start, 0, false);
+            vm.push_call_stack(start, 0, false, None);
 
             match vm.run_program() {
                 Ok(_) => {}
