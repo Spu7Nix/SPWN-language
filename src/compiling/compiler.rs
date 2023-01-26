@@ -218,8 +218,13 @@ impl<'a> Compiler<'a> {
         Ok(&self.map.map[&self.src])
     }
 
-    pub fn compile_import(&mut self, typ: &ImportType, span: CodeSpan) -> CompileResult<()> {
-        let base_dir = match &self.src {
+    pub fn compile_import(
+        &mut self,
+        typ: &ImportType,
+        span: CodeSpan,
+        importer_src: SpwnSource,
+    ) -> CompileResult<()> {
+        let base_dir = match &importer_src {
             SpwnSource::File(path) => path.parent().unwrap(),
         };
 
@@ -258,10 +263,10 @@ impl<'a> Compiler<'a> {
 
                 if bytecode.source_hash == hash.into() {
                     for import in &bytecode.import_paths {
-                        self.compile_import(&import.value, import.span)?;
+                        self.compile_import(&import.value, import.span, import_src.clone())?;
                     }
 
-                    self.map.map.insert(import_src.clone(), bytecode);
+                    self.map.map.insert(import_src, bytecode);
                     return Ok(());
                     // break 'bytecode &self.map.map[&import_src];
                 }
@@ -533,7 +538,7 @@ impl<'a> Compiler<'a> {
                                 let ret_reg = self.compile_expr(node, scope, builder)?;
                                 self.global_return =
                                     Some((items.iter().map(|i| i.0).collect(), stmt.span));
-                                builder.export(ret_reg);
+                                builder.ret(ret_reg);
                             }
                             _ => {
                                 return Err(CompilerError::InvalidModuleReturn {
@@ -899,7 +904,7 @@ impl<'a> Compiler<'a> {
                 builder.load_empty(out_reg, expr.span);
             }
             Expression::Import(t) => {
-                self.compile_import(t, expr.span)?;
+                self.compile_import(t, expr.span, self.src.clone())?;
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
             }
             Expression::Instance { base, items } => todo!(),

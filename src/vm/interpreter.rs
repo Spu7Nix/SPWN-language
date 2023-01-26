@@ -6,14 +6,14 @@ use colored::Colorize;
 use lasso::Spur;
 use slotmap::{new_key_type, SlotMap};
 
-use super::context::{CallStackItem, FullContext};
+use super::context::{CallKey, CallStackItem, FullContext};
 use super::error::RuntimeError;
 use super::opcodes::{Opcode, Register};
 use super::value::{ArgData, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
 use crate::gd::ids::IDClass;
-use crate::sources::{CodeArea, CodeSpan};
+use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -38,8 +38,9 @@ pub struct Vm<'a> {
     // 256 registers per function
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    pub programs: SlotMap<BytecodeKey, &'a Bytecode<Register>>,
-    // pub imports: AHashMap<SpwnSource, BytecodeKey>,
+    pub programs: SlotMap<BytecodeKey, (SpwnSource, &'a Bytecode<Register>)>,
+    pub src_map: AHashMap<SpwnSource, BytecodeKey>,
+
     pub interner: Rc<RefCell<Interner>>,
 
     pub id_counters: [usize; 4],
@@ -48,13 +49,22 @@ pub struct Vm<'a> {
 }
 
 impl<'a> Vm<'a> {
-    pub fn new(interner: Rc<RefCell<Interner>>) -> Vm<'a> {
+    pub fn new(bytecode_map: &'a BytecodeMap, interner: Rc<RefCell<Interner>>) -> Vm<'a> {
+        let mut programs = SlotMap::default();
+        let mut src_map = AHashMap::new();
+
+        for (src, bytecode) in &bytecode_map.map {
+            let k = programs.insert((src.clone(), bytecode));
+            src_map.insert(src.clone(), k);
+        }
+
         Self {
             memory: SlotMap::default(),
             interner,
-            programs: SlotMap::default(),
+            programs,
             id_counters: [0; 4],
             contexts: FullContext::new(),
+            src_map,
         }
     }
 
@@ -120,7 +130,7 @@ impl<'a> Vm<'a> {
     // }
 
     pub fn make_area(&self, span: CodeSpan, code: BytecodeKey) -> CodeArea {
-        //todo!()
+        // todo!()
         // CodeArea {
         //     span,
         //     src: self.programs[code].src.clone(),
@@ -130,7 +140,7 @@ impl<'a> Vm<'a> {
     }
 
     pub fn get_span(&self, func: FuncCoord, i: usize) -> CodeSpan {
-        self.programs[func.code].opcode_span_map[&(func.func, i)]
+        self.programs[func.code].1.opcode_span_map[&(func.func, i)]
     }
 
     pub fn get_area(&self, func: FuncCoord, i: usize) -> CodeArea {
@@ -143,7 +153,7 @@ impl<'a> Vm<'a> {
         return_dest: Register,
         increment_last: bool,
     ) {
-        let regs_used = self.programs[func.code].functions[func.func].regs_used;
+        let regs_used = self.programs[func.code].1.functions[func.func].regs_used;
 
         let mut regs = Vec::with_capacity(regs_used);
 
@@ -174,10 +184,10 @@ impl<'a> Vm<'a> {
         //dbg!(&self.contexts);
     }
 
-    pub fn return_and_pop_current(&mut self, ret_val: Option<StoredValue>) {
+    pub fn return_and_pop_current(&mut self, ret_val: Option<StoredValue>) -> Option<CallKey> {
         if self.contexts.current().pos_stack.len() == 1 {
             self.contexts.yeet_current();
-            return;
+            return None;
         }
 
         let ret_val = if let Some(ret_val) = ret_val {
@@ -189,18 +199,14 @@ impl<'a> Vm<'a> {
             }
         };
 
-        let call_key = {
-            let mut current = self.contexts.current_mut();
-            current.recursion_depth -= 1;
-            current.registers.pop();
-            let item = current.pos_stack.pop().unwrap();
+        let mut current = self.contexts.current_mut();
+        current.recursion_depth -= 1;
+        current.registers.pop();
+        let item = current.pos_stack.pop().unwrap();
 
-            self.memory[current.registers.last_mut().unwrap()[item.return_dest as usize]] = ret_val;
+        self.memory[current.registers.last_mut().unwrap()[item.return_dest as usize]] = ret_val;
 
-            item.call_key
-        };
-
-        self.contexts.have_not_returned.remove(call_key);
+        Some(item.call_key)
     }
 
     pub fn run_program(&mut self) -> RuntimeResult<()> {
@@ -209,7 +215,7 @@ impl<'a> Vm<'a> {
             let &CallStackItem {
                 func, ip, call_key, ..
             } = self.contexts.current().pos_stack.last().unwrap();
-            let opcodes = &self.programs[func.code].functions[func.func].opcodes;
+            let opcodes = &self.programs[func.code].1.functions[func.func].opcodes;
 
             if ip >= opcodes.len() {
                 if self.contexts.have_not_returned.contains_key(call_key) {
@@ -231,7 +237,7 @@ impl<'a> Vm<'a> {
             match opcode {
                 Opcode::LoadConst { dest, id } => {
                     let value =
-                        Value::from_const(&self.programs[func.code].consts[*id as usize], self);
+                        Value::from_const(&self.programs[func.code].1.consts[*id as usize], self);
 
                     self.set_reg(
                         *dest,
@@ -417,7 +423,8 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::Ret { src } => {
                     let ret_val = self.deep_clone_reg(*src);
-                    self.return_and_pop_current(Some(ret_val));
+                    let Some(call_key) = self.return_and_pop_current(Some(ret_val)) else { continue };
+                    self.contexts.have_not_returned.remove(call_key);
                     continue;
                 }
                 Opcode::WrapMaybe { src, dest } => {
@@ -456,11 +463,24 @@ impl<'a> Vm<'a> {
                     dest: _,
                     index: _,
                 } => todo!(),
-                Opcode::Member {
-                    from: _,
-                    dest: _,
-                    member: _,
-                } => todo!(),
+                Opcode::Member { from, dest, member } => {
+                    let key = match &self.get_reg(*member).value {
+                        Value::String(s) => s.clone(),
+                        _ => unreachable!(),
+                    };
+                    let key = self.interner.borrow_mut().get_or_intern(key);
+
+                    match &self.get_reg(*from).value {
+                        Value::Dict(v) => match v.get(&key) {
+                            Some(k) => {
+                                let v = self.deep_clone_key(*k);
+                                self.set_reg(*dest, v)
+                            }
+                            None => todo!(),
+                        },
+                        a => unreachable!("{:?}", a),
+                    }
+                }
                 Opcode::Associated {
                     from: _,
                     dest: _,
@@ -562,7 +582,7 @@ impl<'a> Vm<'a> {
 
                             for (k, (_, to)) in captured
                                 .iter()
-                                .zip(&self.programs[func.code].functions[func.func].capture_regs)
+                                .zip(&self.programs[func.code].1.functions[func.func].capture_regs)
                             {
                                 self.change_reg_key(*to, *k)
                             }
@@ -594,7 +614,7 @@ impl<'a> Vm<'a> {
                                 code: func.code,
                             },
                             args: vec![],
-                            captured: self.programs[func.code].functions[*id as usize]
+                            captured: self.programs[func.code].1.functions[*id as usize]
                                 .capture_regs
                                 .iter()
                                 .map(|(from, _)| self.get_reg_key(*from))
@@ -633,7 +653,21 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     }
                 }
-                Opcode::Import { src, dest } => todo!(),
+                Opcode::Import { src, dest } => {
+                    let import = &self.programs[func.code].1.import_paths[*src as usize];
+
+                    let rel_path = import.value.to_path_name().1;
+                    let SpwnSource::File(current_path) = &self.programs[func.code].0;
+
+                    let src = SpwnSource::File(current_path.parent().unwrap().join(rel_path));
+                    let coord = FuncCoord {
+                        func: 0,
+                        code: self.src_map[&src],
+                    };
+
+                    self.push_call_stack(coord, *dest, true);
+                    continue;
+                }
             }
 
             // increment ip

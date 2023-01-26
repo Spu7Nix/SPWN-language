@@ -1233,7 +1233,7 @@ impl Bytecode<Register> {
             );
 
             println!(
-                "{}\n{}\n{}",
+                "{}\n{}\n{}\n\n",
                 format!("│ registers used: {}", func.regs_used).bright_yellow(),
                 format!(
                     "│ capture regs: {}",
