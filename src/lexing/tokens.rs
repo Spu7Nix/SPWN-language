@@ -1,12 +1,17 @@
 use crate::lexer;
 
 lexer! {
+    ["int literal"]
     Int: regex(r#"0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[\d_]+"#),
+    ["float literal"]
     Float: regex(r#"[\d_]+(\.[\d_]+)?"#),
 
+    ["string literal"]
     String: regex(r###"([a-zA-Z]\w*)?("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')|([a-zA-Z]\w*_)?(r".*?"|r#".*?"#|r##".*?"##|r'.*?'|r#'.*?'#|r##'.*?'##)"###),
 
+    ["ID literal"]
     Id: regex(r"([0-9]+|\?)[gbci]"),
+    ["type indicator"]
     TypeIndicator: regex(r"@[a-zA-Z_]\w*"),
 
     //Attribute: regex(r"#\[.*?\]"),
@@ -106,101 +111,15 @@ lexer! {
 
     Hashtag: text("#"),
 
+    ["identifier"]
     Ident: regex(r"[a-zA-Z_][a-zA-Z_0-9]*"),
 
+    ["linebreak"]
     Newline: regex(r"(\n|(\r\n))+"),
 
+    ["end of file"]
     Eof,
 
     @skip: r#"[ \t\f]+|/\*[^*]*\*(([^/\*][^\*]*)?\*)*/|//[^\n]*"#;
     @error: Error;
-}
-
-// generate this in macro???
-impl Token {
-    pub fn to_str(self) -> &'static str {
-        match self {
-            Self::Int => "int literal",
-            Self::Float => "float literal",
-            Self::Id => "ID literal",
-            Self::String => "string literal",
-            Self::TypeIndicator => "type indicator",
-            Self::Let => "let",
-            Self::Ident => "identifier",
-            Self::Error => "unknown",
-            Self::Eof => "end of file",
-            Self::True => "true",
-            Self::False => "false",
-            Self::Obj => "obj",
-            Self::Trigger => "trigger",
-            Self::Plus => "+",
-            Self::Minus => "-",
-            Self::Mult => "*",
-            Self::Div => "/",
-            Self::Mod => "%",
-            Self::Pow => "^",
-            Self::PlusEq => "+=",
-            Self::MinusEq => "-=",
-            Self::MultEq => "*=",
-            Self::DivEq => "/=",
-            Self::ModEq => "%=",
-            Self::PowEq => "^=",
-            Self::Assign => "=",
-            Self::LParen => "(",
-            Self::RParen => ")",
-            Self::LSqBracket => "[",
-            Self::RSqBracket => "]",
-            Self::LBracket => "{",
-            Self::RBracket => "}",
-            Self::TrigFnBracket => "!{",
-            Self::Comma => ",",
-            Self::Eol => ";",
-            Self::If => "if",
-            Self::Else => "else",
-            Self::While => "while",
-            Self::For => "for",
-            Self::In => "in",
-            Self::Try => "try",
-            Self::Catch => "catch",
-            Self::Return => "return",
-            Self::Break => "break",
-            Self::Continue => "continue",
-            Self::Is => "is",
-            Self::Eq => "==",
-            Self::Neq => "!=",
-            Self::Gt => ">",
-            Self::Gte => ">=",
-            Self::Lt => "<",
-            Self::Lte => "<=",
-            Self::Colon => ":",
-            Self::DoubleColon => "::",
-            Self::Dot => ".",
-            Self::Range => "..",
-            Self::FatArrow => "=>",
-            Self::Arrow => "->",
-            Self::QMark => "?",
-            Self::ExclMark => "!",
-            Self::Type => "type",
-            Self::Impl => "impl",
-            Self::Dollar => "$",
-            Self::Import => "import",
-            Self::As => "as",
-            Self::BinAndEq => "&=",
-            Self::BinOrEq => "|=",
-            Self::BinNotEq => "~=",
-            Self::BinAnd => "&",
-            Self::BinOr => "|",
-            Self::BinNot => "~",
-            Self::And => "&&",
-            Self::Or => "||",
-            Self::ShiftLeftEq => "<<=",
-            Self::ShiftRightEq => ">>=",
-            Self::ShiftLeft => "<<",
-            Self::ShiftRight => ">>",
-            Self::Hashtag => "#",
-            Self::Extract => "extract",
-            Self::Print => "print",
-            Self::Newline => "linebreak",
-        }
-    }
 }
