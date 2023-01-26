@@ -1,15 +1,5 @@
 #[debug_bytecode]
 
-// let haha = import "funny/a.spwn"
+a = import "test2.spwn"
 
-// haha.guga(1)
-// haha.guga(5)
-// haha.guga(2)
-
-f = () {
-    -> return []
-    -> return $
-}
-
-
-print [f(),[f(),[f()],f()],f()]
+a.f(10)

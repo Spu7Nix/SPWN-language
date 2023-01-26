@@ -1,3 +1,8 @@
 
+g = (x) => x + "hello"
 
-print "test2";
+return {
+    f: (x) {
+        return g(x)
+    }
+}

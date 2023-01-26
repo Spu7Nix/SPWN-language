@@ -12,6 +12,7 @@ pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm, code: BytecodeKey) -> R
                 v: (v.value.get_type(), v.area.clone()),
                 expected: ValueType::Bool,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -72,6 +73,7 @@ pub fn add(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Plus,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -95,6 +97,7 @@ pub fn sub(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Minus,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -123,6 +126,7 @@ pub fn mult(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Mult,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -145,6 +149,7 @@ pub fn div(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Div,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -168,6 +173,7 @@ pub fn modulo(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Mod,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -191,6 +197,7 @@ pub fn pow(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Pow,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -209,6 +216,7 @@ pub fn unary_not(
                 v: (v.value.get_type(), v.area.clone()),
                 op: UnaryOp::ExclMark,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -228,6 +236,7 @@ pub fn unary_negate(
                 v: (v.value.get_type(), v.area.clone()),
                 op: UnaryOp::Minus,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -252,6 +261,7 @@ pub fn gt(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Gt,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -276,6 +286,7 @@ pub fn lt(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Lt,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -300,6 +311,7 @@ pub fn gte(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Gte,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -324,6 +336,7 @@ pub fn lte(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Lte,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -344,6 +357,7 @@ pub fn and(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::And,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -364,6 +378,7 @@ pub fn or(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Or,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -389,6 +404,7 @@ pub fn range(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::Range,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -411,6 +427,7 @@ pub fn bin_and(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinAnd,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -433,6 +450,7 @@ pub fn bin_or(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -454,6 +472,7 @@ pub fn shift_left(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })
@@ -475,6 +494,7 @@ pub fn shift_right(
                 b: (b.value.get_type(), b.area.clone()),
                 op: BinOp::BinOr,
                 area: vm.make_area(span, code),
+                call_stack: vm.get_call_stack(),
             })
         }
     })

@@ -131,12 +131,10 @@ impl<'a> Vm<'a> {
 
     pub fn make_area(&self, span: CodeSpan, code: BytecodeKey) -> CodeArea {
         // todo!()
-        // CodeArea {
-        //     span,
-        //     src: self.programs[code].src.clone(),
-        // }
-
-        CodeArea::internal()
+        CodeArea {
+            span,
+            src: self.programs[code].0.clone(),
+        }
     }
 
     pub fn get_span(&self, func: FuncCoord, i: usize) -> CodeSpan {
@@ -147,11 +145,16 @@ impl<'a> Vm<'a> {
         self.make_area(self.get_span(func, i), func.code)
     }
 
+    pub fn get_call_stack(&self) -> Vec<CallStackItem> {
+        self.contexts.current().pos_stack.iter().cloned().collect()
+    }
+
     pub fn push_call_stack(
         &mut self,
         func: FuncCoord,
         return_dest: Register,
         increment_last: bool,
+        call_area: Option<CodeArea>,
     ) {
         let regs_used = self.programs[func.code].1.functions[func.func].regs_used;
 
@@ -178,6 +181,7 @@ impl<'a> Vm<'a> {
             ip: 0,
             return_dest,
             call_key,
+            call_area,
         });
         current.recursion_depth += 1;
 
@@ -190,19 +194,19 @@ impl<'a> Vm<'a> {
             return None;
         }
 
+        let mut current = self.contexts.current_mut();
+        current.recursion_depth -= 1;
+        current.registers.pop();
+        let item = current.pos_stack.pop().unwrap();
+
         let ret_val = if let Some(ret_val) = ret_val {
             ret_val
         } else {
             StoredValue {
                 value: Value::Empty,
-                area: CodeArea::internal(), // probably gonna have to store the areas in the stack
+                area: item.call_area.or(Some(CodeArea::internal())).unwrap(),
             }
         };
-
-        let mut current = self.contexts.current_mut();
-        current.recursion_depth -= 1;
-        current.registers.pop();
-        let item = current.pos_stack.pop().unwrap();
 
         self.memory[current.registers.last_mut().unwrap()[item.return_dest as usize]] = ret_val;
 
@@ -507,7 +511,7 @@ impl<'a> Vm<'a> {
                 Opcode::Export { src: _ } => todo!(),
                 Opcode::Call { args, base, dest } => {
                     let base = self.get_reg(*base);
-                    let span = self.get_span(func, ip);
+                    let call_area = self.get_area(func, ip);
                     match base.value.clone() {
                         Value::Macro {
                             func,
@@ -526,10 +530,11 @@ impl<'a> Vm<'a> {
                                         Value::Array(v) => {
                                             if v.len() > arg_data.len() {
                                                 return Err(RuntimeError::TooManyArguments {
-                                                    call_area: self.make_area(span, func.code),
+                                                    call_area,
                                                     macro_def_area: base.area.clone(),
                                                     macro_arg_amount: arg_data.len(),
                                                     call_arg_amount: v.len(),
+                                                    call_stack: self.get_call_stack(),
                                                 });
                                             }
                                             for (param, data) in v.iter().zip(&arg_data) {
@@ -546,10 +551,10 @@ impl<'a> Vm<'a> {
                                                 } else {
                                                     return Err(
                                                         RuntimeError::NonexistentArgument {
-                                                            call_area: self
-                                                                .make_area(span, func.code),
+                                                            call_area,
                                                             macro_def_area: base.area.clone(),
                                                             arg_name: self.resolve(name),
+                                                            call_stack: self.get_call_stack(),
                                                         },
                                                     );
                                                 }
@@ -561,7 +566,7 @@ impl<'a> Vm<'a> {
                                 _ => unreachable!(),
                             }
                             let base_area = base.area.clone();
-                            self.push_call_stack(func, *dest, true);
+                            self.push_call_stack(func, *dest, true, Some(call_area.clone()));
 
                             for (i, data) in arg_data.iter().enumerate() {
                                 let v = match param_map[&data.name] {
@@ -570,9 +575,10 @@ impl<'a> Vm<'a> {
                                         Some(k) => self.deep_clone_key(k),
                                         None => {
                                             return Err(RuntimeError::ArgumentNotSatisfied {
-                                                call_area: self.make_area(span, func.code),
+                                                call_area,
                                                 macro_def_area: base_area,
                                                 arg_name: self.resolve(&data.name),
+                                                call_stack: self.get_call_stack(),
                                             })
                                         }
                                     },
@@ -600,7 +606,8 @@ impl<'a> Vm<'a> {
                             return Err(RuntimeError::TypeMismatch {
                                 v: (base.value.get_type(), base.area.clone()),
                                 expected: ValueType::Macro,
-                                area: self.make_area(span, func.code),
+                                area: call_area,
+                                call_stack: self.get_call_stack(),
                             })
                         }
                     }
@@ -665,7 +672,7 @@ impl<'a> Vm<'a> {
                         code: self.src_map[&src],
                     };
 
-                    self.push_call_stack(coord, *dest, true);
+                    self.push_call_stack(coord, *dest, true, None);
                     continue;
                 }
             }

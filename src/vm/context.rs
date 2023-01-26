@@ -7,6 +7,7 @@ use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use super::interpreter::{FuncCoord, ValueKey};
 use super::opcodes::Register;
 use crate::gd::ids::Id;
+use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallStackItem {
@@ -14,6 +15,7 @@ pub struct CallStackItem {
     pub ip: usize,
     pub return_dest: Register,
     pub call_key: CallKey,
+    pub call_area: Option<CodeArea>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

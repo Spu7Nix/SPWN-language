@@ -1,5 +1,6 @@
 use std::string::ToString;
 
+use super::context::CallStackItem;
 use super::value::ValueType;
 use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
@@ -23,6 +24,7 @@ error_maker! {
             b: (ValueType, CodeArea),
             op: BinOp,
             area: CodeArea,
+            [call_stack]
         },
 
         /////////
@@ -37,6 +39,7 @@ error_maker! {
             v: (ValueType, CodeArea),
             op: UnaryOp,
             area: CodeArea,
+            [call_stack]
         },
 
         /////////
@@ -51,6 +54,7 @@ error_maker! {
             v: (ValueType, CodeArea),
             area: CodeArea,
             expected: ValueType,
+            [call_stack]
         },
 
         /////////
@@ -66,6 +70,7 @@ error_maker! {
             macro_def_area: CodeArea,
             macro_arg_amount: usize,
             call_arg_amount: usize,
+            [call_stack]
         },
 
         /////////
@@ -80,6 +85,7 @@ error_maker! {
             call_area: CodeArea,
             macro_def_area: CodeArea,
             arg_name: String,
+            [call_stack]
         },
 
         /////////
@@ -94,6 +100,7 @@ error_maker! {
             call_area: CodeArea,
             macro_def_area: CodeArea,
             arg_name: String,
+            [call_stack]
         },
     }
 }
