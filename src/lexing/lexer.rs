@@ -202,7 +202,7 @@ macro_rules! lexer {
                             Self::$tok => $name,
                         )?
                         $($(
-                            #[allow(dead_code)]
+                            #[allow(unreachable_patterns)]
                             Self::$tok => $text,
                         )?)?
                     )*
