@@ -1,5 +1,36 @@
-#[debug_bytecode]
+sq = (z) => [z[0] * z[0] - z[1] * z[1], 2 * z[0] * z[1]]
+abs_sq = (z) => z[0] * z[0] + z[1] * z[1]
 
-a = import "test2.spwn"
+mandelbrot = (x, y) {
+    c = [x, y]
+    let z = [0, 0]
+    let iter = 0
 
-a.f(10)
+    while iter < 100 {
+        z = sq(z)
+        z[0] = z[0] + c[0]
+        z[1] = z[1] + c[1]
+
+        if abs_sq(z) > 4 {
+            return false
+        }
+
+        iter = iter + 1
+
+    }
+
+    return true
+}
+
+let y = -2.0
+while y < 2 {
+    let x = -2.0
+    let s = ""
+    while x < 2 {
+        s = s + ("O" if mandelbrot(x, y) else " ")
+
+        x = x + 0.02
+    }
+    $.println(s)
+    y = y + 0.02
+}

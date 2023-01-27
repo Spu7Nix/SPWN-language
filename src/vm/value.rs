@@ -4,6 +4,7 @@ use ahash::AHashMap;
 use lasso::Spur;
 use strum::EnumDiscriminants;
 
+use super::builtins::{Builtin, BuiltinFn};
 use super::interpreter::{FuncCoord, ValueKey, Vm};
 use super::opcodes::FunctionID;
 use crate::compiling::bytecode::Constant;
@@ -21,6 +22,16 @@ pub struct ArgData {
     pub name: Spur,
     pub default: Option<ValueKey>,
     pub pattern: Option<ValueKey>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MacroCode {
+    Normal {
+        func: FuncCoord,
+        args: Vec<ArgData>,
+        captured: Vec<ValueKey>,
+    },
+    Builtin(Builtin),
 }
 
 #[derive(EnumDiscriminants, Debug, Clone, PartialEq)]
@@ -44,15 +55,12 @@ pub enum Value {
     Item(Id),
 
     Builtins,
+
     Range(i64, i64, usize), //start, end, step
 
     Maybe(Option<ValueKey>),
     Empty,
-    Macro {
-        func: FuncCoord,
-        args: Vec<ArgData>,
-        captured: Vec<ValueKey>,
-    },
+    Macro(MacroCode),
 }
 
 impl std::fmt::Display for ValueType {
@@ -94,7 +102,7 @@ impl Value {
             Value::Int(n) => n.to_string(),
             Value::Float(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::String(s) => format!("\"{s}\""),
+            Value::String(s) => s.clone(),
             Value::Array(arr) => format!(
                 "[{}]",
                 arr.iter()
@@ -130,13 +138,18 @@ impl Value {
                 None => "?".into(),
             },
             Value::Empty => "()".into(),
-            Value::Macro { args, .. } => format!(
+            Value::Macro(MacroCode::Normal {
+                func,
+                args,
+                captured,
+            }) => format!(
                 "({}) {{...}}",
                 args.iter()
                     .map(|d| vm.resolve(&d.name))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            Value::Macro(MacroCode::Builtin(b)) => format!("<builtin: {b}>"),
         }
     }
 }

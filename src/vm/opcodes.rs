@@ -134,7 +134,7 @@ opcodes! {
     Copy { => from, => to },
     #[delve(display = |reg: &R| format!("print R{reg}"))]
     Print { => reg },
-    // LoadBuiltin {},
+
 
     #[delve(display = |b: &R, a: &R, d: &R| format!("R{b}(args R{a}) -> R{d}"))]
     Call { => base, => args, => dest },
@@ -267,9 +267,9 @@ opcodes! {
     #[delve(display = |d: &R| format!("() -> R{d}"))]
     LoadEmpty { => dest },
 
-    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}[R{i}] -> R{d}"))]
-    Index { => from, => dest, => index },
-    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.R{i} -> R{d}"))]
+    #[delve(display = |b: &R, d: &R, i: &R| format!("R{b}[R{i}] ~> R{d}"))]
+    Index { => base, => dest, => index },
+    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.R{i} ~> R{d}"))]
     Member { => from, => dest, => member },
     #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} -> R{d}"))]
     Associated { => from, => dest, => name },

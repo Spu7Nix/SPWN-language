@@ -1,5 +1,6 @@
 #![deny(unused_must_use)]
 #![allow(clippy::result_large_err)] // shut the fuck up clippy Lmao
+#![allow(clippy::type_complexity)]
 
 mod cli;
 mod compiling;
