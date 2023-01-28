@@ -1,4 +1,10 @@
 #[debug_bytecode]
+m = () {
+    !{
+        -> return 1
+    }
+}
 
-print [?g, ?c, ?b, ?g];
-
+print "a"
+m()
+print "b"

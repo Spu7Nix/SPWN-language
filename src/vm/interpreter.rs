@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use ahash::AHashMap;
+use colored::Colorize;
 use lasso::Spur;
 use slotmap::{new_key_type, SlotMap};
 
@@ -256,7 +257,11 @@ impl<'a> Vm<'a> {
                     self.set_reg(*to, v)
                 }
                 Opcode::Print { reg } => {
-                    println!("{}", self.get_reg(*reg).value.runtime_display(self))
+                    println!(
+                        "{}, {}",
+                        self.get_reg(*reg).value.runtime_display(self),
+                        self.contexts.group().fmt("g").green()
+                    )
                 }
                 Opcode::AllocArray { size, dest } => self.set_reg(
                     *dest,
@@ -815,12 +820,15 @@ impl<'a> Vm<'a> {
                         },
                     )
                 }
-                Opcode::ChangeContextGroup { src } => {
+                Opcode::PushContextGroup { src } => {
                     let group = match &self.get_reg(*src).value {
                         Value::Group(g) => *g,
                         _ => unreachable!(),
                     };
-                    self.contexts.current_mut().group = group;
+                    self.contexts.set_group_and_push(group);
+                }
+                Opcode::PopGroupStack => {
+                    self.contexts.pop_group();
                 }
                 Opcode::MakeTriggerFunc { src, dest } => {
                     let group = match &self.get_reg(*src).value {

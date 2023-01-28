@@ -591,11 +591,15 @@ impl<'a> FuncBuilder<'a> {
         // self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
 
-    pub fn change_context_group(&mut self, group: UnoptRegister, span: CodeSpan) {
+    pub fn push_context_group(&mut self, group: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::ChangeContextGroup { src: group }),
+            ProtoOpcode::Raw(UnoptOpcode::PushContextGroup { src: group }),
             span,
         )
+    }
+
+    pub fn pop_context_group(&mut self, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PopGroupStack), span)
     }
 
     pub fn make_trigger_function(

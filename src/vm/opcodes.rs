@@ -273,7 +273,9 @@ opcodes! {
     LoadArbitraryId { class: IDClass, => dest },
 
     #[delve(display = |src: &R| format!("change to R{src}"))]
-    ChangeContextGroup { => src },
+    PushContextGroup { => src },
+    #[delve(display = || "pop".to_string())]
+    PopGroupStack,
 
     #[delve(display = |s: &R, d: &R| format!("!{{R{s}}} -> R{d}"))]
     MakeTriggerFunc { => src, => dest },

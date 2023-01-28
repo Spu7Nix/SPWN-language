@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use ahash::AHashMap;
 use lasso::Spur;
+use libflate::lz77::Code;
 use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
@@ -30,11 +31,13 @@ pub struct Variable {
     reg: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ScopeType {
     Global,
     Loop(Vec<usize>),
     MacroBody,
+    TriggerFunc(CodeArea),
+    ArrowStmt(CodeArea),
 }
 
 pub struct Scope {
@@ -132,13 +135,15 @@ impl<'a> Compiler<'a> {
     pub fn is_inside_loop(&self, scope: ScopeKey) -> Option<&Vec<usize>> {
         let scope = &self.scopes[scope];
         match &scope.typ {
+            Some(ScopeType::ArrowStmt(_) | ScopeType::TriggerFunc(_)) | None => {
+                match scope.parent {
+                    Some(k) => self.is_inside_loop(k),
+                    None => None,
+                }
+            }
             Some(t) => match t {
                 ScopeType::Loop(v) => Some(v),
                 _ => None,
-            },
-            None => match scope.parent {
-                Some(k) => self.is_inside_loop(k),
-                None => None,
             },
         }
     }
@@ -156,6 +161,69 @@ impl<'a> Compiler<'a> {
         match scope.parent {
             Some(k) => self.is_inside_macro(k),
             None => false,
+        }
+    }
+
+    pub fn assert_can_return(&self, scope: ScopeKey, area: CodeArea) -> CompileResult<()> {
+        fn can_return_d(slf: &Compiler, scope: ScopeKey, area: CodeArea) -> CompileResult<()> {
+            let scope = &slf.scopes[scope];
+            match &scope.typ {
+                Some(t) => match t {
+                    ScopeType::MacroBody => return Ok(()),
+                    ScopeType::TriggerFunc(def) => {
+                        return Err(CompilerError::BreakInTriggerFuncScope {
+                            area,
+                            def: def.clone(),
+                        })
+                    }
+                    ScopeType::ArrowStmt(def) => {
+                        return Err(CompilerError::BreakInArrowStmtScope {
+                            area,
+                            def: def.clone(),
+                        })
+                    }
+                    _ => (),
+                },
+                None => (),
+            }
+            match scope.parent {
+                Some(k) => can_return_d(slf, k, area),
+                None => unreachable!(),
+            }
+        }
+
+        if let Some(ScopeType::ArrowStmt(_)) = self.scopes[scope].typ {
+            return Ok(()); // -> return
+        }
+
+        can_return_d(self, scope, area)
+    }
+
+    pub fn assert_can_break_loop(&self, scope: ScopeKey, area: CodeArea) -> CompileResult<()> {
+        let scope = &self.scopes[scope];
+        match &scope.typ {
+            Some(t) => match t {
+                ScopeType::Loop(_) => return Ok(()),
+                ScopeType::TriggerFunc(def) => {
+                    return Err(CompilerError::BreakInTriggerFuncScope {
+                        area,
+                        def: def.clone(),
+                    })
+                }
+                ScopeType::ArrowStmt(def) => {
+                    return Err(CompilerError::BreakInArrowStmtScope {
+                        area,
+                        def: def.clone(),
+                    })
+                }
+
+                _ => (),
+            },
+            None => (),
+        }
+        match scope.parent {
+            Some(k) => self.assert_can_break_loop(k, area),
+            None => unreachable!(), // should only be called after is_inside_loop
         }
     }
 
@@ -515,7 +583,10 @@ impl<'a> Compiler<'a> {
                 })?;
             }
             Statement::Break => match self.is_inside_loop(scope) {
-                Some(path) => builder.exit_other_block(path.clone()),
+                Some(path) => {
+                    self.assert_can_break_loop(scope, self.make_area(stmt.span))?;
+                    builder.exit_other_block(path.clone())
+                }
                 _ => {
                     return Err(CompilerError::BreakOutsideLoop {
                         area: self.make_area(stmt.span),
@@ -523,7 +594,10 @@ impl<'a> Compiler<'a> {
                 }
             },
             Statement::Continue => match self.is_inside_loop(scope) {
-                Some(path) => builder.repeat_other_block(path.clone()),
+                Some(path) => {
+                    self.assert_can_break_loop(scope, self.make_area(stmt.span))?;
+                    builder.repeat_other_block(path.clone())
+                }
                 _ => {
                     return Err(CompilerError::ContinueOutsideLoop {
                         area: self.make_area(stmt.span),
@@ -542,8 +616,10 @@ impl<'a> Compiler<'a> {
             } => todo!(),
             Statement::Arrow(statement) => {
                 builder.block(|b| {
+                    let inner_scope = self
+                        .derive_scope(scope, Some(ScopeType::ArrowStmt(self.make_area(stmt.span)))); // variables made in arrow statements shouldnt be allowed anyways
                     b.enter_arrow();
-                    self.compile_stmt(statement, scope, b)?;
+                    self.compile_stmt(statement, inner_scope, b)?;
                     b.yeet_context();
                     Ok(())
                 })?;
@@ -579,6 +655,7 @@ impl<'a> Compiler<'a> {
                         }
                     }
                 } else if self.is_inside_macro(scope) {
+                    self.assert_can_return(scope, self.make_area(stmt.span))?;
                     match value {
                         None => {
                             let out_reg = builder.next_reg();
@@ -926,11 +1003,16 @@ impl<'a> Compiler<'a> {
                 use crate::gd::ids::IDClass::Group;
                 let group_reg = builder.next_reg();
                 builder.load_id(None, Group, group_reg, expr.span);
-                builder.change_context_group(group_reg, expr.span);
+                builder.push_context_group(group_reg, expr.span);
                 builder.block(|b| {
-                    let inner_scope = self.derive_scope(scope, None);
+                    let inner_scope = self.derive_scope(
+                        scope,
+                        Some(ScopeType::TriggerFunc(self.make_area(expr.span))),
+                    );
                     self.compile_stmts(code, inner_scope, b)
                 })?;
+                builder.pop_context_group(expr.span);
+                builder.make_trigger_function(group_reg, out_reg, expr.span);
             }
             Expression::TriggerFuncCall(_) => todo!(),
             Expression::Ternary {
