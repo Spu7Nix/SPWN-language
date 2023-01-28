@@ -14,35 +14,68 @@ use super::value::{Value, ValueType};
 use super::value_ops;
 use crate::sources::CodeArea;
 
-trait ConstTypeOf {
-    const TYPE: &'static [ValueType];
+#[derive(delve::EnumDisplay, Clone, Debug)]
+pub enum BuiltinValueType {
+    #[delve(display = |v: &ValueType| format!("{v}"))]
+    Atom(ValueType),
+    #[delve(display = |v: &'static [BuiltinValueType]| v.iter().map(|v| format!("{v}")).collect::<Vec<_>>().join(", "))]
+    List(&'static [BuiltinValueType]),
+    None,
 }
-impl ConstTypeOf for bool {
-    const TYPE: &'static [ValueType] = &[ValueType::Bool];
+
+trait TypeOf {
+    const TYPE: BuiltinValueType;
 }
-impl ConstTypeOf for String {
-    const TYPE: &'static [ValueType] = &[ValueType::String];
+
+impl TypeOf for bool {
+    const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::Bool);
 }
-impl ConstTypeOf for i64 {
-    const TYPE: &'static [ValueType] = &[ValueType::Int];
+impl TypeOf for f64 {
+    const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::Float);
 }
-impl ConstTypeOf for f64 {
-    const TYPE: &'static [ValueType] = &[ValueType::Float];
+impl TypeOf for () {
+    const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::Empty);
 }
-impl<T> ConstTypeOf for Spread<T> {
-    const TYPE: &'static [ValueType] = &[];
+impl TypeOf for String {
+    const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::String);
 }
-impl ConstTypeOf for Array {
-    const TYPE: &'static [ValueType] = &[ValueType::Array];
+impl TypeOf for i64 {
+    const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::Int);
 }
-impl ConstTypeOf for Range<i64> {
-    const TYPE: &'static [ValueType] = &[ValueType::Range];
+impl TypeOf for Array {
+    const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::Array);
 }
-impl ConstTypeOf for Value {
-    const TYPE: &'static [ValueType] = &[];
+impl TypeOf for Value {
+    const TYPE: BuiltinValueType = BuiltinValueType::None;
 }
-impl<T: ConstTypeOf> ConstTypeOf for Option<T> {
-    const TYPE: &'static [ValueType] = &[T::TYPE[0]];
+impl TypeOf for Range<i64> {
+    const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::Range);
+}
+impl<T> TypeOf for Spread<T> {
+    const TYPE: BuiltinValueType = BuiltinValueType::None;
+}
+impl<T: TypeOf> TypeOf for Option<T> {
+    const TYPE: BuiltinValueType =
+        BuiltinValueType::List(&[BuiltinValueType::Atom(ValueType::Empty), T::TYPE]);
+}
+
+trait IsOptional {
+    const OPTIONAL: bool = false;
+}
+impl IsOptional for bool {}
+impl IsOptional for f64 {}
+impl IsOptional for () {}
+impl IsOptional for String {}
+impl IsOptional for i64 {}
+impl IsOptional for Array {}
+impl IsOptional for Value {}
+impl IsOptional for Range<i64> {}
+impl<T> IsOptional for Of<T> {}
+impl<T> IsOptional for Spread<T> {
+    const OPTIONAL: bool = true;
+}
+impl<T> IsOptional for Option<T> {
+    const OPTIONAL: bool = true;
 }
 
 type Array = Vec<Value>;
@@ -194,23 +227,19 @@ impl NextValue<Array> for Vec<ValueKey> {
         }
     }
 }
-// impl NextValue<Vec<ValueKey>> for Vec<ValueKey> {
-//     type Output = Vec<ValueKey>;
 
-//     fn next_value(&mut self, _: &mut Vm) -> Option<Self::Output> {
-//         self.reverse();
-//         Some(self.to_vec())
-//     }
-// }
-
-impl<T> NextValue<Option<T>> for Vec<ValueKey>
+impl<T: std::fmt::Debug> NextValue<Option<T>> for Vec<ValueKey>
 where
     Vec<ValueKey>: NextValue<T, Output = T>,
 {
     type Output = Option<T>;
 
     fn next_value(&mut self, vm: &mut Vm) -> Option<Self::Output> {
-        Some(<Vec<ValueKey> as NextValue<T>>::next_value(self, vm))
+        Some(if self.is_empty() {
+            None
+        } else {
+            Some(<Vec<ValueKey> as NextValue<T>>::next_value(self, vm)?)
+        })
     }
 }
 
@@ -222,7 +251,7 @@ macro_rules! tuple_impls {
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
-                $name: ConstTypeOf,
+                $name: TypeOf + IsOptional,
             )*
             Res: ToValue,
             Fun: Fn($($name,)* &Vm) -> Res
@@ -231,30 +260,35 @@ macro_rules! tuple_impls {
 
             fn invoke(&self, _args: &mut Vec<ValueKey>, _vm: &mut Vm, _area: CodeArea) -> Self::Result {
                 $(
-
-                    if _args.is_empty() {
+                    if _args.is_empty() && !$name::OPTIONAL {
                         return Err(RuntimeError::TooFewBuiltinArguments {
                             call_area: _area.clone(),
                             call_stack: _vm.get_call_stack(),
                         })
                     }
 
-                    let v = &_vm.memory[*_args.last().unwrap()];
-                    let found = v.value.get_type();
-                    let def_area = v.area.clone();
+                    let $name: $name = match _args.last() {
+                        Some(a) => {
+                            let v = &_vm.memory[*a];
+                            let found = v.value.get_type();
+                            let def_area = v.area.clone();
 
-                    #[allow(non_snake_case)]
-                    let $name: $name = <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
-                        let expected = $name::TYPE;
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
+                                let expected = $name::TYPE;
 
-                        RuntimeError::InvalidBuiltinArgumentType {
-                            call_area: _area.clone(),
-                            call_stack: _vm.get_call_stack(),
-                            def_area,
-                            expected,
-                            found,
+                                RuntimeError::InvalidBuiltinArgumentType {
+                                    call_area: _area.clone(),
+                                    call_stack: _vm.get_call_stack(),
+                                    def_area,
+                                    expected,
+                                    found,
+                                }
+                            })?
                         }
-                    })?;
+                        None => {
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).unwrap()
+                        }
+                    };
                 )*
                 if !_args.is_empty() {
                     return Err(RuntimeError::TooManyBuiltinArguments {
@@ -270,7 +304,7 @@ macro_rules! tuple_impls {
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
-                $name: ConstTypeOf,
+                $name: TypeOf + IsOptional,
             )*
             Res: ToValue,
             Fun: Fn($($name,)* &mut Vm) -> Res
@@ -279,30 +313,35 @@ macro_rules! tuple_impls {
 
             fn invoke(&self, _args: &mut Vec<ValueKey>, _vm: &mut Vm, _area: CodeArea) -> Self::Result {
                 $(
-
-                    if _args.is_empty() {
+                    if _args.is_empty() && !$name::OPTIONAL {
                         return Err(RuntimeError::TooFewBuiltinArguments {
                             call_area: _area.clone(),
                             call_stack: _vm.get_call_stack(),
                         })
                     }
 
-                    let v = &_vm.memory[*_args.last().unwrap()];
-                    let found = v.value.get_type();
-                    let def_area = v.area.clone();
+                    let $name: $name = match _args.last() {
+                        Some(a) => {
+                            let v = &_vm.memory[*a];
+                            let found = v.value.get_type();
+                            let def_area = v.area.clone();
 
-                    #[allow(non_snake_case)]
-                    let $name: $name = <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
-                        let expected = $name::TYPE;
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
+                                let expected = $name::TYPE;
 
-                        RuntimeError::InvalidBuiltinArgumentType {
-                            call_area: _area.clone(),
-                            call_stack: _vm.get_call_stack(),
-                            def_area,
-                            expected,
-                            found,
+                                RuntimeError::InvalidBuiltinArgumentType {
+                                    call_area: _area.clone(),
+                                    call_stack: _vm.get_call_stack(),
+                                    def_area,
+                                    expected,
+                                    found,
+                                }
+                            })?
                         }
-                    })?;
+                        None => {
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).unwrap()
+                        }
+                    };
                 )*
                 if !_args.is_empty() {
                     return Err(RuntimeError::TooManyBuiltinArguments {
@@ -318,7 +357,7 @@ macro_rules! tuple_impls {
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
-                $name: ConstTypeOf,
+                $name: IsOptional + TypeOf,
             )*
             Res: ToValue,
             Fun: Fn($($name,)*) -> Res
@@ -327,30 +366,35 @@ macro_rules! tuple_impls {
 
             fn invoke(&self, _args: &mut Vec<ValueKey>, _vm: &mut Vm, _area: CodeArea) -> Self::Result {
                 $(
-
-                    if _args.is_empty() {
+                    if _args.is_empty() && !$name::OPTIONAL {
                         return Err(RuntimeError::TooFewBuiltinArguments {
                             call_area: _area.clone(),
                             call_stack: _vm.get_call_stack(),
                         })
                     }
 
-                    let v = &_vm.memory[*_args.last().unwrap()];
-                    let found = v.value.get_type();
-                    let def_area = v.area.clone();
+                    let $name: $name = match _args.last() {
+                        Some(a) => {
+                            let v = &_vm.memory[*a];
+                            let found = v.value.get_type();
+                            let def_area = v.area.clone();
 
-                    #[allow(non_snake_case)]
-                    let $name: $name = <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
-                        let expected = $name::TYPE;
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
+                                let expected = $name::TYPE;
 
-                        RuntimeError::InvalidBuiltinArgumentType {
-                            call_area: _area.clone(),
-                            call_stack: _vm.get_call_stack(),
-                            def_area,
-                            expected,
-                            found,
+                                RuntimeError::InvalidBuiltinArgumentType {
+                                    call_area: _area.clone(),
+                                    call_stack: _vm.get_call_stack(),
+                                    def_area,
+                                    expected,
+                                    found,
+                                }
+                            })?
                         }
-                    })?;
+                        None => {
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).unwrap()
+                        }
+                    };
                 )*
                 if !_args.is_empty() {
                     return Err(RuntimeError::TooManyBuiltinArguments {
@@ -366,7 +410,7 @@ macro_rules! tuple_impls {
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
-                $name: ConstTypeOf,
+                $name: TypeOf + IsOptional,
             )*
             Res: ToValue,
             Fun: Fn($($name,)* &Vm, CodeArea) -> Res
@@ -375,30 +419,35 @@ macro_rules! tuple_impls {
 
             fn invoke(&self, _args: &mut Vec<ValueKey>, _vm: &mut Vm, _area: CodeArea) -> Self::Result {
                 $(
-
-                    if _args.is_empty() {
+                    if _args.is_empty() && !$name::OPTIONAL {
                         return Err(RuntimeError::TooFewBuiltinArguments {
                             call_area: _area.clone(),
                             call_stack: _vm.get_call_stack(),
                         })
                     }
 
-                    let v = &_vm.memory[*_args.last().unwrap()];
-                    let found = v.value.get_type();
-                    let def_area = v.area.clone();
+                    let $name: $name = match _args.last() {
+                        Some(a) => {
+                            let v = &_vm.memory[*a];
+                            let found = v.value.get_type();
+                            let def_area = v.area.clone();
 
-                    #[allow(non_snake_case)]
-                    let $name: $name = <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
-                        let expected = $name::TYPE;
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
+                                let expected = $name::TYPE;
 
-                        RuntimeError::InvalidBuiltinArgumentType {
-                            call_area: _area.clone(),
-                            call_stack: _vm.get_call_stack(),
-                            def_area,
-                            expected,
-                            found,
+                                RuntimeError::InvalidBuiltinArgumentType {
+                                    call_area: _area.clone(),
+                                    call_stack: _vm.get_call_stack(),
+                                    def_area,
+                                    expected,
+                                    found,
+                                }
+                            })?
                         }
-                    })?;
+                        None => {
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).unwrap()
+                        }
+                    };
                 )*
                 if !_args.is_empty() {
                     return Err(RuntimeError::TooManyBuiltinArguments {
@@ -414,7 +463,7 @@ macro_rules! tuple_impls {
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
-                $name: ConstTypeOf,
+                $name: TypeOf + IsOptional,
             )*
             Res: ToValue,
             Fun: Fn($($name,)* &mut Vm, CodeArea) -> Res
@@ -423,30 +472,35 @@ macro_rules! tuple_impls {
 
             fn invoke(&self, _args: &mut Vec<ValueKey>, _vm: &mut Vm, _area: CodeArea) -> Self::Result {
                 $(
-
-                    if _args.is_empty() {
+                    if _args.is_empty() && !$name::OPTIONAL {
                         return Err(RuntimeError::TooFewBuiltinArguments {
                             call_area: _area.clone(),
                             call_stack: _vm.get_call_stack(),
                         })
                     }
 
-                    let v = &_vm.memory[*_args.last().unwrap()];
-                    let found = v.value.get_type();
-                    let def_area = v.area.clone();
+                    let $name: $name = match _args.last() {
+                        Some(a) => {
+                            let v = &_vm.memory[*a];
+                            let found = v.value.get_type();
+                            let def_area = v.area.clone();
 
-                    #[allow(non_snake_case)]
-                    let $name: $name = <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
-                        let expected = $name::TYPE;
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
+                                let expected = $name::TYPE;
 
-                        RuntimeError::InvalidBuiltinArgumentType {
-                            call_area: _area.clone(),
-                            call_stack: _vm.get_call_stack(),
-                            def_area,
-                            expected,
-                            found,
+                                RuntimeError::InvalidBuiltinArgumentType {
+                                    call_area: _area.clone(),
+                                    call_stack: _vm.get_call_stack(),
+                                    def_area,
+                                    expected,
+                                    found,
+                                }
+                            })?
                         }
-                    })?;
+                        None => {
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).unwrap()
+                        }
+                    };
                 )*
                 if !_args.is_empty() {
                     return Err(RuntimeError::TooManyBuiltinArguments {
@@ -462,7 +516,7 @@ macro_rules! tuple_impls {
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
-                $name: ConstTypeOf,
+                $name: TypeOf + IsOptional,
             )*
             Res: ToValue,
             Fun: Fn($($name,)* CodeArea) -> Res
@@ -471,30 +525,35 @@ macro_rules! tuple_impls {
 
             fn invoke(&self, _args: &mut Vec<ValueKey>, _vm: &mut Vm, _area: CodeArea) -> Self::Result {
                 $(
-
-                    if _args.is_empty() {
+                    if _args.is_empty() && !$name::OPTIONAL {
                         return Err(RuntimeError::TooFewBuiltinArguments {
                             call_area: _area.clone(),
                             call_stack: _vm.get_call_stack(),
                         })
                     }
 
-                    let v = &_vm.memory[*_args.last().unwrap()];
-                    let found = v.value.get_type();
-                    let def_area = v.area.clone();
+                    let $name: $name = match _args.last() {
+                        Some(a) => {
+                            let v = &_vm.memory[*a];
+                            let found = v.value.get_type();
+                            let def_area = v.area.clone();
 
-                    #[allow(non_snake_case)]
-                    let $name: $name = <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
-                        let expected = $name::TYPE;
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).ok_or_else(|| {
+                                let expected = $name::TYPE;
 
-                        RuntimeError::InvalidBuiltinArgumentType {
-                            call_area: _area.clone(),
-                            call_stack: _vm.get_call_stack(),
-                            def_area,
-                            expected,
-                            found,
+                                RuntimeError::InvalidBuiltinArgumentType {
+                                    call_area: _area.clone(),
+                                    call_stack: _vm.get_call_stack(),
+                                    def_area,
+                                    expected,
+                                    found,
+                                }
+                            })?
                         }
-                    })?;
+                        None => {
+                            <Vec<ValueKey> as NextValue<$name>>::next_value(_args, _vm).unwrap()
+                        }
+                    };
                 )*
                 if !_args.is_empty() {
                     return Err(RuntimeError::TooManyBuiltinArguments {
@@ -504,12 +563,6 @@ macro_rules! tuple_impls {
                 }
                 Ok((self)( $($name,)* _area))
             }
-        }
-
-        impl< $($name,)* > ConstTypeOf for Of<( $($name,)* )>
-        where $( $name: ConstTypeOf, )*
-        {
-            const TYPE: &'static [ValueType] = &[$( $name::TYPE[0], )*];
         }
 
         impl< $($name: 'static,)*> TOf<( $($name,)* )> for Of<( $(Option<$name>,)* )> {
@@ -525,7 +578,7 @@ macro_rules! tuple_impls {
             }
         }
 
-        impl< $($name,)* > NextValue<Of<( $(Option<$name>,)* )>> for Vec<ValueKey>
+        impl< $($name: std::fmt::Debug,)* > NextValue<Of<( $(Option<$name>,)* )>> for Vec<ValueKey>
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
@@ -547,6 +600,7 @@ macro_rules! tuple_impls {
                         $name = <Vec<ValueKey> as NextValue<$name>>::next_value(self, _vm);
 
                         if $name.is_some() {
+                            self.pop();
                             break '_a;
                         } else {
                             self.push(_v);
@@ -555,8 +609,18 @@ macro_rules! tuple_impls {
 
                 }
 
+                if ( $( $name.is_none() && )* true ) {
+                    return None
+                }
+
                 Some(Of(( $($name,)* )))
             }
+        }
+
+        impl< $($name,)* > TypeOf for Of<( $( Option<$name>,)* )>
+        where $( $name: TypeOf, )*
+        {
+            const TYPE: BuiltinValueType = BuiltinValueType::List(&[ $($name::TYPE,)* ]);
         }
     };
 }
@@ -589,23 +653,16 @@ macro_rules! of {
 
 ///////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, EnumFromStr, EnumDisplay, PartialEq, Clone, EnumProperty)]
+#[derive(Debug, EnumFromStr, EnumDisplay, PartialEq, Clone)]
 #[delve(rename_variants = "snake_case")]
 pub enum Builtin {
-    #[strum(props(link = "https://spu7nix.net/spwn/#/builtins?id=print"))]
     Print,
-    #[strum(props(link = "https://spu7nix.net/spwn/#/builtins?id=print"))]
     Println,
     Exit,
-    #[strum(props(link = "https://spu7nix.net/spwn/#/builtins?id=random"))]
     Random,
-    #[strum(props(link = "https://spu7nix.net/spwn/#/builtins?id=spwn_version"))]
     Version,
-    #[strum(props(link = "https://spu7nix.net/spwn/#/builtins?id=assert"))]
     Assert,
-    #[strum(props(link = "https://spu7nix.net/spwn/#/builtins?id=assert"))]
     AssertEq,
-    #[strum(props(link = "https://spu7nix.net/spwn/#/builtins?id=get_input"))]
     Input,
 }
 
@@ -629,7 +686,7 @@ impl Builtin {
     }
 }
 
-pub fn exit(vm: &mut Vm) {
+pub fn exit(_vm: &mut Vm) {
     // vm.contexts.yeet_current();
     // the goof (the sill)
 }

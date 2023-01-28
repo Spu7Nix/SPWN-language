@@ -969,12 +969,12 @@ impl Parser<'_> {
 
                 Statement::ExtractImport(import_type)
             }
-            Token::Print => {
-                self.next();
-                let v = self.parse_expr()?;
+            // Token::Print => {
+            //     self.next();
+            //     let v = self.parse_expr()?;
 
-                Statement::Print(v)
-            }
+            //     Statement::Print(v)
+            // }
             _ => {
                 let left = self.parse_expr()?;
                 let peek = self.peek();

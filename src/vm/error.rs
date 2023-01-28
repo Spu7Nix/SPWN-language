@@ -1,11 +1,12 @@
 use std::string::ToString;
 
-use super::builtins::Builtin;
+use super::builtins::{Builtin, BuiltinValueType};
 use super::context::CallStackItem;
 use super::value::ValueType;
 use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;
+use crate::util::hyperlink;
 
 error_maker! {
     Title: "Runtime Error"
@@ -177,7 +178,7 @@ error_maker! {
 
         /////////
         #[
-            Message: "Too few builtin arguments provided", Note: None;
+            Message: "Too few arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
             Labels: [
                 call_area => "Builtin called here";
             ]
@@ -190,7 +191,7 @@ error_maker! {
 
         /////////
         #[
-            Message: "Too many builtin arguments provided", Note: None;
+            Message: "Too many arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
             Labels: [
                 call_area => "Builtin called here";
             ]
@@ -203,16 +204,16 @@ error_maker! {
 
         /////////
         #[
-            Message: "Invalid builtin argument type", Note: None;
+            Message: "Invalid builtin argument type", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
             Labels: [
-                call_area => "Builtin called here";
-                def_area => "Expected {}, found {}": expected.iter().map(|v| format!("{v}")).collect::<Vec<_>>().join(", "), found;
+                call_area => "Builtin expected type {} here": expected;
+                def_area => "Value defined as {} here": found;
             ]
         ]
         InvalidBuiltinArgumentType {
             call_area: CodeArea,
             def_area: CodeArea,
-            expected: &'static [ValueType],
+            expected: BuiltinValueType,
             found: ValueType,
             [call_stack]
         },

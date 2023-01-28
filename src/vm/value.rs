@@ -1,13 +1,9 @@
-use std::fmt::write;
-
 use ahash::AHashMap;
 use lasso::Spur;
 use strum::EnumDiscriminants;
 
 use super::builtins::Builtin;
-// use super::builtins::{Builtin, BuiltinFn};
 use super::interpreter::{FuncCoord, ValueKey, Vm};
-use super::opcodes::FunctionID;
 use crate::compiling::bytecode::Constant;
 use crate::gd::ids::*;
 use crate::sources::CodeArea;

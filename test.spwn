@@ -1,10 +1,5 @@
 #[debug_bytecode]
-m = () {
-    !{
-        -> return 1
-    }
-}
 
-print "a"
-m()
-print "b"
+foo = () {}
+
+$.assert_eq(foo, foo)

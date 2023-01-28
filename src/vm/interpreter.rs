@@ -16,6 +16,7 @@ use crate::compiling::bytecode::Bytecode;
 use crate::gd::ids::{IDClass, Id};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
+use crate::vm::builtins::Builtin;
 // use crate::vm::builtins::Builtin;
 use crate::vm::value::MacroCode;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -548,7 +549,7 @@ impl<'a> Vm<'a> {
                         (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
 
                         (Value::Builtins, name) => Some(Value::Macro(MacroCode::Builtin(
-                            todo!(), // Builtin::from_str(name).unwrap(),
+                            Builtin::from_str(name).unwrap(),
                         ))),
                         _ => None,
                     };
