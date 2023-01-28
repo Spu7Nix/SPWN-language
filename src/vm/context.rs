@@ -20,12 +20,11 @@ pub struct CallStackItem {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
-    pub group: Id,
     pub recursion_depth: usize,
     pub memory: usize,
 
     pub pos_stack: Vec<CallStackItem>,
-
+    group_stack: Vec<Id>,
     pub registers: Vec<Vec<ValueKey>>,
 }
 // yore sot sitnky 😍😍😍😍😍😍😍😂😂😂😂😻😻😻😻😻❤️❤️❤️❤️❤️❤️😭💷💷💷💷💵💵🚘🚘🚘😉😉😉
@@ -64,11 +63,11 @@ impl FullContext {
     pub fn new() -> Self {
         let mut contexts = BinaryHeap::new();
         contexts.push(Context {
-            group: Id::Specific(0),
             recursion_depth: 0,
             memory: 0,
             registers: vec![],
             pos_stack: vec![],
+            group_stack: vec![Id::Specific(0)],
         });
         Self {
             contexts,
@@ -113,6 +112,20 @@ impl FullContext {
 
     pub fn yeet_current(&mut self) {
         self.contexts.pop();
+    }
+
+    pub fn set_group_and_push(&mut self, group: Id) {
+        let mut current = self.current_mut();
+        current.group_stack.push(group);
+    }
+
+    pub fn pop_group(&mut self) -> Id {
+        let mut current = self.current_mut();
+        current.group_stack.pop().unwrap()
+    }
+
+    pub fn group(&self) -> Id {
+        *self.current().group_stack.last().unwrap()
     }
 }
 

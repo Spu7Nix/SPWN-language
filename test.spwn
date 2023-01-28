@@ -1,5 +1,10 @@
-#[debug_bytecode, no_optimize_bytecode]
+#[debug_bytecode]
+m = () {
+    !{
+        -> return 1
+    }
+}
 
-a = import "test2.spwn"
-
-a.f(10)
+print "a"
+m()
+print "b"

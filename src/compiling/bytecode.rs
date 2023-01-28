@@ -57,7 +57,7 @@ pub enum Constant {
     Float(f64),
     String(String),
     Bool(bool),
-    Id(IDClass, Option<u16>),
+    Id(IDClass, u16),
 }
 
 impl std::fmt::Debug for Constant {
@@ -67,16 +67,7 @@ impl std::fmt::Debug for Constant {
             Constant::Float(v) => write!(f, "{v}"),
             Constant::Bool(v) => write!(f, "{v}"),
             Constant::String(v) => write!(f, "{v:?}"),
-            Constant::Id(class, n) => write!(
-                f,
-                "{}{}",
-                if let Some(n) = n {
-                    n.to_string()
-                } else {
-                    "".into()
-                },
-                class.letter()
-            ),
+            Constant::Id(class, n) => write!(f, "{}{}", n, class.letter()),
         }
     }
 }
@@ -583,11 +574,44 @@ impl<'a> FuncBuilder<'a> {
         reg: UnoptRegister,
         span: CodeSpan,
     ) {
-        let k = self
-            .code_builder
-            .constants
-            .insert(Constant::Id(class, value));
-        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+        match value {
+            Some(v) => {
+                let k = self.code_builder.constants.insert(Constant::Id(class, v));
+                self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+            }
+            None => self.push_opcode_spanned(
+                ProtoOpcode::Raw(Opcode::LoadArbitraryId { class, dest: reg }),
+                span,
+            ),
+        }
+        // let k = self
+        //     .code_builder
+        //     .constants
+        //     .insert(Constant::Id(class, value));
+        // self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+    }
+
+    pub fn push_context_group(&mut self, group: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::PushContextGroup { src: group }),
+            span,
+        )
+    }
+
+    pub fn pop_context_group(&mut self, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PopGroupStack), span)
+    }
+
+    pub fn make_trigger_function(
+        &mut self,
+        src: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::MakeTriggerFunc { src, dest }),
+            span,
+        )
     }
 
     pub fn add(
@@ -922,10 +946,6 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Copy { from, to }), span)
     }
 
-    pub fn print(&mut self, reg: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Print { reg }))
-    }
-
     pub fn repeat_block(&mut self) {
         let path = self.block_path.clone();
         self.push_opcode(ProtoOpcode::Jump(JumpTo::Start(path)))
@@ -978,7 +998,11 @@ impl<'a> FuncBuilder<'a> {
         span: CodeSpan,
     ) {
         self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Index { from, dest, index }),
+            ProtoOpcode::Raw(UnoptOpcode::Index {
+                base: from,
+                dest,
+                index,
+            }),
             span,
         )
     }
@@ -1032,10 +1056,6 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Ret { src }))
     }
 
-    pub fn export(&mut self, src: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Export { src }))
-    }
-
     pub fn yeet_context(&mut self) {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::YeetContext))
     }
@@ -1062,6 +1082,10 @@ impl<'a> FuncBuilder<'a> {
             }),
             span,
         )
+    }
+
+    pub fn print(&mut self, reg: UnoptRegister) {
+        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Print { reg }))
     }
 }
 
@@ -1094,6 +1118,7 @@ impl Bytecode<Register> {
         let mut colors = RainbowColorGenerator::new(150.0, 0.4, 0.9, 60.0);
 
         let col_reg = Regex::new(r"(R\d+)").unwrap();
+        let sarrow_reg = Regex::new(r"~>").unwrap();
 
         let ansi_regex = Regex::new(r#"(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]"#).unwrap();
         let clear_ansi = |s: &str| ansi_regex.replace_all(s, "").to_string();
@@ -1125,6 +1150,14 @@ impl Bytecode<Register> {
                                 .bold()
                         )
                     }
+                    Opcode::Import { dest, src } => {
+                        format!(
+                            "import {} -> R{dest}",
+                            format!("{:?}", &self.import_paths[*src as usize].value)
+                                .bright_cyan()
+                                .bold()
+                        )
+                    }
                     _ => {
                         format!("{opcode}")
                     }
@@ -1132,6 +1165,9 @@ impl Bytecode<Register> {
 
                 let formatted = col_reg
                     .replace_all(&formatted, "$1".bright_red().bold().to_string())
+                    .to_string();
+                let formatted = sarrow_reg
+                    .replace_all(&formatted, "~>".bright_green().bold().to_string())
                     .to_string();
                 let f_len = clear_ansi(&formatted).len();
 
@@ -1240,8 +1276,9 @@ impl Bytecode<Register> {
                     func.capture_regs
                         .iter()
                         .map(|(from, to)| format!(
-                            "{} -> {}",
+                            "{} {} {}",
                             format!("R{from}").bright_red().bold(),
+                            "~>".bright_green().bold(),
                             format!("R{to}").bright_red().bold(),
                         ))
                         .collect::<Vec<_>>()

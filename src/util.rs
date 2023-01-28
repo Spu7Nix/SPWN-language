@@ -64,8 +64,6 @@ impl<'de> Visitor<'de> for DigestVisitor {
 
         // SAFETY:
         // this is safe since we check the length above (cant be more than 16)
-        Ok(Digest(unsafe {
-            *std::mem::transmute::<_, &[u8; 16]>(v.as_ptr())
-        }))
+        Ok(Digest(unsafe { *v.as_ptr().cast::<[u8; 16]>() }))
     }
 }

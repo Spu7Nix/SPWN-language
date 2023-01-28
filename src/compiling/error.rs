@@ -68,6 +68,30 @@ error_maker! {
             area: CodeArea,
         },
 
+        #[
+            Message: "Illegal action inside trigger function", Note: None;
+            Labels: [
+                def => "Trigger function defined here";
+                area => "This is not allowed inside a trigger function";
+            ]
+        ]
+        BreakInTriggerFuncScope {// break/return/continue
+            area: CodeArea,
+            def: CodeArea,
+        },
+
+        #[
+            Message: "Illegal action inside arrow statement", Note: None;
+            Labels: [
+                def => "Arrow statement defined here";
+                area => "This is not allowed inside an arrow statement";
+            ]
+        ]
+        BreakInArrowStmtScope { // break/return/continue
+            area: CodeArea,
+            def: CodeArea,
+        },
+
         /////
         #[
             Message: "Invalid module return", Note: None;
