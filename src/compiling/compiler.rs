@@ -600,6 +600,10 @@ impl<'a> Compiler<'a> {
             Statement::TypeDef(_) => todo!(),
             Statement::Impl { typ, items } => todo!(),
             Statement::ExtractImport(_) => todo!(),
+            Statement::Print(v) => {
+                let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
+                builder.print(v);
+            }
         }
         Ok(())
     }
@@ -918,7 +922,16 @@ impl<'a> Compiler<'a> {
                 builder.call(base_reg, out_reg, args_reg, expr.span);
             }
             Expression::MacroPattern { args, ret_type } => todo!(),
-            Expression::TriggerFunc { attributes, code } => todo!(),
+            Expression::TriggerFunc { attributes, code } => {
+                use crate::gd::ids::IDClass::Group;
+                let group_reg = builder.next_reg();
+                builder.load_id(None, Group, group_reg, expr.span);
+                builder.change_context_group(group_reg, expr.span);
+                builder.block(|b| {
+                    let inner_scope = self.derive_scope(scope, None);
+                    self.compile_stmts(code, inner_scope, b)
+                })?;
+            }
             Expression::TriggerFuncCall(_) => todo!(),
             Expression::Ternary {
                 cond,

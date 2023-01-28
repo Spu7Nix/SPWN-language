@@ -33,6 +33,8 @@ lexer! {
     Type: text("type"),
     Impl: text("impl"),
 
+    Print: text("print"),
+
     Extract: text("extract"),
     Import: text("import"),
     Dollar: text("$"),
@@ -198,6 +200,7 @@ impl Token {
             Self::Hashtag => "#",
             Self::Extract => "extract",
             Self::Newline => "linebreak",
+            Self::Print => "print",
         }
     }
 }

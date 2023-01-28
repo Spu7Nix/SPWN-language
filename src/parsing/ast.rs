@@ -179,6 +179,8 @@ pub enum Statement {
         typ: Spur,
         items: DictItems,
     },
+
+    Print(ExprNode),
 }
 
 pub type Statements = Vec<StmtNode>;

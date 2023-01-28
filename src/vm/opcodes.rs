@@ -4,6 +4,8 @@ use delve::{EnumDisplay, EnumFields, EnumToStr, EnumVariantNames};
 use serde::de::{Error, Visitor};
 use serde::{Deserialize, Serialize};
 
+use crate::gd::ids::IDClass;
+
 struct OpcodeVisitor;
 
 impl Serialize for Opcode<Register> {
@@ -266,6 +268,15 @@ opcodes! {
 
     #[delve(display = |d: &R| format!("() -> R{d}"))]
     LoadEmpty { => dest },
+
+    #[delve(display = |c: &IDClass, d: &R| format!("?{} -> R{d}", c.letter()))]
+    LoadArbitraryId { class: IDClass, => dest },
+
+    #[delve(display = |src: &R| format!("change to R{src}"))]
+    ChangeContextGroup { => src },
+
+    #[delve(display = |s: &R, d: &R| format!("!{{R{s}}} -> R{d}"))]
+    MakeTriggerFunc { => src, => dest },
 
     #[delve(display = |b: &R, d: &R, i: &R| format!("R{b}[R{i}] ~> R{d}"))]
     Index { => base, => dest, => index },

@@ -57,7 +57,7 @@ pub enum Constant {
     Float(f64),
     String(String),
     Bool(bool),
-    Id(IDClass, Option<u16>),
+    Id(IDClass, u16),
 }
 
 impl std::fmt::Debug for Constant {
@@ -67,16 +67,7 @@ impl std::fmt::Debug for Constant {
             Constant::Float(v) => write!(f, "{v}"),
             Constant::Bool(v) => write!(f, "{v}"),
             Constant::String(v) => write!(f, "{v:?}"),
-            Constant::Id(class, n) => write!(
-                f,
-                "{}{}",
-                if let Some(n) = n {
-                    n.to_string()
-                } else {
-                    "".into()
-                },
-                class.letter()
-            ),
+            Constant::Id(class, n) => write!(f, "{}{}", n, class.letter()),
         }
     }
 }
@@ -583,11 +574,40 @@ impl<'a> FuncBuilder<'a> {
         reg: UnoptRegister,
         span: CodeSpan,
     ) {
-        let k = self
-            .code_builder
-            .constants
-            .insert(Constant::Id(class, value));
-        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+        match value {
+            Some(v) => {
+                let k = self.code_builder.constants.insert(Constant::Id(class, v));
+                self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+            }
+            None => self.push_opcode_spanned(
+                ProtoOpcode::Raw(Opcode::LoadArbitraryId { class, dest: reg }),
+                span,
+            ),
+        }
+        // let k = self
+        //     .code_builder
+        //     .constants
+        //     .insert(Constant::Id(class, value));
+        // self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+    }
+
+    pub fn change_context_group(&mut self, group: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::ChangeContextGroup { src: group }),
+            span,
+        )
+    }
+
+    pub fn make_trigger_function(
+        &mut self,
+        src: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::MakeTriggerFunc { src, dest }),
+            span,
+        )
     }
 
     pub fn add(
@@ -1058,6 +1078,10 @@ impl<'a> FuncBuilder<'a> {
             }),
             span,
         )
+    }
+
+    pub fn print(&mut self, reg: UnoptRegister) {
+        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Print { reg }))
     }
 }
 

@@ -12,10 +12,10 @@ use super::opcodes::{Opcode, Register};
 use super::value::{ArgData, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
-use crate::gd::ids::IDClass;
+use crate::gd::ids::{IDClass, Id};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
-use crate::vm::builtins::Builtin;
+// use crate::vm::builtins::Builtin;
 use crate::vm::value::MacroCode;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
@@ -241,8 +241,7 @@ impl<'a> Vm<'a> {
 
             match opcode {
                 Opcode::LoadConst { dest, id } => {
-                    let value =
-                        Value::from_const(&self.programs[func.code].1.consts[*id as usize], self);
+                    let value = Value::from_const(&self.programs[func.code].1.consts[*id as usize]);
 
                     self.set_reg(
                         *dest,
@@ -358,7 +357,6 @@ impl<'a> Vm<'a> {
                                 &self.get_reg(*left).value,
                                 &self.get_reg(*right).value,
                                 self,
-                                func.code,
                             )),
                             area: self.make_area(span, func.code),
                         },
@@ -373,7 +371,6 @@ impl<'a> Vm<'a> {
                                 &self.get_reg(*left).value,
                                 &self.get_reg(*right).value,
                                 self,
-                                func.code,
                             )),
                             area: self.make_area(span, func.code),
                         },
@@ -546,7 +543,7 @@ impl<'a> Vm<'a> {
                         (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
 
                         (Value::Builtins, name) => Some(Value::Macro(MacroCode::Builtin(
-                            Builtin::from_str(name).unwrap(),
+                            todo!(), // Builtin::from_str(name).unwrap(),
                         ))),
                         _ => None,
                     };
@@ -710,10 +707,10 @@ impl<'a> Vm<'a> {
                                 _ => unreachable!(),
                             };
 
-                            //args.reverse();
+                            args.reverse();
 
-                            let value = b.call(&mut args, self);
                             let span = self.get_span(func, ip);
+                            let value = b.call(&mut args, self, self.make_area(span, func.code))?;
 
                             self.set_reg(
                                 *dest,
@@ -800,6 +797,44 @@ impl<'a> Vm<'a> {
 
                     self.push_call_stack(coord, *dest, true, None);
                     continue;
+                }
+                Opcode::LoadArbitraryId { class, dest } => {
+                    let id = Id::Arbitrary(self.next_id(*class));
+                    let v = match class {
+                        IDClass::Group => Value::Group(id),
+                        IDClass::Color => Value::Color(id),
+                        IDClass::Block => Value::Block(id),
+                        IDClass::Item => Value::Item(id),
+                    };
+
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: v,
+                            area: self.get_area(func, ip),
+                        },
+                    )
+                }
+                Opcode::ChangeContextGroup { src } => {
+                    let group = match &self.get_reg(*src).value {
+                        Value::Group(g) => *g,
+                        _ => unreachable!(),
+                    };
+                    self.contexts.current_mut().group = group;
+                }
+                Opcode::MakeTriggerFunc { src, dest } => {
+                    let group = match &self.get_reg(*src).value {
+                        Value::Group(g) => *g,
+                        _ => unreachable!(),
+                    };
+
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::TriggerFunction(group),
+                            area: self.get_area(func, ip),
+                        },
+                    )
                 }
             }
 

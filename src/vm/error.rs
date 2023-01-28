@@ -1,5 +1,6 @@
 use std::string::ToString;
 
+use super::builtins::Builtin;
 use super::context::CallStackItem;
 use super::value::ValueType;
 use crate::error_maker;
@@ -145,6 +146,74 @@ error_maker! {
             index: i64,
             area: CodeArea,
             typ: ValueType,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Assertion failed", Note: None;
+            Labels: [
+                area => "Assertion happened here";
+            ]
+        ]
+        AssertionFailed {
+            area: CodeArea,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Equality assertion failed", Note: None;
+            Labels: [
+                area => "{} is not equal to {}": left, right;
+            ]
+        ]
+        EqAssertionFailed {
+            area: CodeArea,
+            left: String,
+            right: String,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Too few builtin arguments provided", Note: None;
+            Labels: [
+                call_area => "Builtin called here";
+            ]
+        ]
+        TooFewBuiltinArguments {
+            call_area: CodeArea,
+            //builtin: Builtin,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Too many builtin arguments provided", Note: None;
+            Labels: [
+                call_area => "Builtin called here";
+            ]
+        ]
+        TooManyBuiltinArguments {
+            call_area: CodeArea,
+            //builtin: Builtin,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Invalid builtin argument type", Note: None;
+            Labels: [
+                call_area => "Builtin called here";
+                def_area => "Expected {}, found {}": expected.iter().map(|v| format!("{v}")).collect::<Vec<_>>().join(", "), found;
+            ]
+        ]
+        InvalidBuiltinArgumentType {
+            call_area: CodeArea,
+            def_area: CodeArea,
+            expected: &'static [ValueType],
+            found: ValueType,
             [call_stack]
         },
     }

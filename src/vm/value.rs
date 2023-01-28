@@ -4,7 +4,8 @@ use ahash::AHashMap;
 use lasso::Spur;
 use strum::EnumDiscriminants;
 
-use super::builtins::{Builtin, BuiltinFn};
+use super::builtins::Builtin;
+// use super::builtins::{Builtin, BuiltinFn};
 use super::interpreter::{FuncCoord, ValueKey, Vm};
 use super::opcodes::FunctionID;
 use crate::compiling::bytecode::Constant;
@@ -61,6 +62,8 @@ pub enum Value {
     Maybe(Option<ValueKey>),
     Empty,
     Macro(MacroCode),
+
+    TriggerFunction(Id),
 }
 
 impl std::fmt::Display for ValueType {
@@ -74,19 +77,14 @@ impl Value {
         self.into()
     }
 
-    pub fn from_const(c: &Constant, vm: &mut Vm) -> Self {
+    pub fn from_const(c: &Constant) -> Self {
         match c {
             Constant::Int(v) => Value::Int(*v),
             Constant::Float(v) => Value::Float(*v),
             Constant::String(v) => Value::String(v.clone()),
             Constant::Bool(v) => Value::Bool(*v),
             Constant::Id(c, v) => {
-                let id = if let Some(n) = v {
-                    Id::Specific(*n)
-                } else {
-                    Id::Arbitrary(vm.next_id(*c))
-                };
-
+                let id = Id::Specific(*v);
                 match c {
                     IDClass::Group => Value::Group(id),
                     IDClass::Color => Value::Color(id),
@@ -150,6 +148,7 @@ impl Value {
                     .join(", ")
             ),
             Value::Macro(MacroCode::Builtin(b)) => format!("<builtin: {b}>"),
+            Value::TriggerFunction(_) => "!{{...}}".to_string(),
         }
     }
 }
