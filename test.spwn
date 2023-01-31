@@ -1,5 +1,7 @@
-#[debug_bytecode]
+// #[debug_bytecode]
 
-foo = () {}
+a = "aaaaaa"
+$.println(a)
+a.clear()
 
-$.assert_eq(foo, foo)
+$.println(a)

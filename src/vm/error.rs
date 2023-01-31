@@ -1,12 +1,12 @@
 use std::string::ToString;
 
-use super::builtins::{Builtin, BuiltinValueType};
 use super::context::CallStackItem;
 use super::value::ValueType;
 use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;
 use crate::util::hyperlink;
+use crate::vm::builtins::builtin_utils::BuiltinValueType;
 
 error_maker! {
     Title: "Runtime Error"

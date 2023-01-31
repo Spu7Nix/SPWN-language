@@ -16,13 +16,15 @@ use crate::compiling::bytecode::Bytecode;
 use crate::gd::ids::{IDClass, Id};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
-use crate::vm::builtins::Builtin;
+use crate::vm::builtins::builtin_utils::BuiltinType;
+use crate::vm::builtins::builtins::Builtin;
 // use crate::vm::builtins::Builtin;
 use crate::vm::value::MacroCode;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 new_key_type! {
-    pub struct ValueKey; pub struct BytecodeKey;
+    pub struct ValueKey;
+    pub struct BytecodeKey;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -536,59 +538,68 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     };
                     let span = self.get_span(func, ip);
-                    let value = &self.get_reg(*from).value;
 
-                    let special = match (value, &key[..]) {
-                        (Value::String(s), "length") => Some(Value::Int(s.chars().count() as i64)),
+                    // let value = &self.get_reg(*from).value;
+                    // i dont think this clone can go away :(((
+                    let value = self.get_reg(*from).value.clone();
 
-                        (Value::Range(start, ..), "start") => Some(Value::Int(*start)),
-                        (Value::Range(_, end, _), "end") => Some(Value::Int(*end)),
-                        (Value::Range(_, _, step), "step") => Some(Value::Int(*step as i64)),
+                    let v = value.invoke_self(&key[..], self)?;
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: v,
+                            area: self.make_area(span, func.code),
+                        },
+                    );
 
-                        (Value::Array(v), "length") => Some(Value::Int(v.len() as i64)),
-                        (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
+                    // let special = match (value, &key[..]) {
+                    //     // (Value::String(s), "length") => Some(Value::Int(s.chars().count() as i64)),
 
-                        (Value::Builtins, name) => Some(Value::Macro(MacroCode::Builtin(
-                            Builtin::from_str(name).unwrap(),
-                        ))),
-                        _ => None,
-                    };
+                    //     // (Value::Range(start, ..), "start") => Some(Value::Int(*start)),
+                    //     // (Value::Range(_, end, _), "end") => Some(Value::Int(*end)),
+                    //     // (Value::Range(_, _, step), "step") => Some(Value::Int(*step as i64)),
 
-                    macro_rules! error {
-                        () => {
-                            return Err(RuntimeError::NonexistentMember {
-                                area: self.make_area(span, func.code),
-                                member: key,
-                                base_type: value.get_type(),
-                                call_stack: self.get_call_stack(),
-                            })
-                        };
-                    }
+                    //     // (Value::Array(v), "length") => Some(Value::Int(v.len() as i64)),
+                    //     // (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
+                    //     // (Value::Builtins, name) => Some(Value::Macro(MacroCode::Builtin(
+                    //     //     Builtin::from_str(name).unwrap(),
+                    //     // ))),
+                    //     _ => None,
+                    // };
 
-                    if let Some(v) = special {
-                        self.set_reg(
-                            *dest,
-                            StoredValue {
-                                value: v,
-                                area: self.make_area(span, func.code),
-                            },
-                        );
-                    } else {
-                        let key_interned = self.interner.borrow_mut().get_or_intern(&key);
-                        match value {
-                            Value::Dict(v) => match v.get(&key_interned) {
-                                Some(k) => self.change_reg_key(*dest, *k),
-                                None => error!(),
-                            },
-                            _ => error!(),
-                        }
-                    }
+                    // macro_rules! error {
+                    //     () => {
+                    //         return Err(RuntimeError::NonexistentMember {
+                    //             area: self.make_area(span, func.code),
+                    //             member: key,
+                    //             base_type: value.get_type(),
+                    //             call_stack: self.get_call_stack(),
+                    //         })
+                    //     };
+                    // }
+
+                    // if let Some(v) = special {
+                    //     self.set_reg(
+                    //         *dest,
+                    //         StoredValue {
+                    //             value: v,
+                    //             area: self.make_area(span, func.code),
+                    //         },
+                    //     );
+                    // } else {
+                    //     // let key_interned = self.interner.borrow_mut().get_or_intern(&key);
+                    //     // match value {
+                    //     //     Value::Dict(v) => match v.get(&key_interned) {
+                    //     //         Some(k) => self.change_reg_key(*dest, *k),
+                    //     //         None => error!(),
+                    //     //     },
+                    //     //     _ => error!(),
+                    //     // }
+                    // }
                 }
-                Opcode::Associated {
-                    from: _,
-                    dest: _,
-                    name: _,
-                } => todo!(),
+                Opcode::Associated { from, dest, name } => {
+                    dbg!(from, dest, name);
+                }
                 Opcode::YeetContext => {
                     self.contexts.yeet_current();
                     continue;
@@ -716,7 +727,7 @@ impl<'a> Vm<'a> {
                             args.reverse();
 
                             let span = self.get_span(func, ip);
-                            let value = b.call(&mut args, self, self.make_area(span, func.code))?;
+                            let value = b(&mut args, self, self.make_area(span, func.code))?;
 
                             self.set_reg(
                                 *dest,
