@@ -1,10 +1,7 @@
-#[debug_bytecode]
-m = () {
-    !{
-        -> return 1
-    }
-}
+// #[debug_bytecode]
 
-print "a"
-m()
-print "b"
+a = "aaaaaa"
+$.println(a)
+a.clear()
+
+$.println(a)

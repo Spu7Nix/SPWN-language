@@ -72,7 +72,9 @@ impl std::fmt::Debug for Constant {
     }
 }
 
+#[allow(unknown_lints)]
 #[allow(clippy::derived_hash_with_manual_eq)]
+#[allow(clippy::derive_hash_xor_eq)]
 impl Hash for Constant {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         std::mem::discriminant(self).hash(state);
