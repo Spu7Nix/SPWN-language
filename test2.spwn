@@ -1,8 +1,0 @@
-
-g = (x) => x + "hello"
-
-return {
-    f: (x) {
-        return g(x)
-    }
-}

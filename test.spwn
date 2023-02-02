@@ -1,5 +1,7 @@
-#[debug_bytecode]
+// #[debug_bytecode]
 
-a = import "test2.spwn"
+a = "aaaaaa"
+$.println(a)
+a.clear()
 
-a.f(10)
+$.println(a)

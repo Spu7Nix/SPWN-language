@@ -1,3 +1,4 @@
+pub mod builtins;
 pub mod context;
 pub mod error;
 pub mod interpreter;

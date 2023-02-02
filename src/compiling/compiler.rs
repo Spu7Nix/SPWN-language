@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use ahash::AHashMap;
 use lasso::Spur;
+use libflate::lz77::Code;
 use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
@@ -30,11 +31,13 @@ pub struct Variable {
     reg: usize,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ScopeType {
     Global,
     Loop(Vec<usize>),
     MacroBody,
+    TriggerFunc(CodeArea),
+    ArrowStmt(CodeArea),
 }
 
 pub struct Scope {
@@ -118,14 +121,109 @@ impl<'a> Compiler<'a> {
         })
     }
 
-    pub fn find_scope_type(&self, scope: ScopeKey) -> Option<&ScopeType> {
+    // pub fn find_scope_type(&self, scope: ScopeKey) -> Option<&ScopeType> {
+    //     let scope = &self.scopes[scope];
+    //     match &scope.typ {
+    //         Some(t) => Some(t),
+    //         None => match scope.parent {
+    //             Some(k) => self.find_scope_type(k),
+    //             None => None,
+    //         },
+    //     }
+    // }
+
+    pub fn is_inside_loop(&self, scope: ScopeKey) -> Option<&Vec<usize>> {
         let scope = &self.scopes[scope];
         match &scope.typ {
-            Some(t) => Some(t),
-            None => match scope.parent {
-                Some(k) => self.find_scope_type(k),
-                None => None,
+            Some(ScopeType::ArrowStmt(_) | ScopeType::TriggerFunc(_)) | None => {
+                match scope.parent {
+                    Some(k) => self.is_inside_loop(k),
+                    None => None,
+                }
+            }
+            Some(t) => match t {
+                ScopeType::Loop(v) => Some(v),
+                _ => None,
             },
+        }
+    }
+
+    pub fn is_inside_macro(&self, scope: ScopeKey) -> bool {
+        let scope = &self.scopes[scope];
+        match &scope.typ {
+            Some(t) => match t {
+                ScopeType::MacroBody => return true,
+                ScopeType::Global => return false,
+                _ => (),
+            },
+            None => (),
+        }
+        match scope.parent {
+            Some(k) => self.is_inside_macro(k),
+            None => false,
+        }
+    }
+
+    pub fn assert_can_return(&self, scope: ScopeKey, area: CodeArea) -> CompileResult<()> {
+        fn can_return_d(slf: &Compiler, scope: ScopeKey, area: CodeArea) -> CompileResult<()> {
+            let scope = &slf.scopes[scope];
+            match &scope.typ {
+                Some(t) => match t {
+                    ScopeType::MacroBody => return Ok(()),
+                    ScopeType::TriggerFunc(def) => {
+                        return Err(CompilerError::BreakInTriggerFuncScope {
+                            area,
+                            def: def.clone(),
+                        })
+                    }
+                    ScopeType::ArrowStmt(def) => {
+                        return Err(CompilerError::BreakInArrowStmtScope {
+                            area,
+                            def: def.clone(),
+                        })
+                    }
+                    _ => (),
+                },
+                None => (),
+            }
+            match scope.parent {
+                Some(k) => can_return_d(slf, k, area),
+                None => unreachable!(),
+            }
+        }
+
+        if let Some(ScopeType::ArrowStmt(_)) = self.scopes[scope].typ {
+            return Ok(()); // -> return
+        }
+
+        can_return_d(self, scope, area)
+    }
+
+    pub fn assert_can_break_loop(&self, scope: ScopeKey, area: CodeArea) -> CompileResult<()> {
+        let scope = &self.scopes[scope];
+        match &scope.typ {
+            Some(t) => match t {
+                ScopeType::Loop(_) => return Ok(()),
+                ScopeType::TriggerFunc(def) => {
+                    return Err(CompilerError::BreakInTriggerFuncScope {
+                        area,
+                        def: def.clone(),
+                    })
+                }
+                ScopeType::ArrowStmt(def) => {
+                    return Err(CompilerError::BreakInArrowStmtScope {
+                        area,
+                        def: def.clone(),
+                    })
+                }
+
+                _ => (),
+            },
+            None => (),
+        }
+        match scope.parent {
+            Some(k) => self.assert_can_break_loop(k, area),
+            None => unreachable!(), // should only be called after is_inside_loop
         }
     }
 
@@ -332,7 +430,7 @@ impl<'a> Compiler<'a> {
     ) -> CompileResult<()> {
         match &*stmt.stmt {
             Statement::Expr(e) => {
-                self.compile_expr(e, scope, builder)?;
+                self.compile_expr(e, scope, builder, ExprType::Normal)?;
             }
             Statement::Let(var, expr) => match *var.expr {
                 Expression::Var(s) => {
@@ -346,30 +444,16 @@ impl<'a> Compiler<'a> {
                         },
                         scope,
                     );
-                    let expr_reg = self.compile_expr(expr, scope, builder)?;
+                    let expr_reg = self.compile_expr(expr, scope, builder, ExprType::Normal)?;
 
                     builder.copy(expr_reg, var_reg, stmt.span);
                 }
                 _ => todo!("haha 😂😂😂😂"),
             },
             Statement::AssignOp(left, op, right) => match op {
-                AssignOp::Assign => match *left.expr {
-                    Expression::Var(s) => match self.get_var(s, scope) {
-                        Some(var) => {
-                            if var.mutable {
-                                self.redef_var(s, stmt.span, scope);
-                                let expr_reg = self.compile_expr(right, scope, builder)?;
-
-                                builder.copy(expr_reg, var.reg, stmt.span);
-                            } else {
-                                return Err(CompilerError::ImmutableAssign {
-                                    area: self.make_area(stmt.span),
-                                    def_area: self.make_area(var.def_span),
-                                    var: self.resolve(&s),
-                                });
-                            }
-                        }
-                        None => {
+                AssignOp::Assign => {
+                    if let Expression::Var(s) = *left.expr {
+                        if self.get_var(s, scope).is_none() {
                             let var_reg = builder.next_reg();
 
                             self.new_var(
@@ -381,66 +465,75 @@ impl<'a> Compiler<'a> {
                                 },
                                 scope,
                             );
-                            let expr_reg = self.compile_expr(right, scope, builder)?;
+                            let expr_reg =
+                                self.compile_expr(right, scope, builder, ExprType::Normal)?;
 
                             builder.copy(expr_reg, var_reg, stmt.span);
+
+                            return Ok(());
                         }
-                    },
-                    _ => todo!("haha 😂😂😂😂"),
-                },
+                    }
+
+                    let into_reg =
+                        self.compile_expr(left, scope, builder, ExprType::Assign(stmt.span))?;
+
+                    let expr_reg = self.compile_expr(right, scope, builder, ExprType::Normal)?;
+
+                    builder.copy(expr_reg, into_reg, stmt.span);
+                }
                 AssignOp::PlusEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.add_eq(a, b, stmt.span)
                 }
                 AssignOp::MinusEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.sub_eq(a, b, stmt.span)
                 }
                 AssignOp::MultEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.mult_eq(a, b, stmt.span)
                 }
                 AssignOp::DivEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.div_eq(a, b, stmt.span)
                 }
                 AssignOp::ModEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.modulo_eq(a, b, stmt.span)
                 }
                 AssignOp::PowEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.pow_eq(a, b, stmt.span)
                 }
                 AssignOp::ShiftLeftEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.shl_eq(a, b, stmt.span)
                 }
                 AssignOp::ShiftRightEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.shr_eq(a, b, stmt.span)
                 }
                 AssignOp::BinAndEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.bin_and_eq(a, b, stmt.span)
                 }
                 AssignOp::BinOrEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.bin_or_eq(a, b, stmt.span)
                 }
                 AssignOp::BinNotEq => {
-                    let a = self.compile_expr(left, scope, builder)?;
-                    let b = self.compile_expr(right, scope, builder)?;
+                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
+                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.bin_not_eq(a, b, stmt.span)
                 }
             },
@@ -450,7 +543,7 @@ impl<'a> Compiler<'a> {
                     let inner_scope =
                         self.derive_scope(scope, Some(ScopeType::Loop(b.block_path.clone())));
 
-                    let cond_reg = self.compile_expr(cond, scope, b)?;
+                    let cond_reg = self.compile_expr(cond, scope, b, ExprType::Normal)?;
                     b.exit_if_false(cond_reg, cond.span);
 
                     self.compile_stmts(code, inner_scope, b)?;
@@ -470,7 +563,7 @@ impl<'a> Compiler<'a> {
                         let inner_scope = self.derive_scope(scope, None);
                         // let fuck = outer_b.test();
                         outer_b.block(|b| {
-                            let cond_reg = self.compile_expr(cond, scope, b)?;
+                            let cond_reg = self.compile_expr(cond, scope, b, ExprType::Normal)?;
                             b.exit_if_false(cond_reg, cond.span);
                             self.compile_stmts(code, inner_scope, b)?;
 
@@ -489,16 +582,22 @@ impl<'a> Compiler<'a> {
                     Ok(())
                 })?;
             }
-            Statement::Break => match self.find_scope_type(scope) {
-                Some(ScopeType::Loop(path)) => builder.exit_other_block(path.clone()),
+            Statement::Break => match self.is_inside_loop(scope) {
+                Some(path) => {
+                    self.assert_can_break_loop(scope, self.make_area(stmt.span))?;
+                    builder.exit_other_block(path.clone())
+                }
                 _ => {
                     return Err(CompilerError::BreakOutsideLoop {
                         area: self.make_area(stmt.span),
                     })
                 }
             },
-            Statement::Continue => match self.find_scope_type(scope) {
-                Some(ScopeType::Loop(path)) => builder.repeat_other_block(path.clone()),
+            Statement::Continue => match self.is_inside_loop(scope) {
+                Some(path) => {
+                    self.assert_can_break_loop(scope, self.make_area(stmt.span))?;
+                    builder.repeat_other_block(path.clone())
+                }
                 _ => {
                     return Err(CompilerError::ContinueOutsideLoop {
                         area: self.make_area(stmt.span),
@@ -517,8 +616,10 @@ impl<'a> Compiler<'a> {
             } => todo!(),
             Statement::Arrow(statement) => {
                 builder.block(|b| {
+                    let inner_scope = self
+                        .derive_scope(scope, Some(ScopeType::ArrowStmt(self.make_area(stmt.span)))); // variables made in arrow statements shouldnt be allowed anyways
                     b.enter_arrow();
-                    self.compile_stmt(statement, scope, b)?;
+                    self.compile_stmt(statement, inner_scope, b)?;
                     b.yeet_context();
                     Ok(())
                 })?;
@@ -535,7 +636,8 @@ impl<'a> Compiler<'a> {
                                     });
                                 }
 
-                                let ret_reg = self.compile_expr(node, scope, builder)?;
+                                let ret_reg =
+                                    self.compile_expr(node, scope, builder, ExprType::Normal)?;
                                 self.global_return =
                                     Some((items.iter().map(|i| i.0).collect(), stmt.span));
                                 builder.ret(ret_reg);
@@ -552,33 +654,32 @@ impl<'a> Compiler<'a> {
                             })
                         }
                     }
-                } else {
-                    match self.find_scope_type(scope) {
-                        Some(ScopeType::MacroBody) => match value {
-                            None => {
-                                let out_reg = builder.next_reg();
-                                builder.load_empty(out_reg, stmt.span);
-                                builder.ret(out_reg)
-                            }
-                            Some(expr) => {
-                                let ret_reg = self.compile_expr(expr, scope, builder)?;
-                                builder.ret(ret_reg)
-                            }
-                        },
-                        _ => {
-                            return Err(CompilerError::ReturnOutsideMacro {
-                                area: self.make_area(stmt.span),
-                            })
+                } else if self.is_inside_macro(scope) {
+                    self.assert_can_return(scope, self.make_area(stmt.span))?;
+                    match value {
+                        None => {
+                            let out_reg = builder.next_reg();
+                            builder.load_empty(out_reg, stmt.span);
+                            builder.ret(out_reg)
+                        }
+                        Some(expr) => {
+                            let ret_reg =
+                                self.compile_expr(expr, scope, builder, ExprType::Normal)?;
+                            builder.ret(ret_reg)
                         }
                     }
+                } else {
+                    return Err(CompilerError::ReturnOutsideMacro {
+                        area: self.make_area(stmt.span),
+                    });
                 }
             }
             Statement::TypeDef(_) => todo!(),
             Statement::Impl { typ, items } => todo!(),
             Statement::ExtractImport(_) => todo!(),
             Statement::Print(v) => {
-                let v_reg = self.compile_expr(v, scope, builder)?;
-                builder.print(v_reg);
+                let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
+                builder.print(v);
             }
         }
         Ok(())
@@ -589,13 +690,14 @@ impl<'a> Compiler<'a> {
         expr: &ExprNode,
         scope: ScopeKey,
         builder: &mut FuncBuilder,
+        expr_type: ExprType,
     ) -> CompileResult<usize> {
         let out_reg = builder.next_reg();
 
         macro_rules! bin_op {
             ($left:ident $fn:ident $right:ident) => {{
-                let a = self.compile_expr(&$left, scope, builder)?;
-                let b = self.compile_expr(&$right, scope, builder)?;
+                let a = self.compile_expr(&$left, scope, builder, ExprType::Normal)?;
+                let b = self.compile_expr(&$right, scope, builder, ExprType::Normal)?;
                 builder.$fn(a, b, out_reg, expr.span)
             }};
         }
@@ -659,7 +761,7 @@ impl<'a> Compiler<'a> {
                 BinOp::And => todo!(),
             },
             Expression::Unary(op, value) => {
-                let v = self.compile_expr(value, scope, builder)?;
+                let v = self.compile_expr(value, scope, builder, ExprType::Normal)?;
                 match op {
                     UnaryOp::BinNot => builder.unary_bin_not(v, out_reg, expr.span),
                     UnaryOp::ExclMark => builder.unary_not(v, out_reg, expr.span),
@@ -667,7 +769,20 @@ impl<'a> Compiler<'a> {
                 }
             }
             Expression::Var(name) => match self.get_var(*name, scope) {
-                Some(data) => return Ok(data.reg),
+                Some(data) => {
+                    if let ExprType::Assign(stmt_span) = expr_type {
+                        if !data.mutable {
+                            println!("{:?} {:?}", stmt_span, data.def_span);
+                            return Err(CompilerError::ImmutableAssign {
+                                area: self.make_area(stmt_span),
+                                def_area: self.make_area(data.def_span),
+                                var: self.resolve(name),
+                            });
+                        }
+                    }
+
+                    return Ok(data.reg);
+                }
                 None => {
                     return Err(CompilerError::NonexistentVariable {
                         area: self.make_area(expr.span),
@@ -682,7 +797,12 @@ impl<'a> Compiler<'a> {
                     out_reg,
                     |builder, elems| {
                         for item in items {
-                            elems.push(self.compile_expr(item, scope, builder)?);
+                            elems.push(self.compile_expr(
+                                item,
+                                scope,
+                                builder,
+                                ExprType::Normal,
+                            )?);
                         }
                         Ok(())
                     },
@@ -696,7 +816,9 @@ impl<'a> Compiler<'a> {
                     |builder, elems| {
                         for (key, item) in items {
                             let value_reg = match item {
-                                Some(e) => self.compile_expr(e, scope, builder)?,
+                                Some(e) => {
+                                    self.compile_expr(e, scope, builder, ExprType::Normal)?
+                                }
                                 None => match self.get_var(key.value, scope) {
                                     Some(data) => data.reg,
                                     None => {
@@ -717,18 +839,18 @@ impl<'a> Compiler<'a> {
             }
             Expression::Maybe(e) => match e {
                 Some(e) => {
-                    let value = self.compile_expr(e, scope, builder)?;
+                    let value = self.compile_expr(e, scope, builder, ExprType::Normal)?;
                     builder.wrap_maybe(value, out_reg, expr.span)
                 }
                 None => builder.load_none(out_reg, expr.span),
             },
             Expression::Index { base, index } => {
-                let base_reg = self.compile_expr(base, scope, builder)?;
-                let index_reg = self.compile_expr(index, scope, builder)?;
+                let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
+                let index_reg = self.compile_expr(index, scope, builder, ExprType::Normal)?;
                 builder.index(base_reg, out_reg, index_reg, expr.span)
             }
             Expression::Member { base, name } => {
-                let base_reg = self.compile_expr(base, scope, builder)?;
+                let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
                 builder.member(
                     base_reg,
                     out_reg,
@@ -737,7 +859,7 @@ impl<'a> Compiler<'a> {
                 )
             }
             Expression::Associated { base, name } => {
-                let base_reg = self.compile_expr(base, scope, builder)?;
+                let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
                 builder.associated(
                     base_reg,
                     out_reg,
@@ -782,7 +904,8 @@ impl<'a> Compiler<'a> {
                         match code {
                             MacroCode::Normal(stmts) => self.compile_stmts(stmts, base_scope, f)?,
                             MacroCode::Lambda(expr) => {
-                                let ret_reg = self.compile_expr(expr, base_scope, f)?;
+                                let ret_reg =
+                                    self.compile_expr(expr, base_scope, f, ExprType::Normal)?;
                                 f.ret(ret_reg);
                             }
                         }
@@ -800,12 +923,12 @@ impl<'a> Compiler<'a> {
                             let n = self.resolve(&name.value).spanned(name.span);
 
                             let p = if let Some(p) = pat {
-                                Some(self.compile_expr(p, scope, builder)?)
+                                Some(self.compile_expr(p, scope, builder, ExprType::Normal)?)
                             } else {
                                 None
                             };
                             let d = if let Some(d) = def {
-                                Some(self.compile_expr(d, scope, builder)?)
+                                Some(self.compile_expr(d, scope, builder, ExprType::Normal)?)
                             } else {
                                 None
                             };
@@ -823,7 +946,7 @@ impl<'a> Compiler<'a> {
                 params,
                 named_params,
             } => {
-                let base_reg = self.compile_expr(base, scope, builder)?;
+                let base_reg = self.compile_expr(base, scope, builder, ExprType::Normal)?;
                 let args_reg = builder.next_reg();
                 builder.new_array(
                     2,
@@ -835,7 +958,12 @@ impl<'a> Compiler<'a> {
                             params_reg,
                             |builder, elems| {
                                 for i in params {
-                                    elems.push(self.compile_expr(i, scope, builder)?);
+                                    elems.push(self.compile_expr(
+                                        i,
+                                        scope,
+                                        builder,
+                                        ExprType::Normal,
+                                    )?);
                                 }
                                 Ok(())
                             },
@@ -848,7 +976,8 @@ impl<'a> Compiler<'a> {
                             named_params_reg,
                             |builder, elems| {
                                 for (name, param) in named_params {
-                                    let value_reg = self.compile_expr(param, scope, builder)?;
+                                    let value_reg =
+                                        self.compile_expr(param, scope, builder, ExprType::Normal)?;
 
                                     elems.push((
                                         self.resolve(&name.value).spanned(name.span),
@@ -870,27 +999,41 @@ impl<'a> Compiler<'a> {
                 builder.call(base_reg, out_reg, args_reg, expr.span);
             }
             Expression::MacroPattern { args, ret_type } => todo!(),
-            Expression::TriggerFunc { attributes, code } => todo!(),
+            Expression::TriggerFunc { attributes, code } => {
+                use crate::gd::ids::IDClass::Group;
+                let group_reg = builder.next_reg();
+                builder.load_id(None, Group, group_reg, expr.span);
+                builder.push_context_group(group_reg, expr.span);
+                builder.block(|b| {
+                    let inner_scope = self.derive_scope(
+                        scope,
+                        Some(ScopeType::TriggerFunc(self.make_area(expr.span))),
+                    );
+                    self.compile_stmts(code, inner_scope, b)
+                })?;
+                builder.pop_context_group(expr.span);
+                builder.make_trigger_function(group_reg, out_reg, expr.span);
+            }
             Expression::TriggerFuncCall(_) => todo!(),
             Expression::Ternary {
                 cond,
                 if_true,
                 if_false,
             } => {
-                let cond_reg = self.compile_expr(cond, scope, builder)?;
+                let cond_reg = self.compile_expr(cond, scope, builder, ExprType::Normal)?;
                 builder.block(|outer_b| {
                     let outer_path = outer_b.block_path.clone();
 
                     outer_b.block(|b| {
                         b.exit_if_false(cond_reg, cond.span);
-                        let reg = self.compile_expr(if_true, scope, b)?;
+                        let reg = self.compile_expr(if_true, scope, b, ExprType::Normal)?;
                         b.copy(reg, out_reg, expr.span);
 
                         b.exit_other_block(outer_path);
                         Ok(())
                     })?;
 
-                    let reg = self.compile_expr(if_false, scope, outer_b)?;
+                    let reg = self.compile_expr(if_false, scope, outer_b, ExprType::Normal)?;
                     outer_b.copy(reg, out_reg, expr.span);
 
                     Ok(())
@@ -912,4 +1055,11 @@ impl<'a> Compiler<'a> {
 
         Ok(out_reg)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExprType {
+    Normal,
+    Assign(CodeSpan),
+    // Match,
 }

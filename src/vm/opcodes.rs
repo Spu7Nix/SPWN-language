@@ -4,6 +4,8 @@ use delve::{EnumDisplay, EnumFields, EnumToStr, EnumVariantNames};
 use serde::de::{Error, Visitor};
 use serde::{Deserialize, Serialize};
 
+use crate::gd::ids::IDClass;
+
 struct OpcodeVisitor;
 
 impl Serialize for Opcode<Register> {
@@ -134,7 +136,7 @@ opcodes! {
     Copy { => from, => to },
     #[delve(display = |reg: &R| format!("print R{reg}"))]
     Print { => reg },
-    // LoadBuiltin {},
+
 
     #[delve(display = |b: &R, a: &R, d: &R| format!("R{b}(args R{a}) -> R{d}"))]
     Call { => base, => args, => dest },
@@ -267,9 +269,20 @@ opcodes! {
     #[delve(display = |d: &R| format!("() -> R{d}"))]
     LoadEmpty { => dest },
 
-    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}[R{i}] -> R{d}"))]
-    Index { => from, => dest, => index },
-    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.R{i} -> R{d}"))]
+    #[delve(display = |c: &IDClass, d: &R| format!("?{} -> R{d}", c.letter()))]
+    LoadArbitraryId { class: IDClass, => dest },
+
+    #[delve(display = |src: &R| format!("change to R{src}"))]
+    PushContextGroup { => src },
+    #[delve(display = || "pop".to_string())]
+    PopGroupStack,
+
+    #[delve(display = |s: &R, d: &R| format!("!{{R{s}}} -> R{d}"))]
+    MakeTriggerFunc { => src, => dest },
+
+    #[delve(display = |b: &R, d: &R, i: &R| format!("R{b}[R{i}] ~> R{d}"))]
+    Index { => base, => dest, => index },
+    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.R{i} ~> R{d}"))]
     Member { => from, => dest, => member },
     #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} -> R{d}"))]
     Associated { => from, => dest, => name },

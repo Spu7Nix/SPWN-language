@@ -953,7 +953,7 @@ impl Parser<'_> {
             Token::Impl => {
                 self.next();
                 self.expect_tok(Token::TypeIndicator)?;
-                let typ = self.intern_string(self.slice()[1..].to_string());
+                let typ = self.intern_string(&self.slice()[1..]);
                 self.expect_tok(Token::LBracket)?;
                 let items = self.parse_dictlike()?;
                 // todo!()
@@ -969,13 +969,12 @@ impl Parser<'_> {
 
                 Statement::ExtractImport(import_type)
             }
-            Token::Print => {
-                self.next();
+            // Token::Print => {
+            //     self.next();
+            //     let v = self.parse_expr()?;
 
-                let value = self.parse_expr()?;
-
-                Statement::Print(value)
-            }
+            //     Statement::Print(v)
+            // }
             _ => {
                 let left = self.parse_expr()?;
                 let peek = self.peek();

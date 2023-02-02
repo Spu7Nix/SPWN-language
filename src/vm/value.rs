@@ -1,11 +1,14 @@
-use std::fmt::write;
+use std::rc::Rc;
+use std::str::FromStr;
 
 use ahash::AHashMap;
 use lasso::Spur;
 use strum::EnumDiscriminants;
 
+use super::builtins::builtin_utils::BuiltinType;
+use super::builtins::builtins::Builtin;
+use super::error::RuntimeError;
 use super::interpreter::{FuncCoord, ValueKey, Vm};
-use super::opcodes::FunctionID;
 use crate::compiling::bytecode::Constant;
 use crate::gd::ids::*;
 use crate::sources::CodeArea;
@@ -21,6 +24,54 @@ pub struct ArgData {
     pub name: Spur,
     pub default: Option<ValueKey>,
     pub pattern: Option<ValueKey>,
+}
+
+#[derive(Clone)]
+pub enum MacroCode {
+    Normal {
+        func: FuncCoord,
+        args: Vec<ArgData>,
+        captured: Vec<ValueKey>,
+    },
+    Builtin(Rc<dyn Fn(&mut Vec<ValueKey>, &mut Vm, CodeArea) -> Result<Value, RuntimeError>>),
+}
+
+impl PartialEq for MacroCode {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Normal {
+                    func: f,
+                    args: a,
+                    captured: c,
+                },
+                Self::Normal {
+                    func: of,
+                    args: oa,
+                    captured: oc,
+                },
+            ) => f == of && a == oa && c == oc,
+            _ => false,
+        }
+    }
+}
+
+impl std::fmt::Debug for MacroCode {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Normal {
+                func: f,
+                args: a,
+                captured: c,
+            } => {
+                write!(
+                    fmt,
+                    "Normal {{ func: {f:?}, args: {a:?}, captured: {c:?} }}"
+                )
+            }
+            Self::Builtin(..) => write!(fmt, "<builtin fn>"),
+        }
+    }
 }
 
 #[derive(EnumDiscriminants, Debug, Clone, PartialEq)]
@@ -44,15 +95,16 @@ pub enum Value {
     Item(Id),
 
     Builtins,
+
     Range(i64, i64, usize), //start, end, step
 
     Maybe(Option<ValueKey>),
     Empty,
-    Macro {
-        func: FuncCoord,
-        args: Vec<ArgData>,
-        captured: Vec<ValueKey>,
-    },
+    Macro(MacroCode),
+
+    TypeIndicator(usize),
+
+    TriggerFunction(Id),
 }
 
 impl std::fmt::Display for ValueType {
@@ -66,19 +118,14 @@ impl Value {
         self.into()
     }
 
-    pub fn from_const(c: &Constant, vm: &mut Vm) -> Self {
+    pub fn from_const(c: &Constant) -> Self {
         match c {
             Constant::Int(v) => Value::Int(*v),
             Constant::Float(v) => Value::Float(*v),
             Constant::String(v) => Value::String(v.clone()),
             Constant::Bool(v) => Value::Bool(*v),
             Constant::Id(c, v) => {
-                let id = if let Some(n) = v {
-                    Id::Specific(*n)
-                } else {
-                    Id::Arbitrary(vm.next_id(*c))
-                };
-
+                let id = Id::Specific(*v);
                 match c {
                     IDClass::Group => Value::Group(id),
                     IDClass::Color => Value::Color(id),
@@ -94,7 +141,7 @@ impl Value {
             Value::Int(n) => n.to_string(),
             Value::Float(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::String(s) => format!("\"{s}\""),
+            Value::String(s) => s.clone(),
             Value::Array(arr) => format!(
                 "[{}]",
                 arr.iter()
@@ -130,13 +177,45 @@ impl Value {
                 None => "?".into(),
             },
             Value::Empty => "()".into(),
-            Value::Macro { args, .. } => format!(
+            Value::Macro(MacroCode::Normal {
+                func,
+                args,
+                captured,
+            }) => format!(
                 "({}) {{...}}",
                 args.iter()
                     .map(|d| vm.resolve(&d.name))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            Value::Macro(MacroCode::Builtin(_)) => "<builtin fn>".to_string(),
+            Value::TriggerFunction(_) => "!{{...}}".to_string(),
+            Value::TypeIndicator(_) => todo!(),
         }
+    }
+
+    pub fn invoke_static(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
+        match self {
+            Value::TypeIndicator(id) => match id {
+                0 => String::invoke_static(name, vm),
+                _ => todo!(),
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn invoke_self(self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
+        Ok(match self {
+            Value::String(s) => s.invoke_self(name, vm)?,
+
+            Value::Builtins => {
+                let b = Builtin::from_str(name).unwrap();
+
+                Value::Macro(MacroCode::Builtin(Rc::new(move |_args, _vm, _area| {
+                    b.call(_args, _vm, _area)
+                })))
+            }
+            _ => todo!(),
+        })
     }
 }

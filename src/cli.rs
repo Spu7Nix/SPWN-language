@@ -5,7 +5,7 @@ use crate::parsing::attributes::ScriptAttribute;
 // cli will come later
 
 #[derive(Parser, Debug)]
-#[command(author = "Spu7Nix", version = include_str!("./VERSION"), about)]
+#[command(author = "Spu7Nix", version = env!("CARGO_PKG_VERSION"), about)]
 pub struct Arguments {
     #[clap(flatten)]
     pub settings: FileSettings,

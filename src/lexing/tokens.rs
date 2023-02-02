@@ -38,11 +38,11 @@ lexer! {
     Type: text("type"),
     Impl: text("impl"),
 
+    //Print: text("print"),
+
     Extract: text("extract"),
     Import: text("import"),
     Dollar: text("$"),
-
-    Print: text("print"),
 
     Is: text("is"),
     As: text("as"),
