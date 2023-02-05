@@ -32,7 +32,7 @@ impl<'de> Visitor<'de> for OpcodeVisitor {
     type Value = Opcode<Register>;
 
     fn expecting(&self, _: &mut std::fmt::Formatter) -> std::fmt::Result {
-        panic!("idk")
+        panic!("expected u32")
     }
 
     fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E>
@@ -151,11 +151,23 @@ opcodes! {
         size: AllocSize,
         => dest,
     },
+    #[delve(display = |s: &AllocSize, d: &R| format!("obj {{...; {s}}} -> R{d}"))]
+    AllocObject {
+        size: AllocSize,
+        => dest,
+    },
+    #[delve(display = |s: &AllocSize, d: &R| format!("trigger {{...; {s}}} -> R{d}"))]
+    AllocTrigger {
+        size: AllocSize,
+        => dest,
+    },
 
     #[delve(display = |e: &R, d: &R| format!("push R{e} into R{d}"))]
     PushArrayElem { => elem, => dest },
     #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d}"))]
     PushDictElem { => elem, => key, => dest },
+    #[delve(display = |e: &R, i: &u8, d: &R| format!("insert i:R{e} into R{d}"))]
+    PushObjectElem { => elem, obj_id: u8, => dest },
 
     #[delve(display = |i: &FunctionID, d: &R| format!("{i}: (...) {{...}} -> R{d}"))]
     CreateMacro {

@@ -11,6 +11,7 @@ use super::error::RuntimeError;
 use super::interpreter::{FuncCoord, ValueKey, Vm};
 use crate::compiling::bytecode::Constant;
 use crate::gd::ids::*;
+use crate::parsing::ast::ObjectType;
 use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -105,6 +106,8 @@ pub enum Value {
     TypeIndicator(usize),
 
     TriggerFunction(Id),
+
+    Object(AHashMap<u8, ValueKey>, ObjectType),
 }
 
 impl std::fmt::Display for ValueType {
@@ -177,11 +180,7 @@ impl Value {
                 None => "?".into(),
             },
             Value::Empty => "()".into(),
-            Value::Macro(MacroCode::Normal {
-                func,
-                args,
-                captured,
-            }) => format!(
+            Value::Macro(MacroCode::Normal { args, .. }) => format!(
                 "({}) {{...}}",
                 args.iter()
                     .map(|d| vm.resolve(&d.name))
@@ -191,6 +190,17 @@ impl Value {
             Value::Macro(MacroCode::Builtin(_)) => "<builtin fn>".to_string(),
             Value::TriggerFunction(_) => "!{{...}}".to_string(),
             Value::TypeIndicator(_) => todo!(),
+            Value::Object(map, typ) => format!(
+                "{} {{ {} }}",
+                match typ {
+                    ObjectType::Object => "obj",
+                    ObjectType::Trigger => "trigger",
+                },
+                map.iter()
+                    .map(|(s, k)| format!("{}: {}", s, vm.memory[*k].value.runtime_display(vm)))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 
@@ -204,15 +214,15 @@ impl Value {
         }
     }
 
-    pub fn invoke_self(self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
+    pub fn invoke_self(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
         Ok(match self {
-            Value::String(s) => s.invoke_self(name, vm)?,
+            Value::String(s) => s.clone().invoke_self(name, vm)?,
 
             Value::Builtins => {
                 let b = Builtin::from_str(name).unwrap();
 
-                Value::Macro(MacroCode::Builtin(Rc::new(move |_args, _vm, _area| {
-                    b.call(_args, _vm, _area)
+                Value::Macro(MacroCode::Builtin(Rc::new(move |args, vm, area| {
+                    b.call(args, vm, area)
                 })))
             }
             _ => todo!(),

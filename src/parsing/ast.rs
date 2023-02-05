@@ -59,7 +59,7 @@ pub struct ExprNode {
 #[derive(Debug, Clone)]
 pub struct StmtNode {
     pub stmt: Box<Statement>,
-    pub attributes: Vec<StmtAttribute>,
+    pub attributes: Vec<Spanned<StmtAttribute>>,
     pub span: CodeSpan,
 }
 
@@ -138,6 +138,19 @@ pub enum Expression {
         base: ExprNode,
         items: DictItems,
     },
+    Obj(ObjectType, Vec<(Spanned<ObjectKey>, ExprNode)>),
+}
+
+#[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq)]
+pub enum ObjectType {
+    Object,
+    Trigger,
+}
+
+#[derive(Debug, Clone, Copy, EnumToStr)]
+pub enum ObjectKey {
+    Name(Spur),
+    Num(u8),
 }
 
 #[derive(Debug, Clone, EnumToStr)]
@@ -195,7 +208,7 @@ impl Expression {
     }
 }
 impl Statement {
-    pub fn into_node(self, attributes: Vec<StmtAttribute>, span: CodeSpan) -> StmtNode {
+    pub fn into_node(self, attributes: Vec<Spanned<StmtAttribute>>, span: CodeSpan) -> StmtNode {
         StmtNode {
             stmt: Box::new(self),
             attributes,

@@ -3,14 +3,14 @@ use std::rc::Rc;
 
 use ahash::AHashMap;
 use lasso::Spur;
-use libflate::lz77::Code;
 use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
 use super::error::CompilerError;
 use crate::cli::FileSettings;
+use crate::gd::objects::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
-    ExprNode, Expression, ImportType, MacroCode, Spannable, Spanned, Statement, StmtNode,
+    ExprNode, Expression, ImportType, MacroCode, ObjectKey, Spannable, Spanned, Statement, StmtNode,
 };
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
@@ -132,7 +132,7 @@ impl<'a> Compiler<'a> {
     //     }
     // }
 
-    pub fn is_inside_loop(&self, scope: ScopeKey) -> Option<&Vec<usize>> {
+    fn is_inside_loop(&self, scope: ScopeKey) -> Option<&Vec<usize>> {
         let scope = &self.scopes[scope];
         match &scope.typ {
             Some(ScopeType::ArrowStmt(_) | ScopeType::TriggerFunc(_)) | None => {
@@ -148,7 +148,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn is_inside_macro(&self, scope: ScopeKey) -> bool {
+    fn is_inside_macro(&self, scope: ScopeKey) -> bool {
         let scope = &self.scopes[scope];
         match &scope.typ {
             Some(t) => match t {
@@ -286,8 +286,13 @@ impl<'a> Compiler<'a> {
                 let opcodes = f
                     .opcodes
                     .into_iter()
-                    .map(|opcode| opcode.try_into().expect("usize too big for u8"))
+                    .map(|opcode| {
+                        opcode
+                            .try_into()
+                            .expect("usize too big for u8 (too many registers used)")
+                    })
                     .collect();
+
                 Function {
                     opcodes,
                     regs_used: f.regs_used,
@@ -428,6 +433,19 @@ impl<'a> Compiler<'a> {
         scope: ScopeKey,
         builder: &mut FuncBuilder,
     ) -> CompileResult<()> {
+        // for attr in &stmt.attributes {
+        //     match &attr.value {
+        //         StmtAttribute::Deprecated { since, note } => Warning::UseOfDeprecatedValue {
+        //             since: since.clone(),
+        //             note: note.clone(),
+        //             area: self.make_area(stmt.span),
+        //         }
+        //         .to_report()
+        //         .display(),
+        //         _ => todo!(),
+        //     }
+        // }
+
         match &*stmt.stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder, ExprType::Normal)?;
@@ -1051,6 +1069,34 @@ impl<'a> Compiler<'a> {
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
             }
             Expression::Instance { base, items } => todo!(),
+
+            Expression::Obj(typ, items) => {
+                builder.new_object(
+                    items.len() as u16,
+                    out_reg,
+                    |builder, elems| {
+                        for (key, expr) in items {
+                            let num = match key.value {
+                                // 😉
+                                ObjectKey::Name(n) => {
+                                    let (id, ..) = &OBJECT_KEYS[&self.resolve(&n)];
+                                    *id
+                                }
+                                ObjectKey::Num(n) => n,
+                            };
+
+                            let value_reg =
+                                self.compile_expr(expr, scope, builder, ExprType::Normal)?;
+
+                            elems.push((num.spanned(key.span), value_reg));
+                        }
+
+                        Ok(())
+                    },
+                    expr.span,
+                    *typ,
+                )?;
+            }
         }
 
         Ok(out_reg)

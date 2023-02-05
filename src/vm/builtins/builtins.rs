@@ -25,6 +25,7 @@ pub enum Builtin {
     Assert,
     AssertEq,
     Input,
+    Add,
 }
 
 impl Builtin {
@@ -43,9 +44,16 @@ impl Builtin {
             // Self::Input => input.invoke_fn(args, vm, area).to_value(vm),
             Self::Assert => assert.invoke_fn(args, vm, area).to_value(vm),
             Self::AssertEq => assert_eq.invoke_fn(args, vm, area).to_value(vm),
+            Self::Add => add.invoke_fn(args, vm, area).to_value(vm),
             _ => todo!(),
         }
     }
+}
+
+pub fn add(object: Value, vm: &mut Vm) {
+    // vm.contexts.yeet_current(
+    // the goof (the sill)
+    println!("helloe!!!");
 }
 
 pub fn exit(_vm: &mut Vm) {

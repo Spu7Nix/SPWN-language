@@ -25,17 +25,15 @@ pub trait IsOptional {
     const OPTIONAL: bool = false;
 }
 
-// returns the spwn type name for a custom builtin type
-pub trait TypeName {
-    const NAME: &'static str;
-}
+// // returns the spwn type name for a custom builtin type
+// pub trait TypeName {
+//     const NAME: &'static str;
+// }
 
 // functions to call rust functions / get struct members from within spwn
 pub trait BuiltinType {
     fn invoke_static(name: &str, vm: &mut Vm) -> Result<Value, RuntimeError>;
-    fn invoke_self(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
-        unimplemented!()
-    }
+    fn invoke_self(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError>;
 }
 
 // gets a value of a given type within a tuple
@@ -46,17 +44,17 @@ pub trait TOf<Args = ()> {
 pub trait NextValue<T> {
     type Output;
 
-    fn next_value(&mut self, vm: &mut Vm) -> Option<Self::Output>;
+    fn next_value(&mut self, vm: &Vm) -> Option<Self::Output>;
 }
 
 pub trait ToValue<const O: usize = 0, A = ()> {
     fn to_value(self, vm: &mut Vm) -> Result<Value, RuntimeError>;
 }
 
-pub trait Invoke<const O: usize, Args, A = ()> {
+pub trait Invoke<const O: usize, A = ()> {
     type Result;
 
-    fn invoke_fn(&self, args: &mut Args, vm: &mut Vm, area: CodeArea) -> Self::Result;
+    fn invoke_fn(&self, args: &mut Vec<ValueKey>, vm: &mut Vm, area: CodeArea) -> Self::Result;
 }
 
 pub struct Of<Types>(Types);
@@ -88,6 +86,7 @@ macro_rules! inner_fn {
                 })
             }
 
+            #[allow(non_snake_case)]
             let $name: $name = match $args.last() {
                 Some(a) => {
                     let v = &$vm.memory[*a];
@@ -129,7 +128,7 @@ macro_rules! inner_fn {
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Fun, Res, $($name),*> Invoke<0, Vec<ValueKey>, ($($name,)*)> for Fun
+        impl<Fun, Res, $($name),*> Invoke<0, ($($name,)*)> for Fun
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
@@ -149,14 +148,14 @@ macro_rules! tuple_impls {
         impl<Fun, Res, $($name,)*> ToValue<0, ($($name,)*)> for Fun
         where
             Res: ToValue,
-            Fun: Fn($($name,)* &Vm) -> Res + Invoke<0, Vec<ValueKey>, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+            Fun: Fn($($name,)* &Vm) -> Res + Invoke<0, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
             fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
                 inner_fn!(@to_value self)
             }
         }
 
-        impl<Fun, Res, $($name),*> Invoke<1, Vec<ValueKey>, ($($name,)*)> for Fun
+        impl<Fun, Res, $($name),*> Invoke<1, ($($name,)*)> for Fun
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
@@ -176,14 +175,14 @@ macro_rules! tuple_impls {
         impl<Fun, Res, $($name,)*> ToValue<1, ($($name,)*)> for Fun
         where
             Res: ToValue,
-            Fun: Fn($($name,)* &mut Vm) -> Res + Invoke<1, Vec<ValueKey>, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+            Fun: Fn($($name,)* &mut Vm) -> Res + Invoke<1, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
             fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
                 inner_fn!(@to_value self)
             }
         }
 
-        impl<Fun, Res, $($name),*> Invoke<2, Vec<ValueKey>, ($($name,)*)> for Fun
+        impl<Fun, Res, $($name),*> Invoke<2, ($($name,)*)> for Fun
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
@@ -203,14 +202,14 @@ macro_rules! tuple_impls {
         impl<Fun, Res, $($name,)*> ToValue<2, ($($name,)*)> for Fun
         where
             Res: ToValue,
-            Fun: Fn($($name,)*) -> Res + Invoke<2, Vec<ValueKey>, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+            Fun: Fn($($name,)*) -> Res + Invoke<2, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
             fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
                 inner_fn!(@to_value self)
             }
         }
 
-        impl<Fun, Res, $($name),*> Invoke<3, Vec<ValueKey>, ($($name,)*)> for Fun
+        impl<Fun, Res, $($name),*> Invoke<3, ($($name,)*)> for Fun
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
@@ -230,14 +229,14 @@ macro_rules! tuple_impls {
         impl<Fun, Res, $($name,)*> ToValue<3, ($($name,)*)> for Fun
         where
             Res: ToValue,
-            Fun: Fn($($name,)* &Vm, CodeArea) -> Res + Invoke<3, Vec<ValueKey>, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+            Fun: Fn($($name,)* &Vm, CodeArea) -> Res + Invoke<3, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
             fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
                 inner_fn!(@to_value self)
             }
         }
 
-        impl<Fun, Res, $($name),*> Invoke<4, Vec<ValueKey>, ($($name,)*)> for Fun
+        impl<Fun, Res, $($name),*> Invoke<4, ($($name,)*)> for Fun
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
@@ -263,14 +262,14 @@ macro_rules! tuple_impls {
         impl<Fun, Res, $($name,)*> ToValue<4, ($($name,)*)> for Fun
         where
             Res: ToValue,
-            Fun: Fn($($name,)* &mut Vm, CodeArea) -> Res + Invoke<4, Vec<ValueKey>, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+            Fun: Fn($($name,)* &mut Vm, CodeArea) -> Res + Invoke<4, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
             fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
                 inner_fn!(@to_value self)
             }
         }
 
-        impl<Fun, Res, $($name),*> Invoke<5, Vec<ValueKey>, ($($name,)*)> for Fun
+        impl<Fun, Res, $($name),*> Invoke<5, ($($name,)*)> for Fun
         where
             $(
                 Vec<ValueKey>: NextValue<$name, Output = $name>,
@@ -290,14 +289,14 @@ macro_rules! tuple_impls {
         impl<Fun, Res, $($name,)*> ToValue<5, ($($name,)*)> for Fun
         where
             Res: ToValue,
-            Fun: Fn($($name,)* CodeArea) -> Res + Invoke<5, Vec<ValueKey>, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+            Fun: Fn($($name,)* CodeArea) -> Res + Invoke<5, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
             fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
                 inner_fn!(@to_value self)
             }
         }
 
-        impl<Fun, This, Res, $($name),*> Invoke<6, Vec<ValueKey>, (This, $($name,)*)> for Fun
+        impl<Fun, This, Res, $($name),*> Invoke<6, (This, $($name,)*)> for Fun
         where
             Vec<ValueKey>: NextValue<This, Output = This>,
             $(
@@ -319,14 +318,14 @@ macro_rules! tuple_impls {
         impl<Fun, This, Res, $($name,)*> ToValue<6, (This, $($name,)*)> for Fun
         where
             Res: ToValue,
-            Fun: Fn(This, $($name,)*) -> Res + Invoke<6, Vec<ValueKey>, (This, $($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+            Fun: Fn(This, $($name,)*) -> Res + Invoke<6, (This, $($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
             fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
                 inner_fn!(@to_value self)
             }
         }
 
-        impl<Fun, This, Res, $($name),*> Invoke<7, Vec<ValueKey>, (This, $($name,)*)> for Fun
+        impl<Fun, This, Res, $($name),*> Invoke<7, (This, $($name,)*)> for Fun
         where
             Vec<ValueKey>: NextValue<This, Output = This>,
             $(
@@ -348,14 +347,14 @@ macro_rules! tuple_impls {
         impl<Fun, This, Res, $($name,)*> ToValue<7, (This, $($name,)*)> for Fun
         where
             Res: ToValue,
-            for<'a> Fun: Fn(&'a This, $($name,)*) -> Res + Invoke<7, Vec<ValueKey>, (This, $($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+            for<'a> Fun: Fn(&'a This, $($name,)*) -> Res + Invoke<7, (This, $($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
             fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
                 inner_fn!(@to_value self)
             }
         }
 
-        impl<Fun, This, Res, $($name),*> Invoke<8, Vec<ValueKey>, (This, $($name,)*)> for Fun
+        impl<Fun, This, Res, $($name),*> Invoke<8, (This, $($name,)*)> for Fun
         where
             Vec<ValueKey>: NextValue<This, Output = This>,
             $(
@@ -377,7 +376,7 @@ macro_rules! tuple_impls {
         impl<Fun, This, Res, $($name,)*> ToValue<8, (This, $($name,)*)> for Fun
         where
             Res: ToValue,
-            for<'a> Fun: Fn(&'a mut This, $($name,)*) -> Res + Invoke<8, Vec<ValueKey>, (This, $($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+            for<'a> Fun: Fn(&'a mut This, $($name,)*) -> Res + Invoke<8, (This, $($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
             fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
                 inner_fn!(@to_value self)
@@ -407,7 +406,7 @@ macro_rules! tuple_impls {
         {
             type Output = Of<( $(Option<$name>,)* )>;
 
-            fn next_value(&mut self, _vm: &mut Vm) -> Option<Self::Output> {
+            fn next_value(&mut self, _vm: &Vm) -> Option<Self::Output> {
                 let _v = *self.last().unwrap();
 
                 $(
@@ -482,7 +481,7 @@ macro_rules! impl_for_t {
                     type Output = $ty;
 
                     // TODO: optimise this
-                    fn next_value(&mut self, vm: &mut Vm) -> Option<Self::Output> {
+                    fn next_value(&mut self, vm: &Vm) -> Option<Self::Output> {
                         match &vm.memory[self.pop()?].value {
                             Value::$en(_v) => Some(_v.clone()),
                             _ => None,
@@ -552,14 +551,14 @@ impl<T: TypeOf> TypeOf for Option<T> {
 impl TypeOf for Range<i64> {
     const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::Range);
 }
-impl TypeOf for Vec<Value> {
+impl<T> TypeOf for Vec<T> {
     const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::Array);
 }
 
 impl NextValue<Range<i64>> for Vec<ValueKey> {
     type Output = Range<i64>;
 
-    fn next_value(&mut self, vm: &mut Vm) -> Option<Self::Output> {
+    fn next_value(&mut self, vm: &Vm) -> Option<Self::Output> {
         match vm.memory[self.pop()?].value {
             Value::Range(start, end, _) => Some(start..end),
             _ => None,
@@ -569,14 +568,14 @@ impl NextValue<Range<i64>> for Vec<ValueKey> {
 impl NextValue<Value> for Vec<ValueKey> {
     type Output = Value;
 
-    fn next_value(&mut self, vm: &mut Vm) -> Option<Self::Output> {
+    fn next_value(&mut self, vm: &Vm) -> Option<Self::Output> {
         Some(vm.memory[self.pop()?].value.clone())
     }
 }
 impl NextValue<Spread<Value>> for Vec<ValueKey> {
     type Output = Spread<Value>;
 
-    fn next_value(&mut self, vm: &mut Vm) -> Option<Self::Output> {
+    fn next_value(&mut self, vm: &Vm) -> Option<Self::Output> {
         let mut out = vec![];
         out.append(self);
         out.reverse();
@@ -588,14 +587,14 @@ impl NextValue<Spread<Value>> for Vec<ValueKey> {
 impl NextValue<ValueKey> for Vec<ValueKey> {
     type Output = ValueKey;
 
-    fn next_value(&mut self, _: &mut Vm) -> Option<Self::Output> {
+    fn next_value(&mut self, _: &Vm) -> Option<Self::Output> {
         self.pop()
     }
 }
 impl NextValue<Vec<Value>> for Vec<ValueKey> {
     type Output = Vec<Value>;
 
-    fn next_value(&mut self, vm: &mut Vm) -> Option<Self::Output> {
+    fn next_value(&mut self, vm: &Vm) -> Option<Self::Output> {
         match &vm.memory[self.pop()?].value {
             Value::Array(a) => Some(a.iter().map(|k| vm.memory[*k].value.clone()).collect()),
             _ => None,
@@ -608,7 +607,7 @@ where
 {
     type Output = Option<T>;
 
-    fn next_value(&mut self, vm: &mut Vm) -> Option<Self::Output> {
+    fn next_value(&mut self, vm: &Vm) -> Option<Self::Output> {
         Some(if self.is_empty() {
             None
         } else {

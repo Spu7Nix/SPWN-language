@@ -57,7 +57,7 @@ impl FileSettings {
                 ScriptAttribute::NoLevel => self.no_level = true,
                 ScriptAttribute::NoBytecodeCache => self.no_bytecode_cache = true,
                 ScriptAttribute::DebugBytecode => self.debug_bytecode = true,
-                ScriptAttribute::NoOptimize => self.no_optimize = true,
+                ScriptAttribute::NoOptimizeTriggers => self.no_optimize = true,
                 ScriptAttribute::NoOptimizeBytecode => self.no_optimize_bytecode = true,
             }
         }

@@ -1,4 +1,4 @@
-use super::builtin_utils::{BuiltinType, TypeName};
+use super::builtin_utils::BuiltinType;
 use crate::vm::builtins::builtin_utils::ToValue;
 use crate::vm::error::RuntimeError;
 use crate::vm::interpreter::Vm;
@@ -10,7 +10,6 @@ impl BuiltinType for String {
     }
 
     fn invoke_self(&self, mname: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
-        todo!();
         Ok(match mname {
             "length" => self.len().to_value(vm)?,
             "clear" => String::clear.to_value(vm)?,
@@ -19,6 +18,6 @@ impl BuiltinType for String {
     }
 }
 
-impl TypeName for String {
-    const NAME: &'static str = "string";
-}
+// impl TypeName for String {
+//     const NAME: &'static str = "string";
+// }

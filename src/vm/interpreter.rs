@@ -18,7 +18,6 @@ use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 use crate::vm::builtins::builtin_utils::BuiltinType;
 use crate::vm::builtins::builtins::Builtin;
-// use crate::vm::builtins::Builtin;
 use crate::vm::value::MacroCode;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
@@ -51,6 +50,7 @@ pub struct Vm<'a> {
     pub id_counters: [usize; 4],
 
     pub contexts: FullContext,
+    //pub objects: Vec<GdObject>,
 }
 
 impl<'a> Vm<'a> {
@@ -135,7 +135,6 @@ impl<'a> Vm<'a> {
     // }
 
     pub fn make_area(&self, span: CodeSpan, code: BytecodeKey) -> CodeArea {
-        // todo!()
         CodeArea {
             span,
             src: self.programs[code].0.clone(),
@@ -189,8 +188,6 @@ impl<'a> Vm<'a> {
             call_area,
         });
         current.recursion_depth += 1;
-
-        //dbg!(&self.contexts);
     }
 
     pub fn return_and_pop_current(&mut self, ret_val: Option<StoredValue>) -> Option<CallKey> {
@@ -219,7 +216,6 @@ impl<'a> Vm<'a> {
     }
 
     pub fn run_program(&mut self) -> RuntimeResult<()> {
-        //self.push_call_stack(start, 0);
         while self.contexts.valid() {
             let &CallStackItem {
                 func, ip, call_key, ..
@@ -237,11 +233,6 @@ impl<'a> Vm<'a> {
                 continue;
             }
             let opcode = &opcodes[ip];
-
-            // println!(
-            //     "{} - {opcode}",
-            //     <&Opcode<Register> as Into<&'static str>>::into(opcode).green()
-            // );
 
             match opcode {
                 Opcode::LoadConst { dest, id } => {
@@ -305,6 +296,39 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     }
                 }
+
+                Opcode::AllocObject { size, dest } => self.set_reg(
+                    *dest,
+                    StoredValue {
+                        value: Value::Object(
+                            AHashMap::with_capacity(*size as usize),
+                            crate::parsing::ast::ObjectType::Object,
+                        ),
+                        area: self.get_area(func, ip),
+                    },
+                ),
+                Opcode::AllocTrigger { size, dest } => self.set_reg(
+                    *dest,
+                    StoredValue {
+                        value: Value::Object(
+                            AHashMap::with_capacity(*size as usize),
+                            crate::parsing::ast::ObjectType::Trigger,
+                        ),
+                        area: self.get_area(func, ip),
+                    },
+                ),
+
+                Opcode::PushObjectElem { elem, obj_id, dest } => {
+                    let push = self.deep_clone_reg_insert(*elem);
+
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Object(v, _) => {
+                            v.insert(*obj_id, push);
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+
                 Opcode::Add { left, right, dest } => {
                     self.bin_op(value_ops::add, func, ip, left, right, dest)?
                 }
@@ -539,23 +563,35 @@ impl<'a> Vm<'a> {
                     };
                     let span = self.get_span(func, ip);
 
-                    // let value = &self.get_reg(*from).value;
-                    // i dont think this clone can go away :(((
-                    let value = self.get_reg(*from).value.clone();
+                    let key = &key[..];
 
-                    let v = value.invoke_self(&key[..], self)?;
+                    let ret_value = match key {
+                        "type" => todo!(),
+                        _ => {
+                            let value = &self.get_reg(*from).value as *const Value;
+                            // SAFETY:
+                            // - `value` will never be modified as A) we dont need to and B) `invoke_self` takes an immutable reference
+                            // - `vm.memory` will not be modified when getting the member
+                            unsafe { value.as_ref().unwrap().invoke_self(key, self)? }
+                        }
+                    };
+
                     self.set_reg(
                         *dest,
                         StoredValue {
-                            value: v,
+                            value: ret_value,
                             area: self.make_area(span, func.code),
                         },
                     );
 
                     // let special = match (value, &key[..]) {
-                    //     // (Value::String(s), "length") => Some(Value::Int(s.chars().count() as i64)),
+                    //     (Value::String(s), "length") => Some(Value::Int(s.chars().count() as i64)),
 
-                    //     // (Value::Range(start, ..), "start") => Some(Value::Int(*start)),
+                    //     (Value::Range(start, ..), "start") => {
+                    //         let s = *start;
+
+                    //         Some(Value::Int(s))
+                    //     },
                     //     // (Value::Range(_, end, _), "end") => Some(Value::Int(*end)),
                     //     // (Value::Range(_, _, step), "step") => Some(Value::Int(*step as i64)),
 
@@ -868,6 +904,21 @@ impl<'a> Vm<'a> {
         }
 
         Ok(())
+    }
+
+    pub fn invoke_self(&mut self, val: &Value, name: &str) -> Result<Value, RuntimeError> {
+        Ok(match val {
+            Value::String(s) => s.invoke_self(name, self)?,
+
+            Value::Builtins => {
+                let b = Builtin::from_str(name).unwrap();
+
+                Value::Macro(MacroCode::Builtin(Rc::new(move |_args, _vm, _area| {
+                    b.call(_args, _vm, _area)
+                })))
+            }
+            _ => todo!(),
+        })
     }
 
     #[inline]

@@ -54,10 +54,9 @@ macro_rules! error_maker {
                 },
             )*
         }
-        use $crate::error::ErrorReport;
 
         impl $enum {
-            pub fn to_report(&self $(, $extra_arg: $extra_type)* ) -> ErrorReport {
+            pub fn to_report(&self $(, $extra_arg: $extra_type)* ) -> $crate::error::ErrorReport {
                 use colored::Colorize;
                 use $crate::error::RainbowColorGenerator;
 
@@ -65,7 +64,7 @@ macro_rules! error_maker {
 
                 match self {
                     $(
-                        $enum::$err_name { $($field,)* $($call_stack)? } => ErrorReport {
+                        $enum::$err_name { $($field,)* $($call_stack)? } => $crate::error::ErrorReport  {
                             title: $title.to_string(),
                             message: ($msg).to_string(),
                             labels: {
@@ -124,8 +123,6 @@ impl RainbowColorGenerator {
     pub fn next(&mut self) -> (u8, u8, u8) {
         let c = self.v * self.s;
         let h0 = self.h / 60.0;
-
-        // "gfdgdf".bold().hidden()
 
         let x = c * (1.0 - (h0.rem_euclid(2.0) - 1.0).abs());
 

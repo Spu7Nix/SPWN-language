@@ -11,7 +11,7 @@ use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 use super::compiler::CompileResult;
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
-use crate::parsing::ast::{ImportType, Spannable, Spanned};
+use crate::parsing::ast::{ImportType, ObjectType, Spannable, Spanned};
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
 use crate::vm::opcodes::{FunctionID, ImportID, Opcode, Register, UnoptOpcode, UnoptRegister};
@@ -491,6 +491,39 @@ impl<'a> FuncBuilder<'a> {
             self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushDictElem {
                 elem: r,
                 key: key_reg,
+                dest,
+            }))
+        }
+
+        Ok(())
+    }
+
+    pub fn new_object<F>(
+        &mut self,
+        len: u16,
+        dest: UnoptRegister,
+        f: F,
+        span: CodeSpan,
+        typ: ObjectType,
+    ) -> CompileResult<()>
+    where
+        F: FnOnce(&mut FuncBuilder, &mut Vec<(Spanned<u8>, UnoptRegister)>) -> CompileResult<()>,
+    {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(match typ {
+                ObjectType::Object => UnoptOpcode::AllocObject { size: len, dest },
+                ObjectType::Trigger => UnoptOpcode::AllocTrigger { size: len, dest },
+            }),
+            span,
+        );
+
+        let mut items = vec![];
+        f(self, &mut items)?;
+
+        for (k, r) in items {
+            self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushObjectElem {
+                elem: r,
+                obj_id: k.value,
                 dest,
             }))
         }

@@ -22,6 +22,8 @@ delve = { version = "0.3.0", features = ["derive"] }
 md5 = "0.7.0"
 strum = { version = "0.24", features = ["derive"] }
 clap = { version = "4.1.2", features = ["derive"] }
+hex-serde = "0.1.0"
+phf = { version = "0.11", features = ["macros"] }
 
 quick-xml = "0.27.1"
 libflate = "1.1.0"

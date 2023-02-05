@@ -1,95 +1,129 @@
-// OBJ_ID: ok(1, @number, "OBJ_ID"),
-// X: ok(2, @number, "X"),
-// Y: ok(3, @number, "Y"),
-// HORIZONTAL_FLIP: ok(4, @bool, "HORIZONTAL_FLIP"),
-// VERTICAL_FLIP: ok(5, @bool, "VERTICAL_FLIP"),
-// ROTATION: ok(6, @number, "ROTATION"),
-// TRIGGER_RED: ok(7, @number, "TRIGGER_RED"),
-// TRIGGER_GREEN: ok(8, @number, "TRIGGER_GREEN"),
-// TRIGGER_BLUE: ok(9, @number, "TRIGGER_BLUE"),
-// DURATION: ok(10, @number, "DURATION"),
-// TOUCH_TRIGGERED: ok(11, @bool, "TOUCH_TRIGGERED"),
-// PORTAL_CHECKED: ok(13, @bool, "PORTAL_CHECKED"),
-// PLAYER_COLOR_1: ok(15, @bool, "PLAYER_COLOR_1"),
-// PLAYER_COLOR_2: ok(16, @bool, "PLAYER_COLOR_2"),
-// BLENDING: ok(17, @bool, "BLENDING"),
-// EDITOR_LAYER_1: ok(20, @number, "EDITOR_LAYER_1"),
-// COLOR: ok(21, @color, "COLOR"),
-// COLOR_2: ok(22, @color, "COLOR_2"),
-// TARGET_COLOR: ok(23, @color, "TARGET_COLOR"),
-// Z_LAYER: ok(24, @number, "Z_LAYER"),
-// Z_ORDER: ok(25, @number, "Z_ORDER"),
-// MOVE_X: ok(28, @number, "MOVE_X"),
-// MOVE_Y: ok(29, @number, "MOVE_Y"),
-// EASING: ok(30, @number, "EASING"),
-// TEXT: ok(31, @string, "TEXT"),
-// SCALING: ok(32, @number, "SCALING"),
-// GROUP_PARENT: ok(34, @bool, "GROUP_PARENT"),
-// OPACITY: ok(35, @number, "OPACITY"),
-// HVS_ENABLED: ok(41, @bool, "HVS_ENABLED"),
-// COLOR_2_HVS_ENABLED: ok(42, @bool, "COLOR_2_HVS_ENABLED"),
-// HVS: ok(43, @string, "HVS"),
-// COLOR_2_HVS: ok(44, @string, "COLOR_2_HVS"),
-// FADE_IN: ok(45, @number, "FADE_IN"),
-// HOLD: ok(46, @number, "HOLD"),
-// FADE_OUT: ok(47, @number, "FADE_OUT"),
-// PULSE_HSV: ok(48, @bool, "PULSE_HSV"),
-// COPIED_COLOR_HVS: ok(49, @string, "COPIED_COLOR_HVS"),
-// COPIED_COLOR_ID: ok(50, @color, "COPIED_COLOR_ID"),
-// TARGET: ok(51, @color | @group | @trigger_function | @number, "TARGET"),
-// TARGET_TYPE: ok(52, @number, "TARGET_TYPE"),
-// YELLOW_TELEPORTATION_PORTAL_DISTANCE: ok(54, @number, "YELLOW_TELEPORTATION_PORTAL_DISTANC"),
-// ACTIVATE_GROUP: ok(56, @bool, "ACTIVATE_GROUP"),
-// GROUPS: ok(57, [@group] | @group, "GROUPS"),
-// LOCK_TO_PLAYER_X: ok(58, @bool, "LOCK_TO_PLAYER_X"),
-// LOCK_TO_PLAYER_Y: ok(59, @bool, "LOCK_TO_PLAYER_Y"),
-// COPY_OPACITY: ok(60, @bool, "COPY_OPACITY"),
-// EDITOR_LAYER_2: ok(61, @number, "EDITOR_LAYER_2"),
-// SPAWN_TRIGGERED: ok(62, @bool, "SPAWN_TRIGGERED"),
-// SPAWN_DURATION: ok(63, @number | @epsilon, "SPAWN_DURATION"),
-// DONT_FADE: ok(64, @bool, "DONT_FADE"),
-// MAIN_ONLY: ok(65, @bool, "MAIN_ONLY"),1
-// DETAIL_ONLY: ok(66, @bool, "DETAIL_ONLY"),
-// DONT_ENTER: ok(67, @bool, "DONT_ENTER"),
-// ROTATE_DEGREES: ok(68, @number, "ROTATE_DEGREES"),
-// TIMES_360: ok(69, @number, "TIMES_360"),
-// LOCK_OBJECT_ROTATION: ok(70, @bool, "LOCK_OBJECT_ROTATION"),
-// FOLLOW: ok(71, @group, "FOLLOW"),
-// CENTER: ok(71, @group, "CENTER"),
-// TARGET_POS: ok(71, @group, "TARGET_POS"),
-// X_MOD: ok(72, @number, "X_MOD"),
-// Y_MOD: ok(73, @number, "Y_MOD"),
-// STRENGTH: ok(75, @number, "STRENGTH"),
-// ANIMATION_ID: ok(76, @number, "ANIMATION_ID"),
-// COUNT: ok(77, @number, "COUNT"),
-// SUBTRACT_COUNT: ok(78, @number, "SUBTRACT_COUNT"),
-// PICKUP_MODE: ok(79, @number, "PICKUP_MODE"),
-// ITEM: ok(80, @item | @block, "ITEM"),
-// BLOCK_A: ok(80, @block, "BLOCK_A"),
-// HOLD_MODE: ok(81, @bool, "HOLD_MODE"),
-// TOGGLE_MODE: ok(82, @number, "TOGGLE_MODE"),
-// INTERVAL: ok(84, @number, "INTERVAL"),
-// EASING_RATE: ok(85, @number, "EASING_RATE"),
-// EXCLUSIVE: ok(86, @bool, "EXCLUSIVE"),
-// MULTI_TRIGGER: ok(87, @bool, "MULTI_TRIGGER"),
-// COMPARISON: ok(88, @number, "COMPARISON"),
-// DUAL_MODE: ok(89, @bool, "DUAL_MODE"),
-// SPEED: ok(90, @number, "SPEED"),
-// DELAY: ok(91, @number, "DELAY"),
-// Y_OFFSET: ok(92, @number, "Y_OFFSET"),
-// ACTIVATE_ON_EXIT: ok(93, @bool, "ACTIVATE_ON_EXIT"),
-// DYNAMIC_BLOCK: ok(94, @bool, "DYNAMIC_BLOCK"),
-// BLOCK_B: ok(95, @block, "BLOCK_B"),
-// GLOW_DISABLED: ok(96, @bool, "GLOW_DISABLED"),
-// ROTATION_SPEED: ok(97, @number, "ROTATION_SPEED"),
-// DISABLE_ROTATION: ok(98, @bool, "DISABLE_ROTATION"),
-// COUNT_MULTI_ACTIVATE: ok(104, @bool, "COUNT_MULTI_ACTIVATE"),
-// USE_TARGET: ok(100, @bool, "USE_TARGET"),
-// TARGET_POS_AXES: ok(101, @number, "TARGET_POS_AXES"),
-// EDITOR_DISABLE: ok(102, @bool, "EDITOR_DISABLE"),
-// HIGH_DETAIL: ok(103, @bool, "HIGH_DETAIL"),
-// MAX_SPEED: ok(105, @number, "MAX_SPEED"),
-// RANDOMIZE_START: ok(106, @bool, "RANDOMIZE_START"),
-// ANIMATION_SPEED: ok(107, @number, "ANIMATION_SPEED"),
-// LINKED_GROUP: ok(108, @number, "LINKED_GROUP"),
-// ACTIVE_TRIGGER: ok(36, @bool, "ACTIVE_TRIGGER"),
+use ahash::AHashMap;
+use lazy_static::lazy_static;
+pub enum ObjectKeyValueType {
+    Int,
+    Float,
+
+    Bool,
+    Group,
+    Channel,
+    Block,
+    Item,
+    GroupArray,
+    String,
+    Epsilon,
+}
+
+macro_rules! object_keys {
+    (
+        $(
+            $name:ident: $id:literal, $($typs:ident)|*;
+        )*
+    ) => {
+        lazy_static! {
+            pub static ref OBJECT_KEYS: AHashMap<String, (u8, Vec<ObjectKeyValueType>)> = [
+                $((
+                    stringify!($name).to_string(), ($id, vec![$(ObjectKeyValueType::$typs),*])
+                )),*
+            ].into_iter().collect();
+        }
+    };
+}
+
+object_keys! {
+    OBJ_ID: 1, Int;
+    X: 2, Float;
+    Y: 3, Float;
+    HORIZONTAL_FLIP: 4, Bool;
+    VERTICAL_FLIP: 5, Bool;
+    ROTATION: 6, Float;
+    TRIGGER_RED: 7, Int;
+    TRIGGER_GREEN: 8, Int;
+    TRIGGER_BLUE: 9, Int;
+    DURATION: 10, Float;
+    TOUCH_TRIGGERED: 11, Bool;
+    PORTAL_CHECKED: 13, Bool;
+    PLAYER_COLOR_1: 15, Bool;
+    PLAYER_COLOR_2: 16, Bool;
+    BLENDING: 17, Bool;
+    EDITOR_LAYER_1: 20, Int;
+    COLOR: 21, Channel;
+    COLOR_2: 22, Channel;
+    TARGET_COLOR: 23, Channel;
+    Z_LAYER: 24, Int;
+    Z_ORDER: 25, Int;
+    MOVE_X: 28, Int;
+    MOVE_Y: 29, Int;
+    EASING: 30, Int;
+    TEXT: 31, String;
+    SCALING: 32, Float;
+    GROUP_PARENT: 34, Bool;
+    OPACITY: 35, Float;
+    HVS_ENABLED: 41, Bool;
+    COLOR_2_HVS_ENABLED: 42, Bool;
+    HVS: 43, String;
+    COLOR_2_HVS: 44, String;
+    FADE_IN: 45, Float;
+    HOLD: 46, Float;
+    FADE_OUT: 47, Float;
+    PULSE_HSV: 48, Bool;
+    COPIED_COLOR_HVS: 49, String;
+    COPIED_COLOR_ID: 50, Channel;
+    TARGET: 51, Channel | Group;
+    TARGET_TYPE: 52, Bool;
+    YELLOW_TELEPORTATION_PORTAL_DISTANCE: 54, Float;
+    ACTIVATE_GROUP: 56, Bool;
+    GROUPS: 57, Group | GroupArray;
+    LOCK_TO_PLAYER_X: 58, Bool;
+    LOCK_TO_PLAYER_Y: 59, Bool;
+    COPY_OPACITY: 60, Bool;
+    EDITOR_LAYER_2: 61, Int;
+    SPAWN_TRIGGERED: 62, Bool;
+    SPAWN_DURATION: 63, Float | Epsilon;
+    DONT_FADE: 64, Bool;
+    MAIN_ONLY: 65, Bool;
+    DETAIL_ONLY: 66, Bool;
+    DONT_ENTER: 67, Bool;
+    ROTATE_DEGREES: 68, Float;
+    TIMES_360: 69, Int;
+    LOCK_OBJECT_ROTATION: 70, Bool;
+    FOLLOW: 71, Group;
+    CENTER: 71, Group;
+    TARGET_POS: 71, Group;
+    X_MOD: 72, Float;
+    Y_MOD: 73, Float;
+    STRENGTH: 75, Float;
+    ANIMATION_ID: 76, Int;
+    COUNT: 77, Int;
+    SUBTRACT_COUNT: 78, Bool;
+    PICKUP_MODE: 79, Int;
+    ITEM: 80, Item | Block;
+    BLOCK_A: 80, Block;
+    HOLD_MODE: 81, Bool;
+    TOGGLE_MODE: 82, Int;
+    INTERVAL: 84, Float;
+    EASING_RATE: 85, Float;
+    EXCLUSIVE: 86, Bool;
+    MULTI_TRIGGER: 87, Bool;
+    COMPARISON: 88, Int;
+    DUAL_MODE: 89, Bool;
+    SPEED: 90, Float;
+    DELAY: 91, Float;
+    Y_OFFSET: 92, Int;
+    ACTIVATE_ON_EXIT: 93, Bool;
+    DYNAMIC_BLOCK: 94, Bool;
+    BLOCK_B: 95, Block;
+    GLOW_DISABLED: 96, Bool;
+    ROTATION_SPEED: 97, Float;
+    DISABLE_ROTATION: 98, Bool;
+    COUNT_MULTI_ACTIVATE: 104, Bool;
+    USE_TARGET: 100, Bool;
+    TARGET_POS_AXES: 101, Int;
+    EDITOR_DISABLE: 102, Bool;
+    HIGH_DETAIL: 103, Bool;
+    MAX_SPEED: 105, Float;
+    RANDOMIZE_START: 106, Bool;
+    ANIMATION_SPEED: 107, Float;
+    LINKED_GROUP: 108, Int;
+    ACTIVE_TRIGGER: 36, Bool;
+}
