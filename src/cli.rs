@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Args, Parser, Subcommand};
 
 use crate::parsing::attributes::ScriptAttribute;
@@ -9,13 +11,16 @@ use crate::parsing::attributes::ScriptAttribute;
 pub struct Arguments {
     #[command(subcommand)]
     pub command: Command,
+
+    #[arg(short = 'r', long)]
+    pub no_color: bool,
 }
 
 #[derive(Subcommand, Debug)]
 #[command(rename_all = "lowercase")]
 pub enum Command {
     Build {
-        file: String,
+        file: PathBuf,
 
         #[clap(flatten)]
         settings: Settings,

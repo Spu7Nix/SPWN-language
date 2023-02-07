@@ -15,98 +15,82 @@ mod vm;
 
 use std::cell::RefCell;
 use std::error::Error;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::PathBuf;
+use std::process::Stdio;
 use std::rc::Rc;
-use std::sync::mpsc::{channel, Sender};
-use std::thread::JoinHandle;
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::{fs, thread};
 
 use clap::Parser as _;
 use cli::Settings;
 use colored::Colorize;
 use gd::gd_object::GdObject;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 use lasso::Rodeo;
-use slotmap::SlotMap;
+use spinoff::spinners::SpinnerFrames;
+use spinoff::{Spinner as SSpinner, *};
 
 use crate::cli::{Arguments, Command};
 use crate::compiling::compiler::Compiler;
 use crate::gd::{gd_object, levelstring};
-use crate::lexing::tokens::Token;
 use crate::parsing::parser::Parser;
 use crate::sources::{BytecodeMap, SpwnSource};
 use crate::util::RandomState;
-use crate::vm::context::FullContext;
 use crate::vm::interpreter::{FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
+
+struct Spinner {
+    frames: SpinnerFrames,
+    spinner: Option<(SSpinner, String)>,
+}
+impl Spinner {
+    pub fn new() -> Self {
+        Self {
+            frames: spinner!(
+                ["[⠋]", "[⠙]", "[⠸]", "[⢰]", "[⣠]", "[⣄]", "[⡆]", "[⠇]"],
+                100
+            ),
+            spinner: None,
+        }
+    }
+
+    pub fn start(&mut self, msg: String) {
+        self.spinner = Some((SSpinner::new(self.frames.clone(), msg.clone(), None), msg));
+    }
+
+    pub fn fail(&mut self, msg: Option<String>) {
+        let (spinner, curr_msg) = self.spinner.take().unwrap();
+        spinner.stop_with_message(&format!(
+            "{} {:>20}",
+            curr_msg,
+            "(Failed)".bright_red().bold()
+        ));
+        if let Some(m) = msg {
+            eprintln!("{m}");
+        }
+    }
+
+    pub fn complete(&mut self, msg: Option<String>) {
+        let (spinner, curr_msg) = self.spinner.take().unwrap();
+
+        spinner.stop_with_message(&format!(
+            "{} {:>20}",
+            &(if let Some(m) = msg { m } else { curr_msg }),
+            "(Successful)".bright_green().bold()
+        ));
+    }
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
 
     let args = Arguments::parse();
+    let mut spinner = Spinner::new();
 
-    let (sender, receiver) = channel();
-
-    thread::spawn(move || {
-        let spinner_style = ProgressStyle::with_template("{spinner} {msg}")
-            .unwrap()
-            .tick_chars("⢁⡈⠔⠢ ");
-
-        let mut pb = None;
-
-        // let handle;
-
-        loop {
-            // let gaga = receiver.try_recv();
-            // println!("{:?}", gaga);
-
-            match receiver.try_recv() {
-                Ok(e) => match e {
-                    SpinnerEvent::Start(msg) => {
-                        let p = ProgressBar::new(100).with_style(spinner_style.clone());
-                        p.set_message(msg);
-
-                        pb = Some(p);
-                    }
-                    SpinnerEvent::Stop(msg) => {
-                        if let Some(pb) = &pb {
-                            if let Some(s) = msg {
-                                pb.finish_with_message(s)
-                            } else {
-                                pb.finish()
-                            }
-                        }
-                        pb = None;
-                    }
-                    SpinnerEvent::Finish => break,
-                },
-                Err(e) => match e {
-                    std::sync::mpsc::TryRecvError::Empty => {
-                        if let Some(pb) = &pb {
-                            pb.inc(1);
-                            std::thread::sleep(std::time::Duration::from_millis(100));
-                        }
-                    }
-                    std::sync::mpsc::TryRecvError::Disconnected => break,
-                },
-            }
-            // match receiver.recv().unwrap() {
-            //     SpinnerEvent::Finish => return,
-            //     SpinnerEvent::Start(msg) => {
-            //         pb.set_message(msg);
-            //         // loop {
-            //         //     if let Ok(SpinnerEvent::Stop) = receiver.recv() {
-            //         //         break;
-            //         //     }
-
-            //         //     pb.inc(1)
-            //         // }
-            //     }
-            //     SpinnerEvent::Stop => {}
-            // }
-        }
-    });
+    if args.no_color {
+        std::env::set_var("NO_COLOR", "true");
+    }
 
     match args.command {
         Command::Build { file, settings } => {
@@ -133,32 +117,29 @@ fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 None
             };
+
             let level_string = if !settings.no_level {
                 if let Some(gd_path) = &gd_path {
-                    sender
-                        .send(SpinnerEvent::Start(format!(
-                            "📖 {}",
-                            "Reading savefile...".bright_cyan().bold()
-                        )))
-                        .unwrap();
+                    spinner.start(format!(
+                        "📖  {:20}",
+                        "Reading savefile...".bright_cyan().bold()
+                    ));
 
-                    let mut file = fs::File::open(gd_path).unwrap();
+                    let mut file = fs::File::open(gd_path)?;
                     let mut file_content = Vec::new();
 
                     match file.read_to_end(&mut file_content) {
                         Ok(..) => (),
                         Err(e) => {
-                            eprintln!(
+                            spinner.fail(Some(format!(
                                 "❌  {} {}",
                                 "Error reading savefile:".bright_red().bold(),
                                 e
-                            );
+                            )));
+
+                            std::process::exit(1);
                         }
                     }
-
-                    std::thread::sleep(std::time::Duration::from_millis(3000));
-
-                    sender.send(SpinnerEvent::Stop(None)).unwrap();
 
                     let mut level_string = match levelstring::get_level_string(
                         file_content,
@@ -166,13 +147,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                     ) {
                         Ok(s) => s,
                         Err(e) => {
-                            eprintln!("❌  {} {}", "Error reading level:".bright_red().bold(), e);
+                            spinner.fail(Some(format!(
+                                "❌  {} {}",
+                                "Error reading level:".bright_red().bold(),
+                                e
+                            )));
 
                             std::process::exit(1);
                         }
                     };
+
+                    spinner.complete(None);
+
                     if level_string.is_empty() {}
+
                     gd_object::remove_spwn_objects(&mut level_string);
+
                     level_string
                 } else {
                     String::new()
@@ -185,16 +175,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                 objects,
                 triggers,
                 id_counters,
-            } = run_spwn(&settings);
+            } = run_spwn(file, &settings, &mut spinner)?;
 
             println!("\n{} objects added", objects.len());
 
             let (new_ls, used_ids) = gd_object::append_objects(objects, &level_string)?;
 
-            println!("\n{}", "Level uses:".bright_magenta().bold());
+            println!("\n{}", "Level uses:".bright_green().bold());
 
             for (i, len) in used_ids.iter().enumerate() {
-                // if *len > 0 {
                 println!(
                     "{}",
                     &format!(
@@ -203,13 +192,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                         ["groups", "channels", "block IDs", "item IDs"][i]
                     ),
                 );
-                // }
             }
 
             match gd_path {
                 Some(gd_path) => {
                     println!(
-                        "\n📝  {}",
+                        "\n📝  {:20}",
                         "Writing back to savefile...".bright_cyan().bold()
                     );
 
@@ -233,51 +221,67 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    sender.send(SpinnerEvent::Finish).unwrap();
-
     Ok(())
 }
 
-pub struct SpwnOutput {
+struct SpwnOutput {
     pub objects: Vec<GdObject>,
     pub triggers: Vec<GdObject>,
     pub id_counters: [usize; 4],
 }
 
-pub fn run_spwn(settings: &Settings) -> SpwnOutput {
+fn run_spwn(
+    file: PathBuf,
+    settings: &Settings,
+    spinner: &mut Spinner,
+) -> Result<SpwnOutput, Box<dyn Error>> {
     let interner = Rc::new(RefCell::new(Rodeo::with_hasher(RandomState::new())));
 
-    let path = PathBuf::from("test.spwn");
+    let src = SpwnSource::File(file);
+    let code = match src.read() {
+        Some(c) => c,
+        None => {
+            spinner.fail(Some(format!(
+                "❌  {}",
+                "Error reading SPWN file".bright_red().bold()
+            )));
+            std::process::exit(1);
+        }
+    };
 
-    let src = SpwnSource::File(path);
-    let code = src.read().unwrap();
+    spinner.start(format!("🤖  {:20}", "Parsing...".bright_blue().bold()));
 
     let mut parser = Parser::new(&code, src, Rc::clone(&interner));
-
-    let mut map = BytecodeMap::default();
-
-    println!("🤖  {}", "Parsing...".bright_blue().bold());
-
+    // [\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]
     match parser.parse() {
         Ok(ast) => {
+            spinner.complete(None);
+
+            spinner.start(format!("🛠️  {:20}", "Compiling...".bright_yellow().bold()));
+
+            let mut map = BytecodeMap::default();
+
             let mut compiler =
                 Compiler::new(Rc::clone(&interner), parser.src.clone(), settings, &mut map);
-
-            println!("🛠️  {}", "Compiling...".bright_green().bold());
 
             match compiler.compile(ast.statements) {
                 Ok(_) => (),
                 Err(err) => {
+                    spinner.fail(None);
                     err.to_report().display();
+
                     std::process::exit(1);
                 }
             }
+
+            spinner.complete(None);
 
             if settings.debug_bytecode {
                 for (k, b) in &map.map {
                     b.debug_str(k)
                 }
             }
+            spinner.start(format!("🏁  {:20}", "Executing...".bright_purple().bold()));
 
             let mut vm = Vm::new(&map, interner);
 
@@ -287,45 +291,28 @@ pub fn run_spwn(settings: &Settings) -> SpwnOutput {
             vm.push_call_stack(start, 0, false, None);
 
             match vm.run_program() {
-                Ok(_) => SpwnOutput {
-                    objects: vm.objects,
-                    triggers: vm.triggers,
-                    id_counters: vm.id_counters,
-                },
+                Ok(_) => Ok({
+                    spinner.complete(None);
+
+                    SpwnOutput {
+                        objects: vm.objects,
+                        triggers: vm.triggers,
+                        id_counters: vm.id_counters,
+                    }
+                }),
                 Err(err) => {
+                    spinner.fail(None);
+
                     err.to_report().display();
                     std::process::exit(1);
                 }
             }
         }
         Err(err) => {
+            spinner.fail(None);
+
             err.to_report().display();
             std::process::exit(1);
         }
     }
 }
-
-// fn run_async<F: Send + Sync, T: Send + Sync + 'static>(mut f: F) -> JoinHandle<T>
-// where
-//     F: FnMut() -> T + 'static,
-// {
-//     thread::spawn(move || f())
-// }
-#[derive(Debug)]
-enum SpinnerEvent {
-    Start(String),
-    Stop(Option<String>),
-    Finish,
-}
-
-// fn run_spinner() -> Sender<SpinnerEvent> {
-//     let (sender, receiver) = channel();
-
-//     thread::spawn(move || {
-//         if receiver.recv().is_ok() {
-//             return;
-//         }
-//     });
-
-//     sender
-// }

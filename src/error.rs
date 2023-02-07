@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use ariadne::{sources, Label, Report, ReportKind};
+use ariadne::{sources, Config, Label, Report, ReportKind};
 
 use crate::sources::CodeArea;
 use crate::vm::context::CallStackItem;
@@ -154,6 +154,7 @@ impl ErrorReport {
         let mut label_colors = RainbowColorGenerator::new(308.0, 0.5, 0.95, 35.0);
 
         let mut report = Report::build(ReportKind::Error, "", 0).with_message(&self.message);
+        //.with_config(Config::default().with_color(false));
 
         let mut source_vec = vec![];
 

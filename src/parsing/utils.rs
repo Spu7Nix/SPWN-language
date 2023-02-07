@@ -10,9 +10,7 @@ macro_rules! operators {
         )+
     ) => {
         pub mod operators {
-
-            use crate::Token;
-
+            use crate::lexing::tokens::Token;
 
             #[derive(Debug, Clone, Copy)]
             pub enum AssignOp {

@@ -2,14 +2,6 @@
 
 
 
-sex = (a, b) {
-    -> return a;
-    -> return b;
+while true {
+    "g"
 }
-
-$.add(obj {
-    OBJ_ID: 1,
-    X: sex(15, 15 + 2 * 30),
-    Y: sex(15, 15 + 1 * 30),
-})
-

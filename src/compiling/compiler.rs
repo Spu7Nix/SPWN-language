@@ -788,7 +788,7 @@ impl<'a> Compiler<'a> {
                 Some(data) => {
                     if let ExprType::Assign(stmt_span) = expr_type {
                         if !data.mutable {
-                            println!("{:?} {:?}", stmt_span, data.def_span);
+                            // println!("{:?} {:?}", stmt_span, data.def_span);
                             return Err(CompilerError::ImmutableAssign {
                                 area: self.make_area(stmt_span),
                                 def_area: self.make_area(data.def_span),
