@@ -61,6 +61,20 @@ error_maker! {
 
         /////////
         #[
+            Message: "Invalid object value", Note: None;
+            Labels: [
+                v.1 => "{} is not a valid object value": v.0;
+                area => "Object key used here";
+            ]
+        ]
+        InvalidObjectValue {
+            v: (String, CodeArea),
+            area: CodeArea,
+            [call_stack]
+        },
+
+        /////////
+        #[
             Message: "Too many arguments", Note: None;
             Labels: [
                 call_area => "Received {} arguments, expected {}": call_arg_amount, macro_arg_amount;

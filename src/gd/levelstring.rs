@@ -161,8 +161,6 @@ pub fn encrypt_level_string(
     let mut k2_detected = false;
     let mut level_detected = false;
 
-    // println!("{}", old_ls);
-
     let full_ls = old_ls + &ls;
 
     loop {
@@ -194,11 +192,11 @@ pub fn encrypt_level_string(
                         if let Some(level_name) = &level_name {
                             if level_name == &text {
                                 level_detected = true;
-                                println!("Writing to level: {text}");
+                                println!("Level: {text}");
                             }
                         } else {
                             level_detected = true;
-                            println!("Writing to level: {text}");
+                            println!("Level: {text}");
                         }
 
                         k2_detected = false;

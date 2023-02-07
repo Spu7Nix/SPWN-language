@@ -1,12 +1,14 @@
+use std::fmt::{Display, write};
 use std::path::PathBuf;
 
-use delve::EnumToStr;
+use delve::{EnumToStr, EnumDisplay};
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::attributes::{ExprAttribute, ScriptAttribute, StmtAttribute};
 use super::utils::operators::{AssignOp, BinOp, UnaryOp};
 use crate::gd::ids::IDClass;
+use crate::gd::object_keys::ObjectKey;
 use crate::sources::CodeSpan;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,7 +140,7 @@ pub enum Expression {
         base: ExprNode,
         items: DictItems,
     },
-    Obj(ObjectType, Vec<(Spanned<ObjectKey>, ExprNode)>),
+    Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
 }
 
 #[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq)]
@@ -147,11 +149,14 @@ pub enum ObjectType {
     Trigger,
 }
 
-#[derive(Debug, Clone, Copy, EnumToStr)]
-pub enum ObjectKey {
-    Name(Spur),
+#[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash, EnumDisplay)]
+pub enum ObjKeyType {
+    #[delve(display = |o: &ObjectKey| format!("{}", <&ObjectKey as Into<&'static str>>::into(o)))]
+    Name(ObjectKey),
+    #[delve(display = |n: &u8| format!("{n}"))]
     Num(u8),
 }
+
 
 #[derive(Debug, Clone, EnumToStr)]
 pub enum Statement {

@@ -30,7 +30,9 @@ impl SpwnSource {
 
     pub fn read(&self) -> Option<String> {
         match self {
-            SpwnSource::File(p) => fs::read_to_string(p).ok(),
+            SpwnSource::File(p) => fs::read_to_string(p)
+                .ok()
+                .map(|s| s.replace("\r\n", "\n").trim_end().to_string()),
         }
     }
 

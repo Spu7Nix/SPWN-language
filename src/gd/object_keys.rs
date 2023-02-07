@@ -14,18 +14,47 @@ pub enum ObjectKeyValueType {
     Epsilon,
 }
 
+use paste::paste;
+
 macro_rules! object_keys {
     (
         $(
             $name:ident: $id:literal, $($typs:ident)|*;
         )*
     ) => {
-        lazy_static! {
-            pub static ref OBJECT_KEYS: AHashMap<String, (u8, Vec<ObjectKeyValueType>)> = [
-                $((
-                    stringify!($name).to_string(), ($id, vec![$(ObjectKeyValueType::$typs),*])
-                )),*
-            ].into_iter().collect();
+        paste! {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, delve::EnumToStr)]
+            #[delve(rename_variants = "SCREAMING_SNAKE_CASE")]
+            pub enum ObjectKey {
+                $(
+                    [<$name:camel>],
+                )*
+            }
+
+            impl ObjectKey {
+                pub fn id(self) -> u8 {
+                    match self {
+                        $(
+                            Self::[<$name:camel>] => $id,
+                        )*
+                    }
+                }
+                pub fn types(self) -> &'static [ObjectKeyValueType] {
+                    match self {
+                        $(
+                            Self::[<$name:camel>] => &[$(ObjectKeyValueType::$typs),*],
+                        )*
+                    }
+                }
+            }
+
+            lazy_static! {
+                pub static ref OBJECT_KEYS: AHashMap<String, ObjectKey> = [
+                    $((
+                        stringify!($name).to_string(), ObjectKey::[<$name:camel>]
+                    )),*
+                ].into_iter().collect();
+            }
         }
     };
 }

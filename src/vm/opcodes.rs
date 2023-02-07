@@ -5,6 +5,7 @@ use serde::de::{Error, Visitor};
 use serde::{Deserialize, Serialize};
 
 use crate::gd::ids::IDClass;
+use crate::gd::object_keys::ObjectKey;
 
 struct OpcodeVisitor;
 
@@ -166,8 +167,11 @@ opcodes! {
     PushArrayElem { => elem, => dest },
     #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d}"))]
     PushDictElem { => elem, => key, => dest },
-    #[delve(display = |e: &R, i: &u8, d: &R| format!("insert i:R{e} into R{d}"))]
-    PushObjectElem { => elem, obj_id: u8, => dest },
+    
+    #[delve(display = |e: &R, k: &ObjectKey, d: &R| format!("insert {}:R{e} into R{d}", <&ObjectKey as Into<&'static str>>::into(k)))]
+    PushObjectElemKey { => elem, obj_key: ObjectKey, => dest },
+    #[delve(display = |e: &R, k: &u8, d: &R| format!("insert {k}:R{e} into R{d}"))]
+    PushObjectElemUnchecked { => elem, obj_key: u8, => dest },
 
     #[delve(display = |i: &FunctionID, d: &R| format!("{i}: (...) {{...}} -> R{d}"))]
     CreateMacro {

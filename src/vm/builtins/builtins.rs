@@ -7,11 +7,13 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 
 use super::builtin_utils::{Invoke, Spread, TOf, ToValue};
+use crate::gd::gd_object::{GdObject, ObjParam};
 use crate::of;
-use crate::sources::CodeArea;
+use crate::parsing::ast::ObjectType;
+use crate::sources::{CodeArea, CodeSpan};
 use crate::vm::error::RuntimeError;
-use crate::vm::interpreter::{ValueKey, Vm};
-use crate::vm::value::Value;
+use crate::vm::interpreter::{BytecodeKey, ValueKey, Vm};
+use crate::vm::value::{StoredValue, Value, ValueType};
 use crate::vm::value_ops;
 
 #[derive(Debug, EnumFromStr, EnumDisplay, PartialEq, Clone)]
@@ -41,7 +43,7 @@ impl Builtin {
             Self::Exit => exit.invoke_fn(args, vm, area).to_value(vm),
             //Self::Random => random.invoke_fn(args, vm, area).to_value(vm),
             Self::Version => version.invoke_fn(args, vm, area).to_value(vm),
-            // Self::Input => input.invoke_fn(args, vm, area).to_value(vm),
+            //Self::Input => input.invoke_fn(args, vm, area).to_value(vm),
             Self::Assert => assert.invoke_fn(args, vm, area).to_value(vm),
             Self::AssertEq => assert_eq.invoke_fn(args, vm, area).to_value(vm),
             Self::Add => add.invoke_fn(args, vm, area).to_value(vm),
@@ -50,10 +52,28 @@ impl Builtin {
     }
 }
 
-pub fn add(object: Value, vm: &mut Vm) {
-    // vm.contexts.yeet_current(
-    // the goof (the sill)
-    println!("helloe!!!");
+pub fn add(object: StoredValue, vm: &mut Vm, area: CodeArea) -> Result<(), RuntimeError> {
+    let (params, mode) = match &object.value {
+        Value::Object(v, m) => (v.clone(), *m),
+        Value::Object(v, m) => (v.clone(), *m),
+        _ => {
+            return Err(RuntimeError::TypeMismatch {
+                v: (object.value.get_type(), object.area.clone()),
+                expected: ValueType::Object,
+                area,
+                call_stack: vm.get_call_stack(),
+            })
+        }
+    };
+
+    let obj = GdObject { params, mode };
+
+    match mode {
+        ObjectType::Object => vm.objects.push(obj),
+        ObjectType::Trigger => vm.triggers.push(obj),
+    }
+
+    Ok(())
 }
 
 pub fn exit(_vm: &mut Vm) {

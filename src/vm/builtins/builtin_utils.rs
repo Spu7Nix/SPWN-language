@@ -4,7 +4,7 @@ use std::ops::Range;
 use crate::sources::CodeArea;
 use crate::vm::error::RuntimeError;
 use crate::vm::interpreter::{ValueKey, Vm};
-use crate::vm::value::{MacroCode, Value, ValueType};
+use crate::vm::value::{MacroCode, StoredValue, Value, ValueType};
 
 #[derive(delve::EnumDisplay, Clone, Debug)]
 pub enum BuiltinValueType {
@@ -495,6 +495,7 @@ macro_rules! impl_for_t {
 
 impl_for_t! {
     (),
+    StoredValue,
     bool: Bool,
     String: String,
     Value,
@@ -553,6 +554,9 @@ impl TypeOf for Range<i64> {
 }
 impl<T> TypeOf for Vec<T> {
     const TYPE: BuiltinValueType = BuiltinValueType::Atom(ValueType::Array);
+}
+impl TypeOf for StoredValue {
+    const TYPE: BuiltinValueType = BuiltinValueType::None;
 }
 
 impl NextValue<Range<i64>> for Vec<ValueKey> {
@@ -613,5 +617,12 @@ where
         } else {
             Some(<Vec<ValueKey> as NextValue<T>>::next_value(self, vm)?)
         })
+    }
+}
+impl NextValue<StoredValue> for Vec<ValueKey> {
+    type Output = StoredValue;
+
+    fn next_value(&mut self, vm: &Vm) -> Option<Self::Output> {
+        Some(vm.memory[self.pop()?].clone())
     }
 }

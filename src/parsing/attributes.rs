@@ -290,11 +290,5 @@ attributes! {
     pub enum ScriptAttribute {
         CacheOutput,
         NoStd,
-        ConsoleOutput,
-        NoLevel,
-        NoBytecodeCache,
-        DebugBytecode,
-        NoOptimizeTriggers,
-        NoOptimizeBytecode,
     }
 }

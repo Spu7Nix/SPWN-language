@@ -1,6 +1,7 @@
 use super::error::RuntimeError;
 use super::interpreter::{BytecodeKey, RuntimeResult, Vm};
 use super::value::{StoredValue, Value, ValueType};
+use crate::gd::gd_object::ObjParam;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeSpan;
 
@@ -15,6 +16,51 @@ pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm, code: BytecodeKey) -> R
                 call_stack: vm.get_call_stack(),
             })
         }
+    })
+}
+pub fn to_obj_param(
+    v: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<ObjParam> {
+    let param = 'm: {
+        match &v.value {
+            Value::Int(n) => Some(ObjParam::Number(*n as f64)),
+            Value::Float(n) => Some(ObjParam::Number(*n)),
+
+            Value::Group(id) => Some(ObjParam::Group(*id)),
+            Value::Channel(id) => Some(ObjParam::Channel(*id)),
+            Value::Block(id) => Some(ObjParam::Block(*id)),
+            Value::Item(id) => Some(ObjParam::Item(*id)),
+
+            Value::Bool(b) => Some(ObjParam::Bool(*b)),
+            Value::String(s) => Some(ObjParam::Text(s.clone())),
+
+            Value::Epsilon => Some(ObjParam::Epsilon),
+
+            Value::Array(v) => {
+                let mut arr = vec![];
+                for k in v {
+                    match &vm.memory[*k].value {
+                        Value::Group(g) => arr.push(*g),
+                        _ => break 'm None,
+                    }
+                }
+                Some(ObjParam::GroupList(arr))
+            }
+            // if v.iter().all(|k| {
+            //     matches!(&vm.memory[*k].value, Value::Group(_))
+            // }) => ObjParam::GroupList(v.iter().map(f))
+            // Value::Bool(b) => *b,
+            _ => None,
+        }
+    };
+
+    param.ok_or(RuntimeError::InvalidObjectValue {
+        v: (v.value.runtime_display(vm), v.area.clone()),
+        area: vm.make_area(span, code),
+        call_stack: vm.get_call_stack(),
     })
 }
 
