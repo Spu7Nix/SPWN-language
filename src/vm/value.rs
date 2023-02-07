@@ -10,8 +10,9 @@ use super::builtins::builtins::Builtin;
 use super::error::RuntimeError;
 use super::interpreter::{FuncCoord, ValueKey, Vm};
 use crate::compiling::bytecode::Constant;
+use crate::gd::gd_object::ObjParam;
 use crate::gd::ids::*;
-use crate::parsing::ast::ObjectType;
+use crate::parsing::ast::{ObjKeyType, ObjectType};
 use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,7 +92,7 @@ pub enum Value {
     Dict(AHashMap<Spur, ValueKey>),
 
     Group(Id),
-    Color(Id),
+    Channel(Id),
     Block(Id),
     Item(Id),
 
@@ -107,7 +108,9 @@ pub enum Value {
 
     TriggerFunction(Id),
 
-    Object(AHashMap<u8, ValueKey>, ObjectType),
+    Object(AHashMap<u8, ObjParam>, ObjectType),
+
+    Epsilon,
 }
 
 impl std::fmt::Display for ValueType {
@@ -131,7 +134,7 @@ impl Value {
                 let id = Id::Specific(*v);
                 match c {
                     IDClass::Group => Value::Group(id),
-                    IDClass::Color => Value::Color(id),
+                    IDClass::Color => Value::Channel(id),
                     IDClass::Block => Value::Block(id),
                     IDClass::Item => Value::Item(id),
                 }
@@ -164,7 +167,7 @@ impl Value {
                     .join(", ")
             ),
             Value::Group(id) => id.fmt("g"),
-            Value::Color(id) => id.fmt("c"),
+            Value::Channel(id) => id.fmt("c"),
             Value::Block(id) => id.fmt("b"),
             Value::Item(id) => id.fmt("i"),
             Value::Builtins => "$".to_string(),
@@ -197,10 +200,11 @@ impl Value {
                     ObjectType::Trigger => "trigger",
                 },
                 map.iter()
-                    .map(|(s, k)| format!("{}: {}", s, vm.memory[*k].value.runtime_display(vm)))
+                    .map(|(s, k)| format!("{}: {}", s, todo!()))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            Value::Epsilon => "$.epsilon()".to_string(),
         }
     }
 

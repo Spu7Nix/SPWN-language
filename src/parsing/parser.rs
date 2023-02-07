@@ -14,8 +14,9 @@ use super::attributes::{ExprAttribute, IsValidOn, ParseAttribute, ScriptAttribut
 use super::error::SyntaxError;
 use super::utils::operators::{self, is_assign_op, unary_prec};
 use crate::gd::ids::IDClass;
+use crate::gd::object_keys::OBJECT_KEYS;
 use crate::lexing::tokens::{Lexer, Token};
-use crate::parsing::ast::ObjectKey;
+use crate::parsing::ast::ObjKeyType;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 
@@ -596,12 +597,12 @@ impl Parser<'_> {
 
                     self.expect_tok(Token::LBracket)?;
 
-                    let mut items: Vec<(Spanned<ObjectKey>, ExprNode)> = vec![];
+                    let mut items: Vec<(Spanned<ObjKeyType>, ExprNode)> = vec![];
 
                     list_helper!(self, RBracket {
                         let key = match self.next() {
-                            Token::Int => ObjectKey::Num(self.parse_int(self.slice()) as u8),
-                            Token::Ident => ObjectKey::Name(self.intern_string(self.slice())),
+                            Token::Int => ObjKeyType::Num(self.parse_int(self.slice()) as u8),
+                            Token::Ident => ObjKeyType::Name(OBJECT_KEYS[self.slice()]),
                             other => {
                                 return Err(SyntaxError::UnexpectedToken {
                                     expected: "key".into(),

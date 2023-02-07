@@ -13,7 +13,9 @@ use super::opcodes::{Opcode, Register};
 use super::value::{ArgData, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
+use crate::gd::gd_object::GdObject;
 use crate::gd::ids::{IDClass, Id};
+use crate::gd::object_keys::ObjectKeyValueType;
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 use crate::vm::builtins::builtin_utils::BuiltinType;
@@ -50,7 +52,8 @@ pub struct Vm<'a> {
     pub id_counters: [usize; 4],
 
     pub contexts: FullContext,
-    //pub objects: Vec<GdObject>,
+    pub objects: Vec<GdObject>,
+    pub triggers: Vec<GdObject>,
 }
 
 impl<'a> Vm<'a> {
@@ -70,6 +73,8 @@ impl<'a> Vm<'a> {
             id_counters: [0; 4],
             contexts: FullContext::new(),
             src_map,
+            objects: Vec::new(),
+            triggers: Vec::new(),
         }
     }
 
@@ -150,7 +155,7 @@ impl<'a> Vm<'a> {
     }
 
     pub fn get_call_stack(&self) -> Vec<CallStackItem> {
-        self.contexts.current().pos_stack.iter().cloned().collect()
+        self.contexts.current().pos_stack.to_vec()
     }
 
     pub fn push_call_stack(
@@ -318,12 +323,76 @@ impl<'a> Vm<'a> {
                     },
                 ),
 
-                Opcode::PushObjectElem { elem, obj_id, dest } => {
+                Opcode::PushObjectElemKey {
+                    elem,
+                    obj_key,
+                    dest,
+                } => {
+                    // Objec
                     let push = self.deep_clone_reg_insert(*elem);
+
+                    let param = {
+                        let types = obj_key.types();
+
+                        for t in types {
+                            match (t, &self.memory[push].value) {
+                                (ObjectKeyValueType::Int, Value::Int(_)) => (),
+                                (ObjectKeyValueType::Float, Value::Float(_) | Value::Int(_)) => (),
+                                (ObjectKeyValueType::Bool, Value::Bool(_)) => (),
+                                (
+                                    ObjectKeyValueType::Group,
+                                    Value::Group(_) | Value::TriggerFunction(_),
+                                ) => (),
+                                (ObjectKeyValueType::Channel, Value::Channel(_)) => (),
+                                (ObjectKeyValueType::Block, Value::Block(_)) => (),
+                                (ObjectKeyValueType::Item, Value::Item(_)) => (),
+                                (ObjectKeyValueType::String, Value::String(_)) => (),
+                                (ObjectKeyValueType::Epsilon, Value::Epsilon) => (),
+
+                                (ObjectKeyValueType::GroupArray, Value::Array(v))
+                                    if v.iter().all(|k| {
+                                        matches!(&self.memory[*k].value, Value::Group(_))
+                                    }) => {}
+
+                                _ => panic!(
+                                    "\n\nOk   heres the deal!!! I not this yet XDXDC😭😭🤣🤣 \nLOl"
+                                ),
+                            }
+                        }
+
+                        value_ops::to_obj_param(
+                            &self.memory[push],
+                            self.get_span(func, ip),
+                            self,
+                            func.code,
+                        )?
+                    };
 
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Object(v, _) => {
-                            v.insert(*obj_id, push);
+                            v.insert(obj_key.id(), param);
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                Opcode::PushObjectElemUnchecked {
+                    elem,
+                    obj_key,
+                    dest,
+                } => {
+                    // Objec
+                    let push = self.deep_clone_reg_insert(*elem);
+
+                    let param = value_ops::to_obj_param(
+                        &self.memory[push],
+                        self.get_span(func, ip),
+                        self,
+                        func.code,
+                    )?;
+
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Object(v, _) => {
+                            v.insert(*obj_key, param);
                         }
                         _ => unreachable!(),
                     }
@@ -855,7 +924,7 @@ impl<'a> Vm<'a> {
                     let id = Id::Arbitrary(self.next_id(*class));
                     let v = match class {
                         IDClass::Group => Value::Group(id),
-                        IDClass::Color => Value::Color(id),
+                        IDClass::Color => Value::Channel(id),
                         IDClass::Block => Value::Block(id),
                         IDClass::Item => Value::Item(id),
                     };

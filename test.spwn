@@ -1,7 +1,15 @@
-#[debug_bytecode]
 
-$.add(trigger {
-    1: 1,
-    X: 10,
-    
+
+
+
+sex = (a, b) {
+    -> return a;
+    -> return b;
+}
+
+$.add(obj {
+    OBJ_ID: 1,
+    X: sex(15, 15 + 2 * 30),
+    Y: sex(15, 15 + 1 * 30),
 })
+

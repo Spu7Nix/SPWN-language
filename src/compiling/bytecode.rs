@@ -11,7 +11,7 @@ use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 use super::compiler::CompileResult;
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
-use crate::parsing::ast::{ImportType, ObjectType, Spannable, Spanned};
+use crate::parsing::ast::{ImportType, ObjKeyType, ObjectType, Spannable, Spanned};
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
 use crate::vm::opcodes::{FunctionID, ImportID, Opcode, Register, UnoptOpcode, UnoptRegister};
@@ -507,7 +507,10 @@ impl<'a> FuncBuilder<'a> {
         typ: ObjectType,
     ) -> CompileResult<()>
     where
-        F: FnOnce(&mut FuncBuilder, &mut Vec<(Spanned<u8>, UnoptRegister)>) -> CompileResult<()>,
+        F: FnOnce(
+            &mut FuncBuilder,
+            &mut Vec<(Spanned<ObjKeyType>, UnoptRegister)>,
+        ) -> CompileResult<()>,
     {
         self.push_opcode_spanned(
             ProtoOpcode::Raw(match typ {
@@ -521,11 +524,21 @@ impl<'a> FuncBuilder<'a> {
         f(self, &mut items)?;
 
         for (k, r) in items {
-            self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushObjectElem {
-                elem: r,
-                obj_id: k.value,
-                dest,
-            }))
+            self.push_opcode_spanned(
+                match k.value {
+                    ObjKeyType::Name(k) => ProtoOpcode::Raw(UnoptOpcode::PushObjectElemKey {
+                        elem: r,
+                        obj_key: k,
+                        dest,
+                    }),
+                    ObjKeyType::Num(n) => ProtoOpcode::Raw(UnoptOpcode::PushObjectElemUnchecked {
+                        elem: r,
+                        obj_key: n,
+                        dest,
+                    }),
+                },
+                k.span,
+            )
         }
 
         Ok(())
@@ -1277,7 +1290,7 @@ impl Bytecode<Register> {
             println!(
                 "{}",
                 format!(
-                    "╭────┤ Function {} ├{}┬{}┬{}╮",
+                    "╭────┤ Function {} ├─────{}┬{}┬{}╮",
                     func_i,
                     "─".repeat(longest_formatted + max_num_width + 10),
                     "─".repeat(longest_span + 4),
@@ -1294,7 +1307,7 @@ impl Bytecode<Register> {
             println!(
                 "{}",
                 format!(
-                    "├──────────────────{}┴{}┴{}╯",
+                    "├───────────────────────{}┴{}┴{}╯",
                     "─".repeat(longest_formatted + max_num_width + 10),
                     "─".repeat(longest_span + 4),
                     // bytecode will never be more than 15 characters (2 spaces padding on either side, 2 hex chars + 1 space * 4)

@@ -7,10 +7,11 @@ use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
 use super::error::CompilerError;
-use crate::cli::FileSettings;
-use crate::gd::objects::{ObjectKeyValueType, OBJECT_KEYS};
+use crate::cli::Settings;
+use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
-    ExprNode, Expression, ImportType, MacroCode, ObjectKey, Spannable, Spanned, Statement, StmtNode,
+    ExprNode, Expression, ImportType, MacroCode, ObjKeyType, Spannable, Spanned, Statement,
+    StmtNode,
 };
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
@@ -53,7 +54,7 @@ pub struct Compiler<'a> {
 
     global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
 
-    file_attrs: &'a FileSettings,
+    settings: &'a Settings,
 
     pub map: &'a mut BytecodeMap,
 }
@@ -62,7 +63,7 @@ impl<'a> Compiler<'a> {
     pub fn new(
         interner: Rc<RefCell<Interner>>,
         src: SpwnSource,
-        file_attrs: &'a FileSettings,
+        settings: &'a Settings,
         map: &'a mut BytecodeMap,
     ) -> Self {
         Self {
@@ -70,7 +71,7 @@ impl<'a> Compiler<'a> {
             scopes: SlotMap::default(),
             src,
             global_return: None,
-            file_attrs,
+            settings,
             map,
         }
     }
@@ -380,13 +381,10 @@ impl<'a> Compiler<'a> {
 
         match parser.parse() {
             Ok(ast) => {
-                let mut file_settings = FileSettings::default();
-                file_settings.apply_attributes(&ast.file_attributes);
-
                 let mut compiler = Compiler::new(
                     Rc::clone(&self.interner),
                     parser.src,
-                    &file_settings,
+                    self.settings,
                     self.map,
                 );
 
@@ -395,7 +393,7 @@ impl<'a> Compiler<'a> {
                         let bytes = bincode::serialize(&bytecode).unwrap();
 
                         // dont write bytecode if caching is disabled
-                        if !self.file_attrs.no_bytecode_cache {
+                        if !self.settings.no_bytecode_cache {
                             let _ = std::fs::create_dir(import_base.join(".spwnc"));
                             std::fs::write(&spwnc_path, bytes).unwrap();
                         }
@@ -1076,19 +1074,10 @@ impl<'a> Compiler<'a> {
                     out_reg,
                     |builder, elems| {
                         for (key, expr) in items {
-                            let num = match key.value {
-                                // 😉
-                                ObjectKey::Name(n) => {
-                                    let (id, ..) = &OBJECT_KEYS[&self.resolve(&n)];
-                                    *id
-                                }
-                                ObjectKey::Num(n) => n,
-                            };
-
                             let value_reg =
                                 self.compile_expr(expr, scope, builder, ExprType::Normal)?;
 
-                            elems.push((num.spanned(key.span), value_reg));
+                            elems.push((*key, value_reg));
                         }
 
                         Ok(())
