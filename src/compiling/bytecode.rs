@@ -8,7 +8,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 
-use super::compiler::CompileResult;
+use super::compiler::{CompileResult, TypeDef, TypeKey};
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
 use crate::parsing::ast::{ImportType, ObjKeyType, ObjectType, Spannable, Spanned};
@@ -49,6 +49,8 @@ where
 
     pub export_names: Vec<String>,
     pub import_paths: Vec<Spanned<ImportType>>,
+
+    pub custom_types: SlotMap<TypeKey, Spanned<String>>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -58,6 +60,7 @@ pub enum Constant {
     String(String),
     Bool(bool),
     Id(IDClass, u16),
+    Type(TypeKey),
 }
 
 impl std::fmt::Debug for Constant {
@@ -68,12 +71,15 @@ impl std::fmt::Debug for Constant {
             Constant::Bool(v) => write!(f, "{v}"),
             Constant::String(v) => write!(f, "{v:?}"),
             Constant::Id(class, n) => write!(f, "{}{}", n, class.letter()),
+            Constant::Type(_) => write!(f, "@<type>"),
         }
     }
 }
 
-#[allow(unknown_lints)]
+// clippy moment
 #[allow(clippy::derived_hash_with_manual_eq)]
+#[allow(renamed_and_removed_lints)]
+#[allow(unknown_lints)]
 #[allow(clippy::derive_hash_xor_eq)]
 impl Hash for Constant {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -88,6 +94,7 @@ impl Hash for Constant {
                 v.hash(state);
                 c.hash(state);
             }
+            Constant::Type(v) => v.hash(state),
         }
     }
 }
@@ -181,6 +188,8 @@ pub struct BytecodeBuilder {
     funcs: Vec<ProtoFunc>,
 
     import_paths: Vec<Spanned<ImportType>>,
+
+    custom_types: SlotMap<TypeKey, Spanned<String>>,
 }
 
 pub struct FuncBuilder<'a> {
@@ -196,6 +205,7 @@ impl BytecodeBuilder {
             constants: UniqueRegister::new(),
             funcs: vec![],
             import_paths: vec![],
+            custom_types: SlotMap::default(),
         }
     }
 
@@ -355,6 +365,7 @@ impl BytecodeBuilder {
             opcode_span_map,
             export_names: global_returns, //todo
             import_paths: self.import_paths,
+            custom_types: self.custom_types,
         }
     }
 }
@@ -612,6 +623,11 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn load_bool(&mut self, value: bool, reg: UnoptRegister, span: CodeSpan) {
         let k = self.code_builder.constants.insert(Constant::Bool(value));
+        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+    }
+
+    pub fn load_type(&mut self, key: TypeKey, reg: UnoptRegister, span: CodeSpan) {
+        let k = self.code_builder.constants.insert(Constant::Type(key));
         self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
 
@@ -1135,6 +1151,10 @@ impl<'a> FuncBuilder<'a> {
     pub fn print(&mut self, reg: UnoptRegister) {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Print { reg }))
     }
+
+    pub fn create_type(&mut self, name: String, span: CodeSpan) -> TypeKey {
+        self.code_builder.custom_types.insert(name.spanned(span))
+    }
 }
 
 impl Bytecode<Register> {
@@ -1160,6 +1180,14 @@ impl Bytecode<Register> {
             self.import_paths
                 .iter()
                 .map(|p| &p.value)
+                .collect::<Vec<_>>()
+        );
+        println!(
+            "{}: {:?}\n",
+            "Custom types".bright_cyan().bold(),
+            self.custom_types
+                .iter()
+                .map(|(k, n)| format!("{:?}: @{}", k, &n.value))
                 .collect::<Vec<_>>()
         );
 

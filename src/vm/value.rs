@@ -10,6 +10,7 @@ use super::builtins::builtins::Builtin;
 use super::error::RuntimeError;
 use super::interpreter::{FuncCoord, ValueKey, Vm};
 use crate::compiling::bytecode::Constant;
+use crate::compiling::compiler::TypeKey;
 use crate::gd::gd_object::ObjParam;
 use crate::gd::ids::*;
 use crate::parsing::ast::{ObjKeyType, ObjectType};
@@ -104,7 +105,7 @@ pub enum Value {
     Empty,
     Macro(MacroCode),
 
-    TypeIndicator(usize),
+    TypeIndicator(TypeKey),
 
     TriggerFunction(Id),
 
@@ -139,6 +140,7 @@ impl Value {
                     IDClass::Item => Value::Item(id),
                 }
             }
+            Constant::Type(k) => Value::TypeIndicator(*k),
         }
     }
 
@@ -156,7 +158,7 @@ impl Value {
                     .join(", ")
             ),
             Value::Dict(d) => format!(
-                "{{{}}}",
+                "{{ {} }}",
                 d.iter()
                     .map(|(s, k)| format!(
                         "{}: {}",
@@ -192,7 +194,7 @@ impl Value {
             ),
             Value::Macro(MacroCode::Builtin(_)) => "<builtin fn>".to_string(),
             Value::TriggerFunction(_) => "!{{...}}".to_string(),
-            Value::TypeIndicator(_) => todo!(),
+            Value::TypeIndicator(t) => format!("@{}", vm.resolve(&vm.types[*t].value.name)),
             Value::Object(map, typ) => format!(
                 "{} {{ {} }}",
                 match typ {
@@ -200,7 +202,7 @@ impl Value {
                     ObjectType::Trigger => "trigger",
                 },
                 map.iter()
-                    .map(|(s, k)| format!("{}: {}", s, todo!()))
+                    .map(|(s, k)| format!("{s}: {k:?}"))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
@@ -209,13 +211,14 @@ impl Value {
     }
 
     pub fn invoke_static(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
-        match self {
-            Value::TypeIndicator(id) => match id {
-                0 => String::invoke_static(name, vm),
-                _ => todo!(),
-            },
-            _ => unreachable!(),
-        }
+        todo!();
+        // match self {
+        //     Value::TypeIndicator(id) => match id {
+        //         0 => String::invoke_static(name, vm),
+        //         _ => todo!(),
+        //     },
+        //     _ => unreachable!(),
+        // }
     }
 
     pub fn invoke_self(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {

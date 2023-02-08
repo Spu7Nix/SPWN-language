@@ -2,6 +2,7 @@ use std::io;
 use std::io::Write;
 use std::ops::Range;
 
+use colored::Colorize;
 use delve::{EnumDisplay, EnumFromStr};
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -98,7 +99,7 @@ pub fn println(values: Spread<Value>, vm: &Vm) {
             .iter()
             .map(|v| v.runtime_display(vm))
             .collect::<Vec<_>>()
-            .join(" ")
+            .join(" "),
     )
 }
 

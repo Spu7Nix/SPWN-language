@@ -105,6 +105,30 @@ error_maker! {
 
         /////
         #[
+            Message: "Type definition outside global scope", Note: None;
+            Labels: [
+                area => "Type definitions can only be used on the top level";
+            ]
+        ]
+        TypeDefNotGlobal {
+            area: CodeArea,
+        },
+
+        /////
+        #[
+            Message: "Duplicate type definition", Note: None;
+            Labels: [
+                area => "Duplicate type defined here";
+                prev_area => "Previously defined here";
+            ]
+        ]
+        DuplicateTypeDef {
+            area: CodeArea,
+            prev_area: CodeArea,
+        },
+
+        /////
+        #[
             Message: "Import could not be resolved", Note: None;
             Labels: [
                 area => "{} `{}` could not be found": => (if *is_module { "Module" } else { "Library" }), name;

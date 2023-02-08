@@ -15,28 +15,27 @@ mod vm;
 
 use std::cell::RefCell;
 use std::error::Error;
+use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::Stdio;
 use std::rc::Rc;
-use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
-use std::{fs, thread};
 
 use clap::Parser as _;
 use cli::Settings;
 use colored::Colorize;
 use gd::gd_object::GdObject;
-use indicatif::{ProgressBar, ProgressStyle};
 use lasso::Rodeo;
+use slotmap::SecondaryMap;
 use spinoff::spinners::SpinnerFrames;
 use spinoff::{Spinner as SSpinner, *};
 
 use crate::cli::{Arguments, Command};
-use crate::compiling::compiler::Compiler;
+use crate::compiling::compiler::{Compiler, TypeDefMap};
 use crate::gd::{gd_object, levelstring};
+use crate::parsing::ast::Spannable;
 use crate::parsing::parser::Parser;
 use crate::sources::{BytecodeMap, SpwnSource};
-use crate::util::RandomState;
+use crate::util::{HexColorize, RandomState};
 use crate::vm::interpreter::{FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
 
@@ -47,10 +46,7 @@ struct Spinner {
 impl Spinner {
     pub fn new() -> Self {
         Self {
-            frames: spinner!(
-                ["[⠋]", "[⠙]", "[⠸]", "[⢰]", "[⣠]", "[⣄]", "[⡆]", "[⠇]"],
-                100
-            ),
+            frames: spinner!(["◜ ", "◠ ", "◝ ", "◞ ", "◡ ", "◟ "], 50),
             spinner: None,
         }
     }
@@ -75,14 +71,19 @@ impl Spinner {
         let (spinner, curr_msg) = self.spinner.take().unwrap();
 
         spinner.stop_with_message(&format!(
-            "{} {:>20}",
+            "{} ✅",
             &(if let Some(m) = msg { m } else { curr_msg }),
-            "(Successful)".bright_green().bold()
         ));
     }
 }
 
+const READING_COLOR: u32 = 0x7F94FF;
+const PARSING_COLOR: u32 = 0x59C7FF;
+const COMPILING_COLOR: u32 = 0xFFC759;
+const RUNNING_COLOR: u32 = 0xFF59C7;
+
 fn main() -> Result<(), Box<dyn Error>> {
+    // println!("{:?}", format!("{}⠋{}", "[".dimmed(), "]".dimmed()));
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
 
     let args = Arguments::parse();
@@ -91,6 +92,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     if args.no_color {
         std::env::set_var("NO_COLOR", "true");
     }
+
+    println!();
 
     match args.command {
         Command::Build { file, settings } => {
@@ -121,8 +124,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let level_string = if !settings.no_level {
                 if let Some(gd_path) = &gd_path {
                     spinner.start(format!(
-                        "📖  {:20}",
-                        "Reading savefile...".bright_cyan().bold()
+                        "{:20}",
+                        "Reading savefile...".color_hex(READING_COLOR).bold()
                     ));
 
                     let mut file = fs::File::open(gd_path)?;
@@ -177,7 +180,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 id_counters,
             } = run_spwn(file, &settings, &mut spinner)?;
 
-            println!("\n{} objects added", objects.len());
+            println!(
+                "\n{} objects added",
+                objects.len().to_string().bright_white().bold()
+            );
 
             let (new_ls, used_ids) = gd_object::append_objects(objects, &level_string)?;
 
@@ -188,7 +194,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "{}",
                     &format!(
                         "{} {}",
-                        len,
+                        len.to_string().bright_white().bold(),
                         ["groups", "channels", "block IDs", "item IDs"][i]
                     ),
                 );
@@ -216,7 +222,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     );
                 }
 
-                None => println!("Output: {new_ls}",),
+                None => println!("\nOutput: {new_ls}",),
             };
         }
     };
@@ -249,20 +255,32 @@ fn run_spwn(
         }
     };
 
-    spinner.start(format!("🤖  {:20}", "Parsing...".bright_blue().bold()));
+    spinner.start(format!(
+        "{:20}",
+        "Parsing...".color_hex(PARSING_COLOR).bold()
+    ));
 
     let mut parser = Parser::new(&code, src, Rc::clone(&interner));
-    // [\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]
+
     match parser.parse() {
         Ok(ast) => {
             spinner.complete(None);
 
-            spinner.start(format!("🛠️  {:20}", "Compiling...".bright_yellow().bold()));
+            spinner.start(format!(
+                "{:20}",
+                "Compiling...".color_hex(COMPILING_COLOR).bold()
+            ));
 
             let mut map = BytecodeMap::default();
+            let mut typedefs = TypeDefMap::default();
 
-            let mut compiler =
-                Compiler::new(Rc::clone(&interner), parser.src.clone(), settings, &mut map);
+            let mut compiler = Compiler::new(
+                Rc::clone(&interner),
+                parser.src.clone(),
+                settings,
+                &mut map,
+                &mut typedefs,
+            );
 
             match compiler.compile(ast.statements) {
                 Ok(_) => (),
@@ -275,15 +293,32 @@ fn run_spwn(
             }
 
             spinner.complete(None);
+            println!("{:#?}", compiler.type_defs.def_map);
+
+            let mut types = SecondaryMap::new();
+            for (info, k) in &compiler.type_defs.def_map {
+                types.insert(k.value, info.clone().spanned(k.span));
+            }
 
             if settings.debug_bytecode {
                 for (k, b) in &map.map {
                     b.debug_str(k)
                 }
             }
-            spinner.start(format!("🏁  {:20}", "Executing...".bright_purple().bold()));
 
-            let mut vm = Vm::new(&map, interner);
+            // spinner.start(format!(
+            //     "{:20}",
+            //     "Building...".color_hex(RUNNING_COLOR).bold()
+            // ));
+
+            println!(
+                "\n{}",
+                "════╡ Output ╞══════════════════════"
+                    .bright_yellow()
+                    .bold(),
+            );
+
+            let mut vm = Vm::new(&map, interner, types);
 
             let key = vm.src_map[&parser.src];
             let start = FuncCoord::new(0, key);
@@ -292,7 +327,14 @@ fn run_spwn(
 
             match vm.run_program() {
                 Ok(_) => Ok({
-                    spinner.complete(None);
+                    println!(
+                        "\n{}",
+                        "════════════════════════════════════"
+                            .bright_yellow()
+                            .bold()
+                    );
+
+                    //spinner.complete(None);
 
                     SpwnOutput {
                         objects: vm.objects,
@@ -301,7 +343,14 @@ fn run_spwn(
                     }
                 }),
                 Err(err) => {
-                    spinner.fail(None);
+                    println!(
+                        "\n{}",
+                        "════════════════════════════════════"
+                            .bright_yellow()
+                            .bold()
+                    );
+
+                    //spinner.fail(None);
 
                     err.to_report().display();
                     std::process::exit(1);

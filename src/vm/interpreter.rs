@@ -5,7 +5,7 @@ use std::str::FromStr;
 use ahash::AHashMap;
 use colored::Colorize;
 use lasso::Spur;
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use super::context::{CallKey, CallStackItem, FullContext};
 use super::error::RuntimeError;
@@ -13,9 +13,11 @@ use super::opcodes::{Opcode, Register};
 use super::value::{ArgData, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
+use crate::compiling::compiler::{TypeDef, TypeKey};
 use crate::gd::gd_object::GdObject;
 use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::ObjectKeyValueType;
+use crate::parsing::ast::Spanned;
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 use crate::vm::builtins::builtin_utils::BuiltinType;
@@ -54,10 +56,16 @@ pub struct Vm<'a> {
     pub contexts: FullContext,
     pub objects: Vec<GdObject>,
     pub triggers: Vec<GdObject>,
+
+    pub types: SecondaryMap<TypeKey, Spanned<TypeDef>>,
 }
 
 impl<'a> Vm<'a> {
-    pub fn new(bytecode_map: &'a BytecodeMap, interner: Rc<RefCell<Interner>>) -> Vm<'a> {
+    pub fn new(
+        bytecode_map: &'a BytecodeMap,
+        interner: Rc<RefCell<Interner>>,
+        types: SecondaryMap<TypeKey, Spanned<TypeDef>>,
+    ) -> Vm<'a> {
         let mut programs = SlotMap::default();
         let mut src_map = AHashMap::new();
 
@@ -75,6 +83,7 @@ impl<'a> Vm<'a> {
             src_map,
             objects: Vec::new(),
             triggers: Vec::new(),
+            types,
         }
     }
 

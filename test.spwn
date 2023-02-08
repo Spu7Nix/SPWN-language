@@ -1,7 +1,8 @@
 
+type @sfeefuh
 
+// $.print(@sfeefuh)
 
+let w = import "test2.spwn"
 
-while true {
-    "g"
-}
+$.println(w)

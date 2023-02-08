@@ -1,8 +1,10 @@
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use ahash::AHashMap;
 use lasso::Spur;
+use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
@@ -23,6 +25,7 @@ pub type CompileResult<T> = Result<T, CompilerError>;
 
 new_key_type! {
     pub struct ScopeKey;
+    pub struct TypeKey;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -47,6 +50,17 @@ pub struct Scope {
     typ: Option<ScopeType>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TypeDef {
+    pub def_src: SpwnSource,
+    pub name: Spur,
+}
+
+#[derive(Default)]
+pub struct TypeDefMap {
+    pub def_map: AHashMap<TypeDef, Spanned<TypeKey>>,
+}
+
 pub struct Compiler<'a> {
     interner: Rc<RefCell<Interner>>,
     scopes: SlotMap<ScopeKey, Scope>,
@@ -57,6 +71,8 @@ pub struct Compiler<'a> {
     settings: &'a Settings,
 
     pub map: &'a mut BytecodeMap,
+
+    pub type_defs: &'a mut TypeDefMap,
 }
 
 impl<'a> Compiler<'a> {
@@ -65,6 +81,7 @@ impl<'a> Compiler<'a> {
         src: SpwnSource,
         settings: &'a Settings,
         map: &'a mut BytecodeMap,
+        type_defs: &'a mut TypeDefMap,
     ) -> Self {
         Self {
             interner,
@@ -73,6 +90,7 @@ impl<'a> Compiler<'a> {
             global_return: None,
             settings,
             map,
+            type_defs,
         }
     }
 
@@ -85,6 +103,10 @@ impl<'a> Compiler<'a> {
 
     fn resolve(&self, spur: &Spur) -> String {
         self.interner.borrow().resolve(spur).to_string()
+    }
+
+    fn intern(&self, s: &str) -> Spur {
+        self.interner.borrow_mut().get_or_intern(s)
     }
 
     pub fn get_var(&self, var: Spur, scope: ScopeKey) -> Option<Variable> {
@@ -311,6 +333,7 @@ impl<'a> Compiler<'a> {
             self.src.clone(),
             Bytecode {
                 import_paths: unopt_code.import_paths,
+                custom_types: unopt_code.custom_types,
                 source_hash: unopt_code.source_hash,
                 consts: unopt_code.consts,
                 functions,
@@ -356,9 +379,9 @@ impl<'a> Compiler<'a> {
 
         'from_cache: {
             if spwnc_path.is_file() {
-                let source = std::fs::read(&spwnc_path).unwrap();
+                let source_bytes = std::fs::read(&spwnc_path).unwrap();
 
-                let bytecode: Bytecode<Register> = match bincode::deserialize(&source) {
+                let bytecode: Bytecode<Register> = match bincode::deserialize(&source_bytes) {
                     Ok(b) => b,
                     Err(_) => {
                         break 'from_cache;
@@ -368,6 +391,15 @@ impl<'a> Compiler<'a> {
                 if bytecode.source_hash == hash.into() {
                     for import in &bytecode.import_paths {
                         self.compile_import(&import.value, import.span, import_src.clone())?;
+                    }
+                    for (k, name) in &bytecode.custom_types {
+                        self.type_defs.def_map.insert(
+                            TypeDef {
+                                def_src: import_src.clone(),
+                                name: self.intern(&name.value),
+                            },
+                            k.spanned(name.span),
+                        );
                     }
 
                     self.map.map.insert(import_src, bytecode);
@@ -386,6 +418,7 @@ impl<'a> Compiler<'a> {
                     parser.src,
                     self.settings,
                     self.map,
+                    self.type_defs,
                 );
 
                 match compiler.compile(ast.statements) {
@@ -690,7 +723,29 @@ impl<'a> Compiler<'a> {
                     });
                 }
             }
-            Statement::TypeDef(_) => todo!(),
+            Statement::TypeDef(t) => {
+                if !matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
+                    return Err(CompilerError::TypeDefNotGlobal {
+                        area: self.make_area(stmt.span),
+                    });
+                }
+
+                let info = TypeDef {
+                    def_src: self.src.clone(),
+                    name: *t,
+                };
+
+                if self.type_defs.def_map.contains_key(&info) {
+                    // return Err(CompilerError::DuplicateTypeDef {
+                    //     area: self.make_area(stmt.span),
+                    //     prev_area: self.make_area(self.type_defs.type_map[&t].span),
+                    // });
+                }
+
+                let k = builder.create_type(self.resolve(t), stmt.span);
+
+                self.type_defs.def_map.insert(info, k.spanned(stmt.span));
+            }
             Statement::Impl { typ, items } => todo!(),
             Statement::ExtractImport(_) => todo!(),
             Statement::Print(v) => {
@@ -806,7 +861,15 @@ impl<'a> Compiler<'a> {
                     })
                 }
             },
-            Expression::Type(_) => todo!(),
+            Expression::Type(t) => {
+                match self.type_defs.def_map.get(&TypeDef {
+                    def_src: self.src.clone(),
+                    name: *t,
+                }) {
+                    Some(k) => builder.load_type(k.value, out_reg, expr.span),
+                    None => todo!(),
+                }
+            }
             Expression::Array(items) => {
                 builder.new_array(
                     items.len() as u16,

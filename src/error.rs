@@ -3,6 +3,7 @@ use std::io::Write;
 use ariadne::{sources, Config, Label, Report, ReportKind};
 
 use crate::sources::CodeArea;
+use crate::util::hsv_to_rgb;
 use crate::vm::context::CallStackItem;
 
 #[derive(Debug)]
@@ -121,31 +122,11 @@ impl RainbowColorGenerator {
     }
 
     pub fn next(&mut self) -> (u8, u8, u8) {
-        let c = self.v * self.s;
         let h0 = self.h / 60.0;
-
-        let x = c * (1.0 - (h0.rem_euclid(2.0) - 1.0).abs());
-
-        let (r, g, b) = if (0.0..1.0).contains(&h0) {
-            (c, x, 0.0)
-        } else if (1.0..2.0).contains(&h0) {
-            (x, c, 0.0)
-        } else if (2.0..3.0).contains(&h0) {
-            (0.0, c, x)
-        } else if (3.0..4.0).contains(&h0) {
-            (0.0, x, c)
-        } else if (4.0..5.0).contains(&h0) {
-            (x, 0.0, c)
-        } else {
-            (c, 0.0, x)
-        };
-
-        let m = self.v - c;
-        let (r, g, b) = (r + m, g + m, b + m);
 
         self.h = (self.h + self.hue_shift).rem_euclid(360.0);
 
-        ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+        hsv_to_rgb(h0, self.s, self.v)
     }
 }
 
