@@ -49,4 +49,7 @@ pub struct Settings {
 
     #[arg(short = 'y', long)]
     pub no_optimize_bytecode: bool,
+
+    #[arg(short = 'f', long)]
+    pub save_file: Option<PathBuf>,
 }

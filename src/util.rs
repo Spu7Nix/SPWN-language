@@ -5,16 +5,25 @@ use colored::{ColoredString, Colorize};
 use serde::{Deserialize, Serialize};
 
 pub fn hyperlink<T: ToString, U: ToString>(url: T, text: Option<U>) -> String {
-    let text = match text {
+    let mtext = match &text {
         Some(t) => t.to_string(),
         None => url.to_string(),
     };
 
-    format!("\x1B]8;;{}\x1B\\{}\x1B]8;;\x1B\\", url.to_string(), text)
-        .blue()
-        .underline()
-        .bold()
-        .to_string()
+    match std::env::var("NO_COLOR").ok() {
+        Some(_) => {
+            if text.is_some() {
+                format!("[{}]({mtext})", url.to_string())
+            } else {
+                url.to_string()
+            }
+        }
+        None => format!("\x1B]8;;{}\x1B\\{}\x1B]8;;\x1B\\", url.to_string(), mtext)
+            .blue()
+            .underline()
+            .bold()
+            .to_string(),
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -76,5 +85,15 @@ impl<T: Colorize> HexColorize for T {
     fn on_color_hex(self, c: u32) -> ColoredString {
         let (r, g, b) = hex_to_rgb(c);
         self.on_truecolor(r, g, b)
+    }
+}
+
+#[derive(Debug)]
+pub struct BasicError(pub(crate) String);
+impl std::error::Error for BasicError {}
+
+impl std::fmt::Display for BasicError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

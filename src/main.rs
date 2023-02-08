@@ -35,7 +35,7 @@ use crate::gd::{gd_object, levelstring};
 use crate::parsing::ast::Spannable;
 use crate::parsing::parser::Parser;
 use crate::sources::{BytecodeMap, SpwnSource};
-use crate::util::{HexColorize, RandomState};
+use crate::util::{BasicError, HexColorize, RandomState};
 use crate::vm::interpreter::{FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
 
@@ -57,11 +57,7 @@ impl Spinner {
 
     pub fn fail(&mut self, msg: Option<String>) {
         let (spinner, curr_msg) = self.spinner.take().unwrap();
-        spinner.stop_with_message(&format!(
-            "{} {:>20}",
-            curr_msg,
-            "(Failed)".bright_red().bold()
-        ));
+        spinner.stop_with_message(&format!("{curr_msg} ❌",));
         if let Some(m) = msg {
             eprintln!("{m}");
         }
@@ -70,10 +66,13 @@ impl Spinner {
     pub fn complete(&mut self, msg: Option<String>) {
         let (spinner, curr_msg) = self.spinner.take().unwrap();
 
-        spinner.stop_with_message(&format!(
-            "{} ✅",
-            &(if let Some(m) = msg { m } else { curr_msg }),
-        ));
+        if let Some(m) = msg {
+            spinner.stop_with_message(&format!("{curr_msg} ✅",));
+            println!("{m}");
+        } else {
+            spinner.clear();
+            println!("{curr_msg} ✅")
+        }
     }
 }
 
@@ -83,7 +82,6 @@ const COMPILING_COLOR: u32 = 0xFFC759;
 const RUNNING_COLOR: u32 = 0xFF59C7;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // println!("{:?}", format!("{}⠋{}", "[".dimmed(), "]".dimmed()));
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
 
     let args = Arguments::parse();
@@ -93,35 +91,30 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::env::set_var("NO_COLOR", "true");
     }
 
-    println!();
-
     match args.command {
         Command::Build { file, settings } => {
             let gd_path = if !settings.no_level {
-                Some(
-                    // if save_file != None {
-                    //     PathBuf::from(save_file.expect("what"))
-                    // } else
-                    if cfg!(target_os = "windows") {
-                        PathBuf::from(std::env::var("localappdata").expect("No local app data"))
-                            .join("GeometryDash/CCLocalLevels.dat")
-                    } else if cfg!(target_os = "macos") {
-                        PathBuf::from(std::env::var("HOME").expect("No home directory"))
-                            .join("Library/Application Support/GeometryDash/CCLocalLevels.dat")
-                    } else if cfg!(target_os = "linux") {
-                        PathBuf::from(std::env::var("HOME").expect("No home directory"))
+                Some(if let Some(ref sf) = settings.save_file {
+                    sf.clone()
+                } else if cfg!(target_os = "windows") {
+                    PathBuf::from(std::env::var("localappdata").expect("No local app data"))
+                        .join("GeometryDash/CCLocalLevels.dat")
+                } else if cfg!(target_os = "macos") {
+                    PathBuf::from(std::env::var("HOME").expect("No home directory"))
+                        .join("Library/Application Support/GeometryDash/CCLocalLevels.dat")
+                } else if cfg!(target_os = "linux") {
+                    PathBuf::from(std::env::var("HOME").expect("No home directory"))
                         .join(".steam/steam/steamapps/compatdata/322170/pfx/drive_c/users/steamuser/Local Settings/Application Data/GeometryDash/CCLocalLevels.dat")
-                    } else if cfg!(target_os = "android") {
-                        PathBuf::from("/data/data/com.robtopx.geometryjump/CCLocalLevels.dat")
-                    } else {
-                        panic!("Unsupported operating system");
-                    },
-                )
+                } else if cfg!(target_os = "android") {
+                    PathBuf::from("/data/data/com.robtopx.geometryjump/CCLocalLevels.dat")
+                } else {
+                    panic!("Unsupported operating system");
+                })
             } else {
                 None
             };
 
-            let level_string = if !settings.no_level {
+            let (level_string, level_name) = if !settings.no_level {
                 if let Some(gd_path) = &gd_path {
                     spinner.start(format!(
                         "{:20}",
@@ -144,7 +137,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         }
                     }
 
-                    let mut level_string = match levelstring::get_level_string(
+                    let (mut level_string, level_name) = match levelstring::get_level_string(
                         file_content,
                         settings.level_name.as_ref(),
                     ) {
@@ -166,19 +159,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                     gd_object::remove_spwn_objects(&mut level_string);
 
-                    level_string
+                    (level_string, level_name)
                 } else {
-                    String::new()
+                    (String::new(), String::new())
                 }
             } else {
-                String::new()
+                (String::new(), String::new())
             };
 
             let SpwnOutput {
                 objects,
                 triggers,
                 id_counters,
-            } = run_spwn(file, &settings, &mut spinner)?;
+            } = match run_spwn(file, &settings, &mut spinner) {
+                Ok(o) => o,
+                Err(e) => {
+                    spinner.fail(Some(format!("❌  {e}")));
+
+                    std::process::exit(1);
+                }
+            };
 
             println!(
                 "\n{} objects added",
@@ -200,12 +200,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 );
             }
 
+            println!();
+
             match gd_path {
                 Some(gd_path) => {
-                    println!(
-                        "\n📝  {:20}",
-                        "Writing back to savefile...".bright_cyan().bold()
-                    );
+                    spinner.start(format!(
+                        r#"{} "{}" {:20}"#,
+                        "Writing back to".bright_cyan().bold(),
+                        level_name.bright_white().bold(),
+                        "..."
+                    ));
 
                     levelstring::encrypt_level_string(
                         new_ls,
@@ -214,12 +218,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                         settings.level_name,
                     )?;
 
-                    println!(
+                    spinner.complete(Some(format!(
                         "\n👍  {}  🙂",
                         "Written to save. You can now open Geometry Dash again!"
                             .bright_green()
                             .bold(),
-                    );
+                    )));
                 }
 
                 None => println!("\nOutput: {new_ls}",),
@@ -243,125 +247,85 @@ fn run_spwn(
 ) -> Result<SpwnOutput, Box<dyn Error>> {
     let interner = Rc::new(RefCell::new(Rodeo::with_hasher(RandomState::new())));
 
-    let src = SpwnSource::File(file);
-    let code = match src.read() {
-        Some(c) => c,
-        None => {
-            spinner.fail(Some(format!(
-                "❌  {}",
-                "Error reading SPWN file".bright_red().bold()
-            )));
-            std::process::exit(1);
-        }
-    };
-
     spinner.start(format!(
         "{:20}",
         "Parsing...".color_hex(PARSING_COLOR).bold()
     ));
 
+    let src = SpwnSource::File(file);
+    let code = src
+        .read()
+        .ok_or(BasicError("Failed to read SPWN file".into()))?;
+
     let mut parser = Parser::new(&code, src, Rc::clone(&interner));
 
-    match parser.parse() {
-        Ok(ast) => {
-            spinner.complete(None);
+    let ast = parser.parse()?;
 
-            spinner.start(format!(
-                "{:20}",
-                "Compiling...".color_hex(COMPILING_COLOR).bold()
-            ));
+    spinner.complete(None);
 
-            let mut map = BytecodeMap::default();
-            let mut typedefs = TypeDefMap::default();
+    spinner.start(format!(
+        "{:20}",
+        "Compiling...".color_hex(COMPILING_COLOR).bold()
+    ));
 
-            let mut compiler = Compiler::new(
-                Rc::clone(&interner),
-                parser.src.clone(),
-                settings,
-                &mut map,
-                &mut typedefs,
-            );
+    let mut map = BytecodeMap::default();
+    let mut typedefs = TypeDefMap::default();
 
-            match compiler.compile(ast.statements) {
-                Ok(_) => (),
-                Err(err) => {
-                    spinner.fail(None);
-                    err.to_report().display();
+    let mut compiler = Compiler::new(
+        Rc::clone(&interner),
+        parser.src.clone(),
+        settings,
+        &mut map,
+        &mut typedefs,
+    );
 
-                    std::process::exit(1);
-                }
-            }
+    compiler.compile(ast.statements)?;
 
-            spinner.complete(None);
-            println!("{:#?}", compiler.type_defs.def_map);
+    let mut types = SecondaryMap::new();
 
-            let mut types = SecondaryMap::new();
-            for (info, k) in &compiler.type_defs.def_map {
-                types.insert(k.value, info.clone().spanned(k.span));
-            }
+    for (info, k) in &compiler.type_defs.def_map {
+        types.insert(k.value, info.clone().spanned(k.span));
+    }
 
-            if settings.debug_bytecode {
-                for (k, b) in &map.map {
-                    b.debug_str(k)
-                }
-            }
-
-            // spinner.start(format!(
-            //     "{:20}",
-            //     "Building...".color_hex(RUNNING_COLOR).bold()
-            // ));
-
-            println!(
-                "\n{}",
-                "════╡ Output ╞══════════════════════"
-                    .bright_yellow()
-                    .bold(),
-            );
-
-            let mut vm = Vm::new(&map, interner, types);
-
-            let key = vm.src_map[&parser.src];
-            let start = FuncCoord::new(0, key);
-
-            vm.push_call_stack(start, 0, false, None);
-
-            match vm.run_program() {
-                Ok(_) => Ok({
-                    println!(
-                        "\n{}",
-                        "════════════════════════════════════"
-                            .bright_yellow()
-                            .bold()
-                    );
-
-                    //spinner.complete(None);
-
-                    SpwnOutput {
-                        objects: vm.objects,
-                        triggers: vm.triggers,
-                        id_counters: vm.id_counters,
-                    }
-                }),
-                Err(err) => {
-                    println!(
-                        "\n{}",
-                        "════════════════════════════════════"
-                            .bright_yellow()
-                            .bold()
-                    );
-
-                    //spinner.fail(None);
-
-                    err.to_report().display();
-                    std::process::exit(1);
-                }
-            }
-        }
-        Err(err) => {
-            spinner.fail(None);
-
-            err.to_report().display();
-            std::process::exit(1);
+    if settings.debug_bytecode {
+        for (k, b) in &map.map {
+            b.debug_str(k)
         }
     }
+
+    spinner.complete(None);
+
+    let mut vm = Vm::new(&map, interner, types);
+
+    let key = vm.src_map[&parser.src];
+    let start = FuncCoord::new(0, key);
+
+    vm.push_call_stack(start, 0, false, None);
+
+    // spinner.start(format!(
+    //     "{:20}",
+    //     "Building...".color_hex(RUNNING_COLOR).bold()
+    // ));
+
+    println!(
+        "\n{}",
+        "════╡ Output ╞══════════════════════"
+            .bright_yellow()
+            .bold(),
+    );
+
+    vm.run_program()?;
+
+    println!(
+        "\n{}",
+        "════════════════════════════════════"
+            .bright_yellow()
+            .bold()
+    );
+
+    Ok(SpwnOutput {
+        objects: vm.objects,
+        triggers: vm.triggers,
+        id_counters: vm.id_counters,
+    })
 }
