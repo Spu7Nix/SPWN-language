@@ -5,23 +5,3 @@ type @cockc
 return {
     a: 3,
 }
-
-
-// // indexing
-// impl @mfloat {
-//     CONSTS: {
-        
-//     },
-//     precomputed: @type_indicator
-// }
-
-// impl @mfloat::consts {
-//     inf :   [0] + [1] * 8 + [0] * 23,
-//     ninf:   [1] + [1] * 8 + [0] * 23,
-//     NaN :   [0] + [1] * 8 + [1] * 23 // NaN can have any significand, this is just the default
-// }
-
-
-// impl @mfloat {
-//     pow2:   [2 ** i for i in ..8]
-// }

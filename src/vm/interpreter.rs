@@ -13,15 +13,15 @@ use super::opcodes::{Opcode, Register};
 use super::value::{ArgData, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
-use crate::compiling::compiler::{TypeDef, TypeKey};
+use crate::compiling::compiler::{CustomTypeKey, TypeDef};
 use crate::gd::gd_object::GdObject;
 use crate::gd::ids::{IDClass, Id};
 use crate::gd::object_keys::ObjectKeyValueType;
-use crate::parsing::ast::Spanned;
+use crate::parsing::ast::{Spannable, Spanned};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
+use crate::vm::builtins::builtin_funcs::Builtin;
 use crate::vm::builtins::builtin_utils::BuiltinType;
-use crate::vm::builtins::builtins::Builtin;
 use crate::vm::value::MacroCode;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
@@ -46,7 +46,7 @@ pub struct Vm<'a> {
     // 256 registers per function
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    pub programs: SlotMap<BytecodeKey, (SpwnSource, &'a Bytecode<Register>)>,
+    pub programs: SlotMap<BytecodeKey, (SpwnSource, &'a Bytecode<Register>, Vec<CustomTypeKey>)>,
     pub src_map: AHashMap<SpwnSource, BytecodeKey>,
 
     pub interner: Rc<RefCell<Interner>>,
@@ -57,21 +57,43 @@ pub struct Vm<'a> {
     pub objects: Vec<GdObject>,
     pub triggers: Vec<GdObject>,
 
-    pub types: SecondaryMap<TypeKey, Spanned<TypeDef>>,
+    pub types: SecondaryMap<CustomTypeKey, Spanned<TypeDef>>,
 }
 
 impl<'a> Vm<'a> {
     pub fn new(
         bytecode_map: &'a BytecodeMap,
         interner: Rc<RefCell<Interner>>,
-        types: SecondaryMap<TypeKey, Spanned<TypeDef>>,
+        type_defs: AHashMap<TypeDef, Spanned<CustomTypeKey>>,
     ) -> Vm<'a> {
         let mut programs = SlotMap::default();
         let mut src_map = AHashMap::new();
 
+        let mut type_src_map: AHashMap<_, Vec<CustomTypeKey>> = AHashMap::new();
+
+        for (TypeDef { def_src, .. }, k) in &type_defs {
+            // println!("alala {} {:?}", def_src.name(), k.value);
+            type_src_map
+                .entry(def_src)
+                .and_modify(|v| v.push(k.value))
+                .or_insert(vec![k.value]);
+        }
+
+        // println!("{:?}", type_src_map);
+
         for (src, bytecode) in &bytecode_map.map {
-            let k = programs.insert((src.clone(), bytecode));
+            let k = programs.insert((
+                src.clone(),
+                bytecode,
+                type_src_map.remove(src).unwrap_or(vec![]),
+            ));
             src_map.insert(src.clone(), k);
+        }
+
+        let mut types = SecondaryMap::new();
+
+        for (info, k) in type_defs {
+            types.insert(k.value, info.clone().spanned(k.span));
         }
 
         Self {
@@ -89,6 +111,10 @@ impl<'a> Vm<'a> {
 
     pub fn resolve(&self, spur: &Spur) -> String {
         self.interner.borrow().resolve(spur).to_string()
+    }
+
+    fn intern(&self, s: &str) -> Spur {
+        self.interner.borrow_mut().get_or_intern(s)
     }
 
     pub fn deep_clone_key(&mut self, k: ValueKey) -> StoredValue {
@@ -135,7 +161,7 @@ impl<'a> Vm<'a> {
         &mut self.memory[self.contexts.current_mut().registers.last().unwrap()[reg as usize]]
     }
 
-    // please only use for "mutating" something, otherwise context fuckery
+    /// please only use for "mutating" something, otherwise context fuckery
     pub fn set_reg(&mut self, reg: Register, v: StoredValue) {
         self.memory[self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize]] = v
     }
@@ -220,7 +246,7 @@ impl<'a> Vm<'a> {
         } else {
             StoredValue {
                 value: Value::Empty,
-                area: item.call_area.or(Some(CodeArea::internal())).unwrap(),
+                area: item.call_area.unwrap_or(CodeArea::internal()),
             }
         };
 
@@ -533,8 +559,21 @@ impl<'a> Vm<'a> {
                         continue;
                     }
                 }
-                Opcode::Ret { src } => {
-                    let ret_val = self.deep_clone_reg(*src);
+                Opcode::Ret { src, module_ret } => {
+                    let mut ret_val = self.deep_clone_reg(*src);
+
+                    if *module_ret {
+                        match ret_val.value {
+                            Value::Dict(d) => {
+                                ret_val.value = Value::Module {
+                                    exports: d,
+                                    types: self.programs[func.code].2.clone(),
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+
                     let Some(call_key) = self.return_and_pop_current(Some(ret_val)) else { continue };
                     self.contexts.have_not_returned.remove(call_key);
                     continue;
@@ -566,6 +605,16 @@ impl<'a> Vm<'a> {
                         *dest,
                         StoredValue {
                             value: Value::Empty,
+                            area: self.make_area(span, func.code),
+                        },
+                    )
+                }
+                Opcode::LoadEmptyDict { dest } => {
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Dict(AHashMap::new()),
                             area: self.make_area(span, func.code),
                         },
                     )
@@ -641,75 +690,102 @@ impl<'a> Vm<'a> {
                     };
                     let span = self.get_span(func, ip);
 
+                    let value = &self.get_reg(*from).value;
                     let key = &key[..];
 
-                    let ret_value = match key {
-                        "type" => todo!(),
-                        _ => {
-                            let value = &self.get_reg(*from).value as *const Value;
-                            // SAFETY:
-                            // - `value` will never be modified as A) we dont need to and B) `invoke_self` takes an immutable reference
-                            // - `vm.memory` will not be modified when getting the member
-                            unsafe { value.as_ref().unwrap().invoke_self(key, self)? }
+                    let special = match (value, key) {
+                        (Value::String(s), "length") => Some(Value::Int(s.len() as i64)),
+
+                        (Value::Range(start, ..), "start") => Some(Value::Int(*start)),
+                        (Value::Range(_, end, _), "end") => Some(Value::Int(*end)),
+                        (Value::Range(_, _, step), "step") => Some(Value::Int(*step as i64)),
+
+                        (Value::Array(v), "length") => Some(Value::Int(v.len() as i64)),
+                        (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
+
+                        (Value::Builtins, _) => {
+                            let b = Builtin::from_str(key).unwrap();
+
+                            Some(Value::Macro(MacroCode::Builtin(Rc::new(
+                                move |args, vm, area| b.call(args, vm, area),
+                            ))))
                         }
+                        _ => None,
                     };
 
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value: ret_value,
-                            area: self.make_area(span, func.code),
-                        },
-                    );
+                    macro_rules! error {
+                        () => {
+                            return Err(RuntimeError::NonexistentMember {
+                                area: self.make_area(span, func.code),
+                                member: key.into(),
+                                base_type: value.get_type(),
+                                call_stack: self.get_call_stack(),
+                            })
+                        };
+                    }
 
-                    // let special = match (value, &key[..]) {
-                    //     (Value::String(s), "length") => Some(Value::Int(s.chars().count() as i64)),
+                    if let Some(v) = special {
+                        self.set_reg(
+                            *dest,
+                            StoredValue {
+                                value: v,
+                                area: self.make_area(span, func.code),
+                            },
+                        );
+                    } else {
+                        let key_interned = self.interner.borrow_mut().get_or_intern(key);
+                        match value {
+                            Value::Dict(v) => match v.get(&key_interned) {
+                                Some(k) => self.change_reg_key(*dest, *k),
+                                None => error!(),
+                            },
+                            Value::Module { exports, .. } => match exports.get(&key_interned) {
+                                Some(k) => self.change_reg_key(*dest, *k),
+                                None => error!(),
+                            },
+                            _ => error!(),
+                        }
+                    }
+                }
+                Opcode::TypeMember { from, dest, member } => {
+                    let stored_value = self.get_reg(*from);
+                    let value = &stored_value.value;
+                    let span = self.get_span(func, ip);
 
-                    //     (Value::Range(start, ..), "start") => {
-                    //         let s = *start;
+                    match &self.get_reg(*from).value {
+                        Value::Module { types, .. } => {
+                            let key = self.intern(match &self.get_reg(*member).value {
+                                Value::String(s) => s,
+                                _ => unreachable!(),
+                            });
 
-                    //         Some(Value::Int(s))
-                    //     },
-                    //     // (Value::Range(_, end, _), "end") => Some(Value::Int(*end)),
-                    //     // (Value::Range(_, _, step), "step") => Some(Value::Int(*step as i64)),
+                            let typ = types
+                                .iter()
+                                .find(|k| self.types[**k].value.name == key)
+                                .ok_or(RuntimeError::NonexistentTypeMember {
+                                    area: self.make_area(span, func.code),
+                                    type_name: self.resolve(&key),
+                                    call_stack: self.get_call_stack(),
+                                })?;
 
-                    //     // (Value::Array(v), "length") => Some(Value::Int(v.len() as i64)),
-                    //     // (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
-                    //     // (Value::Builtins, name) => Some(Value::Macro(MacroCode::Builtin(
-                    //     //     Builtin::from_str(name).unwrap(),
-                    //     // ))),
-                    //     _ => None,
-                    // };
-
-                    // macro_rules! error {
-                    //     () => {
-                    //         return Err(RuntimeError::NonexistentMember {
-                    //             area: self.make_area(span, func.code),
-                    //             member: key,
-                    //             base_type: value.get_type(),
-                    //             call_stack: self.get_call_stack(),
-                    //         })
-                    //     };
-                    // }
-
-                    // if let Some(v) = special {
-                    //     self.set_reg(
-                    //         *dest,
-                    //         StoredValue {
-                    //             value: v,
-                    //             area: self.make_area(span, func.code),
-                    //         },
-                    //     );
-                    // } else {
-                    //     // let key_interned = self.interner.borrow_mut().get_or_intern(&key);
-                    //     // match value {
-                    //     //     Value::Dict(v) => match v.get(&key_interned) {
-                    //     //         Some(k) => self.change_reg_key(*dest, *k),
-                    //     //         None => error!(),
-                    //     //     },
-                    //     //     _ => error!(),
-                    //     // }
-                    // }
+                            self.set_reg(
+                                *dest,
+                                StoredValue {
+                                    value: Value::TypeIndicator(*typ),
+                                    area: self.make_area(span, func.code),
+                                },
+                            );
+                            // let s = self.int
+                        }
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: (value.get_type(), stored_value.area.clone()),
+                                area: self.make_area(span, func.code),
+                                expected: ValueType::Module,
+                                call_stack: self.get_call_stack(),
+                            })
+                        }
+                    }
                 }
                 Opcode::Associated { from, dest, name } => {
                     dbg!(from, dest, name);
@@ -982,21 +1058,6 @@ impl<'a> Vm<'a> {
         }
 
         Ok(())
-    }
-
-    pub fn invoke_self(&mut self, val: &Value, name: &str) -> Result<Value, RuntimeError> {
-        Ok(match val {
-            Value::String(s) => s.invoke_self(name, self)?,
-
-            Value::Builtins => {
-                let b = Builtin::from_str(name).unwrap();
-
-                Value::Macro(MacroCode::Builtin(Rc::new(move |_args, _vm, _area| {
-                    b.call(_args, _vm, _area)
-                })))
-            }
-            _ => todo!(),
-        })
     }
 
     #[inline]

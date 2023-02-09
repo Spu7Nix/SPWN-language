@@ -714,6 +714,13 @@ impl Parser<'_> {
                                 name: name.spanned(self.span()),
                             }
                         }
+                        Token::TypeIndicator => {
+                            let name = self.slice()[1..].to_string();
+                            Expression::TypeMember {
+                                base: value,
+                                name: self.intern_string(name).spanned(self.span()),
+                            }
+                        }
                         Token::Type => Expression::Typeof(value),
                         other => {
                             return Err(SyntaxError::UnexpectedToken {

@@ -56,10 +56,18 @@ impl Spinner {
     }
 
     pub fn fail(&mut self, msg: Option<String>) {
-        let (spinner, curr_msg) = self.spinner.take().unwrap();
-        spinner.stop_with_message(&format!("{curr_msg} ❌",));
+        if let Some((spinner, curr_msg)) = self.spinner.take() {
+            spinner.stop_with_message(&format!("{curr_msg} ❌",));
+        } else {
+            println!(
+                "\n{}",
+                "════════════════════════════════════"
+                    .bright_yellow()
+                    .bold()
+            );
+        }
         if let Some(m) = msg {
-            eprintln!("{m}");
+            eprintln!("\n{m}");
         }
     }
 
@@ -79,7 +87,6 @@ impl Spinner {
 const READING_COLOR: u32 = 0x7F94FF;
 const PARSING_COLOR: u32 = 0x59C7FF;
 const COMPILING_COLOR: u32 = 0xFFC759;
-const RUNNING_COLOR: u32 = 0xFF59C7;
 
 fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
@@ -281,11 +288,8 @@ fn run_spwn(
 
     compiler.compile(ast.statements)?;
 
-    let mut types = SecondaryMap::new();
-
-    for (info, k) in &compiler.type_defs.def_map {
-        types.insert(k.value, info.clone().spanned(k.span));
-    }
+    spinner.complete(None);
+    println!();
 
     if settings.debug_bytecode {
         for (k, b) in &map.map {
@@ -293,9 +297,7 @@ fn run_spwn(
         }
     }
 
-    spinner.complete(None);
-
-    let mut vm = Vm::new(&map, interner, types);
+    let mut vm = Vm::new(&map, interner, typedefs);
 
     let key = vm.src_map[&parser.src];
     let start = FuncCoord::new(0, key);

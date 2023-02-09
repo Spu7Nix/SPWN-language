@@ -135,6 +135,19 @@ error_maker! {
 
         /////////
         #[
+            Message: "Nonexistent type member", Note: None;
+            Labels: [
+                area => "Type {} does not exist in this module": format!("@{type_name}");
+            ]
+        ]
+        NonexistentTypeMember {
+            area: CodeArea,
+            type_name: String,
+            [call_stack]
+        },
+
+        /////////
+        #[
             Message: "Invalid index", Note: None;
             Labels: [
                 area => "{} cannot be indexed by {}": base.0, index.0;

@@ -8,7 +8,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 
-use super::compiler::{CompileResult, TypeDef, TypeKey};
+use super::compiler::{CompileResult, CustomTypeKey, TypeDef};
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
 use crate::parsing::ast::{ImportType, ObjKeyType, ObjectType, Spannable, Spanned};
@@ -50,7 +50,7 @@ where
     pub export_names: Vec<String>,
     pub import_paths: Vec<Spanned<ImportType>>,
 
-    pub custom_types: SlotMap<TypeKey, Spanned<String>>,
+    pub custom_types: SlotMap<CustomTypeKey, Spanned<String>>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -60,7 +60,7 @@ pub enum Constant {
     String(String),
     Bool(bool),
     Id(IDClass, u16),
-    Type(TypeKey),
+    Type(CustomTypeKey),
 }
 
 impl std::fmt::Debug for Constant {
@@ -189,7 +189,7 @@ pub struct BytecodeBuilder {
 
     import_paths: Vec<Spanned<ImportType>>,
 
-    custom_types: SlotMap<TypeKey, Spanned<String>>,
+    custom_types: SlotMap<CustomTypeKey, Spanned<String>>,
 }
 
 pub struct FuncBuilder<'a> {
@@ -626,7 +626,7 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
 
-    pub fn load_type(&mut self, key: TypeKey, reg: UnoptRegister, span: CodeSpan) {
+    pub fn load_type(&mut self, key: CustomTypeKey, reg: UnoptRegister, span: CodeSpan) {
         let k = self.code_builder.constants.insert(Constant::Type(key));
         self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
@@ -1054,6 +1054,13 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }), span)
     }
 
+    pub fn load_empty_dict(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::LoadEmptyDict { dest: reg }),
+            span,
+        )
+    }
+
     pub fn index(
         &mut self,
         from: UnoptRegister,
@@ -1090,6 +1097,25 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
+    pub fn type_member(
+        &mut self,
+        from: UnoptRegister,
+        dest: UnoptRegister,
+        member: Spanned<String>,
+        span: CodeSpan,
+    ) {
+        let next_reg = self.next_reg();
+        self.load_string(member.value, next_reg, member.span);
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::TypeMember {
+                from,
+                dest,
+                member: next_reg,
+            }),
+            span,
+        )
+    }
+
     pub fn associated(
         &mut self,
         from: UnoptRegister,
@@ -1116,8 +1142,8 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
-    pub fn ret(&mut self, src: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Ret { src }))
+    pub fn ret(&mut self, src: UnoptRegister, module_ret: bool) {
+        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Ret { src, module_ret }))
     }
 
     pub fn yeet_context(&mut self) {
@@ -1152,7 +1178,7 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Print { reg }))
     }
 
-    pub fn create_type(&mut self, name: String, span: CodeSpan) -> TypeKey {
+    pub fn create_type(&mut self, name: String, span: CodeSpan) -> CustomTypeKey {
         self.code_builder.custom_types.insert(name.spanned(span))
     }
 }
@@ -1248,7 +1274,7 @@ impl Bytecode<Register> {
                 let f_len = clear_ansi(&formatted).len();
 
                 let opcode_str = match self.opcode_span_map.get(&(func_i, opcode_i)) {
-                    Some(span) => {
+                    Some(span) if span.start != usize::MAX => {
                         let mut s = format!("{:?}", &code[span.start..span.end]);
                         s = s[1..s.len() - 1].into();
                         let last_char = &s[s.len() - 1..s.len()];
@@ -1265,7 +1291,7 @@ impl Bytecode<Register> {
 
                         format!("({}..{}) {}", span.start, span.end, s)
                     }
-                    None => "".into(),
+                    _ => "".into(),
                 };
 
                 let o_len = clear_ansi(&opcode_str).len();

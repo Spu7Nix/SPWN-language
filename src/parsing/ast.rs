@@ -1,7 +1,7 @@
-use std::fmt::{Display, write};
+use std::fmt::{write, Display};
 use std::path::PathBuf;
 
-use delve::{EnumToStr, EnumDisplay};
+use delve::{EnumDisplay, EnumToStr};
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
@@ -95,6 +95,10 @@ pub enum Expression {
         base: ExprNode,
         name: Spanned<Spur>,
     },
+    TypeMember {
+        base: ExprNode,
+        name: Spanned<Spur>,
+    },
     Associated {
         base: ExprNode,
         name: Spanned<Spur>,
@@ -156,7 +160,6 @@ pub enum ObjKeyType {
     #[delve(display = |n: &u8| format!("{n}"))]
     Num(u8),
 }
-
 
 #[derive(Debug, Clone, EnumToStr)]
 pub enum Statement {

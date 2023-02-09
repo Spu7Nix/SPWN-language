@@ -167,7 +167,7 @@ opcodes! {
     PushArrayElem { => elem, => dest },
     #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d}"))]
     PushDictElem { => elem, => key, => dest },
-    
+
     #[delve(display = |e: &R, k: &ObjectKey, d: &R| format!("insert {}:R{e} into R{d}", <&ObjectKey as Into<&'static str>>::into(k)))]
     PushObjectElemKey { => elem, obj_key: ObjectKey, => dest },
     #[delve(display = |e: &R, k: &u8, d: &R| format!("insert {k}:R{e} into R{d}"))]
@@ -274,8 +274,8 @@ opcodes! {
         to: JumpPos,
     },
 
-    #[delve(display = |s: &R| format!("return R{s}"))]
-    Ret { => src },
+    #[delve(display = |s: &R, m: &bool| format!("{} R{s}", if *module_ret { "export" } else { "return" }))]
+    Ret { => src, module_ret: bool },
 
     #[delve(display = |s: &R, d: &R| format!("R{s}? -> R{d}"))]
     WrapMaybe { => src, => dest },
@@ -284,6 +284,9 @@ opcodes! {
 
     #[delve(display = |d: &R| format!("() -> R{d}"))]
     LoadEmpty { => dest },
+
+    #[delve(display = |d: &R| format!("{{}} -> R{d}"))]
+    LoadEmptyDict { => dest },
 
     #[delve(display = |c: &IDClass, d: &R| format!("?{} -> R{d}", c.letter()))]
     LoadArbitraryId { class: IDClass, => dest },
@@ -300,6 +303,8 @@ opcodes! {
     Index { => base, => dest, => index },
     #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.R{i} ~> R{d}"))]
     Member { => from, => dest, => member },
+    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.@R{i} -> R{d}"))]
+    TypeMember { => from, => dest, => member },
     #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} -> R{d}"))]
     Associated { => from, => dest, => name },
 

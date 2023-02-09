@@ -25,7 +25,7 @@ pub type CompileResult<T> = Result<T, CompilerError>;
 
 new_key_type! {
     pub struct ScopeKey;
-    pub struct TypeKey;
+    pub struct CustomTypeKey;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -56,10 +56,7 @@ pub struct TypeDef {
     pub name: Spur,
 }
 
-#[derive(Default)]
-pub struct TypeDefMap {
-    pub def_map: AHashMap<TypeDef, Spanned<TypeKey>>,
-}
+pub type TypeDefMap = AHashMap<TypeDef, Spanned<CustomTypeKey>>;
 
 pub struct Compiler<'a> {
     interner: Rc<RefCell<Interner>>,
@@ -72,7 +69,8 @@ pub struct Compiler<'a> {
 
     pub map: &'a mut BytecodeMap,
 
-    pub type_defs: &'a mut TypeDefMap,
+    pub custom_type_defs: &'a mut TypeDefMap,
+    available_custom_types: AHashMap<Spur, CustomTypeKey>,
 }
 
 impl<'a> Compiler<'a> {
@@ -90,7 +88,8 @@ impl<'a> Compiler<'a> {
             global_return: None,
             settings,
             map,
-            type_defs,
+            custom_type_defs: type_defs,
+            available_custom_types: AHashMap::new(),
         }
     }
 
@@ -279,6 +278,19 @@ impl<'a> Compiler<'a> {
 
                 self.compile_stmts(&stmts, base_scope, f)?;
 
+                let final_ret = f.next_reg();
+
+                f.load_empty_dict(
+                    final_ret,
+                    CodeSpan {
+                        start: usize::MAX,
+                        end: usize::MAX,
+                    },
+                );
+                f.ret(final_ret, true);
+
+                // f.load_empty(reg, span)
+
                 Ok(vec![])
             },
             0,
@@ -393,7 +405,7 @@ impl<'a> Compiler<'a> {
                         self.compile_import(&import.value, import.span, import_src.clone())?;
                     }
                     for (k, name) in &bytecode.custom_types {
-                        self.type_defs.def_map.insert(
+                        self.custom_type_defs.insert(
                             TypeDef {
                                 def_src: import_src.clone(),
                                 name: self.intern(&name.value),
@@ -409,7 +421,7 @@ impl<'a> Compiler<'a> {
             }
         }
 
-        let mut parser = Parser::new(code.trim_end(), import_src, Rc::clone(&self.interner));
+        let mut parser = Parser::new(&code, import_src, Rc::clone(&self.interner));
 
         match parser.parse() {
             Ok(ast) => {
@@ -418,7 +430,7 @@ impl<'a> Compiler<'a> {
                     parser.src,
                     self.settings,
                     self.map,
-                    self.type_defs,
+                    self.custom_type_defs,
                 );
 
                 match compiler.compile(ast.statements) {
@@ -689,7 +701,7 @@ impl<'a> Compiler<'a> {
                                     self.compile_expr(node, scope, builder, ExprType::Normal)?;
                                 self.global_return =
                                     Some((items.iter().map(|i| i.0).collect(), stmt.span));
-                                builder.ret(ret_reg);
+                                builder.ret(ret_reg, true);
                             }
                             _ => {
                                 return Err(CompilerError::InvalidModuleReturn {
@@ -709,12 +721,12 @@ impl<'a> Compiler<'a> {
                         None => {
                             let out_reg = builder.next_reg();
                             builder.load_empty(out_reg, stmt.span);
-                            builder.ret(out_reg)
+                            builder.ret(out_reg, false)
                         }
                         Some(expr) => {
                             let ret_reg =
                                 self.compile_expr(expr, scope, builder, ExprType::Normal)?;
-                            builder.ret(ret_reg)
+                            builder.ret(ret_reg, false)
                         }
                     }
                 } else {
@@ -735,7 +747,7 @@ impl<'a> Compiler<'a> {
                     name: *t,
                 };
 
-                if self.type_defs.def_map.contains_key(&info) {
+                if self.custom_type_defs.contains_key(&info) {
                     // return Err(CompilerError::DuplicateTypeDef {
                     //     area: self.make_area(stmt.span),
                     //     prev_area: self.make_area(self.type_defs.type_map[&t].span),
@@ -744,7 +756,7 @@ impl<'a> Compiler<'a> {
 
                 let k = builder.create_type(self.resolve(t), stmt.span);
 
-                self.type_defs.def_map.insert(info, k.spanned(stmt.span));
+                self.custom_type_defs.insert(info, k.spanned(stmt.span));
             }
             Statement::Impl { typ, items } => todo!(),
             Statement::ExtractImport(_) => todo!(),
@@ -862,7 +874,7 @@ impl<'a> Compiler<'a> {
                 }
             },
             Expression::Type(t) => {
-                match self.type_defs.def_map.get(&TypeDef {
+                match self.custom_type_defs.get(&TypeDef {
                     def_src: self.src.clone(),
                     name: *t,
                 }) {
@@ -937,6 +949,15 @@ impl<'a> Compiler<'a> {
                     expr.span,
                 )
             }
+            Expression::TypeMember { base, name } => {
+                let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
+                builder.type_member(
+                    base_reg,
+                    out_reg,
+                    self.resolve(&name.value).spanned(name.span),
+                    expr.span,
+                )
+            }
             Expression::Associated { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
                 builder.associated(
@@ -985,7 +1006,7 @@ impl<'a> Compiler<'a> {
                             MacroCode::Lambda(expr) => {
                                 let ret_reg =
                                     self.compile_expr(expr, base_scope, f, ExprType::Normal)?;
-                                f.ret(ret_reg);
+                                f.ret(ret_reg, false);
                             }
                         }
 

@@ -1,8 +1,5 @@
 
-type @sfeefuh
+a = import "test2.spwn"
 
-// $.print(@sfeefuh)
 
-let w = import "test2.spwn"
-
-$.println(w)
+$.print(a.@cockc)

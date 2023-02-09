@@ -5,12 +5,12 @@ use ahash::AHashMap;
 use lasso::Spur;
 use strum::EnumDiscriminants;
 
+use super::builtins::builtin_funcs::Builtin;
 use super::builtins::builtin_utils::BuiltinType;
-use super::builtins::builtins::Builtin;
 use super::error::RuntimeError;
 use super::interpreter::{FuncCoord, ValueKey, Vm};
 use crate::compiling::bytecode::Constant;
-use crate::compiling::compiler::TypeKey;
+use crate::compiling::compiler::CustomTypeKey;
 use crate::gd::gd_object::ObjParam;
 use crate::gd::ids::*;
 use crate::parsing::ast::{ObjKeyType, ObjectType};
@@ -105,7 +105,11 @@ pub enum Value {
     Empty,
     Macro(MacroCode),
 
-    TypeIndicator(TypeKey),
+    TypeIndicator(CustomTypeKey),
+    Module {
+        exports: AHashMap<Spur, ValueKey>,
+        types: Vec<CustomTypeKey>,
+    },
 
     TriggerFunction(Id),
 
@@ -207,6 +211,30 @@ impl Value {
                     .join(", ")
             ),
             Value::Epsilon => "$.epsilon()".to_string(),
+            Value::Module { exports, types } => format!(
+                "module {{ {}{} }}",
+                exports
+                    .iter()
+                    .map(|(s, k)| format!(
+                        "{}: {}",
+                        vm.interner.borrow().resolve(s),
+                        vm.memory[*k].value.runtime_display(vm)
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                if !types.is_empty() {
+                    format!(
+                        "; {}",
+                        types
+                            .iter()
+                            .map(|t| format!("@{}", vm.resolve(&vm.types[*t].value.name)))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                } else {
+                    "".into()
+                }
+            ),
         }
     }
 
@@ -221,18 +249,18 @@ impl Value {
         // }
     }
 
-    pub fn invoke_self(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
-        Ok(match self {
-            Value::String(s) => s.clone().invoke_self(name, vm)?,
+    // pub fn invoke_self(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
+    //     Ok(match (self, name) {
+    //         (Value::String(s), "length") => Value::Int(),
 
-            Value::Builtins => {
-                let b = Builtin::from_str(name).unwrap();
+    //         Value::Builtins => {
+    //             let b = Builtin::from_str(name).unwrap();
 
-                Value::Macro(MacroCode::Builtin(Rc::new(move |args, vm, area| {
-                    b.call(args, vm, area)
-                })))
-            }
-            _ => todo!(),
-        })
-    }
+    //             Value::Macro(MacroCode::Builtin(Rc::new(move |args, vm, area| {
+    //                 b.call(args, vm, area)
+    //             })))
+    //         }
+    //         _ => todo!(),
+    //     })
+    // }
 }
