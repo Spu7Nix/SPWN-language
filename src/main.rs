@@ -59,12 +59,7 @@ impl Spinner {
         if let Some((spinner, curr_msg)) = self.spinner.take() {
             spinner.stop_with_message(&format!("{curr_msg} ❌",));
         } else {
-            println!(
-                "\n{}",
-                "════════════════════════════════════"
-                    .bright_yellow()
-                    .bold()
-            );
+            println!("\n{}", "══════════════════════════════════".dimmed().bold());
         }
         if let Some(m) = msg {
             eprintln!("\n{m}");
@@ -266,7 +261,7 @@ fn run_spwn(
 
     let mut parser = Parser::new(&code, src, Rc::clone(&interner));
 
-    let ast = parser.parse()?;
+    let ast = parser.parse().map_err(|e| e.to_report())?;
 
     spinner.complete(None);
 
@@ -286,7 +281,9 @@ fn run_spwn(
         &mut typedefs,
     );
 
-    compiler.compile(ast.statements)?;
+    compiler
+        .compile(ast.statements)
+        .map_err(|e| e.to_report())?;
 
     spinner.complete(None);
     println!();
@@ -309,21 +306,11 @@ fn run_spwn(
     //     "Building...".color_hex(RUNNING_COLOR).bold()
     // ));
 
-    println!(
-        "\n{}",
-        "════╡ Output ╞══════════════════════"
-            .bright_yellow()
-            .bold(),
-    );
+    println!("\n{}", "════ Output ══════════════════════".dimmed().bold(),);
 
-    vm.run_program()?;
+    vm.run_program().map_err(|e| e.to_report(&vm))?;
 
-    println!(
-        "\n{}",
-        "════════════════════════════════════"
-            .bright_yellow()
-            .bold()
-    );
+    println!("\n{}", "══════════════════════════════════".dimmed().bold());
 
     Ok(SpwnOutput {
         objects: vm.objects,

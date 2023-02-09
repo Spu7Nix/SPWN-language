@@ -22,12 +22,25 @@ use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 use crate::vm::builtins::builtin_funcs::Builtin;
 use crate::vm::builtins::builtin_utils::BuiltinType;
-use crate::vm::value::MacroCode;
+use crate::vm::value::{BuiltinFn, MacroCode};
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 new_key_type! {
     pub struct ValueKey;
     pub struct BytecodeKey;
+}
+
+impl ValueKey {
+    pub fn test(self, vm: &mut Vm) {
+        match &vm.memory[self].value {
+            // Value::String(s) => {
+            //     s.clone().invoke_self("foo", vm);
+            // }
+            _ => todo!(),
+        };
+
+        todo!()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -706,10 +719,16 @@ impl<'a> Vm<'a> {
                         (Value::Builtins, _) => {
                             let b = Builtin::from_str(key).unwrap();
 
-                            Some(Value::Macro(MacroCode::Builtin(Rc::new(
+                            Some(Value::Macro(MacroCode::Builtin(BuiltinFn(Rc::new(
                                 move |args, vm, area| b.call(args, vm, area),
-                            ))))
+                            )))))
                         }
+
+                        (..) => {
+                            self.get_reg_key(*from).test(self);
+                            todo!();
+                        }
+
                         _ => None,
                     };
 
@@ -771,11 +790,10 @@ impl<'a> Vm<'a> {
                             self.set_reg(
                                 *dest,
                                 StoredValue {
-                                    value: Value::TypeIndicator(*typ),
+                                    value: Value::Type(ValueType::Custom(*typ)),
                                     area: self.make_area(span, func.code),
                                 },
                             );
-                            // let s = self.int
                         }
                         _ => {
                             return Err(RuntimeError::TypeMismatch {
@@ -789,6 +807,43 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::Associated { from, dest, name } => {
                     dbg!(from, dest, name);
+                }
+                Opcode::CreateInstance { base, dict, dest } => {
+                    let span = self.get_span(func, ip);
+
+                    let value = self.get_reg(*base);
+
+                    let typ = *match &value.value {
+                        Value::Type(ValueType::Custom(k)) => k,
+                        Value::Type(t) => {
+                            return Err(RuntimeError::CannotInstanceBuiltinType {
+                                area: self.make_area(span, func.code),
+                                typ: *t,
+                                call_stack: self.get_call_stack(),
+                            })
+                        }
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: (value.value.get_type(), value.area.clone()),
+                                area: self.make_area(span, func.code),
+                                expected: ValueType::Type,
+                                call_stack: self.get_call_stack(),
+                            })
+                        }
+                    };
+
+                    let items = match &self.get_reg(*dict).value {
+                        Value::Dict(items) => items.clone(),
+                        _ => unreachable!(),
+                    };
+
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Instance { typ, items },
+                            area: self.make_area(span, func.code),
+                        },
+                    );
                 }
                 Opcode::YeetContext => {
                     self.contexts.yeet_current();
@@ -917,7 +972,7 @@ impl<'a> Vm<'a> {
                             args.reverse();
 
                             let span = self.get_span(func, ip);
-                            let value = b(&mut args, self, self.make_area(span, func.code))?;
+                            let value = b.0(&mut args, self, self.make_area(span, func.code))?;
 
                             self.set_reg(
                                 *dest,

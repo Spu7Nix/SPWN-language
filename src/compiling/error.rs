@@ -129,6 +129,17 @@ error_maker! {
 
         /////
         #[
+            Message: "Duplicate imported type name", Note: None;
+            Labels: [
+                area => "This type definition has the same name as a type from within a previous `extract import`";
+            ]
+        ]
+        DuplicateImportedType {
+            area: CodeArea,
+        },
+
+        /////
+        #[
             Message: "Import could not be resolved", Note: None;
             Labels: [
                 area => "{} `{}` could not be found": => (if *is_module { "Module" } else { "Library" }), name;
@@ -165,6 +176,29 @@ error_maker! {
         DuplicateModuleReturn {
             area: CodeArea,
             prev_area: CodeArea,
+        },
+
+        /////
+        #[
+            Message: "Cannot override builtin type", Note: None;
+            Labels: [
+                area => "Tried to override a builtin type here";
+            ]
+        ]
+        BuiltinTypeOverride {
+            area: CodeArea,
+        },
+
+        /////////
+        #[
+            Message: "Nonexistent type", Note: None;
+            Labels: [
+                area => "Type {} does not exist or has not been imported and extracted": format!("@{type_name}");
+            ]
+        ]
+        NonexistentType {
+            area: CodeArea,
+            type_name: String,
         },
     }
 }

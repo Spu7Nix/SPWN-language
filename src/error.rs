@@ -13,6 +13,49 @@ pub struct ErrorReport {
     pub note: Option<String>,
 }
 
+impl std::error::Error for ErrorReport {}
+impl std::fmt::Display for ErrorReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut label_colors = RainbowColorGenerator::new(308.0, 0.5, 0.95, 35.0);
+
+        let mut report = Report::build(ReportKind::Error, "", 0).with_message(&self.message);
+
+        let mut source_vec = vec![];
+
+        for (area, msg) in &self.labels {
+            source_vec.push(area.src.clone());
+
+            let col = label_colors.next();
+
+            report = report.with_label(
+                Label::new((area.src.hyperlink(), area.span.into()))
+                    .with_message(msg)
+                    .with_color(ariadne::Color::RGB(col.0, col.1, col.2)),
+            );
+        }
+
+        if let Some(n) = &self.note {
+            report = report.with_note(n)
+        }
+
+        let mut out = BufWriter::new(Vec::new());
+
+        report
+            .finish()
+            .write_for_stdout(
+                sources(
+                    source_vec
+                        .iter()
+                        .map(|src| (src.hyperlink(), src.read().unwrap())),
+                ),
+                &mut out,
+            )
+            .unwrap();
+
+        write!(f, "{}", String::from_utf8(out.buffer().to_vec()).unwrap())
+    }
+}
+
 #[macro_export]
 macro_rules! error_maker {
     (
@@ -53,13 +96,6 @@ macro_rules! error_maker {
                     $($call_stack: Vec<CallStackItem>)?
                 },
             )*
-        }
-
-        impl std::error::Error for $enum {}
-        impl std::fmt::Display for $enum {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}", self.to_report().to_string())
-            }
         }
 
         impl $enum {
@@ -136,50 +172,50 @@ impl RainbowColorGenerator {
     }
 }
 
-impl ToString for ErrorReport {
-    fn to_string(&self) -> String {
-        let mut label_colors = RainbowColorGenerator::new(308.0, 0.5, 0.95, 35.0);
+// impl ToString for ErrorReport {
+//     fn to_string(&self) -> String {
+//         let mut label_colors = RainbowColorGenerator::new(308.0, 0.5, 0.95, 35.0);
 
-        let mut report = Report::build(ReportKind::Error, "", 0).with_message(&self.message);
+//         let mut report = Report::build(ReportKind::Error, "", 0).with_message(&self.message);
 
-        let mut source_vec = vec![];
+//         let mut source_vec = vec![];
 
-        for (area, msg) in &self.labels {
-            source_vec.push(area.src.clone());
+//         for (area, msg) in &self.labels {
+//             source_vec.push(area.src.clone());
 
-            let col = label_colors.next();
+//             let col = label_colors.next();
 
-            report = report.with_label(
-                Label::new((area.src.hyperlink(), area.span.into()))
-                    .with_message(msg)
-                    .with_color(ariadne::Color::RGB(col.0, col.1, col.2)),
-            );
-        }
+//             report = report.with_label(
+//                 Label::new((area.src.hyperlink(), area.span.into()))
+//                     .with_message(msg)
+//                     .with_color(ariadne::Color::RGB(col.0, col.1, col.2)),
+//             );
+//         }
 
-        if let Some(n) = &self.note {
-            report = report.with_note(n)
-        }
+//         if let Some(n) = &self.note {
+//             report = report.with_note(n)
+//         }
 
-        let mut buf = BufWriter::new(Vec::new());
+//         let mut buf = BufWriter::new(Vec::new());
 
-        report
-            .finish()
-            .write_for_stdout(
-                sources(
-                    source_vec
-                        .iter()
-                        .map(|src| (src.hyperlink(), src.read().unwrap())),
-                ),
-                &mut buf,
-            )
-            .unwrap();
+//         report
+//             .finish()
+//             .write_for_stdout(
+//                 sources(
+//                     source_vec
+//                         .iter()
+//                         .map(|src| (src.hyperlink(), src.read().unwrap())),
+//                 ),
+//                 &mut buf,
+//             )
+//             .unwrap();
 
-        String::from_utf8(buf.into_inner().unwrap()).unwrap()
-    }
-}
+//         String::from_utf8(buf.into_inner().unwrap()).unwrap()
+//     }
+// }
 
-impl ErrorReport {
-    pub fn display(&self) {
-        eprintln!("{}", self.to_string());
-    }
-}
+// impl ErrorReport {
+//     pub fn display(&self) {
+//         eprintln!("{}", self.to_string());
+//     }
+// }

@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::str::FromStr;
 
 use ahash::AHashMap;
 use colored::Colorize;
@@ -15,6 +16,7 @@ use crate::parsing::ast::{ImportType, ObjKeyType, ObjectType, Spannable, Spanned
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
 use crate::vm::opcodes::{FunctionID, ImportID, Opcode, Register, UnoptOpcode, UnoptRegister};
+use crate::vm::value::ValueType;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
@@ -60,7 +62,7 @@ pub enum Constant {
     String(String),
     Bool(bool),
     Id(IDClass, u16),
-    Type(CustomTypeKey),
+    Type(ValueType),
 }
 
 impl std::fmt::Debug for Constant {
@@ -626,8 +628,19 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
 
-    pub fn load_type(&mut self, key: CustomTypeKey, reg: UnoptRegister, span: CodeSpan) {
-        let k = self.code_builder.constants.insert(Constant::Type(key));
+    pub fn load_custom_type(&mut self, key: CustomTypeKey, reg: UnoptRegister, span: CodeSpan) {
+        let k = self
+            .code_builder
+            .constants
+            .insert(Constant::Type(ValueType::Custom(key)));
+        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+    }
+
+    pub fn load_builtin_type(&mut self, name: &str, reg: UnoptRegister, span: CodeSpan) {
+        let k = self
+            .code_builder
+            .constants
+            .insert(Constant::Type(ValueType::from_str(name).unwrap()));
         self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
 
@@ -1048,6 +1061,19 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn wrap_maybe(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::WrapMaybe { src, dest }), span)
+    }
+
+    pub fn create_instance(
+        &mut self,
+        base: UnoptRegister,
+        dict: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::CreateInstance { base, dest, dict }),
+            span,
+        )
     }
 
     pub fn load_empty(&mut self, reg: UnoptRegister, span: CodeSpan) {

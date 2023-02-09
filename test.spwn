@@ -1,5 +1,9 @@
 
-a = import "test2.spwn"
+type @cock
 
 
-$.print(a.@cockc)
+
+$.print(@cock::{ a: @cock::{} })
+
+
+

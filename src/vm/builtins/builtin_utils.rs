@@ -1,16 +1,17 @@
 use std::any::Any;
+use std::borrow::BorrowMut;
 use std::ops::Range;
 
 use crate::sources::CodeArea;
 use crate::vm::error::RuntimeError;
 use crate::vm::interpreter::{ValueKey, Vm};
-use crate::vm::value::{MacroCode, StoredValue, Value, ValueType};
+use crate::vm::value::{BuiltinFn, MacroCode, StoredValue, Value, ValueType};
 
 #[derive(delve::EnumDisplay, Clone, Debug)]
 pub enum BuiltinValueType {
-    #[delve(display = |v: &ValueType| format!("{v}"))]
+    //#[delve(display = |v: &ValueType| format!("{v}"))]
     Atom(ValueType),
-    #[delve(display = |v: &'static [BuiltinValueType]| v.iter().map(|v| format!("{v}")).collect::<Vec<_>>().join(", "))]
+    //#[delve(display = |v: &'static [BuiltinValueType]| v.iter().map(|v| format!("{v}")).collect::<Vec<_>>().join(", "))]
     List(&'static [BuiltinValueType]),
     None,
 }
@@ -32,8 +33,8 @@ pub trait IsOptional {
 
 // functions to call rust functions / get struct members from within spwn
 pub trait BuiltinType {
-    fn invoke_static(name: &str, vm: &mut Vm) -> Result<Value, RuntimeError>;
-    fn invoke_self(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError>;
+    fn invoke_static(name: &str, vm: &mut Vm) -> Result<BuiltinFn, RuntimeError>;
+    fn invoke_self(&self, name: &str, vm: &mut Vm) -> Result<BuiltinFn, RuntimeError>;
 }
 
 // gets a value of a given type within a tuple
@@ -55,6 +56,34 @@ pub trait Invoke<const O: usize, A = ()> {
     type Result;
 
     fn invoke_fn(&self, args: &mut Vec<ValueKey>, vm: &mut Vm, area: CodeArea) -> Self::Result;
+}
+
+trait RemoveRef {
+    type WithoutRef;
+}
+
+struct Ref<T> {
+    phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> RemoveRef for Ref<T> {
+    type WithoutRef = T;
+}
+
+impl<'a, T: RemoveRef> RemoveRef for &'a T {
+    type WithoutRef = T::WithoutRef;
+}
+
+impl<'a, T: RemoveRef> RemoveRef for &'a mut T {
+    type WithoutRef = T::WithoutRef;
+}
+
+// god rust generics just are garbage sometimes
+// wont infer shit so gotta use `as` or fully qualified syntax
+// using `From` causes some inference recursion overflow
+// so forced into using a trait
+pub trait ToBuiltinFn<const O: usize = 0, A = ()> {
+    fn to_fn(self) -> BuiltinFn;
 }
 
 pub struct Of<Types>(Types);
@@ -120,9 +149,9 @@ macro_rules! inner_fn {
     };
 
     (@to_value $self:ident) => {
-        Ok(Value::Macro(MacroCode::Builtin(std::rc::Rc::new(move |_args, _vm, _area| {
+        BuiltinFn(std::rc::Rc::new(move |_args, _vm, _area| {
             $self.invoke_fn(_args, _vm, _area).to_value(_vm)
-        }))))
+        }))
     }
 }
 
@@ -145,15 +174,7 @@ macro_rules! tuple_impls {
             }
         }
 
-        impl<Fun, Res, $($name,)*> ToValue<0, ($($name,)*)> for Fun
-        where
-            Res: ToValue,
-            Fun: Fn($($name,)* &Vm) -> Res + Invoke<0, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
-        {
-            fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
-                inner_fn!(@to_value self)
-            }
-        }
+        ////////////
 
         impl<Fun, Res, $($name),*> Invoke<1, ($($name,)*)> for Fun
         where
@@ -172,15 +193,7 @@ macro_rules! tuple_impls {
             }
         }
 
-        impl<Fun, Res, $($name,)*> ToValue<1, ($($name,)*)> for Fun
-        where
-            Res: ToValue,
-            Fun: Fn($($name,)* &mut Vm) -> Res + Invoke<1, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
-        {
-            fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
-                inner_fn!(@to_value self)
-            }
-        }
+        ////////////////
 
         impl<Fun, Res, $($name),*> Invoke<2, ($($name,)*)> for Fun
         where
@@ -199,15 +212,17 @@ macro_rules! tuple_impls {
             }
         }
 
-        impl<Fun, Res, $($name,)*> ToValue<2, ($($name,)*)> for Fun
+        impl<Fun, Res, $($name),*> ToBuiltinFn<2, ($($name,)*)> for Fun
         where
             Res: ToValue,
             Fun: Fn($($name,)*) -> Res + Invoke<2, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
-            fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
+            fn to_fn(self) -> BuiltinFn {
                 inner_fn!(@to_value self)
             }
         }
+
+        //////////////////////////////////////
 
         impl<Fun, Res, $($name),*> Invoke<3, ($($name,)*)> for Fun
         where
@@ -226,15 +241,7 @@ macro_rules! tuple_impls {
             }
         }
 
-        impl<Fun, Res, $($name,)*> ToValue<3, ($($name,)*)> for Fun
-        where
-            Res: ToValue,
-            Fun: Fn($($name,)* &Vm, CodeArea) -> Res + Invoke<3, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
-        {
-            fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
-                inner_fn!(@to_value self)
-            }
-        }
+        //////////////////////////
 
         impl<Fun, Res, $($name),*> Invoke<4, ($($name,)*)> for Fun
         where
@@ -259,15 +266,7 @@ macro_rules! tuple_impls {
             }
         }
 
-        impl<Fun, Res, $($name,)*> ToValue<4, ($($name,)*)> for Fun
-        where
-            Res: ToValue,
-            Fun: Fn($($name,)* &mut Vm, CodeArea) -> Res + Invoke<4, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
-        {
-            fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
-                inner_fn!(@to_value self)
-            }
-        }
+        ///////////////////////////
 
         impl<Fun, Res, $($name),*> Invoke<5, ($($name,)*)> for Fun
         where
@@ -286,15 +285,17 @@ macro_rules! tuple_impls {
             }
         }
 
-        impl<Fun, Res, $($name,)*> ToValue<5, ($($name,)*)> for Fun
-        where
-            Res: ToValue,
-            Fun: Fn($($name,)* CodeArea) -> Res + Invoke<5, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
-        {
-            fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
-                inner_fn!(@to_value self)
-            }
-        }
+        // impl<Res, $($name,)*> From<fn($($name,)*) -> Res> for BuiltinFn
+        // where
+        //     Res: ToValue,
+        //     fn($($name,)* CodeArea) -> Res: Invoke<5, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+        // {
+        //     fn from(v: fn($($name,)*) -> Res) -> BuiltinFn {
+        //         inner_fn!(@to_value v)
+        //     }
+        // }
+
+        //////////////////
 
         impl<Fun, This, Res, $($name),*> Invoke<6, (This, $($name,)*)> for Fun
         where
@@ -315,15 +316,7 @@ macro_rules! tuple_impls {
             }
         }
 
-        impl<Fun, This, Res, $($name,)*> ToValue<6, (This, $($name,)*)> for Fun
-        where
-            Res: ToValue,
-            Fun: Fn(This, $($name,)*) -> Res + Invoke<6, (This, $($name,)*), Result = Result<Res, RuntimeError>> + 'static,
-        {
-            fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
-                inner_fn!(@to_value self)
-            }
-        }
+        ///////////////////////////
 
         impl<Fun, This, Res, $($name),*> Invoke<7, (This, $($name,)*)> for Fun
         where
@@ -344,15 +337,16 @@ macro_rules! tuple_impls {
             }
         }
 
-        impl<Fun, This, Res, $($name,)*> ToValue<7, (This, $($name,)*)> for Fun
+        impl<Fun, This, Res, $($name),*> ToBuiltinFn<7, (This, $($name,)*)> for Fun
         where
             Res: ToValue,
             for<'a> Fun: Fn(&'a This, $($name,)*) -> Res + Invoke<7, (This, $($name,)*), Result = Result<Res, RuntimeError>> + 'static,
         {
-            fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
+            fn to_fn(self) -> BuiltinFn {
                 inner_fn!(@to_value self)
             }
         }
+        ///////////////
 
         impl<Fun, This, Res, $($name),*> Invoke<8, (This, $($name,)*)> for Fun
         where
@@ -366,22 +360,22 @@ macro_rules! tuple_impls {
         {
             type Result = Result<Res, RuntimeError>;
 
-            fn invoke_fn(&self, _args: &mut Vec<ValueKey>, _vm: &mut Vm, _area: CodeArea) -> Self::Result {
-                let mut _this: This = <Vec<ValueKey> as NextValue<This>>::next_value(_args, _vm).unwrap();
+            fn invoke_fn<'a>(&self, _args: &mut Vec<ValueKey>, _vm: &mut Vm, _area: CodeArea) -> Self::Result {
+                let mut _this = <Vec<ValueKey> as NextValue<This>>::next_value(_args, _vm).unwrap();
                 inner_fn!(@invoke $($name)*, self, _args, _vm, _area);
                 Ok((self)( &mut _this, $($name,)*))
             }
         }
 
-        impl<Fun, This, Res, $($name,)*> ToValue<8, (This, $($name,)*)> for Fun
-        where
-            Res: ToValue,
-            for<'a> Fun: Fn(&'a mut This, $($name,)*) -> Res + Invoke<8, (This, $($name,)*), Result = Result<Res, RuntimeError>> + 'static,
-        {
-            fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
-                inner_fn!(@to_value self)
-            }
-        }
+        // impl<Fun, This, Res, $($name),*> ToBuiltinFn<8, (This, $($name,)*)> for Fun
+        // where
+        //     Res: ToValue,
+        //     for<'a> Fun: Fn(&'a mut This, $($name,)*) -> Res + Invoke<8, ($($name,)*), Result = Result<Res, RuntimeError>> + 'static,
+        // {
+        //     fn to_fn(self) -> BuiltinFn {
+        //         inner_fn!(@to_value self)
+        //     }
+        // }
 
         ////////////////////////////
 
@@ -537,6 +531,11 @@ impl<T: ToValue> ToValue for Result<T, RuntimeError> {
         }
     }
 }
+impl ToValue for Vec<ValueKey> {
+    fn to_value(self, _: &mut Vm) -> Result<Value, RuntimeError> {
+        todo!()
+    }
+}
 
 // `TypeOf for ()` is implemented in the `tuple_impls` macro (empty tuple)
 impl TypeOf for Value {
@@ -624,5 +623,13 @@ impl NextValue<StoredValue> for Vec<ValueKey> {
 
     fn next_value(&mut self, vm: &Vm) -> Option<Self::Output> {
         Some(vm.memory[self.pop()?].clone())
+    }
+}
+
+impl NextValue<Vec<ValueKey>> for Vec<ValueKey> {
+    type Output = StoredValue;
+
+    fn next_value(&mut self, vm: &Vm) -> Option<Self::Output> {
+        todo!()
     }
 }

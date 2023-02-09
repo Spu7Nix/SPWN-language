@@ -322,4 +322,7 @@ opcodes! {
     Export { => src },
     #[delve(display = |s: &ImportID, d: &R| format!("import id {s} -> R{d}"))]
     Import { src: ImportID => dest },
+
+    #[delve(display = |b: &R, d: &R, t: &R| format!("@R{b}::R{d} -> R{t}"))]
+    CreateInstance { => base, => dict, => dest },
 }

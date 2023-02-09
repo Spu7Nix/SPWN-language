@@ -2,13 +2,16 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use ahash::AHashMap;
+use delve::VariantNames;
 use lasso::Spur;
+use serde::{Deserialize, Serialize};
 use strum::EnumDiscriminants;
 
 use super::builtins::builtin_funcs::Builtin;
 use super::builtins::builtin_utils::BuiltinType;
 use super::error::RuntimeError;
 use super::interpreter::{FuncCoord, ValueKey, Vm};
+use super::pattern::Pattern;
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::CustomTypeKey;
 use crate::gd::gd_object::ObjParam;
@@ -30,13 +33,18 @@ pub struct ArgData {
 }
 
 #[derive(Clone)]
+pub struct BuiltinFn(
+    pub Rc<dyn Fn(&mut Vec<ValueKey>, &mut Vm, CodeArea) -> Result<Value, RuntimeError>>,
+);
+
+#[derive(Clone)]
 pub enum MacroCode {
     Normal {
         func: FuncCoord,
         args: Vec<ArgData>,
         captured: Vec<ValueKey>,
     },
-    Builtin(Rc<dyn Fn(&mut Vec<ValueKey>, &mut Vm, CodeArea) -> Result<Value, RuntimeError>>),
+    Builtin(BuiltinFn),
 }
 
 impl PartialEq for MacroCode {
@@ -77,13 +85,70 @@ impl std::fmt::Debug for MacroCode {
     }
 }
 
-#[derive(EnumDiscriminants, Debug, Clone, PartialEq)]
-// `EnumDiscriminants` generates a new enum that is just the variant names without any data
-// anything in `strum_discriminants` is applied to the `ValueType` enum
-#[strum_discriminants(name(ValueType))]
-#[strum_discriminants(derive(delve::EnumToStr))]
-#[strum_discriminants(delve(rename_all = "lowercase"))]
-pub enum Value {
+#[rustfmt::skip]
+macro_rules! value {
+    (
+        $(
+            $(#[$($meta:meta)*] )?
+            $name:ident
+                $( ( $($t0:tt)* ) )?
+                $( { $($t1:tt)* } )?
+            ,
+        )*
+
+        => $i_name:ident
+            $( ( $($it0:tt)* ) )?
+            $( { $($it1:tt)* } )?
+        ,
+    ) => {
+        #[derive(Debug, Clone, PartialEq)]
+        pub enum Value {
+            $(
+                $name $( ( $($t0)* ) )? $( { $($t1)* } )?,
+            )*
+            $i_name $( ( $($it0)* ) )? $( { $($it1)* } )?
+        }
+
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+        #[derive(delve::EnumFromStr, delve::EnumVariantNames, delve::EnumToStr)]
+        #[delve(rename_all = "snake_case")]
+        pub enum ValueType {
+            $(
+                $( #[$($meta)* ])?
+                $name,
+            )*
+            
+            #[delve(skip)]
+            Custom(CustomTypeKey),
+        }
+
+        impl Value {
+            pub fn get_type(&self) -> ValueType {
+                match self {
+                    Self::Instance { typ, .. } => ValueType::Custom(*typ),
+                    
+                    $(
+                        Self::$name {..} => ValueType::$name,
+                    )*
+                }
+            }
+        }
+    };
+}
+
+impl ValueType {
+    pub fn runtime_display(self, vm: &Vm) -> String {
+        format!(
+            "@{}",
+            match self {
+                Self::Custom(t) => vm.resolve(&vm.types[t].value.name),
+                _ => <ValueType as Into<&'static str>>::into(self).into(),
+            }
+        )
+    }
+}
+
+value! {
     Int(i64),
     Float(f64),
     Bool(bool),
@@ -105,7 +170,9 @@ pub enum Value {
     Empty,
     Macro(MacroCode),
 
-    TypeIndicator(CustomTypeKey),
+    Type(ValueType),
+    Pattern(Pattern),
+
     Module {
         exports: AHashMap<Spur, ValueKey>,
         types: Vec<CustomTypeKey>,
@@ -116,19 +183,14 @@ pub enum Value {
     Object(AHashMap<u8, ObjParam>, ObjectType),
 
     Epsilon,
-}
 
-impl std::fmt::Display for ValueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "@{}", <&ValueType as Into<&'static str>>::into(self))
-    }
+    => Instance {
+        typ: CustomTypeKey,
+        items: AHashMap<Spur, ValueKey>,
+    },
 }
 
 impl Value {
-    pub fn get_type(&self) -> ValueType {
-        self.into()
-    }
-
     pub fn from_const(c: &Constant) -> Self {
         match c {
             Constant::Int(v) => Value::Int(*v),
@@ -144,7 +206,7 @@ impl Value {
                     IDClass::Item => Value::Item(id),
                 }
             }
-            Constant::Type(k) => Value::TypeIndicator(*k),
+            Constant::Type(k) => Value::Type(*k),
         }
     }
 
@@ -198,7 +260,7 @@ impl Value {
             ),
             Value::Macro(MacroCode::Builtin(_)) => "<builtin fn>".to_string(),
             Value::TriggerFunction(_) => "!{{...}}".to_string(),
-            Value::TypeIndicator(t) => format!("@{}", vm.resolve(&vm.types[*t].value.name)),
+            Value::Type(t) => t.runtime_display(vm),
             Value::Object(map, typ) => format!(
                 "{} {{ {} }}",
                 match typ {
@@ -234,6 +296,20 @@ impl Value {
                 } else {
                     "".into()
                 }
+            ),
+            Value::Pattern(p) => p.runtime_display(vm),
+            Value::Instance { typ, items } => format!(
+                "@{}::{{ {} }}",
+                vm.resolve(&vm.types[*typ].value.name),
+                items
+                    .iter()
+                    .map(|(s, k)| format!(
+                        "{}: {}",
+                        vm.interner.borrow().resolve(s),
+                        vm.memory[*k].value.runtime_display(vm)
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ),
         }
     }

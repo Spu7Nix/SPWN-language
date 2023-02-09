@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use delve::VariantNames;
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
@@ -20,6 +21,7 @@ use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 use crate::vm::opcodes::Register;
+use crate::vm::value::ValueType;
 
 pub type CompileResult<T> = Result<T, CompilerError>;
 
@@ -747,16 +749,26 @@ impl<'a> Compiler<'a> {
                     name: *t,
                 };
 
-                if self.custom_type_defs.contains_key(&info) {
-                    // return Err(CompilerError::DuplicateTypeDef {
-                    //     area: self.make_area(stmt.span),
-                    //     prev_area: self.make_area(self.type_defs.type_map[&t].span),
-                    // });
+                if ValueType::VARIANT_NAMES.contains(&self.resolve(t).as_str()) {
+                    return Err(CompilerError::BuiltinTypeOverride {
+                        area: self.make_area(stmt.span),
+                    });
+                } else if self.custom_type_defs.contains_key(&info) {
+                    return Err(CompilerError::DuplicateTypeDef {
+                        area: self.make_area(stmt.span),
+                        prev_area: self.make_area(self.custom_type_defs[&info].span),
+                    });
+                } else if self.available_custom_types.contains_key(t) {
+                    // TODO test
+                    return Err(CompilerError::DuplicateImportedType {
+                        area: self.make_area(stmt.span),
+                    });
                 }
 
                 let k = builder.create_type(self.resolve(t), stmt.span);
 
                 self.custom_type_defs.insert(info, k.spanned(stmt.span));
+                self.available_custom_types.insert(*t, k);
             }
             Statement::Impl { typ, items } => todo!(),
             Statement::ExtractImport(_) => todo!(),
@@ -874,12 +886,19 @@ impl<'a> Compiler<'a> {
                 }
             },
             Expression::Type(t) => {
-                match self.custom_type_defs.get(&TypeDef {
-                    def_src: self.src.clone(),
-                    name: *t,
-                }) {
-                    Some(k) => builder.load_type(k.value, out_reg, expr.span),
-                    None => todo!(),
+                let name = self.resolve(t);
+                if ValueType::VARIANT_NAMES.contains(&name.as_str()) {
+                    builder.load_builtin_type(&name, out_reg, expr.span)
+                } else {
+                    match self.available_custom_types.get(t) {
+                        Some(k) => builder.load_custom_type(*k, out_reg, expr.span),
+                        None => {
+                            return Err(CompilerError::NonexistentType {
+                                area: self.make_area(expr.span),
+                                type_name: name,
+                            })
+                        }
+                    }
                 }
             }
             Expression::Array(items) => {
@@ -901,32 +920,15 @@ impl<'a> Compiler<'a> {
                 )?;
             }
             Expression::Dict(items) => {
-                builder.new_dict(
-                    items.len() as u16,
-                    out_reg,
-                    |builder, elems| {
-                        for (key, item) in items {
-                            let value_reg = match item {
-                                Some(e) => {
-                                    self.compile_expr(e, scope, builder, ExprType::Normal)?
-                                }
-                                None => match self.get_var(key.value, scope) {
-                                    Some(data) => data.reg,
-                                    None => {
-                                        return Err(CompilerError::NonexistentVariable {
-                                            area: self.make_area(key.span),
-                                            var: self.resolve(&key.value),
-                                        })
-                                    }
-                                },
-                            };
+                self.build_dict(builder, items, out_reg, scope, expr.span)?;
+            }
+            Expression::Instance { base, items } => {
+                let dict_reg = builder.next_reg();
+                self.build_dict(builder, items, dict_reg, scope, expr.span)?;
 
-                            elems.push((self.resolve(&key.value).spanned(key.span), value_reg));
-                        }
-                        Ok(())
-                    },
-                    expr.span,
-                )?;
+                let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
+
+                builder.create_instance(base_reg, dict_reg, out_reg, expr.span);
             }
             Expression::Maybe(e) => match e {
                 Some(e) => {
@@ -1150,7 +1152,6 @@ impl<'a> Compiler<'a> {
                 self.compile_import(t, expr.span, self.src.clone())?;
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
             }
-            Expression::Instance { base, items } => todo!(),
 
             Expression::Obj(typ, items) => {
                 builder.new_object(
@@ -1173,6 +1174,41 @@ impl<'a> Compiler<'a> {
         }
 
         Ok(out_reg)
+    }
+
+    fn build_dict(
+        &mut self,
+        builder: &mut FuncBuilder,
+        items: &Vec<(Spanned<Spur>, Option<ExprNode>)>,
+        out_reg: usize,
+        scope: ScopeKey,
+        span: CodeSpan,
+    ) -> Result<(), CompilerError> {
+        builder.new_dict(
+            items.len() as u16,
+            out_reg,
+            |builder, elems| {
+                for (key, item) in items {
+                    let value_reg = match item {
+                        Some(e) => self.compile_expr(e, scope, builder, ExprType::Normal)?,
+                        None => match self.get_var(key.value, scope) {
+                            Some(data) => data.reg,
+                            None => {
+                                return Err(CompilerError::NonexistentVariable {
+                                    area: self.make_area(key.span),
+                                    var: self.resolve(&key.value),
+                                })
+                            }
+                        },
+                    };
+
+                    elems.push((self.resolve(&key.value).spanned(key.span), value_reg));
+                }
+                Ok(())
+            },
+            span,
+        )?;
+        Ok(())
     }
 }
 
