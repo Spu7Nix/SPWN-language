@@ -1,9 +1,10 @@
 
-type @cock
+
+a = (a) {
+    dbg a;
+}
 
 
-
-$.print(@cock::{ a: @cock::{} })
-
+a(5);
 
 

@@ -7,8 +7,8 @@ use lasso::Spur;
 use unindent::unindent;
 
 use super::ast::{
-    Ast, DictItems, ExprNode, Expression, ImportType, MacroCode, ObjectType, Spannable, Spanned,
-    Statement, Statements, StmtNode,
+    Ast, DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjectType, Spannable,
+    Spanned, Statement, Statements, StmtNode,
 };
 use super::attributes::{ExprAttribute, IsValidOn, ParseAttribute, ScriptAttribute, StmtAttribute};
 use super::error::SyntaxError;
@@ -456,7 +456,11 @@ impl Parser<'_> {
                         let code = MacroCode::Lambda(self.parse_expr()?);
 
                         break 'out_expr Expression::Macro {
-                            args: vec![(var_name.spanned(start), None, None)],
+                            args: vec![MacroArg::Single {
+                                name: var_name.spanned(start),
+                                pattern: None,
+                                default: None,
+                            }],
                             code,
                             ret_type,
                         }
@@ -518,24 +522,44 @@ impl Parser<'_> {
                     if is_macro {
                         let mut args = vec![];
 
+                        let mut first_spread_span = None;
+
                         list_helper!(self, RParen {
+                            let is_spread = if self.next_is(Token::Spread) {
+                                self.next();
+                                true
+                            } else {
+                                false
+                            };
+
                             self.expect_tok_named(Token::Ident, "argument name")?;
                             let arg_name = self.slice_interned().spanned(self.span());
 
-                            let typ = if self.next_is(Token::Colon) {
-                                self.next();
-                                Some(self.parse_expr()?)
-                            } else {
-                                None
-                            };
-                            let default = if self.next_is(Token::Assign) {
+                            if is_spread {
+                                if let Some(prev_s) = first_spread_span {
+                                    return Err(SyntaxError::MultipleSpreadArguments { area: self.make_area(self.span()), prev_area: self.make_area(prev_s) })
+                                }
+                                first_spread_span = Some(self.span())
+                            }
+
+                            let pattern = if self.next_is(Token::Colon) {
                                 self.next();
                                 Some(self.parse_expr()?)
                             } else {
                                 None
                             };
 
-                            args.push((arg_name, typ, default));
+                            if !is_spread {
+                                let default = if self.next_is(Token::Assign) {
+                                    self.next();
+                                    Some(self.parse_expr()?)
+                                } else {
+                                    None
+                                };
+                                args.push(MacroArg::Single { name: arg_name, pattern, default });
+                            } else {
+                                args.push(MacroArg::Spread { name: arg_name, pattern });
+                            }
                         });
 
                         let ret_type = if self.next_is(Token::Arrow) {
@@ -1022,12 +1046,12 @@ impl Parser<'_> {
 
                 Statement::ExtractImport(import_type)
             }
-            // Token::Print => {
-            //     self.next();
-            //     let v = self.parse_expr()?;
+            Token::Dbg => {
+                self.next();
+                let v = self.parse_expr()?;
 
-            //     Statement::Print(v)
-            // }
+                Statement::Dbg(v)
+            }
             _ => {
                 let left = self.parse_expr()?;
                 let peek = self.peek();

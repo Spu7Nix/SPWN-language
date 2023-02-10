@@ -67,6 +67,58 @@ pub struct StmtNode {
 
 pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>)>;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum MacroArg<N, E> {
+    Single {
+        name: N,
+        pattern: Option<E>,
+        default: Option<E>,
+    },
+    Spread {
+        name: N,
+        pattern: Option<E>,
+    },
+}
+impl<N, E> MacroArg<N, E> {
+    pub fn name(&self) -> &N {
+        match self {
+            MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
+        }
+    }
+
+    pub fn name_mut(&mut self) -> &mut N {
+        match self {
+            MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
+        }
+    }
+
+    pub fn default(&self) -> &Option<E> {
+        match self {
+            MacroArg::Single { default, .. } => default,
+            _ => panic!("bad"),
+        }
+    }
+
+    pub fn default_mut(&mut self) -> &mut Option<E> {
+        match self {
+            MacroArg::Single { default, .. } => default,
+            _ => panic!("bad"),
+        }
+    }
+
+    pub fn pattern(&self) -> &Option<E> {
+        match self {
+            MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
+        }
+    }
+
+    pub fn pattern_mut(&mut self) -> &mut Option<E> {
+        match self {
+            MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
+        }
+    }
+}
+
 #[derive(Debug, Clone, EnumToStr)]
 pub enum Expression {
     Int(i64),
@@ -111,7 +163,7 @@ pub enum Expression {
     },
 
     Macro {
-        args: Vec<(Spanned<Spur>, Option<ExprNode>, Option<ExprNode>)>,
+        args: Vec<MacroArg<Spanned<Spur>, ExprNode>>,
         ret_type: Option<ExprNode>,
         code: MacroCode,
     },
@@ -201,7 +253,7 @@ pub enum Statement {
         items: DictItems,
     },
 
-    Print(ExprNode),
+    Dbg(ExprNode),
 }
 
 pub type Statements = Vec<StmtNode>;
@@ -247,7 +299,7 @@ pub struct Ast {
     pub file_attributes: Vec<ScriptAttribute>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Spanned<T> {
     pub value: T,
     pub span: CodeSpan,

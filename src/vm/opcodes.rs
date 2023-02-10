@@ -136,7 +136,7 @@ opcodes! {
     #[delve(display = |f: &R, t: &R| format!("R{f} -> R{t}"))]
     Copy { => from, => to },
     #[delve(display = |reg: &R| format!("print R{reg}"))]
-    Print { => reg },
+    Dbg { => reg },
 
 
     #[delve(display = |b: &R, a: &R, d: &R| format!("R{b}(args R{a}) -> R{d}"))]
@@ -184,6 +184,8 @@ opcodes! {
     SetMacroArgDefault { => src, => dest },
     #[delve(display = |s: &R, d: &R| format!("set pattern to R{s} for R{d}"))]
     SetMacroArgPattern { => src, => dest },
+    #[delve(display = |n: &R, d: &R| format!("insert arg ...R{n} into R{d}"))]
+    PushMacroSpreadArg { => name, => dest },
 
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} + R{b} -> R{x}"))]
     Add { => left, => right, => dest },

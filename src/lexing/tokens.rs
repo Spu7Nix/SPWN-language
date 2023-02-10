@@ -33,7 +33,7 @@ lexer! {
     Type: text("type"),
     Impl: text("impl"),
 
-    //Print: text("print"),
+    Dbg: text("dbg"),
 
     Extract: text("extract"),
     Import: text("import"),
@@ -97,6 +97,7 @@ lexer! {
     DoubleColon: text("::"),
     Dot: text("."),
     Range: text(".."),
+    Spread: text("..."),
 
     FatArrow: text("=>"),
     Arrow: text("->"),
@@ -200,7 +201,8 @@ impl Token {
             Self::Hashtag => "#",
             Self::Extract => "extract",
             Self::Newline => "linebreak",
-            //Self::Print => "print",
+            Self::Spread => "...",
+            Self::Dbg => "dbg",
         }
     }
 }

@@ -1,161 +1,161 @@
-use std::io;
-use std::io::Write;
-use std::ops::Range;
+// use std::io;
+// use std::io::Write;
+// use std::ops::Range;
 
-use colored::Colorize;
-use delve::{EnumDisplay, EnumFromStr};
-use rand::seq::SliceRandom;
-use rand::Rng;
+// use colored::Colorize;
+// use delve::{EnumDisplay, EnumFromStr};
+// use rand::seq::SliceRandom;
+// use rand::Rng;
 
-use super::builtin_utils::{Invoke, Spread, TOf, ToValue};
-use crate::gd::gd_object::{GdObject, ObjParam};
-use crate::of;
-use crate::parsing::ast::ObjectType;
-use crate::sources::{CodeArea, CodeSpan};
-use crate::vm::error::RuntimeError;
-use crate::vm::interpreter::{BytecodeKey, ValueKey, Vm};
-use crate::vm::value::{StoredValue, Value, ValueType};
-use crate::vm::value_ops;
+// use super::builtin_utils::{Invoke, Spread, TOf, ToValue};
+// use crate::gd::gd_object::{GdObject, ObjParam};
+// use crate::of;
+// use crate::parsing::ast::ObjectType;
+// use crate::sources::{CodeArea, CodeSpan};
+// use crate::vm::error::RuntimeError;
+// use crate::vm::interpreter::{BytecodeKey, ValueKey, Vm};
+// use crate::vm::value::{StoredValue, Value, ValueType};
+// use crate::vm::value_ops;
 
-#[derive(Debug, EnumFromStr, EnumDisplay, PartialEq, Clone)]
-#[delve(rename_variants = "snake_case")]
-pub enum Builtin {
-    Print,
-    Println,
-    Exit,
-    Random,
-    Version,
-    Assert,
-    AssertEq,
-    Input,
-    Add,
-}
+// #[derive(Debug, EnumFromStr, EnumDisplay, PartialEq, Clone)]
+// #[delve(rename_variants = "snake_case")]
+// pub enum Builtin {
+//     Print,
+//     Println,
+//     Exit,
+//     Random,
+//     Version,
+//     Assert,
+//     AssertEq,
+//     Input,
+//     Add,
+// }
 
-impl Builtin {
-    pub fn call(
-        &self,
-        args: &mut Vec<ValueKey>,
-        vm: &mut Vm,
-        area: CodeArea,
-    ) -> Result<Value, RuntimeError> {
-        match self {
-            Self::Print => print.invoke_fn(args, vm, area).to_value(vm),
-            Self::Println => println.invoke_fn(args, vm, area).to_value(vm),
-            Self::Exit => exit.invoke_fn(args, vm, area).to_value(vm),
-            //Self::Random => random.invoke_fn(args, vm, area).to_value(vm),
-            Self::Version => version.invoke_fn(args, vm, area).to_value(vm),
-            //Self::Input => input.invoke_fn(args, vm, area).to_value(vm),
-            Self::Assert => assert.invoke_fn(args, vm, area).to_value(vm),
-            Self::AssertEq => assert_eq.invoke_fn(args, vm, area).to_value(vm),
-            Self::Add => add.invoke_fn(args, vm, area).to_value(vm),
-            _ => todo!(),
-        }
-    }
-}
+// impl Builtin {
+//     pub fn call(
+//         &self,
+//         args: &mut Vec<ValueKey>,
+//         vm: &mut Vm,
+//         area: CodeArea,
+//     ) -> Result<Value, RuntimeError> {
+//         match self {
+//             Self::Print => print.invoke_fn(args, vm, area).to_value(vm),
+//             Self::Println => println.invoke_fn(args, vm, area).to_value(vm),
+//             Self::Exit => exit.invoke_fn(args, vm, area).to_value(vm),
+//             //Self::Random => random.invoke_fn(args, vm, area).to_value(vm),
+//             Self::Version => version.invoke_fn(args, vm, area).to_value(vm),
+//             //Self::Input => input.invoke_fn(args, vm, area).to_value(vm),
+//             Self::Assert => assert.invoke_fn(args, vm, area).to_value(vm),
+//             Self::AssertEq => assert_eq.invoke_fn(args, vm, area).to_value(vm),
+//             Self::Add => add.invoke_fn(args, vm, area).to_value(vm),
+//             _ => todo!(),
+//         }
+//     }
+// }
 
-pub fn add(object: StoredValue, vm: &mut Vm, area: CodeArea) -> Result<(), RuntimeError> {
-    let (params, mode) = match &object.value {
-        Value::Object(v, m) => (v.clone(), *m),
-        Value::Object(v, m) => (v.clone(), *m),
-        _ => {
-            return Err(RuntimeError::TypeMismatch {
-                v: (object.value.get_type(), object.area.clone()),
-                expected: ValueType::Object,
-                area,
-                call_stack: vm.get_call_stack(),
-            })
-        }
-    };
+// pub fn add(object: StoredValue, vm: &mut Vm, area: CodeArea) -> Result<(), RuntimeError> {
+//     let (params, mode) = match &object.value {
+//         Value::Object(v, m) => (v.clone(), *m),
+//         Value::Object(v, m) => (v.clone(), *m),
+//         _ => {
+//             return Err(RuntimeError::TypeMismatch {
+//                 v: (object.value.get_type(), object.area.clone()),
+//                 expected: ValueType::Object,
+//                 area,
+//                 call_stack: vm.get_call_stack(),
+//             })
+//         }
+//     };
 
-    let obj = GdObject { params, mode };
+//     let obj = GdObject { params, mode };
 
-    match mode {
-        ObjectType::Object => vm.objects.push(obj),
-        ObjectType::Trigger => vm.triggers.push(obj),
-    }
+//     match mode {
+//         ObjectType::Object => vm.objects.push(obj),
+//         ObjectType::Trigger => vm.triggers.push(obj),
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }
 
-pub fn exit(_vm: &mut Vm) {
-    // vm.contexts.yeet_current();
-    // the goof (the sill)
-}
+// pub fn exit(_vm: &mut Vm) {
+//     // vm.contexts.yeet_current();
+//     // the goof (the sill)
+// }
 
-pub fn print(values: Spread<Value>, vm: &Vm) {
-    print!(
-        "{}",
-        values
-            .iter()
-            .map(|v| v.runtime_display(vm))
-            .collect::<Vec<_>>()
-            .join(" ")
-    )
-}
-pub fn println(values: Spread<Value>, vm: &Vm) {
-    println!(
-        "{}",
-        values
-            .iter()
-            .map(|v| v.runtime_display(vm))
-            .collect::<Vec<_>>()
-            .join(" "),
-    )
-}
+// pub fn print(values: Spread<Value>, vm: &Vm) {
+//     print!(
+//         "{}",
+//         values
+//             .iter()
+//             .map(|v| v.runtime_display(vm))
+//             .collect::<Vec<_>>()
+//             .join(" ")
+//     )
+// }
+// pub fn println(values: Spread<Value>, vm: &Vm) {
+//     println!(
+//         "{}",
+//         values
+//             .iter()
+//             .map(|v| v.runtime_display(vm))
+//             .collect::<Vec<_>>()
+//             .join(" "),
+//     )
+// }
 
-pub fn random(value: of!(Range<i64>, Vec<Value>, i64, f64)) -> Value {
-    if let Some(range) = value.get::<Range<i64>>() {
-        return Value::Int(rand::thread_rng().gen_range(range.clone()));
-    }
-    if let Some(values) = value.get::<Vec<Value>>() {
-        // TODO: handle empty array !!!!
-        return values.choose(&mut rand::thread_rng()).unwrap().clone();
-    }
-    if let Some(n) = value.get::<i64>() {
-        return Value::Int(rand::thread_rng().gen_range(0..*n));
-    }
-    if let Some(n) = value.get::<f64>() {
-        return Value::Float(rand::thread_rng().gen_range(0.0..*n));
-    }
+// pub fn random(value: of!(Range<i64>, Vec<Value>, i64, f64)) -> Value {
+//     if let Some(range) = value.get::<Range<i64>>() {
+//         return Value::Int(rand::thread_rng().gen_range(range.clone()));
+//     }
+//     if let Some(values) = value.get::<Vec<Value>>() {
+//         // TODO: handle empty array !!!!
+//         return values.choose(&mut rand::thread_rng()).unwrap().clone();
+//     }
+//     if let Some(n) = value.get::<i64>() {
+//         return Value::Int(rand::thread_rng().gen_range(0..*n));
+//     }
+//     if let Some(n) = value.get::<f64>() {
+//         return Value::Float(rand::thread_rng().gen_range(0.0..*n));
+//     }
 
-    unreachable!()
-}
+//     unreachable!()
+// }
 
-pub fn input(prompt: Option<String>) -> String {
-    let prompt = prompt.unwrap_or(String::new());
+// pub fn input(prompt: Option<String>) -> String {
+//     let prompt = prompt.unwrap_or(String::new());
 
-    print!("{prompt}");
-    std::io::stdout().flush().unwrap();
+//     print!("{prompt}");
+//     std::io::stdout().flush().unwrap();
 
-    let mut s = String::new();
-    io::stdin().read_line(&mut s).expect("Couldn't read line");
+//     let mut s = String::new();
+//     io::stdin().read_line(&mut s).expect("Couldn't read line");
 
-    s.trim_end_matches(|p| matches!(p, '\n' | '\r')).into()
-}
+//     s.trim_end_matches(|p| matches!(p, '\n' | '\r')).into()
+// }
 
-pub fn version() -> String {
-    env!("CARGO_PKG_VERSION").into()
-}
+// pub fn version() -> String {
+//     env!("CARGO_PKG_VERSION").into()
+// }
 
-pub fn assert(expr: bool, vm: &Vm, area: CodeArea) -> Result<(), RuntimeError> {
-    if !expr {
-        return Err(RuntimeError::AssertionFailed {
-            area,
-            call_stack: vm.get_call_stack(),
-        });
-    }
+// pub fn assert(expr: bool, vm: &Vm, area: CodeArea) -> Result<(), RuntimeError> {
+//     if !expr {
+//         return Err(RuntimeError::AssertionFailed {
+//             area,
+//             call_stack: vm.get_call_stack(),
+//         });
+//     }
 
-    Ok(())
-}
-pub fn assert_eq(a: Value, b: Value, vm: &Vm, area: CodeArea) -> Result<(), RuntimeError> {
-    if !value_ops::equality(&a, &b, vm) {
-        return Err(RuntimeError::EqAssertionFailed {
-            area,
-            left: a.runtime_display(vm),
-            right: b.runtime_display(vm),
-            call_stack: vm.get_call_stack(),
-        });
-    }
+//     Ok(())
+// }
+// pub fn assert_eq(a: Value, b: Value, vm: &Vm, area: CodeArea) -> Result<(), RuntimeError> {
+//     if !value_ops::equality(&a, &b, vm) {
+//         return Err(RuntimeError::EqAssertionFailed {
+//             area,
+//             left: a.runtime_display(vm),
+//             right: b.runtime_display(vm),
+//             call_stack: vm.get_call_stack(),
+//         });
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }

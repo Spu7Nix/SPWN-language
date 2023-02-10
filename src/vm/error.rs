@@ -7,7 +7,6 @@ use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeArea;
 use crate::util::hyperlink;
-use crate::vm::builtins::builtin_utils::BuiltinValueType;
 
 error_maker! {
     Title: "Runtime Error"
@@ -107,13 +106,13 @@ error_maker! {
 
         /////////
         #[
-            Message: "Nonexistent argument", Note: None;
+            Message: "Invalid keyword argument", Note: None;
             Labels: [
-                call_area => "Argument `{}` does not exist": arg_name;
+                call_area => "Keyword argument `{}` is invalid": arg_name;
                 macro_def_area => "Macro defined here";
             ]
         ]
-        NonexistentArgument {
+        InvalidKeywordArgument {
             call_area: CodeArea,
             macro_def_area: CodeArea,
             arg_name: String,
@@ -219,46 +218,46 @@ error_maker! {
             [call_stack]
         },
 
-        /////////
-        #[
-            Message: "Too few arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
-            Labels: [
-                call_area => "Builtin called here";
-            ]
-        ]
-        TooFewBuiltinArguments {
-            call_area: CodeArea,
-            //builtin: Builtin,
-            [call_stack]
-        },
+        // /////////
+        // #[
+        //     Message: "Too few arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
+        //     Labels: [
+        //         call_area => "Builtin called here";
+        //     ]
+        // ]
+        // TooFewBuiltinArguments {
+        //     call_area: CodeArea,
+        //     //builtin: Builtin,
+        //     [call_stack]
+        // },
 
-        /////////
-        #[
-            Message: "Too many arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
-            Labels: [
-                call_area => "Builtin called here";
-            ]
-        ]
-        TooManyBuiltinArguments {
-            call_area: CodeArea,
-            //builtin: Builtin,
-            [call_stack]
-        },
+        // /////////
+        // #[
+        //     Message: "Too many arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
+        //     Labels: [
+        //         call_area => "Builtin called here";
+        //     ]
+        // ]
+        // TooManyBuiltinArguments {
+        //     call_area: CodeArea,
+        //     //builtin: Builtin,
+        //     [call_stack]
+        // },
 
-        /////////
-        #[
-            Message: "Invalid builtin argument type", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
-            Labels: [
-                call_area => "Builtin expected type {} here": expected;
-                def_area => "Value defined as {} here": found.runtime_display(vm);
-            ]
-        ]
-        InvalidBuiltinArgumentType {
-            call_area: CodeArea,
-            def_area: CodeArea,
-            expected: BuiltinValueType,
-            found: ValueType,
-            [call_stack]
-        },
+        // /////////
+        // #[
+        //     Message: "Invalid builtin argument type", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
+        //     Labels: [
+        //         call_area => "Builtin expected type {} here": expected;
+        //         def_area => "Value defined as {} here": found.runtime_display(vm);
+        //     ]
+        // ]
+        // InvalidBuiltinArgumentType {
+        //     call_area: CodeArea,
+        //     def_area: CodeArea,
+        //     expected: BuiltinValueType,
+        //     found: ValueType,
+        //     [call_stack]
+        // },
     }
 }

@@ -82,6 +82,7 @@ impl Spinner {
 const READING_COLOR: u32 = 0x7F94FF;
 const PARSING_COLOR: u32 = 0x59C7FF;
 const COMPILING_COLOR: u32 = 0xFFC759;
+const RUNNING_COLOR: u32 = 0xFF59C7;
 
 fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
@@ -301,10 +302,7 @@ fn run_spwn(
 
     vm.push_call_stack(start, 0, false, None);
 
-    // spinner.start(format!(
-    //     "{:20}",
-    //     "Building...".color_hex(RUNNING_COLOR).bold()
-    // ));
+    println!("{:20}", "Building...".color_hex(RUNNING_COLOR).bold());
 
     println!("\n{}", "════ Output ══════════════════════".dimmed().bold(),);
 

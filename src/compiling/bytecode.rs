@@ -12,7 +12,7 @@ use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 use super::compiler::{CompileResult, CustomTypeKey, TypeDef};
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
-use crate::parsing::ast::{ImportType, ObjKeyType, ObjectType, Spannable, Spanned};
+use crate::parsing::ast::{ImportType, MacroArg, ObjKeyType, ObjectType, Spannable, Spanned};
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
 use crate::vm::opcodes::{FunctionID, ImportID, Opcode, Register, UnoptOpcode, UnoptRegister};
@@ -567,11 +567,7 @@ impl<'a> FuncBuilder<'a> {
     where
         F: FnOnce(
             &mut FuncBuilder,
-            &mut Vec<(
-                Spanned<String>,
-                Option<UnoptRegister>,
-                Option<UnoptRegister>,
-            )>,
+            &mut Vec<MacroArg<Spanned<String>, UnoptRegister>>,
         ) -> CompileResult<()>,
     {
         self.push_opcode_spanned(
@@ -582,26 +578,56 @@ impl<'a> FuncBuilder<'a> {
         let mut items = vec![];
         f(self, &mut items)?;
 
-        for (n, pat, def) in items {
-            let name_reg = self.next_reg();
-            self.load_string(n.value, name_reg, n.span);
+        for arg in items {
+            match arg {
+                MacroArg::Single {
+                    name,
+                    pattern,
+                    default,
+                } => {
+                    let name_reg = self.next_reg();
+                    self.load_string(name.value, name_reg, name.span);
 
-            self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushMacroArg {
-                name: name_reg,
-                dest,
-            }));
+                    self.push_opcode_spanned(
+                        ProtoOpcode::Raw(UnoptOpcode::PushMacroArg {
+                            name: name_reg,
+                            dest,
+                        }),
+                        name.span,
+                    );
 
-            if let Some(p) = pat {
-                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
-                    src: p,
-                    dest,
-                }));
-            }
-            if let Some(d) = def {
-                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgDefault {
-                    src: d,
-                    dest,
-                }));
+                    if let Some(p) = pattern {
+                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
+                            src: p,
+                            dest,
+                        }));
+                    }
+                    if let Some(d) = default {
+                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgDefault {
+                            src: d,
+                            dest,
+                        }));
+                    }
+                }
+                MacroArg::Spread { name, pattern } => {
+                    let name_reg = self.next_reg();
+                    self.load_string(name.value, name_reg, name.span);
+
+                    self.push_opcode_spanned(
+                        ProtoOpcode::Raw(UnoptOpcode::PushMacroSpreadArg {
+                            name: name_reg,
+                            dest,
+                        }),
+                        name.span,
+                    );
+
+                    if let Some(p) = pattern {
+                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
+                            src: p,
+                            dest,
+                        }));
+                    }
+                }
             }
         }
 
@@ -1200,8 +1226,8 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
-    pub fn print(&mut self, reg: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Print { reg }))
+    pub fn dbg(&mut self, reg: UnoptRegister) {
+        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Dbg { reg }))
     }
 
     pub fn create_type(&mut self, name: String, span: CodeSpan) -> CustomTypeKey {

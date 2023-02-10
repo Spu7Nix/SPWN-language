@@ -1,0 +1,11 @@
+impl @builtins {
+    add: (self: @a) {}
+}
+
+$.print()
+
+
+
+
+
+

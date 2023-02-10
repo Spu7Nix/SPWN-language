@@ -13,8 +13,8 @@ use super::error::CompilerError;
 use crate::cli::Settings;
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
-    ExprNode, Expression, ImportType, MacroCode, ObjKeyType, Spannable, Spanned, Statement,
-    StmtNode,
+    ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjKeyType, Spannable, Spanned,
+    Statement, StmtNode,
 };
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
@@ -772,9 +772,9 @@ impl<'a> Compiler<'a> {
             }
             Statement::Impl { typ, items } => todo!(),
             Statement::ExtractImport(_) => todo!(),
-            Statement::Print(v) => {
+            Statement::Dbg(v) => {
                 let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
-                builder.print(v);
+                builder.dbg(v);
             }
         }
         Ok(())
@@ -978,23 +978,30 @@ impl<'a> Compiler<'a> {
                     |f| {
                         let mut variables = AHashMap::new();
 
-                        for (name, ..) in args {
+                        for a in args {
                             variables.insert(
-                                name.value,
+                                a.name().value,
                                 Variable {
                                     mutable: false,
-                                    def_span: name.span,
+                                    def_span: a.name().span,
                                     reg: f.next_reg(),
                                 },
                             );
                         }
+
                         let to_capture = self.get_accessible_vars(scope);
                         let mut capture_regs = vec![];
 
                         for (name, data) in to_capture {
-                            let reg = f.next_reg();
-                            capture_regs.push((data.reg, reg));
-                            variables.insert(name, Variable { reg, ..data });
+                            if !variables.contains_key(&name) {
+                                let reg = f.next_reg();
+                                capture_regs.push((data.reg, reg));
+                                variables.insert(name, Variable { reg, ..data });
+                            }
+                        }
+
+                        for (s, v) in &variables {
+                            println!("{}: {:?}", self.resolve(s), v)
                         }
 
                         let base_scope = self.scopes.insert(Scope {
@@ -1021,23 +1028,63 @@ impl<'a> Compiler<'a> {
                     func_id,
                     out_reg,
                     |builder, elems| {
-                        for (name, pat, def) in args {
-                            let n = self.resolve(&name.value).spanned(name.span);
+                        for arg in args {
+                            match arg {
+                                MacroArg::Single {
+                                    name,
+                                    pattern,
+                                    default,
+                                } => {
+                                    let n = self.resolve(&name.value).spanned(name.span);
 
-                            let p = if let Some(p) = pat {
-                                Some(self.compile_expr(p, scope, builder, ExprType::Normal)?)
-                            } else {
-                                None
-                            };
-                            let d = if let Some(d) = def {
-                                Some(self.compile_expr(d, scope, builder, ExprType::Normal)?)
-                            } else {
-                                None
-                            };
+                                    let p = if let Some(p) = pattern {
+                                        Some(self.compile_expr(
+                                            p,
+                                            scope,
+                                            builder,
+                                            ExprType::Normal,
+                                        )?)
+                                    } else {
+                                        None
+                                    };
+                                    let d = if let Some(d) = default {
+                                        Some(self.compile_expr(
+                                            d,
+                                            scope,
+                                            builder,
+                                            ExprType::Normal,
+                                        )?)
+                                    } else {
+                                        None
+                                    };
 
-                            elems.push((n, p, d))
+                                    elems.push(MacroArg::Single {
+                                        name: n,
+                                        pattern: p,
+                                        default: d,
+                                    })
+                                }
+                                MacroArg::Spread { name, pattern } => {
+                                    let n = self.resolve(&name.value).spanned(name.span);
+
+                                    let p = if let Some(p) = pattern {
+                                        Some(self.compile_expr(
+                                            p,
+                                            scope,
+                                            builder,
+                                            ExprType::Normal,
+                                        )?)
+                                    } else {
+                                        None
+                                    };
+
+                                    elems.push(MacroArg::Spread {
+                                        name: n,
+                                        pattern: p,
+                                    })
+                                }
+                            }
                         }
-
                         Ok(())
                     },
                     expr.span,
