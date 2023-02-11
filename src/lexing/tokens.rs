@@ -39,6 +39,8 @@ lexer! {
     Import: text("import"),
     Dollar: text("$"),
 
+    Slf: text("self"),
+
     Is: text("is"),
     As: text("as"),
 
@@ -203,6 +205,7 @@ impl Token {
             Self::Newline => "linebreak",
             Self::Spread => "...",
             Self::Dbg => "dbg",
+            Self::Slf => "self",
         }
     }
 }

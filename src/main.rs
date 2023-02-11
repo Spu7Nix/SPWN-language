@@ -23,7 +23,7 @@ use std::rc::Rc;
 use clap::Parser as _;
 use cli::Settings;
 use colored::Colorize;
-use gd::gd_object::GdObject;
+use gd::gd_object::{GdObject, Trigger};
 use lasso::Rodeo;
 use slotmap::SecondaryMap;
 use spinoff::spinners::SpinnerFrames;
@@ -171,7 +171,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
 
             let SpwnOutput {
-                objects,
+                mut objects,
                 triggers,
                 id_counters,
             } = match run_spwn(file, &settings, &mut spinner) {
@@ -183,9 +183,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             };
 
+            objects.extend(gd_object::apply_triggers(triggers));
+
             println!(
                 "\n{} objects added",
-                objects.len().to_string().bright_white().bold()
+                (objects.len()).to_string().bright_white().bold()
             );
 
             let (new_ls, used_ids) = gd_object::append_objects(objects, &level_string)?;
@@ -239,7 +241,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 struct SpwnOutput {
     pub objects: Vec<GdObject>,
-    pub triggers: Vec<GdObject>,
+    pub triggers: Vec<Trigger>,
     pub id_counters: [usize; 4],
 }
 
@@ -258,7 +260,7 @@ fn run_spwn(
     let src = SpwnSource::File(file);
     let code = src
         .read()
-        .ok_or(BasicError("Failed to read SPWN file".into()))?;
+        .ok_or_else(|| BasicError("Failed to read SPWN file".into()))?;
 
     let mut parser = Parser::new(&code, src, Rc::clone(&interner));
 

@@ -150,6 +150,53 @@ error_maker! {
 
         /////////
         #[
+            Message: "Nonexistent associated member", Note: None;
+            Labels: [
+                area => "Associated member `{}` does not exist on {}": member, base_type.runtime_display(vm);
+            ]
+        ]
+        NonexistentAssociatedMember {
+            area: CodeArea,
+            member: String,
+            base_type: ValueType,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Associated function is not method", Note: None;
+            Labels: [
+                area => "Associated function `{}` is not a method, because it does not have a `self` argument": func_name;
+                def_area => "Associated function defined on type {} here": base_type.runtime_display(vm);
+            ]
+        ]
+        AssociatedNotAMethod {
+            area: CodeArea,
+            def_area: CodeArea,
+            func_name: String,
+            base_type: ValueType,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Associated member is not method", Note: None;
+            Labels: [
+                area => "Member `{}` implemented on type {} is not a method": member_name, base_type.runtime_display(vm);
+                def_area => "Member defined as {} here": member_type.runtime_display(vm);
+            ]
+        ]
+        NotAMethod {
+            area: CodeArea,
+            def_area: CodeArea,
+            member_name: String,
+            member_type: ValueType,
+            base_type: ValueType,
+            [call_stack]
+        },
+
+        /////////
+        #[
             Message: "Nonexistent type member", Note: None;
             Labels: [
                 area => "Type {} does not exist in this module": format!("@{type_name}");
@@ -215,6 +262,17 @@ error_maker! {
             area: CodeArea,
             left: String,
             right: String,
+            [call_stack]
+        },
+
+        #[
+            Message: "Added object in runtime context", Note: Some("TODO (link to docs)".into());
+            Labels: [
+                area => "Cannot add this object at runtime";
+            ]
+        ]
+        AddObjectInTriggerContext {
+            area: CodeArea,
             [call_stack]
         },
 

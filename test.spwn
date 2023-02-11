@@ -1,10 +1,9 @@
+import "libraries/core/builtins.spwn"
 
 
-a = (a) {
-    dbg a;
-}
 
 
-a(5);
+
+
 
 

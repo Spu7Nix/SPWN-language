@@ -39,6 +39,8 @@ pub fn to_obj_param(
 
             Value::Epsilon => Some(ObjParam::Epsilon),
 
+            Value::TriggerFunction { group, .. } => Some(ObjParam::Group(*group)),
+
             Value::Array(v) => {
                 let mut arr = vec![];
                 for k in v {

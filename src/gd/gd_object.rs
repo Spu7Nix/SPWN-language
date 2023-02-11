@@ -5,7 +5,19 @@ use ahash::{AHashMap, AHashSet};
 use super::ids::*;
 use crate::parsing::ast::ObjectType;
 
-pub struct TriggerOrder(f32);
+#[derive(Clone, Copy)]
+pub struct TriggerOrder(f64);
+
+impl TriggerOrder {
+    pub fn new() -> Self {
+        Self(0.0)
+    }
+
+    pub fn next(&mut self) -> Self {
+        self.0 += 1.0;
+        *self
+    }
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ObjParam {
@@ -61,6 +73,18 @@ impl fmt::Display for ObjParam {
 pub struct GdObject {
     pub params: AHashMap<u8, ObjParam>,
     pub mode: ObjectType,
+}
+
+pub struct Trigger {
+    pub obj: GdObject,
+    pub order: TriggerOrder,
+}
+
+impl Trigger {
+    pub fn apply_context(mut self, context: Id) -> Self {
+        self.obj.params.insert(57, ObjParam::Group(context));
+        self
+    }
 }
 
 pub fn get_used_ids(ls: &str) -> [AHashSet<u16>; 4] {
@@ -372,4 +396,70 @@ pub fn append_objects(
             closed_ids[3].len(),
         ],
     ))
+}
+
+const START_HEIGHT: u16 = 10;
+const MAX_HEIGHT: u16 = 40;
+
+const DELTA_X: u16 = 1;
+
+pub fn apply_triggers(mut triggers: Vec<Trigger>) -> Vec<GdObject> {
+    //println!("{:?}", trigger);
+
+    let mut full_obj_list = Vec::<GdObject>::new();
+
+    //add top layer
+    let possible_height = MAX_HEIGHT - START_HEIGHT; //30 is max (TODO: case for if y_offset is more than 30)
+    triggers.sort_by(|x, y| x.order.0.partial_cmp(&y.order.0).unwrap());
+
+    for (i, Trigger { obj, .. }) in triggers.iter().enumerate() {
+        match obj.mode {
+            ObjectType::Object => {
+                full_obj_list.push(obj.clone());
+            }
+            ObjectType::Trigger => {
+                let y_pos = (i as u16) % possible_height + START_HEIGHT;
+                let x_pos = 0;
+
+                let spawned = match obj.params.get(&62) {
+                    Some(ObjParam::Bool(b)) => *b,
+                    _ => match obj.params.get(&57) {
+                        None => false,
+                        // Some(ObjParam::GroupList(l)) => {
+                        //     l.iter().any(|x| x.id != ID::Specific(0))
+                        // }
+                        Some(ObjParam::Group(g)) => *g != Id::Specific(0),
+                        Some(ObjParam::GroupList(g)) => g[0] != Id::Specific(0),
+                        _ => unreachable!(),
+                    },
+                };
+
+                let mut new_obj = obj.clone();
+
+                if spawned {
+                    new_obj.params.insert(62, ObjParam::Bool(true));
+                    new_obj.params.insert(87, ObjParam::Bool(true));
+                }
+
+                new_obj.params.insert(
+                    2,
+                    if spawned {
+                        ObjParam::Number(
+                            (x_pos * (MAX_HEIGHT - START_HEIGHT) as u32 * DELTA_X as u32
+                                + 15
+                                + i as u32 * DELTA_X as u32) as f64,
+                        )
+                    } else {
+                        ObjParam::Number(0.0)
+                    },
+                );
+                new_obj
+                    .params
+                    .insert(3, ObjParam::Number(((80 - y_pos) * 30 + 15) as f64));
+                full_obj_list.push(new_obj);
+            }
+        }
+    }
+
+    full_obj_list
 }

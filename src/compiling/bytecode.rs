@@ -584,6 +584,7 @@ impl<'a> FuncBuilder<'a> {
                     name,
                     pattern,
                     default,
+                    is_ref,
                 } => {
                     let name_reg = self.next_reg();
                     self.load_string(name.value, name_reg, name.span);
@@ -591,6 +592,7 @@ impl<'a> FuncBuilder<'a> {
                     self.push_opcode_spanned(
                         ProtoOpcode::Raw(UnoptOpcode::PushMacroArg {
                             name: name_reg,
+                            is_ref,
                             dest,
                         }),
                         name.span,
@@ -701,8 +703,11 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
-    pub fn pop_context_group(&mut self, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PopGroupStack), span)
+    pub fn pop_context_group(&mut self, fn_reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::PopGroupStack { fn_reg }),
+            span,
+        )
     }
 
     pub fn make_trigger_function(
@@ -1100,6 +1105,10 @@ impl<'a> FuncBuilder<'a> {
             ProtoOpcode::Raw(UnoptOpcode::CreateInstance { base, dest, dict }),
             span,
         )
+    }
+
+    pub fn do_impl(&mut self, base: UnoptRegister, dict: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Impl { base, dict }), span)
     }
 
     pub fn load_empty(&mut self, reg: UnoptRegister, span: CodeSpan) {

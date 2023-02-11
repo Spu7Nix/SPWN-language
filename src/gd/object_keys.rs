@@ -1,5 +1,7 @@
 use ahash::AHashMap;
 use lazy_static::lazy_static;
+
+#[derive(Debug)]
 pub enum ObjectKeyValueType {
     Int,
     Float,

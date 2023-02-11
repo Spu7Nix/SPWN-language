@@ -73,12 +73,14 @@ pub enum MacroArg<N, E> {
         name: N,
         pattern: Option<E>,
         default: Option<E>,
+        is_ref: bool,
     },
     Spread {
         name: N,
         pattern: Option<E>,
     },
 }
+
 impl<N, E> MacroArg<N, E> {
     pub fn name(&self) -> &N {
         match self {
@@ -249,7 +251,7 @@ pub enum Statement {
     ExtractImport(ImportType),
 
     Impl {
-        typ: Spur,
+        base: ExprNode,
         items: DictItems,
     },
 

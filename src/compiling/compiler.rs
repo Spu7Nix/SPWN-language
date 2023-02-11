@@ -770,7 +770,14 @@ impl<'a> Compiler<'a> {
                 self.custom_type_defs.insert(info, k.spanned(stmt.span));
                 self.available_custom_types.insert(*t, k);
             }
-            Statement::Impl { typ, items } => todo!(),
+            Statement::Impl { base, items } => {
+                let dict_reg = builder.next_reg();
+                self.build_dict(builder, items, dict_reg, scope, stmt.span)?;
+
+                let base_reg = self.compile_expr(base, scope, builder, ExprType::Normal)?;
+
+                builder.do_impl(base_reg, dict_reg, stmt.span);
+            }
             Statement::ExtractImport(_) => todo!(),
             Statement::Dbg(v) => {
                 let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
@@ -861,13 +868,18 @@ impl<'a> Compiler<'a> {
                     UnaryOp::BinNot => builder.unary_bin_not(v, out_reg, expr.span),
                     UnaryOp::ExclMark => builder.unary_not(v, out_reg, expr.span),
                     UnaryOp::Minus => builder.unary_negate(v, out_reg, expr.span),
+                    UnaryOp::Eq => todo!(),
+                    UnaryOp::Neq => todo!(),
+                    UnaryOp::Gt => todo!(),
+                    UnaryOp::Gte => todo!(),
+                    UnaryOp::Lt => todo!(),
+                    UnaryOp::Lte => todo!(),
                 }
             }
             Expression::Var(name) => match self.get_var(*name, scope) {
                 Some(data) => {
                     if let ExprType::Assign(stmt_span) = expr_type {
                         if !data.mutable {
-                            // println!("{:?} {:?}", stmt_span, data.def_span);
                             return Err(CompilerError::ImmutableAssign {
                                 area: self.make_area(stmt_span),
                                 def_area: self.make_area(data.def_span),
@@ -1000,10 +1012,6 @@ impl<'a> Compiler<'a> {
                             }
                         }
 
-                        for (s, v) in &variables {
-                            println!("{}: {:?}", self.resolve(s), v)
-                        }
-
                         let base_scope = self.scopes.insert(Scope {
                             parent: None,
                             variables,
@@ -1034,6 +1042,7 @@ impl<'a> Compiler<'a> {
                                     name,
                                     pattern,
                                     default,
+                                    is_ref,
                                 } => {
                                     let n = self.resolve(&name.value).spanned(name.span);
 
@@ -1062,6 +1071,7 @@ impl<'a> Compiler<'a> {
                                         name: n,
                                         pattern: p,
                                         default: d,
+                                        is_ref: *is_ref,
                                     })
                                 }
                                 MacroArg::Spread { name, pattern } => {
@@ -1152,6 +1162,8 @@ impl<'a> Compiler<'a> {
                 use crate::gd::ids::IDClass::Group;
                 let group_reg = builder.next_reg();
                 builder.load_id(None, Group, group_reg, expr.span);
+                builder.make_trigger_function(group_reg, out_reg, expr.span);
+
                 builder.push_context_group(group_reg, expr.span);
                 builder.block(|b| {
                     let inner_scope = self.derive_scope(
@@ -1160,8 +1172,7 @@ impl<'a> Compiler<'a> {
                     );
                     self.compile_stmts(code, inner_scope, b)
                 })?;
-                builder.pop_context_group(expr.span);
-                builder.make_trigger_function(group_reg, out_reg, expr.span);
+                builder.pop_context_group(out_reg, expr.span);
             }
             Expression::TriggerFuncCall(_) => todo!(),
             Expression::Ternary {

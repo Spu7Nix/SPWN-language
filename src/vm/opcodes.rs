@@ -175,11 +175,11 @@ opcodes! {
 
     #[delve(display = |i: &FunctionID, d: &R| format!("{i}: (...) {{...}} -> R{d}"))]
     CreateMacro {
-        id: FunctionID,
+        id: FunctionID, // boo
         => dest,
     },
-    #[delve(display = |n: &R, d: &R| format!("insert arg R{n} into R{d}"))]
-    PushMacroArg { => name, => dest },
+    #[delve(display = |n: &R, d: &R, m: &bool| format!("insert arg {}R{n} into R{d}", if *m { "&" } else { "" }))]
+    PushMacroArg { => name, => dest, is_ref: bool },
     #[delve(display = |s: &R, d: &R| format!("set default to R{s} for R{d}"))]
     SetMacroArgDefault { => src, => dest },
     #[delve(display = |s: &R, d: &R| format!("set pattern to R{s} for R{d}"))]
@@ -293,10 +293,11 @@ opcodes! {
     #[delve(display = |c: &IDClass, d: &R| format!("?{} -> R{d}", c.letter()))]
     LoadArbitraryId { class: IDClass, => dest },
 
+
     #[delve(display = |src: &R| format!("change to R{src}"))]
     PushContextGroup { => src },
-    #[delve(display = || "pop".to_string())]
-    PopGroupStack,
+    #[delve(display = |f: &R| format!("pop out of R{f}"))]
+    PopGroupStack { => fn_reg },
 
     #[delve(display = |s: &R, d: &R| format!("!{{R{s}}} -> R{d}"))]
     MakeTriggerFunc { => src, => dest },
@@ -307,7 +308,7 @@ opcodes! {
     Member { => from, => dest, => member },
     #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.@R{i} -> R{d}"))]
     TypeMember { => from, => dest, => member },
-    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} -> R{d}"))]
+    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} ~> R{d}"))]
     Associated { => from, => dest, => name },
 
     #[delve(display = || "yeet".to_string())]
@@ -327,4 +328,6 @@ opcodes! {
 
     #[delve(display = |b: &R, d: &R, t: &R| format!("@R{b}::R{d} -> R{t}"))]
     CreateInstance { => base, => dict, => dest },
+    #[delve(display = |b: &R, d: &R| format!("impl @R{b} {{R{d}}}"))]
+    Impl { => base, => dict },
 }
