@@ -99,6 +99,19 @@ error_maker! {
 
         /////////
         #[
+            Message: "Cannot have multiple spread arguments", Note: None;
+            Labels: [
+                area => "Second spread argument provided here";
+                prev_area => "First spread argument provided here";
+            ]
+        ]
+        MultipleSpreadArguments {
+            area: CodeArea,
+            prev_area: CodeArea,
+        },
+
+        /////////
+        #[
             Message: "Positional argument after keyword argument", Note: None;
             Labels: [
                 area => "This positional argument was provided after keyword arguments";
@@ -171,5 +184,24 @@ error_maker! {
             area: CodeArea,
         },
 
+    }
+}
+
+error_maker! {
+    Title: "Warning"
+    Extra: {}
+    pub enum Warning {
+        /////////
+        #[
+            Message: "Use of deprecated value", Note: Some(note.to_string());
+            Labels: [
+                area => "Value deprecated since {}": since;
+            ]
+        ]
+        UseOfDeprecatedValue {
+            since: String,
+            note: String,
+            area: CodeArea,
+        },
     }
 }

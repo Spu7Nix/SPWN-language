@@ -1,9 +1,9 @@
-use std::io::Write;
+use std::io::{BufWriter, Write};
 
 use ariadne::{sources, Label, Report, ReportKind};
 
 use crate::sources::CodeArea;
-use crate::vm::context::CallStackItem;
+use crate::util::hsv_to_rgb;
 
 #[derive(Debug)]
 pub struct ErrorReport {
@@ -11,6 +11,49 @@ pub struct ErrorReport {
     pub message: String,
     pub labels: Vec<(CodeArea, String)>,
     pub note: Option<String>,
+}
+
+impl std::error::Error for ErrorReport {}
+impl std::fmt::Display for ErrorReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut label_colors = RainbowColorGenerator::new(308.0, 0.5, 0.95, 35.0);
+
+        let mut report = Report::build(ReportKind::Error, "", 0).with_message(&self.message);
+
+        let mut source_vec = vec![];
+
+        for (area, msg) in &self.labels {
+            source_vec.push(area.src.clone());
+
+            let col = label_colors.next();
+
+            report = report.with_label(
+                Label::new((area.src.hyperlink(), area.span.into()))
+                    .with_message(msg)
+                    .with_color(ariadne::Color::RGB(col.0, col.1, col.2)),
+            );
+        }
+
+        if let Some(n) = &self.note {
+            report = report.with_note(n)
+        }
+
+        let mut out = BufWriter::new(Vec::new());
+
+        report
+            .finish()
+            .write_for_stdout(
+                sources(
+                    source_vec
+                        .iter()
+                        .map(|src| (src.hyperlink(), src.read().unwrap())),
+                ),
+                &mut out,
+            )
+            .unwrap();
+
+        write!(f, "{}", String::from_utf8(out.buffer().to_vec()).unwrap())
+    }
 }
 
 #[macro_export]
@@ -54,10 +97,9 @@ macro_rules! error_maker {
                 },
             )*
         }
-        use $crate::error::ErrorReport;
 
         impl $enum {
-            pub fn to_report(&self $(, $extra_arg: $extra_type)* ) -> ErrorReport {
+            pub fn to_report(&self $(, $extra_arg: $extra_type)* ) -> $crate::error::ErrorReport {
                 use colored::Colorize;
                 use $crate::error::RainbowColorGenerator;
 
@@ -65,7 +107,7 @@ macro_rules! error_maker {
 
                 match self {
                     $(
-                        $enum::$err_name { $($field,)* $($call_stack)? } => ErrorReport {
+                        $enum::$err_name { $($field,)* $($call_stack)? } => $crate::error::ErrorReport  {
                             title: $title.to_string(),
                             message: ($msg).to_string(),
                             labels: {
@@ -122,69 +164,58 @@ impl RainbowColorGenerator {
     }
 
     pub fn next(&mut self) -> (u8, u8, u8) {
-        let c = self.v * self.s;
         let h0 = self.h / 60.0;
-
-        // "gfdgdf".bold().hidden()
-
-        let x = c * (1.0 - (h0.rem_euclid(2.0) - 1.0).abs());
-
-        let (r, g, b) = if (0.0..1.0).contains(&h0) {
-            (c, x, 0.0)
-        } else if (1.0..2.0).contains(&h0) {
-            (x, c, 0.0)
-        } else if (2.0..3.0).contains(&h0) {
-            (0.0, c, x)
-        } else if (3.0..4.0).contains(&h0) {
-            (0.0, x, c)
-        } else if (4.0..5.0).contains(&h0) {
-            (x, 0.0, c)
-        } else {
-            (c, 0.0, x)
-        };
-
-        let m = self.v - c;
-        let (r, g, b) = (r + m, g + m, b + m);
 
         self.h = (self.h + self.hue_shift).rem_euclid(360.0);
 
-        ((r * 255.0) as u8, (g * 255.0) as u8, (b * 255.0) as u8)
+        hsv_to_rgb(h0, self.s, self.v)
     }
 }
 
-impl ErrorReport {
-    pub fn display(&self) {
-        let mut label_colors = RainbowColorGenerator::new(308.0, 0.5, 0.95, 35.0);
+// impl ToString for ErrorReport {
+//     fn to_string(&self) -> String {
+//         let mut label_colors = RainbowColorGenerator::new(308.0, 0.5, 0.95, 35.0);
 
-        let mut report = Report::build(ReportKind::Error, "", 0).with_message(&self.message);
+//         let mut report = Report::build(ReportKind::Error, "", 0).with_message(&self.message);
 
-        let mut source_vec = vec![];
+//         let mut source_vec = vec![];
 
-        for (area, msg) in &self.labels {
-            source_vec.push(area.src.clone());
+//         for (area, msg) in &self.labels {
+//             source_vec.push(area.src.clone());
 
-            let col = label_colors.next();
+//             let col = label_colors.next();
 
-            report = report.with_label(
-                Label::new((area.src.hyperlink(), area.span.into()))
-                    .with_message(msg)
-                    .with_color(ariadne::Color::RGB(col.0, col.1, col.2)),
-            );
-        }
-        println!("\n");
-        std::io::stdout().flush().unwrap();
+//             report = report.with_label(
+//                 Label::new((area.src.hyperlink(), area.span.into()))
+//                     .with_message(msg)
+//                     .with_color(ariadne::Color::RGB(col.0, col.1, col.2)),
+//             );
+//         }
 
-        if let Some(n) = &self.note {
-            report = report.with_note(n)
-        }
+//         if let Some(n) = &self.note {
+//             report = report.with_note(n)
+//         }
 
-        report
-            .finish()
-            .eprint(sources(
-                source_vec
-                    .iter()
-                    .map(|src| (src.hyperlink(), src.read().unwrap())),
-            ))
-            .unwrap();
-    }
-}
+//         let mut buf = BufWriter::new(Vec::new());
+
+//         report
+//             .finish()
+//             .write_for_stdout(
+//                 sources(
+//                     source_vec
+//                         .iter()
+//                         .map(|src| (src.hyperlink(), src.read().unwrap())),
+//                 ),
+//                 &mut buf,
+//             )
+//             .unwrap();
+
+//         String::from_utf8(buf.into_inner().unwrap()).unwrap()
+//     }
+// }
+
+// impl ErrorReport {
+//     pub fn display(&self) {
+//         eprintln!("{}", self.to_string());
+//     }
+// }

@@ -124,6 +124,12 @@ impl FullContext {
         current.group_stack.pop().unwrap()
     }
 
+    pub fn pop_groups_until(&mut self, group: Id) {
+        let mut current = self.current_mut();
+        while current.group_stack.pop().unwrap() != group {}
+        current.group_stack.push(group);
+    }
+
     pub fn group(&self) -> Id {
         *self.current().group_stack.last().unwrap()
     }

@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::str::FromStr;
 
 use ahash::AHashMap;
 use colored::Colorize;
@@ -8,13 +9,14 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 
-use super::compiler::CompileResult;
+use super::compiler::{CompileResult, CustomTypeKey, TypeDef};
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
-use crate::parsing::ast::{ImportType, Spannable, Spanned};
+use crate::parsing::ast::{ImportType, MacroArg, ObjKeyType, ObjectType, Spannable, Spanned};
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
 use crate::vm::opcodes::{FunctionID, ImportID, Opcode, Register, UnoptOpcode, UnoptRegister};
+use crate::vm::value::ValueType;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(bound = "Opcode<R>: Serialize, for<'de2> Opcode<R>: Deserialize<'de2>")]
@@ -49,6 +51,8 @@ where
 
     pub export_names: Vec<String>,
     pub import_paths: Vec<Spanned<ImportType>>,
+
+    pub custom_types: SlotMap<CustomTypeKey, Spanned<String>>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -58,6 +62,7 @@ pub enum Constant {
     String(String),
     Bool(bool),
     Id(IDClass, u16),
+    Type(ValueType),
 }
 
 impl std::fmt::Debug for Constant {
@@ -68,12 +73,15 @@ impl std::fmt::Debug for Constant {
             Constant::Bool(v) => write!(f, "{v}"),
             Constant::String(v) => write!(f, "{v:?}"),
             Constant::Id(class, n) => write!(f, "{}{}", n, class.letter()),
+            Constant::Type(_) => write!(f, "@<type>"),
         }
     }
 }
 
-#[allow(unknown_lints)]
+// clippy moment
 #[allow(clippy::derived_hash_with_manual_eq)]
+#[allow(renamed_and_removed_lints)]
+#[allow(unknown_lints)]
 #[allow(clippy::derive_hash_xor_eq)]
 impl Hash for Constant {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -88,6 +96,7 @@ impl Hash for Constant {
                 v.hash(state);
                 c.hash(state);
             }
+            Constant::Type(v) => v.hash(state),
         }
     }
 }
@@ -181,6 +190,8 @@ pub struct BytecodeBuilder {
     funcs: Vec<ProtoFunc>,
 
     import_paths: Vec<Spanned<ImportType>>,
+
+    custom_types: SlotMap<CustomTypeKey, Spanned<String>>,
 }
 
 pub struct FuncBuilder<'a> {
@@ -196,6 +207,7 @@ impl BytecodeBuilder {
             constants: UniqueRegister::new(),
             funcs: vec![],
             import_paths: vec![],
+            custom_types: SlotMap::default(),
         }
     }
 
@@ -355,6 +367,7 @@ impl BytecodeBuilder {
             opcode_span_map,
             export_names: global_returns, //todo
             import_paths: self.import_paths,
+            custom_types: self.custom_types,
         }
     }
 }
@@ -498,6 +511,52 @@ impl<'a> FuncBuilder<'a> {
         Ok(())
     }
 
+    pub fn new_object<F>(
+        &mut self,
+        len: u16,
+        dest: UnoptRegister,
+        f: F,
+        span: CodeSpan,
+        typ: ObjectType,
+    ) -> CompileResult<()>
+    where
+        F: FnOnce(
+            &mut FuncBuilder,
+            &mut Vec<(Spanned<ObjKeyType>, UnoptRegister)>,
+        ) -> CompileResult<()>,
+    {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(match typ {
+                ObjectType::Object => UnoptOpcode::AllocObject { size: len, dest },
+                ObjectType::Trigger => UnoptOpcode::AllocTrigger { size: len, dest },
+            }),
+            span,
+        );
+
+        let mut items = vec![];
+        f(self, &mut items)?;
+
+        for (k, r) in items {
+            self.push_opcode_spanned(
+                match k.value {
+                    ObjKeyType::Name(k) => ProtoOpcode::Raw(UnoptOpcode::PushObjectElemKey {
+                        elem: r,
+                        obj_key: k,
+                        dest,
+                    }),
+                    ObjKeyType::Num(n) => ProtoOpcode::Raw(UnoptOpcode::PushObjectElemUnchecked {
+                        elem: r,
+                        obj_key: n,
+                        dest,
+                    }),
+                },
+                k.span,
+            )
+        }
+
+        Ok(())
+    }
+
     pub fn new_macro<F>(
         &mut self,
         id: FunctionID,
@@ -508,11 +567,7 @@ impl<'a> FuncBuilder<'a> {
     where
         F: FnOnce(
             &mut FuncBuilder,
-            &mut Vec<(
-                Spanned<String>,
-                Option<UnoptRegister>,
-                Option<UnoptRegister>,
-            )>,
+            &mut Vec<MacroArg<Spanned<String>, UnoptRegister>>,
         ) -> CompileResult<()>,
     {
         self.push_opcode_spanned(
@@ -523,26 +578,58 @@ impl<'a> FuncBuilder<'a> {
         let mut items = vec![];
         f(self, &mut items)?;
 
-        for (n, pat, def) in items {
-            let name_reg = self.next_reg();
-            self.load_string(n.value, name_reg, n.span);
+        for arg in items {
+            match arg {
+                MacroArg::Single {
+                    name,
+                    pattern,
+                    default,
+                    is_ref,
+                } => {
+                    let name_reg = self.next_reg();
+                    self.load_string(name.value, name_reg, name.span);
 
-            self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushMacroArg {
-                name: name_reg,
-                dest,
-            }));
+                    self.push_opcode_spanned(
+                        ProtoOpcode::Raw(UnoptOpcode::PushMacroArg {
+                            name: name_reg,
+                            is_ref,
+                            dest,
+                        }),
+                        name.span,
+                    );
 
-            if let Some(p) = pat {
-                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
-                    src: p,
-                    dest,
-                }));
-            }
-            if let Some(d) = def {
-                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgDefault {
-                    src: d,
-                    dest,
-                }));
+                    if let Some(p) = pattern {
+                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
+                            src: p,
+                            dest,
+                        }));
+                    }
+                    if let Some(d) = default {
+                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgDefault {
+                            src: d,
+                            dest,
+                        }));
+                    }
+                }
+                MacroArg::Spread { name, pattern } => {
+                    let name_reg = self.next_reg();
+                    self.load_string(name.value, name_reg, name.span);
+
+                    self.push_opcode_spanned(
+                        ProtoOpcode::Raw(UnoptOpcode::PushMacroSpreadArg {
+                            name: name_reg,
+                            dest,
+                        }),
+                        name.span,
+                    );
+
+                    if let Some(p) = pattern {
+                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
+                            src: p,
+                            dest,
+                        }));
+                    }
+                }
             }
         }
 
@@ -566,6 +653,22 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn load_bool(&mut self, value: bool, reg: UnoptRegister, span: CodeSpan) {
         let k = self.code_builder.constants.insert(Constant::Bool(value));
+        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+    }
+
+    pub fn load_custom_type(&mut self, key: CustomTypeKey, reg: UnoptRegister, span: CodeSpan) {
+        let k = self
+            .code_builder
+            .constants
+            .insert(Constant::Type(ValueType::Custom(key)));
+        self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
+    }
+
+    pub fn load_builtin_type(&mut self, name: &str, reg: UnoptRegister, span: CodeSpan) {
+        let k = self
+            .code_builder
+            .constants
+            .insert(Constant::Type(ValueType::from_str(name).unwrap()));
         self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
 
@@ -600,8 +703,11 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
-    pub fn pop_context_group(&mut self, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PopGroupStack), span)
+    pub fn pop_context_group(&mut self, fn_reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::PopGroupStack { fn_reg }),
+            span,
+        )
     }
 
     pub fn make_trigger_function(
@@ -988,8 +1094,32 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::WrapMaybe { src, dest }), span)
     }
 
+    pub fn create_instance(
+        &mut self,
+        base: UnoptRegister,
+        dict: UnoptRegister,
+        dest: UnoptRegister,
+        span: CodeSpan,
+    ) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::CreateInstance { base, dest, dict }),
+            span,
+        )
+    }
+
+    pub fn do_impl(&mut self, base: UnoptRegister, dict: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Impl { base, dict }), span)
+    }
+
     pub fn load_empty(&mut self, reg: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }), span)
+    }
+
+    pub fn load_empty_dict(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::LoadEmptyDict { dest: reg }),
+            span,
+        )
     }
 
     pub fn index(
@@ -1028,6 +1158,25 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
+    pub fn type_member(
+        &mut self,
+        from: UnoptRegister,
+        dest: UnoptRegister,
+        member: Spanned<String>,
+        span: CodeSpan,
+    ) {
+        let next_reg = self.next_reg();
+        self.load_string(member.value, next_reg, member.span);
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::TypeMember {
+                from,
+                dest,
+                member: next_reg,
+            }),
+            span,
+        )
+    }
+
     pub fn associated(
         &mut self,
         from: UnoptRegister,
@@ -1054,8 +1203,8 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
-    pub fn ret(&mut self, src: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Ret { src }))
+    pub fn ret(&mut self, src: UnoptRegister, module_ret: bool) {
+        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Ret { src, module_ret }))
     }
 
     pub fn yeet_context(&mut self) {
@@ -1086,8 +1235,12 @@ impl<'a> FuncBuilder<'a> {
         )
     }
 
-    pub fn print(&mut self, reg: UnoptRegister) {
-        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Print { reg }))
+    pub fn dbg(&mut self, reg: UnoptRegister) {
+        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Dbg { reg }))
+    }
+
+    pub fn create_type(&mut self, name: String, span: CodeSpan) -> CustomTypeKey {
+        self.code_builder.custom_types.insert(name.spanned(span))
     }
 }
 
@@ -1114,6 +1267,14 @@ impl Bytecode<Register> {
             self.import_paths
                 .iter()
                 .map(|p| &p.value)
+                .collect::<Vec<_>>()
+        );
+        println!(
+            "{}: {:?}\n",
+            "Custom types".bright_cyan().bold(),
+            self.custom_types
+                .iter()
+                .map(|(k, n)| format!("{:?}: @{}", k, &n.value))
                 .collect::<Vec<_>>()
         );
 
@@ -1174,7 +1335,7 @@ impl Bytecode<Register> {
                 let f_len = clear_ansi(&formatted).len();
 
                 let opcode_str = match self.opcode_span_map.get(&(func_i, opcode_i)) {
-                    Some(span) => {
+                    Some(span) if span.start != usize::MAX => {
                         let mut s = format!("{:?}", &code[span.start..span.end]);
                         s = s[1..s.len() - 1].into();
                         let last_char = &s[s.len() - 1..s.len()];
@@ -1191,7 +1352,7 @@ impl Bytecode<Register> {
 
                         format!("({}..{}) {}", span.start, span.end, s)
                     }
-                    None => "".into(),
+                    _ => "".into(),
                 };
 
                 let o_len = clear_ansi(&opcode_str).len();
@@ -1244,7 +1405,7 @@ impl Bytecode<Register> {
             println!(
                 "{}",
                 format!(
-                    "╭────┤ Function {} ├{}┬{}┬{}╮",
+                    "╭────┤ Function {} ├─────{}┬{}┬{}╮",
                     func_i,
                     "─".repeat(longest_formatted + max_num_width + 10),
                     "─".repeat(longest_span + 4),
@@ -1261,7 +1422,7 @@ impl Bytecode<Register> {
             println!(
                 "{}",
                 format!(
-                    "├──────────────────{}┴{}┴{}╯",
+                    "├───────────────────────{}┴{}┴{}╯",
                     "─".repeat(longest_formatted + max_num_width + 10),
                     "─".repeat(longest_span + 4),
                     // bytecode will never be more than 15 characters (2 spaces padding on either side, 2 hex chars + 1 space * 4)

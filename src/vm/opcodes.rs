@@ -5,6 +5,7 @@ use serde::de::{Error, Visitor};
 use serde::{Deserialize, Serialize};
 
 use crate::gd::ids::IDClass;
+use crate::gd::object_keys::ObjectKey;
 
 struct OpcodeVisitor;
 
@@ -32,7 +33,7 @@ impl<'de> Visitor<'de> for OpcodeVisitor {
     type Value = Opcode<Register>;
 
     fn expecting(&self, _: &mut std::fmt::Formatter) -> std::fmt::Result {
-        panic!("idk")
+        panic!("expected u32")
     }
 
     fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E>
@@ -135,7 +136,7 @@ opcodes! {
     #[delve(display = |f: &R, t: &R| format!("R{f} -> R{t}"))]
     Copy { => from, => to },
     #[delve(display = |reg: &R| format!("print R{reg}"))]
-    Print { => reg },
+    Dbg { => reg },
 
 
     #[delve(display = |b: &R, a: &R, d: &R| format!("R{b}(args R{a}) -> R{d}"))]
@@ -151,23 +152,40 @@ opcodes! {
         size: AllocSize,
         => dest,
     },
+    #[delve(display = |s: &AllocSize, d: &R| format!("obj {{...; {s}}} -> R{d}"))]
+    AllocObject {
+        size: AllocSize,
+        => dest,
+    },
+    #[delve(display = |s: &AllocSize, d: &R| format!("trigger {{...; {s}}} -> R{d}"))]
+    AllocTrigger {
+        size: AllocSize,
+        => dest,
+    },
 
     #[delve(display = |e: &R, d: &R| format!("push R{e} into R{d}"))]
     PushArrayElem { => elem, => dest },
     #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d}"))]
     PushDictElem { => elem, => key, => dest },
 
+    #[delve(display = |e: &R, k: &ObjectKey, d: &R| format!("insert {}:R{e} into R{d}", <&ObjectKey as Into<&'static str>>::into(k)))]
+    PushObjectElemKey { => elem, obj_key: ObjectKey, => dest },
+    #[delve(display = |e: &R, k: &u8, d: &R| format!("insert {k}:R{e} into R{d}"))]
+    PushObjectElemUnchecked { => elem, obj_key: u8, => dest },
+
     #[delve(display = |i: &FunctionID, d: &R| format!("{i}: (...) {{...}} -> R{d}"))]
     CreateMacro {
-        id: FunctionID,
+        id: FunctionID, // boo
         => dest,
     },
-    #[delve(display = |n: &R, d: &R| format!("insert arg R{n} into R{d}"))]
-    PushMacroArg { => name, => dest },
+    #[delve(display = |n: &R, d: &R, m: &bool| format!("insert arg {}R{n} into R{d}", if *m { "&" } else { "" }))]
+    PushMacroArg { => name, => dest, is_ref: bool },
     #[delve(display = |s: &R, d: &R| format!("set default to R{s} for R{d}"))]
     SetMacroArgDefault { => src, => dest },
     #[delve(display = |s: &R, d: &R| format!("set pattern to R{s} for R{d}"))]
     SetMacroArgPattern { => src, => dest },
+    #[delve(display = |n: &R, d: &R| format!("insert arg ...R{n} into R{d}"))]
+    PushMacroSpreadArg { => name, => dest },
 
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} + R{b} -> R{x}"))]
     Add { => left, => right, => dest },
@@ -258,8 +276,8 @@ opcodes! {
         to: JumpPos,
     },
 
-    #[delve(display = |s: &R| format!("return R{s}"))]
-    Ret { => src },
+    #[delve(display = |s: &R, m: &bool| format!("{} R{s}", if *module_ret { "export" } else { "return" }))]
+    Ret { => src, module_ret: bool },
 
     #[delve(display = |s: &R, d: &R| format!("R{s}? -> R{d}"))]
     WrapMaybe { => src, => dest },
@@ -269,13 +287,17 @@ opcodes! {
     #[delve(display = |d: &R| format!("() -> R{d}"))]
     LoadEmpty { => dest },
 
+    #[delve(display = |d: &R| format!("{{}} -> R{d}"))]
+    LoadEmptyDict { => dest },
+
     #[delve(display = |c: &IDClass, d: &R| format!("?{} -> R{d}", c.letter()))]
     LoadArbitraryId { class: IDClass, => dest },
 
+
     #[delve(display = |src: &R| format!("change to R{src}"))]
     PushContextGroup { => src },
-    #[delve(display = || "pop".to_string())]
-    PopGroupStack,
+    #[delve(display = |f: &R| format!("pop out of R{f}"))]
+    PopGroupStack { => fn_reg },
 
     #[delve(display = |s: &R, d: &R| format!("!{{R{s}}} -> R{d}"))]
     MakeTriggerFunc { => src, => dest },
@@ -284,7 +306,9 @@ opcodes! {
     Index { => base, => dest, => index },
     #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.R{i} ~> R{d}"))]
     Member { => from, => dest, => member },
-    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} -> R{d}"))]
+    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}.@R{i} -> R{d}"))]
+    TypeMember { => from, => dest, => member },
+    #[delve(display = |f: &R, d: &R, i: &R| format!("R{f}::R{i} ~> R{d}"))]
     Associated { => from, => dest, => name },
 
     #[delve(display = || "yeet".to_string())]
@@ -301,4 +325,9 @@ opcodes! {
     Export { => src },
     #[delve(display = |s: &ImportID, d: &R| format!("import id {s} -> R{d}"))]
     Import { src: ImportID => dest },
+
+    #[delve(display = |b: &R, d: &R, t: &R| format!("@R{b}::R{d} -> R{t}"))]
+    CreateInstance { => base, => dict, => dest },
+    #[delve(display = |b: &R, d: &R| format!("impl @R{b} {{R{d}}}"))]
+    Impl { => base, => dict },
 }

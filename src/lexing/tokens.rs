@@ -38,11 +38,13 @@ lexer! {
     Type: text("type"),
     Impl: text("impl"),
 
-    //Print: text("print"),
+    Dbg: text("dbg"),
 
     Extract: text("extract"),
     Import: text("import"),
     Dollar: text("$"),
+
+    Slf: text("self"),
 
     Is: text("is"),
     As: text("as"),
@@ -102,6 +104,7 @@ lexer! {
     DoubleColon: text("::"),
     Dot: text("."),
     Range: text(".."),
+    Spread: text("..."),
 
     FatArrow: text("=>"),
     Arrow: text("->"),

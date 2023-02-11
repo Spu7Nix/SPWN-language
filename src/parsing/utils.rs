@@ -10,9 +10,7 @@ macro_rules! operators {
         )+
     ) => {
         pub mod operators {
-
-            use crate::Token;
-
+            use crate::lexing::tokens::Token;
 
             #[derive(Debug, Clone, Copy)]
             pub enum AssignOp {
@@ -159,6 +157,7 @@ operators! {
     Left => [BinOr, Or];
     Left => [BinAnd, And];
     Unary => [BinNot];
+    Unary => [Eq, Neq, Gt, Gte, Lt, Lte];
     Unary => [ExclMark];
     Left => [Eq, Neq, Gt, Gte, Lt, Lte];
     Left => [ShiftLeft, ShiftRight];

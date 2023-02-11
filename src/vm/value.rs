@@ -1,16 +1,21 @@
+use std::fmt::Debug;
 use std::rc::Rc;
 use std::str::FromStr;
 
 use ahash::AHashMap;
+use delve::{FieldNames, ModifyField, VariantNames};
 use lasso::Spur;
+use serde::{Deserialize, Serialize};
 use strum::EnumDiscriminants;
 
-use super::builtins::builtin_utils::BuiltinType;
-use super::builtins::builtins::Builtin;
 use super::error::RuntimeError;
-use super::interpreter::{FuncCoord, ValueKey, Vm};
+use super::interpreter::{FuncCoord, RuntimeResult, ValueKey, Vm};
+use super::pattern::Pattern;
 use crate::compiling::bytecode::Constant;
+use crate::compiling::compiler::CustomTypeKey;
+use crate::gd::gd_object::ObjParam;
 use crate::gd::ids::*;
+use crate::parsing::ast::{MacroArg, ObjKeyType, ObjectType, Spanned};
 use crate::sources::CodeArea;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,68 +24,197 @@ pub struct StoredValue {
     pub area: CodeArea,
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub struct ArgData {
-    pub name: Spur,
-    pub default: Option<ValueKey>,
-    pub pattern: Option<ValueKey>,
-}
-
 #[derive(Clone)]
-pub enum MacroCode {
-    Normal {
+pub struct BuiltinFn(pub Rc<dyn Fn(Vec<ValueKey>, &mut Vm, CodeArea) -> RuntimeResult<Value>>);
+
+#[derive(Clone, Debug)]
+pub enum MacroTarget {
+    Macro {
         func: FuncCoord,
-        args: Vec<ArgData>,
         captured: Vec<ValueKey>,
     },
-    Builtin(Rc<dyn Fn(&mut Vec<ValueKey>, &mut Vm, CodeArea) -> Result<Value, RuntimeError>>),
+    Builtin(BuiltinFn),
 }
 
-impl PartialEq for MacroCode {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (
-                Self::Normal {
-                    func: f,
-                    args: a,
-                    captured: c,
-                },
-                Self::Normal {
-                    func: of,
-                    args: oa,
-                    captured: oc,
-                },
-            ) => f == of && a == oa && c == oc,
-            _ => false,
-        }
+impl Debug for BuiltinFn {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<builtin fn>")
     }
 }
 
-impl std::fmt::Debug for MacroCode {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Normal {
-                func: f,
-                args: a,
-                captured: c,
-            } => {
-                write!(
-                    fmt,
-                    "Normal {{ func: {f:?}, args: {a:?}, captured: {c:?} }}"
-                )
+#[derive(Clone, Debug)]
+pub struct MacroData {
+    pub target: MacroTarget,
+    pub args: Vec<MacroArg<Spanned<Spur>, ValueKey>>,
+    pub self_arg: Option<ValueKey>,
+}
+
+impl PartialEq for MacroData {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
+#[rustfmt::skip]
+macro_rules! value {
+    (
+        $(
+            $(#[$($meta:meta)*] )?
+            $name:ident
+                $( ( $( $t0:ty ),* ) )?
+                $( { $( $n:ident: $t1:ty ,)* } )?
+            ,
+        )*
+
+        => $i_name:ident
+            $( ( $( $it0:ty ),* ) )?
+            $( { $( $in:ident: $it1:ty ,)* } )?
+        ,
+    ) => {
+        #[derive(Debug, Clone, PartialEq)]
+        pub enum Value {
+            $(
+                $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?,
+            )*
+            $i_name $( ( $( $it0 ),* ) )? $( { $( $in: $it1 ,)* } )?,
+        }
+
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+        #[derive(delve::EnumFromStr, delve::EnumVariantNames, delve::EnumToStr)]
+        #[delve(rename_all = "snake_case")]
+        pub enum ValueType {
+            $(
+                $( #[$($meta)* ])?
+                $name,
+            )*
+            
+            #[delve(skip)]
+            Custom(CustomTypeKey),
+        }
+
+        impl Value {
+            pub fn get_type(&self) -> ValueType {
+                match self {
+                    Self::Instance { typ, .. } => ValueType::Custom(*typ),
+                    
+                    $(
+                        Self::$name {..} => ValueType::$name,
+                    )*
+                }
             }
-            Self::Builtin(..) => write!(fmt, "<builtin fn>"),
         }
+
+        pub mod arg_aliases {
+            use super::*;
+            use crate::vm::builtins::builtin_utils::IntoArg;
+            
+            $(
+                value!{ @semicolon $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
+            )*
+
+            paste::paste! {
+                $(
+                    impl IntoArg<[<A $name>]> for ValueKey {
+                        fn into_arg(self, vm: &Vm) -> [<A $name>] {
+
+                            let val = vm.memory[self].value.clone();
+
+                            value! {@into_arg_empty val $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
+
+                            $(
+                                value! {@tuple_match val $name $( $t0, )*}
+                            )?
+
+                            match val {
+                                $(
+                                    Value::$name {$($n,)*} => return [<A $name>] {$($n,)*},
+                                )?
+                                _ => (),
+                            }
+
+                            unreachable!();
+ 
+                        }
+                    }
+                )*
+            }
+
+        }
+    };
+
+    (@semicolon $name:ident) => {
+        paste::paste! {
+            pub struct [<A $name>];
+        }
+    };
+    (@semicolon $name:ident ( $( $t0:ty ),* )) => {
+        paste::paste! {
+            pub struct [<A $name>] ( $( pub $t0 ),* );
+        }
+    };
+    (@semicolon $name:ident { $( $n:ident: $t1:ty ,)* }) => {
+        paste::paste! {
+            pub struct [<A $name>] { $( pub $n: $t1 ,)* }
+        }
+    };
+
+    (@tuple_match $self:ident $name:ident $t1:ty, $t2:ty, $t3:ty, $t4:ty, ) => {
+        paste::paste! {
+            match $self {
+                Value::$name (a, b, c, d) => return [<A $name>](a, b, c, d),
+                _ => (),
+            }
+        }
+    };
+    (@tuple_match $self:ident $name:ident $t1:ty, $t2:ty, $t3:ty, ) => {
+        paste::paste! {
+            match $self {
+                Value::$name (a, b, c) => return [<A $name>](a, b, c),
+                _ => (),
+            }
+        }
+    };
+    (@tuple_match $self:ident $name:ident $t1:ty, $t2:ty, ) => {
+        paste::paste! {
+            match $self {
+                Value::$name (a, b) => return [<A $name>](a, b),
+                _ => (),
+            }
+        }
+    };
+    (@tuple_match $self:ident $name:ident $t1:ty, ) => {
+        paste::paste! {
+            match $self {
+                Value::$name (a) => return [<A $name>](a),
+                _ => (),
+            }
+        }
+    };
+
+    (@into_arg_empty $self:ident $name:ident) => {
+        paste::paste! {
+            match $self {
+                Value::$name => return [<A $name>],
+                _ => (),
+            }
+        }
+    };
+    (@into_arg_empty $self:ident $name:ident $($t:tt)+) => {};
+}
+
+impl ValueType {
+    pub fn runtime_display(self, vm: &Vm) -> String {
+        format!(
+            "@{}",
+            match self {
+                Self::Custom(t) => vm.resolve(&vm.types[t].value.name),
+                _ => <ValueType as Into<&'static str>>::into(self).into(),
+            }
+        )
     }
 }
 
-#[derive(EnumDiscriminants, Debug, Clone, PartialEq)]
-// `EnumDiscriminants` generates a new enum that is just the variant names without any data
-// anything in `strum_discriminants` is applied to the `ValueType` enum
-#[strum_discriminants(name(ValueType))]
-#[strum_discriminants(derive(delve::EnumToStr))]
-#[strum_discriminants(delve(rename_all = "lowercase"))]
-pub enum Value {
+value! {
     Int(i64),
     Float(f64),
     Bool(bool),
@@ -90,7 +224,7 @@ pub enum Value {
     Dict(AHashMap<Spur, ValueKey>),
 
     Group(Id),
-    Color(Id),
+    Channel(Id),
     Block(Id),
     Item(Id),
 
@@ -100,24 +234,32 @@ pub enum Value {
 
     Maybe(Option<ValueKey>),
     Empty,
-    Macro(MacroCode),
+    Macro(MacroData),
 
-    TypeIndicator(usize),
+    Type(ValueType),
+    Pattern(Pattern),
 
-    TriggerFunction(Id),
-}
+    Module {
+        exports: AHashMap<Spur, ValueKey>,
+        types: Vec<CustomTypeKey>,
+    },
 
-impl std::fmt::Display for ValueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "@{}", <&ValueType as Into<&'static str>>::into(self))
-    }
+    TriggerFunction {
+        group: Id,
+        prev_context: Id,
+    },
+
+    Object(AHashMap<u8, ObjParam>, ObjectType),
+
+    Epsilon,
+
+    => Instance {
+        typ: CustomTypeKey,
+        items: AHashMap<Spur, ValueKey>,
+    },
 }
 
 impl Value {
-    pub fn get_type(&self) -> ValueType {
-        self.into()
-    }
-
     pub fn from_const(c: &Constant) -> Self {
         match c {
             Constant::Int(v) => Value::Int(*v),
@@ -128,11 +270,12 @@ impl Value {
                 let id = Id::Specific(*v);
                 match c {
                     IDClass::Group => Value::Group(id),
-                    IDClass::Color => Value::Color(id),
+                    IDClass::Color => Value::Channel(id),
                     IDClass::Block => Value::Block(id),
                     IDClass::Item => Value::Item(id),
                 }
             }
+            Constant::Type(k) => Value::Type(*k),
         }
     }
 
@@ -150,7 +293,7 @@ impl Value {
                     .join(", ")
             ),
             Value::Dict(d) => format!(
-                "{{{}}}",
+                "{{ {} }}",
                 d.iter()
                     .map(|(s, k)| format!(
                         "{}: {}",
@@ -161,7 +304,7 @@ impl Value {
                     .join(", ")
             ),
             Value::Group(id) => id.fmt("g"),
-            Value::Color(id) => id.fmt("c"),
+            Value::Channel(id) => id.fmt("c"),
             Value::Block(id) => id.fmt("b"),
             Value::Item(id) => id.fmt("i"),
             Value::Builtins => "$".to_string(),
@@ -177,45 +320,67 @@ impl Value {
                 None => "?".into(),
             },
             Value::Empty => "()".into(),
-            Value::Macro(MacroCode::Normal {
-                func,
-                args,
-                captured,
-            }) => format!(
+
+            Value::Macro(MacroData { args, .. }) => format!(
                 "({}) {{...}}",
                 args.iter()
-                    .map(|d| vm.resolve(&d.name))
+                    .map(|a| vm.resolve(&a.name().value))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            Value::Macro(MacroCode::Builtin(_)) => "<builtin fn>".to_string(),
-            Value::TriggerFunction(_) => "!{{...}}".to_string(),
-            Value::TypeIndicator(_) => todo!(),
+
+            Value::TriggerFunction { .. } => "!{...}".to_string(),
+            Value::Type(t) => t.runtime_display(vm),
+            Value::Object(map, typ) => format!(
+                "{} {{ {} }}",
+                match typ {
+                    ObjectType::Object => "obj",
+                    ObjectType::Trigger => "trigger",
+                },
+                map.iter()
+                    .map(|(s, k)| format!("{s}: {k:?}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Value::Epsilon => "$.epsilon()".to_string(),
+            Value::Module { exports, types } => format!(
+                "module {{ {}{} }}",
+                exports
+                    .iter()
+                    .map(|(s, k)| format!(
+                        "{}: {}",
+                        vm.interner.borrow().resolve(s),
+                        vm.memory[*k].value.runtime_display(vm)
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                if !types.is_empty() {
+                    format!(
+                        "; {}",
+                        types
+                            .iter()
+                            .map(|t| format!("@{}", vm.resolve(&vm.types[*t].value.name)))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                } else {
+                    "".into()
+                }
+            ),
+            Value::Pattern(p) => p.runtime_display(vm),
+            Value::Instance { typ, items } => format!(
+                "@{}::{{ {} }}",
+                vm.resolve(&vm.types[*typ].value.name),
+                items
+                    .iter()
+                    .map(|(s, k)| format!(
+                        "{}: {}",
+                        vm.interner.borrow().resolve(s),
+                        vm.memory[*k].value.runtime_display(vm)
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ),
         }
-    }
-
-    pub fn invoke_static(&self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
-        match self {
-            Value::TypeIndicator(id) => match id {
-                0 => String::invoke_static(name, vm),
-                _ => todo!(),
-            },
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn invoke_self(self, name: &str, vm: &mut Vm) -> Result<Value, RuntimeError> {
-        Ok(match self {
-            Value::String(s) => s.invoke_self(name, vm)?,
-
-            Value::Builtins => {
-                let b = Builtin::from_str(name).unwrap();
-
-                Value::Macro(MacroCode::Builtin(Rc::new(move |_args, _vm, _area| {
-                    b.call(_args, _vm, _area)
-                })))
-            }
-            _ => todo!(),
-        })
     }
 }

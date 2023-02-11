@@ -3,6 +3,7 @@ use paste::paste;
 
 use super::ast::{Expression, Spanned};
 use crate::lexing::tokens::Token;
+use crate::parsing::ast::Statement;
 use crate::parsing::error::SyntaxError;
 use crate::parsing::parser::{ParseResult, Parser};
 use crate::util::hyperlink;
@@ -264,10 +265,6 @@ macro_rules! attributes {
 }
 
 attributes! {
-    pub enum StmtAttribute {}
-}
-
-attributes! {
     #[check_validity(Expression)]
     pub enum ExprAttribute {
         #[valid_on(TriggerFunc)]
@@ -279,13 +276,13 @@ attributes! {
 }
 
 attributes! {
-    //#[check_validity(Statement)]
-    pub enum DocAttribute {
+    #[check_validity(Statement)]
+    pub enum StmtAttribute {
         // #[valid_on(Arrow)]
         // Doc(String),
 
-        // #[valid_on(TriggerFunc, Method, Type)]
-        // Deprecated { since: String, note: String },
+        #[valid_on(Let, TypeDef)]
+        Deprecated { since: String, note: String, },
     }
 }
 
@@ -293,11 +290,5 @@ attributes! {
     pub enum ScriptAttribute {
         CacheOutput,
         NoStd,
-        ConsoleOutput,
-        NoLevel,
-        NoBytecodeCache,
-        DebugBytecode,
-        NoOptimize,
-        NoOptimizeBytecode,
     }
 }

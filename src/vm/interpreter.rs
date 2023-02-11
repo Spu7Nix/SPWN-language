@@ -1,25 +1,25 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::str::FromStr;
 
 use ahash::AHashMap;
 use colored::Colorize;
 use lasso::Spur;
-use slotmap::{new_key_type, SlotMap};
+use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
 use super::context::{CallKey, CallStackItem, FullContext};
 use super::error::RuntimeError;
 use super::opcodes::{Opcode, Register};
-use super::value::{ArgData, StoredValue, Value, ValueType};
+use super::value::{MacroTarget, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
+use crate::compiling::compiler::{CustomTypeKey, TypeDef};
+use crate::gd::gd_object::{GdObject, Trigger, TriggerOrder};
 use crate::gd::ids::{IDClass, Id};
+use crate::gd::object_keys::ObjectKeyValueType;
+use crate::parsing::ast::{MacroArg, Spannable, Spanned};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
-use crate::vm::builtins::builtin_utils::BuiltinType;
-use crate::vm::builtins::builtins::Builtin;
-// use crate::vm::builtins::Builtin;
-use crate::vm::value::MacroCode;
+use crate::vm::value::MacroData;
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 new_key_type! {
@@ -43,7 +43,7 @@ pub struct Vm<'a> {
     // 256 registers per function
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    pub programs: SlotMap<BytecodeKey, (SpwnSource, &'a Bytecode<Register>)>,
+    pub programs: SlotMap<BytecodeKey, (SpwnSource, &'a Bytecode<Register>, Vec<CustomTypeKey>)>,
     pub src_map: AHashMap<SpwnSource, BytecodeKey>,
 
     pub interner: Rc<RefCell<Interner>>,
@@ -51,16 +51,46 @@ pub struct Vm<'a> {
     pub id_counters: [usize; 4],
 
     pub contexts: FullContext,
+    pub objects: Vec<GdObject>,
+    pub triggers: Vec<Trigger>,
+    pub trigger_order_count: TriggerOrder,
+
+    pub types: SecondaryMap<CustomTypeKey, Spanned<TypeDef>>,
+
+    pub impls: AHashMap<ValueType, AHashMap<Spur, ValueKey>>,
 }
 
 impl<'a> Vm<'a> {
-    pub fn new(bytecode_map: &'a BytecodeMap, interner: Rc<RefCell<Interner>>) -> Vm<'a> {
+    pub fn new(
+        bytecode_map: &'a BytecodeMap,
+        interner: Rc<RefCell<Interner>>,
+        type_defs: AHashMap<TypeDef, Spanned<CustomTypeKey>>,
+    ) -> Vm<'a> {
         let mut programs = SlotMap::default();
         let mut src_map = AHashMap::new();
 
+        let mut type_src_map: AHashMap<_, Vec<CustomTypeKey>> = AHashMap::new();
+
+        for (TypeDef { def_src, .. }, k) in &type_defs {
+            type_src_map
+                .entry(def_src)
+                .and_modify(|v| v.push(k.value))
+                .or_insert_with(|| vec![k.value]);
+        }
+
         for (src, bytecode) in &bytecode_map.map {
-            let k = programs.insert((src.clone(), bytecode));
+            let k = programs.insert((
+                src.clone(),
+                bytecode,
+                type_src_map.remove(src).unwrap_or_default(),
+            ));
             src_map.insert(src.clone(), k);
+        }
+
+        let mut types = SecondaryMap::new();
+
+        for (info, k) in type_defs {
+            types.insert(k.value, info.clone().spanned(k.span));
         }
 
         Self {
@@ -70,11 +100,20 @@ impl<'a> Vm<'a> {
             id_counters: [0; 4],
             contexts: FullContext::new(),
             src_map,
+            objects: Vec::new(),
+            triggers: Vec::new(),
+            types,
+            impls: AHashMap::new(),
+            trigger_order_count: TriggerOrder::new(),
         }
     }
 
     pub fn resolve(&self, spur: &Spur) -> String {
         self.interner.borrow().resolve(spur).to_string()
+    }
+
+    fn intern(&self, s: &str) -> Spur {
+        self.interner.borrow_mut().get_or_intern(s)
     }
 
     pub fn deep_clone_key(&mut self, k: ValueKey) -> StoredValue {
@@ -121,7 +160,6 @@ impl<'a> Vm<'a> {
         &mut self.memory[self.contexts.current_mut().registers.last().unwrap()[reg as usize]]
     }
 
-    // please only use for "mutating" something, otherwise context fuckery
     pub fn set_reg(&mut self, reg: Register, v: StoredValue) {
         self.memory[self.contexts.current_mut().registers.last_mut().unwrap()[reg as usize]] = v
     }
@@ -135,7 +173,6 @@ impl<'a> Vm<'a> {
     // }
 
     pub fn make_area(&self, span: CodeSpan, code: BytecodeKey) -> CodeArea {
-        // todo!()
         CodeArea {
             span,
             src: self.programs[code].0.clone(),
@@ -151,7 +188,7 @@ impl<'a> Vm<'a> {
     }
 
     pub fn get_call_stack(&self) -> Vec<CallStackItem> {
-        self.contexts.current().pos_stack.iter().cloned().collect()
+        self.contexts.current().pos_stack.to_vec()
     }
 
     pub fn push_call_stack(
@@ -189,8 +226,6 @@ impl<'a> Vm<'a> {
             call_area,
         });
         current.recursion_depth += 1;
-
-        //dbg!(&self.contexts);
     }
 
     pub fn return_and_pop_current(&mut self, ret_val: Option<StoredValue>) -> Option<CallKey> {
@@ -209,7 +244,7 @@ impl<'a> Vm<'a> {
         } else {
             StoredValue {
                 value: Value::Empty,
-                area: item.call_area.or(Some(CodeArea::internal())).unwrap(),
+                area: item.call_area.unwrap_or_else(|| CodeArea::internal()),
             }
         };
 
@@ -219,7 +254,6 @@ impl<'a> Vm<'a> {
     }
 
     pub fn run_program(&mut self) -> RuntimeResult<()> {
-        //self.push_call_stack(start, 0);
         while self.contexts.valid() {
             let &CallStackItem {
                 func, ip, call_key, ..
@@ -238,11 +272,6 @@ impl<'a> Vm<'a> {
             }
             let opcode = &opcodes[ip];
 
-            // println!(
-            //     "{} - {opcode}",
-            //     <&Opcode<Register> as Into<&'static str>>::into(opcode).green()
-            // );
-
             match opcode {
                 Opcode::LoadConst { dest, id } => {
                     let value = Value::from_const(&self.programs[func.code].1.consts[*id as usize]);
@@ -259,11 +288,12 @@ impl<'a> Vm<'a> {
                     let v = self.deep_clone_reg(*from);
                     self.set_reg(*to, v)
                 }
-                Opcode::Print { reg } => {
+                Opcode::Dbg { reg } => {
                     println!(
-                        "{}, {}",
+                        "{}, {} | {:?}",
                         self.get_reg(*reg).value.runtime_display(self),
-                        self.contexts.group().fmt("g").green()
+                        self.contexts.group().fmt("g").green(),
+                        self.get_reg(*reg).value
                     )
                 }
                 Opcode::AllocArray { size, dest } => self.set_reg(
@@ -305,6 +335,115 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     }
                 }
+
+                Opcode::AllocObject { size, dest } => self.set_reg(
+                    *dest,
+                    StoredValue {
+                        value: Value::Object(
+                            AHashMap::with_capacity(*size as usize),
+                            crate::parsing::ast::ObjectType::Object,
+                        ),
+                        area: self.get_area(func, ip),
+                    },
+                ),
+                Opcode::AllocTrigger { size, dest } => self.set_reg(
+                    *dest,
+                    StoredValue {
+                        value: Value::Object(
+                            AHashMap::with_capacity(*size as usize),
+                            crate::parsing::ast::ObjectType::Trigger,
+                        ),
+                        area: self.get_area(func, ip),
+                    },
+                ),
+
+                Opcode::PushObjectElemKey {
+                    elem,
+                    obj_key,
+                    dest,
+                } => {
+                    // Objec
+                    let push = self.deep_clone_reg_insert(*elem);
+
+                    let param = {
+                        let types = obj_key.types();
+
+                        let mut valid = false;
+
+                        for t in types {
+                            match (t, &self.memory[push].value) {
+                                (ObjectKeyValueType::Int, Value::Int(_))
+                                | (ObjectKeyValueType::Float, Value::Float(_) | Value::Int(_))
+                                | (ObjectKeyValueType::Bool, Value::Bool(_))
+                                | (
+                                    ObjectKeyValueType::Group,
+                                    Value::Group(_) | Value::TriggerFunction { .. },
+                                )
+                                | (ObjectKeyValueType::Channel, Value::Channel(_))
+                                | (ObjectKeyValueType::Block, Value::Block(_))
+                                | (ObjectKeyValueType::Item, Value::Item(_))
+                                | (ObjectKeyValueType::String, Value::String(_))
+                                | (ObjectKeyValueType::Epsilon, Value::Epsilon) => {
+                                    valid = true;
+                                    break;
+                                }
+
+                                (ObjectKeyValueType::GroupArray, Value::Array(v))
+                                    if v.iter().all(|k| {
+                                        matches!(&self.memory[*k].value, Value::Group(_))
+                                    }) =>
+                                {
+                                    valid = true;
+                                    break;
+                                }
+
+                                _ => (),
+                            }
+                        }
+
+                        if !valid {
+                            println!("{:?} {:?}", types, &self.memory[push].value);
+                            panic!("\n\nOk   heres the deal!!! I not this yet XDXDC😭😭🤣🤣 \nLOl")
+                        }
+
+                        value_ops::to_obj_param(
+                            &self.memory[push],
+                            self.get_span(func, ip),
+                            self,
+                            func.code,
+                        )?
+                    };
+
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Object(v, _) => {
+                            v.insert(obj_key.id(), param);
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                Opcode::PushObjectElemUnchecked {
+                    elem,
+                    obj_key,
+                    dest,
+                } => {
+                    // Objec
+                    let push = self.deep_clone_reg_insert(*elem);
+
+                    let param = value_ops::to_obj_param(
+                        &self.memory[push],
+                        self.get_span(func, ip),
+                        self,
+                        func.code,
+                    )?;
+
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Object(v, _) => {
+                            v.insert(*obj_key, param);
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+
                 Opcode::Add { left, right, dest } => {
                     self.bin_op(value_ops::add, func, ip, left, right, dest)?
                 }
@@ -431,8 +570,23 @@ impl<'a> Vm<'a> {
                         continue;
                     }
                 }
-                Opcode::Ret { src } => {
-                    let ret_val = self.deep_clone_reg(*src);
+                Opcode::Ret { src, module_ret } => {
+                    let mut ret_val = self.deep_clone_reg(*src);
+
+                    if *module_ret {
+                        match ret_val.value {
+                            Value::Dict(d) => {
+                                // let module_name = self.programs[func.code].0.name()
+
+                                ret_val.value = Value::Module {
+                                    exports: d,
+                                    types: self.programs[func.code].2.clone(),
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+
                     let Some(call_key) = self.return_and_pop_current(Some(ret_val)) else { continue };
                     self.contexts.have_not_returned.remove(call_key);
                     continue;
@@ -464,6 +618,16 @@ impl<'a> Vm<'a> {
                         *dest,
                         StoredValue {
                             value: Value::Empty,
+                            area: self.make_area(span, func.code),
+                        },
+                    )
+                }
+                Opcode::LoadEmptyDict { dest } => {
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Dict(AHashMap::new()),
                             area: self.make_area(span, func.code),
                         },
                     )
@@ -539,66 +703,248 @@ impl<'a> Vm<'a> {
                     };
                     let span = self.get_span(func, ip);
 
-                    // let value = &self.get_reg(*from).value;
-                    // i dont think this clone can go away :(((
-                    let value = self.get_reg(*from).value.clone();
+                    let value = &self.get_reg(*from).value;
+                    let key = &key[..];
 
-                    let v = value.invoke_self(&key[..], self)?;
+                    let special = match (value, key) {
+                        (Value::String(s), "length") => Some(Value::Int(s.len() as i64)),
+
+                        (Value::Range(start, ..), "start") => Some(Value::Int(*start)),
+                        (Value::Range(_, end, _), "end") => Some(Value::Int(*end)),
+                        (Value::Range(_, _, step), "step") => Some(Value::Int(*step as i64)),
+
+                        (Value::Array(v), "length") => Some(Value::Int(v.len() as i64)),
+                        (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
+
+                        _ => None,
+                    };
+
+                    macro_rules! error {
+                        ($type:ident) => {
+                            return Err(RuntimeError::NonexistentMember {
+                                area: self.make_area(span, func.code),
+                                member: key.into(),
+                                base_type: $type,
+                                call_stack: self.get_call_stack(),
+                            })
+                        };
+                    }
+
+                    if let Some(v) = special {
+                        self.set_reg(
+                            *dest,
+                            StoredValue {
+                                value: v,
+                                area: self.make_area(span, func.code),
+                            },
+                        );
+                    } else {
+                        let key_interned = self.interner.borrow_mut().get_or_intern(key);
+                        let base_type = value.get_type();
+
+                        match value {
+                            Value::Dict(v) => {
+                                if let Some(k) = v.get(&key_interned) {
+                                    self.change_reg_key(*dest, *k)
+                                }
+                            }
+                            Value::Module { exports, .. } => {
+                                if let Some(k) = exports.get(&key_interned) {
+                                    self.change_reg_key(*dest, *k)
+                                }
+                            }
+                            _ => (),
+                        }
+
+                        let Some(members) = self.impls.get(&base_type) else { error!(base_type) };
+                        let Some(k) = members.get(&self.intern(key)) else { error!(base_type) };
+
+                        let mut v = self.deep_clone_key(*k);
+
+                        if let Value::Macro(MacroData { self_arg, args, .. }) = &mut v.value {
+                            match args.get(0) {
+                                Some(arg) if arg.name().value == self.intern("self") => {
+                                    *self_arg = Some(self.deep_clone_reg_insert(*from))
+                                }
+                                _ => {
+                                    return Err(RuntimeError::AssociatedNotAMethod {
+                                        area: self.make_area(span, func.code),
+                                        def_area: v.area.clone(),
+                                        func_name: key.into(),
+                                        base_type,
+                                        call_stack: self.get_call_stack(),
+                                    });
+                                }
+                            }
+                        } else {
+                            return Err(RuntimeError::NotAMethod {
+                                area: self.make_area(span, func.code),
+                                def_area: v.area.clone(),
+                                member_name: key.into(),
+                                member_type: v.value.get_type(),
+                                base_type,
+                                call_stack: self.get_call_stack(),
+                            });
+                        }
+
+                        self.set_reg(*dest, v);
+                    }
+                }
+                Opcode::TypeMember { from, dest, member } => {
+                    let stored_value = self.get_reg(*from);
+                    let value = &stored_value.value;
+                    let span = self.get_span(func, ip);
+
+                    match &self.get_reg(*from).value {
+                        Value::Module { types, .. } => {
+                            let key = self.intern(match &self.get_reg(*member).value {
+                                Value::String(s) => s,
+                                _ => unreachable!(),
+                            });
+
+                            let typ = types
+                                .iter()
+                                .find(|k| self.types[**k].value.name == key)
+                                .ok_or(RuntimeError::NonexistentTypeMember {
+                                    area: self.make_area(span, func.code),
+                                    type_name: self.resolve(&key),
+                                    call_stack: self.get_call_stack(),
+                                })?;
+
+                            self.set_reg(
+                                *dest,
+                                StoredValue {
+                                    value: Value::Type(ValueType::Custom(*typ)),
+                                    area: self.make_area(span, func.code),
+                                },
+                            );
+                        }
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: (value.get_type(), stored_value.area.clone()),
+                                area: self.make_area(span, func.code),
+                                expected: ValueType::Module,
+                                call_stack: self.get_call_stack(),
+                            })
+                        }
+                    }
+                }
+                Opcode::Associated { from, dest, name } => {
+                    let key = self.intern(match &self.get_reg(*name).value {
+                        Value::String(s) => s,
+                        _ => unreachable!(),
+                    });
+                    let span = self.get_span(func, ip);
+
+                    let value = self.get_reg(*from);
+
+                    match &value.value {
+                        Value::Type(t) => {
+                            macro_rules! error {
+                                () => {
+                                    return Err(RuntimeError::NonexistentAssociatedMember {
+                                        area: self.make_area(span, func.code),
+                                        member: self.resolve(&key).into(),
+                                        base_type: *t,
+                                        call_stack: self.get_call_stack(),
+                                    })
+                                };
+                            }
+                            match self.impls.get(t) {
+                                Some(members) => match members.get(&key) {
+                                    Some(k) => {
+                                        let mut v = self.deep_clone_key(*k);
+
+                                        self.set_reg(*dest, v);
+                                    }
+                                    None => error!(),
+                                },
+                                None => error!(),
+                            }
+                        }
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: (value.value.get_type(), value.area.clone()),
+                                area: self.make_area(span, func.code),
+                                expected: ValueType::Type,
+                                call_stack: self.get_call_stack(),
+                            })
+                        }
+                    }
+                }
+                Opcode::CreateInstance { base, dict, dest } => {
+                    let span = self.get_span(func, ip);
+
+                    let value = self.get_reg(*base);
+
+                    let typ = match &value.value {
+                        Value::Type(ValueType::Custom(k)) => *k,
+                        Value::Type(t) => {
+                            return Err(RuntimeError::CannotInstanceBuiltinType {
+                                area: self.make_area(span, func.code),
+                                typ: *t,
+                                call_stack: self.get_call_stack(),
+                            })
+                        }
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: (value.value.get_type(), value.area.clone()),
+                                area: self.make_area(span, func.code),
+                                expected: ValueType::Type,
+                                call_stack: self.get_call_stack(),
+                            })
+                        }
+                    };
+
+                    let items = match &self.get_reg(*dict).value {
+                        Value::Dict(items) => items.clone(),
+                        _ => unreachable!(),
+                    };
+
                     self.set_reg(
                         *dest,
                         StoredValue {
-                            value: v,
+                            value: Value::Instance { typ, items },
                             area: self.make_area(span, func.code),
                         },
                     );
-
-                    // let special = match (value, &key[..]) {
-                    //     // (Value::String(s), "length") => Some(Value::Int(s.chars().count() as i64)),
-
-                    //     // (Value::Range(start, ..), "start") => Some(Value::Int(*start)),
-                    //     // (Value::Range(_, end, _), "end") => Some(Value::Int(*end)),
-                    //     // (Value::Range(_, _, step), "step") => Some(Value::Int(*step as i64)),
-
-                    //     // (Value::Array(v), "length") => Some(Value::Int(v.len() as i64)),
-                    //     // (Value::Dict(v), "length") => Some(Value::Int(v.len() as i64)),
-                    //     // (Value::Builtins, name) => Some(Value::Macro(MacroCode::Builtin(
-                    //     //     Builtin::from_str(name).unwrap(),
-                    //     // ))),
-                    //     _ => None,
-                    // };
-
-                    // macro_rules! error {
-                    //     () => {
-                    //         return Err(RuntimeError::NonexistentMember {
-                    //             area: self.make_area(span, func.code),
-                    //             member: key,
-                    //             base_type: value.get_type(),
-                    //             call_stack: self.get_call_stack(),
-                    //         })
-                    //     };
-                    // }
-
-                    // if let Some(v) = special {
-                    //     self.set_reg(
-                    //         *dest,
-                    //         StoredValue {
-                    //             value: v,
-                    //             area: self.make_area(span, func.code),
-                    //         },
-                    //     );
-                    // } else {
-                    //     // let key_interned = self.interner.borrow_mut().get_or_intern(&key);
-                    //     // match value {
-                    //     //     Value::Dict(v) => match v.get(&key_interned) {
-                    //     //         Some(k) => self.change_reg_key(*dest, *k),
-                    //     //         None => error!(),
-                    //     //     },
-                    //     //     _ => error!(),
-                    //     // }
-                    // }
                 }
-                Opcode::Associated { from, dest, name } => {
-                    dbg!(from, dest, name);
+                Opcode::Impl { base, dict } => {
+                    let span = self.get_span(func, ip);
+
+                    let value = self.get_reg(*base);
+
+                    let typ = match &value.value {
+                        Value::Type(t) => *t,
+                        _ => {
+                            return Err(RuntimeError::TypeMismatch {
+                                v: (value.value.get_type(), value.area.clone()),
+                                area: self.make_area(span, func.code),
+                                expected: ValueType::Type,
+                                call_stack: self.get_call_stack(),
+                            })
+                        }
+                    };
+
+                    let items = match &self.get_reg(*dict).value {
+                        Value::Dict(items) => items.clone(),
+                        _ => unreachable!(),
+                    };
+
+                    for (name, k) in &items {
+                        let name = self.resolve(name);
+
+                        if let Value::Macro(MacroData { target, .. }) = &mut self.memory[*k].value {
+                            if let Some(f) = typ.get_override(&name) {
+                                *target = MacroTarget::Builtin(f)
+                            }
+                        }
+                    }
+
+                    self.impls
+                        .entry(typ)
+                        .and_modify(|d| d.extend(items.iter()))
+                        .or_insert(items);
                 }
                 Opcode::YeetContext => {
                     self.contexts.yeet_current();
@@ -620,35 +966,71 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::Export { src: _ } => todo!(),
                 Opcode::Call { args, base, dest } => {
-                    let base = self.get_reg(*base);
+                    let base = self.get_reg(*base).clone();
                     let call_area = self.get_area(func, ip);
-                    match base.value.clone() {
-                        Value::Macro(MacroCode::Normal {
-                            func,
+                    match base.value {
+                        Value::Macro(MacroData {
+                            target,
                             args: arg_data,
-                            captured,
+                            self_arg,
                         }) => {
-                            let mut param_map = AHashMap::new();
+                            let mut param_map: AHashMap<Spur, ValueKey> = AHashMap::new();
 
-                            for data in &arg_data {
-                                param_map.insert(data.name, None);
+                            if let Some(s) = self_arg {
+                                param_map.insert(self.intern("self"), s);
                             }
 
-                            match &self.get_reg(*args).value {
+                            for arg in &arg_data {
+                                if let MacroArg::Spread { name, .. } = arg {
+                                    param_map.insert(
+                                        name.value,
+                                        self.memory.insert(StoredValue {
+                                            value: Value::Array(vec![]),
+                                            area: self.make_area(name.span, func.code),
+                                        }),
+                                    );
+                                }
+                            }
+
+                            match &self.get_reg(*args).value.clone() {
                                 Value::Array(v) => {
-                                    match &self.memory[v[0]].value {
+                                    match &self.memory[v[0]].value.clone() {
                                         Value::Array(v) => {
-                                            if v.len() > arg_data.len() {
-                                                return Err(RuntimeError::TooManyArguments {
-                                                    call_area,
-                                                    macro_def_area: base.area.clone(),
-                                                    macro_arg_amount: arg_data.len(),
-                                                    call_arg_amount: v.len(),
-                                                    call_stack: self.get_call_stack(),
-                                                });
-                                            }
-                                            for (param, data) in v.iter().zip(&arg_data) {
-                                                param_map.insert(data.name, Some(*param));
+                                            let mut exp_idx = self_arg.is_some() as usize;
+                                            let mut passed_idx = 0;
+
+                                            while passed_idx < v.len() {
+                                                if exp_idx >= arg_data.len() {
+                                                    return Err(RuntimeError::TooManyArguments {
+                                                        call_area,
+                                                        macro_def_area: base.area.clone(),
+                                                        macro_arg_amount: arg_data.len()
+                                                            - self_arg.is_some() as usize,
+                                                        call_arg_amount: v.len(),
+                                                        call_stack: self.get_call_stack(),
+                                                    });
+                                                }
+
+                                                let param = v[passed_idx];
+                                                let data = &arg_data[exp_idx];
+                                                match data {
+                                                    MacroArg::Single { name, .. } => {
+                                                        param_map.insert(name.value, param);
+                                                        exp_idx += 1;
+                                                        passed_idx += 1;
+                                                    }
+                                                    MacroArg::Spread { name, .. } => {
+                                                        match &mut self.memory
+                                                            [param_map[&name.value]]
+                                                            .value
+                                                        {
+                                                            Value::Array(v) => v.push(param),
+                                                            _ => unreachable!(),
+                                                        }
+
+                                                        passed_idx += 1;
+                                                    }
+                                                }
                                             }
                                         }
                                         _ => unreachable!(),
@@ -656,11 +1038,16 @@ impl<'a> Vm<'a> {
                                     match &self.memory[v[1]].value {
                                         Value::Dict(m) => {
                                             for (name, param) in m {
-                                                if param_map.contains_key(name) {
-                                                    param_map.insert(*name, Some(*param));
+                                                if arg_data.iter().any(
+                                                    |m| matches!(
+                                                        m,
+                                                        MacroArg::Single { name: arg_name, .. } if arg_name.value == *name
+                                                    )
+                                                ) {
+                                                    param_map.insert(*name, *param);
                                                 } else {
                                                     return Err(
-                                                        RuntimeError::NonexistentArgument {
+                                                        RuntimeError::InvalidKeywordArgument {
                                                             call_area,
                                                             macro_def_area: base.area.clone(),
                                                             arg_name: self.resolve(name),
@@ -675,69 +1062,76 @@ impl<'a> Vm<'a> {
                                 }
                                 _ => unreachable!(),
                             }
-                            let base_area = base.area.clone();
-                            self.push_call_stack(func, *dest, true, Some(call_area.clone()));
 
-                            for (i, data) in arg_data.iter().enumerate() {
-                                let v = match param_map[&data.name] {
-                                    Some(k) => self.deep_clone_key(k),
-                                    None => match data.default {
-                                        Some(k) => self.deep_clone_key(k),
-                                        None => {
-                                            return Err(RuntimeError::ArgumentNotSatisfied {
-                                                call_area,
-                                                macro_def_area: base_area,
-                                                arg_name: self.resolve(&data.name),
-                                                call_stack: self.get_call_stack(),
-                                            })
-                                        }
-                                    },
+                            macro_rules! per_arg {
+                                (($i:ident, $v:ident) $b:block) => {
+                                    for ($i, data) in arg_data.iter().enumerate() {
+                                        let $v = match param_map.get(&data.name().value) {
+                                            Some(k) => self.deep_clone_key(*k),
+                                            None => match data.default() {
+                                                Some(k) => self.deep_clone_key(*k),
+                                                None => {
+                                                    return Err(
+                                                        RuntimeError::ArgumentNotSatisfied {
+                                                            call_area,
+                                                            macro_def_area: base.area.clone(),
+                                                            arg_name: self
+                                                                .resolve(&data.name().value),
+                                                            call_stack: self.get_call_stack(),
+                                                        },
+                                                    )
+                                                }
+                                            },
+                                        };
+
+                                        $b
+                                    }
                                 };
-                                self.set_reg(i as Register, v)
                             }
 
-                            for (k, (_, to)) in captured
-                                .iter()
-                                .zip(&self.programs[func.code].1.functions[func.func].capture_regs)
-                            {
-                                self.change_reg_key(*to, *k)
-                            }
+                            match target {
+                                MacroTarget::Macro { func, captured } => {
+                                    self.push_call_stack(
+                                        func,
+                                        *dest,
+                                        true,
+                                        Some(call_area.clone()),
+                                    );
 
-                            continue;
-                        }
-                        Value::Macro(MacroCode::Builtin(b)) => {
-                            let mut args = match &self.get_reg(*args).value {
-                                Value::Array(v) => {
-                                    match &self.memory[v[1]].value {
-                                        Value::Dict(m) => {
-                                            if !m.is_empty() {
-                                                todo!()
-                                            }
+                                    per_arg! {
+                                        (i, v) {
+                                            self.set_reg(i as Register, v)
                                         }
-                                        _ => unreachable!(),
                                     }
-                                    match &self.memory[v[0]].value {
-                                        Value::Array(v) => v.clone(),
-                                        _ => unreachable!(),
+
+                                    for (k, (_, to)) in captured.iter().zip(
+                                        &self.programs[func.code].1.functions[func.func]
+                                            .capture_regs,
+                                    ) {
+                                        self.change_reg_key(*to, *k)
                                     }
+
+                                    continue;
                                 }
-                                _ => unreachable!(),
-                            };
-
-                            args.reverse();
-
-                            let span = self.get_span(func, ip);
-                            let value = b(&mut args, self, self.make_area(span, func.code))?;
-
-                            self.set_reg(
-                                *dest,
-                                StoredValue {
-                                    value,
-                                    area: self.make_area(span, func.code),
-                                },
-                            )
+                                // .-
+                                MacroTarget::Builtin(f) => {
+                                    let mut args = vec![];
+                                    per_arg! {
+                                        (i, v) {
+                                            args.push(v.value);
+                                        }
+                                    }
+                                    // let ret = f.0(args, self, call_area.clone())?;
+                                    // self.set_reg(
+                                    //     *dest,
+                                    //     StoredValue {
+                                    //         value: ret,
+                                    //         area: call_area,
+                                    //     },
+                                    // )
+                                }
+                            }
                         }
-
                         _ => {
                             return Err(RuntimeError::TypeMismatch {
                                 v: (base.value.get_type(), base.area.clone()),
@@ -751,32 +1145,53 @@ impl<'a> Vm<'a> {
                 Opcode::CreateMacro { id, dest } => self.set_reg(
                     *dest,
                     StoredValue {
-                        value: Value::Macro(MacroCode::Normal {
-                            func: FuncCoord {
-                                func: *id as usize,
-                                code: func.code,
+                        value: Value::Macro(MacroData {
+                            target: MacroTarget::Macro {
+                                func: FuncCoord {
+                                    func: *id as usize,
+                                    code: func.code,
+                                },
+                                captured: self.programs[func.code].1.functions[*id as usize]
+                                    .capture_regs
+                                    .iter()
+                                    .map(|(from, _)| self.get_reg_key(*from))
+                                    .collect(),
                             },
                             args: vec![],
-                            captured: self.programs[func.code].1.functions[*id as usize]
-                                .capture_regs
-                                .iter()
-                                .map(|(from, _)| self.get_reg_key(*from))
-                                .collect(),
+                            self_arg: None,
                         }),
                         area: self.get_area(func, ip),
                     },
                 ),
-                Opcode::PushMacroArg { name, dest } => {
+                Opcode::PushMacroArg { name, dest, is_ref } => {
                     let name = match &self.get_reg(*name).value {
                         Value::String(s) => s.clone(),
                         _ => unreachable!(),
                     };
+                    let span = self.get_span(func, ip);
 
-                    let name = self.interner.borrow_mut().get_or_intern(name);
+                    let name = self.intern(&name);
                     match &mut self.get_reg_mut(*dest).value {
-                        Value::Macro(MacroCode::Normal { args, .. }) => args.push(ArgData {
-                            name,
+                        Value::Macro(MacroData { args, .. }) => args.push(MacroArg::Single {
+                            name: name.spanned(span),
                             default: None,
+                            pattern: None,
+                            is_ref: *is_ref,
+                        }),
+                        _ => unreachable!(),
+                    }
+                }
+                Opcode::PushMacroSpreadArg { name, dest } => {
+                    let name = match &self.get_reg(*name).value {
+                        Value::String(s) => s.clone(),
+                        _ => unreachable!(),
+                    };
+                    let span = self.get_span(func, ip);
+
+                    let name = self.intern(&name);
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Macro(MacroData { args, .. }) => args.push(MacroArg::Spread {
+                            name: name.spanned(span),
                             pattern: None,
                         }),
                         _ => unreachable!(),
@@ -785,8 +1200,8 @@ impl<'a> Vm<'a> {
                 Opcode::SetMacroArgDefault { src, dest } => {
                     let set = self.deep_clone_reg_insert(*src);
                     match &mut self.get_reg_mut(*dest).value {
-                        Value::Macro(MacroCode::Normal { args, .. }) => {
-                            args.last_mut().unwrap().default = Some(set)
+                        Value::Macro(MacroData { args, .. }) => {
+                            *args.last_mut().unwrap().default_mut() = Some(set)
                         }
                         _ => unreachable!(),
                     }
@@ -794,8 +1209,8 @@ impl<'a> Vm<'a> {
                 Opcode::SetMacroArgPattern { src, dest } => {
                     let set = self.deep_clone_reg_insert(*src);
                     match &mut self.get_reg_mut(*dest).value {
-                        Value::Macro(MacroCode::Normal { args, .. }) => {
-                            args.last_mut().unwrap().pattern = Some(set)
+                        Value::Macro(MacroData { args, .. }) => {
+                            *args.last_mut().unwrap().pattern_mut() = Some(set)
                         }
                         _ => unreachable!(),
                     }
@@ -819,7 +1234,7 @@ impl<'a> Vm<'a> {
                     let id = Id::Arbitrary(self.next_id(*class));
                     let v = match class {
                         IDClass::Group => Value::Group(id),
-                        IDClass::Color => Value::Color(id),
+                        IDClass::Color => Value::Channel(id),
                         IDClass::Block => Value::Block(id),
                         IDClass::Item => Value::Item(id),
                     };
@@ -839,8 +1254,13 @@ impl<'a> Vm<'a> {
                     };
                     self.contexts.set_group_and_push(group);
                 }
-                Opcode::PopGroupStack => {
-                    self.contexts.pop_group();
+                Opcode::PopGroupStack { fn_reg } => {
+                    let prev_group = match &self.get_reg(*fn_reg).value {
+                        Value::TriggerFunction { prev_context, .. } => *prev_context,
+                        _ => unreachable!(),
+                    };
+
+                    self.contexts.pop_groups_until(prev_group);
                 }
                 Opcode::MakeTriggerFunc { src, dest } => {
                     let group = match &self.get_reg(*src).value {
@@ -851,15 +1271,16 @@ impl<'a> Vm<'a> {
                     self.set_reg(
                         *dest,
                         StoredValue {
-                            value: Value::TriggerFunction(group),
+                            value: Value::TriggerFunction {
+                                group,
+                                prev_context: self.contexts.group(),
+                            },
                             area: self.get_area(func, ip),
                         },
                     )
                 }
             }
 
-            // increment ip
-            // TODO: implicit return shit
             {
                 let mut current = self.contexts.current_mut();
                 let ip = &mut current.pos_stack.last_mut().unwrap().ip;

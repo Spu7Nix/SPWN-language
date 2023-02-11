@@ -1,0 +1,7 @@
+
+
+type @cockc
+
+return {
+    a: 3,
+}

@@ -1,12 +1,14 @@
+use std::fmt::{write, Display};
 use std::path::PathBuf;
 
-use delve::EnumToStr;
+use delve::{EnumDisplay, EnumToStr};
 use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::attributes::{ExprAttribute, ScriptAttribute, StmtAttribute};
 use super::utils::operators::{AssignOp, BinOp, UnaryOp};
 use crate::gd::ids::IDClass;
+use crate::gd::object_keys::ObjectKey;
 use crate::sources::CodeSpan;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,11 +61,65 @@ pub struct ExprNode {
 #[derive(Debug, Clone)]
 pub struct StmtNode {
     pub stmt: Box<Statement>,
-    pub attributes: Vec<StmtAttribute>,
+    pub attributes: Vec<Spanned<StmtAttribute>>,
     pub span: CodeSpan,
 }
 
 pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>)>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MacroArg<N, E> {
+    Single {
+        name: N,
+        pattern: Option<E>,
+        default: Option<E>,
+        is_ref: bool,
+    },
+    Spread {
+        name: N,
+        pattern: Option<E>,
+    },
+}
+
+impl<N, E> MacroArg<N, E> {
+    pub fn name(&self) -> &N {
+        match self {
+            MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
+        }
+    }
+
+    pub fn name_mut(&mut self) -> &mut N {
+        match self {
+            MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
+        }
+    }
+
+    pub fn default(&self) -> &Option<E> {
+        match self {
+            MacroArg::Single { default, .. } => default,
+            _ => panic!("bad"),
+        }
+    }
+
+    pub fn default_mut(&mut self) -> &mut Option<E> {
+        match self {
+            MacroArg::Single { default, .. } => default,
+            _ => panic!("bad"),
+        }
+    }
+
+    pub fn pattern(&self) -> &Option<E> {
+        match self {
+            MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
+        }
+    }
+
+    pub fn pattern_mut(&mut self) -> &mut Option<E> {
+        match self {
+            MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
+        }
+    }
+}
 
 #[derive(Debug, Clone, EnumToStr)]
 pub enum Expression {
@@ -93,6 +149,10 @@ pub enum Expression {
         base: ExprNode,
         name: Spanned<Spur>,
     },
+    TypeMember {
+        base: ExprNode,
+        name: Spanned<Spur>,
+    },
     Associated {
         base: ExprNode,
         name: Spanned<Spur>,
@@ -105,7 +165,7 @@ pub enum Expression {
     },
 
     Macro {
-        args: Vec<(Spanned<Spur>, Option<ExprNode>, Option<ExprNode>)>,
+        args: Vec<MacroArg<Spanned<Spur>, ExprNode>>,
         ret_type: Option<ExprNode>,
         code: MacroCode,
     },
@@ -138,6 +198,21 @@ pub enum Expression {
         base: ExprNode,
         items: DictItems,
     },
+    Obj(ObjectType, Vec<(Spanned<ObjKeyType>, ExprNode)>),
+}
+
+#[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq)]
+pub enum ObjectType {
+    Object,
+    Trigger,
+}
+
+#[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash, EnumDisplay)]
+pub enum ObjKeyType {
+    #[delve(display = |o: &ObjectKey| format!("{}", <&ObjectKey as Into<&'static str>>::into(o)))]
+    Name(ObjectKey),
+    #[delve(display = |n: &u8| format!("{n}"))]
+    Num(u8),
 }
 
 #[derive(Debug, Clone, EnumToStr)]
@@ -176,11 +251,11 @@ pub enum Statement {
     ExtractImport(ImportType),
 
     Impl {
-        typ: Spur,
+        base: ExprNode,
         items: DictItems,
     },
 
-    Print(ExprNode),
+    Dbg(ExprNode),
 }
 
 pub type Statements = Vec<StmtNode>;
@@ -195,7 +270,7 @@ impl Expression {
     }
 }
 impl Statement {
-    pub fn into_node(self, attributes: Vec<StmtAttribute>, span: CodeSpan) -> StmtNode {
+    pub fn into_node(self, attributes: Vec<Spanned<StmtAttribute>>, span: CodeSpan) -> StmtNode {
         StmtNode {
             stmt: Box::new(self),
             attributes,
@@ -226,7 +301,7 @@ pub struct Ast {
     pub file_attributes: Vec<ScriptAttribute>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Spanned<T> {
     pub value: T,
     pub span: CodeSpan,

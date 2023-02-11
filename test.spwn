@@ -1,7 +1,9 @@
-// #[debug_bytecode]
+import "libraries/core/builtins.spwn"
 
-a = "aaaaaa"
-$.println(a)
-a.clear()
 
-$.println(a)
+
+
+
+
+
+

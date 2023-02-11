@@ -1,27 +1,33 @@
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use ahash::AHashMap;
+use delve::VariantNames;
 use lasso::Spur;
-use libflate::lz77::Code;
+use serde::{Deserialize, Serialize};
 use slotmap::{new_key_type, SlotMap};
 
 use super::bytecode::{Bytecode, BytecodeBuilder, FuncBuilder, Function};
 use super::error::CompilerError;
-use crate::cli::FileSettings;
+use crate::cli::Settings;
+use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
-    ExprNode, Expression, ImportType, MacroCode, Spannable, Spanned, Statement, StmtNode,
+    ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjKeyType, Spannable, Spanned,
+    Statement, StmtNode,
 };
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 use crate::vm::opcodes::Register;
+use crate::vm::value::ValueType;
 
 pub type CompileResult<T> = Result<T, CompilerError>;
 
 new_key_type! {
     pub struct ScopeKey;
+    pub struct CustomTypeKey;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -46,6 +52,14 @@ pub struct Scope {
     typ: Option<ScopeType>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TypeDef {
+    pub def_src: SpwnSource,
+    pub name: Spur,
+}
+
+pub type TypeDefMap = AHashMap<TypeDef, Spanned<CustomTypeKey>>;
+
 pub struct Compiler<'a> {
     interner: Rc<RefCell<Interner>>,
     scopes: SlotMap<ScopeKey, Scope>,
@@ -53,25 +67,31 @@ pub struct Compiler<'a> {
 
     global_return: Option<(Vec<Spanned<Spur>>, CodeSpan)>,
 
-    file_attrs: &'a FileSettings,
+    settings: &'a Settings,
 
     pub map: &'a mut BytecodeMap,
+
+    pub custom_type_defs: &'a mut TypeDefMap,
+    available_custom_types: AHashMap<Spur, CustomTypeKey>,
 }
 
 impl<'a> Compiler<'a> {
     pub fn new(
         interner: Rc<RefCell<Interner>>,
         src: SpwnSource,
-        file_attrs: &'a FileSettings,
+        settings: &'a Settings,
         map: &'a mut BytecodeMap,
+        type_defs: &'a mut TypeDefMap,
     ) -> Self {
         Self {
             interner,
             scopes: SlotMap::default(),
             src,
             global_return: None,
-            file_attrs,
+            settings,
             map,
+            custom_type_defs: type_defs,
+            available_custom_types: AHashMap::new(),
         }
     }
 
@@ -84,6 +104,10 @@ impl<'a> Compiler<'a> {
 
     fn resolve(&self, spur: &Spur) -> String {
         self.interner.borrow().resolve(spur).to_string()
+    }
+
+    fn intern(&self, s: &str) -> Spur {
+        self.interner.borrow_mut().get_or_intern(s)
     }
 
     pub fn get_var(&self, var: Spur, scope: ScopeKey) -> Option<Variable> {
@@ -132,7 +156,7 @@ impl<'a> Compiler<'a> {
     //     }
     // }
 
-    pub fn is_inside_loop(&self, scope: ScopeKey) -> Option<&Vec<usize>> {
+    fn is_inside_loop(&self, scope: ScopeKey) -> Option<&Vec<usize>> {
         let scope = &self.scopes[scope];
         match &scope.typ {
             Some(ScopeType::ArrowStmt(_) | ScopeType::TriggerFunc(_)) | None => {
@@ -148,7 +172,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn is_inside_macro(&self, scope: ScopeKey) -> bool {
+    fn is_inside_macro(&self, scope: ScopeKey) -> bool {
         let scope = &self.scopes[scope];
         match &scope.typ {
             Some(t) => match t {
@@ -256,6 +280,19 @@ impl<'a> Compiler<'a> {
 
                 self.compile_stmts(&stmts, base_scope, f)?;
 
+                let final_ret = f.next_reg();
+
+                f.load_empty_dict(
+                    final_ret,
+                    CodeSpan {
+                        start: usize::MAX,
+                        end: usize::MAX,
+                    },
+                );
+                f.ret(final_ret, true);
+
+                // f.load_empty(reg, span)
+
                 Ok(vec![])
             },
             0,
@@ -286,8 +323,13 @@ impl<'a> Compiler<'a> {
                 let opcodes = f
                     .opcodes
                     .into_iter()
-                    .map(|opcode| opcode.try_into().expect("usize too big for u8"))
+                    .map(|opcode| {
+                        opcode
+                            .try_into()
+                            .expect("usize too big for u8 (too many registers used)")
+                    })
                     .collect();
+
                 Function {
                     opcodes,
                     regs_used: f.regs_used,
@@ -305,6 +347,7 @@ impl<'a> Compiler<'a> {
             self.src.clone(),
             Bytecode {
                 import_paths: unopt_code.import_paths,
+                custom_types: unopt_code.custom_types,
                 source_hash: unopt_code.source_hash,
                 consts: unopt_code.consts,
                 functions,
@@ -350,9 +393,9 @@ impl<'a> Compiler<'a> {
 
         'from_cache: {
             if spwnc_path.is_file() {
-                let source = std::fs::read(&spwnc_path).unwrap();
+                let source_bytes = std::fs::read(&spwnc_path).unwrap();
 
-                let bytecode: Bytecode<Register> = match bincode::deserialize(&source) {
+                let bytecode: Bytecode<Register> = match bincode::deserialize(&source_bytes) {
                     Ok(b) => b,
                     Err(_) => {
                         break 'from_cache;
@@ -363,6 +406,15 @@ impl<'a> Compiler<'a> {
                     for import in &bytecode.import_paths {
                         self.compile_import(&import.value, import.span, import_src.clone())?;
                     }
+                    for (k, name) in &bytecode.custom_types {
+                        self.custom_type_defs.insert(
+                            TypeDef {
+                                def_src: import_src.clone(),
+                                name: self.intern(&name.value),
+                            },
+                            k.spanned(name.span),
+                        );
+                    }
 
                     self.map.map.insert(import_src, bytecode);
                     return Ok(());
@@ -371,18 +423,16 @@ impl<'a> Compiler<'a> {
             }
         }
 
-        let mut parser = Parser::new(code.trim_end(), import_src, Rc::clone(&self.interner));
+        let mut parser = Parser::new(&code, import_src, Rc::clone(&self.interner));
 
         match parser.parse() {
             Ok(ast) => {
-                let mut file_settings = FileSettings::default();
-                file_settings.apply_attributes(&ast.file_attributes);
-
                 let mut compiler = Compiler::new(
                     Rc::clone(&self.interner),
                     parser.src,
-                    &file_settings,
+                    self.settings,
                     self.map,
+                    self.custom_type_defs,
                 );
 
                 match compiler.compile(ast.statements) {
@@ -390,7 +440,7 @@ impl<'a> Compiler<'a> {
                         let bytes = bincode::serialize(&bytecode).unwrap();
 
                         // dont write bytecode if caching is disabled
-                        if !self.file_attrs.no_bytecode_cache {
+                        if !self.settings.no_bytecode_cache {
                             let _ = std::fs::create_dir(import_base.join(".spwnc"));
                             std::fs::write(&spwnc_path, bytes).unwrap();
                         }
@@ -428,6 +478,19 @@ impl<'a> Compiler<'a> {
         scope: ScopeKey,
         builder: &mut FuncBuilder,
     ) -> CompileResult<()> {
+        // for attr in &stmt.attributes {
+        //     match &attr.value {
+        //         StmtAttribute::Deprecated { since, note } => Warning::UseOfDeprecatedValue {
+        //             since: since.clone(),
+        //             note: note.clone(),
+        //             area: self.make_area(stmt.span),
+        //         }
+        //         .to_report()
+        //         .display(),
+        //         _ => todo!(),
+        //     }
+        // }
+
         match &*stmt.stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder, ExprType::Normal)?;
@@ -640,7 +703,7 @@ impl<'a> Compiler<'a> {
                                     self.compile_expr(node, scope, builder, ExprType::Normal)?;
                                 self.global_return =
                                     Some((items.iter().map(|i| i.0).collect(), stmt.span));
-                                builder.ret(ret_reg);
+                                builder.ret(ret_reg, true);
                             }
                             _ => {
                                 return Err(CompilerError::InvalidModuleReturn {
@@ -660,12 +723,12 @@ impl<'a> Compiler<'a> {
                         None => {
                             let out_reg = builder.next_reg();
                             builder.load_empty(out_reg, stmt.span);
-                            builder.ret(out_reg)
+                            builder.ret(out_reg, false)
                         }
                         Some(expr) => {
                             let ret_reg =
                                 self.compile_expr(expr, scope, builder, ExprType::Normal)?;
-                            builder.ret(ret_reg)
+                            builder.ret(ret_reg, false)
                         }
                     }
                 } else {
@@ -674,12 +737,51 @@ impl<'a> Compiler<'a> {
                     });
                 }
             }
-            Statement::TypeDef(_) => todo!(),
-            Statement::Impl { typ, items } => todo!(),
+            Statement::TypeDef(t) => {
+                if !matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
+                    return Err(CompilerError::TypeDefNotGlobal {
+                        area: self.make_area(stmt.span),
+                    });
+                }
+
+                let info = TypeDef {
+                    def_src: self.src.clone(),
+                    name: *t,
+                };
+
+                if ValueType::VARIANT_NAMES.contains(&self.resolve(t).as_str()) {
+                    return Err(CompilerError::BuiltinTypeOverride {
+                        area: self.make_area(stmt.span),
+                    });
+                } else if self.custom_type_defs.contains_key(&info) {
+                    return Err(CompilerError::DuplicateTypeDef {
+                        area: self.make_area(stmt.span),
+                        prev_area: self.make_area(self.custom_type_defs[&info].span),
+                    });
+                } else if self.available_custom_types.contains_key(t) {
+                    // TODO test
+                    return Err(CompilerError::DuplicateImportedType {
+                        area: self.make_area(stmt.span),
+                    });
+                }
+
+                let k = builder.create_type(self.resolve(t), stmt.span);
+
+                self.custom_type_defs.insert(info, k.spanned(stmt.span));
+                self.available_custom_types.insert(*t, k);
+            }
+            Statement::Impl { base, items } => {
+                let dict_reg = builder.next_reg();
+                self.build_dict(builder, items, dict_reg, scope, stmt.span)?;
+
+                let base_reg = self.compile_expr(base, scope, builder, ExprType::Normal)?;
+
+                builder.do_impl(base_reg, dict_reg, stmt.span);
+            }
             Statement::ExtractImport(_) => todo!(),
-            Statement::Print(v) => {
+            Statement::Dbg(v) => {
                 let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
-                builder.print(v);
+                builder.dbg(v);
             }
         }
         Ok(())
@@ -766,13 +868,18 @@ impl<'a> Compiler<'a> {
                     UnaryOp::BinNot => builder.unary_bin_not(v, out_reg, expr.span),
                     UnaryOp::ExclMark => builder.unary_not(v, out_reg, expr.span),
                     UnaryOp::Minus => builder.unary_negate(v, out_reg, expr.span),
+                    UnaryOp::Eq => todo!(),
+                    UnaryOp::Neq => todo!(),
+                    UnaryOp::Gt => todo!(),
+                    UnaryOp::Gte => todo!(),
+                    UnaryOp::Lt => todo!(),
+                    UnaryOp::Lte => todo!(),
                 }
             }
             Expression::Var(name) => match self.get_var(*name, scope) {
                 Some(data) => {
                     if let ExprType::Assign(stmt_span) = expr_type {
                         if !data.mutable {
-                            println!("{:?} {:?}", stmt_span, data.def_span);
                             return Err(CompilerError::ImmutableAssign {
                                 area: self.make_area(stmt_span),
                                 def_area: self.make_area(data.def_span),
@@ -790,7 +897,22 @@ impl<'a> Compiler<'a> {
                     })
                 }
             },
-            Expression::Type(_) => todo!(),
+            Expression::Type(t) => {
+                let name = self.resolve(t);
+                if ValueType::VARIANT_NAMES.contains(&name.as_str()) {
+                    builder.load_builtin_type(&name, out_reg, expr.span)
+                } else {
+                    match self.available_custom_types.get(t) {
+                        Some(k) => builder.load_custom_type(*k, out_reg, expr.span),
+                        None => {
+                            return Err(CompilerError::NonexistentType {
+                                area: self.make_area(expr.span),
+                                type_name: name,
+                            })
+                        }
+                    }
+                }
+            }
             Expression::Array(items) => {
                 builder.new_array(
                     items.len() as u16,
@@ -810,32 +932,15 @@ impl<'a> Compiler<'a> {
                 )?;
             }
             Expression::Dict(items) => {
-                builder.new_dict(
-                    items.len() as u16,
-                    out_reg,
-                    |builder, elems| {
-                        for (key, item) in items {
-                            let value_reg = match item {
-                                Some(e) => {
-                                    self.compile_expr(e, scope, builder, ExprType::Normal)?
-                                }
-                                None => match self.get_var(key.value, scope) {
-                                    Some(data) => data.reg,
-                                    None => {
-                                        return Err(CompilerError::NonexistentVariable {
-                                            area: self.make_area(key.span),
-                                            var: self.resolve(&key.value),
-                                        })
-                                    }
-                                },
-                            };
+                self.build_dict(builder, items, out_reg, scope, expr.span)?;
+            }
+            Expression::Instance { base, items } => {
+                let dict_reg = builder.next_reg();
+                self.build_dict(builder, items, dict_reg, scope, expr.span)?;
 
-                            elems.push((self.resolve(&key.value).spanned(key.span), value_reg));
-                        }
-                        Ok(())
-                    },
-                    expr.span,
-                )?;
+                let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
+
+                builder.create_instance(base_reg, dict_reg, out_reg, expr.span);
             }
             Expression::Maybe(e) => match e {
                 Some(e) => {
@@ -852,6 +957,15 @@ impl<'a> Compiler<'a> {
             Expression::Member { base, name } => {
                 let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
                 builder.member(
+                    base_reg,
+                    out_reg,
+                    self.resolve(&name.value).spanned(name.span),
+                    expr.span,
+                )
+            }
+            Expression::TypeMember { base, name } => {
+                let base_reg = self.compile_expr(base, scope, builder, expr_type)?;
+                builder.type_member(
                     base_reg,
                     out_reg,
                     self.resolve(&name.value).spanned(name.span),
@@ -876,23 +990,26 @@ impl<'a> Compiler<'a> {
                     |f| {
                         let mut variables = AHashMap::new();
 
-                        for (name, ..) in args {
+                        for a in args {
                             variables.insert(
-                                name.value,
+                                a.name().value,
                                 Variable {
                                     mutable: false,
-                                    def_span: name.span,
+                                    def_span: a.name().span,
                                     reg: f.next_reg(),
                                 },
                             );
                         }
+
                         let to_capture = self.get_accessible_vars(scope);
                         let mut capture_regs = vec![];
 
                         for (name, data) in to_capture {
-                            let reg = f.next_reg();
-                            capture_regs.push((data.reg, reg));
-                            variables.insert(name, Variable { reg, ..data });
+                            if !variables.contains_key(&name) {
+                                let reg = f.next_reg();
+                                capture_regs.push((data.reg, reg));
+                                variables.insert(name, Variable { reg, ..data });
+                            }
                         }
 
                         let base_scope = self.scopes.insert(Scope {
@@ -906,7 +1023,7 @@ impl<'a> Compiler<'a> {
                             MacroCode::Lambda(expr) => {
                                 let ret_reg =
                                     self.compile_expr(expr, base_scope, f, ExprType::Normal)?;
-                                f.ret(ret_reg);
+                                f.ret(ret_reg, false);
                             }
                         }
 
@@ -919,23 +1036,65 @@ impl<'a> Compiler<'a> {
                     func_id,
                     out_reg,
                     |builder, elems| {
-                        for (name, pat, def) in args {
-                            let n = self.resolve(&name.value).spanned(name.span);
+                        for arg in args {
+                            match arg {
+                                MacroArg::Single {
+                                    name,
+                                    pattern,
+                                    default,
+                                    is_ref,
+                                } => {
+                                    let n = self.resolve(&name.value).spanned(name.span);
 
-                            let p = if let Some(p) = pat {
-                                Some(self.compile_expr(p, scope, builder, ExprType::Normal)?)
-                            } else {
-                                None
-                            };
-                            let d = if let Some(d) = def {
-                                Some(self.compile_expr(d, scope, builder, ExprType::Normal)?)
-                            } else {
-                                None
-                            };
+                                    let p = if let Some(p) = pattern {
+                                        Some(self.compile_expr(
+                                            p,
+                                            scope,
+                                            builder,
+                                            ExprType::Normal,
+                                        )?)
+                                    } else {
+                                        None
+                                    };
+                                    let d = if let Some(d) = default {
+                                        Some(self.compile_expr(
+                                            d,
+                                            scope,
+                                            builder,
+                                            ExprType::Normal,
+                                        )?)
+                                    } else {
+                                        None
+                                    };
 
-                            elems.push((n, p, d))
+                                    elems.push(MacroArg::Single {
+                                        name: n,
+                                        pattern: p,
+                                        default: d,
+                                        is_ref: *is_ref,
+                                    })
+                                }
+                                MacroArg::Spread { name, pattern } => {
+                                    let n = self.resolve(&name.value).spanned(name.span);
+
+                                    let p = if let Some(p) = pattern {
+                                        Some(self.compile_expr(
+                                            p,
+                                            scope,
+                                            builder,
+                                            ExprType::Normal,
+                                        )?)
+                                    } else {
+                                        None
+                                    };
+
+                                    elems.push(MacroArg::Spread {
+                                        name: n,
+                                        pattern: p,
+                                    })
+                                }
+                            }
                         }
-
                         Ok(())
                     },
                     expr.span,
@@ -1003,6 +1162,8 @@ impl<'a> Compiler<'a> {
                 use crate::gd::ids::IDClass::Group;
                 let group_reg = builder.next_reg();
                 builder.load_id(None, Group, group_reg, expr.span);
+                builder.make_trigger_function(group_reg, out_reg, expr.span);
+
                 builder.push_context_group(group_reg, expr.span);
                 builder.block(|b| {
                     let inner_scope = self.derive_scope(
@@ -1011,8 +1172,7 @@ impl<'a> Compiler<'a> {
                     );
                     self.compile_stmts(code, inner_scope, b)
                 })?;
-                builder.pop_context_group(expr.span);
-                builder.make_trigger_function(group_reg, out_reg, expr.span);
+                builder.pop_context_group(out_reg, expr.span);
             }
             Expression::TriggerFuncCall(_) => todo!(),
             Expression::Ternary {
@@ -1050,10 +1210,63 @@ impl<'a> Compiler<'a> {
                 self.compile_import(t, expr.span, self.src.clone())?;
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
             }
-            Expression::Instance { base, items } => todo!(),
+
+            Expression::Obj(typ, items) => {
+                builder.new_object(
+                    items.len() as u16,
+                    out_reg,
+                    |builder, elems| {
+                        for (key, expr) in items {
+                            let value_reg =
+                                self.compile_expr(expr, scope, builder, ExprType::Normal)?;
+
+                            elems.push((*key, value_reg));
+                        }
+
+                        Ok(())
+                    },
+                    expr.span,
+                    *typ,
+                )?;
+            }
         }
 
         Ok(out_reg)
+    }
+
+    fn build_dict(
+        &mut self,
+        builder: &mut FuncBuilder,
+        items: &Vec<(Spanned<Spur>, Option<ExprNode>)>,
+        out_reg: usize,
+        scope: ScopeKey,
+        span: CodeSpan,
+    ) -> Result<(), CompilerError> {
+        builder.new_dict(
+            items.len() as u16,
+            out_reg,
+            |builder, elems| {
+                for (key, item) in items {
+                    let value_reg = match item {
+                        Some(e) => self.compile_expr(e, scope, builder, ExprType::Normal)?,
+                        None => match self.get_var(key.value, scope) {
+                            Some(data) => data.reg,
+                            None => {
+                                return Err(CompilerError::NonexistentVariable {
+                                    area: self.make_area(key.span),
+                                    var: self.resolve(&key.value),
+                                })
+                            }
+                        },
+                    };
+
+                    elems.push((self.resolve(&key.value).spanned(key.span), value_reg));
+                }
+                Ok(())
+            },
+            span,
+        )?;
+        Ok(())
     }
 }
 
