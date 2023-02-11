@@ -14,6 +14,7 @@ lexer! {
     ["type indicator"]
     TypeIndicator: regex(r"@[a-zA-Z_]\w*"),
 
+    // ["attribute"]
     //Attribute: regex(r"#\[.*?\]"),
 
     Let: text("let"),
