@@ -65,7 +65,7 @@ pub struct StmtNode {
     pub span: CodeSpan,
 }
 
-pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>)>;
+pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>, bool)>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MacroArg<N, E> {
@@ -246,7 +246,10 @@ pub enum Statement {
     Break,
     Continue,
 
-    TypeDef(Spur),
+    TypeDef {
+        name: Spur,
+        private: bool,
+    },
 
     ExtractImport(ImportType),
 

@@ -173,6 +173,9 @@ opcodes! {
     #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d} by key"))]
     PushDictElemByKey { => elem, => key, => dest },
 
+    #[delve(display = |s: &R, k: &R| format!("R{s}[R{k}] private"))]
+    MakeDictElemPrivate { => dest, => key },
+
     #[delve(display = |e: &R, k: &ObjectKey, d: &R| format!("insert {}:R{e} into R{d}", <&ObjectKey as Into<&'static str>>::into(k)))]
     PushObjectElemKey { => elem, obj_key: ObjectKey, => dest },
     #[delve(display = |e: &R, k: &u8, d: &R| format!("insert {k}:R{e} into R{d}"))]

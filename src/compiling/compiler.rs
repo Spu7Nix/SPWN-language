@@ -14,7 +14,7 @@ use crate::cli::Settings;
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
     ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjKeyType, Spannable, Spanned,
-    Statement, StmtNode,
+    Statement, StmtNode, DictItems,
 };
 use crate::parsing::parser::Parser;
 use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
@@ -783,7 +783,7 @@ impl<'a> Compiler<'a> {
                     });
                 }
             }
-            Statement::TypeDef(t) => {
+            Statement::TypeDef { name, private } => {
                 if !matches!(self.scopes[scope].typ, Some(ScopeType::Global)) {
                     return Err(CompilerError::TypeDefNotGlobal {
                         area: self.make_area(stmt.span),
@@ -792,10 +792,10 @@ impl<'a> Compiler<'a> {
 
                 let info = TypeDef {
                     def_src: self.src.clone(),
-                    name: *t,
+                    name: *name,
                 };
 
-                if ValueType::VARIANT_NAMES.contains(&self.resolve(t).as_str()) {
+                if ValueType::VARIANT_NAMES.contains(&self.resolve(name).as_str()) {
                     return Err(CompilerError::BuiltinTypeOverride {
                         area: self.make_area(stmt.span),
                     });
@@ -804,17 +804,17 @@ impl<'a> Compiler<'a> {
                         area: self.make_area(stmt.span),
                         prev_area: self.make_area(self.custom_type_defs[&info].span),
                     });
-                } else if self.available_custom_types.contains_key(t) {
+                } else if self.available_custom_types.contains_key(name) {
                     // TODO test
                     return Err(CompilerError::DuplicateImportedType {
                         area: self.make_area(stmt.span),
                     });
                 }
 
-                let k = builder.create_type(self.resolve(t), stmt.span);
+                let k = builder.create_type(self.resolve(name), stmt.span);
 
                 self.custom_type_defs.insert(info, k.spanned(stmt.span));
-                self.available_custom_types.insert(*t, k);
+                self.available_custom_types.insert(*name, k);
             }
             Statement::Impl { base, items } => {
                 let dict_reg = builder.next_reg();
@@ -1195,6 +1195,7 @@ impl<'a> Compiler<'a> {
                                         self.resolve(&name.value).spanned(name.span),
                                         value_reg,
                                         true,
+                                        false,
                                     ));
                                 }
                                 Ok(())
@@ -1291,7 +1292,7 @@ impl<'a> Compiler<'a> {
     fn build_dict(
         &mut self,
         builder: &mut FuncBuilder,
-        items: &Vec<(Spanned<Spur>, Option<ExprNode>)>,
+        items: &DictItems,
         out_reg: usize,
         scope: ScopeKey,
         span: CodeSpan,
@@ -1300,7 +1301,7 @@ impl<'a> Compiler<'a> {
             items.len() as u16,
             out_reg,
             |builder, elems| {
-                for (key, item) in items {
+                for (key, item, private) in items {
                     let value_reg = match item {
                         Some(e) => self.compile_expr(e, scope, builder, ExprType::Normal)?,
                         None => match self.get_var(key.value, scope) {
@@ -1314,7 +1315,7 @@ impl<'a> Compiler<'a> {
                         },
                     };
 
-                    elems.push((self.resolve(&key.value).spanned(key.span), value_reg, false));
+                    elems.push((self.resolve(&key.value).spanned(key.span), value_reg, false, *private));
                 }
                 Ok(())
             },

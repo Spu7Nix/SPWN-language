@@ -57,7 +57,7 @@ pub struct Vm<'a> {
 
     pub types: SecondaryMap<CustomTypeKey, Spanned<TypeDef>>,
 
-    pub impls: AHashMap<ValueType, AHashMap<Spur, ValueKey>>,
+    pub impls: AHashMap<ValueType, AHashMap<Spur, (ValueKey, bool)>>,
 }
 
 impl<'a> Vm<'a> {
@@ -113,7 +113,7 @@ impl<'a> Vm<'a> {
     }
 
     pub fn intern(&self, s: &str) -> Spur {
-        self.interner.borrow_mut().get_or_intern(s)
+        self.intern(s)
     }
 
     pub fn deep_clone_key(&mut self, k: ValueKey) -> StoredValue {
@@ -310,16 +310,13 @@ impl<'a> Vm<'a> {
                         self.get_reg_key(*reg),
                     )
                 }
-                Opcode::AllocArray { size, dest } => {
-                    // println!("zasza {}", ip);
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value: Value::Array(Vec::with_capacity(*size as usize)),
-                            area: self.get_area(func, ip),
-                        },
-                    )
-                }
+                Opcode::AllocArray { size, dest } => self.set_reg(
+                    *dest,
+                    StoredValue {
+                        value: Value::Array(Vec::with_capacity(*size as usize)),
+                        area: self.get_area(func, ip),
+                    },
+                ),
 
                 Opcode::AllocDict { size, dest } => self.set_reg(
                     *dest,
@@ -343,11 +340,11 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     };
 
-                    let key = self.interner.borrow_mut().get_or_intern(key);
+                    let key = self.intern(&key);
 
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
-                            v.insert(key, push);
+                            v.insert(key, (push, false));
                         }
                         _ => unreachable!(),
                     }
@@ -367,12 +364,26 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     };
 
-                    let key = self.interner.borrow_mut().get_or_intern(key);
+                    let key = self.intern(&key);
 
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
-                            v.insert(key, push);
+                            v.insert(key, (push, false));
                         }
+                        _ => unreachable!(),
+                    }
+                }
+
+                Opcode::MakeDictElemPrivate { dest, key } => {
+                    let key = match &self.get_reg(*key).value {
+                        Value::String(s) => s.clone(),
+                        _ => unreachable!(),
+                    };
+
+                    let key = self.intern(&key);
+
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Dict(v) => v[&key].1 = true,
                         _ => unreachable!(),
                     }
                 }
@@ -620,7 +631,7 @@ impl<'a> Vm<'a> {
                                 // let module_name = self.programs[func.code].0.name()
 
                                 ret_val.value = Value::Module {
-                                    exports: d,
+                                    exports: d.into_iter().map(|(s, (k, _))| (s, k)).collect(),
                                     types: self.programs[func.code].2.clone(),
                                 }
                             }
@@ -714,9 +725,9 @@ impl<'a> Vm<'a> {
                             );
                         }
                         (Value::Dict(v), Value::String(s)) => {
-                            let key_interned = self.interner.borrow_mut().get_or_intern(s);
+                            let key_interned = self.intern(s);
                             match v.get(&key_interned) {
-                                Some(k) => self.change_reg_key(*dest, *k),
+                                Some((k, _)) => self.change_reg_key(*dest, *k),
                                 None => {
                                     return Err(RuntimeError::NonexistentMember {
                                         area: self.make_area(span, func.code),
@@ -780,12 +791,12 @@ impl<'a> Vm<'a> {
                             },
                         );
                     } else {
-                        let key_interned = self.interner.borrow_mut().get_or_intern(key);
+                        let key_interned = self.intern(key);
                         let base_type = value.get_type();
 
                         match value {
                             Value::Dict(v) => {
-                                if let Some(k) = v.get(&key_interned) {
+                                if let Some((k, _)) = v.get(&key_interned) {
                                     self.change_reg_key(*dest, *k)
                                 }
                             }
@@ -798,7 +809,7 @@ impl<'a> Vm<'a> {
                         }
 
                         let Some(members) = self.impls.get(&base_type) else { error!(base_type) };
-                        let Some(k) = members.get(&self.intern(key)) else { error!(base_type) };
+                        let Some((k, _)) = members.get(&self.intern(key)) else { error!(base_type) };
 
                         let mut v = self.deep_clone_key(*k);
 
@@ -893,7 +904,7 @@ impl<'a> Vm<'a> {
                             }
                             match self.impls.get(t) {
                                 Some(members) => match members.get(&key) {
-                                    Some(k) => {
+                                    Some((k, _)) => {
                                         let mut v = self.deep_clone_key(*k);
 
                                         self.set_reg(*dest, v);
@@ -972,7 +983,7 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     };
 
-                    for (name, k) in &items {
+                    for (name, (k, private)) in &items {
                         let name = self.resolve(name);
 
                         if let Value::Macro(MacroData { target, .. }) = &mut self.memory[*k].value {
@@ -1014,29 +1025,21 @@ impl<'a> Vm<'a> {
                             let pos_args;
                             let named_args;
 
-                            match std::mem::replace(
-                                {
-                                    let k = self.get_reg_key(*args);
-                                    &mut self.memory[k].value
-                                },
-                                Value::Empty,
-                            ) {
+                            match std::mem::take({
+                                let k = self.get_reg_key(*args);
+                                &mut self.memory[k].value
+                            }) {
                                 Value::Array(v) => {
-                                    match std::mem::replace(
-                                        &mut self.memory[v[0]].value,
-                                        Value::Empty,
-                                    ) {
+                                    match std::mem::take(&mut self.memory[v[0]].value) {
                                         Value::Array(v) => {
                                             pos_args = v;
                                         }
                                         _ => unreachable!(),
                                     }
-                                    match std::mem::replace(
-                                        &mut self.memory[v[1]].value,
-                                        Value::Empty,
-                                    ) {
+                                    match std::mem::take(&mut self.memory[v[1]].value) {
                                         Value::Dict(m) => {
-                                            named_args = m;
+                                            named_args =
+                                                m.into_iter().map(|(s, (k, _))| (s, k)).collect();
                                         }
                                         _ => unreachable!(),
                                     }

@@ -511,7 +511,7 @@ impl<'a> FuncBuilder<'a> {
     where
         F: FnOnce(
             &mut FuncBuilder,
-            &mut Vec<(Spanned<String>, UnoptRegister, bool)>,
+            &mut Vec<(Spanned<String>, UnoptRegister, bool, bool)>,
         ) -> CompileResult<()>,
     {
         self.push_opcode_spanned(
@@ -522,7 +522,7 @@ impl<'a> FuncBuilder<'a> {
         let mut items = vec![];
         f(self, &mut items)?;
 
-        for (k, r, by_key) in items {
+        for (k, r, by_key, private) in items {
             let key_reg = self.next_reg();
             self.load_string(k.value, key_reg, k.span);
 
@@ -537,6 +537,13 @@ impl<'a> FuncBuilder<'a> {
                     elem: r,
                     key: key_reg,
                     dest,
+                }))
+            }
+
+            if private {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::MakeDictElemPrivate {
+                    dest,
+                    key: key_reg,
                 }))
             }
         }

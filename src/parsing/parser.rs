@@ -334,10 +334,18 @@ impl Parser<'_> {
         .unwrap_or('\u{FFFD}'))
     }
 
-    pub fn parse_dictlike(&mut self) -> ParseResult<DictItems> {
+    pub fn parse_dictlike(&mut self, allow_vis: bool) -> ParseResult<DictItems> {
         let mut items = vec![];
 
         list_helper!(self, RBracket {
+
+            let private = if allow_vis && self.next_is(Token::Private) {
+                self.next();
+                true
+            } else {
+                false
+            };
+
             let key = match self.next() {
                 Token::Int => self.parse_int(self.slice()).to_string(),
                 Token::String => self.parse_string(self.slice(), self.span())?,
@@ -361,7 +369,7 @@ impl Parser<'_> {
                 None
             };
 
-            items.push((key.spanned(key_span), elem));
+            items.push((key.spanned(key_span), elem, private));
         });
 
         Ok(items)
@@ -693,7 +701,7 @@ impl Parser<'_> {
                 Token::LBracket => {
                     self.next();
 
-                    Expression::Dict(self.parse_dictlike()?).spanned(start.extend(self.span()))
+                    Expression::Dict(self.parse_dictlike(false)?).spanned(start.extend(self.span()))
                 }
                 Token::QMark => {
                     self.next();
@@ -886,7 +894,7 @@ impl Parser<'_> {
                                 }
                             }
                             Token::LBracket => {
-                                let items = self.parse_dictlike()?;
+                                let items = self.parse_dictlike(false)?;
                                 Expression::Instance { base: value, items }
                             }
                             other => {
@@ -1115,13 +1123,19 @@ impl Parser<'_> {
                 self.next();
                 self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
-                Statement::TypeDef(self.intern_string(name))
+                Statement::TypeDef { name: self.intern_string(name), private: false }
+            }
+            Token::Private => {
+                self.next();
+                self.expect_tok(Token::Type);
+                let name = self.slice()[1..].to_string();
+                Statement::TypeDef { name: self.intern_string(name), private: true }
             }
             Token::Impl => {
                 self.next();
                 let base = self.parse_expr(true)?;
                 self.expect_tok(Token::LBracket)?;
-                let items = self.parse_dictlike()?;
+                let items = self.parse_dictlike(true)?;
                 // todo!()
                 // self.next();
 

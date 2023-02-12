@@ -307,11 +307,9 @@ fn run_spwn(
 
     println!("{:20}", "Building...".color_hex(RUNNING_COLOR).bold());
 
-    println!("\n{}", "════ Output ══════════════════════".dimmed().bold(),);
+    println!("\n{}", "════ Output ══════════════════════".dimmed().bold());
 
-    let now = std::time::Instant::now();
     vm.run_program().map_err(|e| e.to_report(&vm))?;
-    println!("{:?}", now.elapsed());
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());
 

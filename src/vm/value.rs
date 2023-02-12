@@ -126,15 +126,16 @@ macro_rules! value {
             $( { $( $in:ident: $it1:ty ,)* } )?
         ,
     ) => {
-        #[derive(Debug, Clone, PartialEq)]
+        #[derive(Debug, Clone, PartialEq, Default)]
         pub enum Value {
             $(
+                $(#[$($meta)*])?
                 $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?,
             )*
             $i_name $( ( $( $it0 ),* ) )? $( { $( $in: $it1 ,)* } )?,
         }
 
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, Default)]
         #[derive(delve::EnumFromStr, delve::EnumVariantNames, delve::EnumToStr)]
         #[delve(rename_all = "snake_case")]
         pub enum ValueType {
@@ -324,7 +325,7 @@ value! {
     String(String),
 
     Array(Vec<ValueKey>),
-    Dict(AHashMap<Spur, ValueKey>),
+    Dict(AHashMap<Spur, (ValueKey, bool)>),
 
     Group(Id),
     Channel(Id),
@@ -336,6 +337,8 @@ value! {
     Range(i64, i64, usize), //start, end, step
 
     Maybe(Option<ValueKey>),
+
+    #[default]
     Empty,
     Macro(MacroData),
 
@@ -360,7 +363,7 @@ value! {
 
     => Instance {
         typ: CustomTypeKey,
-        items: AHashMap<Spur, ValueKey>,
+        items: AHashMap<Spur, (ValueKey, bool)>,
     },
 }
 
@@ -400,7 +403,7 @@ impl Value {
             Value::Dict(d) => format!(
                 "{{ {} }}",
                 d.iter()
-                    .map(|(s, k)| format!(
+                    .map(|(s, (k, _))| format!(
                         "{}: {}",
                         vm.interner.borrow().resolve(s),
                         vm.memory[*k].value.runtime_display(vm)
@@ -478,7 +481,7 @@ impl Value {
                 vm.resolve(&vm.types[*typ].value.name),
                 items
                     .iter()
-                    .map(|(s, k)| format!(
+                    .map(|(s, (k, _))| format!(
                         "{}: {}",
                         vm.interner.borrow().resolve(s),
                         vm.memory[*k].value.runtime_display(vm)
