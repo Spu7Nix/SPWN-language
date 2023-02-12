@@ -1127,7 +1127,7 @@ impl Parser<'_> {
             }
             Token::Private => {
                 self.next();
-                self.expect_tok(Token::Type);
+                self.expect_tok(Token::Type)?;
                 let name = self.slice()[1..].to_string();
                 Statement::TypeDef { name: self.intern_string(name), private: true }
             }

@@ -187,7 +187,7 @@ pub mod dict {
     ) -> RuntimeResult<Value> {
         let key = vm.intern(&key);
         let val = slf.get_mut(vm);
-        val.0.insert(key, elem);
+        val.0.insert(key, (elem, false));
 
         Ok(Value::Empty)
     }

@@ -84,7 +84,7 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
                 for (k, k1) in v1 {
                     match v2.get(k) {
                         Some(k2) => {
-                            if !equality(&vm.memory[*k1].value, &vm.memory[*k2].value, vm) {
+                            if !equality(&vm.memory[k1.0].value, &vm.memory[k2.0].value, vm) {
                                 return false;
                             }
                         }

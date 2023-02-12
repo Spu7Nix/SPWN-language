@@ -113,7 +113,7 @@ impl<'a> Vm<'a> {
     }
 
     pub fn intern(&self, s: &str) -> Spur {
-        self.intern(s)
+        self.interner.borrow_mut().get_or_intern(s)
     }
 
     pub fn deep_clone_key(&mut self, k: ValueKey) -> StoredValue {
@@ -383,7 +383,11 @@ impl<'a> Vm<'a> {
                     let key = self.intern(&key);
 
                     match &mut self.get_reg_mut(*dest).value {
-                        Value::Dict(v) => v[&key].1 = true,
+                        Value::Dict(v) => {
+                            v.entry(key).and_modify(|(_, p)| *p = true);
+                            // let g = &mut v[&key];
+                            // *g = true;
+                        },
                         _ => unreachable!(),
                     }
                 }
