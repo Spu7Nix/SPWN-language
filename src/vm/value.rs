@@ -322,7 +322,7 @@ value! {
     Int(i64),
     Float(f64),
     Bool(bool),
-    String(String),
+    String(Vec<char>),
 
     Array(Vec<ValueKey>),
     Dict(AHashMap<Spur, (ValueKey, bool)>),
@@ -372,7 +372,7 @@ impl Value {
         match c {
             Constant::Int(v) => Value::Int(*v),
             Constant::Float(v) => Value::Float(*v),
-            Constant::String(v) => Value::String(v.clone()),
+            Constant::String(v) => Value::String(v.chars().collect()),
             Constant::Bool(v) => Value::Bool(*v),
             Constant::Id(c, v) => {
                 let id = Id::Specific(*v);
@@ -392,7 +392,7 @@ impl Value {
             Value::Int(n) => n.to_string(),
             Value::Float(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::String(s) => s.clone(),
+            Value::String(s) => s.iter().collect(),
             Value::Array(arr) => format!(
                 "[{}]",
                 arr.iter()
@@ -493,31 +493,3 @@ impl Value {
         }
     }
 }
-
-// struct Thing;
-// struct Other;
-
-// trait Test<O> {
-//     fn thingy(self, t: &mut Thing) -> O;
-// }
-
-// struct RUsize<'a>(&'a mut usize);
-
-// impl<'a> Test<RUsize<'a>> for Other {
-//     fn thingy(self, t: &'a mut Thing) -> RUsize<'a> {
-//         todo!()
-//     }
-// }
-
-// impl<T> Test for Vec<T>
-// where
-//     T: Test + Copy,
-// {
-//     fn thingy(self, t: &mut Thing) -> Vec<T> {
-
-//         self[0].thingy(t);
-//         self[1].thingy(t);
-
-//         todo!()
-//     }
-// }

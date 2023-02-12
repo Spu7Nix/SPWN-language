@@ -63,6 +63,21 @@ error_maker! {
 
         /////////
         #[
+            Message: "Cannot convert between types", Note: None;
+            Labels: [
+                area => "Cannot convert {} to {}": v.0.runtime_display(vm), to.runtime_display(vm);
+                v.1 => "This is of type {}": v.0.runtime_display(vm);
+            ]
+        ]
+        CannotConvertType {
+            v: (ValueType, CodeArea),
+            to: ValueType,
+            area: CodeArea,
+            [call_stack]
+        },
+
+        /////////
+        #[
             Message: "Cannot iterator", Note: None;
             Labels: [
                 area => "Cannot iterate over {}": v.0.runtime_display(vm);

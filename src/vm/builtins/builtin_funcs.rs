@@ -61,8 +61,8 @@ pub mod builtins {
                 .iter()
                 .map(|v| v.runtime_display(vm))
                 .collect::<Vec<_>>()
-                .join(&sep),
-            end,
+                .join(&sep.iter().collect::<String>()),
+            end.iter().collect::<String>(),
         );
 
         Ok(Value::Empty)
@@ -185,7 +185,7 @@ pub mod dict {
         elem: ValueKey,
         vm: &mut Vm,
     ) -> RuntimeResult<Value> {
-        let key = vm.intern(&key);
+        let key = vm.intern_vec(&key);
         let val = slf.get_mut(vm);
         val.0.insert(key, (elem, false));
 

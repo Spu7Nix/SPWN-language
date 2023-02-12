@@ -991,7 +991,7 @@ impl<'a> FuncBuilder<'a> {
         span: CodeSpan,
     ) {
         self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }),
+            ProtoOpcode::Raw(UnoptOpcode::Is { left, right, dest }),
             span,
         )
     }

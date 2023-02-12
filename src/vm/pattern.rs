@@ -1,5 +1,5 @@
 use super::interpreter::Vm;
-use super::value::ValueType;
+use super::value::{Value, ValueType};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Pattern {
@@ -22,6 +22,15 @@ impl Pattern {
                 format!("({} & {})", a.runtime_display(vm), b.runtime_display(vm))
             }
             Pattern::Any => "_".into(),
+        }
+    }
+
+    pub fn value_matches(&self, v: &Value, vm: &Vm) -> bool {
+        match self {
+            Pattern::Type(t) => v.get_type() == *t,
+            Pattern::Either(a, b) => a.value_matches(v, vm) || b.value_matches(v, vm),
+            Pattern::Both(a, b) => a.value_matches(v, vm) && b.value_matches(v, vm),
+            Pattern::Any => true,
         }
     }
 }

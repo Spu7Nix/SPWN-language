@@ -14,7 +14,7 @@ use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
 use crate::compiling::compiler::{CustomTypeKey, TypeDef};
 use crate::gd::gd_object::{GdObject, Trigger, TriggerOrder};
-use crate::gd::ids::{IDClass, Id};
+use crate::gd::ids::{IDClass, Id, SpecificId};
 use crate::gd::object_keys::ObjectKeyValueType;
 use crate::parsing::ast::{MacroArg, Spannable, Spanned};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
@@ -114,6 +114,11 @@ impl<'a> Vm<'a> {
 
     pub fn intern(&self, s: &str) -> Spur {
         self.interner.borrow_mut().get_or_intern(s)
+    }
+
+    pub fn intern_vec(&self, s: &Vec<char>) -> Spur {
+        let s: String = s.iter().collect();
+        self.intern(&s)
     }
 
     pub fn deep_clone_key(&mut self, k: ValueKey) -> StoredValue {
@@ -340,7 +345,7 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     };
 
-                    let key = self.intern(&key);
+                    let key = self.intern_vec(&key);
 
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
@@ -364,7 +369,7 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     };
 
-                    let key = self.intern(&key);
+                    let key = self.intern_vec(&key);
 
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
@@ -380,14 +385,14 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     };
 
-                    let key = self.intern(&key);
+                    let key = self.intern_vec(&key);
 
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
                             v.entry(key).and_modify(|(_, p)| *p = true);
                             // let g = &mut v[&key];
                             // *g = true;
-                        },
+                        }
                         _ => unreachable!(),
                     }
                 }
@@ -599,16 +604,13 @@ impl<'a> Vm<'a> {
                     right: _,
                     dest: _,
                 } => todo!(),
-                Opcode::As {
-                    left: _,
-                    right: _,
-                    dest: _,
-                } => todo!(),
-                Opcode::Is {
-                    left: _,
-                    right: _,
-                    dest: _,
-                } => todo!(),
+                Opcode::As { left, right, dest } => {
+                    // todo!()
+                    self.bin_op(value_ops::as_op, func, ip, left, right, dest)?
+                }
+                Opcode::Is { left, right, dest } => {
+                    self.bin_op(value_ops::is_op, func, ip, left, right, dest)?
+                }
                 Opcode::And { left, right, dest } => {
                     self.bin_op(value_ops::and, func, ip, left, right, dest)?
                 }
@@ -717,25 +719,25 @@ impl<'a> Vm<'a> {
                             self.change_reg_key(*dest, k);
                         }
                         (Value::String(s), Value::Int(index)) => {
-                            let idx = index_wrap(*index, s.chars().count(), ValueType::String)?;
-                            let c = s.chars().nth(idx).unwrap();
+                            let idx = index_wrap(*index, s.len(), ValueType::String)?;
+                            let c = s[idx];
 
                             self.set_reg(
                                 *dest,
                                 StoredValue {
-                                    value: Value::String(c.into()),
+                                    value: Value::String(vec![c]),
                                     area: self.make_area(span, func.code),
                                 },
                             );
                         }
                         (Value::Dict(v), Value::String(s)) => {
-                            let key_interned = self.intern(s);
+                            let key_interned = self.intern_vec(s);
                             match v.get(&key_interned) {
                                 Some((k, _)) => self.change_reg_key(*dest, *k),
                                 None => {
                                     return Err(RuntimeError::NonexistentMember {
                                         area: self.make_area(span, func.code),
-                                        member: s.clone(),
+                                        member: s.iter().collect(),
                                         base_type: base.value.get_type(),
                                         call_stack: self.get_call_stack(),
                                     })
@@ -753,16 +755,15 @@ impl<'a> Vm<'a> {
                     };
                 }
                 Opcode::Member { from, dest, member } => {
-                    let key = match &self.get_reg(*member).value {
-                        Value::String(s) => s.clone(),
+                    let key: String = match &self.get_reg(*member).value {
+                        Value::String(s) => s.iter().collect(),
                         _ => unreachable!(),
                     };
                     let span = self.get_span(func, ip);
 
                     let value = &self.get_reg(*from).value;
-                    let key = &key[..];
 
-                    let special = match (value, key) {
+                    let special = match (value, &key[..]) {
                         (Value::String(s), "length") => Some(Value::Int(s.len() as i64)),
 
                         (Value::Range(start, ..), "start") => Some(Value::Int(*start)),
@@ -795,7 +796,7 @@ impl<'a> Vm<'a> {
                             },
                         );
                     } else {
-                        let key_interned = self.intern(key);
+                        let key_interned = self.intern(&key);
                         let base_type = value.get_type();
 
                         match value {
@@ -813,7 +814,7 @@ impl<'a> Vm<'a> {
                         }
 
                         let Some(members) = self.impls.get(&base_type) else { error!(base_type) };
-                        let Some((k, _)) = members.get(&self.intern(key)) else { error!(base_type) };
+                        let Some((k, _)) = members.get(&self.intern(&key)) else { error!(base_type) };
 
                         let mut v = self.deep_clone_key(*k);
 
@@ -853,10 +854,10 @@ impl<'a> Vm<'a> {
 
                     match &self.get_reg(*from).value {
                         Value::Module { types, .. } => {
-                            let key = self.intern(match &self.get_reg(*member).value {
-                                Value::String(s) => s,
+                            let key = match &self.get_reg(*member).value {
+                                Value::String(s) => self.intern_vec(s),
                                 _ => unreachable!(),
-                            });
+                            };
 
                             let typ = types
                                 .iter()
@@ -886,7 +887,7 @@ impl<'a> Vm<'a> {
                     }
                 }
                 Opcode::Associated { from, dest, name } => {
-                    let key = self.intern(match &self.get_reg(*name).value {
+                    let key = self.intern_vec(match &self.get_reg(*name).value {
                         Value::String(s) => s,
                         _ => unreachable!(),
                     });
@@ -1090,12 +1091,11 @@ impl<'a> Vm<'a> {
                 ),
                 Opcode::PushMacroArg { name, dest, is_ref } => {
                     let name = match &self.get_reg(*name).value {
-                        Value::String(s) => s.clone(),
+                        Value::String(s) => self.intern_vec(s),
                         _ => unreachable!(),
                     };
                     let span = self.get_span(func, ip);
 
-                    let name = self.intern(&name);
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Macro(MacroData { args, .. }) => args.push(MacroArg::Single {
                             name: name.spanned(span),
@@ -1108,12 +1108,11 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::PushMacroSpreadArg { name, dest } => {
                     let name = match &self.get_reg(*name).value {
-                        Value::String(s) => s.clone(),
+                        Value::String(s) => self.intern_vec(s),
                         _ => unreachable!(),
                     };
                     let span = self.get_span(func, ip);
 
-                    let name = self.intern(&name);
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Macro(MacroData { args, .. }) => args.push(MacroArg::Spread {
                             name: name.spanned(span),
@@ -1480,7 +1479,7 @@ impl<'a> Vm<'a> {
         dest: &u8,
     ) -> Result<(), RuntimeError>
     where
-        F: Fn(&StoredValue, &StoredValue, CodeSpan, &Vm, BytecodeKey) -> RuntimeResult<Value>,
+        F: Fn(&StoredValue, &StoredValue, CodeSpan, &mut Vm, BytecodeKey) -> RuntimeResult<Value>,
     {
         let span = self.get_span(func, ip);
         let value = op(
@@ -1526,8 +1525,74 @@ impl<'a> Vm<'a> {
         Ok(())
     }
 
+    // https://cdn.discordapp.com/attachments/912863117699076107/1074291482296586300/i8-WMkH9yC7ljec8.mp4
     pub fn next_id(&mut self, c: IDClass) -> u16 {
         self.id_counters[c as usize] += 1;
         self.id_counters[c as usize] as u16
+    }
+
+    /*
+    let a = @a::{}
+
+    impl @a {
+        _as_
+    }
+
+    if a {
+
+    }
+    */
+
+    pub fn convert_type(
+        &mut self,
+        v: &StoredValue,
+        b: ValueType,
+        span: CodeSpan, // ✍️
+        code: BytecodeKey,
+    ) -> RuntimeResult<Value> {
+        if v.value.get_type() == b {
+            return Ok(v.value.clone());
+        }
+
+        Ok(match (&v.value, b) {
+            (Value::Int(i), ValueType::Group) => Value::Group(Id::Specific(*i as u16)),
+            (Value::Int(i), ValueType::Channel) => Value::Channel(Id::Specific(*i as u16)),
+            (Value::Int(i), ValueType::Block) => Value::Block(Id::Specific(*i as u16)),
+            (Value::Int(i), ValueType::Item) => Value::Item(Id::Specific(*i as u16)),
+
+            (Value::Int(i), ValueType::Float) => Value::Float(*i as f64),
+            (Value::Float(i), ValueType::Int) => Value::Int(*i as i64),
+
+            (v, ValueType::String) => Value::String(v.runtime_display(self).chars().collect()),
+            (v, ValueType::Type) => Value::Type(v.get_type()),
+            (_, ValueType::Bool) => Value::Bool(value_ops::to_bool(v, span, self, code)?),
+            (_, ValueType::Pattern) => Value::Pattern(value_ops::to_pattern(v, span, self, code)?),
+
+            (Value::Bool(b), ValueType::Int) => Value::Int(*b as i64),
+            (Value::Bool(b), ValueType::Float) => Value::Float(*b as i64 as f64),
+
+            (Value::Array(i), ValueType::Dict) => todo!(),
+            (Value::Range(a, b, c), ValueType::Array) => Value::Array(todo!()),
+
+            (Value::TriggerFunction { group, .. }, ValueType::Group) => Value::Group(*group),
+
+            (Value::String(s), ValueType::Float) => {
+                Value::Float(s.iter().collect::<String>().parse().unwrap())
+            }
+
+            // make vm mut >:(
+            (Value::String(s), ValueType::Array) => Value::Array(
+                s.iter()
+                    .map(|c| {
+                        self.memory.insert(StoredValue {
+                            value: Value::String(vec![*c]),
+                            area: v.area.clone(),
+                        })
+                    })
+                    .collect(),
+            ),
+            // oop
+            _ => todo!("error"),
+        })
     }
 }
