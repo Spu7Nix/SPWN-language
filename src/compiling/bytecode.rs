@@ -24,6 +24,7 @@ pub struct Function<R>
 where
     R: Display + Debug + Copy,
     for<'de3> Vec<(R, R)>: Serialize + Deserialize<'de3>,
+    for<'de3> Vec<R>: Serialize + Deserialize<'de3>,
 {
     pub opcodes: Vec<Opcode<R>>,
     // always 0 for unoptimised bytecode
@@ -33,6 +34,7 @@ where
     pub arg_amount: usize,
 
     pub capture_regs: Vec<(R, R)>,
+    pub ref_arg_regs: Vec<R>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,6 +43,7 @@ pub struct Bytecode<R>
 where
     R: Display + Debug + Copy,
     for<'de3> Vec<(R, R)>: Serialize + Deserialize<'de3>,
+    for<'de3> Vec<R>: Serialize + Deserialize<'de3>,
 {
     pub source_hash: Digest,
 
@@ -138,6 +141,7 @@ enum ProtoOpcode {
 
     Jump(JumpTo),
     JumpIfFalse(UnoptRegister, JumpTo),
+    UnwrapOrJump(UnoptRegister, JumpTo),
     LoadConst(UnoptRegister, ConstKey),
 
     EnterArrowStatement(JumpTo),
@@ -179,6 +183,7 @@ struct ProtoFunc {
     used_regs: usize,
     arg_amount: usize,
     capture_regs: Vec<(UnoptRegister, UnoptRegister)>,
+    ref_arg_regs: Vec<UnoptRegister>,
 }
 
 new_key_type! {
@@ -213,7 +218,10 @@ impl BytecodeBuilder {
 
     pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
     where
-        F: FnOnce(&mut FuncBuilder) -> CompileResult<Vec<(UnoptRegister, UnoptRegister)>>,
+        F: FnOnce(
+            &mut FuncBuilder,
+        )
+            -> CompileResult<(Vec<(UnoptRegister, UnoptRegister)>, Vec<UnoptRegister>)>,
     {
         let new_func = ProtoFunc {
             code: Block {
@@ -223,6 +231,7 @@ impl BytecodeBuilder {
             used_regs: 0,
             arg_amount,
             capture_regs: vec![],
+            ref_arg_regs: vec![],
         };
         let func_id = self.funcs.len();
         self.funcs.push(new_func);
@@ -233,8 +242,9 @@ impl BytecodeBuilder {
             block_path: vec![],
         };
 
-        let capture_regs = f(&mut func_builder)?;
+        let (capture_regs, ref_arg_regs) = f(&mut func_builder)?;
         self.funcs[func_id].capture_regs = capture_regs;
+        self.funcs[func_id].ref_arg_regs = ref_arg_regs;
 
         Ok(func_id as FunctionID)
     }
@@ -313,6 +323,10 @@ impl BytecodeBuilder {
                                         src: *r,
                                         to: get_jump_pos(to) as u16,
                                     },
+                                    ProtoOpcode::UnwrapOrJump(r, to) => UnoptOpcode::UnwrapOrJump {
+                                        src: *r,
+                                        to: get_jump_pos(to) as u16,
+                                    },
                                     ProtoOpcode::LoadConst(r, k) => UnoptOpcode::LoadConst {
                                         dest: *r,
                                         id: const_index_map[*k] as u16,
@@ -355,6 +369,7 @@ impl BytecodeBuilder {
                 regs_used: f.used_regs,
                 arg_amount: f.arg_amount,
                 capture_regs: f.capture_regs.clone(),
+                ref_arg_regs: f.ref_arg_regs.clone(),
             })
         }
 
@@ -443,7 +458,10 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn new_func<F>(&mut self, f: F, arg_amount: usize) -> CompileResult<FunctionID>
     where
-        F: FnOnce(&mut FuncBuilder) -> CompileResult<Vec<(UnoptRegister, UnoptRegister)>>,
+        F: FnOnce(
+            &mut FuncBuilder,
+        )
+            -> CompileResult<(Vec<(UnoptRegister, UnoptRegister)>, Vec<UnoptRegister>)>,
     {
         self.code_builder.new_func(f, arg_amount)
     }
@@ -456,7 +474,7 @@ impl<'a> FuncBuilder<'a> {
         span: CodeSpan,
     ) -> CompileResult<()>
     where
-        F: FnOnce(&mut FuncBuilder, &mut Vec<UnoptRegister>) -> CompileResult<()>,
+        F: FnOnce(&mut FuncBuilder, &mut Vec<(UnoptRegister, bool)>) -> CompileResult<()>,
     {
         self.push_opcode_spanned(
             ProtoOpcode::Raw(UnoptOpcode::AllocArray { size: len, dest }),
@@ -466,11 +484,18 @@ impl<'a> FuncBuilder<'a> {
         let mut items = vec![];
         f(self, &mut items)?;
 
-        for i in items {
-            self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushArrayElem {
-                elem: i,
-                dest,
-            }))
+        for (i, by_key) in items {
+            if by_key {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushArrayElemByKey {
+                    elem: i,
+                    dest,
+                }))
+            } else {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushArrayElem {
+                    elem: i,
+                    dest,
+                }))
+            }
         }
 
         Ok(())
@@ -486,7 +511,7 @@ impl<'a> FuncBuilder<'a> {
     where
         F: FnOnce(
             &mut FuncBuilder,
-            &mut Vec<(Spanned<String>, UnoptRegister)>,
+            &mut Vec<(Spanned<String>, UnoptRegister, bool)>,
         ) -> CompileResult<()>,
     {
         self.push_opcode_spanned(
@@ -497,15 +522,23 @@ impl<'a> FuncBuilder<'a> {
         let mut items = vec![];
         f(self, &mut items)?;
 
-        for (k, r) in items {
+        for (k, r, by_key) in items {
             let key_reg = self.next_reg();
             self.load_string(k.value, key_reg, k.span);
 
-            self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushDictElem {
-                elem: r,
-                key: key_reg,
-                dest,
-            }))
+            if by_key {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushDictElemByKey {
+                    elem: r,
+                    key: key_reg,
+                    dest,
+                }))
+            } else {
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushDictElem {
+                    elem: r,
+                    key: key_reg,
+                    dest,
+                }))
+            }
         }
 
         Ok(())
@@ -1086,12 +1119,28 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::JumpIfFalse(reg, JumpTo::End(path)), span)
     }
 
+    pub fn unwrap_or_exit(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        let path = self.block_path.clone();
+        self.push_opcode_spanned(ProtoOpcode::UnwrapOrJump(reg, JumpTo::End(path)), span)
+    }
+
     pub fn load_none(&mut self, reg: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadNone { dest: reg }), span)
     }
 
     pub fn wrap_maybe(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::WrapMaybe { src, dest }), span)
+    }
+
+    pub fn wrap_iterator(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(
+            ProtoOpcode::Raw(UnoptOpcode::WrapIterator { src, dest }),
+            span,
+        )
+    }
+
+    pub fn iter_next(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::IterNext { src, dest }), span)
     }
 
     pub fn create_instance(
@@ -1432,7 +1481,7 @@ impl Bytecode<Register> {
             );
 
             println!(
-                "{}\n{}\n{}\n\n",
+                "{}\n{}\n{}\n{}\n\n",
                 format!("│ registers used: {}", func.regs_used).bright_yellow(),
                 format!(
                     "│ capture regs: {}",
@@ -1443,6 +1492,19 @@ impl Bytecode<Register> {
                             format!("R{from}").bright_red().bold(),
                             "~>".bright_green().bold(),
                             format!("R{to}").bright_red().bold(),
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+                .bright_yellow(),
+                format!(
+                    "│ args regs by ref: {}",
+                    func.ref_arg_regs
+                        .iter()
+                        .map(|r| format!(
+                            "{} {}",
+                            "~>".bright_green().bold(),
+                            format!("R{r}").bright_red().bold(),
                         ))
                         .collect::<Vec<_>>()
                         .join(", ")

@@ -1,7 +1,33 @@
+#[doc(ur"
+    # Example
+    ```spwn
 
+    ```
+")]
+let m = (a: @string, b: @a) {
 
-type @cockc
+}
+
+#[doc("fo bar")]
+type @a
+
+impl @a {
+    new: 
+    #[doc("fo bar")]
+    #[constructor]
+    (self) {
+        self.b // ok
+    },
+
+    b: (self) {
+
+    }
+}
+
+let a = @a::{};
+
+a.b // error
 
 return {
-    a: 3,
+    @a
 }

@@ -293,7 +293,7 @@ impl<'a> Compiler<'a> {
 
                 // f.load_empty(reg, span)
 
-                Ok(vec![])
+                Ok((vec![], vec![]))
             },
             0,
         )?;
@@ -339,6 +339,7 @@ impl<'a> Compiler<'a> {
                         .iter()
                         .map(|(from, to)| (*from as Register, *to as Register))
                         .collect(),
+                    ref_arg_regs: f.ref_arg_regs.iter().map(|r| *r as Register).collect(),
                 }
             })
             .collect();
@@ -616,6 +617,56 @@ impl<'a> Compiler<'a> {
                 })?;
             }
 
+            Statement::For {
+                iter_var,
+                iterator,
+                code,
+            } => {
+                let iter_exec = self.compile_expr(iterator, scope, builder, ExprType::Normal)?;
+                let iter_reg = builder.next_reg();
+                builder.wrap_iterator(iter_exec, iter_reg, iterator.span);
+
+                builder.block(|b| {
+                    let inner_scope =
+                        self.derive_scope(scope, Some(ScopeType::Loop(b.block_path.clone())));
+
+                    let next_reg = b.next_reg();
+                    b.iter_next(iter_reg, next_reg, iter_var.span);
+
+                    b.unwrap_or_exit(next_reg, iterator.span);
+
+                    match &*iter_var.expr {
+                        Expression::Var(s) => {
+                            let var_reg = b.next_reg();
+                            self.new_var(
+                                *s,
+                                Variable {
+                                    mutable: false,
+                                    def_span: iter_var.span,
+                                    reg: var_reg,
+                                },
+                                inner_scope,
+                            );
+                            b.copy(next_reg, var_reg, iter_var.span);
+                        }
+                        _ => todo!("haha 😂😂😂😂"),
+                    }
+
+                    self.compile_stmts(code, inner_scope, b)?;
+
+                    b.repeat_block();
+                    Ok(())
+                })?;
+
+                // thing = [1,2,3]
+                // iter = thing.iter()
+                // let i = iter.next()
+                // while i != ? {
+                //     // do stuff
+                //     i = iter.next()
+                // }
+            }
+
             Statement::If {
                 branches,
                 else_branch,
@@ -667,11 +718,6 @@ impl<'a> Compiler<'a> {
                     })
                 }
             },
-            Statement::For {
-                iter,
-                iterator,
-                code,
-            } => todo!(),
             Statement::TryCatch {
                 try_code,
                 error_var,
@@ -919,12 +965,10 @@ impl<'a> Compiler<'a> {
                     out_reg,
                     |builder, elems| {
                         for item in items {
-                            elems.push(self.compile_expr(
-                                item,
-                                scope,
-                                builder,
-                                ExprType::Normal,
-                            )?);
+                            elems.push((
+                                self.compile_expr(item, scope, builder, ExprType::Normal)?,
+                                false,
+                            ));
                         }
                         Ok(())
                     },
@@ -990,15 +1034,26 @@ impl<'a> Compiler<'a> {
                     |f| {
                         let mut variables = AHashMap::new();
 
+                        let mut ref_arg_regs = vec![];
+
                         for a in args {
+                            let reg = f.next_reg();
+                            let name = a.name().value;
+
+                            let is_by_ref = name == self.intern("self")
+                                || matches!(a, MacroArg::Single { is_ref: true, .. });
+
                             variables.insert(
-                                a.name().value,
+                                name,
                                 Variable {
-                                    mutable: false,
+                                    mutable: is_by_ref,
                                     def_span: a.name().span,
-                                    reg: f.next_reg(),
+                                    reg,
                                 },
                             );
+                            if is_by_ref {
+                                ref_arg_regs.push(reg)
+                            }
                         }
 
                         let to_capture = self.get_accessible_vars(scope);
@@ -1027,7 +1082,7 @@ impl<'a> Compiler<'a> {
                             }
                         }
 
-                        Ok(capture_regs)
+                        Ok((capture_regs, ref_arg_regs))
                     },
                     args.len(),
                 )?;
@@ -1117,12 +1172,10 @@ impl<'a> Compiler<'a> {
                             params_reg,
                             |builder, elems| {
                                 for i in params {
-                                    elems.push(self.compile_expr(
-                                        i,
-                                        scope,
-                                        builder,
-                                        ExprType::Normal,
-                                    )?);
+                                    elems.push((
+                                        self.compile_expr(i, scope, builder, ExprType::Normal)?,
+                                        true,
+                                    ));
                                 }
                                 Ok(())
                             },
@@ -1141,6 +1194,7 @@ impl<'a> Compiler<'a> {
                                     elems.push((
                                         self.resolve(&name.value).spanned(name.span),
                                         value_reg,
+                                        true,
                                     ));
                                 }
                                 Ok(())
@@ -1148,8 +1202,8 @@ impl<'a> Compiler<'a> {
                             expr.span,
                         )?;
 
-                        elems.push(params_reg);
-                        elems.push(named_params_reg);
+                        elems.push((params_reg, true));
+                        elems.push((named_params_reg, true));
 
                         Ok(())
                     },
@@ -1260,7 +1314,7 @@ impl<'a> Compiler<'a> {
                         },
                     };
 
-                    elems.push((self.resolve(&key.value).spanned(key.span), value_reg));
+                    elems.push((self.resolve(&key.value).spanned(key.span), value_reg, false));
                 }
                 Ok(())
             },

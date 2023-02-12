@@ -441,6 +441,13 @@ pub fn range(
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
         (Value::Int(a), Value::Int(b)) => Value::Range(*a, *b, 1),
+        (Value::Range(start, end, step), Value::Int(b)) => {
+            if *step == 1 {
+                Value::Range(*start, *b, *end as usize)
+            } else {
+                todo!()
+            }
+        }
         // (Value::Int(a), Value::Float(b)) => Value::Range(*a, *b as i64, 1),
         // (Value::Float(a), Value::Int(b)) => Value::Range(*a as i64, *b, 1),
         // (Value::Float(a), Value::Float(b)) => Value::Range(*a as i64, *b as i64, 1),

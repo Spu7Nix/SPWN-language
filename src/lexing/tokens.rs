@@ -9,8 +9,6 @@ lexer! {
     Id: regex(r"([0-9]+|\?)[gbci]"),
     TypeIndicator: regex(r"@[a-zA-Z_]\w*"),
 
-    //Attribute: regex(r"#\[.*?\]"),
-
     Let: text("let"),
 
     True: text("true"),
@@ -35,6 +33,7 @@ lexer! {
 
     Dbg: text("dbg"),
 
+    Private: text("private"),
     Extract: text("extract"),
     Import: text("import"),
     Dollar: text("$"),
@@ -206,6 +205,7 @@ impl Token {
             Self::Spread => "...",
             Self::Dbg => "dbg",
             Self::Slf => "self",
+            Self::Private => "private",
         }
     }
 }

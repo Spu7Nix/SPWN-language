@@ -2,6 +2,7 @@
 #![allow(clippy::result_large_err)] // shut the fuck up clippy Lmao
 #![allow(clippy::type_complexity)] // shut the fuck up clippy Lmao
 #![allow(clippy::unit_arg)] // shut the fuck up clippy Lmao
+#![allow(clippy::too_many_arguments)] // shut the fuck up clippy Lmao
 
 mod cli;
 mod compiling;
@@ -308,7 +309,9 @@ fn run_spwn(
 
     println!("\n{}", "════ Output ══════════════════════".dimmed().bold(),);
 
+    let now = std::time::Instant::now();
     vm.run_program().map_err(|e| e.to_report(&vm))?;
+    println!("{:?}", now.elapsed());
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());
 

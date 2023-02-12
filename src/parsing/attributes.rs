@@ -278,8 +278,11 @@ attributes! {
 attributes! {
     #[check_validity(Statement)]
     pub enum StmtAttribute {
-        // #[valid_on(Arrow)]
-        // Doc(String),
+        #[valid_on(Arrow)]
+        Doc(String),
+
+        // #[valid_on(Macro)]
+        // Constructor,
 
         #[valid_on(Let, TypeDef)]
         Deprecated { since: String, note: String, },

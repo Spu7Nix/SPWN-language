@@ -1,9 +1,37 @@
-import "libraries/core/builtins.spwn"
+#![no_std]
+
+import core
 
 
+// // let a = [1, 2, 3];
+// // $.print(a);
+// // a.push(44);
+// // $.print(a);
+
+// // let a = [];
+
+// // let i = 0;
+
+// // while i < 1000000 {
+// //     a.push(i);
+// //     i = i + 1;
+// // }
+
+// // $.print(a.length);
 
 
+// thing = [1,2,3]
 
+// // inside for loop now we in this for loop now #[warn(clippy::unused_unit)]
+// iter = thing.iter()
+// let i = iter.next()
+// while i != ? {
+//     // do stuff
+//     i = iter.next()
+// }
 
+// let a = 0
 
-
+for i in (1..3..12).reversed() {
+    $.print(i)
+}

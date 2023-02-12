@@ -168,6 +168,11 @@ opcodes! {
     #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d}"))]
     PushDictElem { => elem, => key, => dest },
 
+    #[delve(display = |e: &R, d: &R| format!("push R{e} into R{d} by key"))]
+    PushArrayElemByKey { => elem, => dest },
+    #[delve(display = |e: &R, k: &R, d: &R| format!("insert R{k}:R{e} into R{d} by key"))]
+    PushDictElemByKey { => elem, => key, => dest },
+
     #[delve(display = |e: &R, k: &ObjectKey, d: &R| format!("insert {}:R{e} into R{d}", <&ObjectKey as Into<&'static str>>::into(k)))]
     PushObjectElemKey { => elem, obj_key: ObjectKey, => dest },
     #[delve(display = |e: &R, k: &u8, d: &R| format!("insert {k}:R{e} into R{d}"))]
@@ -275,6 +280,16 @@ opcodes! {
         => src,
         to: JumpPos,
     },
+    #[delve(display = |s: &R, to: &JumpPos| format!("if R{s} == ?, to {to}"))]
+    UnwrapOrJump {
+        => src,
+        to: JumpPos,
+    },
+
+    #[delve(display = |s: &R, d: &R| format!("R{s}.iter() -> R{d}"))]
+    WrapIterator { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!("R{s}.next() -> R{d}"))]
+    IterNext { => src, => dest },
 
     #[delve(display = |s: &R, m: &bool| format!("{} R{s}", if *module_ret { "export" } else { "return" }))]
     Ret { => src, module_ret: bool },

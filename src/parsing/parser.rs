@@ -947,9 +947,53 @@ impl Parser<'_> {
         let start = self.peek_span();
 
         let attrs = if self.next_is(Token::Hashtag) {
-            self.next();
+            let mut check = self.clone();
 
-            self.parse_attributes::<StmtAttribute>()?
+            check.next();
+            check.expect_tok(Token::LSqBracket)?;
+            
+            let mut indent = 1;
+
+            let after_close = loop {
+                match check.next() {
+                    Token::LSqBracket => indent += 1,
+                    Token::Eof => {
+                        return Err(SyntaxError::UnmatchedToken {
+                            not_found: Token::RSqBracket,
+                            for_char: Token::LSqBracket,
+                            area: self.make_area(start),
+                        })
+                    }
+                    Token::RSqBracket => {
+                        indent -= 1;
+                        if indent == 0 {
+                            break check.next();
+                        }
+                    }
+                    _ => (),
+                }
+            };
+
+            if matches!(after_close,
+                Token::Let |
+                Token::If |
+                Token::While |
+                Token::For |
+                Token::Try |
+                Token::Return |
+                Token::Continue |
+                Token::Break |
+                Token::Type |
+                Token::Impl |
+                Token::Extract |
+                Token::Dbg
+            ) {
+                println!("Lol sex L:)");
+                self.next();
+                self.parse_attributes::<StmtAttribute>()?
+            } else {
+                vec![]
+            }
         } else {
             vec![]
         };
@@ -1012,14 +1056,14 @@ impl Parser<'_> {
             }
             Token::For => {
                 self.next();
-                let iter = self.parse_unit(true)?;
+                let iter_var = self.parse_unit(true)?;
                 self.expect_tok(Token::In)?;
                 let iterator = self.parse_expr(false)?;
 
                 let code = self.parse_block()?;
 
                 Statement::For {
-                    iter,
+                    iter_var,
                     iterator,
                     code,
                 }
@@ -1150,8 +1194,11 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> ParseResult<Ast> {
-        let file_attributes = if self.next_is(Token::Hashtag) {
+        let file_attributes = if self.next_are(&[Token::Hashtag, Token::ExclMark])  {
             self.next();
+            self.next();
+
+            println!("lesex");
 
             self.parse_attributes::<ScriptAttribute>()?
         } else {

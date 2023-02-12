@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -8,6 +9,7 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 use strum::EnumDiscriminants;
 
+use super::builtins::builtin_utils::IntoArg;
 use super::error::RuntimeError;
 use super::interpreter::{FuncCoord, RuntimeResult, ValueKey, Vm};
 use super::pattern::Pattern;
@@ -17,6 +19,7 @@ use crate::gd::gd_object::ObjParam;
 use crate::gd::ids::*;
 use crate::parsing::ast::{MacroArg, ObjKeyType, ObjectType, Spanned};
 use crate::sources::CodeArea;
+use crate::vm::builtins::builtin_utils::GetMutArg;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -25,7 +28,7 @@ pub struct StoredValue {
 }
 
 #[derive(Clone)]
-pub struct BuiltinFn(pub Rc<dyn Fn(Vec<ValueKey>, &mut Vm, CodeArea) -> RuntimeResult<Value>>);
+pub struct BuiltinFn(pub &'static dyn Fn(Vec<ValueKey>, &mut Vm, CodeArea) -> RuntimeResult<Value>);
 
 #[derive(Clone, Debug)]
 pub enum MacroTarget {
@@ -52,6 +55,58 @@ pub struct MacroData {
 impl PartialEq for MacroData {
     fn eq(&self, _other: &Self) -> bool {
         false
+    }
+} // 🙂
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum IteratorData {
+    Array {
+        array: ValueKey,
+        index: usize,
+    },
+    Range {
+        range: (i64, i64, usize),
+        index: usize,
+    },
+    Dictionary {
+        map: ValueKey,
+        keys: Vec<Spur>,
+        index: usize,
+    },
+    Custom(ValueKey),
+}
+
+impl IteratorData {
+    pub fn next(&mut self, vm: &mut Vm, area: CodeArea) -> Option<ValueKey> {
+        match self {
+            IteratorData::Array { array, index } => {
+                match &vm.memory[*array].value {
+                    Value::Array(values) => values.get(*index).cloned(),
+                    _ => todo!(), // maybe add error here incase its mutated???
+                }
+            }
+            IteratorData::Range { range, index } => {
+                let v = if range.1 >= range.0 {
+                    (range.0..range.1).nth(*index * range.2)
+                } else {
+                    let l = (range.0 - range.1) as usize - 1;
+                    if l >= *index * range.2 {
+                        ((range.1 + 1)..(range.0 + 1)).nth(l - *index * range.2)
+                    } else {
+                        None
+                    }
+                };
+                match v {
+                    Some(v) => Some(vm.memory.insert(StoredValue {
+                        value: Value::Int(v),
+                        area,
+                    })),
+                    None => None,
+                }
+            }
+            // dict string TODO
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -106,23 +161,25 @@ macro_rules! value {
 
         pub mod arg_aliases {
             use super::*;
-            use crate::vm::builtins::builtin_utils::IntoArg;
             
             $(
-                value!{ @semicolon $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
+                value!{ @struct $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
+            )*
+            $(
+                value!{ @struct &mut $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
             )*
 
             paste::paste! {
                 $(
                     impl IntoArg<[<A $name>]> for ValueKey {
-                        fn into_arg(self, vm: &Vm) -> [<A $name>] {
+                        fn into_arg(self, vm: &mut Vm) -> [<A $name>] {
 
                             let val = vm.memory[self].value.clone();
 
-                            value! {@into_arg_empty val $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
+                            value! {@into_arg_empty val [Value::$name] [[<A $name>]] [] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
 
                             $(
-                                value! {@tuple_match val $name $( $t0, )*}
+                                value! {@tuple_match val [Value::$name] [[<A $name>]] $( $t0, )*}
                             )?
 
                             match val {
@@ -137,69 +194,115 @@ macro_rules! value {
                         }
                     }
                 )*
+
+
+                
+                $(
+                    impl<'a> GetMutArg<'a> for [<A $name>] {
+                        type Output = [<MutA $name>]<'a>;
+
+                        fn get_mut_arg(key: ValueKey, vm: &'a mut Vm) -> Self::Output {
+                            let val = &mut vm.memory[key].value;
+
+                            value! {@into_arg_empty val [Value::$name] [[<MutA $name>]] [(PhantomData)] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
+
+                            $(
+                                value! {@tuple_match val [Value::$name] [[<MutA $name>]] $( $t0, )*}
+                            )?
+
+                            match val {
+                                $(
+                                    Value::$name {$($n,)*} => return [<MutA $name>] {$($n,)*},
+                                )?
+                                _ => (),
+                            }
+
+                            unreachable!();
+                        }
+                    }
+                )*
             }
 
         }
     };
 
-    (@semicolon $name:ident) => {
+    (@struct $name:ident) => {
         paste::paste! {
+            #[derive(Debug)]
             pub struct [<A $name>];
         }
     };
-    (@semicolon $name:ident ( $( $t0:ty ),* )) => {
+    (@struct $name:ident ( $( $t0:ty ),* )) => {
         paste::paste! {
+            #[derive(Debug)]
             pub struct [<A $name>] ( $( pub $t0 ),* );
         }
     };
-    (@semicolon $name:ident { $( $n:ident: $t1:ty ,)* }) => {
+    (@struct $name:ident { $( $n:ident: $t1:ty ,)* }) => {
         paste::paste! {
+            #[derive(Debug)]
             pub struct [<A $name>] { $( pub $n: $t1 ,)* }
         }
     };
 
-    (@tuple_match $self:ident $name:ident $t1:ty, $t2:ty, $t3:ty, $t4:ty, ) => {
+    (@struct &mut $name:ident) => {
+        paste::paste! {
+            pub struct [<MutA $name>]<'a>(PhantomData<&'a ()>);
+        }
+    };
+    (@struct &mut $name:ident ( $( $t0:ty ),* )) => {
+        paste::paste! {
+            pub struct [<MutA $name>]<'a> ( $( pub &'a mut $t0 ),* );
+        }
+    };
+    (@struct &mut $name:ident { $( $n:ident: $t1:ty ,)* }) => {
+        paste::paste! {
+            pub struct [<MutA $name>]<'a> { $( pub $n: &'a mut $t1 ,)* }
+        }
+    };
+
+    (@tuple_match $self:ident [$($left:tt)*] [$($right:tt)*] $t1:ty, $t2:ty, $t3:ty, $t4:ty, ) => {
         paste::paste! {
             match $self {
-                Value::$name (a, b, c, d) => return [<A $name>](a, b, c, d),
+                $($left)* (a, b, c, d) => return $($right)* (a, b, c, d),
                 _ => (),
             }
         }
     };
-    (@tuple_match $self:ident $name:ident $t1:ty, $t2:ty, $t3:ty, ) => {
+    (@tuple_match $self:ident [$($left:tt)*] [$($right:tt)*] $t1:ty, $t2:ty, $t3:ty, ) => {
         paste::paste! {
             match $self {
-                Value::$name (a, b, c) => return [<A $name>](a, b, c),
+                $($left)* (a, b, c) => return $($right)* (a, b, c),
                 _ => (),
             }
         }
     };
-    (@tuple_match $self:ident $name:ident $t1:ty, $t2:ty, ) => {
+    (@tuple_match $self:ident [$($left:tt)*] [$($right:tt)*] $t1:ty, $t2:ty, ) => {
         paste::paste! {
             match $self {
-                Value::$name (a, b) => return [<A $name>](a, b),
+                $($left)* (a, b) => return $($right)* (a, b),
                 _ => (),
             }
         }
     };
-    (@tuple_match $self:ident $name:ident $t1:ty, ) => {
+    (@tuple_match $self:ident [$($left:tt)*] [$($right:tt)*] $t1:ty, ) => {
         paste::paste! {
             match $self {
-                Value::$name (a) => return [<A $name>](a),
+                $($left)* (a) => return $($right)* (a),
                 _ => (),
             }
         }
     };
 
-    (@into_arg_empty $self:ident $name:ident) => {
+    (@into_arg_empty $self:ident [$($left:tt)*] [$($right:tt)*] [$($extra_args:tt)*]) => {
         paste::paste! {
             match $self {
-                Value::$name => return [<A $name>],
+                $($left)* => return $($right)* $($extra_args)*,
                 _ => (),
             }
         }
     };
-    (@into_arg_empty $self:ident $name:ident $($t:tt)+) => {};
+    (@into_arg_empty $self:ident [$($left:tt)*] [$($right:tt)*] [$($extra_args:tt)*] $($t:tt)+) => {};
 }
 
 impl ValueType {
@@ -252,6 +355,8 @@ value! {
     Object(AHashMap<u8, ObjParam>, ObjectType),
 
     Epsilon,
+
+    Iterator(IteratorData),
 
     => Instance {
         typ: CustomTypeKey,
@@ -381,6 +486,35 @@ impl Value {
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
+            Value::Iterator(_) => todo!(),
         }
     }
 }
+
+// struct Thing;
+// struct Other;
+
+// trait Test<O> {
+//     fn thingy(self, t: &mut Thing) -> O;
+// }
+
+// struct RUsize<'a>(&'a mut usize);
+
+// impl<'a> Test<RUsize<'a>> for Other {
+//     fn thingy(self, t: &'a mut Thing) -> RUsize<'a> {
+//         todo!()
+//     }
+// }
+
+// impl<T> Test for Vec<T>
+// where
+//     T: Test + Copy,
+// {
+//     fn thingy(self, t: &mut Thing) -> Vec<T> {
+
+//         self[0].thingy(t);
+//         self[1].thingy(t);
+
+//         todo!()
+//     }
+// }

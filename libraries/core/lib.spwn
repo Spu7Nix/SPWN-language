@@ -1,4 +1,5 @@
 
+
 impl @builtins {
     print: (self, ...args, end: @string = "\n", sep: @string = " ") {
         /* compiler built-in */ 
@@ -24,11 +25,40 @@ impl @float {
 }
 
 impl @array {
-    push: (self, el) -> @NULL {
+    push: (self, value) {
         /* compiler built-in */ 
     },
 
     pop: (self) {
+        /* compiler built-in */ 
+    },
+
+    map: (self, cb: @macro) -> @array {
+        /* compiler built-in */ 
+    },
+
+    iter: (self) -> @iterator {
+        /* compiler built-in */ 
+    },
+}
+
+impl @iterator {
+    next: (self) {
+        /* compiler built-in */ 
+    },
+}
+
+impl @dict {
+    insert: (self, key: @string, value) {
+        /* compiler built-in */ 
+    },
+}
+
+impl @range {
+    reversed: (self) -> @range {
+        /* compiler built-in */ 
+    },
+    contains: (self, n: @int) -> @bool {
         /* compiler built-in */ 
     },
 }

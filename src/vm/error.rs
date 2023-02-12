@@ -63,6 +63,20 @@ error_maker! {
 
         /////////
         #[
+            Message: "Cannot iterator", Note: None;
+            Labels: [
+                area => "Cannot iterate over {}": v.0.runtime_display(vm);
+                v.1 => "Value defined as {} here": v.0.runtime_display(vm);
+            ]
+        ]
+        CannotIterate {
+            v: (ValueType, CodeArea),
+            area: CodeArea,
+            [call_stack]
+        },
+
+        /////////
+        #[
             Message: "Cannot instance builtin type", Note: None;
             Labels: [
                 area => "Cannot instance builtin type {}": typ.runtime_display(vm);

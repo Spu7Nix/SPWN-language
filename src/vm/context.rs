@@ -27,8 +27,7 @@ pub struct Context {
     group_stack: Vec<Id>,
     pub registers: Vec<Vec<ValueKey>>,
 }
-// yore sot sitnky 😍😍😍😍😍😍😍😂😂😂😂😻😻😻😻😻❤️❤️❤️❤️❤️❤️😭💷💷💷💷💵💵🚘🚘🚘😉😉😉
-// sort by pos, then by recursion depth
+
 impl PartialOrd for Context {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))

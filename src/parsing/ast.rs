@@ -230,7 +230,7 @@ pub enum Statement {
         code: Statements,
     },
     For {
-        iter: ExprNode,
+        iter_var: ExprNode,
         iterator: ExprNode,
         code: Statements,
     },
