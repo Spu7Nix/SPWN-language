@@ -1,3 +1,3 @@
 import "libraries/core/lib.spwn"
 
-$.print(1 is @int)
+$.print("ag1ga" as @array)

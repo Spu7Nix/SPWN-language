@@ -606,7 +606,24 @@ impl<'a> Vm<'a> {
                 } => todo!(),
                 Opcode::As { left, right, dest } => {
                     // todo!()
-                    self.bin_op(value_ops::as_op, func, ip, left, right, dest)?
+                    // self.bin_op(value_ops::as_op, func, ip, left, right, dest)?
+                    let span = self.get_span(func, ip);
+
+                    let value = value_ops::as_op(
+                        &self.get_reg(*left).clone(),
+                        &self.get_reg(*right).clone(),
+                        span,
+                        self,
+                        func.code,
+                    )?;
+
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value,
+                            area: self.make_area(span, func.code),
+                        },
+                    );
                 }
                 Opcode::Is { left, right, dest } => {
                     self.bin_op(value_ops::is_op, func, ip, left, right, dest)?
@@ -1479,9 +1496,10 @@ impl<'a> Vm<'a> {
         dest: &u8,
     ) -> Result<(), RuntimeError>
     where
-        F: Fn(&StoredValue, &StoredValue, CodeSpan, &mut Vm, BytecodeKey) -> RuntimeResult<Value>,
+        F: Fn(&StoredValue, &StoredValue, CodeSpan, &Vm, BytecodeKey) -> RuntimeResult<Value>,
     {
         let span = self.get_span(func, ip);
+
         let value = op(
             self.get_reg(*left),
             self.get_reg(*right),
@@ -1513,6 +1531,7 @@ impl<'a> Vm<'a> {
         F: Fn(&StoredValue, CodeSpan, &Vm, BytecodeKey) -> RuntimeResult<Value>,
     {
         let span = self.get_span(func, ip);
+
         let value = op(self.get_reg(*value), span, self, func.code)?;
 
         self.set_reg(

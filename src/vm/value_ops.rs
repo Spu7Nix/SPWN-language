@@ -6,12 +6,7 @@ use crate::gd::gd_object::ObjParam;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
 use crate::sources::CodeSpan;
 
-pub fn to_bool(
-    v: &StoredValue,
-    span: CodeSpan,
-    vm: &mut Vm,
-    code: BytecodeKey,
-) -> RuntimeResult<bool> {
+pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm, code: BytecodeKey) -> RuntimeResult<bool> {
     Ok(match &v.value {
         Value::Bool(b) => *b,
         _ => {
@@ -27,7 +22,7 @@ pub fn to_bool(
 pub fn to_obj_param(
     v: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<ObjParam> {
     let param = 'm: {
@@ -110,7 +105,7 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
 pub fn to_pattern(
     v: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Pattern> {
     Ok(match &v.value {
@@ -132,7 +127,7 @@ pub fn is_op(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     let pat = to_pattern(b, span, vm, code)?;
@@ -163,7 +158,7 @@ pub fn add(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -189,7 +184,7 @@ pub fn sub(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -213,7 +208,7 @@ pub fn mult(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -241,7 +236,7 @@ pub fn div(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -265,7 +260,7 @@ pub fn modulo(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -289,7 +284,7 @@ pub fn pow(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -312,7 +307,7 @@ pub fn pow(
 pub fn unary_not(
     v: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match &v.value {
@@ -331,7 +326,7 @@ pub fn unary_not(
 pub fn unary_negate(
     v: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match &v.value {
@@ -352,7 +347,7 @@ pub fn gt(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -377,7 +372,7 @@ pub fn lt(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -402,7 +397,7 @@ pub fn gte(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -427,7 +422,7 @@ pub fn lte(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -452,7 +447,7 @@ pub fn and(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -473,7 +468,7 @@ pub fn or(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -494,7 +489,7 @@ pub fn range(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -527,7 +522,7 @@ pub fn bin_and(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -550,7 +545,7 @@ pub fn bin_or(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -573,7 +568,7 @@ pub fn shift_left(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
@@ -595,7 +590,7 @@ pub fn shift_right(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &mut Vm,
+    vm: &Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     Ok(match (&a.value, &b.value) {
