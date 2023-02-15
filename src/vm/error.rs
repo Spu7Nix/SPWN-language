@@ -304,47 +304,5 @@ error_maker! {
             area: CodeArea,
             [call_stack]
         },
-
-        // /////////
-        // #[
-        //     Message: "Too few arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
-        //     Labels: [
-        //         call_area => "Builtin called here";
-        //     ]
-        // ]
-        // TooFewBuiltinArguments {
-        //     call_area: CodeArea,
-        //     //builtin: Builtin,
-        //     [call_stack]
-        // },
-
-        // /////////
-        // #[
-        //     Message: "Too many arguments provided to builtin", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
-        //     Labels: [
-        //         call_area => "Builtin called here";
-        //     ]
-        // ]
-        // TooManyBuiltinArguments {
-        //     call_area: CodeArea,
-        //     //builtin: Builtin,
-        //     [call_stack]
-        // },
-
-        // /////////
-        // #[
-        //     Message: "Invalid builtin argument type", Note: Some(format!("The valid builtins are listed {}", hyperlink("https://spu7nix.net/spwn/#/builtins?id=list-of-built-in-functions", Some("here"))));
-        //     Labels: [
-        //         call_area => "Builtin expected type {} here": expected;
-        //         def_area => "Value defined as {} here": found.runtime_display(vm);
-        //     ]
-        // ]
-        // InvalidBuiltinArgumentType {
-        //     call_area: CodeArea,
-        //     def_area: CodeArea,
-        //     expected: BuiltinValueType,
-        //     found: ValueType,
-        //     [call_stack]
-        // },
     }
 }

@@ -59,7 +59,10 @@ pub mod builtins {
             "{}{}",
             values
                 .iter()
-                .map(|v| v.runtime_display(vm))
+                .map(|v| match v {
+                    Value::String(s) => s.iter().collect(),
+                    _ => v.runtime_display(vm),
+                })
                 .collect::<Vec<_>>()
                 .join(&sep.iter().collect::<String>()),
             end.iter().collect::<String>(),
@@ -128,8 +131,9 @@ pub mod array {
         Ok(Value::Empty)
     }
 
-    pub fn map(AArray(slf): AArray, AMacro(mapper): AMacro) -> RuntimeResult<Value> {
-        Ok(Value::Empty)
+    pub fn reversed(AArray(mut slf): AArray, vm: &mut Vm) -> RuntimeResult<Value> {
+        slf.reverse();
+        Ok(Value::Array(slf.iter().map(|k| vm.deep_clone_key_insert(*k)).collect()))
     }
 
     pub fn iter(array: ValueKey) -> RuntimeResult<Value> {
@@ -178,6 +182,7 @@ pub mod iterator {
 
 pub mod dict {
     use super::*;
+    use crate::vm::interpreter::Visibility;
 
     pub fn insert(
         slf: Mut<ADict>,
@@ -187,7 +192,7 @@ pub mod dict {
     ) -> RuntimeResult<Value> {
         let key = vm.intern_vec(&key);
         let val = slf.get_mut(vm);
-        val.0.insert(key, (elem, false));
+        val.0.insert(key, (elem, Visibility::Public));
 
         Ok(Value::Empty)
     }
@@ -246,6 +251,7 @@ override_names! {
     Array: [
         push,
         iter,
+        reversed,
     ],
     Dict: [
         insert,

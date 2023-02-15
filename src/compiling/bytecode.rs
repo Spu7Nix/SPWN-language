@@ -13,6 +13,7 @@ use super::compiler::{CompileResult, CustomTypeKey, TypeDef};
 use crate::error::RainbowColorGenerator;
 use crate::gd::ids::IDClass;
 use crate::parsing::ast::{ImportType, MacroArg, ObjKeyType, ObjectType, Spannable, Spanned};
+use crate::parsing::utils::operators::Operator;
 use crate::sources::{CodeSpan, SpwnSource};
 use crate::util::Digest;
 use crate::vm::opcodes::{FunctionID, ImportID, Opcode, Register, UnoptOpcode, UnoptRegister};
@@ -491,10 +492,7 @@ impl<'a> FuncBuilder<'a> {
                     dest,
                 }))
             } else {
-                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushArrayElem {
-                    elem: i,
-                    dest,
-                }))
+                self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::PushArrayElem { elem: i, dest }))
             }
         }
 
@@ -607,13 +605,10 @@ impl<'a> FuncBuilder<'a> {
     where
         F: FnOnce(
             &mut FuncBuilder,
-            &mut Vec<MacroArg<Spanned<String>, UnoptRegister>>,
+            &mut Vec<MacroArg<Spanned<String>, UnoptRegister, Spanned<UnoptRegister>>>,
         ) -> CompileResult<()>,
     {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::CreateMacro { id, dest }),
-            span,
-        );
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::CreateMacro { id, dest }), span);
 
         let mut items = vec![];
         f(self, &mut items)?;
@@ -639,10 +634,13 @@ impl<'a> FuncBuilder<'a> {
                     );
 
                     if let Some(p) = pattern {
-                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
-                            src: p,
-                            dest,
-                        }));
+                        self.push_opcode_spanned(
+                            ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
+                                src: p.value,
+                                dest,
+                            }),
+                            p.span,
+                        );
                     }
                     if let Some(d) = default {
                         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgDefault {
@@ -664,10 +662,13 @@ impl<'a> FuncBuilder<'a> {
                     );
 
                     if let Some(p) = pattern {
-                        self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
-                            src: p,
-                            dest,
-                        }));
+                        self.push_opcode_spanned(
+                            ProtoOpcode::Raw(UnoptOpcode::SetMacroArgPattern {
+                                src: p.value,
+                                dest,
+                            }),
+                            p.span,
+                        );
                     }
                 }
             }
@@ -729,11 +730,6 @@ impl<'a> FuncBuilder<'a> {
                 span,
             ),
         }
-        // let k = self
-        //     .code_builder
-        //     .constants
-        //     .insert(Constant::Id(class, value));
-        // self.push_opcode_spanned(ProtoOpcode::LoadConst(reg, k), span)
     }
 
     pub fn push_context_group(&mut self, group: UnoptRegister, span: CodeSpan) {
@@ -744,10 +740,7 @@ impl<'a> FuncBuilder<'a> {
     }
 
     pub fn pop_context_group(&mut self, fn_reg: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::PopGroupStack { fn_reg }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PopGroupStack { fn_reg }), span)
     }
 
     pub fn make_trigger_function(
@@ -756,10 +749,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::MakeTriggerFunc { src, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::MakeTriggerFunc { src, dest }), span)
     }
 
     pub fn add(
@@ -769,10 +759,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Add { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Add { left, right, dest }), span)
     }
 
     pub fn sub(
@@ -782,10 +769,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Sub { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Sub { left, right, dest }), span)
     }
 
     pub fn mult(
@@ -795,10 +779,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Mult { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Mult { left, right, dest }), span)
     }
 
     pub fn div(
@@ -808,10 +789,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Div { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Div { left, right, dest }), span)
     }
 
     pub fn modulo(
@@ -821,10 +799,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Mod { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Mod { left, right, dest }), span)
     }
 
     pub fn pow(
@@ -834,10 +809,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Pow { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Pow { left, right, dest }), span)
     }
 
     pub fn shl(
@@ -873,10 +845,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Eq { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Eq { left, right, dest }), span)
     }
 
     pub fn neq(
@@ -886,10 +855,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Neq { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Neq { left, right, dest }), span)
     }
 
     pub fn gt(
@@ -899,10 +865,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Gt { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Gt { left, right, dest }), span)
     }
 
     pub fn gte(
@@ -912,10 +875,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Gte { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Gte { left, right, dest }), span)
     }
 
     pub fn lt(
@@ -925,10 +885,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Lt { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Lt { left, right, dest }), span)
     }
 
     pub fn lte(
@@ -938,10 +895,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Lte { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Lte { left, right, dest }), span)
     }
 
     pub fn range(
@@ -951,10 +905,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Range { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Range { left, right, dest }), span)
     }
 
     pub fn in_op(
@@ -964,10 +915,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::In { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::In { left, right, dest }), span)
     }
 
     pub fn as_op(
@@ -977,10 +925,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }), span)
     }
 
     pub fn is_op(
@@ -990,10 +935,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Is { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Is { left, right, dest }), span)
     }
 
     pub fn bin_or(
@@ -1003,10 +945,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::BinOr { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinOr { left, right, dest }), span)
     }
 
     pub fn bin_and(
@@ -1016,10 +955,7 @@ impl<'a> FuncBuilder<'a> {
         dest: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::BinAnd { left, right, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinAnd { left, right, dest }), span)
     }
 
     pub fn add_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
@@ -1047,35 +983,19 @@ impl<'a> FuncBuilder<'a> {
     }
 
     pub fn shl_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::ShiftLeftEq { left, right }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::ShiftLeftEq { left, right }), span)
     }
 
     pub fn shr_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::ShiftRightEq { left, right }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::ShiftRightEq { left, right }), span)
     }
 
     pub fn bin_and_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::BinAndEq { left, right }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinAndEq { left, right }), span)
     }
 
     pub fn bin_or_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinOrEq { left, right }), span)
-    }
-
-    pub fn bin_not_eq(&mut self, left: UnoptRegister, right: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::BinNotEq { left, right }),
-            span,
-        )
     }
 
     pub fn unary_not(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
@@ -1140,10 +1060,7 @@ impl<'a> FuncBuilder<'a> {
     }
 
     pub fn wrap_iterator(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::WrapIterator { src, dest }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::WrapIterator { src, dest }), span)
     }
 
     pub fn iter_next(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
@@ -1167,15 +1084,20 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Impl { base, dict }), span)
     }
 
+    pub fn do_overload(&mut self, array: UnoptRegister, op: Operator, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Overload { array, op }), span)
+    }
+
     pub fn load_empty(&mut self, reg: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }), span)
     }
 
+    pub fn load_any(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadAnyPattern { dest: reg }), span)
+    }
+
     pub fn load_empty_dict(&mut self, reg: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::LoadEmptyDict { dest: reg }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmptyDict { dest: reg }), span)
     }
 
     pub fn index(
@@ -1253,10 +1175,7 @@ impl<'a> FuncBuilder<'a> {
     }
 
     pub fn load_builtins(&mut self, to: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::LoadBuiltins { dest: to }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadBuiltins { dest: to }), span)
     }
 
     pub fn ret(&mut self, src: UnoptRegister, module_ret: bool) {
@@ -1274,10 +1193,7 @@ impl<'a> FuncBuilder<'a> {
         args: UnoptRegister,
         span: CodeSpan,
     ) {
-        self.push_opcode_spanned(
-            ProtoOpcode::Raw(UnoptOpcode::Call { base, dest, args }),
-            span,
-        )
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Call { base, dest, args }), span)
     }
 
     pub fn import(&mut self, dest: UnoptRegister, src: Spanned<ImportType>, span: CodeSpan) {
@@ -1298,6 +1214,10 @@ impl<'a> FuncBuilder<'a> {
     pub fn create_type(&mut self, name: String, span: CodeSpan) -> CustomTypeKey {
         self.code_builder.custom_types.insert(name.spanned(span))
     }
+
+    pub fn make_byte_array(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::MakeByteArray { reg }), span)
+    }
 }
 
 impl Bytecode<Register> {
@@ -1310,11 +1230,7 @@ impl Bytecode<Register> {
             .max()
             .unwrap_or(2);
 
-        println!(
-            "{0} {1} {0}",
-            "======".bright_yellow().bold(),
-            src.name().bright_yellow().bold()
-        );
+        println!("{0} {1} {0}", "======".bright_yellow().bold(), src.name().bright_yellow().bold());
 
         println!("{}: {:?}", "Constants".bright_cyan().bold(), self.consts);
         println!(

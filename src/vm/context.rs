@@ -13,7 +13,8 @@ use crate::sources::CodeArea;
 pub struct CallStackItem {
     pub func: FuncCoord,
     pub ip: usize,
-    pub return_dest: Register,
+    // is Some in all cases except assign operator overloading because bukny
+    pub return_dest: Option<Register>,
     pub call_key: CallKey,
     pub call_area: Option<CodeArea>,
 }

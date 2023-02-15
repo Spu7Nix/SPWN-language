@@ -13,11 +13,11 @@ use super::error::CompilerError;
 use crate::cli::Settings;
 use crate::gd::object_keys::{ObjectKeyValueType, OBJECT_KEYS};
 use crate::parsing::ast::{
-    ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjKeyType, Spannable, Spanned,
-    Statement, StmtNode, DictItems,
+    DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjKeyType, Spannable,
+    Spanned, Statement, StmtNode, StringContent,
 };
 use crate::parsing::parser::Parser;
-use crate::parsing::utils::operators::{AssignOp, BinOp, UnaryOp};
+use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 use crate::vm::opcodes::Register;
@@ -121,17 +121,17 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn redef_var(&mut self, var: Spur, span: CodeSpan, scope: ScopeKey) {
-        let scope = &mut self.scopes[scope];
-        match scope.variables.get_mut(&var) {
-            Some(v) => v.def_span = span,
-            None => {
-                if let Some(k) = scope.parent {
-                    self.redef_var(var, span, k)
-                }
-            }
-        }
-    }
+    // pub fn redef_var(&mut self, var: Spur, span: CodeSpan, scope: ScopeKey) {
+    //     let scope = &mut self.scopes[scope];
+    //     match scope.variables.get_mut(&var) {
+    //         Some(v) => v.def_span = span,
+    //         None => {
+    //             if let Some(k) = scope.parent {
+    //                 self.redef_var(var, span, k)
+    //             }
+    //         }
+    //     }
+    // }
 
     pub fn new_var(&mut self, var: Spur, data: Variable, scope: ScopeKey) {
         self.scopes[scope].variables.insert(var, data);
@@ -479,19 +479,6 @@ impl<'a> Compiler<'a> {
         scope: ScopeKey,
         builder: &mut FuncBuilder,
     ) -> CompileResult<()> {
-        // for attr in &stmt.attributes {
-        //     match &attr.value {
-        //         StmtAttribute::Deprecated { since, note } => Warning::UseOfDeprecatedValue {
-        //             since: since.clone(),
-        //             note: note.clone(),
-        //             area: self.make_area(stmt.span),
-        //         }
-        //         .to_report()
-        //         .display(),
-        //         _ => todo!(),
-        //     }
-        // }
-
         match &*stmt.stmt {
             Statement::Expr(e) => {
                 self.compile_expr(e, scope, builder, ExprType::Normal)?;
@@ -595,11 +582,6 @@ impl<'a> Compiler<'a> {
                     let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
                     builder.bin_or_eq(a, b, stmt.span)
                 }
-                AssignOp::BinNotEq => {
-                    let a = self.compile_expr(left, scope, builder, ExprType::Normal)?;
-                    let b = self.compile_expr(right, scope, builder, ExprType::Normal)?;
-                    builder.bin_not_eq(a, b, stmt.span)
-                }
             },
 
             Statement::While { cond, code } => {
@@ -657,14 +639,6 @@ impl<'a> Compiler<'a> {
                     b.repeat_block();
                     Ok(())
                 })?;
-
-                // thing = [1,2,3]
-                // iter = thing.iter()
-                // let i = iter.next()
-                // while i != ? {
-                //     // do stuff
-                //     i = iter.next()
-                // }
             }
 
             Statement::If {
@@ -824,6 +798,76 @@ impl<'a> Compiler<'a> {
 
                 builder.do_impl(base_reg, dict_reg, stmt.span);
             }
+            Statement::Overload { op, macros } => {
+                let array_reg = builder.next_reg();
+
+                builder.new_array(
+                    macros.len() as u16,
+                    array_reg,
+                    |builder, elems| {
+                        for e in macros {
+                            match &*e.expr {
+                                Expression::Macro { args, .. } => {
+                                    match op {
+                                        Operator::Bin(_) | Operator::Assign(_) => {
+                                            if args.len() != 2 {
+                                                return Err(CompilerError::InvalidOverload {
+                                                    expected: "macro with 2 arguments".into(),
+                                                    area: self.make_area(e.span),
+                                                });
+                                            }
+                                        }
+                                        Operator::Unary(_) => {
+                                            if args.len() != 1 {
+                                                return Err(CompilerError::InvalidOverload {
+                                                    expected: "macro with 1 argument".into(),
+                                                    area: self.make_area(e.span),
+                                                });
+                                            }
+                                        }
+                                    }
+                                    for arg in args {
+                                        let err = match arg {
+                                            MacroArg::Spread { .. } => {
+                                                Some("macro with no spreads")
+                                            }
+                                            MacroArg::Single {
+                                                default: Some(_), ..
+                                            } => Some("macro with no defaults"),
+                                            MacroArg::Single { pattern: None, .. } => {
+                                                Some("macro with explicit patterns")
+                                            }
+                                            _ => None,
+                                        };
+                                        if let Some(msg) = err {
+                                            return Err(CompilerError::InvalidOverload {
+                                                expected: msg.into(),
+                                                area: self.make_area(e.span),
+                                            });
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(CompilerError::InvalidOverload {
+                                        expected: "macro expression".into(),
+                                        area: self.make_area(e.span),
+                                    })
+                                }
+                            }
+
+                            elems.push((
+                                self.compile_expr(e, scope, builder, ExprType::Normal)?,
+                                false,
+                            ));
+                        }
+
+                        Ok(())
+                    },
+                    stmt.span,
+                )?;
+
+                builder.do_overload(array_reg, *op, stmt.span);
+            }
             Statement::ExtractImport(_) => todo!(),
             Statement::Dbg(v) => {
                 let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
@@ -854,7 +898,16 @@ impl<'a> Compiler<'a> {
             Expression::Int(v) => builder.load_int(*v, out_reg, expr.span),
             Expression::Float(v) => builder.load_float(*v, out_reg, expr.span),
             Expression::Bool(v) => builder.load_bool(*v, out_reg, expr.span),
-            Expression::String(v) => builder.load_string(self.resolve(v), out_reg, expr.span),
+            Expression::String(v) => {
+                match v.s {
+                    StringContent::Normal(s) => {
+                        builder.load_string(self.resolve(&s), out_reg, expr.span);
+                    }
+                }
+                if v.bytes {
+                    builder.make_byte_array(out_reg, expr.span);
+                }
+            }
             Expression::Id(class, value) => builder.load_id(*value, *class, out_reg, expr.span),
             Expression::Op(left, op, right) => match op {
                 BinOp::Plus => bin_op!(left add right),
@@ -1102,12 +1155,10 @@ impl<'a> Compiler<'a> {
                                     let n = self.resolve(&name.value).spanned(name.span);
 
                                     let p = if let Some(p) = pattern {
-                                        Some(self.compile_expr(
-                                            p,
-                                            scope,
-                                            builder,
-                                            ExprType::Normal,
-                                        )?)
+                                        Some(
+                                            self.compile_expr(p, scope, builder, ExprType::Normal)?
+                                                .spanned(p.span),
+                                        )
                                     } else {
                                         None
                                     };
@@ -1133,12 +1184,10 @@ impl<'a> Compiler<'a> {
                                     let n = self.resolve(&name.value).spanned(name.span);
 
                                     let p = if let Some(p) = pattern {
-                                        Some(self.compile_expr(
-                                            p,
-                                            scope,
-                                            builder,
-                                            ExprType::Normal,
-                                        )?)
+                                        Some(
+                                            self.compile_expr(p, scope, builder, ExprType::Normal)?
+                                                .spanned(p.span),
+                                        )
                                     } else {
                                         None
                                     };
@@ -1261,6 +1310,9 @@ impl<'a> Compiler<'a> {
             Expression::Empty => {
                 builder.load_empty(out_reg, expr.span);
             }
+            Expression::AnyPattern => {
+                builder.load_any(out_reg, expr.span);
+            }
             Expression::Import(t) => {
                 self.compile_import(t, expr.span, self.src.clone())?;
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
@@ -1315,7 +1367,12 @@ impl<'a> Compiler<'a> {
                         },
                     };
 
-                    elems.push((self.resolve(&key.value).spanned(key.span), value_reg, false, *private));
+                    elems.push((
+                        self.resolve(&key.value).spanned(key.span),
+                        value_reg,
+                        false,
+                        *private,
+                    ));
                 }
                 Ok(())
             },

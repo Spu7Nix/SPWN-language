@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
+use crate::parsing::utils::operators::Operator;
 
 struct OpcodeVisitor;
 
@@ -236,8 +237,6 @@ opcodes! {
     BinAndEq { => left, => right },
     #[delve(display = |a: &R, b: &R| format!("R{a} |= R{b}"))]
     BinOrEq { => left, => right },
-    #[delve(display = |a: &R, b: &R| format!("R{a} ~= R{b}"))]
-    BinNotEq { => left, => right },
 
     #[delve(display = |s: &R, d: &R| format!("!R{s} -> R{d}"))]
     Not { => src, => dest },
@@ -304,6 +303,8 @@ opcodes! {
 
     #[delve(display = |d: &R| format!("() -> R{d}"))]
     LoadEmpty { => dest },
+    #[delve(display = |d: &R| format!("_ -> R{d}"))]
+    LoadAnyPattern { => dest },
 
     #[delve(display = |d: &R| format!("{{}} -> R{d}"))]
     LoadEmptyDict { => dest },
@@ -348,4 +349,9 @@ opcodes! {
     CreateInstance { => base, => dict, => dest },
     #[delve(display = |b: &R, d: &R| format!("impl @R{b} {{R{d}}}"))]
     Impl { => base, => dict },
+    #[delve(display = |a: &R, o: &Operator| format!("overload {} with {{R{a}}}", o.to_str()))]
+    Overload { => array, op: Operator },
+
+    #[delve(display = |reg: &R| format!("convert R{reg} to byte array"))]
+    MakeByteArray { => reg },
 }

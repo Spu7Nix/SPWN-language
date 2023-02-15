@@ -19,6 +19,7 @@ pub fn to_bool(v: &StoredValue, span: CodeSpan, vm: &Vm, code: BytecodeKey) -> R
         }
     })
 }
+
 pub fn to_obj_param(
     v: &StoredValue,
     span: CodeSpan,
@@ -606,4 +607,24 @@ pub fn shift_right(
             })
         }
     })
+}
+
+pub fn eq_op(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
+    Ok(Value::Bool(equality(&a.value, &b.value, vm)))
+}
+
+pub fn neq_op(
+    a: &StoredValue,
+    b: &StoredValue,
+    span: CodeSpan,
+    vm: &Vm,
+    code: BytecodeKey,
+) -> RuntimeResult<Value> {
+    Ok(Value::Bool(!equality(&a.value, &b.value, vm)))
 }

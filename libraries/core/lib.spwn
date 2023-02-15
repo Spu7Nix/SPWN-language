@@ -34,12 +34,22 @@ impl @array {
     },
 
     map: (self, cb: @macro) -> @array {
-        /* compiler built-in */ 
+        let out = []
+        for el in self {
+            out.push(el)
+        }
+        return out
     },
 
     iter: (self) -> @iterator {
         /* compiler built-in */ 
     },
+
+    reversed: (self) -> @array {
+        /* compiler built-in */ 
+    },
+
+
 }
 
 impl @iterator {

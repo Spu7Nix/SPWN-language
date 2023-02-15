@@ -22,7 +22,7 @@ pub trait IsValidOn<T: Into<&'static str>> {
 #[allow(unused_macros)]
 macro_rules! parse_string {
     ($parser:ident) => {
-        $parser.parse_string($parser.slice(), $parser.span())?
+        $parser.resolve(&$parser.parse_plain_string($parser.slice(), $parser.span())?)
     };
 }
 

@@ -6,10 +6,22 @@ use lasso::Spur;
 use serde::{Deserialize, Serialize};
 
 use super::attributes::{ExprAttribute, ScriptAttribute, StmtAttribute};
-use super::utils::operators::{AssignOp, BinOp, UnaryOp};
+use super::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::ObjectKey;
 use crate::sources::CodeSpan;
+
+#[derive(Debug, Clone)]
+pub enum StringContent {
+    Normal(Spur),
+}
+
+#[derive(Debug, Clone)]
+pub struct StringType {
+    pub s: StringContent,
+    pub bytes: bool,
+    // f_string: bool,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ImportType {
@@ -22,10 +34,7 @@ impl ImportType {
         match self {
             ImportType::Module(s) => {
                 let rel_path = PathBuf::from(s);
-                (
-                    rel_path.file_stem().unwrap().to_str().unwrap().to_string(),
-                    rel_path,
-                )
+                (rel_path.file_stem().unwrap().to_str().unwrap().to_string(), rel_path)
             }
             ImportType::Library(name) => {
                 let rel_path = PathBuf::from(format!("libraries/{name}/lib.spwn"));
@@ -68,20 +77,20 @@ pub struct StmtNode {
 pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>, bool)>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum MacroArg<N, E> {
+pub enum MacroArg<N, D, P> {
     Single {
         name: N,
-        pattern: Option<E>,
-        default: Option<E>,
+        pattern: Option<P>,
+        default: Option<D>,
         is_ref: bool,
     },
     Spread {
         name: N,
-        pattern: Option<E>,
+        pattern: Option<P>,
     },
 }
 
-impl<N, E> MacroArg<N, E> {
+impl<N, D, P> MacroArg<N, D, P> {
     pub fn name(&self) -> &N {
         match self {
             MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
@@ -94,27 +103,27 @@ impl<N, E> MacroArg<N, E> {
         }
     }
 
-    pub fn default(&self) -> &Option<E> {
+    pub fn default(&self) -> &Option<D> {
         match self {
             MacroArg::Single { default, .. } => default,
             _ => panic!("bad"),
         }
     }
 
-    pub fn default_mut(&mut self) -> &mut Option<E> {
+    pub fn default_mut(&mut self) -> &mut Option<D> {
         match self {
             MacroArg::Single { default, .. } => default,
             _ => panic!("bad"),
         }
     }
 
-    pub fn pattern(&self) -> &Option<E> {
+    pub fn pattern(&self) -> &Option<P> {
         match self {
             MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
         }
     }
 
-    pub fn pattern_mut(&mut self) -> &mut Option<E> {
+    pub fn pattern_mut(&mut self) -> &mut Option<P> {
         match self {
             MacroArg::Single { pattern, .. } | MacroArg::Spread { pattern, .. } => pattern,
         }
@@ -125,7 +134,7 @@ impl<N, E> MacroArg<N, E> {
 pub enum Expression {
     Int(i64),
     Float(f64),
-    String(Spur),
+    String(StringType),
     Bool(bool),
 
     Id(IDClass, Option<u16>),
@@ -165,7 +174,7 @@ pub enum Expression {
     },
 
     Macro {
-        args: Vec<MacroArg<Spanned<Spur>, ExprNode>>,
+        args: Vec<MacroArg<Spanned<Spur>, ExprNode, ExprNode>>,
         ret_type: Option<ExprNode>,
         code: MacroCode,
     },
@@ -191,6 +200,7 @@ pub enum Expression {
 
     Builtins,
     Empty,
+    AnyPattern,
 
     Import(ImportType),
 
@@ -209,7 +219,7 @@ pub enum ObjectType {
 
 #[derive(Debug, Clone, Copy, EnumToStr, PartialEq, Eq, Hash, EnumDisplay)]
 pub enum ObjKeyType {
-    #[delve(display = |o: &ObjectKey| format!("{}", <&ObjectKey as Into<&'static str>>::into(o)))]
+    #[delve(display = |o: &ObjectKey| <&ObjectKey as Into<&'static str>>::into(o).to_string())]
     Name(ObjectKey),
     #[delve(display = |n: &u8| format!("{n}"))]
     Num(u8),
@@ -256,6 +266,10 @@ pub enum Statement {
     Impl {
         base: ExprNode,
         items: DictItems,
+    },
+    Overload {
+        op: Operator,
+        macros: Vec<ExprNode>,
     },
 
     Dbg(ExprNode),

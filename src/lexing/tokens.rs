@@ -1,6 +1,8 @@
 use crate::lexer;
 
 lexer! {
+    Any: text("_"),
+
     Int: regex(r#"0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[\d_]+"#),
     Float: regex(r#"[\d_]+(\.[\d_]+)?"#),
 
@@ -30,6 +32,8 @@ lexer! {
 
     Type: text("type"),
     Impl: text("impl"),
+    Overload: text("overload"),
+    Unary: text("unary"),
 
     Dbg: text("dbg"),
 
@@ -206,6 +210,9 @@ impl Token {
             Self::Dbg => "dbg",
             Self::Slf => "self",
             Self::Private => "private",
+            Self::Any => "_",
+            Self::Overload => "overload",
+            Self::Unary => "unary",
         }
     }
 }

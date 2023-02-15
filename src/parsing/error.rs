@@ -172,7 +172,7 @@ error_maker! {
 
         /////////
         #[
-            Message: "Invalid numnber of arguments", Note: None;
+            Message: "Invalid number of arguments", Note: None;
             Labels: [
                 area => "Attribute `{}` expected {} arguments": attribute, expected;
             ]
@@ -184,6 +184,17 @@ error_maker! {
             area: CodeArea,
         },
 
+        /////////
+        #[
+            Message: "Invalid string type", Note: None;
+            Labels: [
+                area => "Expected {} string": typ;
+            ]
+        ]
+        InvalidStringType {
+            typ: &'static str,
+            area: CodeArea,
+        },
     }
 }
 

@@ -9,6 +9,7 @@ use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use super::context::{CallKey, CallStackItem, FullContext};
 use super::error::RuntimeError;
 use super::opcodes::{Opcode, Register};
+use super::pattern::Pattern;
 use super::value::{IteratorData, MacroTarget, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
@@ -17,9 +18,12 @@ use crate::gd::gd_object::{GdObject, Trigger, TriggerOrder};
 use crate::gd::ids::{IDClass, Id, SpecificId};
 use crate::gd::object_keys::ObjectKeyValueType;
 use crate::parsing::ast::{MacroArg, Spannable, Spanned};
+use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 use crate::vm::value::MacroData;
+use crate::vm::value_ops as vo;
+
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 new_key_type! {
@@ -57,7 +61,15 @@ pub struct Vm<'a> {
 
     pub types: SecondaryMap<CustomTypeKey, Spanned<TypeDef>>,
 
-    pub impls: AHashMap<ValueType, AHashMap<Spur, (ValueKey, bool)>>,
+    pub impls: AHashMap<ValueType, AHashMap<Spur, (ValueKey, Visibility)>>,
+    // last e lement in ove🤕rload vecto🤕r has highes🤕t prio🤕rity :)))
+    pub overloads: AHashMap<Operator, Vec<ValueKey>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Visibility {
+    Public,
+    Private(SpwnSource),
 }
 
 impl<'a> Vm<'a> {
@@ -104,6 +116,7 @@ impl<'a> Vm<'a> {
             triggers: Vec::new(),
             types,
             impls: AHashMap::new(),
+            overloads: AHashMap::new(),
             trigger_order_count: TriggerOrder::new(),
         }
     }
@@ -212,7 +225,7 @@ impl<'a> Vm<'a> {
     pub fn push_call_stack(
         &mut self,
         func: FuncCoord,
-        return_dest: Register,
+        return_dest: Option<Register>,
         increment_last: bool,
         call_area: Option<CodeArea>,
     ) {
@@ -266,7 +279,9 @@ impl<'a> Vm<'a> {
             }
         };
 
-        self.memory[current.registers.last_mut().unwrap()[item.return_dest as usize]] = ret_val;
+        if let Some(r) = item.return_dest {
+            self.memory[current.registers.last_mut().unwrap()[r as usize]] = ret_val;
+        }
 
         Some(item.call_key)
     }
@@ -289,6 +304,14 @@ impl<'a> Vm<'a> {
                 continue;
             }
             let opcode = &opcodes[ip];
+
+            macro_rules! cont_if {
+                ($e:expr) => {
+                    if $e {
+                        continue;
+                    }
+                };
+            }
 
             match opcode {
                 Opcode::LoadConst { dest, id } => {
@@ -349,7 +372,7 @@ impl<'a> Vm<'a> {
 
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
-                            v.insert(key, (push, false));
+                            v.insert(key, (push, Visibility::Public));
                         }
                         _ => unreachable!(),
                     }
@@ -373,7 +396,7 @@ impl<'a> Vm<'a> {
 
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
-                            v.insert(key, (push, false));
+                            v.insert(key, (push, Visibility::Public));
                         }
                         _ => unreachable!(),
                     }
@@ -387,11 +410,11 @@ impl<'a> Vm<'a> {
 
                     let key = self.intern_vec(&key);
 
+                    let new_vis = Visibility::Private(self.programs[func.code].0.clone());
+
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Dict(v) => {
-                            v.entry(key).and_modify(|(_, p)| *p = true);
-                            // let g = &mut v[&key];
-                            // *g = true;
+                            v.entry(key).and_modify(|(_, p)| *p = new_vis);
                         }
                         _ => unreachable!(),
                     }
@@ -417,6 +440,28 @@ impl<'a> Vm<'a> {
                         area: self.get_area(func, ip),
                     },
                 ),
+
+                Opcode::MakeByteArray { reg } => {
+                    let area = self.get_area(func, ip);
+
+                    let s = match &self.get_reg(*reg).value {
+                        Value::String(s) => s.iter().collect::<String>(),
+                        _ => unreachable!(),
+                    };
+
+                    let val = Value::Array(
+                        s.bytes()
+                            .map(|c| {
+                                self.memory.insert(StoredValue {
+                                    value: Value::Int(c as i64),
+                                    area: area.clone(),
+                                })
+                            })
+                            .collect(),
+                    );
+
+                    self.set_reg(*reg, StoredValue { value: val, area })
+                }
 
                 Opcode::PushObjectElemKey {
                     elem,
@@ -467,7 +512,7 @@ impl<'a> Vm<'a> {
                             panic!("\n\nOk   heres the deal!!! I not this yet XDXDC😭😭🤣🤣 \nLOl")
                         }
 
-                        value_ops::to_obj_param(
+                        vo::to_obj_param(
                             &self.memory[push],
                             self.get_span(func, ip),
                             self,
@@ -490,7 +535,7 @@ impl<'a> Vm<'a> {
                     // Objec
                     let push = self.deep_clone_reg_insert(*elem);
 
-                    let param = value_ops::to_obj_param(
+                    let param = vo::to_obj_param(
                         &self.memory[push],
                         self.get_span(func, ip),
                         self,
@@ -506,98 +551,149 @@ impl<'a> Vm<'a> {
                 }
 
                 Opcode::Add { left, right, dest } => {
-                    self.bin_op(value_ops::add, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::add, func, ip, left, right, dest, BinOp::Plus)?)
                 }
                 Opcode::Sub { left, right, dest } => {
-                    self.bin_op(value_ops::sub, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::sub, func, ip, left, right, dest, BinOp::Minus)?)
                 }
                 Opcode::Mult { left, right, dest } => {
-                    self.bin_op(value_ops::mult, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::mult, func, ip, left, right, dest, BinOp::Mult)?)
                 }
                 Opcode::Div { left, right, dest } => {
-                    self.bin_op(value_ops::div, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::div, func, ip, left, right, dest, BinOp::Div)?)
                 }
                 Opcode::Mod { left, right, dest } => {
-                    self.bin_op(value_ops::modulo, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::modulo, func, ip, left, right, dest, BinOp::Mod)?)
                 }
                 Opcode::Pow { left, right, dest } => {
-                    self.bin_op(value_ops::pow, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::pow, func, ip, left, right, dest, BinOp::Pow)?)
                 }
-                Opcode::ShiftLeft { left, right, dest } => {
-                    self.bin_op(value_ops::shift_left, func, ip, left, right, dest)?
-                }
-                Opcode::ShiftRight { left, right, dest } => {
-                    self.bin_op(value_ops::shift_right, func, ip, left, right, dest)?
-                }
+                Opcode::ShiftLeft { left, right, dest } => cont_if!(self.bin_op(
+                    vo::shift_left,
+                    func,
+                    ip,
+                    left,
+                    right,
+                    dest,
+                    BinOp::ShiftLeft,
+                )?),
+                Opcode::ShiftRight { left, right, dest } => cont_if!(self.bin_op(
+                    vo::shift_right,
+                    func,
+                    ip,
+                    left,
+                    right,
+                    dest,
+                    BinOp::ShiftRight,
+                )?),
                 Opcode::BinOr { left, right, dest } => {
-                    self.bin_op(value_ops::bin_or, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::bin_or, func, ip, left, right, dest, BinOp::BinOr)?)
                 }
                 Opcode::BinAnd { left, right, dest } => {
-                    self.bin_op(value_ops::bin_and, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(
+                        vo::bin_and,
+                        func,
+                        ip,
+                        left,
+                        right,
+                        dest,
+                        BinOp::BinAnd
+                    )?)
                 }
 
-                Opcode::AddEq { left: _, right: _ } => todo!(),
-                Opcode::SubEq { left: _, right: _ } => todo!(),
-                Opcode::MultEq { left: _, right: _ } => todo!(),
-                Opcode::DivEq { left: _, right: _ } => todo!(),
-                Opcode::ModEq { left: _, right: _ } => todo!(),
-                Opcode::PowEq { left: _, right: _ } => todo!(),
-                Opcode::ShiftLeftEq { left: _, right: _ } => todo!(),
-                Opcode::ShiftRightEq { left: _, right: _ } => todo!(),
-                Opcode::BinAndEq { left: _, right: _ } => todo!(),
-                Opcode::BinOrEq { left: _, right: _ } => todo!(),
-                Opcode::BinNotEq { left: _, right: _ } => todo!(),
+                Opcode::AddEq { left, right } => {
+                    cont_if!(self.assign_op(vo::add, func, ip, left, right, AssignOp::PlusEq)?)
+                }
+                Opcode::SubEq { left, right } => {
+                    cont_if!(self.assign_op(vo::sub, func, ip, left, right, AssignOp::MinusEq)?)
+                }
+                Opcode::MultEq { left, right } => {
+                    cont_if!(self.assign_op(vo::mult, func, ip, left, right, AssignOp::MultEq)?)
+                }
+                Opcode::DivEq { left, right } => {
+                    cont_if!(self.assign_op(vo::div, func, ip, left, right, AssignOp::DivEq)?)
+                }
+                Opcode::ModEq { left, right } => {
+                    cont_if!(self.assign_op(vo::modulo, func, ip, left, right, AssignOp::ModEq)?)
+                }
+                Opcode::PowEq { left, right } => {
+                    cont_if!(self.assign_op(vo::pow, func, ip, left, right, AssignOp::PowEq)?)
+                }
+                Opcode::ShiftLeftEq { left, right } => {
+                    cont_if!(self.assign_op(
+                        vo::shift_left,
+                        func,
+                        ip,
+                        left,
+                        right,
+                        AssignOp::ShiftLeftEq
+                    )?)
+                }
+                Opcode::ShiftRightEq { left, right } => cont_if!(self.assign_op(
+                    vo::shift_right,
+                    func,
+                    ip,
+                    left,
+                    right,
+                    AssignOp::ShiftRightEq
+                )?),
+                Opcode::BinAndEq { left, right } => {
+                    cont_if!(self.assign_op(
+                        vo::bin_and,
+                        func,
+                        ip,
+                        left,
+                        right,
+                        AssignOp::BinAndEq
+                    )?)
+                }
+                Opcode::BinOrEq { left, right } => {
+                    cont_if!(self.assign_op(
+                        vo::bin_or,
+                        func,
+                        ip,
+                        left,
+                        right,
+                        AssignOp::BinOrEq
+                    )?)
+                }
+
                 Opcode::Not { src, dest } => {
-                    self.unary_op(value_ops::unary_not, func, ip, src, dest)?
+                    cont_if!(self.unary_op(
+                        vo::unary_not,
+                        func,
+                        ip,
+                        src,
+                        dest,
+                        UnaryOp::ExclMark
+                    )?)
                 }
                 Opcode::Negate { src, dest } => {
-                    self.unary_op(value_ops::unary_negate, func, ip, src, dest)?
+                    cont_if! {self.unary_op(vo::unary_negate, func, ip, src, dest, UnaryOp::Minus)?}
                 }
 
                 Opcode::BinNot { src: _, dest: _ } => todo!(),
 
                 Opcode::Eq { left, right, dest } => {
-                    let span = self.get_span(func, ip);
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value: Value::Bool(value_ops::equality(
-                                &self.get_reg(*left).value,
-                                &self.get_reg(*right).value,
-                                self,
-                            )),
-                            area: self.make_area(span, func.code),
-                        },
-                    );
+                    cont_if!(self.bin_op(vo::eq_op, func, ip, left, right, dest, BinOp::Mod)?)
                 }
                 Opcode::Neq { left, right, dest } => {
-                    let span = self.get_span(func, ip);
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value: Value::Bool(!value_ops::equality(
-                                &self.get_reg(*left).value,
-                                &self.get_reg(*right).value,
-                                self,
-                            )),
-                            area: self.make_area(span, func.code),
-                        },
-                    );
+                    cont_if!(self.bin_op(vo::neq_op, func, ip, left, right, dest, BinOp::Mod)?)
                 }
                 Opcode::Gt { left, right, dest } => {
-                    self.bin_op(value_ops::gt, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::gt, func, ip, left, right, dest, BinOp::Gt)?)
                 }
                 Opcode::Lt { left, right, dest } => {
-                    self.bin_op(value_ops::lt, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::lt, func, ip, left, right, dest, BinOp::Lt)?)
                 }
                 Opcode::Gte { left, right, dest } => {
-                    self.bin_op(value_ops::gte, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::gte, func, ip, left, right, dest, BinOp::Gte)?)
                 }
                 Opcode::Lte { left, right, dest } => {
-                    self.bin_op(value_ops::lte, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::lte, func, ip, left, right, dest, BinOp::Lte)?)
                 }
                 Opcode::Range { left, right, dest } => {
-                    self.bin_op(value_ops::range, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::range, func, ip, left, right, dest, BinOp::Range)?)
                 }
                 Opcode::In {
                     left: _,
@@ -605,34 +701,42 @@ impl<'a> Vm<'a> {
                     dest: _,
                 } => todo!(),
                 Opcode::As { left, right, dest } => {
-                    // todo!()
-                    // self.bin_op(value_ops::as_op, func, ip, left, right, dest)?
                     let span = self.get_span(func, ip);
 
-                    let value = value_ops::as_op(
-                        &self.get_reg(*left).clone(),
-                        &self.get_reg(*right).clone(),
+                    if let Some(true) = self.run_overload(
+                        Operator::Bin(BinOp::As),
+                        [*left, *right],
+                        func,
                         span,
-                        self,
-                        func.code,
-                    )?;
+                        Some(*dest),
+                    )? {
+                        continue;
+                    } else {
+                        let value = vo::as_op(
+                            &self.get_reg(*left).clone(),
+                            &self.get_reg(*right).clone(),
+                            span,
+                            self,
+                            func.code,
+                        )?;
 
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value,
-                            area: self.make_area(span, func.code),
-                        },
-                    );
+                        self.set_reg(
+                            *dest,
+                            StoredValue {
+                                value,
+                                area: self.make_area(span, func.code),
+                            },
+                        );
+                    };
                 }
                 Opcode::Is { left, right, dest } => {
-                    self.bin_op(value_ops::is_op, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::is_op, func, ip, left, right, dest, BinOp::Is)?)
                 }
                 Opcode::And { left, right, dest } => {
-                    self.bin_op(value_ops::and, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::and, func, ip, left, right, dest, BinOp::And)?)
                 }
                 Opcode::Or { left, right, dest } => {
-                    self.bin_op(value_ops::or, func, ip, left, right, dest)?
+                    cont_if!(self.bin_op(vo::or, func, ip, left, right, dest, BinOp::Or)?)
                 }
                 Opcode::Jump { to } => {
                     self.contexts.jump_current(*to as usize);
@@ -640,7 +744,7 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::JumpIfFalse { src, to } => {
                     let span = self.get_span(func, ip);
-                    if !value_ops::to_bool(self.get_reg(*src), span, self, func.code)? {
+                    if !vo::to_bool(self.get_reg(*src), span, self, func.code)? {
                         self.contexts.jump_current(*to as usize);
                         continue;
                     }
@@ -693,6 +797,16 @@ impl<'a> Vm<'a> {
                         *dest,
                         StoredValue {
                             value: Value::Empty,
+                            area: self.make_area(span, func.code),
+                        },
+                    )
+                }
+                Opcode::LoadAnyPattern { dest } => {
+                    let span = self.get_span(func, ip);
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Pattern(Pattern::Any),
                             area: self.make_area(span, func.code),
                         },
                     )
@@ -1005,7 +1119,7 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     };
 
-                    for (name, (k, private)) in &items {
+                    for (name, (k, vis)) in &items {
                         let name = self.resolve(name);
 
                         if let Value::Macro(MacroData { target, .. }) = &mut self.memory[*k].value {
@@ -1017,7 +1131,20 @@ impl<'a> Vm<'a> {
 
                     self.impls
                         .entry(typ)
-                        .and_modify(|d| d.extend(items.iter()))
+                        .and_modify(|d| d.extend(items.clone().into_iter()))
+                        .or_insert(items);
+                }
+                Opcode::Overload { array, op } => {
+                    let span = self.get_span(func, ip);
+
+                    let items = match &self.get_reg(*array).value {
+                        Value::Array(items) => items.clone(),
+                        _ => unreachable!(),
+                    };
+
+                    self.overloads
+                        .entry(*op)
+                        .and_modify(|d| d.extend(items.clone()))
                         .or_insert(items);
                 }
                 Opcode::YeetContext => {
@@ -1070,7 +1197,13 @@ impl<'a> Vm<'a> {
                             }
 
                             if self.run_macro(
-                                data, pos_args, named_args, func, call_area, *dest, base.area,
+                                data,
+                                pos_args,
+                                named_args,
+                                func,
+                                call_area,
+                                Some(*dest),
+                                base.area,
                             )? {
                                 continue;
                             }
@@ -1148,10 +1281,13 @@ impl<'a> Vm<'a> {
                     }
                 }
                 Opcode::SetMacroArgPattern { src, dest } => {
-                    let set = self.deep_clone_reg_insert(*src);
+                    let span = self.get_span(func, ip);
+
+                    let pat = vo::to_pattern(self.get_reg(*src), span, self, func.code)?;
+
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Macro(MacroData { args, .. }) => {
-                            *args.last_mut().unwrap().pattern_mut() = Some(set)
+                            *args.last_mut().unwrap().pattern_mut() = Some(pat)
                         }
                         _ => unreachable!(),
                     }
@@ -1168,7 +1304,7 @@ impl<'a> Vm<'a> {
                         code: self.src_map[&src],
                     };
 
-                    self.push_call_stack(coord, *dest, true, None);
+                    self.push_call_stack(coord, Some(*dest), true, None);
                     continue;
                 }
                 Opcode::LoadArbitraryId { class, dest } => {
@@ -1245,6 +1381,10 @@ impl<'a> Vm<'a> {
                             array: val,
                             index: 0,
                         }),
+                        Value::String(_) => Value::Iterator(IteratorData::String {
+                            string: val,
+                            index: 0,
+                        }),
                         Value::Range(a, b, c) => Value::Iterator(IteratorData::Range {
                             range: (*a, *b, *c),
                             index: 0,
@@ -1267,50 +1407,26 @@ impl<'a> Vm<'a> {
                     )
                 }
                 Opcode::IterNext { src, dest } => {
-                    let iter_val = self.get_reg(*src);
-                    let val = match &iter_val.value {
-                        Value::Iterator(IteratorData::Array { array, index }) => {
-                            match &self.memory[*array].value {
-                                Value::Array(values) => values.get(*index).cloned(),
-                                _ => todo!(), // maybe add error here incase its mutated???
-                            }
-                        }
-                        Value::Iterator(IteratorData::Range { range, index }) => {
-                            let v = if range.1 >= range.0 {
-                                (range.0..range.1).nth(*index * range.2)
-                            } else {
-                                let l = (range.0 - range.1) as usize - 1;
-                                if l >= *index * range.2 {
-                                    ((range.1 + 1)..(range.0 + 1)).nth(l - *index * range.2)
-                                } else {
-                                    None
-                                }
-                            };
-                            match v {
-                                Some(v) => Some(self.memory.insert(StoredValue {
-                                    value: Value::Int(v),
-                                    area: iter_val.area.clone(),
-                                })),
-                                None => None,
-                            }
-                        }
-                        // dict string TODO
-                        _ => unreachable!(),
-                    };
-                    // do we need this?? if it will copy anyway?? something to think abiot........
-                    let cloned_val = val.map(|v| self.deep_clone_key_insert(v));
+                    let area = self.get_area(func, ip);
 
-                    // increment index
-                    match &mut self.get_reg_mut(*src).value {
-                        Value::Iterator(IteratorData::Array { index, .. }) => *index += 1,
-                        Value::Iterator(IteratorData::Range { index, .. }) => *index += 1,
+                    let val = match &self.get_reg(*src).value {
+                        Value::Iterator(data) => data.next(self, area),
                         _ => unreachable!(),
-                    };
+                    }
+                    .map(|v| {
+                        let k = self.memory.insert(v);
+                        self.deep_clone_key_insert(k)
+                    });
+
+                    match &mut self.get_reg_mut(*src).value {
+                        Value::Iterator(data) => data.increment(),
+                        _ => unreachable!(),
+                    }
 
                     self.set_reg(
                         *dest,
                         StoredValue {
-                            value: Value::Maybe(cloned_val),
+                            value: Value::Maybe(val),
                             area: self.get_area(func, ip),
                         },
                     )
@@ -1336,7 +1452,7 @@ impl<'a> Vm<'a> {
         func: FuncCoord,
         call_area: CodeArea,
 
-        dest: Register,
+        dest: Option<Register>,
         base_area: CodeArea,
     ) -> RuntimeResult<bool> {
         let mut param_map: AHashMap<Spur, ValueKey> = AHashMap::new();
@@ -1440,10 +1556,6 @@ impl<'a> Vm<'a> {
                 }
             };
         }
-        // for (n, v) in &param_map {
-        //     println!("j {}: {:?}", self.resolve(n), self.memory[*v].value)
-        // }
-        // todo!()
 
         match data.target {
             MacroTarget::Macro { func, captured } => {
@@ -1464,7 +1576,7 @@ impl<'a> Vm<'a> {
 
                 Ok(true)
             }
-            // .-
+
             MacroTarget::Builtin(f) => {
                 let mut args = vec![];
                 per_arg! {
@@ -1473,16 +1585,67 @@ impl<'a> Vm<'a> {
                     }
                 }
                 let ret = f.0(args, self, call_area.clone())?;
-                self.set_reg(
-                    dest,
-                    StoredValue {
-                        value: ret,
-                        area: call_area,
-                    },
-                );
+                if let Some(dest) = dest {
+                    self.set_reg(
+                        dest,
+                        StoredValue {
+                            value: ret,
+                            area: call_area,
+                        },
+                    );
+                }
                 Ok(false)
             }
         }
+    }
+
+    fn find_overload<const N: usize>(
+        &self,
+        op: Operator,
+        values: [&Value; N],
+    ) -> Option<(MacroData, CodeArea)> {
+        if let Some(overloads) = self.overloads.get(&op) {
+            for overload in overloads.iter().rev() {
+                match &self.memory[*overload].value {
+                    Value::Macro(data) => {
+                        if values
+                            .into_iter()
+                            .zip(&data.args)
+                            .all(|(v, arg)| arg.pattern().as_ref().unwrap().value_matches(v, self))
+                        {
+                            return Some((data.clone(), self.memory[*overload].area.clone()));
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+        None
+    }
+
+    fn run_overload<const N: usize>(
+        &mut self,
+        operator: Operator,
+        regs: [u8; N],
+        func: FuncCoord,
+        span: CodeSpan,
+        dest: Option<u8>,
+    ) -> Result<Option<bool>, RuntimeError> {
+        if let Some((data, base_area)) =
+            self.find_overload(operator, regs.map(|a| &self.get_reg(a).value))
+        {
+            let cont = self.run_macro(
+                data,
+                regs.map(|a| self.get_reg_key(a)).to_vec(),
+                AHashMap::new(),
+                func,
+                self.make_area(span, func.code),
+                dest,
+                base_area,
+            )?;
+            return Ok(Some(cont));
+        }
+        Ok(None)
     }
 
     #[inline]
@@ -1494,19 +1657,20 @@ impl<'a> Vm<'a> {
         left: &u8,
         right: &u8,
         dest: &u8,
-    ) -> Result<(), RuntimeError>
+        operator: BinOp,
+    ) -> Result<bool, RuntimeError>
     where
         F: Fn(&StoredValue, &StoredValue, CodeSpan, &Vm, BytecodeKey) -> RuntimeResult<Value>,
     {
         let span = self.get_span(func, ip);
 
-        let value = op(
-            self.get_reg(*left),
-            self.get_reg(*right),
-            span,
-            self,
-            func.code,
-        )?;
+        if let Some(cont) =
+            self.run_overload(Operator::Bin(operator), [*left, *right], func, span, Some(*dest))?
+        {
+            return Ok(cont);
+        };
+
+        let value = op(self.get_reg(*left), self.get_reg(*right), span, self, func.code)?;
 
         self.set_reg(
             *dest,
@@ -1515,7 +1679,34 @@ impl<'a> Vm<'a> {
                 area: self.make_area(span, func.code),
             },
         );
-        Ok(())
+        Ok(false)
+    }
+
+    #[inline]
+    fn assign_op<F>(
+        &mut self,
+        op: F,
+        func: FuncCoord,
+        ip: usize,
+        left: &u8,
+        right: &u8,
+        operator: AssignOp,
+    ) -> Result<bool, RuntimeError>
+    where
+        F: Fn(&StoredValue, &StoredValue, CodeSpan, &Vm, BytecodeKey) -> RuntimeResult<Value>,
+    {
+        let span = self.get_span(func, ip);
+
+        if let Some(cont) =
+            self.run_overload(Operator::Assign(operator), [*left, *right], func, span, None)?
+        {
+            return Ok(cont);
+        };
+
+        let value = op(self.get_reg(*left), self.get_reg(*right), span, self, func.code)?;
+        let k = self.get_reg_key(*left);
+        self.memory[k].value = value;
+        Ok(false)
     }
 
     #[inline]
@@ -1526,11 +1717,18 @@ impl<'a> Vm<'a> {
         ip: usize,
         value: &u8,
         dest: &u8,
-    ) -> Result<(), RuntimeError>
+        operator: UnaryOp,
+    ) -> Result<bool, RuntimeError>
     where
         F: Fn(&StoredValue, CodeSpan, &Vm, BytecodeKey) -> RuntimeResult<Value>,
     {
         let span = self.get_span(func, ip);
+
+        if let Some(cont) =
+            self.run_overload(Operator::Unary(operator), [*value], func, span, Some(*dest))?
+        {
+            return Ok(cont);
+        };
 
         let value = op(self.get_reg(*value), span, self, func.code)?;
 
@@ -1541,26 +1739,13 @@ impl<'a> Vm<'a> {
                 area: self.make_area(span, func.code),
             },
         );
-        Ok(())
+        Ok(false)
     }
 
-    // https://cdn.discordapp.com/attachments/912863117699076107/1074291482296586300/i8-WMkH9yC7ljec8.mp4
     pub fn next_id(&mut self, c: IDClass) -> u16 {
         self.id_counters[c as usize] += 1;
         self.id_counters[c as usize] as u16
     }
-
-    /*
-    let a = @a::{}
-
-    impl @a {
-        _as_
-    }
-
-    if a {
-
-    }
-    */
 
     pub fn convert_type(
         &mut self,
@@ -1599,7 +1784,6 @@ impl<'a> Vm<'a> {
                 Value::Float(s.iter().collect::<String>().parse().unwrap())
             }
 
-            // make vm mut >:(
             (Value::String(s), ValueType::Array) => Value::Array(
                 s.iter()
                     .map(|c| {

@@ -8,15 +8,16 @@ use unindent::unindent;
 
 use super::ast::{
     Ast, DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjectType, Spannable,
-    Spanned, Statement, Statements, StmtNode,
+    Spanned, Statement, Statements, StmtNode, StringType, StringContent,
 };
 use super::attributes::{ExprAttribute, IsValidOn, ParseAttribute, ScriptAttribute, StmtAttribute};
 use super::error::SyntaxError;
-use super::utils::operators::{self, is_assign_op, unary_prec};
+use super::utils::operators::{self, unary_prec};
 use crate::gd::ids::IDClass;
 use crate::gd::object_keys::OBJECT_KEYS;
 use crate::lexing::tokens::{Lexer, Token};
 use crate::parsing::ast::ObjKeyType;
+use crate::parsing::utils::operators::Operator;
 use crate::sources::{CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
 
@@ -198,7 +199,7 @@ impl Parser<'_> {
         (class, value)
     }
 
-    pub fn parse_string(&self, s: &str, span: CodeSpan) -> ParseResult<String> {
+    pub fn parse_string(&self, s: &str, span: CodeSpan) -> ParseResult<StringType> {
         let mut chars = s.chars();
 
         // Remove trailing "
@@ -211,7 +212,10 @@ impl Parser<'_> {
         let mut out: String = chars.collect();
 
         if flags.is_empty() {
-            return self.parse_escapes(&mut out.chars());
+            return Ok(StringType {
+                s: StringContent::Normal(self.intern_string(self.parse_escapes(&mut out.chars())?)),
+                bytes: false,
+            });
         }
 
         let mut flags = flags.split('_').collect::<Vec<_>>();
@@ -223,9 +227,12 @@ impl Parser<'_> {
             flags.push(last);
         }
 
+
+        let mut is_bytes = false;
+
         for flag in flags {
             match flag {
-                "b" => todo!("byte string"),
+                "b" => is_bytes = true,
                 "u" => out = unindent(&out),
                 "b64" => {
                     out = base64::engine::general_purpose::STANDARD.encode(out);
@@ -239,11 +246,31 @@ impl Parser<'_> {
             }
         }
 
-        Ok(out)
+        Ok(StringType {
+            s: StringContent::Normal(self.intern_string(out)),
+            bytes: is_bytes,
+        })
+    }
+
+    pub fn parse_plain_string(&self, s: &str, span: CodeSpan) -> ParseResult<Spur> {
+        let st = self.parse_string(s, span)?;
+
+        let s = match st {
+            StringType { s: StringContent::Normal(s), bytes: false } => s,
+            _ => return Err(SyntaxError::InvalidStringType {
+                typ: "plain",
+                area: self.make_area(span)
+            })
+        };
+
+        Ok(s)
     }
 
     fn intern_string<T: AsRef<str>>(&self, string: T) -> Spur {
         self.interner.borrow_mut().get_or_intern(string)
+    }
+    pub fn resolve(&self, s: &Spur) -> String {
+        self.interner.borrow_mut().resolve(s).into()
     }
 
     fn parse_escapes(&self, chars: &mut Chars) -> ParseResult<String> {
@@ -347,9 +374,9 @@ impl Parser<'_> {
             };
 
             let key = match self.next() {
-                Token::Int => self.parse_int(self.slice()).to_string(),
-                Token::String => self.parse_string(self.slice(), self.span())?,
-                Token::Ident => self.slice().to_string(),
+                Token::Int => self.intern_string(self.parse_int(self.slice()).to_string()),
+                Token::String => self.parse_plain_string(self.slice(), self.span())?,
+                Token::Ident => self.intern_string(self.slice().to_string()),
                 other => {
                     return Err(SyntaxError::UnexpectedToken {
                         expected: "key".into(),
@@ -358,7 +385,6 @@ impl Parser<'_> {
                     })
                 }
             };
-            let key = self.intern_string(key);
 
             let key_span = self.span();
 
@@ -391,7 +417,7 @@ impl Parser<'_> {
         Ok(match self.peek() {
             Token::String => {
                 self.next();
-                ImportType::Module(self.parse_string(self.slice(), self.span())?)
+                ImportType::Module(self.resolve(&self.parse_plain_string(self.slice(), self.span())?))
             }
             Token::Ident => {
                 self.next();
@@ -435,7 +461,7 @@ impl Parser<'_> {
                 Token::String => {
                     self.next();
                     Expression::String(
-                        self.intern_string(self.parse_string(self.slice(), self.span())?),
+                        self.parse_string(self.slice(), self.span())?,
                     )
                     .spanned(start)
                 }
@@ -493,6 +519,10 @@ impl Parser<'_> {
                 Token::Slf => {
                     self.next();
                     Expression::Var(self.intern_string("self")).spanned(start)
+                }
+                Token::Any => {
+                    self.next();
+                    Expression::AnyPattern.spanned(start)
                 }
                 Token::TypeIndicator => {
                     self.next();
@@ -741,7 +771,7 @@ impl Parser<'_> {
                         None => self.parse_value(allow_macros)?,
                     };
 
-                    Expression::Unary(unary_op.to_unary_op(), val)
+                    Expression::Unary(unary_op.to_unary_op().unwrap(), val)
                         .spanned(start.extend(self.span()))
                 }
 
@@ -937,7 +967,7 @@ impl Parser<'_> {
                 self.parse_op(prec, allow_macros)?
             };
             let new_span = left.span.extend(right.span);
-            left = Expression::Op(left, op.to_bin_op(), right).into_node(vec![], new_span)
+            left = Expression::Op(left, op.to_bin_op().unwrap(), right).into_node(vec![], new_span)
         }
 
         Ok(left)
@@ -993,6 +1023,7 @@ impl Parser<'_> {
                 Token::Break |
                 Token::Type |
                 Token::Impl |
+                Token::Overload |
                 Token::Extract |
                 Token::Dbg
             ) {
@@ -1136,10 +1167,46 @@ impl Parser<'_> {
                 let base = self.parse_expr(true)?;
                 self.expect_tok(Token::LBracket)?;
                 let items = self.parse_dictlike(true)?;
-                // todo!()
-                // self.next();
 
                 Statement::Impl { base, items }
+            }
+            Token::Overload => {
+                self.next();
+
+                let tok = self.next();
+
+                let op = if tok == Token::Unary {
+                    let tok = self.next();
+                    if let Some(op) = tok.to_unary_op() {
+                        Operator::Unary(op)
+                    } else {
+                        return Err(SyntaxError::UnexpectedToken {
+                            found: tok,
+                            expected: "unary operator".to_string(),
+                            area: self.make_area(self.span()),
+                        });
+                    }
+                } else if let Some(op) = tok.to_bin_op() {
+                    Operator::Bin(op)
+                } else if let Some(op) = tok.to_assign_op() {
+                    Operator::Assign(op)
+                } else {
+                    return Err(SyntaxError::UnexpectedToken {
+                        found: tok,
+                        expected: "binary operator".to_string(),
+                        area: self.make_area(self.span()),
+                    });
+                };
+                
+                self.expect_tok(Token::LBracket)?;
+
+                let mut macros = vec![];
+
+                list_helper!(self, RBracket {
+                    macros.push(self.parse_expr(true)?);
+                });
+
+                Statement::Overload { op, macros }
             }
             Token::Extract => {
                 self.next();
@@ -1158,10 +1225,10 @@ impl Parser<'_> {
             _ => {
                 let left = self.parse_expr(true)?;
                 let peek = self.peek();
-                if is_assign_op(peek) {
+                if let Some(op) = peek.to_assign_op() {
                     self.next();
                     let right = self.parse_expr(true)?;
-                    Statement::AssignOp(left, peek.to_assign_op(), right)
+                    Statement::AssignOp(left, op, right)
                 } else {
                     Statement::Expr(left)
                 }

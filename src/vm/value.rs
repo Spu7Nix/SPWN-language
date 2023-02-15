@@ -48,7 +48,7 @@ impl Debug for BuiltinFn {
 #[derive(Clone, Debug)]
 pub struct MacroData {
     pub target: MacroTarget,
-    pub args: Vec<MacroArg<Spanned<Spur>, ValueKey>>,
+    pub args: Vec<MacroArg<Spanned<Spur>, ValueKey, Pattern>>,
     pub self_arg: Option<ValueKey>,
 }
 
@@ -64,6 +64,10 @@ pub enum IteratorData {
         array: ValueKey,
         index: usize,
     },
+    String {
+        string: ValueKey,
+        index: usize,
+    },
     Range {
         range: (i64, i64, usize),
         index: usize,
@@ -77,11 +81,11 @@ pub enum IteratorData {
 }
 
 impl IteratorData {
-    pub fn next(&mut self, vm: &mut Vm, area: CodeArea) -> Option<ValueKey> {
+    pub fn next(&self, vm: &Vm, area: CodeArea) -> Option<StoredValue> {
         match self {
             IteratorData::Array { array, index } => {
                 match &vm.memory[*array].value {
-                    Value::Array(values) => values.get(*index).cloned(),
+                    Value::Array(values) => values.get(*index).map(|k| vm.memory[*k].clone()),
                     _ => todo!(), // maybe add error here incase its mutated???
                 }
             }
@@ -96,14 +100,31 @@ impl IteratorData {
                         None
                     }
                 };
-                match v {
-                    Some(v) => Some(vm.memory.insert(StoredValue {
-                        value: Value::Int(v),
+                v.map(|v| StoredValue {
+                    value: Value::Int(v),
+                    area,
+                })
+            }
+            IteratorData::String { string, index } => {
+                match &vm.memory[*string].value {
+                    Value::String(s) => s.get(*index).map(|c| StoredValue {
+                        value: Value::String(vec![*c]),
                         area,
-                    })),
-                    None => None,
+                    }),
+                    _ => todo!(), // maybe add error here incase its mutated???
                 }
             }
+            // dict string TODO
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn increment(&mut self) {
+        match self {
+            IteratorData::Array { index, .. } => *index += 1,
+            IteratorData::Range { index, .. } => *index += 1,
+            IteratorData::String { index, .. } => *index += 1,
+            IteratorData::Dictionary { index, .. } => *index += 1,
             // dict string TODO
             _ => unreachable!(),
         }
@@ -318,6 +339,8 @@ impl ValueType {
     }
 }
 
+use super::interpreter::Visibility;
+
 value! {
     Int(i64),
     Float(f64),
@@ -325,7 +348,7 @@ value! {
     String(Vec<char>),
 
     Array(Vec<ValueKey>),
-    Dict(AHashMap<Spur, (ValueKey, bool)>),
+    Dict(AHashMap<Spur, (ValueKey, Visibility)>),
 
     Group(Id),
     Channel(Id),
@@ -363,7 +386,7 @@ value! {
 
     => Instance {
         typ: CustomTypeKey,
-        items: AHashMap<Spur, (ValueKey, bool)>,
+        items: AHashMap<Spur, (ValueKey, Visibility)>,
     },
 }
 
@@ -392,7 +415,7 @@ impl Value {
             Value::Int(n) => n.to_string(),
             Value::Float(n) => n.to_string(),
             Value::Bool(b) => b.to_string(),
-            Value::String(s) => s.iter().collect(),
+            Value::String(s) => format!("{:?}", s.iter().collect::<String>()),
             Value::Array(arr) => format!(
                 "[{}]",
                 arr.iter()
@@ -489,7 +512,7 @@ impl Value {
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
-            Value::Iterator(_) => todo!(),
+            Value::Iterator(_) => "<iterator>".into(),
         }
     }
 }

@@ -11,9 +11,6 @@ pub trait Invoke<const N: usize, Args = ()> {
 pub trait IntoArg<O> {
     fn into_arg(self, vm: &mut Vm) -> O;
 }
-// pub trait IntoValue {
-//     fn into_value(self) -> Value;
-// }
 
 pub trait GetMutArg<'a> {
     type Output;

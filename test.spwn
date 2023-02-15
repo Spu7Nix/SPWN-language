@@ -1,3 +1,7 @@
-import "libraries/core/lib.spwn"
+import core
 
-$.print("ag1ga" as @array)
+
+$.print(b"A")
+
+
+
