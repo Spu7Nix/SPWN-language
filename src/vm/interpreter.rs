@@ -6,7 +6,7 @@ use colored::Colorize;
 use lasso::Spur;
 use slotmap::{new_key_type, SecondaryMap, SlotMap};
 
-use super::context::{CallKey, CallStackItem, FullContext};
+use super::context::{CallInfo, Context, ContextStack, FullContext};
 use super::error::RuntimeError;
 use super::opcodes::{Opcode, Register};
 use super::pattern::Pattern;
@@ -54,7 +54,7 @@ pub struct Vm<'a> {
 
     pub id_counters: [usize; 4],
 
-    pub contexts: FullContext,
+    pub contexts: ContextStack,
     pub objects: Vec<GdObject>,
     pub triggers: Vec<Trigger>,
     pub trigger_order_count: TriggerOrder,
@@ -110,7 +110,7 @@ impl<'a> Vm<'a> {
             interner,
             programs,
             id_counters: [0; 4],
-            contexts: FullContext::new(),
+            contexts: ContextStack(vec![]),
             src_map,
             objects: Vec::new(),
             triggers: Vec::new(),
@@ -218,85 +218,121 @@ impl<'a> Vm<'a> {
         self.make_area(self.get_span(func, i), func.code)
     }
 
-    pub fn get_call_stack(&self) -> Vec<CallStackItem> {
-        self.contexts.current().pos_stack.to_vec()
+    pub fn get_call_stack(&self) -> Vec<CallInfo> {
+        self.contexts
+            .0
+            .iter()
+            .map(|f| &f.call_info)
+            .cloned()
+            .collect()
     }
 
-    pub fn push_call_stack(
+    // pub fn push_call_stack(
+    //     &mut self,
+    //     func: FuncCoord,
+    //     return_dest: Option<Register>,
+    //     increment_last: bool,
+    //     call_area: Option<CodeArea>,
+    // ) {
+    //     let regs_used = self.programs[func.code].1.functions[func.func].regs_used;
+
+    //     let mut regs = Vec::with_capacity(regs_used);
+
+    //     for _ in 0..regs_used {
+    //         regs.push(self.memory.insert(StoredValue {
+    //             value: Value::Empty,
+    //             area: self.make_area(CodeSpan::invalid(), func.code),
+    //         }))
+    //     }
+
+    //     let call_key = self.contexts.have_not_returned.insert(());
+
+    //     let mut current = self.contexts.current_mut();
+    //     current.registers.push(regs);
+
+    //     if increment_last {
+    //         current.pos_stack.last_mut().unwrap().ip += 1;
+    //     }
+
+    //     current.pos_stack.push(CallInfo {
+    //         func,
+    //         ip: 0,
+    //         return_dest,
+    //         call_key,
+    //         call_area,
+    //     });
+    //     current.recursion_depth += 1;
+    // }
+
+    // pub fn return_and_pop_current(&mut self, ret_val: Option<StoredValue>) -> Option<CallKey> {
+    //     if self.contexts.current().pos_stack.len() == 1 {
+    //         self.contexts.yeet_current();
+    //         return None;
+    //     }
+
+    //     let mut current = self.contexts.current_mut();
+    //     current.recursion_depth -= 1;
+    //     current.registers.pop();
+    //     let item = current.pos_stack.pop().unwrap();
+
+    //     let ret_val = if let Some(ret_val) = ret_val {
+    //         ret_val
+    //     } else {
+    //         StoredValue {
+    //             value: Value::Empty,
+    //             area: item.call_area.unwrap_or_else(CodeArea::internal),
+    //         }
+    //     };
+
+    //     if let Some(r) = item.return_dest {
+    //         self.memory[current.registers.last_mut().unwrap()[r as usize]] = ret_val;
+    //     }
+
+    //     Some(item.call_key)
+    // }
+
+    pub fn run_function<F>(
         &mut self,
-        func: FuncCoord,
-        return_dest: Option<Register>,
-        increment_last: bool,
-        call_area: Option<CodeArea>,
-    ) {
-        let regs_used = self.programs[func.code].1.functions[func.func].regs_used;
+        mut context: Context,
+        call_info: CallInfo,
+        cb: F,
+    ) -> RuntimeResult<usize>
+    where
+        F: FnOnce(&mut Vm) -> RuntimeResult<()>,
+    {
+        let &CallInfo { func, .. } = &call_info;
 
-        let mut regs = Vec::with_capacity(regs_used);
+        let original_ip = context.ip;
+        context.ip = 0;
 
-        for _ in 0..regs_used {
-            regs.push(self.memory.insert(StoredValue {
-                value: Value::Empty,
-                area: self.make_area(CodeSpan::invalid(), func.code),
-            }))
-        }
+        {
+            let regs_used = self.programs[func.code].1.functions[func.func].regs_used;
 
-        let call_key = self.contexts.have_not_returned.insert(());
+            let mut regs = Vec::with_capacity(regs_used);
 
-        let mut current = self.contexts.current_mut();
-        current.registers.push(regs);
-
-        if increment_last {
-            current.pos_stack.last_mut().unwrap().ip += 1;
-        }
-
-        current.pos_stack.push(CallStackItem {
-            func,
-            ip: 0,
-            return_dest,
-            call_key,
-            call_area,
-        });
-        current.recursion_depth += 1;
-    }
-
-    pub fn return_and_pop_current(&mut self, ret_val: Option<StoredValue>) -> Option<CallKey> {
-        if self.contexts.current().pos_stack.len() == 1 {
-            self.contexts.yeet_current();
-            return None;
-        }
-
-        let mut current = self.contexts.current_mut();
-        current.recursion_depth -= 1;
-        current.registers.pop();
-        let item = current.pos_stack.pop().unwrap();
-
-        let ret_val = if let Some(ret_val) = ret_val {
-            ret_val
-        } else {
-            StoredValue {
-                value: Value::Empty,
-                area: item.call_area.unwrap_or_else(CodeArea::internal),
+            for _ in 0..regs_used {
+                regs.push(self.memory.insert(StoredValue {
+                    value: Value::Empty,
+                    area: self.make_area(CodeSpan::invalid(), func.code),
+                }))
             }
-        };
 
-        if let Some(r) = item.return_dest {
-            self.memory[current.registers.last_mut().unwrap()[r as usize]] = ret_val;
+            context.registers.push(regs);
         }
 
-        Some(item.call_key)
-    }
+        self.contexts.0.push(FullContext::new(context, call_info));
 
-    pub fn run_program(&mut self) -> RuntimeResult<()> {
+        cb(self)?;
+
+        let opcodes = &self.programs[func.code].1.functions[func.func].opcodes;
+
         while self.contexts.valid() {
-            let &CallStackItem {
-                func, ip, call_key, ..
-            } = self.contexts.current().pos_stack.last().unwrap();
-            let opcodes = &self.programs[func.code].1.functions[func.func].opcodes;
+            let ip = self.contexts.ip();
 
             if ip >= opcodes.len() {
-                if self.contexts.have_not_returned.contains_key(call_key) {
+                if !self.contexts.last().have_returned {
                     // implicit return
-                    self.return_and_pop_current(None);
+                    return Ok(original_ip);
                 } else {
                     // implicit yeet
                     self.contexts.yeet_current();
@@ -766,9 +802,18 @@ impl<'a> Vm<'a> {
                         }
                     }
 
-                    let Some(call_key) = self.return_and_pop_current(Some(ret_val)) else { continue };
-                    self.contexts.have_not_returned.remove(call_key);
-                    continue;
+                    self.contexts.last_mut().have_returned = true;
+
+                    let return_dest = self.contexts.last().call_info.return_dest;
+                    let mut current = self.contexts.current_mut();
+                    current.registers.pop();
+
+                    if let Some(r) = return_dest {
+                        self.memory[current.registers.last_mut().unwrap()[r as usize]] = ret_val;
+                    }
+
+                    // let Some(call_key) = self.return_and_pop_current(Some(ret_val)) else { continue };
+                    // self.contexts.have_not_returned.remove(call_key);
                 }
                 Opcode::WrapMaybe { src, dest } => {
                     let v = self.deep_clone_reg_insert(*src);
@@ -1304,7 +1349,21 @@ impl<'a> Vm<'a> {
                         code: self.src_map[&src],
                     };
 
-                    self.push_call_stack(coord, Some(*dest), true, None);
+                    let mut full_context = self.contexts.0.pop().unwrap();
+                    let current_context = full_context.yeet_current().unwrap();
+
+                    let original_ip = self.run_function(
+                        current_context,
+                        CallInfo {
+                            func: coord,
+                            return_dest: Some(*dest),
+                            call_area: None,
+                        },
+                        |_| Ok(()),
+                    )?;
+
+                    self.contexts.merge_down(full_context, original_ip + 1);
+
                     continue;
                 }
                 Opcode::LoadArbitraryId { class, dest } => {
@@ -1435,12 +1494,11 @@ impl<'a> Vm<'a> {
 
             {
                 let mut current = self.contexts.current_mut();
-                let ip = &mut current.pos_stack.last_mut().unwrap().ip;
-                *ip += 1;
+                current.ip += 1;
             };
         }
 
-        Ok(())
+        todo!()
     }
 
     // #[inline]
@@ -1529,24 +1587,24 @@ impl<'a> Vm<'a> {
         }
 
         macro_rules! per_arg {
-            (($i:ident, $v:ident) $b:block) => {
+            ($vm:ident,($i:ident, $v:ident) $b:block) => {
                 for ($i, data) in data.args.iter().enumerate() {
                     let $v = match param_map.get(&data.name().value) {
                         Some(k) => {
                             if let MacroArg::Single { is_ref: true, .. } = data {
                                 *k
                             } else {
-                                self.deep_clone_key_insert(*k)
+                                $vm.deep_clone_key_insert(*k)
                             }
                         }
                         None => match data.default() {
-                            Some(k) => self.deep_clone_key_insert(*k),
+                            Some(k) => $vm.deep_clone_key_insert(*k),
                             None => {
                                 return Err(RuntimeError::ArgumentNotSatisfied {
                                     call_area,
                                     macro_def_area: base_area,
-                                    arg_name: self.resolve(&data.name().value),
-                                    call_stack: self.get_call_stack(),
+                                    arg_name: $vm.resolve(&data.name().value),
+                                    call_stack: $vm.get_call_stack(),
                                 })
                             }
                         },
@@ -1559,27 +1617,48 @@ impl<'a> Vm<'a> {
 
         match data.target {
             MacroTarget::Macro { func, captured } => {
-                self.push_call_stack(func, dest, true, Some(call_area.clone()));
+                let mut full_context = self.contexts.0.pop().unwrap();
+                let current_context = full_context.yeet_current().unwrap();
 
-                per_arg! {
-                    (i, k) {
-                        self.change_reg_key(i as Register, k)
-                    }
-                }
+                let original_ip = self.run_function(
+                    current_context,
+                    CallInfo {
+                        func,
+                        return_dest: dest,
+                        call_area: Some(call_area.clone()),
+                    },
+                    |vm| {
+                        per_arg! {
+                            vm,
+                            (i, k) {
+                                vm.change_reg_key(i as Register, k)
+                            }
+                        }
 
-                for (k, (_, to)) in captured
-                    .iter()
-                    .zip(&self.programs[func.code].1.functions[func.func].capture_regs)
-                {
-                    self.change_reg_key(*to, *k)
-                }
+                        for (k, (_, to)) in captured
+                            .iter()
+                            .zip(&vm.programs[func.code].1.functions[func.func].capture_regs)
+                        {
+                            vm.change_reg_key(*to, *k);
+                        }
+
+                        Ok(())
+                    },
+                )?;
+
+                self.contexts.merge_down(full_context, original_ip + 1);
 
                 Ok(true)
+
+                // self.push_call_stack(func, dest, true, Some(call_area.clone()));
+
+                // Ok(true)
             }
 
             MacroTarget::Builtin(f) => {
                 let mut args = vec![];
                 per_arg! {
+                    self,
                     (_i, k) {
                         args.push(k);
                     }

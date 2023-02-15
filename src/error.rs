@@ -93,7 +93,7 @@ macro_rules! error_maker {
                     $(
                         $field: $typ,
                     )*
-                    $($call_stack: Vec<CallStackItem>)?
+                    $($call_stack: Vec<CallInfo>)?
                 },
             )*
         }

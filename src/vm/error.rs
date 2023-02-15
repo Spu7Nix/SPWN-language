@@ -1,6 +1,6 @@
 use std::string::ToString;
 
-use super::context::CallStackItem;
+use super::context::CallInfo;
 use super::interpreter::Vm;
 use super::value::ValueType;
 use crate::error_maker;

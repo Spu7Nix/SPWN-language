@@ -38,6 +38,7 @@ use crate::parsing::ast::Spannable;
 use crate::parsing::parser::Parser;
 use crate::sources::{BytecodeMap, SpwnSource};
 use crate::util::{BasicError, HexColorize, RandomState};
+use crate::vm::context::{CallInfo, Context};
 use crate::vm::interpreter::{FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
 
@@ -290,13 +291,24 @@ fn run_spwn(
     let key = vm.src_map[&parser.src];
     let start = FuncCoord::new(0, key);
 
-    vm.push_call_stack(start, Some(0), false, None);
+    // vm.push_call_stack(start, Some(0), false, None);
 
     println!("{:20}", "Building...".color_hex(RUNNING_COLOR).bold());
 
     println!("\n{}", "════ Output ══════════════════════".dimmed().bold());
 
-    vm.run_program().map_err(|e| e.to_report(&vm))?;
+    vm.run_function(
+        Context::new(),
+        CallInfo {
+            func: start,
+            return_dest: Some(0),
+            call_area: None,
+        },
+        |_| Ok(()),
+    )
+    .map_err(|e| e.to_report(&vm))?;
+
+    // vm.run_program().map_err(|e| e.to_report(&vm))?;
 
     println!("\n{}", "══════════════════════════════════".dimmed().bold());
 

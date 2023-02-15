@@ -1,7 +1,14 @@
-import core
+// import core
 
 
-$.print(b"A")
+
+let a = 5
+let b = "Long"
+b += "e"
+
+dbg a * b;
+
+
 
 
 
