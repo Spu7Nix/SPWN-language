@@ -1,14 +1,20 @@
-// import core
+import core
+
+
+// lol = () {
+//     -> return 0
+//     -> return 1
+// }
 
 
 
-let a = 5
-let b = "Long"
-b += "e"
-
-dbg a * b;
+// $.print(lol())
 
 
+$.print(==1)
 
+// type @a
 
-
+// return {
+//     a: b
+// }

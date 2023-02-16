@@ -348,6 +348,7 @@ impl<'a> Compiler<'a> {
             self.src.clone(),
             Bytecode {
                 import_paths: unopt_code.import_paths,
+                spwn_ver: unopt_code.spwn_ver,
                 custom_types: unopt_code.custom_types,
                 source_hash: unopt_code.source_hash,
                 consts: unopt_code.consts,
@@ -403,7 +404,9 @@ impl<'a> Compiler<'a> {
                     }
                 };
 
-                if bytecode.source_hash == hash.into() {
+                if bytecode.source_hash == hash.into()
+                    && bytecode.spwn_ver == env!("CARGO_PKG_VERSION")
+                {
                     for import in &bytecode.import_paths {
                         self.compile_import(&import.value, import.span, import_src.clone())?;
                     }
@@ -967,12 +970,12 @@ impl<'a> Compiler<'a> {
                     UnaryOp::BinNot => builder.unary_bin_not(v, out_reg, expr.span),
                     UnaryOp::ExclMark => builder.unary_not(v, out_reg, expr.span),
                     UnaryOp::Minus => builder.unary_negate(v, out_reg, expr.span),
-                    UnaryOp::Eq => todo!(),
-                    UnaryOp::Neq => todo!(),
-                    UnaryOp::Gt => todo!(),
-                    UnaryOp::Gte => todo!(),
-                    UnaryOp::Lt => todo!(),
-                    UnaryOp::Lte => todo!(),
+                    UnaryOp::Eq => builder.unary_pat_eq(v, out_reg, expr.span),
+                    UnaryOp::Neq => builder.unary_pat_neq(v, out_reg, expr.span),
+                    UnaryOp::Gt => builder.unary_pat_gt(v, out_reg, expr.span),
+                    UnaryOp::Gte => builder.unary_pat_gte(v, out_reg, expr.span),
+                    UnaryOp::Lt => builder.unary_pat_lt(v, out_reg, expr.span),
+                    UnaryOp::Lte => builder.unary_pat_lte(v, out_reg, expr.span),
                 }
             }
             Expression::Var(name) => match self.get_var(*name, scope) {
@@ -1314,6 +1317,7 @@ impl<'a> Compiler<'a> {
                 builder.load_any(out_reg, expr.span);
             }
             Expression::Import(t) => {
+                println!("{:?}", t);
                 self.compile_import(t, expr.span, self.src.clone())?;
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
             }

@@ -301,10 +301,10 @@ fn run_spwn(
         Context::new(),
         CallInfo {
             func: start,
-            return_dest: Some(0),
+            return_dest: None,
             call_area: None,
         },
-        |_| Ok(()),
+        Box::new(|_| Ok(())),
     )
     .map_err(|e| e.to_report(&vm))?;
 

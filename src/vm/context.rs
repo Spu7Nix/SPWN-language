@@ -50,7 +50,7 @@ impl Ord for Context {
 /// all the contexts!!!pub
 #[derive(Debug)]
 pub struct FullContext {
-    contexts: BinaryHeap<Context>,
+    pub contexts: BinaryHeap<Context>,
 
     pub call_info: CallInfo,
     pub have_returned: bool,
@@ -154,6 +154,7 @@ impl<'a> super::interpreter::Vm<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct ContextStack(pub Vec<FullContext>);
 
 impl ContextStack {
@@ -207,19 +208,5 @@ impl ContextStack {
 
     pub fn group(&self) -> Id {
         self.last().group()
-    }
-
-    pub fn merge_down(&mut self, mut full_context: FullContext, ip: usize) {
-        let top = self.0.pop().unwrap();
-
-        let mut vec = top.contexts.into_sorted_vec();
-
-        for context in &mut vec {
-            context.ip = ip
-        }
-
-        full_context.contexts.extend(vec);
-
-        self.0.push(full_context);
     }
 }

@@ -12,10 +12,15 @@ pub trait IntoArg<O> {
     fn into_arg(self, vm: &mut Vm) -> O;
 }
 
-pub trait GetMutArg<'a> {
+pub trait GetMutRefArg<'a> {
     type Output;
 
-    fn get_mut_arg(key: ValueKey, vm: &'a mut Vm) -> Self::Output;
+    fn get_mut_ref_arg(key: ValueKey, vm: &'a mut Vm) -> Self::Output;
+}
+pub trait GetRefArg<'a> {
+    type Output;
+
+    fn get_ref_arg(key: ValueKey, vm: &'a Vm) -> Self::Output;
 }
 
 pub struct Or<T>(T);
@@ -30,55 +35,29 @@ impl<T> std::ops::Deref for Spread<T> {
 }
 
 #[derive(Clone, Copy)]
-pub struct Mut<'a, T: GetMutArg<'a>> {
-    pub key: ValueKey,
+pub struct Ref<'a, T: GetMutRefArg<'a> + GetRefArg<'a>> {
+    key: ValueKey,
     _phantom: PhantomData<&'a T>,
 }
 
-impl<'a, T: GetMutArg<'a>> Mut<'a, T> {
-    pub fn get_mut(self, vm: &'a mut Vm) -> <T as GetMutArg<'a>>::Output {
-        T::get_mut_arg(self.key, vm)
+impl<'a, T: GetMutRefArg<'a> + GetRefArg<'a>> Ref<'a, T> {
+    pub fn get_mut_ref(&self, vm: &'a mut Vm) -> <T as GetMutRefArg<'a>>::Output {
+        T::get_mut_ref_arg(self.key, vm)
+    }
+
+    pub fn get_ref(&self, vm: &'a Vm) -> <T as GetRefArg<'a>>::Output {
+        T::get_ref_arg(self.key, vm)
     }
 }
 
-// pub struct Mut<T: IntoValue> {
-//     pub value: T,
-//     pub key: ValueKey,
-// }
-
-// impl<T: IntoValue> std::ops::Deref for Mut<T> {
-//     type Target = T;
-
-//     fn deref(&self) -> &Self::Target {
-//         &self.value
-//     }
-// }
-
-// impl<T: IntoValue> std::ops::DerefMut for Mut<T> {
-//     fn deref_mut(&mut self) -> &mut T {
-//         &mut self.value
-//     }
-// }
-
-// impl<T: IntoValue> Mut<T> {
-//     pub fn update(self, vm: &mut Vm) {
-//         vm.memory[self.key].value = self.value.into_value()
-//     }
-
-//     pub fn update_with_area(self, area: CodeArea, vm: &mut Vm) {
-//         vm.memory[self.key].value = self.value.into_value();
-//         vm.memory[self.key].area = area;
-//     }
-// }
-
 ////////////////////
 
-impl<'a, T: GetMutArg<'a>> IntoArg<Mut<'a, T>> for ValueKey
+impl<'a, T: GetMutRefArg<'a> + GetRefArg<'a>> IntoArg<Ref<'a, T>> for ValueKey
 where
     ValueKey: IntoArg<T>,
 {
-    fn into_arg(self, _: &mut Vm) -> Mut<'a, T> {
-        Mut {
+    fn into_arg(self, _: &mut Vm) -> Ref<'a, T> {
+        Ref {
             key: self,
             _phantom: PhantomData,
         }

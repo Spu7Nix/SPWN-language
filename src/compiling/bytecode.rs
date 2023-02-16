@@ -47,6 +47,7 @@ where
     for<'de3> Vec<R>: Serialize + Deserialize<'de3>,
 {
     pub source_hash: Digest,
+    pub spwn_ver: String,
 
     pub consts: Vec<Constant>,
 
@@ -378,6 +379,7 @@ impl BytecodeBuilder {
 
         Bytecode {
             source_hash: hash.into(),
+            spwn_ver: env!("CARGO_PKG_VERSION").into(),
             consts,
             functions,
             opcode_span_map,
@@ -1008,6 +1010,30 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn unary_bin_not(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinNot { src, dest }), span)
+    }
+
+    pub fn unary_pat_eq(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatEq { src, dest }), span)
+    }
+
+    pub fn unary_pat_neq(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatNeq { src, dest }), span)
+    }
+
+    pub fn unary_pat_gt(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatGt { src, dest }), span)
+    }
+
+    pub fn unary_pat_gte(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatGte { src, dest }), span)
+    }
+
+    pub fn unary_pat_lt(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatLt { src, dest }), span)
+    }
+
+    pub fn unary_pat_lte(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatLte { src, dest }), span)
     }
 
     pub fn copy(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {

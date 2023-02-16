@@ -2,6 +2,7 @@ use std::string::ToString;
 
 use super::context::CallInfo;
 use super::interpreter::Vm;
+use super::pattern::Pattern;
 use super::value::ValueType;
 use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
@@ -160,6 +161,24 @@ error_maker! {
             call_area: CodeArea,
             macro_def_area: CodeArea,
             arg_name: String,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Argument pattern mismatch", Note: None;
+            Labels: [
+                call_area => "Call occurred here";
+                macro_def_area => "Argument `{}` was defined as taking {} here": arg_name, pattern.runtime_display(vm);
+                v.1 => "This `{}` is not {}": v.0.runtime_display(vm), pattern.runtime_display(vm);
+            ]
+        ]
+        ArgumentPatternMismatch {
+            call_area: CodeArea,
+            macro_def_area: CodeArea,
+            arg_name: String,
+            pattern: Pattern,
+            v: (ValueType, CodeArea),
             [call_stack]
         },
 

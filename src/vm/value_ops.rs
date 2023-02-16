@@ -128,12 +128,12 @@ pub fn is_op(
     a: &StoredValue,
     b: &StoredValue,
     span: CodeSpan,
-    vm: &Vm,
+    vm: &mut Vm,
     code: BytecodeKey,
 ) -> RuntimeResult<Value> {
     let pat = to_pattern(b, span, vm, code)?;
 
-    Ok(Value::Bool(pat.value_matches(&a.value, vm)))
+    Ok(Value::Bool(pat.value_matches(&a.value, vm)?))
 }
 
 pub fn as_op(

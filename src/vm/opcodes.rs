@@ -245,6 +245,25 @@ opcodes! {
     #[delve(display = |s: &R, d: &R| format!("~R{s} -> R{d}"))]
     BinNot { => src, => dest },
 
+    // UnaryOp::Eq => todo!(),
+    // UnaryOp::Neq => todo!(),
+    // UnaryOp::Gt => todo!(),
+    // UnaryOp::Gte => todo!(),
+    // UnaryOp::Lt => todo!(),
+    // UnaryOp::Lte => todo!(),
+    #[delve(display = |s: &R, d: &R| format!("==R{s} -> R{d}"))]
+    PatEq { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!("!=R{s} -> R{d}"))]
+    PatNeq { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!(">R{s} -> R{d}"))]
+    PatGt { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!(">=R{s} -> R{d}"))]
+    PatGte { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!("<R{s} -> R{d}"))]
+    PatLt { => src, => dest },
+    #[delve(display = |s: &R, d: &R| format!("<=R{s} -> R{d}"))]
+    PatLte { => src, => dest },
+
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} == R{b} -> R{x}"))]
     Eq { => left, => right, => dest },
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} != R{b} -> R{x}"))]

@@ -19,7 +19,7 @@ use crate::gd::gd_object::ObjParam;
 use crate::gd::ids::*;
 use crate::parsing::ast::{MacroArg, ObjKeyType, ObjectType, Spanned};
 use crate::sources::CodeArea;
-use crate::vm::builtins::builtin_utils::GetMutArg;
+use crate::vm::builtins::builtin_utils::{GetMutRefArg, GetRefArg};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoredValue {
@@ -190,6 +190,9 @@ macro_rules! value {
             $(
                 value!{ @struct &mut $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
             )*
+            $(
+                value!{ @struct & $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )? }
+            )*
 
             paste::paste! {
                 $(
@@ -220,21 +223,46 @@ macro_rules! value {
 
                 
                 $(
-                    impl<'a> GetMutArg<'a> for [<A $name>] {
-                        type Output = [<MutA $name>]<'a>;
+                    impl<'a> GetMutRefArg<'a> for [<A $name>] {
+                        type Output = [<MutRefA $name>]<'a>;
 
-                        fn get_mut_arg(key: ValueKey, vm: &'a mut Vm) -> Self::Output {
+                        fn get_mut_ref_arg(key: ValueKey, vm: &'a mut Vm) -> Self::Output {
                             let val = &mut vm.memory[key].value;
 
-                            value! {@into_arg_empty val [Value::$name] [[<MutA $name>]] [(PhantomData)] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
+                            value! {@into_arg_empty val [Value::$name] [[<MutRefA $name>]] [(PhantomData)] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
 
                             $(
-                                value! {@tuple_match val [Value::$name] [[<MutA $name>]] $( $t0, )*}
+                                value! {@tuple_match val [Value::$name] [[<MutRefA $name>]] $( $t0, )*}
                             )?
 
                             match val {
                                 $(
-                                    Value::$name {$($n,)*} => return [<MutA $name>] {$($n,)*},
+                                    Value::$name {$($n,)*} => return [<MutRefA $name>] {$($n,)*},
+                                )?
+                                _ => (),
+                            }
+
+                            unreachable!();
+                        }
+                    }
+                )*
+
+                $(
+                    impl<'a> GetRefArg<'a> for [<A $name>] {
+                        type Output = [<RefA $name>]<'a>;
+
+                        fn get_ref_arg(key: ValueKey, vm: &'a Vm) -> Self::Output {
+                            let val = &vm.memory[key].value;
+
+                            value! {@into_arg_empty val [Value::$name] [[<RefA $name>]] [(PhantomData)] $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?}
+
+                            $(
+                                value! {@tuple_match val [Value::$name] [[<RefA $name>]] $( $t0, )*}
+                            )?
+
+                            match val {
+                                $(
+                                    Value::$name {$($n,)*} => return [<RefA $name>] {$($n,)*},
                                 )?
                                 _ => (),
                             }
@@ -269,17 +297,33 @@ macro_rules! value {
 
     (@struct &mut $name:ident) => {
         paste::paste! {
-            pub struct [<MutA $name>]<'a>(PhantomData<&'a ()>);
+            pub struct [<MutRefA $name>]<'a>(PhantomData<&'a ()>);
         }
     };
     (@struct &mut $name:ident ( $( $t0:ty ),* )) => {
         paste::paste! {
-            pub struct [<MutA $name>]<'a> ( $( pub &'a mut $t0 ),* );
+            pub struct [<MutRefA $name>]<'a> ( $( pub &'a mut $t0 ),* );
         }
     };
     (@struct &mut $name:ident { $( $n:ident: $t1:ty ,)* }) => {
         paste::paste! {
-            pub struct [<MutA $name>]<'a> { $( pub $n: &'a mut $t1 ,)* }
+            pub struct [<MutRefA $name>]<'a> { $( pub $n: &'a mut $t1 ,)* }
+        }
+    };
+
+    (@struct & $name:ident) => {
+        paste::paste! {
+            pub struct [<RefA $name>]<'a>(PhantomData<&'a ()>);
+        }
+    };
+    (@struct & $name:ident ( $( $t0:ty ),* )) => {
+        paste::paste! {
+            pub struct [<RefA $name>]<'a> ( $( pub &'a  $t0 ),* );
+        }
+    };
+    (@struct & $name:ident { $( $n:ident: $t1:ty ,)* }) => {
+        paste::paste! {
+            pub struct [<RefA $name>]<'a> { $( pub $n: &'a  $t1 ,)* }
         }
     };
 
