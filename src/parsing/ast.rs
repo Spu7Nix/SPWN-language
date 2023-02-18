@@ -74,6 +74,12 @@ pub struct StmtNode {
     pub span: CodeSpan,
 }
 
+#[derive(Debug, Clone)]
+pub struct PatternNode {
+    pub expr: Box<PatternTree>,
+    pub span: CodeSpan,
+}
+
 pub type DictItems = Vec<(Spanned<Spur>, Option<ExprNode>, bool)>;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -276,6 +282,22 @@ pub enum Statement {
 }
 
 pub type Statements = Vec<StmtNode>;
+
+#[derive(Debug, Clone)]
+pub enum PatternTree {
+    Any,
+
+    Type(Spur),
+    Either(PatternNode, PatternNode),
+    Both(PatternNode, PatternNode),
+
+    Eq(ExprNode),
+    NEq(ExprNode),
+    Lt(ExprNode),
+    Lte(ExprNode),
+    Gt(ExprNode),
+    Gte(ExprNode),
+}
 
 impl Expression {
     pub fn into_node(self, attributes: Vec<ExprAttribute>, span: CodeSpan) -> ExprNode {
