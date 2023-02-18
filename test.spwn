@@ -1,20 +1,24 @@
 import core
 
+// penis = import "test2.spwn"
 
-// lol = () {
-//     -> return 0
-//     -> return 1
-// }
+// dbg penis;
 
 
+// import "test2.spwn"
 
-// $.print(lol())
+$.print(@string)
 
 
-$.print(==1)
 
-// type @a
 
-// return {
-//     a: b
-// }
+a = 5 // @int
+
+if ... {
+    a = "fgdfgj"
+}
+
+a // @int | @string
+
+
+

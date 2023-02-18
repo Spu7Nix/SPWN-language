@@ -414,7 +414,7 @@ value! {
 
     Module {
         exports: AHashMap<Spur, ValueKey>,
-        types: Vec<CustomTypeKey>,
+        types: Vec<(CustomTypeKey, bool)>,
     },
 
     TriggerFunction {
@@ -529,12 +529,13 @@ impl Value {
                     ))
                     .collect::<Vec<_>>()
                     .join(", "),
-                if !types.is_empty() {
+                if !types.iter().any(|(_, p)| *p) {
                     format!(
                         "; {}",
                         types
                             .iter()
-                            .map(|t| format!("@{}", vm.resolve(&vm.types[*t].value.name)))
+                            .filter(|(_, p)| !*p)
+                            .map(|(t, _)| format!("@{}", vm.resolve(&vm.types[*t].value.name)))
                             .collect::<Vec<_>>()
                             .join(", ")
                     )

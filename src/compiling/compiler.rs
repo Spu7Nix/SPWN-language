@@ -56,6 +56,7 @@ pub struct Scope {
 pub struct TypeDef {
     pub def_src: SpwnSource,
     pub name: Spur,
+    pub private: bool,
 }
 
 pub type TypeDefMap = AHashMap<TypeDef, Spanned<CustomTypeKey>>;
@@ -410,11 +411,12 @@ impl<'a> Compiler<'a> {
                     for import in &bytecode.import_paths {
                         self.compile_import(&import.value, import.span, import_src.clone())?;
                     }
-                    for (k, name) in &bytecode.custom_types {
+                    for (k, (name, private)) in &bytecode.custom_types {
                         self.custom_type_defs.insert(
                             TypeDef {
                                 def_src: import_src.clone(),
                                 name: self.intern(&name.value),
+                                private: *private,
                             },
                             k.spanned(name.span),
                         );
@@ -770,6 +772,7 @@ impl<'a> Compiler<'a> {
                 let info = TypeDef {
                     def_src: self.src.clone(),
                     name: *name,
+                    private: *private,
                 };
 
                 if ValueType::VARIANT_NAMES.contains(&self.resolve(name).as_str()) {
@@ -788,7 +791,7 @@ impl<'a> Compiler<'a> {
                     });
                 }
 
-                let k = builder.create_type(self.resolve(name), stmt.span);
+                let k = builder.create_type(self.resolve(name), *private, stmt.span);
 
                 self.custom_type_defs.insert(info, k.spanned(stmt.span));
                 self.available_custom_types.insert(*name, k);
@@ -1317,7 +1320,6 @@ impl<'a> Compiler<'a> {
                 builder.load_any(out_reg, expr.span);
             }
             Expression::Import(t) => {
-                println!("{:?}", t);
                 self.compile_import(t, expr.span, self.src.clone())?;
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)
             }

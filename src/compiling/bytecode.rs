@@ -57,7 +57,7 @@ where
     pub export_names: Vec<String>,
     pub import_paths: Vec<Spanned<ImportType>>,
 
-    pub custom_types: SlotMap<CustomTypeKey, Spanned<String>>,
+    pub custom_types: SlotMap<CustomTypeKey, (Spanned<String>, bool)>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -198,7 +198,7 @@ pub struct BytecodeBuilder {
 
     import_paths: Vec<Spanned<ImportType>>,
 
-    custom_types: SlotMap<CustomTypeKey, Spanned<String>>,
+    custom_types: SlotMap<CustomTypeKey, (Spanned<String>, bool)>,
 }
 
 pub struct FuncBuilder<'a> {
@@ -1237,8 +1237,10 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Dbg { reg }))
     }
 
-    pub fn create_type(&mut self, name: String, span: CodeSpan) -> CustomTypeKey {
-        self.code_builder.custom_types.insert(name.spanned(span))
+    pub fn create_type(&mut self, name: String, private: bool, span: CodeSpan) -> CustomTypeKey {
+        self.code_builder
+            .custom_types
+            .insert((name.spanned(span), private))
     }
 
     pub fn make_byte_array(&mut self, reg: UnoptRegister, span: CodeSpan) {
@@ -1272,7 +1274,7 @@ impl Bytecode<Register> {
             "Custom types".bright_cyan().bold(),
             self.custom_types
                 .iter()
-                .map(|(k, n)| format!("{:?}: @{}", k, &n.value))
+                .map(|(k, n)| format!("{:?}: @{}", k, &n.0.value))
                 .collect::<Vec<_>>()
         );
 

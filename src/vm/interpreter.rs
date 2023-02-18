@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::process::exit;
 use std::rc::Rc;
 
 use ahash::AHashMap;
@@ -48,7 +47,8 @@ pub struct Vm<'a> {
     // 256 registers per function
     pub memory: SlotMap<ValueKey, StoredValue>,
 
-    pub programs: SlotMap<BytecodeKey, (SpwnSource, &'a Bytecode<Register>, Vec<CustomTypeKey>)>,
+    pub programs:
+        SlotMap<BytecodeKey, (SpwnSource, &'a Bytecode<Register>, Vec<(CustomTypeKey, bool)>)>,
     pub src_map: AHashMap<SpwnSource, BytecodeKey>,
 
     pub interner: Rc<RefCell<Interner>>,
@@ -63,7 +63,6 @@ pub struct Vm<'a> {
     pub types: SecondaryMap<CustomTypeKey, Spanned<TypeDef>>,
 
     pub impls: AHashMap<ValueType, AHashMap<Spur, (ValueKey, Visibility)>>,
-    // last e lement in ove🤕rload vecto🤕r has highes🤕t prio🤕rity :)))
     pub overloads: AHashMap<Operator, Vec<ValueKey>>,
 }
 
@@ -82,13 +81,19 @@ impl<'a> Vm<'a> {
         let mut programs = SlotMap::default();
         let mut src_map = AHashMap::new();
 
-        let mut type_src_map: AHashMap<_, Vec<CustomTypeKey>> = AHashMap::new();
+        let mut type_src_map: AHashMap<_, Vec<(CustomTypeKey, bool)>> = AHashMap::new();
 
-        for (TypeDef { def_src, .. }, k) in &type_defs {
+        for (
+            TypeDef {
+                def_src, private, ..
+            },
+            k,
+        ) in &type_defs
+        {
             type_src_map
                 .entry(def_src)
-                .and_modify(|v| v.push(k.value))
-                .or_insert_with(|| vec![k.value]);
+                .and_modify(|v| v.push((k.value, *private)))
+                .or_insert_with(|| vec![(k.value, *private)]);
         }
 
         for (src, bytecode) in &bytecode_map.map {
@@ -130,7 +135,7 @@ impl<'a> Vm<'a> {
         self.interner.borrow_mut().get_or_intern(s)
     }
 
-    pub fn intern_vec(&self, s: &Vec<char>) -> Spur {
+    pub fn intern_vec(&self, s: &[char]) -> Spur {
         let s: String = s.iter().collect();
         self.intern(&s)
     }
@@ -756,7 +761,7 @@ impl<'a> Vm<'a> {
 
                                 ret_val.value = Value::Module {
                                     exports: d.into_iter().map(|(s, (k, _))| (s, k)).collect(),
-                                    types: self.programs[func.code].2.clone(),
+                                    types: self.programs[func.code].2.to_vec(),
                                 }
                             }
                             _ => unreachable!(),
@@ -950,52 +955,74 @@ impl<'a> Vm<'a> {
                         let key_interned = self.intern(&key);
                         let base_type = value.get_type();
 
+                        let mut found = false;
+
                         match value {
                             Value::Dict(v) => {
                                 if let Some((k, _)) = v.get(&key_interned) {
-                                    self.change_reg_key(*dest, *k)
+                                    self.change_reg_key(*dest, *k);
+                                    found = true;
+                                }
+                            }
+                            Value::Instance { items, .. } => {
+                                if let Some((k, vis)) = items.get(&key_interned) {
+                                    if let Visibility::Private(src) = vis {
+                                        if src != &self.programs[func.code].0 {
+                                            return Err(RuntimeError::PrivateMemberAccess {
+                                                area: self.make_area(span, func.code),
+                                                member: key,
+                                                call_stack: self.get_call_stack(),
+                                            });
+                                        }
+                                    }
+
+                                    self.change_reg_key(*dest, *k);
+                                    found = true;
                                 }
                             }
                             Value::Module { exports, .. } => {
                                 if let Some(k) = exports.get(&key_interned) {
-                                    self.change_reg_key(*dest, *k)
+                                    self.change_reg_key(*dest, *k);
+                                    found = true;
                                 }
                             }
                             _ => (),
                         }
 
-                        let Some(members) = self.impls.get(&base_type) else { error!(base_type) };
-                        let Some((k, _)) = members.get(&self.intern(&key)) else { error!(base_type) };
+                        if !found {
+                            let Some(members) = self.impls.get(&base_type) else { error!(base_type) };
+                            let Some((k, _)) = members.get(&self.intern(&key)) else { error!(base_type) };
 
-                        let mut v = self.deep_clone_key(*k);
+                            let mut v = self.deep_clone_key(*k);
 
-                        if let Value::Macro(MacroData { self_arg, args, .. }) = &mut v.value {
-                            match args.get(0) {
-                                Some(arg) if arg.name().value == self.intern("self") => {
-                                    *self_arg = Some(self.get_reg_key(*from))
+                            if let Value::Macro(MacroData { self_arg, args, .. }) = &mut v.value {
+                                match args.get(0) {
+                                    Some(arg) if arg.name().value == self.intern("self") => {
+                                        *self_arg = Some(self.get_reg_key(*from))
+                                    }
+                                    _ => {
+                                        return Err(RuntimeError::AssociatedNotAMethod {
+                                            area: self.make_area(span, func.code),
+                                            def_area: v.area.clone(),
+                                            func_name: key,
+                                            base_type,
+                                            call_stack: self.get_call_stack(),
+                                        });
+                                    }
                                 }
-                                _ => {
-                                    return Err(RuntimeError::AssociatedNotAMethod {
-                                        area: self.make_area(span, func.code),
-                                        def_area: v.area.clone(),
-                                        func_name: key.into(),
-                                        base_type,
-                                        call_stack: self.get_call_stack(),
-                                    });
-                                }
+                            } else {
+                                return Err(RuntimeError::NotAMethod {
+                                    area: self.make_area(span, func.code),
+                                    def_area: v.area.clone(),
+                                    member_name: key,
+                                    member_type: v.value.get_type(),
+                                    base_type,
+                                    call_stack: self.get_call_stack(),
+                                });
                             }
-                        } else {
-                            return Err(RuntimeError::NotAMethod {
-                                area: self.make_area(span, func.code),
-                                def_area: v.area.clone(),
-                                member_name: key.into(),
-                                member_type: v.value.get_type(),
-                                base_type,
-                                call_stack: self.get_call_stack(),
-                            });
-                        }
 
-                        self.set_reg(*dest, v);
+                            self.set_reg(*dest, v);
+                        }
                     }
                 }
                 Opcode::TypeMember { from, dest, member } => {
@@ -1012,17 +1039,25 @@ impl<'a> Vm<'a> {
 
                             let typ = types
                                 .iter()
-                                .find(|k| self.types[**k].value.name == key)
+                                .find(|k| self.types[k.0].value.name == key)
                                 .ok_or(RuntimeError::NonexistentTypeMember {
                                     area: self.make_area(span, func.code),
                                     type_name: self.resolve(&key),
                                     call_stack: self.get_call_stack(),
                                 })?;
 
+                            if typ.1 {
+                                return Err(RuntimeError::PrivateType {
+                                    area: self.make_area(span, func.code),
+                                    type_name: self.resolve(&key),
+                                    call_stack: self.get_call_stack(),
+                                });
+                            }
+
                             self.set_reg(
                                 *dest,
                                 StoredValue {
-                                    value: Value::Type(ValueType::Custom(*typ)),
+                                    value: Value::Type(ValueType::Custom(typ.0)),
                                     area: self.make_area(span, func.code),
                                 },
                             );

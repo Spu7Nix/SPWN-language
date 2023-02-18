@@ -198,6 +198,19 @@ error_maker! {
 
         /////////
         #[
+            Message: "Tried to access private member", Note: None;
+            Labels: [
+                area => "Member `{}` is private": member;
+            ]
+        ]
+        PrivateMemberAccess {
+            area: CodeArea,
+            member: String,
+            [call_stack]
+        },
+
+        /////////
+        #[
             Message: "Nonexistent associated member", Note: None;
             Labels: [
                 area => "Associated member `{}` does not exist on {}": member, base_type.runtime_display(vm);
@@ -251,6 +264,19 @@ error_maker! {
             ]
         ]
         NonexistentTypeMember {
+            area: CodeArea,
+            type_name: String,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Tried to access private type", Note: None;
+            Labels: [
+                area => "Type {} is private": format!("@{type_name}");
+            ]
+        ]
+        PrivateType {
             area: CodeArea,
             type_name: String,
             [call_stack]

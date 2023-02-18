@@ -1,33 +1,33 @@
-#[doc(ur"
-    # Example
-    ```spwn
+// #[doc(ur"
+//     # Example
+//     ```spwn
 
-    ```
-")]
-let m = (a: @string, b: @a) {
+//     ```
+// ")]
+// let m = (a: @string, b: @a) {
 
-}
+// }
 
-#[doc("fo bar")]
-type @a
+// #[doc("fo bar")]
+// type @a
 
-impl @a {
-    new: 
-    #[doc("fo bar")]
-    #[constructor]
-    (self) {
-        self.b // ok
-    },
+// impl @a {
+//     new: 
+//     #[doc("fo bar")]
+//     #[constructor]
+//     (self) {
+//         self.b // ok
+//     },
 
-    b: (self) {
+//     b: (self) {
 
-    }
-}
+//     }
+// }
 
-let a = @a::{};
+// let a = @a::{};
 
-a.b // error
+// a.b // error
 
-return {
-    @a
-}
+// return {
+//     @a
+// }

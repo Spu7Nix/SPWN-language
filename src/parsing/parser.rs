@@ -924,7 +924,7 @@ impl Parser<'_> {
                                 }
                             }
                             Token::LBracket => {
-                                let items = self.parse_dictlike(false)?;
+                                let items = self.parse_dictlike(true)?;
                                 Expression::Instance { base: value, items }
                             }
                             other => {
@@ -1159,6 +1159,7 @@ impl Parser<'_> {
             Token::Private => {
                 self.next();
                 self.expect_tok(Token::Type)?;
+                self.expect_tok(Token::TypeIndicator)?;
                 let name = self.slice()[1..].to_string();
                 Statement::TypeDef { name: self.intern_string(name), private: true }
             }
