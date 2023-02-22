@@ -251,18 +251,18 @@ opcodes! {
     // UnaryOp::Gte => todo!(),
     // UnaryOp::Lt => todo!(),
     // UnaryOp::Lte => todo!(),
-    #[delve(display = |s: &R, d: &R| format!("==R{s} -> R{d}"))]
-    PatEq { => src, => dest },
-    #[delve(display = |s: &R, d: &R| format!("!=R{s} -> R{d}"))]
-    PatNeq { => src, => dest },
-    #[delve(display = |s: &R, d: &R| format!(">R{s} -> R{d}"))]
-    PatGt { => src, => dest },
-    #[delve(display = |s: &R, d: &R| format!(">=R{s} -> R{d}"))]
-    PatGte { => src, => dest },
-    #[delve(display = |s: &R, d: &R| format!("<R{s} -> R{d}"))]
-    PatLt { => src, => dest },
-    #[delve(display = |s: &R, d: &R| format!("<=R{s} -> R{d}"))]
-    PatLte { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!("==R{s} -> R{d}"))]
+    // PatEq { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!("!=R{s} -> R{d}"))]
+    // PatNeq { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!(">R{s} -> R{d}"))]
+    // PatGt { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!(">=R{s} -> R{d}"))]
+    // PatGte { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!("<R{s} -> R{d}"))]
+    // PatLt { => src, => dest },
+    // #[delve(display = |s: &R, d: &R| format!("<=R{s} -> R{d}"))]
+    // PatLte { => src, => dest },
 
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} == R{b} -> R{x}"))]
     Eq { => left, => right, => dest },
@@ -284,8 +284,8 @@ opcodes! {
     In { => left, => right, => dest },
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} as R{b} -> R{x}"))]
     As { => left, => right, => dest },
-    #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} is R{b} -> R{x}"))]
-    Is { => left, => right, => dest },
+    // #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} is R{b} -> R{x}"))]
+    // Is { => left, => right, => dest },
 
     #[delve(display = |a: &R, b: &R, x: &R| format!("R{a} && R{b} -> R{x}"))]
     And { => left, => right, => dest },
@@ -322,8 +322,6 @@ opcodes! {
 
     #[delve(display = |d: &R| format!("() -> R{d}"))]
     LoadEmpty { => dest },
-    #[delve(display = |d: &R| format!("_ -> R{d}"))]
-    LoadAnyPattern { => dest },
 
     #[delve(display = |d: &R| format!("{{}} -> R{d}"))]
     LoadEmptyDict { => dest },
@@ -363,6 +361,8 @@ opcodes! {
     Export { => src },
     #[delve(display = |s: &ImportID, d: &R| format!("import id {s} -> R{d}"))]
     Import { src: ImportID => dest },
+    #[delve(display = |e: &R| format!("throw R{e}"))]
+    Throw { => err },
 
     #[delve(display = |b: &R, d: &R, t: &R| format!("@R{b}::R{d} -> R{t}"))]
     CreateInstance { => base, => dict, => dest },

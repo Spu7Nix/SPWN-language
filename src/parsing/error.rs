@@ -197,22 +197,3 @@ error_maker! {
         },
     }
 }
-
-error_maker! {
-    Title: "Warning"
-    Extra: {}
-    pub enum Warning {
-        /////////
-        #[
-            Message: "Use of deprecated value", Note: Some(note.to_string());
-            Labels: [
-                area => "Value deprecated since {}": since;
-            ]
-        ]
-        UseOfDeprecatedValue {
-            since: String,
-            note: String,
-            area: CodeArea,
-        },
-    }
-}

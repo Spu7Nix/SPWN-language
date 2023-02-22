@@ -76,7 +76,7 @@ pub struct StmtNode {
 
 #[derive(Debug, Clone)]
 pub struct PatternNode {
-    pub expr: Box<PatternTree>,
+    pub pat: Box<PatternTree>,
     pub span: CodeSpan,
 }
 
@@ -156,6 +156,8 @@ pub enum Expression {
 
     Maybe(Option<ExprNode>),
 
+    Is(ExprNode, PatternNode),
+
     Index {
         base: ExprNode,
         index: ExprNode,
@@ -180,13 +182,9 @@ pub enum Expression {
     },
 
     Macro {
-        args: Vec<MacroArg<Spanned<Spur>, ExprNode, ExprNode>>,
+        args: Vec<MacroArg<Spanned<Spur>, ExprNode, PatternNode>>,
         ret_type: Option<ExprNode>,
         code: MacroCode,
-    },
-    MacroPattern {
-        args: Vec<ExprNode>,
-        ret_type: ExprNode,
     },
 
     TriggerFunc {
@@ -206,7 +204,6 @@ pub enum Expression {
 
     Builtins,
     Empty,
-    AnyPattern,
 
     Import(ImportType),
 
@@ -279,6 +276,8 @@ pub enum Statement {
     },
 
     Dbg(ExprNode),
+
+    Throw(Spur),
 }
 
 pub type Statements = Vec<StmtNode>;
@@ -297,6 +296,11 @@ pub enum PatternTree {
     Lte(ExprNode),
     Gt(ExprNode),
     Gte(ExprNode),
+
+    MacroPattern {
+        args: Vec<PatternNode>,
+        ret_type: PatternNode,
+    },
 }
 
 impl Expression {

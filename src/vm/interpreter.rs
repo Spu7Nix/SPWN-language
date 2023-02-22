@@ -411,6 +411,7 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::PushArrayElemByKey { elem, dest } => {
                     let push = self.get_reg_key(*elem);
+                    println!("{:?}", self.get_reg_mut(*dest).value);
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Array(v) => v.push(push),
                         _ => unreachable!(),
@@ -706,34 +707,6 @@ impl<'a> Vm<'a> {
                         );
                     };
                 }
-                Opcode::Is { left, right, dest } => {
-                    let span = self.get_span(func, ip);
-
-                    if !self.run_overload(
-                        Operator::Bin(BinOp::Is),
-                        [*left, *right],
-                        func,
-                        span,
-                        Some(*dest),
-                    )? {
-                        let value = vo::is_op(
-                            &self.get_reg(*left).clone(),
-                            &self.get_reg(*right).clone(),
-                            span,
-                            self,
-                            func.code,
-                        )?;
-
-                        self.set_reg(
-                            *dest,
-                            StoredValue {
-                                value,
-                                area: self.make_area(span, func.code),
-                            },
-                        );
-                    };
-                    // self.bin_op(vo::is_op, func, ip, left, right, dest, BinOp::Is)?
-                }
                 Opcode::And { left, right, dest } => {
                     self.bin_op(vo::and, func, ip, left, right, dest, BinOp::And)?
                 }
@@ -822,16 +795,6 @@ impl<'a> Vm<'a> {
                         *dest,
                         StoredValue {
                             value: Value::Empty,
-                            area: self.make_area(span, func.code),
-                        },
-                    )
-                }
-                Opcode::LoadAnyPattern { dest } => {
-                    let span = self.get_span(func, ip);
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value: Value::Pattern(Pattern::Any),
                             area: self.make_area(span, func.code),
                         },
                     )
@@ -1334,16 +1297,17 @@ impl<'a> Vm<'a> {
                     }
                 }
                 Opcode::SetMacroArgPattern { src, dest } => {
-                    let span = self.get_span(func, ip);
+                    todo!()
+                    // let span = self.get_span(func, ip);
 
-                    let pat = vo::to_pattern(self.get_reg(*src), span, self, func.code)?;
+                    // let pat = vo::to_pattern(self.get_reg(*src), span, self, func.code)?;
 
-                    match &mut self.get_reg_mut(*dest).value {
-                        Value::Macro(MacroData { args, .. }) => {
-                            *args.last_mut().unwrap().pattern_mut() = Some(pat)
-                        }
-                        _ => unreachable!(),
-                    }
+                    // match &mut self.get_reg_mut(*dest).value {
+                    //     Value::Macro(MacroData { args, .. }) => {
+                    //         *args.last_mut().unwrap().pattern_mut() = Some(pat)
+                    //     }
+                    //     _ => unreachable!(),
+                    // }
                 }
                 Opcode::Import { src, dest } => {
                     let import = &self.programs[func.code].1.import_paths[*src as usize];
@@ -1495,12 +1459,22 @@ impl<'a> Vm<'a> {
                         },
                     )
                 }
-                Opcode::PatEq { src, dest } => todo!(),
-                Opcode::PatNeq { src, dest } => todo!(),
-                Opcode::PatGt { src, dest } => todo!(),
-                Opcode::PatGte { src, dest } => todo!(),
-                Opcode::PatLt { src, dest } => todo!(),
-                Opcode::PatLte { src, dest } => todo!(),
+                // Opcode::PatEq { src, dest } => todo!(),
+                // Opcode::PatNeq { src, dest } => todo!(),
+                // Opcode::PatGt { src, dest } => todo!(),
+                // Opcode::PatGte { src, dest } => todo!(),
+                // Opcode::PatLt { src, dest } => todo!(),
+                // Opcode::PatLte { src, dest } => todo!(),
+                Opcode::Throw { err } => {
+                    let area = self.get_area(func, ip);
+                    let err = self.get_reg(*err);
+
+                    return Err(RuntimeError::ThrownError {
+                        area,
+                        message: err.value.runtime_display(self),
+                        call_stack: self.get_call_stack(),
+                    });
+                }
             }
 
             {
@@ -1881,8 +1855,7 @@ impl<'a> Vm<'a> {
             (v, ValueType::String) => Value::String(v.runtime_display(self).chars().collect()),
             (v, ValueType::Type) => Value::Type(v.get_type()),
             (_, ValueType::Bool) => Value::Bool(value_ops::to_bool(v, span, self, code)?),
-            (_, ValueType::Pattern) => Value::Pattern(value_ops::to_pattern(v, span, self, code)?),
-
+            // (_, ValueType::Pattern) => Value::Pattern(value_ops::to_pattern(v, span, self, code)?),
             (Value::Bool(b), ValueType::Int) => Value::Int(*b as i64),
             (Value::Bool(b), ValueType::Float) => Value::Float(*b as i64 as f64),
 

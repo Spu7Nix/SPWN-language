@@ -25,6 +25,7 @@ lexer! {
     In: text("in"),
     Try: text("try"),
     Catch: text("catch"),
+    Throw: text("throw"),
 
     Return: text("return"),
     Break: text("break"),
@@ -213,6 +214,7 @@ impl Token {
             Self::Any => "_",
             Self::Overload => "overload",
             Self::Unary => "unary",
+            Self::Throw => "throw",
         }
     }
 }

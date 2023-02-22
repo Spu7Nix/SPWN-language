@@ -879,6 +879,12 @@ impl<'a> Compiler<'a> {
                 let v = self.compile_expr(v, scope, builder, ExprType::Normal)?;
                 builder.dbg(v);
             }
+            Statement::Throw(err) => {
+                let out_reg = builder.next_reg();
+
+                builder.load_string(self.resolve(err), out_reg, stmt.span);
+                builder.throw(out_reg, stmt.span);
+            }
         }
         Ok(())
     }
@@ -961,24 +967,28 @@ impl<'a> Compiler<'a> {
                 BinOp::As => {
                     bin_op!(left as_op right)
                 }
-                BinOp::Is => {
-                    bin_op!(left is_op right)
-                }
                 BinOp::Or => todo!(),
                 BinOp::And => todo!(),
             },
+            /*
+
+            @ignt => Checktype
+
+            @int | @bint => CheckTYpe, Checktype, OR
+
+             */
             Expression::Unary(op, value) => {
                 let v = self.compile_expr(value, scope, builder, ExprType::Normal)?;
                 match op {
                     UnaryOp::BinNot => builder.unary_bin_not(v, out_reg, expr.span),
                     UnaryOp::ExclMark => builder.unary_not(v, out_reg, expr.span),
                     UnaryOp::Minus => builder.unary_negate(v, out_reg, expr.span),
-                    UnaryOp::Eq => builder.unary_pat_eq(v, out_reg, expr.span),
-                    UnaryOp::Neq => builder.unary_pat_neq(v, out_reg, expr.span),
-                    UnaryOp::Gt => builder.unary_pat_gt(v, out_reg, expr.span),
-                    UnaryOp::Gte => builder.unary_pat_gte(v, out_reg, expr.span),
-                    UnaryOp::Lt => builder.unary_pat_lt(v, out_reg, expr.span),
-                    UnaryOp::Lte => builder.unary_pat_lte(v, out_reg, expr.span),
+                    // UnaryOp::Eq => builder.unary_pat_eq(v, out_reg, expr.span),
+                    // UnaryOp::Neq => builder.unary_pat_neq(v, out_reg, expr.span),
+                    // UnaryOp::Gt => builder.unary_pat_gt(v, out_reg, expr.span),
+                    // UnaryOp::Gte => builder.unary_pat_gte(v, out_reg, expr.span),
+                    // UnaryOp::Lt => builder.unary_pat_lt(v, out_reg, expr.span),
+                    // UnaryOp::Lte => builder.unary_pat_lte(v, out_reg, expr.span),
                 }
             }
             Expression::Var(name) => match self.get_var(*name, scope) {
@@ -1084,6 +1094,9 @@ impl<'a> Compiler<'a> {
                     expr.span,
                 )
             }
+            Expression::Is(expr, pat) => {
+                todo!()
+            }
             Expression::Macro {
                 args,
                 ret_type,
@@ -1146,69 +1159,71 @@ impl<'a> Compiler<'a> {
                     args.len(),
                 )?;
 
-                builder.new_macro(
-                    func_id,
-                    out_reg,
-                    |builder, elems| {
-                        for arg in args {
-                            match arg {
-                                MacroArg::Single {
-                                    name,
-                                    pattern,
-                                    default,
-                                    is_ref,
-                                } => {
-                                    let n = self.resolve(&name.value).spanned(name.span);
+                todo!()
 
-                                    let p = if let Some(p) = pattern {
-                                        Some(
-                                            self.compile_expr(p, scope, builder, ExprType::Normal)?
-                                                .spanned(p.span),
-                                        )
-                                    } else {
-                                        None
-                                    };
-                                    let d = if let Some(d) = default {
-                                        Some(self.compile_expr(
-                                            d,
-                                            scope,
-                                            builder,
-                                            ExprType::Normal,
-                                        )?)
-                                    } else {
-                                        None
-                                    };
+                // builder.new_macro(
+                //     func_id,
+                //     out_reg,
+                //     |builder, elems| {
+                //         for arg in args {
+                //             match arg {
+                //                 MacroArg::Single {
+                //                     name,
+                //                     pattern,
+                //                     default,
+                //                     is_ref,
+                //                 } => {
+                //                     let n = self.resolve(&name.value).spanned(name.span);
 
-                                    elems.push(MacroArg::Single {
-                                        name: n,
-                                        pattern: p,
-                                        default: d,
-                                        is_ref: *is_ref,
-                                    })
-                                }
-                                MacroArg::Spread { name, pattern } => {
-                                    let n = self.resolve(&name.value).spanned(name.span);
+                //                     let p = if let Some(p) = pattern {
+                //                         Some(
+                //                             self.compile_expr(p, scope, builder, ExprType::Normal)?
+                //                                 .spanned(p.span),
+                //                         )
+                //                     } else {
+                //                         None
+                //                     };
+                //                     let d = if let Some(d) = default {
+                //                         Some(self.compile_expr(
+                //                             d,
+                //                             scope,
+                //                             builder,
+                //                             ExprType::Normal,
+                //                         )?)
+                //                     } else {
+                //                         None
+                //                     };
 
-                                    let p = if let Some(p) = pattern {
-                                        Some(
-                                            self.compile_expr(p, scope, builder, ExprType::Normal)?
-                                                .spanned(p.span),
-                                        )
-                                    } else {
-                                        None
-                                    };
+                //                     elems.push(MacroArg::Single {
+                //                         name: n,
+                //                         pattern: p,
+                //                         default: d,
+                //                         is_ref: *is_ref,
+                //                     })
+                //                 }
+                //                 MacroArg::Spread { name, pattern } => {
+                //                     let n = self.resolve(&name.value).spanned(name.span);
 
-                                    elems.push(MacroArg::Spread {
-                                        name: n,
-                                        pattern: p,
-                                    })
-                                }
-                            }
-                        }
-                        Ok(())
-                    },
-                    expr.span,
-                )?;
+                //                     let p = if let Some(p) = pattern {
+                //                         Some(
+                //                             self.compile_expr(p, scope, builder, ExprType::Normal)?
+                //                                 .spanned(p.span),
+                //                         )
+                //                     } else {
+                //                         None
+                //                     };
+
+                //                     elems.push(MacroArg::Spread {
+                //                         name: n,
+                //                         pattern: p,
+                //                     })
+                //                 }
+                //             }
+                //         }
+                //         Ok(())
+                //     },
+                //     expr.span,
+                // )?;
             }
             Expression::Call {
                 base,
@@ -1267,7 +1282,7 @@ impl<'a> Compiler<'a> {
                 )?;
                 builder.call(base_reg, out_reg, args_reg, expr.span);
             }
-            Expression::MacroPattern { args, ret_type } => todo!(),
+            // Expression::MacroPattern { args, ret_type } => todo!(),
             Expression::TriggerFunc { attributes, code } => {
                 use crate::gd::ids::IDClass::Group;
                 let group_reg = builder.next_reg();
@@ -1316,9 +1331,9 @@ impl<'a> Compiler<'a> {
             Expression::Empty => {
                 builder.load_empty(out_reg, expr.span);
             }
-            Expression::AnyPattern => {
-                builder.load_any(out_reg, expr.span);
-            }
+            // Expression::AnyPattern => {
+            //     builder.load_any(out_reg, expr.span);
+            // }
             Expression::Import(t) => {
                 self.compile_import(t, expr.span, self.src.clone())?;
                 builder.import(out_reg, t.clone().spanned(expr.span), expr.span)

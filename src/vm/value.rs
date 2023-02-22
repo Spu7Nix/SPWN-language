@@ -410,7 +410,6 @@ value! {
     Macro(MacroData),
 
     Type(ValueType),
-    Pattern(Pattern),
 
     Module {
         exports: AHashMap<Spur, ValueKey>,
@@ -543,7 +542,6 @@ impl Value {
                     "".into()
                 }
             ),
-            Value::Pattern(p) => p.runtime_display(vm),
             Value::Instance { typ, items } => format!(
                 "@{}::{{ {} }}",
                 vm.resolve(&vm.types[*typ].value.name),

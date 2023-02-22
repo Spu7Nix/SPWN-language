@@ -103,38 +103,17 @@ pub fn equality(a: &Value, b: &Value, vm: &Vm) -> bool {
     }
 }
 
-pub fn to_pattern(
-    v: &StoredValue,
-    span: CodeSpan,
-    vm: &Vm,
-    code: BytecodeKey,
-) -> RuntimeResult<Pattern> {
-    Ok(match &v.value {
-        Value::Type(t) => Pattern::Type(*t),
-        Value::Pattern(p) => p.clone(),
-        // Value::Array(v) => if v.len() != 1 {},
-        _ => {
-            return Err(RuntimeError::CannotConvertType {
-                v: (v.value.get_type(), v.area.clone()),
-                to: ValueType::Pattern,
-                area: vm.make_area(span, code),
-                call_stack: vm.get_call_stack(),
-            })
-        }
-    })
-}
+// pub fn is_op(
+//     a: &StoredValue,
+//     b: &StoredValue,
+//     span: CodeSpan,
+//     vm: &mut Vm,
+//     code: BytecodeKey,
+// ) -> RuntimeResult<Value> {
+//     let pat = to_pattern(b, span, vm, code)?;
 
-pub fn is_op(
-    a: &StoredValue,
-    b: &StoredValue,
-    span: CodeSpan,
-    vm: &mut Vm,
-    code: BytecodeKey,
-) -> RuntimeResult<Value> {
-    let pat = to_pattern(b, span, vm, code)?;
-
-    Ok(Value::Bool(pat.value_matches(&a.value, vm)?))
-}
+//     Ok(Value::Bool(pat.value_matches(&a.value, vm)?))
+// }
 
 pub fn as_op(
     a: &StoredValue,

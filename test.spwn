@@ -1,24 +1,3 @@
-import core
-
-// penis = import "test2.spwn"
-
-// dbg penis;
 
 
-// import "test2.spwn"
-
-$.print(@string)
-
-
-
-
-a = 5 // @int
-
-if ... {
-    a = "fgdfgj"
-}
-
-a // @int | @string
-
-
-
+throw [10, 4]

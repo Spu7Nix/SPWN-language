@@ -339,6 +339,7 @@ error_maker! {
             [call_stack]
         },
 
+        /////////
         #[
             Message: "Added object in runtime context", Note: Some("TODO (link to docs)".into());
             Labels: [
@@ -347,6 +348,19 @@ error_maker! {
         ]
         AddObjectInTriggerContext {
             area: CodeArea,
+            [call_stack]
+        },
+
+        /////////
+        #[
+            Message: "Runtime Error", Note: None;
+            Labels: [
+                area => "{}": message;
+            ]
+        ]
+        ThrownError {
+            area: CodeArea,
+            message: String,
             [call_stack]
         },
     }

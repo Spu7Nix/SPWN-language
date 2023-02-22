@@ -7,9 +7,9 @@ use crate::parsing::ast::ObjectType;
 use crate::sources::CodeArea;
 use crate::vm::builtins::builtin_utils::Ref;
 use crate::vm::error::RuntimeError;
-use crate::vm::interpreter::{RuntimeResult, ValueKey, Vm};
+use crate::vm::interpreter::{RuntimeResult, ValueKey, Visibility, Vm};
 use crate::vm::value::arg_aliases::{ABuiltins, AInt, AString, *};
-use crate::vm::value::{BuiltinFn, Value, ValueType};
+use crate::vm::value::{BuiltinFn, IteratorData, Value, ValueType};
 
 macro_rules! or {
     ( $($t:ty)|* ) => {
@@ -119,8 +119,6 @@ pub mod float {
     }
 }
 
-use crate::vm::value::IteratorData;
-
 pub mod array {
     use super::*;
 
@@ -158,7 +156,6 @@ pub mod iterator {
 
 pub mod dict {
     use super::*;
-    use crate::vm::interpreter::Visibility;
 
     pub fn insert(
         slf: Ref<ADict>,
@@ -188,7 +185,6 @@ pub mod range {
         Ok(Value::Bool(contains))
     }
 }
-
 
 pub mod maybe {
     use super::*;

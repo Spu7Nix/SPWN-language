@@ -930,15 +930,15 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::As { left, right, dest }), span)
     }
 
-    pub fn is_op(
-        &mut self,
-        left: UnoptRegister,
-        right: UnoptRegister,
-        dest: UnoptRegister,
-        span: CodeSpan,
-    ) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Is { left, right, dest }), span)
-    }
+    // pub fn is_op(
+    //     &mut self,
+    //     left: UnoptRegister,
+    //     right: UnoptRegister,
+    //     dest: UnoptRegister,
+    //     span: CodeSpan,
+    // ) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Is { left, right, dest }), span)
+    // }
 
     pub fn bin_or(
         &mut self,
@@ -1012,29 +1012,29 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::BinNot { src, dest }), span)
     }
 
-    pub fn unary_pat_eq(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatEq { src, dest }), span)
-    }
+    // pub fn unary_pat_eq(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatEq { src, dest }), span)
+    // }
 
-    pub fn unary_pat_neq(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatNeq { src, dest }), span)
-    }
+    // pub fn unary_pat_neq(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatNeq { src, dest }), span)
+    // }
 
-    pub fn unary_pat_gt(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatGt { src, dest }), span)
-    }
+    // pub fn unary_pat_gt(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatGt { src, dest }), span)
+    // }
 
-    pub fn unary_pat_gte(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatGte { src, dest }), span)
-    }
+    // pub fn unary_pat_gte(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatGte { src, dest }), span)
+    // }
 
-    pub fn unary_pat_lt(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatLt { src, dest }), span)
-    }
+    // pub fn unary_pat_lt(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatLt { src, dest }), span)
+    // }
 
-    pub fn unary_pat_lte(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatLte { src, dest }), span)
-    }
+    // pub fn unary_pat_lte(&mut self, src: UnoptRegister, dest: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::PatLte { src, dest }), span)
+    // }
 
     pub fn copy(&mut self, from: UnoptRegister, to: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Copy { from, to }), span)
@@ -1118,9 +1118,9 @@ impl<'a> FuncBuilder<'a> {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmpty { dest: reg }), span)
     }
 
-    pub fn load_any(&mut self, reg: UnoptRegister, span: CodeSpan) {
-        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadAnyPattern { dest: reg }), span)
-    }
+    // pub fn load_any(&mut self, reg: UnoptRegister, span: CodeSpan) {
+    //     self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadAnyPattern { dest: reg }), span)
+    // }
 
     pub fn load_empty_dict(&mut self, reg: UnoptRegister, span: CodeSpan) {
         self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::LoadEmptyDict { dest: reg }), span)
@@ -1235,6 +1235,10 @@ impl<'a> FuncBuilder<'a> {
 
     pub fn dbg(&mut self, reg: UnoptRegister) {
         self.push_opcode(ProtoOpcode::Raw(UnoptOpcode::Dbg { reg }))
+    }
+
+    pub fn throw(&mut self, reg: UnoptRegister, span: CodeSpan) {
+        self.push_opcode_spanned(ProtoOpcode::Raw(UnoptOpcode::Throw { err: reg }), span)
     }
 
     pub fn create_type(&mut self, name: String, private: bool, span: CodeSpan) -> CustomTypeKey {
