@@ -333,6 +333,7 @@ impl<'a> Vm<'a> {
 
         while self.contexts.valid() {
             let ip = self.contexts.ip();
+            println!("gagaba {}: {}", func.func, ip);
 
             if ip >= opcodes.len() {
                 if !self.contexts.last().have_returned {
@@ -356,6 +357,7 @@ impl<'a> Vm<'a> {
                     self.set_reg(*dest, StoredValue { value, area })
                 }
                 Opcode::Copy { from, to } => {
+                    println!("galha {} {} {}", self.contexts.0.len(), ip, func.func);
                     let v = self.deep_clone_reg(*from);
                     self.set_reg(*to, v)
                 }
@@ -1642,16 +1644,16 @@ impl<'a> Vm<'a> {
                         call_area: Some(call_area),
                     },
                     Box::new(move |vm| {
-                        for (i, k) in regs_keys {
-                            vm.change_reg_key(i as Register, k)
-                        }
+                        // for (i, k) in regs_keys {
+                        //     vm.change_reg_key(i as Register, k)
+                        // }
 
-                        for (k, (_, to)) in captured
-                            .iter()
-                            .zip(&vm.programs[func.code].1.functions[func.func].capture_regs)
-                        {
-                            vm.change_reg_key(*to, *k);
-                        }
+                        // for (k, (_, to)) in captured
+                        //     .iter()
+                        //     .zip(&vm.programs[func.code].1.functions[func.func].capture_regs)
+                        // {
+                        //     vm.change_reg_key(*to, *k);
+                        // }
 
                         Ok(())
                     }),
