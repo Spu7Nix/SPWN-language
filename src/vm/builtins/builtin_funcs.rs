@@ -195,6 +195,13 @@ pub mod maybe {
     }
 }
 
+// pub mod error {
+
+//     pub const fn get_type_mismatch() {
+//         return Ok(Value::Error(0));
+//     }
+// }
+
 //////////////////////
 
 override_names! {
@@ -221,4 +228,8 @@ override_names! {
     Iterator: [
         next,
     ],
+
+    // Error [
+        // get type_mismatch: get_type_mismatch
+    // ]
 }

@@ -8,7 +8,7 @@ use unindent::unindent;
 
 use super::ast::{
     Ast, DictItems, ExprNode, Expression, ImportType, MacroArg, MacroCode, ObjectType, Spannable,
-    Spanned, Statement, Statements, StmtNode, StringType, StringContent, PatternNode, PatternTree,
+    Spanned, Statement, Statements, StmtNode, StringType, StringContent, PatternNode, Pattern,
 };
 use super::attributes::{ExprAttribute, IsValidOn, ParseAttribute, ScriptAttribute, StmtAttribute};
 use super::error::SyntaxError;
@@ -376,7 +376,7 @@ impl Parser<'_> {
             let key = match self.next() {
                 Token::Int => self.intern_string(self.parse_int(self.slice()).to_string()),
                 Token::String => self.parse_plain_string(self.slice(), self.span())?,
-                Token::Ident => self.intern_string(self.slice().to_string()),
+                Token::Ident => self.intern_string(self.slice()),
                 other => {
                     return Err(SyntaxError::UnexpectedToken {
                         expected: "key".into(),
@@ -436,15 +436,44 @@ impl Parser<'_> {
     pub fn parse_pattern(&mut self) -> ParseResult<PatternNode> {
         let start = self.peek_span();
 
-        let pat = match self.next() {
+        let mut pat = match self.next() {
             Token::TypeIndicator => {
                 let name = self.slice()[1..].to_string();
 
-                PatternTree::Type(self.intern_string(name))
+                Pattern::Type(self.intern_string(name))
             }
-            _ => todo!(),
-            // To do otherrs  ! ! ! ! ;) : ) : ):) :))))
-
+            Token::Any => {
+                Pattern::Any
+            }
+            Token::Eq => {
+                let val = self.parse_value(true)?;
+                Pattern::Eq(val)
+            }
+            Token::Neq => {
+                let val = self.parse_value(true)?;
+                Pattern::Neq(val)
+            }
+            Token::Gt => {
+                let val = self.parse_value(true)?;
+                Pattern::Gt(val)
+            }
+            Token::Gte => {
+                let val = self.parse_value(true)?;
+                Pattern::Gte(val)
+            }
+            Token::Lt => {
+                let val = self.parse_value(true)?;
+                Pattern::Lt(val)
+            }
+            Token::Lte => {
+                let val = self.parse_value(true)?;
+                Pattern::Lte(val)
+            }
+            Token::LParen => {
+                let pat = self.parse_pattern()?;
+                self.expect_tok(Token::RParen)?;
+                *pat.pat
+            }
             other => {
                 return Err(SyntaxError::UnexpectedToken {
                     expected: "pattern".into(),
@@ -453,6 +482,31 @@ impl Parser<'_> {
                 });
             }
         };
+
+        match self.peek() {
+            Token::BinOr => {
+                let left = PatternNode {
+                    pat: Box::new(pat),
+                    span: start.extend(self.span()),
+                };
+    
+                self.next();
+                let right = self.parse_pattern()?;
+                pat = Pattern::Either(left, right);
+            }
+            Token::BinAnd => {
+                let left = PatternNode {
+                    pat: Box::new(pat),
+                    span: start.extend(self.span()),
+                };
+    
+                self.next();
+                let right = self.parse_pattern()?;
+                pat = Pattern::Both(left, right);
+            }
+            _ => (),
+        }
+
 
         Ok(PatternNode {
             pat: Box::new(pat),
@@ -587,9 +641,10 @@ impl Parser<'_> {
                                 break 'out_expr Expression::Empty
                                     .spanned(start.extend(self.span()));
                             }
-                            let inner = self.parse_expr(true)?;
+                            let mut inner = self.parse_expr(true)?;
                             self.expect_tok(Token::RParen)?;
-                            return Ok(inner.extended(self.span()));
+                            inner.span = start.extend(self.span());
+                            return Ok(inner);
                         }
                     }
 

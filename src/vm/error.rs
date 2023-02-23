@@ -2,7 +2,7 @@ use std::string::ToString;
 
 use super::context::CallInfo;
 use super::interpreter::Vm;
-use super::pattern::Pattern;
+use super::pattern::ConstPattern;
 use super::value::ValueType;
 use crate::error_maker;
 use crate::parsing::utils::operators::{BinOp, UnaryOp};
@@ -177,7 +177,7 @@ error_maker! {
             call_area: CodeArea,
             macro_def_area: CodeArea,
             arg_name: String,
-            pattern: Pattern,
+            pattern: ConstPattern,
             v: (ValueType, CodeArea),
             [call_stack]
         },

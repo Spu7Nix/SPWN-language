@@ -20,7 +20,6 @@ pub enum StringContent {
 pub struct StringType {
     pub s: StringContent,
     pub bytes: bool,
-    // f_string: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,7 +75,7 @@ pub struct StmtNode {
 
 #[derive(Debug, Clone)]
 pub struct PatternNode {
-    pub pat: Box<PatternTree>,
+    pub pat: Box<Pattern<Spur, PatternNode, ExprNode>>,
     pub span: CodeSpan,
 }
 
@@ -103,23 +102,23 @@ impl<N, D, P> MacroArg<N, D, P> {
         }
     }
 
-    pub fn name_mut(&mut self) -> &mut N {
-        match self {
-            MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
-        }
-    }
+    // pub fn name_mut(&mut self) -> &mut N {
+    //     match self {
+    //         MacroArg::Single { name, .. } | MacroArg::Spread { name, .. } => name,
+    //     }
+    // }
 
     pub fn default(&self) -> &Option<D> {
         match self {
             MacroArg::Single { default, .. } => default,
-            _ => panic!("bad"),
+            _ => unreachable!(),
         }
     }
 
     pub fn default_mut(&mut self) -> &mut Option<D> {
         match self {
             MacroArg::Single { default, .. } => default,
-            _ => panic!("bad"),
+            _ => unreachable!(),
         }
     }
 
@@ -282,26 +281,28 @@ pub enum Statement {
 
 pub type Statements = Vec<StmtNode>;
 
-#[derive(Debug, Clone)]
-pub enum PatternTree {
+// T = type, P = pattern, E = expression
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Pattern<T, P, E> {
     Any,
 
-    Type(Spur),
-    Either(PatternNode, PatternNode),
-    Both(PatternNode, PatternNode),
+    Type(T),
+    Either(P, P),
+    Both(P, P),
 
-    Eq(ExprNode),
-    NEq(ExprNode),
-    Lt(ExprNode),
-    Lte(ExprNode),
-    Gt(ExprNode),
-    Gte(ExprNode),
+    Eq(E),
+    Neq(E),
+    Lt(E),
+    Lte(E),
+    Gt(E),
+    Gte(E),
 
-    MacroPattern {
-        args: Vec<PatternNode>,
-        ret_type: PatternNode,
-    },
+    MacroPattern { args: Vec<P>, ret_type: P },
 }
+
+// impl<T, P, E> Pattern<T, P, E> {
+//     pub fn map_
+// }
 
 impl Expression {
     pub fn into_node(self, attributes: Vec<ExprAttribute>, span: CodeSpan) -> ExprNode {

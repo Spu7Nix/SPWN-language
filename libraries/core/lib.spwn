@@ -74,6 +74,11 @@ impl @range {
     },
 }
 
+type @error
+impl @error {
+    
+}
+
 // impl @block {}
 // impl @group {}
 // impl @item {}

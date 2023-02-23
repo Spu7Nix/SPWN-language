@@ -213,5 +213,16 @@ error_maker! {
 
             area: CodeArea,
         },
+
+        /////
+        #[
+            Message: "Expected constant expression", Note: None;
+            Labels: [
+                area => "Only constant expressions are allowed here";
+            ]
+        ]
+        ExpectedConstantExpr {
+            area: CodeArea,
+        },
     }
 }

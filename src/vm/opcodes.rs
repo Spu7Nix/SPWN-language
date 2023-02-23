@@ -51,6 +51,7 @@ pub type Register = u8;
 pub type UnoptRegister = usize;
 
 pub type ConstID = u16;
+pub type ConstPatternID = u16;
 pub type JumpPos = u16;
 pub type AllocSize = u16;
 pub type FunctionID = u16;
@@ -191,8 +192,8 @@ opcodes! {
     PushMacroArg { => name, => dest, is_ref: bool },
     #[delve(display = |s: &R, d: &R| format!("set default to R{s} for R{d}"))]
     SetMacroArgDefault { => src, => dest },
-    #[delve(display = |s: &R, d: &R| format!("set pattern to R{s} for R{d}"))]
-    SetMacroArgPattern { => src, => dest },
+    #[delve(display = |i: &ConstPatternID, d: &R| format!("set pattern to id {i} for R{d}"))]
+    SetMacroArgPattern { id: ConstPatternID, => dest },
     #[delve(display = |n: &R, d: &R| format!("insert arg ...R{n} into R{d}"))]
     PushMacroSpreadArg { => name, => dest },
 
@@ -329,6 +330,8 @@ opcodes! {
     #[delve(display = |c: &IDClass, d: &R| format!("?{} -> R{d}", c.letter()))]
     LoadArbitraryId { class: IDClass, => dest },
 
+    #[delve(display = |s: &R, d: &R| format!("R{s}.type -> R{d}"))]
+    TypeOf { => src, => dest },
 
     #[delve(display = |src: &R| format!("change to R{src}"))]
     PushContextGroup { => src },

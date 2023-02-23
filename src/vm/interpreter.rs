@@ -9,7 +9,6 @@ use slotmap::{new_key_type, SecondaryMap, SlotMap};
 use super::context::{CallInfo, Context, ContextStack, FullContext};
 use super::error::RuntimeError;
 use super::opcodes::{Opcode, Register};
-use super::pattern::Pattern;
 use super::value::{IteratorData, MacroTarget, StoredValue, Value, ValueType};
 use super::value_ops;
 use crate::compiling::bytecode::Bytecode;
@@ -17,7 +16,7 @@ use crate::compiling::compiler::{CustomTypeKey, TypeDef};
 use crate::gd::gd_object::{GdObject, Trigger, TriggerOrder};
 use crate::gd::ids::{IDClass, Id, SpecificId};
 use crate::gd::object_keys::ObjectKeyValueType;
-use crate::parsing::ast::{MacroArg, Spannable, Spanned};
+use crate::parsing::ast::{MacroArg, ObjectType, Spannable, Spanned};
 use crate::parsing::utils::operators::{AssignOp, BinOp, Operator, UnaryOp};
 use crate::sources::{BytecodeMap, CodeArea, CodeSpan, SpwnSource};
 use crate::util::Interner;
@@ -347,15 +346,14 @@ impl<'a> Vm<'a> {
 
             match opcode {
                 Opcode::LoadConst { dest, id } => {
-                    let value = Value::from_const(&self.programs[func.code].1.consts[*id as usize]);
+                    let area = self.get_area(func, ip);
+                    let value = Value::from_const(
+                        &self.programs[func.code].1.consts[*id as usize],
+                        self,
+                        &area,
+                    );
 
-                    self.set_reg(
-                        *dest,
-                        StoredValue {
-                            value,
-                            area: self.get_area(func, ip),
-                        },
-                    )
+                    self.set_reg(*dest, StoredValue { value, area })
                 }
                 Opcode::Copy { from, to } => {
                     let v = self.deep_clone_reg(*from);
@@ -411,7 +409,7 @@ impl<'a> Vm<'a> {
                 }
                 Opcode::PushArrayElemByKey { elem, dest } => {
                     let push = self.get_reg_key(*elem);
-                    println!("{:?}", self.get_reg_mut(*dest).value);
+                    println!("bavi {:?}", self.get_reg_mut(*dest).value);
                     match &mut self.get_reg_mut(*dest).value {
                         Value::Array(v) => v.push(push),
                         _ => unreachable!(),
@@ -458,7 +456,7 @@ impl<'a> Vm<'a> {
                     StoredValue {
                         value: Value::Object(
                             AHashMap::with_capacity(*size as usize),
-                            crate::parsing::ast::ObjectType::Object,
+                            ObjectType::Object,
                         ),
                         area: self.get_area(func, ip),
                     },
@@ -468,7 +466,7 @@ impl<'a> Vm<'a> {
                     StoredValue {
                         value: Value::Object(
                             AHashMap::with_capacity(*size as usize),
-                            crate::parsing::ast::ObjectType::Trigger,
+                            ObjectType::Trigger,
                         ),
                         area: self.get_area(func, ip),
                     },
@@ -542,7 +540,8 @@ impl<'a> Vm<'a> {
 
                         if !valid {
                             println!("{:?} {:?}", types, &self.memory[push].value);
-                            panic!("\n\nOk   heres the deal!!! I not this yet XDXDC😭😭🤣🤣 \nLOl")
+                            todo!()
+                            //panic!("\n\nOk   heres the deal!!! I not this yet XDXDC😭😭🤣🤣 \nLOl")
                         }
 
                         vo::to_obj_param(
@@ -1059,7 +1058,7 @@ impl<'a> Vm<'a> {
                             match self.impls.get(t) {
                                 Some(members) => match members.get(&key) {
                                     Some((k, _)) => {
-                                        let mut v = self.deep_clone_key(*k);
+                                        let v = self.deep_clone_key(*k);
 
                                         self.set_reg(*dest, v);
                                     }
@@ -1296,18 +1295,17 @@ impl<'a> Vm<'a> {
                         _ => unreachable!(),
                     }
                 }
-                Opcode::SetMacroArgPattern { src, dest } => {
-                    todo!()
+                Opcode::SetMacroArgPattern { id, dest } => {
                     // let span = self.get_span(func, ip);
 
-                    // let pat = vo::to_pattern(self.get_reg(*src), span, self, func.code)?;
+                    let pat = &self.programs[func.code].1.const_patterns[*id as usize];
 
-                    // match &mut self.get_reg_mut(*dest).value {
-                    //     Value::Macro(MacroData { args, .. }) => {
-                    //         *args.last_mut().unwrap().pattern_mut() = Some(pat)
-                    //     }
-                    //     _ => unreachable!(),
-                    // }
+                    match &mut self.get_reg_mut(*dest).value {
+                        Value::Macro(MacroData { args, .. }) => {
+                            *args.last_mut().unwrap().pattern_mut() = Some(pat.clone())
+                        }
+                        _ => unreachable!(),
+                    }
                 }
                 Opcode::Import { src, dest } => {
                     let import = &self.programs[func.code].1.import_paths[*src as usize];
@@ -1475,6 +1473,17 @@ impl<'a> Vm<'a> {
                         call_stack: self.get_call_stack(),
                     });
                 }
+                Opcode::TypeOf { src, dest } => {
+                    let area = self.get_area(func, ip);
+
+                    self.set_reg(
+                        *dest,
+                        StoredValue {
+                            value: Value::Type(self.get_reg(*src).value.get_type()),
+                            area,
+                        },
+                    )
+                }
             }
 
             {
@@ -1602,12 +1611,10 @@ impl<'a> Vm<'a> {
                     };
 
                     if let Some(pattern) = data.pattern() {
-                        // if !pattern.value_matches(&self.memory[$v].value, $vm) {
-                        //     todo!()
-                        // }
+                        if !pattern.value_matches(&self.memory[$v].value, $vm) {
+                            todo!()
+                        }
                     }
-
-                    // if vm.memory[$v].
 
                     $b
                 }
@@ -1632,7 +1639,7 @@ impl<'a> Vm<'a> {
                     CallInfo {
                         func,
                         return_dest: dest,
-                        call_area: Some(call_area.clone()),
+                        call_area: Some(call_area),
                     },
                     Box::new(move |vm| {
                         for (i, k) in regs_keys {
@@ -1681,36 +1688,36 @@ impl<'a> Vm<'a> {
         op: Operator,
         values: [Register; N],
     ) -> Option<(MacroData, CodeArea)> {
-        if let Some(overloads) = self.overloads.get(&op).cloned() {
-            'overloads: for overload in overloads.iter().rev() {
-                let data = match &self.memory[*overload].value {
-                    Value::Macro(data) => {
-                        data.clone()
-                        // if values
-                        //     .into_iter()
-                        //     .zip(&data.args)
-                        //     .all(|(v, arg)| arg.pattern().as_ref().unwrap().value_matches(v, self))
-                        // {
-                        //     return Some((data.clone(), self.memory[*overload].area.clone()));
-                        // }
-                    }
-                    _ => unreachable!(),
-                };
-                for (v, arg) in values.into_iter().zip(&data.args) {
-                    if !arg
-                        .pattern()
-                        .as_ref()
-                        .unwrap()
-                        .value_matches(&self.get_reg(v).value.clone(), self)
-                        .unwrap()
-                    // lol
-                    {
-                        continue 'overloads;
-                    }
-                }
-                return Some((data.clone(), self.memory[*overload].area.clone()));
-            }
-        }
+        // if let Some(overloads) = self.overloads.get(&op).cloned() {
+        //     'overloads: for overload in overloads.iter().rev() {
+        //         let data = match &self.memory[*overload].value {
+        //             Value::Macro(data) => {
+        //                 data.clone()
+        //                 // if values
+        //                 //     .into_iter()
+        //                 //     .zip(&data.args)
+        //                 //     .all(|(v, arg)| arg.pattern().as_ref().unwrap().value_matches(v, self))
+        //                 // {
+        //                 //     return Some((data.clone(), self.memory[*overload].area.clone()));
+        //                 // }
+        //             }
+        //             _ => unreachable!(),
+        //         };
+        //         for (v, arg) in values.into_iter().zip(&data.args) {
+        //             if !arg
+        //                 .pattern()
+        //                 .as_ref()
+        //                 .unwrap()
+        //                 .value_matches(&self.get_reg(v).value.clone(), self)
+        //                 .unwrap()
+        //             // lol
+        //             {
+        //                 continue 'overloads;
+        //             }
+        //         }
+        //         return Some((data.clone(), self.memory[*overload].area.clone()));
+        //     }
+        // }
         None
     }
 

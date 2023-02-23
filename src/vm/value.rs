@@ -12,7 +12,8 @@ use strum::EnumDiscriminants;
 use super::builtins::builtin_utils::IntoArg;
 use super::error::RuntimeError;
 use super::interpreter::{FuncCoord, RuntimeResult, ValueKey, Vm};
-use super::pattern::Pattern;
+use super::pattern::ConstPattern;
+// use super::pattern::Pattern;
 use crate::compiling::bytecode::Constant;
 use crate::compiling::compiler::CustomTypeKey;
 use crate::gd::gd_object::ObjParam;
@@ -48,7 +49,7 @@ impl Debug for BuiltinFn {
 #[derive(Clone, Debug)]
 pub struct MacroData {
     pub target: MacroTarget,
-    pub args: Vec<MacroArg<Spanned<Spur>, ValueKey, Pattern>>,
+    pub args: Vec<MacroArg<Spanned<Spur>, ValueKey, ConstPattern>>,
     pub self_arg: Option<ValueKey>,
 }
 
@@ -220,8 +221,6 @@ macro_rules! value {
                     }
                 )*
 
-
-                
                 $(
                     impl<'a> GetMutRefArg<'a> for [<A $name>] {
                         type Output = [<MutRefA $name>]<'a>;
@@ -434,7 +433,7 @@ value! {
 }
 
 impl Value {
-    pub fn from_const(c: &Constant) -> Self {
+    pub fn from_const(c: &Constant, vm: &mut Vm, area: &CodeArea) -> Self {
         match c {
             Constant::Int(v) => Value::Int(*v),
             Constant::Float(v) => Value::Float(*v),
@@ -450,6 +449,62 @@ impl Value {
                 }
             }
             Constant::Type(k) => Value::Type(*k),
+            Constant::Array(arr) => Value::Array(
+                arr.iter()
+                    .map(|c| {
+                        let value = Value::from_const(c, vm, area);
+                        vm.memory.insert(StoredValue {
+                            value,
+                            area: area.clone(),
+                        })
+                    })
+                    .collect(),
+            ),
+            Constant::Dict(m) => Value::Dict(
+                m.iter()
+                    .map(|(s, c)| {
+                        let value = Value::from_const(c, vm, area);
+                        (
+                            vm.intern(s),
+                            (
+                                vm.memory.insert(StoredValue {
+                                    value,
+                                    area: area.clone(),
+                                }),
+                                Visibility::Public,
+                            ),
+                        )
+                    })
+                    .collect(),
+            ),
+            Constant::Maybe(o) => Value::Maybe(o.clone().map(|c| {
+                let value = Value::from_const(&c, vm, area);
+                vm.memory.insert(StoredValue {
+                    value,
+                    area: area.clone(),
+                })
+            })),
+            Constant::Builtins => Value::Builtins,
+            Constant::Empty => Value::Empty,
+            Constant::Instance(t, m) => Value::Instance {
+                typ: *t,
+                items: m
+                    .iter()
+                    .map(|(s, c)| {
+                        let value = Value::from_const(c, vm, area);
+                        (
+                            vm.intern(s),
+                            (
+                                vm.memory.insert(StoredValue {
+                                    value,
+                                    area: area.clone(),
+                                }),
+                                Visibility::Public,
+                            ),
+                        )
+                    })
+                    .collect(),
+            },
         }
     }
 
