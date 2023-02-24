@@ -177,3 +177,108 @@ macro_rules! tuple_macro {
 }
 
 tuple_macro! {A B C D}
+
+//     impl @error {
+//         const TYPE_MISMATCH = Int(0);
+
+//         < #[deprecated] >
+//         fn poo(
+//           #[self]
+//             &self / &mut self,
+
+//             Thing(...)
+//             r: mut ref Thing
+//             r: ref Thing
+//             r where Area(a) Key(k),
+
+//             where Area(...) Key(...) Value(...)
+//
+//             _: Range(start, end, step) | String where CodeArea(a) ValueKey(k)
+
+//r: &String | &Int
+
+//             r: &mut Range @ range_area,
+//             r: &Range,
+
+//             a: Range(start, end, step),
+
+//             raw k,
+//         ) {
+//             if let Some(v) = r.is::<Range>() {
+//                 //dfdfdf
+//             }
+//             if let Some(v) = r.is::<String>() {
+//                 / fdfd fd f
+//             }
+
+//             match vm.memory.get_mut(key) {
+//                 Range(ref mut start, ref mut end, ref mut step)
+//             }
+
+//             r.get_mut_ref()
+//         }?
+//     }
+// }
+
+#[rustfmt::skip]
+macro_rules! builtin_impl {
+    (
+        $(#[$impl_doc:meta])?
+        impl @$builtin:ident {
+            $(
+                $(<{ $($fn_raw:tt)* }>)?
+                $(#[$fn_doc:meta])?
+                fn $fn_name:ident (
+                    $(
+                        $(
+                            $var:ident $(: $(
+                                $(mut ref $mut_ref_variant:ident)?
+                                $(ref $ref_variant:ident)?
+                            )|+)?
+                        )?
+
+                        $(
+                            _: $(
+                                $variant:ident $(($($tok1:tt)*))? $({$($tok2:tt)*})?
+                            )|+
+                        )?
+
+                        $(where $($extra:ident($bind:ident))+)?
+
+                        ,
+                    )*
+                ) $(-> $ret_type:ty)? $code:block
+            )*
+        }
+    ) => {
+        #[cfg(test)]
+        pub mod $builtin {
+
+            #[test]
+            pub fn core_gen() {
+                let (slf, line, col) = (file!(), line!(), column!());
+
+                let path = std::path::PathBuf::from("../../libraries/core/");
+                let out = format!(r#"
+#[doc(...)]
+type @A
+
+impl @<> {{
+    #[doc(...)]
+    <>
+
+    #[doc(...)]
+    <>
+}}
+                "#, );
+
+                std::fs::write(path, out).unwrap();
+            }
+        }
+    };
+}
+
+builtin_impl! {
+    impl @string {
+    }
+}
