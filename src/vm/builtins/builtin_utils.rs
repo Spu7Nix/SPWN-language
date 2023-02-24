@@ -258,7 +258,7 @@ macro_rules! builtin_impl {
             pub fn core_gen() {
                 let (slf, line, col) = (file!(), line!(), column!());
 
-                let path = std::path::PathBuf::from("../../libraries/core/");
+                let path = std::path::PathBuf::from(concat!("./libraries/core/", stringify!($builtin), ".spwn"));
                 let out = format!(r#"
 #[doc(...)]
 type @A
