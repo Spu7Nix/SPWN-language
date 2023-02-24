@@ -40,3 +40,5 @@ block-modes = "0.8.1"
 rand = "0.8.5"
 
 spinoff = "0.7.0"
+
+indoc = "2"

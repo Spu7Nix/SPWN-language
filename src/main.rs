@@ -43,6 +43,8 @@ use crate::vm::context::{CallInfo, Context};
 use crate::vm::interpreter::{FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
 
+const CORE_PATH: &str = "./libraries/core/";
+
 struct Spinner {
     frames: SpinnerFrames,
     spinner: Option<(SSpinner, String)>,

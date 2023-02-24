@@ -223,7 +223,9 @@ tuple_macro! {A B C D}
 #[rustfmt::skip]
 macro_rules! builtin_impl {
     (
-        $(#[$impl_doc:meta])?
+        $(#[doc = $impl_doc:literal])*
+        // temporary until 1.0
+        $(#[raw($($impl_raw:tt)*)])?
         impl @$builtin:ident {
             $(
                 $(<{ $($fn_raw:tt)* }>)?
@@ -256,29 +258,37 @@ macro_rules! builtin_impl {
 
             #[test]
             pub fn core_gen() {
-                let (slf, line, col) = (file!(), line!(), column!());
+                //let (slf, line, col) = (file!(), line!(), column!());
+                let path = std::path::PathBuf::from(format!("{}{}{}", $crate::CORE_PATH, stringify!($builtin), ".spwn"));
+                let out = indoc::formatdoc!(r#"
+                        {impl_raw}
+                        #[doc("{impl_doc}")]
+                        impl @<> {{
+                            #[doc(...)]
+                            <>
 
-                let path = std::path::PathBuf::from(concat!("./libraries/core/", stringify!($builtin), ".spwn"));
-                let out = format!(r#"
-#[doc(...)]
-type @A
+                            #[doc(...)]
+                            <>
+                        }}
+                    "#, 
+                    impl_raw = stringify!($($($impl_raw)*)?),
+                    // todo: it no unindent
+                    impl_doc = indoc::concatdoc!($($impl_doc, "\n"),*),
+                );
 
-impl @<> {{
-    #[doc(...)]
-    <>
-
-    #[doc(...)]
-    <>
-}}
-                "#, );
-
-                std::fs::write(path, out).unwrap();
+                std::fs::write(path, &out).unwrap();
             }
         }
     };
 }
 
 builtin_impl! {
+    /// foo bar
+    /// # Example:
+    /// ```
+    ///     fn test() {}
+    /// ```
+    #[raw( #[deprecated] )]
     impl @string {
     }
 }

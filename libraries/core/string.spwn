@@ -1,7 +1,10 @@
-
-#[doc(...)]
-type @A
-
+#[deprecated]
+#[doc(" foo bar
+ # Example:
+ ```
+     fn test() {}
+ ```
+")]
 impl @<> {
     #[doc(...)]
     <>
@@ -9,4 +12,3 @@ impl @<> {
     #[doc(...)]
     <>
 }
-                
