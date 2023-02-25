@@ -1,0 +1,9 @@
+
+#[doc(u" aaaaaaaa\n  bbbbbbbb\"\n  cccccccc#\"\n  dddddddd'")]
+impl @string {
+    #[doc(...)]
+    <>
+
+    #[doc(...)]
+    <>
+}

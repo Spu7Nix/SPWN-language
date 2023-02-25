@@ -278,10 +278,10 @@ macro_rules! builtin_impl {
             #[test]
             pub fn [<$builtin _core_gen>]() {
                 //let (slf, line, col) = (file!(), line!(), column!());
-                let path = std::path::PathBuf::from(format!("{}{}{}", $crate::CORE_PATH, stringify!($builtin), ".spwn"));
+                let path = std::path::PathBuf::from(format!("{}{}.spwn", $crate::CORE_PATH, stringify!($builtin)));
                 let out = indoc::formatdoc!(r#"
                         {impl_raw}
-                        #[doc("{impl_doc}")]
+                        #[doc(u{impl_doc:?})]
                         impl @{typ} {{
                             #[doc(...)]
                             <>
@@ -291,8 +291,7 @@ macro_rules! builtin_impl {
                         }}
                     "#, 
                     impl_raw = stringify!($($($impl_raw)*)?),
-                    // todo: it no unindent
-                    impl_doc = indoc::concatdoc!("\n", $($impl_doc, "\n"),*),
+                    impl_doc = &[$($impl_doc),*].join("\n"),
                     typ = stringify!($builtin),
                 );
 
@@ -303,6 +302,10 @@ macro_rules! builtin_impl {
 }
 
 builtin_impl! {
+    /// aaaaaaaa
+    ///  bbbbbbbb
+    ///  cccccccc
+    ///  dddddddd
     impl @string {
         fn bunk(
             thing: ref Range where ValueKey(a),

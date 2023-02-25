@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::os::windows::raw;
 use std::rc::Rc;
 use std::str::Chars;
 
@@ -205,28 +206,25 @@ impl Parser<'_> {
         // Remove trailing "
         chars.next_back();
 
-        let flags = chars
+        let raw_flags = chars
             .by_ref()
             .take_while(|c| !matches!(c, '"' | '\''))
             .collect::<String>();
+
         let mut out: String = chars.collect();
 
-        if flags.is_empty() {
-            return Ok(StringType {
-                s: StringContent::Normal(self.intern_string(self.parse_escapes(&mut out.chars())?)),
-                bytes: false,
-            });
-        }
-
-        let mut flags = flags.split('_').collect::<Vec<_>>();
+        let mut flags = raw_flags.split('_').collect::<Vec<_>>();
         let last = flags.pop().unwrap();
 
         if matches!(last, "r" | "r#" | "r##") {
             out = out[0..(out.len() - last.len() + 1)].into();
         } else {
-            flags.push(last);
-        }
+            out = self.parse_escapes(&mut out.chars())?;
 
+            if !raw_flags.is_empty() {
+                flags.push(last);
+            }
+        }
 
         let mut is_bytes = false;
 

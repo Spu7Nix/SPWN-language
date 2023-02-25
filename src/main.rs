@@ -95,10 +95,6 @@ const RUNNING_COLOR: u32 = 0xFF59C7;
 fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
 
-    // type_aliases::String.get_override("");
-
-    exit(0);
-
     let args = Arguments::parse();
     let mut spinner = Spinner::new();
 
