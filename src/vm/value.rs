@@ -29,7 +29,9 @@ pub struct StoredValue {
 }
 
 #[derive(Clone)]
-pub struct BuiltinFn(pub &'static dyn Fn(Vec<ValueKey>, &mut Vm, CodeArea) -> RuntimeResult<Value>);
+pub struct BuiltinFn(
+    pub &'static (dyn Fn(Vec<ValueKey>, &mut Vm, CodeArea) -> RuntimeResult<Value>),
+);
 
 #[derive(Clone, Debug)]
 pub enum MacroTarget {
@@ -181,6 +183,35 @@ macro_rules! value {
                 }
             }
         }
+
+        pub mod type_aliases {
+            use super::*;
+
+            pub trait TypeAliasDefaultThisIsNecessaryLOLItsSoThatItHasADefaultAndThenTheDirectImplInBuiltinUtilsOverwritesIt {
+                fn get_override(&self, name: &'static str) -> Option<BuiltinFn> {
+                    None
+                }
+            }
+
+
+            $(
+                pub struct $name;
+                impl TypeAliasDefaultThisIsNecessaryLOLItsSoThatItHasADefaultAndThenTheDirectImplInBuiltinUtilsOverwritesIt for $name {}
+            )*
+
+            impl ValueType {
+                pub fn get_override_func(self, name: &'static str) -> Option<BuiltinFn> {
+                    match self {
+                        $(
+                            Self::$name => type_aliases::$name.get_override(name),
+                        )*
+                        _ => unreachable!(),
+                    }
+                }
+            }
+
+        }
+        
 
         pub mod arg_aliases {
             use super::*;

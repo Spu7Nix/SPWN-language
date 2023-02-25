@@ -20,6 +20,7 @@ use std::fs;
 use std::io::Read;
 use std::ops::ControlFlow;
 use std::path::PathBuf;
+use std::process::exit;
 use std::rc::Rc;
 
 use clap::Parser as _;
@@ -42,6 +43,7 @@ use crate::util::{BasicError, HexColorize, RandomState};
 use crate::vm::context::{CallInfo, Context};
 use crate::vm::interpreter::{FuncCoord, Vm};
 use crate::vm::opcodes::{Opcode, Register};
+use crate::vm::value::{type_aliases, ValueType};
 
 const CORE_PATH: &str = "./libraries/core/";
 
@@ -92,6 +94,10 @@ const RUNNING_COLOR: u32 = 0xFF59C7;
 
 fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
+
+    // type_aliases::String.get_override("");
+
+    exit(0);
 
     let args = Arguments::parse();
     let mut spinner = Spinner::new();

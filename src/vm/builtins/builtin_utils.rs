@@ -1,8 +1,9 @@
 use std::marker::PhantomData;
+use std::sync::Mutex;
 
 use crate::sources::CodeArea;
 use crate::vm::interpreter::{RuntimeResult, ValueKey, Vm};
-use crate::vm::value::Value;
+use crate::vm::value::{BuiltinFn, Value, ValueType};
 
 pub trait Invoke<const N: usize, Args = ()> {
     fn invoke(&self, args: Vec<ValueKey>, vm: &mut Vm, area: CodeArea) -> RuntimeResult<Value>;
@@ -234,15 +235,13 @@ macro_rules! builtin_impl {
                     $(
                         $(
                             $var:ident $(: $(
-                                $(mut ref $mut_ref_variant:ident)?
                                 $(ref $ref_variant:ident)?
+                                $(*$val_variant:ident)?
                             )|+)?
                         )?
 
                         $(
-                            _: $(
-                                $variant:ident $(($($tok1:tt)*))? $({$($tok2:tt)*})?
-                            )|+
+                            _: $variant:ident $(($($tok1:tt)*))? $({$($tok2:tt)*})?
                         )?
 
                         $(where $($extra:ident($bind:ident))+)?
@@ -253,17 +252,37 @@ macro_rules! builtin_impl {
             )*
         }
     ) => {
-        #[cfg(test)]
-        pub mod $builtin {
+        paste::paste! {
+            impl $crate::vm::value::type_aliases::[<$builtin:camel>] {
+                /// <img src="https://cdn.discordapp.com/attachments/909974406850281472/1077264823802417162/lara-hughes-blahaj-spin-compressed.gif" width=64><img src="https://cdn.discordapp.com/attachments/909974406850281472/1077264823802417162/lara-hughes-blahaj-spin-compressed.gif" width=64>
+                pub fn get_override(self, name: &'static str) -> Option<BuiltinFn> {
+                    
+                    match name {
+                        $(
+                            stringify!($fn_name) => {
+                                fn inner(keys: Vec<ValueKey>, vm: &mut Vm, call_area: CodeArea) -> RuntimeResult<Value> {
+                                    // $(
+                                        
+                                    // )*
+                                    todo!()
+                                }
 
+                                Some($crate::vm::value::BuiltinFn(&inner))
+                            },
+                        )*
+                        _ => None
+                    }
+                }
+            }
+            
             #[test]
-            pub fn core_gen() {
+            pub fn [<$builtin _core_gen>]() {
                 //let (slf, line, col) = (file!(), line!(), column!());
                 let path = std::path::PathBuf::from(format!("{}{}{}", $crate::CORE_PATH, stringify!($builtin), ".spwn"));
                 let out = indoc::formatdoc!(r#"
                         {impl_raw}
                         #[doc("{impl_doc}")]
-                        impl @<> {{
+                        impl @{typ} {{
                             #[doc(...)]
                             <>
 
@@ -273,7 +292,8 @@ macro_rules! builtin_impl {
                     "#, 
                     impl_raw = stringify!($($($impl_raw)*)?),
                     // todo: it no unindent
-                    impl_doc = indoc::concatdoc!($($impl_doc, "\n"),*),
+                    impl_doc = indoc::concatdoc!("\n", $($impl_doc, "\n"),*),
+                    typ = stringify!($builtin),
                 );
 
                 std::fs::write(path, &out).unwrap();
@@ -283,12 +303,37 @@ macro_rules! builtin_impl {
 }
 
 builtin_impl! {
-    /// foo bar
-    /// # Example:
-    /// ```
-    ///     fn test() {}
-    /// ```
-    #[raw( #[deprecated] )]
     impl @string {
+        fn bunk(
+            thing: ref Range where ValueKey(a),
+            _: Range(start, end, step),
+            v: *Range | *Thing,
+            farter: ref Int,
+        ) {
+            // if let Some(ARange(....)) =
+            // farter.get_mut_ref() MutAInt
+        }
     }
 }
+
+enum Bop {
+    I(i64),
+    U(u64),
+}
+
+macro_rules! brappa {
+    (z) => {
+        Gaga()
+    };
+}
+
+fn cog(b: Bop) {
+    match b {
+        Bop::I { 0: h } => todo!(),
+        _ => todo!(),
+    }
+}
+// make!(Bubu: Int, Range)
+// enum Umbada {
+//     Gock {0: u64, 1: usize},
+// }
