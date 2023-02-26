@@ -1,25 +1,9 @@
 #[deprecated]
 #[doc(u" aaa")]
-impl @string {	
-	#[doc(u" bbb")]
-	A: @int = 0,	
-	#[doc(u"")]
-	B: @string = "a",
+impl @string {
     	
 	#[doc(u"")]
-	poo: (self) {
-    	/* compiler built-in */
-	},	
-	#[doc(u"")]
-	poo: (self) {
-    	/* compiler built-in */
-	},	
-	#[doc(u"")]
-	poo: (self) -> @test {
-    	/* compiler built-in */
-	},	
-	#[doc(u"")]
-	poo: (self, r: @thing, a: @a | @b, b: @c, c: @d, d: @e | @f | @g, ...e, f, g) -> @test {
+	poo: (self: @string, arg1: @int, arg2: @int, arg2: @range, arg4: @string | @float) {
     	/* compiler built-in */
 	},
 }

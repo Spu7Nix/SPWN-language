@@ -2,8 +2,9 @@
 
 use inflector::Inflector;
 use proc_macro::TokenStream as TokenStream1;
-use proc_macro2::{Ident, Literal, TokenStream};
+use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{format_ident, quote};
+use syn::ext::IdentExt;
 use syn::parse::{self, Parse, Parser, Peek};
 use syn::punctuated::Punctuated;
 use syn::{
@@ -80,21 +81,23 @@ impl Parse for TypeConstant {
 }
 
 #[derive(Debug)]
-struct Ref<T: Parse> {
-    name: T,
+struct Ref {
+    name: Ident,
     is_ref: bool,
-    is_mut: bool,
 }
 
-impl<T: Parse> Parse for Ref<T> {
+impl Parse for Ref {
     fn parse(input: parse::ParseStream) -> syn::Result<Self> {
-        let is_ref = input.parse::<Token![&]>().map_or(false, |_| true);
-        let is_mut = input.parse::<Token![mut]>().map_or(false, |_| true);
+        let mut is_ref = false;
+
+        if input.peek(Token![&]) {
+            input.parse::<Token![&]>()?;
+            is_ref = true;
+        };
 
         Ok(Self {
             name: input.parse()?,
             is_ref,
-            is_mut,
         })
     }
 }
@@ -114,77 +117,93 @@ impl Parse for MacroArgWhere {
 
         input.parse::<Token![where]>()?;
 
-        fn parse_bound<T: Parse, U: Parse>(input: parse::ParseStream) -> syn::Result<U> {
+        fn parse_bound<T: Parse, U: Parse>(input: parse::ParseStream) -> syn::Result<(U, bool)> {
             input.parse::<T>()?;
-            input.parse::<Token![:]>()?;
-            let out = input.parse::<U>()?;
+            let content;
+            parenthesized!(content in input);
+            let out = content.parse::<U>()?;
 
-            // if input.peek2(kw::Area) || input.peek2(kw::Key) {
-            //     input.parse::<Token![,]>()?;
-            // } else {
-            //     if input.peek(Token![,]) {
-            //         input.parse::<Token![,]>()?;
-            //         return Ok(out);
-            //     } else {
-            //         return syn_err!(input.span(); "expected key or area (requires trailing comma)");
-            //     }
-            // }
-
-            Ok(out)
-        }
-
-        // let mut area: Option<Ident> = None;
-        // let mut key: Option<Ident> = None;
-        // todo: make unordered?
-        let mut has_parsed_area = false;
-
-        let area = match parse_bound::<kw::Area, _>(input) {
-            Ok(a) => {
-                has_parsed_area = true;
-                Some(a)
+            if !input.peek(Ident::peek_any) {
+                return Ok((out, true));
             }
-            _ => None,
-        };
 
-        if has_parsed_area {
-            input.parse::<Token![,]>()?;
+            Ok((out, false))
         }
 
-        let key = match parse_bound::<kw::Key, _>(input) {
-            Ok(k) => Some(k),
-            _ => None,
-        };
+        let mut area = None;
+        let mut key = None;
 
-        // loop {
-        //     let lk = input.lookahead1();
-        //     if lk.peek(kw::Area) && area.is_none() {
-        //         area = Some(parse_bound::<kw::Area, _>(input)?);
-        //     } else if lk.peek(kw::Key) && key.is_none() {
-        //         key = Some(parse_bound::<kw::Key, _>(input)?);
-        //     } else if area.is_some() && key.is_some() && !input.is_empty() {
-        //         return Err(lk.error())?;
-        //     }
-
-        //     if input.is_empty() {
-        //         break;
-        //     }
-        // }
-
-        dbg!(&area, &key);
+        loop {
+            let lk = input.lookahead1();
+            if lk.peek(kw::Area) && area.is_none() {
+                let (a, brk) = parse_bound::<kw::Area, _>(input)?;
+                if brk {
+                    break;
+                } else {
+                    area = Some(a);
+                }
+            } else if lk.peek(kw::Key) && key.is_none() {
+                let (k, brk) = parse_bound::<kw::Key, _>(input)?;
+                if brk {
+                    break;
+                } else {
+                    key = Some(k);
+                }
+            } else {
+                return Err(lk.error());
+            }
+        }
 
         Ok(Self { area, key })
     }
 }
 
 #[derive(Debug)]
-struct Destructure(pub Punctuated<Ident, Token![,]>);
+enum DestructureKind {
+    Unit,
+    Struct,
+    Tuple,
+}
+
+#[derive(Debug)]
+struct Destructure {
+    kind: DestructureKind,
+    fields: Punctuated<Ident, Token![,]>,
+}
 
 impl Parse for Destructure {
     fn parse(input: parse::ParseStream) -> syn::Result<Self> {
         let content;
-        parenthesized!(content in input);
 
-        Ok(Self(Punctuated::parse_terminated(&content)?))
+        if input.peek(token::Paren) {
+            parenthesized!(content in input);
+
+            Ok(Self {
+                kind: DestructureKind::Tuple,
+                fields: Punctuated::parse_terminated(&content)?,
+            })
+        } else if input.peek(token::Brace) {
+            braced!(content in input);
+
+            Ok(Self {
+                kind: DestructureKind::Struct,
+                fields: Punctuated::parse_terminated(&content)?,
+            })
+        } else {
+            Ok(Self {
+                kind: DestructureKind::Unit,
+                fields: Punctuated::new(),
+            })
+        }
+    }
+}
+
+fn parse_ident_or_self(input: parse::ParseStream) -> syn::Result<Ident> {
+    if input.peek(Token![self]) {
+        input.parse::<Token![self]>()?;
+        Ok(Ident::new("self", input.span()))
+    } else {
+        input.parse()
     }
 }
 
@@ -198,7 +217,7 @@ enum ArgType {
     },
     Ref {
         binder: Ident,
-        tys: Punctuated<Ref<Ident>, Token![|]>,
+        tys: Punctuated<Ref, Token![|]>,
     },
     Any(Ident),
 }
@@ -222,7 +241,7 @@ impl Parse for ArgType {
             let name = input.parse()?;
             let fields = input.parse()?;
             input.parse::<Token![as]>()?;
-            let binder = input.parse()?;
+            let binder = parse_ident_or_self(input)?;
             Ok(Self::Destructure {
                 binder,
                 name,
@@ -255,7 +274,6 @@ impl Parse for MacroArg {
 #[derive(Debug)]
 struct TypeMacro {
     name: Ident,
-    slf: Ref<Token![self]>,
     args: Punctuated<MacroArg, Token![,]>,
     ret_ty: Option<Ident>,
     block: Block,
@@ -272,9 +290,6 @@ impl Parse for TypeMacro {
         let content;
         parenthesized!(content in input);
 
-        let slf = content.parse()?;
-        content.parse::<Token![,]>();
-
         let args = Punctuated::parse_terminated(&content)?;
 
         let ret_ty = if input.peek(Token![->]) {
@@ -286,7 +301,6 @@ impl Parse for TypeMacro {
 
         Ok(Self {
             name,
-            slf,
             args,
             ret_ty,
             block: input.parse()?,
@@ -388,8 +402,6 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
 
         let name = &m.name;
 
-        let slf = if m.args.len() > 0 { "self, " } else { "self" };
-
         let args = m
             .args
             .iter()
@@ -419,13 +431,12 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
         quote! {
             indoc::formatdoc!("\t{macro_raw}
                 \t#[doc(u{macro_doc:?})]
-                \t{macro_name}: ({macro_self}{macro_args}){macro_ret}{{
+                \t{macro_name}: ({macro_args}){macro_ret}{{
                     \t/* compiler built-in */
                 \t}},",
                 macro_raw = stringify!(#(#raw),*),
                 macro_doc = <[String]>::join(&[#(#docs .to_string()),*], "\n"),
                 macro_name = stringify!(#name),
-                macro_self = #slf,
                 macro_args = #args,
                 macro_ret = #ret_ty,
             )

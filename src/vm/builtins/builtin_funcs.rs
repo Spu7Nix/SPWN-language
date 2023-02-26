@@ -72,7 +72,7 @@ pub mod builtins {
     }
 
     pub fn add(
-        _self: ABuiltins,
+        gdfgsdf: ABuiltins,
         AObject(params, mode): AObject,
         ignore_context: ABool,
         vm: &mut Vm,

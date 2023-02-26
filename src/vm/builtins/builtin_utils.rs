@@ -390,31 +390,104 @@ macro_rules! builtin_impl {
 //     }
 // }
 
+/*
+
+
+fn poo(v: Vec<ValueKey>, vm: &mut Vm, area: CodeArea) -> RuntimeResult<Value> {
+    mod arg1 {
+        pub struct Arg1(i64);
+    }
+    use arg1::Arg1;
+
+    mod arg2 {
+        pub struct Arg2(i64);
+    }
+    use arg2::Arg2;
+
+    mod arg4 {
+        pub struct StringGetter(ValueKey);
+
+        pub struct StringRef<'a>(&'a String);
+        pub struct StringMutRef<'a>(&'a mut String);
+
+        impl StringGetter {
+            pub fn get_ref(&self, vm: &Vm) -> StringRef<'_> {
+                match &vm.memory[self.0].value {
+                    Value::String(s) => StringRef(s)
+                    _ => panic!("valuekey does not point to value of correct type !!!!!!!!")
+                }
+            }
+            pub fn get_mut_ref(&self, vm: &mut Vm) -> StringMutRef<'_> {
+                match &vm.memory[self.0].value {
+                    Value::String(s) => StringMutRef(s)
+                    _ => panic!("valuekey does not point to value of correct type !!!!!!!!")
+                }
+            }
+        }
+
+        pub enum Arg4 {
+            String(StringGetter),
+            Float(f64),
+        }
+    }
+    use arg4::Arg4;
+
+    let Value::String(s) = vm.memory[v[0]].value.clone() else {
+        unreachable!();
+    };
+    let arg1 = match vm.memory[v[0]].value
+
+}
+
+
+
+*/
+
+fn c() {
+    mod fuck {
+        pub const COCK: usize = 5;
+    }
+
+    let fuck = 3;
+    let bunk = fuck + 1;
+}
+
 spwn_codegen::def_type! {
     /// aaa
     #[raw( #[deprecated] )]
     impl @string {
         /// bbb
-        const A: Int = 0;
-        const B: String = "a";
-
-        fn poo(&self) {}
-        fn poo(&mut self) {}
-
-        /// ccc
-        fn poo(&self) -> Test {}
+        //const A = Int(0);
 
         fn poo(
-            &self,
-            Thing(a, b,) as r,
-            a: A | B,
-            b: &C,
-            c: &mut D,
-            d: E | &F | &mut G,
-            ...e,
-            f where Key: K,
-            g where Area: A, Key: K,
-        ) -> Test {}
+            String(s) as self,
+            arg1: Int,
+            arg2: &Int,
+            Range(start, end, step) as arg2 where Key(b_k),
+            arg4: &String | Float,
+        ) {
+            // block
+        }
+
+        // fn poo() {}
+
+        // fn poo(&self) {}
+
+        // /// ccc
+        // fn poo(&self) -> Test {}
+
+        // fn poo(
+        //     &self,
+        //     Thing1 as r,
+        //     Thing2 { a, b } as r,
+        //     Thing3(a, b) as r where Key(k),
+        //     a: A | B,
+        //     b: &C,
+        //     c: &D,
+        //     d: &E | &F |, // enum D { E(ERef), F(FRef) } .get_ref
+        //     ...e,
+        //     f where Key(k),
+        //     g where Area(a) Key(k),
+        // ) -> Test {}
     }
 }
-
