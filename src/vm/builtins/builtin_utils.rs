@@ -177,7 +177,7 @@ macro_rules! tuple_macro {
     };
 }
 
-tuple_macro! {A B C D}
+tuple_macro! { A B C D }
 
 //     impl @error {
 //         const TYPE_MISMATCH = Int(0);
@@ -228,50 +228,80 @@ macro_rules! builtin_impl {
         // temporary until 1.0
         $(#[raw($($impl_raw:tt)*)])?
         impl @$builtin:ident {
+            // $(
+                
+            //     $(#[doc = $adoc:literal])+
+            //     // temporary until 1.0
+            //     // $(#[raw($($doc_raw:tt)*)])?
+                
+            //     // $(
+            //     //     const $const_name:ident : $const_ty:ty = $const_val:literal;
+            //     // )?
+
+            //     // $(
+            //     //     fn $fn_name:ident (
+            //     //         $(
+            //     //             $(
+            //     //                 $var:ident $(: $(
+            //     //                     $(ref $ref_variant:ident)?
+            //     //                     $(*$val_variant:ident)?
+            //     //                 )|+)?
+            //     //             )?
+    
+            //     //             $(
+            //     //                 _: $variant:ident $(($($tok1:tt)*))? $({$($tok2:tt)*})?
+            //     //             )?
+    
+            //     //             $(where $($extra:ident($bind:ident))+)?
+    
+            //     //             ,
+            //     //         )*
+            //     //     ) $(-> $ret_type:ty)? $code:block
+            //     // )?
+            // )*
+
             $(
-                $(<{ $($fn_raw:tt)* }>)?
-                $(#[$fn_doc:meta])?
-                fn $fn_name:ident (
-                    $(
-                        $(
-                            $var:ident $(: $(
-                                $(ref $ref_variant:ident)?
-                                $(*$val_variant:ident)?
-                            )|+)?
-                        )?
+                $(#[doc = $adoc:literal])+
 
-                        $(
-                            _: $variant:ident $(($($tok1:tt)*))? $({$($tok2:tt)*})?
-                        )?
+                const $const_name:ident : $const_ty:ty = $const_val:literal;
+            )*
 
-                        $(where $($extra:ident($bind:ident))+)?
+            $(
+                $(#[doc = $adoc2:literal])+
 
-                        ,
-                    )*
-                ) $(-> $ret_type:ty)? $code:block
+                fn
             )*
         }
     ) => {
         paste::paste! {
             impl $crate::vm::value::type_aliases::[<$builtin:camel>] {
                 /// <img src="https://cdn.discordapp.com/attachments/909974406850281472/1077264823802417162/lara-hughes-blahaj-spin-compressed.gif" width=64><img src="https://cdn.discordapp.com/attachments/909974406850281472/1077264823802417162/lara-hughes-blahaj-spin-compressed.gif" width=64>
-                pub fn get_override(self, name: &'static str) -> Option<BuiltinFn> {
-                    
-                    match name {
-                        $(
-                            stringify!($fn_name) => {
-                                fn inner(keys: Vec<ValueKey>, vm: &mut Vm, call_area: CodeArea) -> RuntimeResult<Value> {
-                                    // $(
+                pub fn get_override_fn(self, name: &'static str) -> Option<BuiltinFn> {
+                    None
+                    // match name {
+                    //     $(
+                    //         stringify!($fn_name) => {
+                    //             fn inner(keys: Vec<ValueKey>, vm: &mut Vm, call_area: CodeArea) -> RuntimeResult<Value> {
+                    //                 // $(
                                         
-                                    // )*
-                                    todo!()
-                                }
+                    //                 // )*
+                    //                 todo!()
+                    //             }
 
-                                Some($crate::vm::value::BuiltinFn(&inner))
-                            },
-                        )*
-                        _ => None
-                    }
+                    //             Some($crate::vm::value::BuiltinFn(&inner))
+                    //         },
+                    //     )*
+                    //     _ => None
+                    // }
+                }
+                pub fn get_override_const(self, name: &'static str) -> Option<$crate::compiling::bytecode::Constant> {
+                    None
+                    // match name {
+                    //     $(
+                    //         stringify!($const_name) => Some($crate::compiling::bytecode::Constant::$const_ty($const_val)),
+                    //     )*
+                    //     _ => None,
+                    // }
                 }
             }
             
@@ -279,10 +309,39 @@ macro_rules! builtin_impl {
             pub fn [<$builtin _core_gen>]() {
                 //let (slf, line, col) = (file!(), line!(), column!());
                 let path = std::path::PathBuf::from(format!("{}{}.spwn", $crate::CORE_PATH, stringify!($builtin)));
+
+                // let consts = &[
+                //     $(
+                //         indoc::formatdoc!(r#"
+                //                 {const_raw}
+                //                 #[doc(u{const_doc:?})]
+                //                 {const_name}: @${const_type} = {const_val}
+                //             "#,
+                //             const_raw = stringify!($doc_raw)*),
+                //             const_doc = &[$($doc),*].join("\n"),
+                //             const_name = stringify!($const_name),
+                //             const_type = stringify!($const_type),
+                //             const_val = stringify!($const_val),
+                //         )
+                //     )*
+                // ];
+
+                let consts = &[
+                    $(
+                        indoc::formatdoc!(r#"
+                                #[doc(u{const_doc:?})]
+                            "#,
+                            const_doc = $doc,
+                        ),
+                    )*
+                ];
+
                 let out = indoc::formatdoc!(r#"
                         {impl_raw}
                         #[doc(u{impl_doc:?})]
                         impl @{typ} {{
+                            {consts}
+
                             #[doc(...)]
                             <>
 
@@ -293,6 +352,7 @@ macro_rules! builtin_impl {
                     impl_raw = stringify!($($($impl_raw)*)?),
                     impl_doc = &[$($impl_doc),*].join("\n"),
                     typ = stringify!($builtin),
+                    consts = consts.join("\n"),
                 );
 
                 std::fs::write(path, &out).unwrap();
@@ -301,42 +361,58 @@ macro_rules! builtin_impl {
     };
 }
 
-builtin_impl! {
-    /// aaaaaaaa
-    ///  bbbbbbbb
-    ///  cccccccc
-    ///  dddddddd
-    impl @string {
-        fn bunk(
-            thing: ref Range where ValueKey(a),
-            _: Range(start, end, step),
-            v: *Range | *Thing,
-            farter: ref Int,
-        ) {
-            // if let Some(ARange(....)) =
-            // farter.get_mut_ref() MutAInt
-        }
-    }
-}
+// builtin_impl! {
+//     /// aaaaaaaa
+//     /// bbbbbbbb
+//     /// cccccccc
+//     /// dddddddd
+//     impl @string {
+//         /// a
+//         /// b
+//         /**
 
-enum Bop {
-    I(i64),
-    U(u64),
-}
+//         bunky
 
-macro_rules! brappa {
-    (z) => {
-        Gaga()
-    };
-}
+//         */
+//         fn
+//         // #[raw( #[deprecated] )]
+//         // const A: Int = 0;
 
-fn cog(b: Bop) {
-    match b {
-        Bop::I { 0: h } => todo!(),
-        _ => todo!(),
-    }
-}
-// make!(Bubu: Int, Range)
-// enum Umbada {
-//     Gock {0: u64, 1: usize},
+//         // fn bunk(
+//         //     thing: ref Range where ValueKey(a),
+//         //     _: Range(start, end, step),
+//         //     v: *Range | *Thing,
+//         //     farter: ref Int,
+//         // ) {
+//         //     // if let Some(ARange(....)) =
+//         //     // farter.get_mut_ref() MutAInt
+//         // }
+//     }
 // }
+
+spwn_codegen::def_type! {
+    /// aaa
+    impl @string {
+        /// bbb
+        const A: Int = 0;
+        const B: Int = 0;
+
+        fn poo(&self) {}
+        fn poo(&mut self) {}
+
+        /// ccc
+        fn poo(&self) -> Test {}
+
+        fn poo(
+            &self,
+            Thing(a, b,),
+            r: Thing | Thing,
+            r: &Thing,
+            r: &mut Thing,
+            r: Thing | &Thing | &mut Thing,
+            ...r,
+            r where Key: K,
+            r where Area: A, Key: K
+        ) -> Test {}
+    }
+}

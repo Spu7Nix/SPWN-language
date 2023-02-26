@@ -3,6 +3,7 @@
 #![allow(clippy::type_complexity)] // shut the fuck up clippy Lmao
 #![allow(clippy::unit_arg)] // shut the fuck up clippy Lmao
 #![allow(clippy::too_many_arguments)] // shut the fuck up clippy Lmao
+#![allow(warnings)]
 
 mod cli;
 mod compiling;
@@ -94,6 +95,8 @@ const RUNNING_COLOR: u32 = 0xFF59C7;
 
 fn main() -> Result<(), Box<dyn Error>> {
     assert_eq!(4, std::mem::size_of::<Opcode<Register>>());
+
+    exit(0);
 
     let args = Arguments::parse();
     let mut spinner = Spinner::new();
