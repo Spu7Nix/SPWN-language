@@ -40,7 +40,7 @@ impl Parse for SpwnAttrs {
                     _ => syn_err!(r#"expected #[doc = "..."]"#),
                 });
             } else if attr.path == Path::parse.parse_str("raw").unwrap() {
-                raw.push(attr.tokens);
+                raw.push(attr.parse_args()?);
             }
         }
 
@@ -119,35 +119,58 @@ impl Parse for MacroArgWhere {
             input.parse::<Token![:]>()?;
             let out = input.parse::<U>()?;
 
-            if !input.peek(Token![,]) {
-                return syn_err!(input.span(); "expected comma");
-            }
+            // if input.peek2(kw::Area) || input.peek2(kw::Key) {
+            //     input.parse::<Token![,]>()?;
+            // } else {
+            //     if input.peek(Token![,]) {
+            //         input.parse::<Token![,]>()?;
+            //         return Ok(out);
+            //     } else {
+            //         return syn_err!(input.span(); "expected key or area (requires trailing comma)");
+            //     }
+            // }
 
             Ok(out)
         }
 
-        let mut area: Option<Ident> = None;
-        let mut key: Option<Ident> = None;
+        // let mut area: Option<Ident> = None;
+        // let mut key: Option<Ident> = None;
+        // todo: make unordered?
+        let mut has_parsed_area = false;
 
-        loop {
-            let lk = input.lookahead1();
-            if lk.peek(kw::Area) && area.is_none() {
-                area = Some(parse_bound::<kw::Area, _>(input)?)
-            } else if lk.peek(kw::Key) && key.is_none() {
-                area = Some(parse_bound::<kw::Key, _>(input)?)
-            } else if area.is_none() && key.is_none() {
-                return Err(lk.error());
-            } else {
-                break;
+        let area = match parse_bound::<kw::Area, _>(input) {
+            Ok(a) => {
+                has_parsed_area = true;
+                Some(a)
             }
-            //  else if area.is_none() && key.is_none() {
-            //     return Err(lk.error());
-            // }
+            _ => None,
+        };
 
-            if input.is_empty() {
-                break;
-            }
+        if has_parsed_area {
+            input.parse::<Token![,]>()?;
         }
+
+        let key = match parse_bound::<kw::Key, _>(input) {
+            Ok(k) => Some(k),
+            _ => None,
+        };
+
+        // loop {
+        //     let lk = input.lookahead1();
+        //     if lk.peek(kw::Area) && area.is_none() {
+        //         area = Some(parse_bound::<kw::Area, _>(input)?);
+        //     } else if lk.peek(kw::Key) && key.is_none() {
+        //         key = Some(parse_bound::<kw::Key, _>(input)?);
+        //     } else if area.is_some() && key.is_some() && !input.is_empty() {
+        //         return Err(lk.error())?;
+        //     }
+
+        //     if input.is_empty() {
+        //         break;
+        //     }
+        // }
+
+        dbg!(&area, &key);
 
         Ok(Self { area, key })
     }
@@ -169,7 +192,8 @@ impl Parse for Destructure {
 enum ArgType {
     Spread(Ident),
     Destructure {
-        name: Path,
+        binder: Ident,
+        name: Ident,
         fields: Destructure,
     },
     Ref {
@@ -195,9 +219,14 @@ impl Parse for ArgType {
             input.parse::<Token![...]>()?;
             Ok(Self::Spread(input.parse()?))
         } else {
+            let name = input.parse()?;
+            let fields = input.parse()?;
+            input.parse::<Token![as]>()?;
+            let binder = input.parse()?;
             Ok(Self::Destructure {
-                name: input.parse()?,
-                fields: input.parse()?,
+                binder,
+                name,
+                fields,
             })
         };
     }
@@ -228,7 +257,7 @@ struct TypeMacro {
     name: Ident,
     slf: Ref<Token![self]>,
     args: Punctuated<MacroArg, Token![,]>,
-    ret_ty: Option<Path>,
+    ret_ty: Option<Ident>,
     block: Block,
     attrs: SpwnAttrs,
 }
@@ -299,16 +328,18 @@ impl Parse for TypeImpl {
                     constants.push(c);
                     continue;
                 }
-                Err(e) => (),
-            };
+                Err(e) => {
+                    match TypeMacro::parse(&content) {
+                        Ok(m) => {
+                            macros.push(m);
+                            continue;
+                        }
+                        Err(e) => return Err(e),
+                    }
 
-            match TypeMacro::parse(&content) {
-                Ok(m) => {
-                    macros.push(m);
-                    continue;
+                    return Err(e);
                 }
-                Err(_) => syn_err!("expected macro or constant"),
-            }
+            };
         }
 
         Ok(Self {
@@ -339,16 +370,64 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
         let ty = format_ident!("{}", &c.ty.to_string().to_camel_case());
         let val = &c.value;
         quote! {
-            indoc::formatdoc!("
-                    \t{const_raw}
-                    \t#[doc(u{const_doc:?})]
-                    \t{const_name}: @{const_type} = {const_val},
-                ",
+            indoc::formatdoc!("\t{const_raw}
+                \t#[doc(u{const_doc:?})]
+                \t{const_name}: @{const_type} = {const_val},",
                 const_raw = stringify!(#(#raw),*),
                 const_doc = <[String]>::join(&[#(#docs .to_string()),*], "\n"),
                 const_name = stringify!(#name),
                 const_type = stringify!(#ty),
                 const_val = stringify!(#val),
+            )
+        }
+    });
+
+    let macros = ty_impl.macros.iter().map(|m| {
+        let raw = &m.attrs.raw;
+        let docs = &m.attrs.docs;
+
+        let name = &m.name;
+
+        let slf = if m.args.len() > 0 { "self, " } else { "self" };
+
+        let args = m
+            .args
+            .iter()
+            .map(|a| match &a.ty {
+                ArgType::Spread(t) => format!("...{t}"),
+                ArgType::Destructure { binder, name, .. } => {
+                    format!("{binder}: @{}", name.to_string().to_camel_case())
+                }
+                ArgType::Ref { binder, tys } => format!(
+                    "{binder}: {}",
+                    tys.iter()
+                        .map(|ty| format!("@{}", ty.name.to_string().to_camel_case()))
+                        .collect::<Vec<_>>()
+                        .join(" | ")
+                ),
+                ArgType::Any(t) => t.to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let ret_ty = if let Some(ty) = &m.ret_ty {
+            format!(" -> @{} ", ty.to_string().to_camel_case())
+        } else {
+            " ".into()
+        };
+
+        quote! {
+            indoc::formatdoc!("\t{macro_raw}
+                \t#[doc(u{macro_doc:?})]
+                \t{macro_name}: ({macro_self}{macro_args}){macro_ret}{{
+                    \t/* compiler built-in */
+                \t}},",
+                macro_raw = stringify!(#(#raw),*),
+                macro_doc = <[String]>::join(&[#(#docs .to_string()),*], "\n"),
+                macro_name = stringify!(#name),
+                macro_self = #slf,
+                macro_args = #args,
+                macro_ret = #ret_ty,
             )
         }
     });
@@ -371,14 +450,15 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
                 let out = indoc::formatdoc!(r#"
                         {impl_raw}
                         #[doc(u{impl_doc:?})]
-                        impl @{typ} {{
-                            {consts}
+                        impl @{typ} {{{consts}
+                            {macros}
                         }}
                     "#,
                     typ = stringify!(#name),
                     impl_raw = stringify!(#(#impl_raw),*),
                     impl_doc = <[String]>::join(&[#(#impl_doc .to_string()),*], "\n"),
-                    consts = <[String]>::join(&[#(#consts .to_string()),*], ""),
+                    consts = <[String]>::join(&[#(#consts),*], ""),
+                    macros = <[String]>::join(&[#(#macros),*], ""),
                 );
 
                 std::fs::write(path, &out).unwrap();

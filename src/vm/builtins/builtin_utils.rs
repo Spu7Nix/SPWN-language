@@ -392,6 +392,7 @@ macro_rules! builtin_impl {
 
 spwn_codegen::def_type! {
     /// aaa
+    #[raw( #[deprecated] )]
     impl @string {
         /// bbb
         const A: Int = 0;
@@ -405,14 +406,15 @@ spwn_codegen::def_type! {
 
         fn poo(
             &self,
-            Thing(a, b,),
-            r: Thing | Thing,
-            r: &Thing,
-            r: &mut Thing,
-            r: Thing | &Thing | &mut Thing,
-            ...r,
-            r where Key: K,
-            r where Area: A, Key: K
+            Thing(a, b,) as r,
+            a: A | B,
+            b: &C,
+            c: &mut D,
+            d: E | &F | &mut G,
+            ...e,
+            f where Key: K,
+            g where Area: A, Key: K,
         ) -> Test {}
     }
 }
+
