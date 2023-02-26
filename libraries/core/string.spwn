@@ -1,9 +1,11 @@
 
-#[doc(u" aaaaaaaa\n  bbbbbbbb\"\n  cccccccc#\"\n  dddddddd'")]
+#[doc(u" aaa")]
 impl @string {
-    #[doc(...)]
-    <>
+    	
+	#[doc(u" bbb")]
+	A: @int = 0,
+	
+	#[doc(u"")]
+	B: @string = "a",
 
-    #[doc(...)]
-    <>
 }

@@ -395,7 +395,7 @@ spwn_codegen::def_type! {
     impl @string {
         /// bbb
         const A: Int = 0;
-        const B: Int = 0;
+        const B: String = "a";
 
         fn poo(&self) {}
         fn poo(&mut self) {}

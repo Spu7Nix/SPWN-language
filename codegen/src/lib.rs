@@ -1,8 +1,9 @@
 #![allow(warnings)]
 
+use inflector::Inflector;
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::{Ident, Literal, TokenStream};
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::parse::{self, Parse, Parser, Peek};
 use syn::punctuated::Punctuated;
 use syn::{
@@ -50,7 +51,7 @@ impl Parse for SpwnAttrs {
 #[derive(Debug)]
 struct TypeConstant {
     name: Ident,
-    ty: Type,
+    ty: Ident,
     value: Expr,
     attrs: SpwnAttrs,
 }
@@ -58,12 +59,21 @@ struct TypeConstant {
 impl Parse for TypeConstant {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs: SpwnAttrs = input.parse()?;
-        let cnst: ItemConst = input.parse()?;
+
+        input.parse::<Token![const]>()?;
+        let name = input.parse()?;
+        input.parse::<Token![:]>()?;
+
+        let ty = input.parse()?;
+        input.parse::<Token![=]>()?;
+
+        let value = input.parse()?;
+        input.parse::<Token![;]>()?;
 
         Ok(Self {
-            name: cnst.ident,
-            ty: *cnst.ty,
-            value: *cnst.expr,
+            name,
+            ty,
+            value,
             attrs,
         })
     }
@@ -289,7 +299,7 @@ impl Parse for TypeImpl {
                     constants.push(c);
                     continue;
                 }
-                Err(e) => dbg!(e),
+                Err(e) => (),
             };
 
             match TypeMacro::parse(&content) {
@@ -314,5 +324,66 @@ impl Parse for TypeImpl {
 pub fn def_type(input: TokenStream1) -> TokenStream1 {
     let ty_impl = parse_macro_input!(input as TypeImpl);
 
-    TokenStream1::new()
+    let name = ty_impl.name;
+
+    let builtin_ident = format_ident!("{}", &name.to_string().to_pascal_case());
+    let core_gen_ident = format_ident!("gen_{}_core", &name);
+
+    let impl_doc = ty_impl.attrs.docs;
+    let impl_raw = ty_impl.attrs.raw;
+
+    let consts = ty_impl.constants.iter().map(|c| {
+        let raw = &c.attrs.raw;
+        let docs = &c.attrs.docs;
+        let name = &c.name;
+        let ty = format_ident!("{}", &c.ty.to_string().to_camel_case());
+        let val = &c.value;
+        quote! {
+            indoc::formatdoc!("
+                    \t{const_raw}
+                    \t#[doc(u{const_doc:?})]
+                    \t{const_name}: @{const_type} = {const_val},
+                ",
+                const_raw = stringify!(#(#raw),*),
+                const_doc = <[String]>::join(&[#(#docs .to_string()),*], "\n"),
+                const_name = stringify!(#name),
+                const_type = stringify!(#ty),
+                const_val = stringify!(#val),
+            )
+        }
+    });
+
+    quote! {
+        impl crate::vm::value::type_aliases::#builtin_ident {
+            pub fn get_override_fn(self, name: &'static str) -> Option<crate::vm::value::BuiltinFn> {
+                None
+            }
+            pub fn get_override_const(self, name: &'static str) -> Option<crate::compiling::bytecode::Constant> {
+                None
+            }
+        }
+
+        #[cfg(test)]
+        mod #core_gen_ident {
+            #[test]
+            pub fn #core_gen_ident() {
+                let path = std::path::PathBuf::from(format!("{}{}.spwn", crate::CORE_PATH, stringify!(#name)));
+                let out = indoc::formatdoc!(r#"
+                        {impl_raw}
+                        #[doc(u{impl_doc:?})]
+                        impl @{typ} {{
+                            {consts}
+                        }}
+                    "#,
+                    typ = stringify!(#name),
+                    impl_raw = stringify!(#(#impl_raw),*),
+                    impl_doc = <[String]>::join(&[#(#impl_doc .to_string()),*], "\n"),
+                    consts = <[String]>::join(&[#(#consts .to_string()),*], ""),
+                );
+
+                std::fs::write(path, &out).unwrap();
+            }
+        }
+    }
+    .into()
 }
