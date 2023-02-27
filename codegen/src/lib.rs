@@ -8,8 +8,8 @@ use syn::ext::IdentExt;
 use syn::parse::{self, Parse, Parser, Peek};
 use syn::punctuated::Punctuated;
 use syn::{
-    braced, parenthesized, parse_macro_input, token, Attribute, Block, Expr, ItemConst, Lit, Meta,
-    Path, Token, Type, Variant,
+    braced, parenthesized, parse_macro_input, token, Attribute, Block, Expr, ExprParen, ItemConst,
+    Lit, Meta, Path, Token, Type, Variant,
 };
 
 macro_rules! syn_err {
@@ -53,7 +53,7 @@ impl Parse for SpwnAttrs {
 struct TypeConstant {
     name: Ident,
     ty: Ident,
-    value: Expr,
+    exprs: Punctuated<Expr, Token![,]>,
     attrs: SpwnAttrs,
 }
 
@@ -63,18 +63,21 @@ impl Parse for TypeConstant {
 
         input.parse::<Token![const]>()?;
         let name = input.parse()?;
-        input.parse::<Token![:]>()?;
 
-        let ty = input.parse()?;
         input.parse::<Token![=]>()?;
 
-        let value = input.parse()?;
+        let ty: Ident = input.parse()?;
+        let content;
+        parenthesized!(content in input);
+
+        let exprs = Punctuated::parse_terminated(&content)?;
+
         input.parse::<Token![;]>()?;
 
         Ok(Self {
             name,
             ty,
-            value,
+            exprs,
             attrs,
         })
     }
@@ -377,12 +380,12 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
     let impl_doc = ty_impl.attrs.docs;
     let impl_raw = ty_impl.attrs.raw;
 
-    let consts = ty_impl.constants.iter().map(|c| {
+    let consts_core_gen = ty_impl.constants.iter().map(|c| {
         let raw = &c.attrs.raw;
         let docs = &c.attrs.docs;
         let name = &c.name;
         let ty = format_ident!("{}", &c.ty.to_string().to_camel_case());
-        let val = &c.value;
+        let val = "aa"; //&c.value;
         quote! {
             indoc::formatdoc!("\t{const_raw}
                 \t#[doc(u{const_doc:?})]
@@ -396,7 +399,35 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
         }
     });
 
-    let macros = ty_impl.macros.iter().map(|m| {
+    let mut macros_core_gen = vec![];
+    let mut macros_codegen = vec![];
+
+    for m in &ty_impl.macros {
+        let args = &m.args;
+
+        let arg_name = format!("{}", m.name.to_string().to_camel_case());
+
+        for a in args {
+            let sdfsdf = match &a.ty {
+                ArgType::Spread(_) => todo!(),
+                ArgType::Destructure {
+                    binder,
+                    name,
+                    fields,
+                } => todo!(),
+                ArgType::Ref { binder, tys } => {
+                    todo!()
+                }
+                ArgType::Any(_) => todo!(),
+            };
+
+            macros_codegen.push(quote! {
+                mod #arg_name {
+
+                }
+            })
+        }
+
         let raw = &m.attrs.raw;
         let docs = &m.attrs.docs;
 
@@ -428,7 +459,7 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
             " ".into()
         };
 
-        quote! {
+        macros_core_gen.push(quote! {
             indoc::formatdoc!("\t{macro_raw}
                 \t#[doc(u{macro_doc:?})]
                 \t{macro_name}: ({macro_args}){macro_ret}{{
@@ -440,8 +471,8 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
                 macro_args = #args,
                 macro_ret = #ret_ty,
             )
-        }
-    });
+        });
+    }
 
     quote! {
         impl crate::vm::value::type_aliases::#builtin_ident {
@@ -468,8 +499,8 @@ pub fn def_type(input: TokenStream1) -> TokenStream1 {
                     typ = stringify!(#name),
                     impl_raw = stringify!(#(#impl_raw),*),
                     impl_doc = <[String]>::join(&[#(#impl_doc .to_string()),*], "\n"),
-                    consts = <[String]>::join(&[#(#consts),*], ""),
-                    macros = <[String]>::join(&[#(#macros),*], ""),
+                    consts = <[String]>::join(&[#(#consts_core_gen),*], ""),
+                    macros = <[String]>::join(&[#(#macros_core_gen),*], ""),
                 );
 
                 std::fs::write(path, &out).unwrap();

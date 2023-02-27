@@ -11,7 +11,7 @@ use strum::EnumDiscriminants;
 
 use super::builtins::builtin_utils::IntoArg;
 use super::error::RuntimeError;
-use super::interpreter::{FuncCoord, RuntimeResult, ValueKey, Vm};
+use super::interpreter::{FuncCoord, RuntimeResult, ValueKey, Visibility, Vm};
 use super::pattern::ConstPattern;
 // use super::pattern::Pattern;
 use crate::compiling::bytecode::Constant;
@@ -137,6 +137,8 @@ impl IteratorData {
 #[rustfmt::skip]
 macro_rules! value {
     (
+        $_:tt
+        
         $(
             $(#[$($meta:meta)*] )?
             $name:ident
@@ -183,6 +185,55 @@ macro_rules! value {
                 }
             }
         }
+
+        // #[macro_export]
+        // macro_rules! make_wrapper {
+        //     // (
+        //     //     $stname:ident : $tyname:ident
+        //     // ) => {
+        //     //     struct make_wrapper!(@make_args $tyname);
+        //     // };
+
+
+        //     $(
+        //         ($stname:ident : $name) => {
+        //             struct $stname $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?;
+        //         };
+        //     )*
+            
+
+        //     (
+        //         $ename:ident : $_($tyname:ident)|+
+        //     ) => {
+
+        //         $_ (
+        //             make_wrapper!(@make_enum $_ ename $_ tyname);
+        //         )*
+
+        //         // enum GOck {
+        //         //     bob!(...)
+        //         // }
+
+        //         // enum $stname {
+        //         //     $_(
+        //         //         $tyname make_wrapper!(@make_args $tyname)
+        //         //     )+
+        //         // }
+        //     };
+        //     $(
+        //         (
+        //             @make_enum
+        //             $enum_name:ident
+        //             $name
+        //         ) => {
+        //             spwn_codegen::_make_wrapper_enum! {
+        //                 $enum_name $name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?
+        //             }
+        //             // (i64)
+        //             //$name $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?;
+        //         };
+        //     )*
+        // }
 
         pub mod type_aliases {
             use super::*;
@@ -424,9 +475,8 @@ impl ValueType {
     }
 }
 
-use super::interpreter::Visibility;
-
 value! {
+    $
     Int(i64),
     Float(f64),
     Bool(bool),

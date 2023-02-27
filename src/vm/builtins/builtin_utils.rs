@@ -395,7 +395,10 @@ macro_rules! builtin_impl {
 
 fn poo(v: Vec<ValueKey>, vm: &mut Vm, area: CodeArea) -> RuntimeResult<Value> {
     mod arg1 {
-        pub struct Arg1(i64);
+        pub struct Arg1 {
+            group: Id,
+            sfddsfsf: Id
+        };
     }
     use arg1::Arg1;
 
@@ -428,6 +431,10 @@ fn poo(v: Vec<ValueKey>, vm: &mut Vm, area: CodeArea) -> RuntimeResult<Value> {
         pub enum Arg4 {
             String(StringGetter),
             Float(f64),
+            TriggerFunction {
+                a: id,
+                b: id
+            }
         }
     }
     use arg4::Arg4;
@@ -435,59 +442,58 @@ fn poo(v: Vec<ValueKey>, vm: &mut Vm, area: CodeArea) -> RuntimeResult<Value> {
     let Value::String(s) = vm.memory[v[0]].value.clone() else {
         unreachable!();
     };
-    let arg1 = match vm.memory[v[0]].value
+    let arg1 = match vm.memory[v[0]].value {
+        Value::TriggerFunction {
+            group, dfsfsdf
+        } => Arg1 { group, dfsfsfsfsgr},
+        ...
+    }
 
 }
 
-
+match arg4.get() {
+    AFloat(f) =>
+}
 
 */
 
-fn c() {
-    mod fuck {
-        pub const COCK: usize = 5;
-    }
 
-    let fuck = 3;
-    let bunk = fuck + 1;
-}
+// spwn_codegen::def_type! {
+//     /// aaa
+//     #[raw( #[deprecated] )]
+//     impl @string {
+//         /// bbb
+//         const A = Range(0, 0, 0);
 
-spwn_codegen::def_type! {
-    /// aaa
-    #[raw( #[deprecated] )]
-    impl @string {
-        /// bbb
-        //const A = Int(0);
+//         fn poo(
+//             String(s) as self,
+//             arg1: Int, Int
+//             arg2: &Int,
+//             Range(start, end, step) as arg2 where Key(b_k),
+//             arg4: &String | AFloat,
+//         ) {
+//             // block
+//         }
 
-        fn poo(
-            String(s) as self,
-            arg1: Int,
-            arg2: &Int,
-            Range(start, end, step) as arg2 where Key(b_k),
-            arg4: &String | Float,
-        ) {
-            // block
-        }
+//         // fn poo() {}
 
-        // fn poo() {}
+//         // fn poo(&self) {}
 
-        // fn poo(&self) {}
+//         // /// ccc
+//         // fn poo(&self) -> Test {}
 
-        // /// ccc
-        // fn poo(&self) -> Test {}
-
-        // fn poo(
-        //     &self,
-        //     Thing1 as r,
-        //     Thing2 { a, b } as r,
-        //     Thing3(a, b) as r where Key(k),
-        //     a: A | B,
-        //     b: &C,
-        //     c: &D,
-        //     d: &E | &F |, // enum D { E(ERef), F(FRef) } .get_ref
-        //     ...e,
-        //     f where Key(k),
-        //     g where Area(a) Key(k),
-        // ) -> Test {}
-    }
-}
+//         // fn poo(
+//         //     &self,
+//         //     Thing1 as r,
+//         //     Thing2 { a, b } as r,
+//         //     Thing3(a, b) as r where Key(k),
+//         //     a: A | B,
+//         //     b: &C,
+//         //     c: &D,
+//         //     d: &E | &F |, // enum D { E(ERef), F(FRef) } .get_ref
+//         //     ...e,
+//         //     f where Key(k),
+//         //     g where Area(a) Key(k),
+//         // ) -> Test {}
+//     }
+// }
