@@ -202,6 +202,12 @@ macro_rules! value {
                             $( ( $( $_(&'a $_($m)?)? $t0, )* std::marker::PhantomData<&'a ()>); )?
                             $( { $( $n: $_(&'a $_($m)?)? $t1 ,)* _pd: std::marker::PhantomData<&'a ()> } )?
                     };
+
+                    (
+                        @match_arm ($_($t:tt)*) $aname:ident -> ($_($t2:tt)*)
+                    ) => {
+                        stringify!($_($t)* $aname => $_($t2:tt)* $aname $( ( $( $t0 ),* ) )? $( { $( $n: $t1 ,)* } )?);
+                    };
                 )*
 
                 (
@@ -209,7 +215,6 @@ macro_rules! value {
                 ) => {
                     use eager::*;
                     eager! {
-                        // use $crate::vm::value::gen_wrapper as bonkle;
                         $v enum $ename {
                             $_ (
                                 $tys gen_wrapper!( $tys ),
@@ -218,6 +223,26 @@ macro_rules! value {
                             $_(
                                 $extra ( $_($t)* ),
                             )*
+                        }
+                    }
+                };
+
+                (
+                    match $e:expr => ($p:path) $_($ty:ident)*
+                ) => {
+                    use eager::*;
+                    
+                    // eager! {
+                    //     $_(
+                    //         gen_wrapper!($ty);
+                    //     )*
+                    // }
+                    eager! {
+                        match $e {
+                            $_(
+                                gen_wrapper! { @match_arm ($crate::vm::value::) $ty -> ($p) },
+                            )*
+                            _ => unreachable!(),
                         }
                     }
                 };
