@@ -92,7 +92,7 @@ impl std::fmt::Debug for Constant {
             Constant::Bool(v) => write!(f, "{v}"),
             Constant::String(v) => write!(f, "{v:?}"),
             Constant::Id(class, n) => write!(f, "{}{}", n, class.letter()),
-            Constant::Type(_) => write!(f, "@<type>"),
+            Constant::Type(t) => write!(f, "@{}", <ValueType as Into<&'static str>>::into(*t)),
             Constant::Array(arr) => write!(f, "{arr:?}"),
             Constant::Dict(m) => write!(f, "{m:?}"),
 

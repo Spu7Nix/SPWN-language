@@ -4,6 +4,14 @@
 */
 
 #[doc(u"")]
-impl @string {
-    
+impl @string {	
+	#[doc(u"")]
+	POO: @int = 10,	
+	#[doc(u"")]
+	FOO: @string = "aaaa",
+	
+	#[doc(u"")]
+	poo: (self: @string, arg1: @int | @range, arg2: @int, arg2: @range, arg4: @string | @float) -> @todo {
+    	/* compiler built-in */
+	},
 }
